@@ -1,0 +1,15 @@
+name: Publish 'latest' image
+
+on:
+  release:
+    types:
+      - 'created'
+
+jobs:
+  social-service-ea-deployment:
+    uses: decentraland/platform-actions/.github/workflows/apps-docker-release.yml@main
+    with:
+      service-name: social-service-ea
+      image-name: social-service-ea
+      deployment-environment: prd
+    secrets: inherit
