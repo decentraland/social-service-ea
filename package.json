@@ -1,13 +1,19 @@
 {
-  "name": "template-server",
+  "name": "social-service-ea",
+  "license": "Apache-2.0",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
-    "test": "jest --forceExit --detectOpenHandles --coverage --verbose"
+    "test": "jest --forceExit --detectOpenHandles --coverage --verbose",
+    "migrate": "node-pg-migrate --database-url-var PG_COMPONENT_PSQL_CONNECTION_STRING --envPath .env -j ts --tsconfig tsconfig.json -m ./src/migrations",
+    "lint:check": "eslint '**/*.{js,ts}'",
+    "lint:fix": "eslint '**/*.{js,ts}' --fix"
   },
   "devDependencies": {
+    "@dcl/eslint-config": "^2.0.0",
     "@types/node": "^20.11.28",
     "@well-known-components/test-helpers": "^1.5.6",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.2"
   },
   "prettier": {
@@ -22,6 +28,8 @@
     "@well-known-components/http-server": "^2.1.0",
     "@well-known-components/interfaces": "^1.4.3",
     "@well-known-components/logger": "^3.1.3",
-    "@well-known-components/metrics": "^2.1.0"
+    "@well-known-components/metrics": "^2.1.0",
+    "@well-known-components/pg-component": "^0.2.2",
+    "@well-known-components/uws-http-server": "^0.0.1-20240314125425.commit-711dd8f"
   }
 }
