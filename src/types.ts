@@ -8,7 +8,7 @@ import type {
 } from '@well-known-components/interfaces'
 import { IPgComponent } from '@well-known-components/pg-component'
 import { metricDeclarations } from './metrics'
-import { IDBComponent } from './adapters/db'
+import { IDatabaseComponent } from './adapters/db'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -21,7 +21,7 @@ export type BaseComponents = {
   server: IHttpServerComponent<GlobalContext>
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   pg: IPgComponent
-  db: IDBComponent
+  db: IDatabaseComponent
 }
 
 // components used in runtime

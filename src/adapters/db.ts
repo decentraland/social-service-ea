@@ -1,7 +1,7 @@
 import { AppComponents } from '../types'
 
-export interface IDBComponent {}
+export interface IDatabaseComponent {}
 
-export function createDBComponent({ pg, logs }: Pick<AppComponents, 'pg' | 'logs'>): IDBComponent {
+export function createDBComponent({ pg, logs }: Pick<AppComponents, 'pg' | 'logs'>): IDatabaseComponent {
   return {}
 }
