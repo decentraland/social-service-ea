@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@dcl/eslint-config": "^2.0.0",
+    "@protobuf-ts/protoc": "^2.9.4",
     "@types/node": "^20.11.28",
     "@types/ws": "^8.5.10",
     "@well-known-components/test-helpers": "^1.5.6",

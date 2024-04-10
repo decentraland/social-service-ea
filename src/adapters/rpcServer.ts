@@ -3,8 +3,10 @@ import { registerService } from '@dcl/rpc/dist/codegen'
 import {
   FriendshipsServiceDefinition,
   UsersResponse,
-  SubscribeFriendshipEventsUpdatesResponse
-} from '@dcl/protocol/out-ts/decentraland/social/friendships_ea/friendships_ea.gen'
+  SubscribeFriendshipEventsUpdatesResponse,
+  RequestEventsResponse,
+  UpdateFriendshipResponse
+} from '../friendships_ea'
 import { AppComponents, RpcServerContext } from '../types'
 
 export default function createRpcServerComponent(components: Pick<AppComponents, 'logs'>) {
@@ -15,16 +17,13 @@ export default function createRpcServerComponent(components: Pick<AppComponents,
   })
 
   const _logger = logs.getLogger('rpc-server-handler')
-  // Mocked server until we get the new service definition done
+  // Mocked server until we get the new service definition & db queries done
   server.setHandler(async function handler(port) {
     registerService(port, FriendshipsServiceDefinition, async () => ({
       getFriends(_request, _context) {
         const generator = async function* () {
           const response: UsersResponse = {
-            response: {
-              $case: 'users',
-              users: { users: [] }
-            }
+            users: { users: [] }
           }
           yield response
         }
@@ -34,10 +33,7 @@ export default function createRpcServerComponent(components: Pick<AppComponents,
       getMutualFriends(_request, _context) {
         const generator = async function* () {
           const response: UsersResponse = {
-            response: {
-              $case: 'users',
-              users: { users: [] }
-            }
+            users: { users: [] }
           }
           yield response
         }
@@ -45,41 +41,31 @@ export default function createRpcServerComponent(components: Pick<AppComponents,
         return generator()
       },
       async getRequestEvents(_request, _context) {
-        return {
-          response: {
-            $case: 'events',
-            events: {
-              outgoing: { total: 0, items: [] },
-              incoming: { total: 0, items: [] }
-            }
+        const res: RequestEventsResponse = {
+          events: {
+            outgoing: { items: [], total: 0 },
+            incoming: { items: [], total: 0 }
           }
         }
+        return res
       },
       async updateFriendshipEvent(_request, _context) {
-        return {
-          response: {
-            $case: 'event',
-            event: {
-              body: {
-                $case: 'accept',
-                accept: {
-                  user: {
-                    address: '0xA'
-                  }
-                }
+        const res: UpdateFriendshipResponse = {
+          event: {
+            accept: {
+              user: {
+                address: '0xa'
               }
             }
           }
         }
+        return res
       },
       subscribeFriendshipEventsUpdates(_request, _context) {
         const generator = async function* () {
           const response: SubscribeFriendshipEventsUpdatesResponse = {
-            response: {
-              $case: 'events',
-              events: {
-                responses: []
-              }
+            events: {
+              responses: []
             }
           }
           yield response
