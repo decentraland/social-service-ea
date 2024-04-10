@@ -51,8 +51,7 @@ export async function wsHandler(context: IHttpServerComponent.DefaultContext<Glo
       ws.removeEventListener('message', receiveAuthchainAsFirstMessage)
 
       const authchainVerifyResult = await verify('get', '/', authChain, {
-        fetcher,
-        expiration: 1000 * 240
+        fetcher
       })
 
       const wsTransport = WebSocketTransport(socket)
