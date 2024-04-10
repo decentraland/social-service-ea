@@ -9,6 +9,8 @@ import type {
 import { IPgComponent } from '@well-known-components/pg-component'
 import { metricDeclarations } from './metrics'
 import { IDatabaseComponent } from './adapters/db'
+import { WebSocketServer } from 'ws'
+import { RpcServer } from '@dcl/rpc'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -22,6 +24,9 @@ export type BaseComponents = {
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   pg: IPgComponent
   db: IDatabaseComponent
+  ws: IWebSocketComponent
+  rpcServer: RpcServer<RpcServerContext>
+  fetcher: IFetchComponent
 }
 
 // components used in runtime
@@ -47,3 +52,9 @@ export type HandlerContextWithPath<
 >
 
 export type Context<Path extends string = any> = IHttpServerComponent.PathAwareContext<GlobalContext, Path>
+
+export type IWebSocketComponent = IBaseComponent & {
+  ws: WebSocketServer
+}
+
+export type RpcServerContext = GlobalContext & { address: string }
