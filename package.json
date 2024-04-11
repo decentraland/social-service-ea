@@ -38,7 +38,7 @@
     "@well-known-components/logger": "^3.1.3",
     "@well-known-components/metrics": "^2.1.0",
     "@well-known-components/pg-component": "^0.2.2",
-    "@well-known-components/uws-http-server": "^0.0.1-20240314125425.commit-711dd8f",
+    "@well-known-components/uws-http-server": "^0.0.2",
     "fp-future": "^1.0.1",
     "ws": "^8.16.0"
   }

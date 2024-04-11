@@ -1166,10 +1166,10 @@
     sinon "^17.0.0"
     ts-jest "^29.1.0"
 
-"@well-known-components/uws-http-server@^0.0.1-20240314125425.commit-711dd8f":
-  version "0.0.1-20240318121702.commit-ac5a332"
-  resolved "https://registry.yarnpkg.com/@well-known-components/uws-http-server/-/uws-http-server-0.0.1-20240318121702.commit-ac5a332.tgz#d74b59ad6b9ce439ea9dc81eced047f3512069e5"
-  integrity sha512-eT6bPvpxB6k9bw9uJCejtq1/JNzzbD3i6aWmTUWI7ZTTR60kBRvN7sRv5qVo7tcrBYwfvUVe3TgZ7H3Q6GoxSw==
+"@well-known-components/uws-http-server@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@well-known-components/uws-http-server/-/uws-http-server-0.0.2.tgz#5ba577fd895bd63b67936b15f7803b2b7e9c1149"
+  integrity sha512-zwq7kpXnr+ml3py1bcuU3ILOGVO+6tg5e8+pf01G2wudWQlLMV3Cp66/U8tlrAFgIo5Ob7ZQmKdAnCQpHm9gFA==
   dependencies:
     "@well-known-components/interfaces" "^1.4.3"
     uWebSockets.js "github:uNetworking/uWebSockets.js#v20.43.0"
