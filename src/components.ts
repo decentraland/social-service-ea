@@ -11,14 +11,22 @@ import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createPgComponent } from '@well-known-components/pg-component'
 import { createDBComponent } from './adapters/db'
+import { createWsComponent } from './adapters/ws'
+import createRpcServerComponent from './adapters/rpcServer'
+import { createFetchComponent } from '@well-known-components/fetch-component'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
   const config = await createDotEnvConfigComponent({ path: ['.env.default', '.env'] })
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ metrics })
-  const server = await createServerComponent<GlobalContext>({ config, logs }, {})
+
+  const ws = await createWsComponent()
+  const server = await createServerComponent<GlobalContext>({ config, logs, ws: ws.ws }, {})
   const statusChecks = await createStatusCheckComponent({ server, config })
+  const rpcServer = createRpcServerComponent({ logs })
+
+  const fetcher = createFetchComponent()
 
   let databaseUrl: string | undefined = await config.getString('PG_COMPONENT_PSQL_CONNECTION_STRING')
   if (!databaseUrl) {
@@ -54,6 +62,9 @@ export async function initComponents(): Promise<AppComponents> {
     statusChecks,
     metrics,
     pg,
-    db
+    db,
+    ws,
+    rpcServer,
+    fetcher
   }
 }
