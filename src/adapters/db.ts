@@ -32,9 +32,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       let query: SQLStatement
 
       if (onlyActive) {
-        query = SQL`SELECT * FROM friendships WHERE (LOWER(address_requester) = LOWER(${userAddress}) OR LOWER(address_requester) = LOWER(${userAddress})) AND is_active = true`
+        query = SQL`SELECT * FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress}) AND is_active = true`
       } else {
-        query = SQL`SELECT * FROM friendships WHERE (LOWER(address_requester) = LOWER(${userAddress}) OR LOWER(address_requester) = LOWER(${userAddress}))`
+        query = SQL`SELECT * FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
       }
 
       const generator = pg.streamQuery<Friendship>(query)
@@ -46,7 +46,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         SQL`WITH friendsA as (
           SELECT
             CASE
-              WHEN LOWER(address_requester) = LOWER(${userAddress1}) then address_requested
+              WHEN address_requester = ${userAddress1} then address_requested
               else address_requester
             end as address
           FROM
@@ -57,8 +57,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
                 friendships f_a
               where
                 (
-                  LOWER(f_a.address_requester) = LOWER(${userAddress1})
-                  or LOWER(f_a.address_requested) = LOWER(${userAddress1})
+                  f_a.address_requester = ${userAddress1}
+                  or f_a.address_requested = ${userAddress1}
                 ) and f_a.is_active = true
             ) as friends_a
         )
@@ -70,7 +70,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
           address IN (
             SELECT
               CASE
-                WHEN LOWER(address_requester) = LOWER(${userAddress2}) then address_requested
+                WHEN address_requester = ${userAddress2} then address_requested
                 else address_requester
               end as address_a
             FROM
@@ -81,8 +81,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
                   friendships f_b
                 where
                   (
-                    LOWER(f_b.address_requester) = LOWER(${userAddress2})
-                    or LOWER(f_b.address_requested) = LOWER(${userAddress2})
+                    f_b.address_requester = ${userAddress2}
+                    or f_b.address_requested = ${userAddress2}
                   ) and f_b.is_active = true
               ) as friends_b
           );`
@@ -95,9 +95,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query = SQL`
         SELECT * FROM friendships 
           WHERE 
-          (LOWER(address_requester) = LOWER(${userAddress1}) AND LOWER(address_requested) = LOWER(${userAddress2})) 
+          (address_requester = ${userAddress1} AND address_requested = ${userAddress2}) 
           OR 
-          (LOWER(address_requester) = LOWER(${userAddress2}) AND LOWER(address_requested) = LOWER(${userAddress1}))
+          (address_requester = ${userAddress2} AND address_requested = ${userAddress1})
       `
 
       const results = await pg.query<Friendship>(query)

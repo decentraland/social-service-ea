@@ -9,6 +9,7 @@ import {
   FriendshipStatus,
   SubscriptionEventsEmitter
 } from '../types'
+import { normalizeAddress } from '../utils/address'
 
 export function isFriendshipActionValid(from: Action | null, to: Action) {
   return FRIENDSHIP_ACTION_TRANSITIONS[to].includes(from)
@@ -79,27 +80,27 @@ export function parseUpsertFriendshipRequest(request: UpsertFriendshipPayload): 
     case 'accept':
       return {
         action: Action.ACCEPT,
-        user: request.action.accept.user!.address
+        user: normalizeAddress(request.action.accept.user!.address)
       }
     case 'cancel':
       return {
         action: Action.CANCEL,
-        user: request.action.cancel.user!.address
+        user: normalizeAddress(request.action.cancel.user!.address)
       }
     case 'delete':
       return {
         action: Action.DELETE,
-        user: request.action.delete.user!.address
+        user: normalizeAddress(request.action.delete.user!.address)
       }
     case 'reject':
       return {
         action: Action.REJECT,
-        user: request.action.reject.user!.address
+        user: normalizeAddress(request.action.reject.user!.address)
       }
     case 'request':
       return {
         action: Action.REQUEST,
-        user: request.action.request.user!.address,
+        user: normalizeAddress(request.action.request.user!.address),
         metadata: request.action.request.message ? { message: request.action.request.message } : null
       }
     default:

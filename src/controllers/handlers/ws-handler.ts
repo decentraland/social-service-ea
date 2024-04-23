@@ -5,6 +5,7 @@ import { WebSocketTransport } from '@dcl/rpc/dist/transports/WebSocket'
 import future from 'fp-future'
 import { verify } from '@dcl/platform-crypto-middleware'
 import { GlobalContext } from '../../types'
+import { normalizeAddress } from '../../utils/address'
 
 export async function wsHandler(context: IHttpServerComponent.DefaultContext<GlobalContext>) {
   const { logs, rpcServer, fetcher } = context.components
@@ -57,7 +58,7 @@ export async function wsHandler(context: IHttpServerComponent.DefaultContext<Glo
 
       logger.debug('addresss > ', { address: authchainVerifyResult.auth })
 
-      const address = authchainVerifyResult.auth.toLowerCase()
+      const address = normalizeAddress(authchainVerifyResult.auth)
 
       rpcServer.attachUser({ transport: wsTransport, address })
 

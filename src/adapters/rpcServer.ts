@@ -18,6 +18,7 @@ import {
   validateNewFriendshipAction
 } from '../logic/friendships'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
+import { normalizeAddress } from '../utils/address'
 
 export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
@@ -89,7 +90,7 @@ export default async function createRpcServerComponent(
         logger.debug(`getting mutual friends ${context.address}<>${request.user!.address}`)
         let mutualFriends: AsyncGenerator<{ address: string }> | undefined
         try {
-          mutualFriends = db.getMutualFriends(context.address, request.user!.address)
+          mutualFriends = db.getMutualFriends(context.address, normalizeAddress(request.user!.address))
         } catch (error) {
           logger.error(error as any)
           // throw an error bc there is no sense to create a generator to send an error
