@@ -253,7 +253,7 @@ describe('parseUpsertFriendshipRequest()', () => {
       })
     ).toEqual({
       action: Action.ACCEPT,
-      user: '0xA'
+      user: '0xa'
     })
   })
 
@@ -271,7 +271,7 @@ describe('parseUpsertFriendshipRequest()', () => {
       })
     ).toEqual({
       action: Action.CANCEL,
-      user: '0xA'
+      user: '0xa'
     })
   })
 
@@ -289,7 +289,7 @@ describe('parseUpsertFriendshipRequest()', () => {
       })
     ).toEqual({
       action: Action.DELETE,
-      user: '0xA'
+      user: '0xa'
     })
   })
 
@@ -307,7 +307,7 @@ describe('parseUpsertFriendshipRequest()', () => {
       })
     ).toEqual({
       action: Action.REJECT,
-      user: '0xA'
+      user: '0xa'
     })
   })
 
@@ -325,7 +325,7 @@ describe('parseUpsertFriendshipRequest()', () => {
       })
     ).toEqual({
       action: Action.REQUEST,
-      user: '0xA',
+      user: '0xa',
       metadata: null
     })
 
@@ -343,7 +343,7 @@ describe('parseUpsertFriendshipRequest()', () => {
       })
     ).toEqual({
       action: Action.REQUEST,
-      user: '0xA',
+      user: '0xa',
       metadata: {
         message: 'Hi!'
       }
