@@ -159,7 +159,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         SELECT f.address_requester as address, fa.timestamp, fa.metadata FROM friendships f
           INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
           WHERE 
-            (LOWER(f.address_requested)) = LOWER(${userAddress})
+            f.address_requested = ${userAddress}
             AND fa.action = 'request'
             AND f.is_active IS FALSE
             AND fa.timestamp = (
@@ -178,7 +178,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         SELECT f.address_requested as address, fa.timestamp, fa.metadata FROM friendships f
           INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
           WHERE 
-            (LOWER(f.address_requester)) = LOWER(${userAddress})
+            f.address_requester = ${userAddress}
             AND fa.action = 'request'
             AND f.is_active IS FALSE
             AND fa.timestamp = (
