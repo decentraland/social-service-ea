@@ -11,7 +11,7 @@ import { WebSocketServer } from 'ws'
 import { Emitter } from 'mitt'
 import { metricDeclarations } from './metrics'
 import { IDatabaseComponent } from './adapters/db'
-import { IRedisComponent } from './ports/redis'
+import { IRedisComponent } from './adapters/redis'
 import { IRPCServerComponent } from './adapters/rpcServer'
 import { IPubSubComponent } from './adapters/pubsub'
 

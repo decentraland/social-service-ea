@@ -12,9 +12,9 @@ import { createPgComponent } from '@well-known-components/pg-component'
 import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createDBComponent } from './adapters/db'
-import { createWsComponent } from './ports/ws'
+import { createWsComponent } from './adapters/ws'
 import createRpcServerComponent from './adapters/rpcServer'
-import createRedisComponent from './ports/redis'
+import createRedisComponent from './adapters/redis'
 import createPubSubComponent from './adapters/pubsub'
 
 // Initialize all the components of the app
