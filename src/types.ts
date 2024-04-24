@@ -14,6 +14,8 @@ import { IDatabaseComponent } from './adapters/db'
 import { IRedisComponent } from './adapters/redis'
 import { IRPCServerComponent } from './adapters/rpcServer'
 import { IPubSubComponent } from './adapters/pubsub'
+import { HttpRequest, HttpResponse, IUWsComponent, WebSocket } from '@well-known-components/uws-http-server'
+import { IUWebSocketEventMap } from './utils/UWebSocketTransport'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -23,11 +25,10 @@ export type GlobalContext = {
 export type BaseComponents = {
   config: IConfigComponent
   logs: ILoggerComponent
-  server: IHttpServerComponent<GlobalContext>
+  server: IUWsComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   pg: IPgComponent
   db: IDatabaseComponent
-  ws: IWebSocketComponent
   rpcServer: IRPCServerComponent
   fetcher: IFetchComponent
   redis: IRedisComponent
@@ -35,15 +36,42 @@ export type BaseComponents = {
 }
 
 // components used in runtime
-export type AppComponents = BaseComponents & {
-  statusChecks: IBaseComponent
-}
+export type AppComponents = BaseComponents
 
 // components used in tests
 export type TestComponents = BaseComponents & {
   // A fetch component that only hits the test server
   localFetch: IFetchComponent
 }
+
+export type JsonBody = Record<string, any>
+export type ResponseBody = JsonBody | string
+
+export type IHandlerResult = {
+  status?: number
+  headers?: Record<string, string>
+  body?: ResponseBody
+}
+
+export type IHandler = {
+  path: string
+  f: (res: HttpResponse, req: HttpRequest) => Promise<IHandlerResult>
+}
+
+export type WsUserData =
+  | {
+      isConnected: boolean
+      auth: false
+      timeout?: NodeJS.Timeout
+    }
+  | {
+      isConnected: boolean
+      eventEmitter: Emitter<IUWebSocketEventMap>
+      auth: true
+      address: string
+    }
+
+export type InternalWebSocket = WebSocket<WsUserData>
 
 // this type simplifies the typings of http handlers
 export type HandlerContextWithPath<
