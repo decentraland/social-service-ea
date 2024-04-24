@@ -5,6 +5,8 @@ import { AppComponents, WsUserData } from '../../types'
 import { normalizeAddress } from '../../utils/address'
 import { IUWebSocketEventMap, UWebSocketTransport } from '../../utils/UWebSocketTransport'
 
+const textDecoder = new TextDecoder()
+
 export async function registerWsHandler(
   components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer'>
 ) {
@@ -56,7 +58,7 @@ export async function registerWsHandler(
         data.timeout = undefined
 
         try {
-          const authChainMessage = new TextDecoder().decode(message)
+          const authChainMessage = textDecoder.decode(message)
 
           const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
             fetcher
