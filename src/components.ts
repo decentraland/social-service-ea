@@ -7,13 +7,15 @@ import {
 } from '@well-known-components/http-server'
 import { createLogComponent } from '@well-known-components/logger'
 import { createMetricsComponent } from '@well-known-components/metrics'
+import { createFetchComponent } from '@well-known-components/fetch-component'
+import { createPgComponent } from '@well-known-components/pg-component'
 import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
-import { createPgComponent } from '@well-known-components/pg-component'
 import { createDBComponent } from './adapters/db'
 import { createWsComponent } from './adapters/ws'
 import createRpcServerComponent from './adapters/rpcServer'
-import { createFetchComponent } from '@well-known-components/fetch-component'
+import createRedisComponent from './adapters/redis'
+import createPubSubComponent from './adapters/pubsub'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -24,7 +26,6 @@ export async function initComponents(): Promise<AppComponents> {
   const ws = await createWsComponent()
   const server = await createServerComponent<GlobalContext>({ config, logs, ws: ws.ws }, {})
   const statusChecks = await createStatusCheckComponent({ server, config })
-  const rpcServer = createRpcServerComponent({ logs })
 
   const fetcher = createFetchComponent()
 
@@ -53,6 +54,10 @@ export async function initComponents(): Promise<AppComponents> {
 
   const db = createDBComponent({ pg, logs })
 
+  const redis = await createRedisComponent({ logs, config })
+  const pubsub = createPubSubComponent({ logs, redis })
+  const rpcServer = await createRpcServerComponent({ logs, db, pubsub })
+
   await instrumentHttpServerWithPromClientRegistry({ metrics, server, config, registry: metrics.registry! })
 
   return {
@@ -64,7 +69,9 @@ export async function initComponents(): Promise<AppComponents> {
     pg,
     db,
     ws,
-    rpcServer,
-    fetcher
+    fetcher,
+    redis,
+    pubsub,
+    rpcServer
   }
 }

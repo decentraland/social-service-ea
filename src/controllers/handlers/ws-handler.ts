@@ -5,6 +5,7 @@ import { WebSocketTransport } from '@dcl/rpc/dist/transports/WebSocket'
 import future from 'fp-future'
 import { verify } from '@dcl/platform-crypto-middleware'
 import { GlobalContext } from '../../types'
+import { normalizeAddress } from '../../utils/address'
 
 export async function wsHandler(context: IHttpServerComponent.DefaultContext<GlobalContext>) {
   const { logs, rpcServer, fetcher } = context.components
@@ -19,7 +20,6 @@ export async function wsHandler(context: IHttpServerComponent.DefaultContext<Glo
         logger.warn('terminating ws because of ping timeout')
         return ws.terminate()
       }
-      logger.debug('pinging websocket bc of cloudflare')
       isAlive = false
       ws.ping()
     }, 30000)
@@ -58,7 +58,9 @@ export async function wsHandler(context: IHttpServerComponent.DefaultContext<Glo
 
       logger.debug('addresss > ', { address: authchainVerifyResult.auth })
 
-      rpcServer.attachTransport(wsTransport, { components: context.components, address: authchainVerifyResult.auth })
+      const address = normalizeAddress(authchainVerifyResult.auth)
+
+      rpcServer.attachUser({ transport: wsTransport, address })
 
       wsTransport.on('error', (err) => {
         if (err && err.message) {

@@ -4,28 +4,28 @@ import { MigrationBuilder, ColumnDefinitions, PgType } from 'node-pg-migrate'
 export const shorthands: ColumnDefinitions | undefined = undefined
 
 export async function up(pgm: MigrationBuilder): Promise<void> {
-  pgm.createTable('friendships', {
+  pgm.createTable('friendship_actions', {
     id: {
       type: PgType.UUID,
       primaryKey: true
     },
-    address_requester: {
+    friendship_id: {
+      type: PgType.UUID,
+      notNull: true
+    },
+    action: {
       type: PgType.VARCHAR,
       notNull: true
     },
-    address_requested: {
+    acting_user: {
       type: PgType.VARCHAR,
       notNull: true
     },
-    is_active: {
-      type: PgType.BOOLEAN,
-      default: false
+    metadata: {
+      type: PgType.JSON,
+      notNull: false
     },
-    created_at: {
-      type: PgType.TIMESTAMP,
-      default: pgm.func('now()')
-    },
-    updated_at: {
+    timestamp: {
       type: PgType.TIMESTAMP,
       default: pgm.func('now()')
     }
@@ -33,5 +33,5 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropTable('friendships')
+  pgm.dropTable('friendship_actions')
 }
