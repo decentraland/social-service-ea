@@ -67,10 +67,10 @@ export async function registerWsHandler(
 
           logger.debug('addresss > ', { address })
 
-          const emitter = mitt<IUWebSocketEventMap>()
-          changeStage(data, { auth: true, address, eventEmitter: emitter, isConnected: true })
+          const eventEmitter = mitt<IUWebSocketEventMap>()
+          changeStage(data, { auth: true, address, eventEmitter, isConnected: true })
 
-          const transport = UWebSocketTransport(ws, emitter)
+          const transport = UWebSocketTransport(ws, eventEmitter)
 
           rpcServer.attachUser({ transport, address })
 
