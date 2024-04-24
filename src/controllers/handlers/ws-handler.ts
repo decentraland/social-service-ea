@@ -58,10 +58,10 @@ export async function registerWsHandler(
         try {
           const authChainMessage = new TextDecoder().decode(message)
 
-          const veirfyResult = await verify('get', '/', JSON.parse(authChainMessage), {
+          const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
             fetcher
           })
-          const address = normalizeAddress(veirfyResult.auth)
+          const address = normalizeAddress(verifyResult.auth)
 
           logger.debug('addresss > ', { address })
 
