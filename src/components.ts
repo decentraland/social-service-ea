@@ -1,21 +1,16 @@
 import { resolve } from 'path'
 import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
-import {
-  createServerComponent,
-  createStatusCheckComponent,
-  instrumentHttpServerWithPromClientRegistry
-} from '@well-known-components/http-server'
 import { createLogComponent } from '@well-known-components/logger'
 import { createMetricsComponent } from '@well-known-components/metrics'
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createPgComponent } from '@well-known-components/pg-component'
-import { AppComponents, GlobalContext } from './types'
+import { AppComponents } from './types'
 import { metricDeclarations } from './metrics'
 import { createDBComponent } from './adapters/db'
-import { createWsComponent } from './adapters/ws'
 import createRpcServerComponent from './adapters/rpcServer'
 import createRedisComponent from './adapters/redis'
 import createPubSubComponent from './adapters/pubsub'
+import { createUWsComponent } from '@well-known-components/uws-http-server'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -23,9 +18,7 @@ export async function initComponents(): Promise<AppComponents> {
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ metrics })
 
-  const ws = await createWsComponent()
-  const server = await createServerComponent<GlobalContext>({ config, logs, ws: ws.ws }, {})
-  const statusChecks = await createStatusCheckComponent({ server, config })
+  const server = await createUWsComponent({ config, logs })
 
   const fetcher = createFetchComponent()
 
@@ -58,17 +51,13 @@ export async function initComponents(): Promise<AppComponents> {
   const pubsub = createPubSubComponent({ logs, redis })
   const rpcServer = await createRpcServerComponent({ logs, db, pubsub })
 
-  await instrumentHttpServerWithPromClientRegistry({ metrics, server, config, registry: metrics.registry! })
-
   return {
     config,
     logs,
     server,
-    statusChecks,
     metrics,
     pg,
     db,
-    ws,
     fetcher,
     redis,
     pubsub,

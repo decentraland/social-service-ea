@@ -1,81 +1,98 @@
-import { IHttpServerComponent } from '@well-known-components/interfaces'
-import { upgradeWebSocketResponse } from '@well-known-components/http-server/dist/ws'
-import { WebSocket, MessageEvent } from 'ws'
-import { WebSocketTransport } from '@dcl/rpc/dist/transports/WebSocket'
-import future from 'fp-future'
+import mitt from 'mitt'
+import { onRequestEnd, onRequestStart } from '@well-known-components/uws-http-server'
 import { verify } from '@dcl/platform-crypto-middleware'
-import { GlobalContext } from '../../types'
+import { AppComponents, WsUserData } from '../../types'
 import { normalizeAddress } from '../../utils/address'
+import { IUWebSocketEventMap, UWebSocketTransport } from '../../utils/UWebSocketTransport'
 
-export async function wsHandler(context: IHttpServerComponent.DefaultContext<GlobalContext>) {
-  const { logs, rpcServer, fetcher } = context.components
+const textDecoder = new TextDecoder()
+
+export async function registerWsHandler(
+  components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer'>
+) {
+  const { logs, server, metrics, fetcher, rpcServer } = components
   const logger = logs.getLogger('ws-handler')
 
-  return upgradeWebSocketResponse(async (socket) => {
-    let isAlive = true
-    const ws = socket as any as WebSocket
-    // it's needed bc of cloudflare
-    const pingInterval = setInterval(() => {
-      if (isAlive === false) {
-        logger.warn('terminating ws because of ping timeout')
-        return ws.terminate()
+  function changeStage(data: WsUserData, newData: WsUserData) {
+    Object.assign(data, newData)
+  }
+
+  server.app.ws<WsUserData>('/', {
+    idleTimeout: 0,
+    upgrade: (res, req, context) => {
+      logger.debug('upgrade requested')
+      const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
+      res.upgrade(
+        {
+          isConnected: false,
+          auth: false
+        },
+        req.getHeader('sec-websocket-key'),
+        req.getHeader('sec-websocket-protocol'),
+        req.getHeader('sec-websocket-extensions'),
+        context
+      )
+      onRequestEnd(metrics, labels, 101, end)
+    },
+    open: (ws) => {
+      logger.debug('ws open')
+      const data = ws.getUserData()
+      // just for type assertion
+      if (!data.auth) {
+        data.timeout = setTimeout(() => {
+          try {
+            logger.error('closing connection, no authchain received')
+            ws.end()
+          } catch (err) {}
+        }, 30000)
       }
-      isAlive = false
-      ws.ping()
-    }, 30000)
+      data.isConnected = true
+    },
+    message: async (ws, message) => {
+      const data = ws.getUserData()
 
-    ws.on('close', () => {
-      logger.debug('closing websocket')
-      clearInterval(pingInterval)
-    })
-
-    ws.on('pong', () => {
-      logger.debug('PONG')
-      isAlive = true
-    })
-
-    const authChainPromise = future()
-
-    function receiveAuthchainAsFirstMessage(event: MessageEvent) {
-      if (typeof event.data === 'string') {
-        authChainPromise.resolve(JSON.parse(event.data))
+      if (data.auth) {
+        data.eventEmitter.emit('message', message)
       } else {
-        authChainPromise.reject(new Error('INVALID_MESSAGE'))
-      }
-    }
+        clearTimeout(data.timeout)
+        data.timeout = undefined
 
-    ws.addEventListener('message', receiveAuthchainAsFirstMessage)
+        try {
+          const authChainMessage = textDecoder.decode(message)
 
-    try {
-      const authChain = await Promise.race([sleep30Secs(), authChainPromise])
-      ws.removeEventListener('message', receiveAuthchainAsFirstMessage)
+          const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
+            fetcher
+          })
+          const address = normalizeAddress(verifyResult.auth)
 
-      const authchainVerifyResult = await verify('get', '/', authChain, {
-        fetcher
-      })
+          logger.debug('addresss > ', { address })
 
-      const wsTransport = WebSocketTransport(socket)
+          const eventEmitter = mitt<IUWebSocketEventMap>()
+          changeStage(data, { auth: true, address, eventEmitter, isConnected: true })
 
-      logger.debug('addresss > ', { address: authchainVerifyResult.auth })
+          const transport = UWebSocketTransport(ws, eventEmitter)
 
-      const address = normalizeAddress(authchainVerifyResult.auth)
+          rpcServer.attachUser({ transport, address })
 
-      rpcServer.attachUser({ transport: wsTransport, address })
-
-      wsTransport.on('error', (err) => {
-        if (err && err.message) {
-          logger.error(err)
+          transport.on('error', (err) => {
+            if (err && err.message) {
+              logger.error(err)
+            }
+          })
+        } catch (error) {
+          console.log(error)
+          logger.error(error as any)
+          ws.close()
         }
-      })
-    } catch (error) {
-      // rejects if timeout, invalid first message or authchain verify error
-      logger.error(error as Error)
-      ws.close()
+      }
+    },
+    close: (ws, code, _message) => {
+      logger.debug(`Websocket closed ${code}`)
+      const data = ws.getUserData()
+      if (data.auth) {
+        data.isConnected = false
+        data.eventEmitter.emit('close', code)
+      }
     }
   })
 }
-
-const sleep30Secs = () =>
-  new Promise((_resolve, reject) => {
-    setTimeout(() => reject(new Error('TIMEOUT_WAITING_FOR_AUTCHAIN')), 30000)
-  })
