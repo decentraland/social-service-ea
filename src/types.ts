@@ -1,7 +1,6 @@
 import type {
   IConfigComponent,
   ILoggerComponent,
-  IHttpServerComponent,
   IBaseComponent,
   IMetricsComponent,
   IFetchComponent
@@ -9,13 +8,14 @@ import type {
 import { IPgComponent } from '@well-known-components/pg-component'
 import { WebSocketServer } from 'ws'
 import { Emitter } from 'mitt'
+import { HttpRequest, HttpResponse, IUWsComponent, WebSocket } from '@well-known-components/uws-http-server'
 import { metricDeclarations } from './metrics'
 import { IDatabaseComponent } from './adapters/db'
 import { IRedisComponent } from './adapters/redis'
 import { IRPCServerComponent } from './adapters/rpcServer'
 import { IPubSubComponent } from './adapters/pubsub'
-import { HttpRequest, HttpResponse, IUWsComponent, WebSocket } from '@well-known-components/uws-http-server'
 import { IUWebSocketEventMap } from './utils/UWebSocketTransport'
+import { ISocialServiceRpcClientComponent } from '../test/rpc'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -40,8 +40,7 @@ export type AppComponents = BaseComponents
 
 // components used in tests
 export type TestComponents = BaseComponents & {
-  // A fetch component that only hits the test server
-  localFetch: IFetchComponent
+  socialServiceClient: ISocialServiceRpcClientComponent
 }
 
 export type JsonBody = Record<string, any>
@@ -72,19 +71,6 @@ export type WsUserData =
     }
 
 export type InternalWebSocket = WebSocket<WsUserData>
-
-// this type simplifies the typings of http handlers
-export type HandlerContextWithPath<
-  ComponentNames extends keyof AppComponents,
-  Path extends string = any
-> = IHttpServerComponent.PathAwareContext<
-  IHttpServerComponent.DefaultContext<{
-    components: Pick<AppComponents, ComponentNames>
-  }>,
-  Path
->
-
-export type Context<Path extends string = any> = IHttpServerComponent.PathAwareContext<GlobalContext, Path>
 
 export type IWebSocketComponent = IBaseComponent & {
   ws: WebSocketServer
