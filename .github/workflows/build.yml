@@ -1,11 +1,39 @@
-name: build
+name: build-app
 
 on:
   push:
 
 jobs:
-  build:
+  validations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: yarn
+      - name: install
+        run: yarn install --frozen-lockfile
+      - name: lint
+        run: yarn lint:check
+
+  test:
+    runs-on: ubuntu-latest
     services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: db
+          POSTGRES_PASSWORD: pass1234
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
       redis:
         image: redis
         options: >-
@@ -15,4 +43,20 @@ jobs:
           --health-retries 5
         ports:
           - 6379:6379
-    uses: decentraland/platform-actions/.github/workflows/apps-with-db-build.yml@main
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: yarn
+      - name: install
+        run: yarn install --frozen-lockfile
+      - name: create .env
+        run: echo "" >> .env
+      - name: build
+        run: yarn build
+      - name: test
+        run: yarn test
+        env:
+          PG_COMPONENT_PSQL_CONNECTION_STRING: postgres://postgres:pass1234@localhost/db
