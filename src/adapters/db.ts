@@ -193,12 +193,11 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
       const pool = pg.getPool()
       const client = await pool.connect()
-      let res: T | undefined
       await client.query('BEGIN')
       try {
-        const callbackResult = await cb(client)
+        const res = await cb(client)
         await client.query('COMMIT')
-        res = callbackResult
+        return res
       } catch (error) {
         logger.error(error as any)
         await client.query('ROLLBACK')
@@ -206,7 +205,6 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         throw error
       } finally {
         client.release()
-        return res as T
       }
     }
   }
