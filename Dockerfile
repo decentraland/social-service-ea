@@ -1,29 +1,19 @@
 ARG RUN
 
-FROM node:lts as builderenv
+FROM node:18-alpine as builderenv
 
 WORKDIR /app
 
 # some packages require a build step
-RUN apt-get update && apt-get -y -qq install build-essential
-
-# We use Tini to handle signals and PID1 (https://github.com/krallin/tini, read why here https://github.com/krallin/tini/issues/8)
-ENV TINI_VERSION v0.19.0
-ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
-RUN chmod +x /tini
-
-# install dependencies
-COPY package.json /app/package.json
-COPY yarn.lock /app/yarn.lock
-RUN yarn
+RUN apk update && apk add wget
 
 # build the app
 COPY . /app
+RUN yarn install --frozen-lockfile
 RUN yarn build
-RUN yarn test
 
 # remove devDependencies, keep only used dependencies
-RUN yarn install --frozen-lockfile --production
+RUN yarn install --prod --frozen-lockfile
 
 ########################## END OF BUILD STAGE ##########################
 
