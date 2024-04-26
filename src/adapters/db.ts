@@ -129,8 +129,6 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async updateFriendshipStatus(friendshipId, isActive, txClient) {
       logger.debug(`updating ${friendshipId} - ${isActive}`)
       const query = SQL`UPDATE friendships SET is_active = ${isActive}, updated_at = now() WHERE id = ${friendshipId}`
-      console.log(query.text)
-      console.log(query.values)
 
       if (txClient) {
         const results = await txClient.query(query)
@@ -195,16 +193,20 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
       const pool = pg.getPool()
       const client = await pool.connect()
+      let res: T | undefined
       await client.query('BEGIN')
       try {
-        const res = await cb(client)
+        const callbackResult = await cb(client)
         await client.query('COMMIT')
-        return res
+        res = callbackResult
       } catch (error) {
         logger.error(error as any)
         await client.query('ROLLBACK')
         client.release()
         throw error
+      } finally {
+        client.release()
+        return res as T
       }
     }
   }
