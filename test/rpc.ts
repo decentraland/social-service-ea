@@ -1,6 +1,7 @@
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service_v2/social_service.gen'
 import { createRpcClient } from '@dcl/rpc'
-import { AuthLinkType, Authenticator } from '@dcl/crypto'
+import { AuthLinkType, Authenticator, AuthIdentity, IdentityType } from '@dcl/crypto'
+import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
 import { loadService } from '@dcl/rpc/dist/codegen'
 import { IWebSocket, WebSocketTransport } from '@dcl/rpc/dist/transports/WebSocket'
 import createAuthChainHeaders from '@dcl/platform-crypto-middleware/dist/createAuthChainHeader'
@@ -66,6 +67,10 @@ export async function createSocialServiceRpcClientComponent({
         toBeResolved.resolve(true)
       })
 
+      ws.on('error', (err) => {
+        logger.error(err as any)
+      })
+
       await toBeResolved
 
       const transport = WebSocketTransport(ws as IWebSocket)
@@ -82,4 +87,22 @@ export async function createSocialServiceRpcClientComponent({
       connection?.close()
     }
   }
+}
+
+export type Identity = { authChain: AuthIdentity; realAccount: IdentityType; ephemeralIdentity: IdentityType }
+
+export async function getIdentity(): Promise<Identity> {
+  const ephemeralIdentity = createUnsafeIdentity()
+  const realAccount = createUnsafeIdentity()
+
+  const authChain = await Authenticator.initializeAuthChain(
+    realAccount.address,
+    ephemeralIdentity,
+    10,
+    async (message) => {
+      return Authenticator.createSignature(realAccount, message)
+    }
+  )
+
+  return { authChain, realAccount, ephemeralIdentity }
 }
