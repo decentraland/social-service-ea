@@ -11,7 +11,7 @@
     "lint:fix": "eslint '**/*.{js,ts}' --fix"
   },
   "devDependencies": {
-    "@dcl/eslint-config": "^2.0.0",
+    "@dcl/eslint-config": "^2.1.0",
     "@protobuf-ts/protoc": "^2.9.4",
     "@types/node": "^20.11.28",
     "@types/redis": "^4.0.11",
