@@ -335,10 +335,10 @@
     eslint-plugin-prettier "^5.1.3"
     prettier "^3.2.4"
 
-"@dcl/platform-crypto-middleware@^1.0.2":
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/@dcl/platform-crypto-middleware/-/platform-crypto-middleware-1.0.2.tgz#3daf9af7f04bd95f833dcf2c421171b37ea1bea6"
-  integrity sha512-V99zV5XntoXmZclSj5t4S8Ioi0s7jULep7dw1UmpvnXDvozQjUNX9w5sWnXrcAalTocXHbf7bL7xK6sHHDZ0Mw==
+"@dcl/platform-crypto-middleware@^1.1.0":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@dcl/platform-crypto-middleware/-/platform-crypto-middleware-1.1.0.tgz#11434eb4fc8d461799ab71d28ce869ab330bdb23"
+  integrity sha512-E2AAIRcbeF+DLQ6urmOkoqwSOGaBlX498nygyOc3EnChEPjJhM0LiTQ9rwAG572DdMGf8ZGbNg+odx6i9M3cMA==
   dependencies:
     "@dcl/crypto" "^3.4.3"
     "@well-known-components/fetch-component" "^2.0.2"
