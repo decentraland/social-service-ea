@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@dcl/platform-crypto-middleware": "^1.0.2",
-    "@dcl/protocol": "^1.0.0-8789372854.commit-f692c7a",
+    "@dcl/protocol": "^1.0.0-9466805132.commit-365e0bb",
     "@dcl/rpc": "^1.1.2",
     "@well-known-components/env-config-provider": "^1.2.0",
     "@well-known-components/fetch-component": "^2.0.2",
