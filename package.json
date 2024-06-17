@@ -29,7 +29,7 @@
     "tabWidth": 2
   },
   "dependencies": {
-    "@dcl/platform-crypto-middleware": "^1.0.2",
+    "@dcl/platform-crypto-middleware": "^1.1.0",
     "@dcl/protocol": "^1.0.0-8789372854.commit-f692c7a",
     "@dcl/rpc": "^1.1.2",
     "@well-known-components/env-config-provider": "^1.2.0",
