@@ -344,10 +344,10 @@
     "@well-known-components/fetch-component" "^2.0.2"
     "@well-known-components/interfaces" "^1.4.2"
 
-"@dcl/protocol@^1.0.0-8789372854.commit-f692c7a":
-  version "1.0.0-8789372854.commit-f692c7a"
-  resolved "https://registry.yarnpkg.com/@dcl/protocol/-/protocol-1.0.0-8789372854.commit-f692c7a.tgz#1d817d50852dbbc143e2507d3eb617d1c79f9914"
-  integrity sha512-emLWfF/8Iciz0nnXFShZXBSbpsdbTHAJuh8st3de5C+4hlNV00Gs5pDBehsxENqHiq9yqL8rDng8EzTXhryAXw==
+"@dcl/protocol@^1.0.0-9687469295.commit-8a31aa4":
+  version "1.0.0-9687469295.commit-8a31aa4"
+  resolved "https://registry.yarnpkg.com/@dcl/protocol/-/protocol-1.0.0-9687469295.commit-8a31aa4.tgz#928b003cc0afaa6103b1e82f7ad9412d23c94670"
+  integrity sha512-yps5kQ1RQ+MxXKetJhSw9fUoTJS0aI3eDaYvzqJOdqAzyhRPLNMDRJIJeTy4NWeIz4cIbgriQ6jWH4VCeXhOdg==
   dependencies:
     "@dcl/ts-proto" "1.154.0"
 
