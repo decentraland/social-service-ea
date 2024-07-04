@@ -201,7 +201,6 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       } catch (error) {
         logger.error(error as any)
         await client.query('ROLLBACK')
-        client.release()
         throw error
       } finally {
         client.release()
