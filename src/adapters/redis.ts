@@ -11,10 +11,12 @@ export default async function createRedisComponent(
 ): Promise<IRedisComponent> {
   const { logs, config } = components
   const logger = logs.getLogger('redis-component')
-  const REDIS_URL = (await config.getString('REDIS_CONNECTION_STRING')) || `redis://127.0.0.1:6379`
+  const REDIS_HOST = (await config.getString('REDIS_HOST')) || '127.0.0.1'
+
+  const url = `redis://${REDIS_HOST}:6379`
 
   const client = createClient({
-    url: REDIS_URL
+    url
   })
 
   client.on('error', (err) => {
