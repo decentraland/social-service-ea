@@ -23,8 +23,8 @@ RUN apk update && apk add --no-cache wget tini curl && \
     wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-2.35-r1.apk && \
     apk add --no-cache ./glibc-2.35-r1.apk && \
     rm -f ./glibc-2.35-r1.apk && \
-    rm -rf /var/cache/apk/* && \
-    apk add --no-cache libstdc++ gcompat
+    apk add --no-cache libstdc++ gcompat && \
+    rm -rf /var/cache/apk/*
 
 # NODE_ENV is used to configure some runtime options, like JSON logger
 ENV NODE_ENV=production
