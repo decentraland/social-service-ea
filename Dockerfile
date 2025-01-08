@@ -1,5 +1,5 @@
 
-FROM node:18-alpine as builderenv
+FROM node:18-alpine AS builderenv
 
 WORKDIR /app
 
@@ -18,10 +18,12 @@ RUN yarn install --prod --frozen-lockfile
 
 FROM node:18-alpine
 
-RUN apk update && apk add --no-cache wget tini
+RUN apk update && \
+    apk add --no-cache wget tini libstdc++ gcompat && \
+    rm -rf /var/cache/apk/*
 
 # NODE_ENV is used to configure some runtime options, like JSON logger
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 ARG COMMIT_HASH=local
 ENV COMMIT_HASH=${COMMIT_HASH:-local}
