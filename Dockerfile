@@ -1,10 +1,10 @@
 
-FROM node:18-alpine as builderenv
+FROM node:18-bullseye-slim as builderenv
 
 WORKDIR /app
 
 # some packages require a build step
-RUN apk update && apk add --no-cache wget
+RUN apt-get update && apt-get install -y --no-install-recommends wget build-essential && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # build the app
 COPY . /app
@@ -16,9 +16,9 @@ RUN yarn install --prod --frozen-lockfile
 
 ########################## END OF BUILD STAGE ##########################
 
-FROM node:18-alpine
+FROM node:18-bullseye-slim
 
-RUN apk update && apk add --no-cache wget tini
+RUN apt-get update && apt-get install -y --no-install-recommends tini && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # NODE_ENV is used to configure some runtime options, like JSON logger
 ENV NODE_ENV production
