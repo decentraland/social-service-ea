@@ -1,10 +1,10 @@
 
-FROM node:18-bullseye-slim as builderenv
+FROM node:18-alpine AS builderenv
 
 WORKDIR /app
 
 # some packages require a build step
-RUN apt-get update && apt-get install -y --no-install-recommends wget build-essential && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apk update && apk add --no-cache wget
 
 # build the app
 COPY . /app
@@ -16,12 +16,17 @@ RUN yarn install --prod --frozen-lockfile
 
 ########################## END OF BUILD STAGE ##########################
 
-FROM node:18-bullseye-slim
+FROM node:18-alpine
 
-RUN apt-get update && apt-get install -y --no-install-recommends tini && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apk update && apk add --no-cache wget tini curl gcompat libstdc++ && \
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-2.35-r1.apk && \
+    apk add --no-cache ./glibc-2.35-r1.apk && \
+    rm -f ./glibc-2.35-r1.apk && \
+    rm -rf /var/cache/apk/*
 
 # NODE_ENV is used to configure some runtime options, like JSON logger
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 ARG COMMIT_HASH=local
 ENV COMMIT_HASH=${COMMIT_HASH:-local}
