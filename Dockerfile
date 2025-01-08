@@ -1,4 +1,3 @@
-ARG RUN
 
 FROM node:18-alpine as builderenv
 
