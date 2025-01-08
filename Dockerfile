@@ -18,12 +18,8 @@ RUN yarn install --prod --frozen-lockfile
 
 FROM node:18-alpine
 
-RUN apk update && apk add --no-cache wget tini curl && \
-    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \
-    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-2.35-r1.apk && \
-    apk add --no-cache ./glibc-2.35-r1.apk && \
-    rm -f ./glibc-2.35-r1.apk && \
-    apk add --no-cache libstdc++ gcompat && \
+RUN apk update && \
+    apk add --no-cache wget tini curl libstdc++ gcompat && \
     rm -rf /var/cache/apk/*
 
 # NODE_ENV is used to configure some runtime options, like JSON logger
