@@ -28,13 +28,9 @@ export default function createPubSubComponent(components: Pick<AppComponents, 'l
       }
     },
     async stop() {
-      if (subClient.isReady) {
-        await subClient.disconnect()
-      }
-
-      if (pubClient.isReady) {
-        await pubClient.disconnect()
-      }
+      await subClient.unsubscribe(FRIENDSHIP_UPDATES_CHANNEL, friendshipUpdatesCb)
+      await subClient.disconnect()
+      await pubClient.disconnect()
     },
     async subscribeToFriendshipUpdates(cb) {
       try {
