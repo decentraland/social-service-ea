@@ -33,8 +33,7 @@ ENV CURRENT_VERSION=${CURRENT_VERSION:-Unknown}
 WORKDIR /app
 COPY --from=builderenv /app /app
 
-RUN echo "" > /app/api/.env
-RUN echo "" > /app/processor/.env
+RUN echo "" > /app/.env
 
 # Please _DO NOT_ use a custom ENTRYPOINT because it may prevent signals
 # (i.e. SIGTERM) to reach the service
