@@ -5,7 +5,7 @@ FROM node:18-alpine as builderenv
 WORKDIR /app
 
 # some packages require a build step
-RUN apk update && apk add wget
+RUN apk update && apk add --no-cache wget
 
 # build the app
 COPY . /app
