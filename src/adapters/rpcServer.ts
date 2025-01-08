@@ -124,7 +124,7 @@ export default async function createRpcServerComponent(
       async getPendingFriendshipRequests(_request, context) {
         try {
           const pendingRequests = await db.getReceivedFriendshipRequests(context.address)
-          const mappedRequestss = pendingRequests.map(({ address, timestamp, metadata }) => ({
+          const mappedRequests = pendingRequests.map(({ address, timestamp, metadata }) => ({
             user: { address },
             createdAt: new Date(timestamp).getTime(),
             message: metadata?.message || ''
@@ -134,7 +134,7 @@ export default async function createRpcServerComponent(
             response: {
               $case: 'requests',
               requests: {
-                requests: mappedRequestss
+                requests: mappedRequests
               }
             }
           }
@@ -151,7 +151,7 @@ export default async function createRpcServerComponent(
       async getSentFriendshipRequests(_request, context) {
         try {
           const pendingRequests = await db.getSentFriendshipRequests(context.address)
-          const mappedRequestss = pendingRequests.map(({ address, timestamp, metadata }) => ({
+          const mappedRequests = pendingRequests.map(({ address, timestamp, metadata }) => ({
             user: { address },
             createdAt: new Date(timestamp).getTime(),
             message: metadata?.message || ''
@@ -161,7 +161,7 @@ export default async function createRpcServerComponent(
             response: {
               $case: 'requests',
               requests: {
-                requests: mappedRequestss
+                requests: mappedRequests
               }
             }
           }
