@@ -30,11 +30,11 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropIndex('friendships', 'friendships_address_requester')
-  pgm.dropIndex('friendships', 'friendships_address_requested')
-  pgm.dropConstraint('friendships', 'unique_addresses')
-  pgm.dropConstraint('friendships', 'address_requester_smaller_than_address_requested')
-  pgm.dropIndex('friendships', 'friendships_address_requester_lower')
-  pgm.dropIndex('friendships', 'friendships_address_requested_lower')
-  pgm.dropIndex('friendship_actions', 'friendship_actions_friendship_id')
+  pgm.dropIndex('friendships', 'friendships_address_requester', { ifExists: true })
+  pgm.dropIndex('friendships', 'friendships_address_requested', { ifExists: true })
+  pgm.dropConstraint('friendships', 'unique_addresses', { ifExists: true })
+  pgm.dropConstraint('friendships', 'address_requester_smaller_than_address_requested', { ifExists: true })
+  pgm.dropIndex('friendships', 'friendships_address_requester_lower', { ifExists: true })
+  pgm.dropIndex('friendships', 'friendships_address_requested_lower', { ifExists: true })
+  pgm.dropIndex('friendship_actions', 'friendship_actions_friendship_id', { ifExists: true })
 }
