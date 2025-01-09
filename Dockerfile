@@ -36,6 +36,8 @@ COPY --from=builderenv /app /app
 
 RUN echo "" > /app/.env
 
+EXPOSE 8085
+
 # Please _DO NOT_ use a custom ENTRYPOINT because it may prevent signals
 # (i.e. SIGTERM) to reach the service
 # Read more here: https://aws.amazon.com/blogs/containers/graceful-shutdowns-with-ecs/
