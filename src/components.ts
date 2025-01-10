@@ -49,7 +49,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
-  const rpcServer = await createRpcServerComponent({ logs, db, pubsub })
+  const rpcServer = await createRpcServerComponent({ logs, db, pubsub, server, config })
 
   return {
     config,
