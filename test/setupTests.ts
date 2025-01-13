@@ -1,3 +1,3 @@
-beforeEach(() => {
+afterEach(() => {
   jest.clearAllMocks()
 })

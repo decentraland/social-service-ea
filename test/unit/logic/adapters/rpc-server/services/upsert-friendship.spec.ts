@@ -58,7 +58,7 @@ describe('upsertFriendshipService', () => {
   })
 
   it('should return an internalServerError for an invalid request', async () => {
-    jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(undefined)
+    jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(null)
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
