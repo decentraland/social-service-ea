@@ -29,21 +29,23 @@ const FRIENDSHIPS_COUNT_PAGE_STREAM = 20
 const INTERNAL_SERVER_ERROR = 'SERVER ERROR'
 
 export default async function createRpcServerComponent(
-  components: Pick<AppComponents, 'logs' | 'db' | 'pubsub'>
+  components: Pick<AppComponents, 'logs' | 'db' | 'pubsub' | 'config' | 'server'>
 ): Promise<IRPCServerComponent> {
-  const { logs, db, pubsub } = components
+  const { logs, db, pubsub, config, server } = components
 
   const SHARED_CONTEXT: Pick<RpcServerContext, 'subscribers'> = {
     subscribers: {}
   }
 
-  const server = createRpcServer<RpcServerContext>({
-    logger: logs.getLogger('rpcserver')
+  const rpcServer = createRpcServer<RpcServerContext>({
+    logger: logs.getLogger('rpcServer')
   })
 
-  const logger = logs.getLogger('rpcserver-handler')
+  const logger = logs.getLogger('rpcServer-handler')
 
-  server.setHandler(async function handler(port) {
+  const rpcPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
+
+  rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
       getFriends(_request, context) {
         logger.debug('getting friends for ', { address: context.address })
@@ -293,6 +295,10 @@ export default async function createRpcServerComponent(
 
   return {
     async start() {
+      server.app.listen(rpcPort, () => {
+        logger.info(`[RPC] RPC Server listening on port ${rpcPort}`)
+      })
+
       await pubsub.subscribeToFriendshipUpdates((message) => {
         try {
           const update = JSON.parse(message) as SubscriptionEventsEmitter['update']
@@ -311,7 +317,7 @@ export default async function createRpcServerComponent(
           delete SHARED_CONTEXT.subscribers[address]
         }
       })
-      server.attachTransport(transport, { subscribers: SHARED_CONTEXT.subscribers, address })
+      rpcServer.attachTransport(transport, { subscribers: SHARED_CONTEXT.subscribers, address })
     }
   }
 }

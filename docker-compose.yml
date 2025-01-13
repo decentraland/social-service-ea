@@ -27,6 +27,7 @@ services:
       REDIS_HOST: 'redis'
     ports:
       - '3000:3000'
+      - '8085:8085'
     depends_on:
       - postgres
       - redis
