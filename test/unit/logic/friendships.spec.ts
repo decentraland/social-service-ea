@@ -5,8 +5,8 @@ import {
   parseEmittedUpdateToFriendshipUpdate,
   parseUpsertFriendshipRequest,
   validateNewFriendshipAction
-} from '../../src/logic/friendships'
-import { Action, FriendshipStatus } from '../../src/types'
+} from '../../../src/logic/friendships'
+import { Action, FriendshipStatus } from '../../../src/types'
 
 describe('isFriendshipActionValid()', () => {
   test('it should be valid if from is null and to is REQUEST ', () => {
