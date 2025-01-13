@@ -7,7 +7,6 @@ export function getFriendsService({ components: { logs, db } }: RPCServiceContex
   const logger = logs.getLogger('get-friends-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<UsersResponse> {
-    logger.debug('getting friends for ', { address: context.address })
     let friendsGenerator: AsyncGenerator<Friendship> | undefined
     try {
       friendsGenerator = db.getFriends(context.address)
@@ -18,33 +17,30 @@ export function getFriendsService({ components: { logs, db } }: RPCServiceContex
       throw new Error(INTERNAL_SERVER_ERROR)
     }
 
-    const generator = async function* () {
-      let users = []
-      for await (const friendship of friendsGenerator) {
-        const { address_requested, address_requester } = friendship
-        if (context.address === address_requested) {
-          users.push({ address: address_requester })
-        } else {
-          users.push({ address: address_requested })
-        }
+    let users = []
 
-        if (users.length === FRIENDSHIPS_COUNT_PAGE_STREAM) {
-          const response = {
-            users: [...users]
-          }
-          users = []
-          yield response
-        }
+    for await (const friendship of friendsGenerator) {
+      const { address_requested, address_requester } = friendship
+      if (context.address === address_requested) {
+        users.push({ address: address_requester })
+      } else {
+        users.push({ address: address_requested })
       }
 
-      if (users.length) {
+      if (users.length === FRIENDSHIPS_COUNT_PAGE_STREAM) {
         const response = {
-          users
+          users: [...users]
         }
+        users = []
         yield response
       }
     }
 
-    return generator()
+    if (users.length) {
+      const response = {
+        users
+      }
+      yield response
+    }
   }
 }

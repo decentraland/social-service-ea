@@ -21,27 +21,25 @@ export function getMutualFriendsService({ components: { logs, db } }: RPCService
       throw new Error(INTERNAL_SERVER_ERROR)
     }
 
-    const generator = async function* () {
-      const users = []
-      for await (const friendship of mutualFriends) {
-        const { address } = friendship
-        users.push({ address })
-        if (users.length === FRIENDSHIPS_COUNT_PAGE_STREAM) {
-          const response = {
-            users
-          }
-          yield response
-        }
-      }
+    let users = []
 
-      if (users.length) {
+    for await (const friendship of mutualFriends) {
+      const { address } = friendship
+      users.push({ address })
+      if (users.length === FRIENDSHIPS_COUNT_PAGE_STREAM) {
         const response = {
           users
         }
         yield response
+        users = []
       }
     }
 
-    return generator()
+    if (users.length) {
+      const response = {
+        users
+      }
+      yield response
+    }
   }
 }
