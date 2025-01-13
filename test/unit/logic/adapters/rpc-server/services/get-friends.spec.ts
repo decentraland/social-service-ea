@@ -1,11 +1,11 @@
 import { mockDb, mockLogs } from '../../../../../mocks/components'
 import { getFriendsService } from '../../../../../../src/adapters/rpc-server/services/get-friends'
-import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import {
   FRIENDSHIPS_COUNT_PAGE_STREAM,
   INTERNAL_SERVER_ERROR
 } from '../../../../../../src/adapters/rpc-server/constants'
 import { RpcServerContext, Friendship, AppComponents } from '../../../../../../src/types'
+import { emptyRequest } from '../../../../../mocks/empty-request'
 
 describe('getFriendsService', () => {
   let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
@@ -15,8 +15,6 @@ describe('getFriendsService', () => {
     address: '0x123',
     subscribers: undefined
   }
-
-  const emptyRequest = {} as Empty
 
   beforeEach(() => {
     components = { db: mockDb, logs: mockLogs }
