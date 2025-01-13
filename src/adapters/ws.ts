@@ -1,6 +1,7 @@
 import { WebSocketServer } from 'ws'
 import { IWebSocketComponent } from '../types'
 
+// TODO: UNUSED
 export async function createWsComponent(): Promise<IWebSocketComponent> {
   let wss: WebSocketServer | undefined
 

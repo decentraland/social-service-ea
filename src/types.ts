@@ -12,7 +12,7 @@ import { Emitter } from 'mitt'
 import { metricDeclarations } from './metrics'
 import { IDatabaseComponent } from './adapters/db'
 import { IRedisComponent } from './adapters/redis'
-import { IRPCServerComponent } from './adapters/rpcServer'
+import { IRPCServerComponent } from './adapters/rpc-server/rpc-server'
 import { IPubSubComponent } from './adapters/pubsub'
 import { HttpRequest, HttpResponse, IUWsComponent, WebSocket } from '@well-known-components/uws-http-server'
 import { IUWebSocketEventMap } from './utils/UWebSocketTransport'
@@ -72,6 +72,10 @@ export type WsUserData =
     }
 
 export type InternalWebSocket = WebSocket<WsUserData>
+
+export type RPCServiceContext<ComponentNames extends keyof AppComponents> = {
+  components: Pick<AppComponents, ComponentNames>
+}
 
 // this type simplifies the typings of http handlers
 export type HandlerContextWithPath<
