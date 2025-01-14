@@ -9,22 +9,22 @@ export function subscribeToFriendshipUpdatesService({ components: { logs } }: RP
   const logger = logs.getLogger('subscribe-to-friendship-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendshipUpdate> {
-    const eventEmitter = mitt<SubscriptionEventsEmitter>()
-    context.subscribers[context.address] = eventEmitter
-    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, 'update')
+    const eventEmitter = context.subscribers[context.address] || mitt<SubscriptionEventsEmitter>()
 
-    const generator = async function* () {
-      for await (const update of updatesGenerator) {
-        logger.debug('> friendship update received, sending: ', { update: update as any })
-        const updateToResponse = parseEmittedUpdateToFriendshipUpdate(update)
-        if (updateToResponse) {
-          yield updateToResponse
-        } else {
-          logger.error('> unable to parse update to FriendshipUpdate > ', { update: update as any })
-        }
-      }
+    if (!context.subscribers[context.address]) {
+      context.subscribers[context.address] = eventEmitter
     }
 
-    return generator()
+    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, 'update')
+
+    for await (const update of updatesGenerator) {
+      logger.debug('> friendship update received, sending: ', { update: update as any })
+      const updateToResponse = parseEmittedUpdateToFriendshipUpdate(update)
+      if (updateToResponse) {
+        yield updateToResponse
+      } else {
+        logger.error('> unable to parse update to FriendshipUpdate > ', { update: update as any })
+      }
+    }
   }
 }
