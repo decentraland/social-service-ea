@@ -4,6 +4,7 @@ import { verify } from '@dcl/platform-crypto-middleware'
 import { AppComponents, WsUserData } from '../../types'
 import { normalizeAddress } from '../../utils/address'
 import { IUWebSocketEventMap, UWebSocketTransport } from '../../utils/UWebSocketTransport'
+import { isNotAuthenticated } from '../../utils/wsUserData'
 
 const textDecoder = new TextDecoder()
 
@@ -38,7 +39,7 @@ export async function registerWsHandler(
       logger.debug('ws open')
       const data = ws.getUserData()
       // just for type assertion
-      if (!data.auth) {
+      if (isNotAuthenticated(data)) {
         data.timeout = setTimeout(() => {
           try {
             logger.error('closing connection, no authchain received')
@@ -53,7 +54,7 @@ export async function registerWsHandler(
 
       if (data.auth) {
         data.eventEmitter.emit('message', message)
-      } else {
+      } else if (isNotAuthenticated(data)) {
         clearTimeout(data.timeout)
         data.timeout = undefined
 
