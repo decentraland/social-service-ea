@@ -1,14 +1,14 @@
-import { mockDb, mockLogs, mockPubSub } from '../../../../../mocks/components'
-import { upsertFriendshipService } from '../../../../../../src/adapters/rpc-server/services/upsert-friendship'
-import { Action, FriendshipStatus, RpcServerContext, AppComponents } from '../../../../../../src/types'
-import * as FriendshipsLogic from '../../../../../../src/logic/friendships'
+import { mockDb, mockLogs, mockPubSub } from '../../../../mocks/components'
+import { upsertFriendshipService } from '../../../../../src/adapters/rpc-server/services/upsert-friendship'
+import { Action, FriendshipStatus, RpcServerContext, AppComponents } from '../../../../../src/types'
+import * as FriendshipsLogic from '../../../../../src/logic/friendships'
 import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
-import { ParsedUpsertFriendshipRequest } from '../../../../../../src/logic/friendships'
+import { ParsedUpsertFriendshipRequest } from '../../../../../src/logic/friendships'
 
-jest.mock('../../../../../../src/logic/friendships')
+jest.mock('../../../../../src/logic/friendships')
 
 describe('upsertFriendshipService', () => {
   let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs' | 'pubsub'>>
@@ -52,8 +52,6 @@ describe('upsertFriendshipService', () => {
   beforeEach(() => {
     components = { db: mockDb, logs: mockLogs, pubsub: mockPubSub }
     upsertFriendship = upsertFriendshipService({ components })
-
-    jest.clearAllMocks()
     mockDb.executeTx.mockImplementation(async (cb) => await cb({} as any))
   })
 

@@ -1,11 +1,8 @@
-import { mockDb, mockLogs } from '../../../../../mocks/components'
-import { getMutualFriendsService } from '../../../../../../src/adapters/rpc-server/services/get-mutual-friends'
-import {
-  INTERNAL_SERVER_ERROR,
-  FRIENDSHIPS_COUNT_PAGE_STREAM
-} from '../../../../../../src/adapters/rpc-server/constants'
+import { mockDb, mockLogs } from '../../../../mocks/components'
+import { getMutualFriendsService } from '../../../../../src/adapters/rpc-server/services/get-mutual-friends'
+import { INTERNAL_SERVER_ERROR, FRIENDSHIPS_COUNT_PAGE_STREAM } from '../../../../../src/adapters/rpc-server/constants'
 import { MutualFriendsPayload } from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
-import { RpcServerContext, AppComponents } from '../../../../../../src/types'
+import { RpcServerContext, AppComponents } from '../../../../../src/types'
 
 describe('getMutualFriendsService', () => {
   let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>

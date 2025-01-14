@@ -1,7 +1,7 @@
-import { subscribeToFriendshipUpdatesService } from '../../../../../../src/adapters/rpc-server/services/subscribe-to-friendship-updates'
+import { subscribeToFriendshipUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friendship-updates'
 import { Empty } from '@dcl/protocol/out-ts/google/protobuf/empty.gen'
-import { RpcServerContext, AppComponents } from '../../../../../../src/types'
-import { mockLogs } from '../../../../../mocks/components'
+import { RpcServerContext, AppComponents } from '../../../../../src/types'
+import { mockLogs } from '../../../../mocks/components'
 
 describe('subscribeToFriendshipUpdatesService', () => {
   let components: Pick<AppComponents, 'logs'>

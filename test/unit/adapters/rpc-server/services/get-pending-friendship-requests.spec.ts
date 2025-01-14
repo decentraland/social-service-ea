@@ -1,12 +1,9 @@
-import { mockDb, mockLogs } from '../../../../../mocks/components'
-import { getPendingFriendshipRequestsService } from '../../../../../../src/adapters/rpc-server/services/get-pending-friendship-requests'
-import { RpcServerContext, AppComponents } from '../../../../../../src/types'
+import { mockDb, mockLogs } from '../../../../mocks/components'
+import { getPendingFriendshipRequestsService } from '../../../../../src/adapters/rpc-server/services/get-pending-friendship-requests'
+import { RpcServerContext, AppComponents } from '../../../../../src/types'
 import { FriendshipRequestsResponse } from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
-import { emptyRequest } from '../../../../../mocks/empty-request'
-import {
-  createMockFriendshipRequest,
-  createMockExpectedFriendshipRequest
-} from '../../../../../mocks/friendship-request'
+import { emptyRequest } from '../../../../mocks/empty-request'
+import { createMockFriendshipRequest, createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'
 
 describe('getPendingFriendshipRequestsService', () => {
   let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
