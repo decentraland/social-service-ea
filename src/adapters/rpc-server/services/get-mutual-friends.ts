@@ -13,7 +13,7 @@ export function getMutualFriendsService({ components: { logs, db } }: RPCService
     logger.debug(`getting mutual friends ${context.address}<>${request.user!.address}`)
     let mutualFriends: AsyncGenerator<{ address: string }> | undefined
     try {
-      mutualFriends = db.getMutualFriends(context.address, normalizeAddress(request.user!.address))
+      mutualFriends = db.getMutualFriends(context.address, normalizeAddress(request.user!.address), request.pagination)
     } catch (error) {
       logger.error(error as any)
       // throw an error bc there is no sense to create a generator to send an error

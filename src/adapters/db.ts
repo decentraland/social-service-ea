@@ -2,6 +2,7 @@ import SQL, { SQLStatement } from 'sql-template-strings'
 import { randomUUID } from 'node:crypto'
 import { PoolClient } from 'pg'
 import { Action, AppComponents, Friendship, FriendshipAction, FriendshipRequest, Pagination } from '../types'
+import { FRIENDSHIPS_COUNT_PAGE_STREAM } from './rpc-server/constants'
 
 export interface IDatabaseComponent {
   createFriendship(users: [string, string], isActive: boolean, txClient?: PoolClient): Promise<string>
@@ -13,7 +14,11 @@ export interface IDatabaseComponent {
       onlyActive?: boolean
     }
   ): AsyncGenerator<Friendship>
-  getMutualFriends(userAddress1: string, userAddress2: string): AsyncGenerator<{ address: string }>
+  getMutualFriends(
+    userAddress1: string,
+    userAddress2: string,
+    pagination?: Pagination
+  ): AsyncGenerator<{ address: string }>
   getFriendship(userAddresses: [string, string]): Promise<Friendship | undefined>
   getLastFriendshipAction(friendshipId: string): Promise<FriendshipAction | undefined>
   recordFriendshipAction(
@@ -35,7 +40,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
   return {
     getFriends(userAddress, { onlyActive, pagination } = { onlyActive: true }) {
-      const { limit, offset } = pagination || { limit: 10, offset: 0 }
+      const { limit, offset } = pagination || { limit: FRIENDSHIPS_COUNT_PAGE_STREAM, offset: 0 }
 
       const query: SQLStatement = SQL`SELECT * FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
 
@@ -49,7 +54,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       return generator
     },
-    getMutualFriends(userAddress1, userAddress2) {
+    getMutualFriends(userAddress1, userAddress2, pagination) {
+      const { limit, offset } = pagination || { limit: FRIENDSHIPS_COUNT_PAGE_STREAM, offset: 0 }
       const generator = pg.streamQuery<{ address: string }>(
         SQL`WITH friendsA as (
           SELECT
@@ -93,7 +99,10 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
                     or f_b.address_requested = ${userAddress2}
                   ) and f_b.is_active = true
               ) as friends_b
-          );`
+          )
+          ORDER BY f_a.address
+          LIMIT ${limit}
+          OFFSET ${offset};`
       )
 
       return generator
