@@ -1,5 +1,4 @@
 import { Transport, createRpcServer } from '@dcl/rpc'
-import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service_v2/social_service.gen'
 import { registerService } from '@dcl/rpc/dist/codegen'
 import { IBaseComponent } from '@well-known-components/interfaces'
 import { AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../../types'
@@ -8,6 +7,7 @@ import { getMutualFriendsService } from './services/get-mutual-friends'
 import { getPendingFriendshipRequestsService } from './services/get-pending-friendship-requests'
 import { upsertFriendshipService } from './services/upsert-friendship'
 import { subscribeToFriendshipUpdatesService } from './services/subscribe-to-friendship-updates'
+import { SocialServiceV2Definition } from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
 
 export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
@@ -38,7 +38,7 @@ export async function createRpcServerComponent(
   const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({ components: { logs } })
 
   rpcServer.setHandler(async function handler(port) {
-    registerService(port, SocialServiceDefinition, async () => ({
+    registerService(port, SocialServiceV2Definition, async () => ({
       getFriends,
       getMutualFriends,
       getPendingFriendshipRequests,

@@ -157,3 +157,8 @@ export type SubscriptionEventsEmitter = {
     metadata?: { message: string }
   }
 }
+
+export type Pagination = {
+  limit: number
+  offset: number
+}

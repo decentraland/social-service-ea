@@ -1,12 +1,18 @@
 import SQL, { SQLStatement } from 'sql-template-strings'
 import { randomUUID } from 'node:crypto'
 import { PoolClient } from 'pg'
-import { Action, AppComponents, Friendship, FriendshipAction, FriendshipRequest } from '../types'
+import { Action, AppComponents, Friendship, FriendshipAction, FriendshipRequest, Pagination } from '../types'
 
 export interface IDatabaseComponent {
   createFriendship(users: [string, string], isActive: boolean, txClient?: PoolClient): Promise<string>
   updateFriendshipStatus(friendshipId: string, isActive: boolean, txClient?: PoolClient): Promise<boolean>
-  getFriends(userAddress: string, onlyActive?: boolean): AsyncGenerator<Friendship>
+  getFriends(
+    userAddress: string,
+    options?: {
+      pagination?: Pagination
+      onlyActive?: boolean
+    }
+  ): AsyncGenerator<Friendship>
   getMutualFriends(userAddress1: string, userAddress2: string): AsyncGenerator<{ address: string }>
   getFriendship(userAddresses: [string, string]): Promise<Friendship | undefined>
   getLastFriendshipAction(friendshipId: string): Promise<FriendshipAction | undefined>
@@ -28,14 +34,16 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
   const logger = logs.getLogger('db-component')
 
   return {
-    getFriends(userAddress, onlyActive = true) {
-      let query: SQLStatement
+    getFriends(userAddress, { onlyActive, pagination } = { onlyActive: true }) {
+      const { limit, offset } = pagination || { limit: 10, offset: 0 }
+
+      const query: SQLStatement = SQL`SELECT * FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
 
       if (onlyActive) {
-        query = SQL`SELECT * FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress}) AND is_active = true`
-      } else {
-        query = SQL`SELECT * FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
+        query.append(SQL`AND is_active = true`)
       }
+
+      query.append(SQL`ORDER BY created_at DESC OFFSET ${offset} LIMIT ${limit}`)
 
       const generator = pg.streamQuery<Friendship>(query)
 
