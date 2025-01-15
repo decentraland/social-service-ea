@@ -60,14 +60,21 @@ export function upsertFriendshipService({
 
       logger.debug('friendship status > ', { isActive: JSON.stringify(isActive), friendshipStatus })
 
-      const id = await db.executeTx(async (tx) => {
-        let id
+      const { id, createdAt } = await db.executeTx(async (tx) => {
+        let id: string, createdAt: number
+
         if (friendship) {
           await db.updateFriendshipStatus(friendship.id, isActive, tx)
           id = friendship.id
+          createdAt = new Date(friendship.created_at).getTime()
         } else {
-          const newFriendshipId = await db.createFriendship([context.address, parsedRequest.user!], isActive, tx)
+          const { id: newFriendshipId, created_at } = await db.createFriendship(
+            [context.address, parsedRequest.user!],
+            isActive,
+            tx
+          )
           id = newFriendshipId
+          createdAt = new Date(created_at).getTime()
         }
 
         await db.recordFriendshipAction(
@@ -77,7 +84,8 @@ export function upsertFriendshipService({
           parsedRequest.action === Action.REQUEST ? parsedRequest.metadata : null,
           tx
         )
-        return id
+
+        return { id, createdAt }
       })
 
       logger.debug(`${id} friendship was upsert successfully`)
@@ -98,7 +106,11 @@ export function upsertFriendshipService({
       return {
         response: {
           $case: 'accepted',
-          accepted: {}
+          accepted: {
+            id: id,
+            createdAt,
+            updatedAt: 0 // TODO: remove it from proto
+          }
         }
       }
     } catch (error) {

@@ -1,4 +1,3 @@
-import { Empty } from '@dcl/protocol/out-ts/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   FriendshipRequestsResponse,

@@ -9,7 +9,14 @@ const getPaginationOrDefaults = (pagination?: Pagination) => {
 }
 
 export interface IDatabaseComponent {
-  createFriendship(users: [string, string], isActive: boolean, txClient?: PoolClient): Promise<string>
+  createFriendship(
+    users: [string, string],
+    isActive: boolean,
+    txClient?: PoolClient
+  ): Promise<{
+    id: string
+    created_at: Date
+  }>
   updateFriendshipStatus(friendshipId: string, isActive: boolean, txClient?: PoolClient): Promise<boolean>
   getFriends(
     userAddress: string,
@@ -137,26 +144,28 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const [addressRequester, addressRequested] = users
       const uuid = randomUUID()
 
-      const query = SQL`INSERT INTO friendships (id, address_requester, address_requested, is_active) VALUES (${uuid}, ${addressRequester}, ${addressRequested}, ${isActive})`
+      const query = SQL`
+      INSERT INTO friendships (id, address_requester, address_requested, is_active)
+      VALUES (${uuid}, ${addressRequester}, ${addressRequested}, ${isActive})
+      RETURNING id, created_at`
 
-      if (txClient) {
-        await txClient.query(query)
-      } else {
-        await pg.query(query)
+      const {
+        rows: [{ id, created_at }]
+      } = txClient ? await txClient.query(query) : await pg.query(query)
+
+      return {
+        id,
+        created_at
       }
-
-      return uuid
     },
     async updateFriendshipStatus(friendshipId, isActive, txClient) {
       logger.debug(`updating ${friendshipId} - ${isActive}`)
-      const query = SQL`UPDATE friendships SET is_active = ${isActive}, updated_at = now() WHERE id = ${friendshipId}`
+      const query = SQL`
+      UPDATE friendships SET is_active = ${isActive}, updated_at = now()
+      WHERE id = ${friendshipId}
+      RETURNING updated_at`
 
-      if (txClient) {
-        const results = await txClient.query(query)
-        return results.rowCount === 1
-      }
-
-      const results = await pg.query(query)
+      const results = txClient ? await txClient?.query(query) : await pg.query(query)
       return results.rowCount === 1
     },
     async recordFriendshipAction(friendshipId, actingUser, action, metadata, txClient) {
