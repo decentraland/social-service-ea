@@ -12,7 +12,7 @@ import { Emitter } from 'mitt'
 import { metricDeclarations } from './metrics'
 import { IDatabaseComponent } from './adapters/db'
 import { IRedisComponent } from './adapters/redis'
-import { IRPCServerComponent } from './adapters/rpcServer'
+import { IRPCServerComponent } from './adapters/rpc-server/rpc-server'
 import { IPubSubComponent } from './adapters/pubsub'
 import { HttpRequest, HttpResponse, IUWsComponent, WebSocket } from '@well-known-components/uws-http-server'
 import { IUWebSocketEventMap } from './utils/UWebSocketTransport'
@@ -58,20 +58,26 @@ export type IHandler = {
   f: (res: HttpResponse, req: HttpRequest) => Promise<IHandlerResult>
 }
 
-export type WsUserData =
-  | {
-      isConnected: boolean
-      auth: false
-      timeout?: NodeJS.Timeout
-    }
-  | {
-      isConnected: boolean
-      eventEmitter: Emitter<IUWebSocketEventMap>
-      auth: true
-      address: string
-    }
+export type WsAuthenticatedUserData = {
+  isConnected: boolean
+  eventEmitter: Emitter<IUWebSocketEventMap>
+  auth: true
+  address: string
+}
+
+export type WsNotAuthenticatedUserData = {
+  isConnected: boolean
+  auth: false
+  timeout?: NodeJS.Timeout
+}
+
+export type WsUserData = WsAuthenticatedUserData | WsNotAuthenticatedUserData
 
 export type InternalWebSocket = WebSocket<WsUserData>
+
+export type RPCServiceContext<ComponentNames extends keyof AppComponents> = {
+  components: Pick<AppComponents, ComponentNames>
+}
 
 // this type simplifies the typings of http handlers
 export type HandlerContextWithPath<

@@ -1,8 +1,6 @@
 import { Transport, TransportEvents } from '@dcl/rpc'
 import mitt, { Emitter } from 'mitt'
 
-export const defer = Promise.prototype.then.bind(Promise.resolve())
-
 export type RecognizedString =
   | string
   | ArrayBuffer
@@ -66,8 +64,12 @@ export function UWebSocketTransport<T extends { isConnected: boolean }>(
   })
 
   // socket already connected at this point
-  void defer(() => events.emit('connect', {}))
-  void defer(() => flush())
+  setImmediate(() => {
+    events.emit('connect', {})
+  })
+  setImmediate(() => {
+    flush()
+  })
 
   const api: Transport = {
     ...events,

@@ -68,7 +68,7 @@ type CommonParsedRequest<A extends Action> = {
   user: string
 }
 
-type ParsedUpsertFriendshipRequest =
+export type ParsedUpsertFriendshipRequest =
   | (CommonParsedRequest<Action.REQUEST> & { metadata: { message: string } | null })
   | CommonParsedRequest<Action.ACCEPT>
   | CommonParsedRequest<Action.CANCEL>
