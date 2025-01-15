@@ -8,6 +8,7 @@ import { getPendingFriendshipRequestsService } from './services/get-pending-frie
 import { upsertFriendshipService } from './services/upsert-friendship'
 import { subscribeToFriendshipUpdatesService } from './services/subscribe-to-friendship-updates'
 import { SocialServiceV2Definition } from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
+import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 
 export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
@@ -33,7 +34,7 @@ export async function createRpcServerComponent(
   const getFriends = getFriendsService({ components: { logs, db } })
   const getMutualFriends = getMutualFriendsService({ components: { logs, db } })
   const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
-  const getSentFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
+  const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })
   const upsertFriendship = upsertFriendshipService({ components: { logs, db, pubsub } })
   const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({ components: { logs } })
 

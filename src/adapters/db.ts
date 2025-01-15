@@ -4,6 +4,10 @@ import { PoolClient } from 'pg'
 import { Action, AppComponents, Friendship, FriendshipAction, FriendshipRequest, Pagination } from '../types'
 import { FRIENDSHIPS_COUNT_PAGE_STREAM } from './rpc-server/constants'
 
+const getPaginationOrDefaults = (pagination?: Pagination) => {
+  return pagination || { limit: FRIENDSHIPS_COUNT_PAGE_STREAM, offset: 0 }
+}
+
 export interface IDatabaseComponent {
   createFriendship(users: [string, string], isActive: boolean, txClient?: PoolClient): Promise<string>
   updateFriendshipStatus(friendshipId: string, isActive: boolean, txClient?: PoolClient): Promise<boolean>
@@ -28,8 +32,8 @@ export interface IDatabaseComponent {
     metadata: Record<string, any> | null,
     txClient?: PoolClient
   ): Promise<boolean>
-  getReceivedFriendshipRequests(userAddress: string): Promise<FriendshipRequest[]>
-  getSentFriendshipRequests(userAddress: string): Promise<FriendshipRequest[]>
+  getReceivedFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
+  getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
 
@@ -40,7 +44,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
   return {
     getFriends(userAddress, { onlyActive, pagination } = { onlyActive: true }) {
-      const { limit, offset } = pagination || { limit: FRIENDSHIPS_COUNT_PAGE_STREAM, offset: 0 }
+      const { limit, offset } = getPaginationOrDefaults(pagination)
 
       const query: SQLStatement = SQL`SELECT * FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
 
@@ -55,7 +59,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return generator
     },
     getMutualFriends(userAddress1, userAddress2, pagination) {
-      const { limit, offset } = pagination || { limit: FRIENDSHIPS_COUNT_PAGE_STREAM, offset: 0 }
+      const { limit, offset } = getPaginationOrDefaults(pagination)
       const generator = pg.streamQuery<{ address: string }>(
         SQL`WITH friendsA as (
           SELECT
@@ -169,9 +173,12 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       return true
     },
-    async getReceivedFriendshipRequests(userAddress) {
+    async getReceivedFriendshipRequests(userAddress, pagination) {
+      const { limit, offset } = pagination || {}
+
       const query = SQL`
-        SELECT f.address_requester as address, fa.timestamp, fa.metadata FROM friendships f
+        SELECT f.address_requester as address, fa.timestamp, fa.metadata
+          FROM friendships f
           INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
           WHERE 
             f.address_requested = ${userAddress}
@@ -182,15 +189,26 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
               FROM friendship_actions fa2
               WHERE fa2.friendship_id = fa.friendship_id
             )
+          ORDER BY fa.timestamp DESC
       `
+
+      if (limit) {
+        query.append(SQL` LIMIT ${limit}`)
+      }
+
+      if (offset) {
+        query.append(SQL` OFFSET ${offset}`)
+      }
 
       const results = await pg.query<FriendshipRequest>(query)
 
       return results.rows
     },
-    async getSentFriendshipRequests(userAddress) {
+    async getSentFriendshipRequests(userAddress, pagination) {
+      const { limit, offset } = pagination || {}
       const query = SQL`
-        SELECT f.address_requested as address, fa.timestamp, fa.metadata FROM friendships f
+        SELECT f.address_requested as address, fa.timestamp, fa.metadata
+          FROM friendships f
           INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
           WHERE 
             f.address_requester = ${userAddress}
@@ -201,7 +219,16 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
               FROM friendship_actions fa2
               WHERE fa2.friendship_id = fa.friendship_id
             )
+          ORDER BY fa.timestamp DESC
       `
+
+      if (limit) {
+        query.append(SQL` LIMIT ${limit}`)
+      }
+
+      if (offset) {
+        query.append(SQL` OFFSET ${offset}`)
+      }
 
       const results = await pg.query<FriendshipRequest>(query)
 
