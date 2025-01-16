@@ -205,7 +205,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         SELECT fa.*
         FROM friendships f
         INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-        WHERE WHERE (address_requester, address_requested) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))
+        WHERE WHERE (f.address_requester, f.address_requested) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))
         ORDER BY fa.timestamp DESC LIMIT 1
       `
       const results = await pg.query<FriendshipAction>(query)
