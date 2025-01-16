@@ -110,6 +110,10 @@ export type Friendship = {
   updated_at: string
 }
 
+export type Mutual = {
+  address: string
+}
+
 export enum Action {
   REQUEST = 'request', // request a friendship
   CANCEL = 'cancel', // cancel a friendship request

@@ -1,7 +1,7 @@
 import {
   FriendshipUpdate,
   UpsertFriendshipPayload
-} from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
+} from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 import {
   Action,
   FRIENDSHIP_ACTION_TRANSITIONS,

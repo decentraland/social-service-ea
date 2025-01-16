@@ -1,51 +1,37 @@
-import { Empty } from '@dcl/protocol/out-ts/google/protobuf/empty.gen'
 import { Friendship, RpcServerContext, RPCServiceContext } from '../../../types'
-import { INTERNAL_SERVER_ERROR, FRIENDSHIPS_COUNT_PAGE_STREAM } from '../constants'
+import { getPage } from '../../../utils/pagination'
+import { FRIENDSHIPS_PER_PAGE, INTERNAL_SERVER_ERROR } from '../constants'
 import {
   GetFriendsPayload,
-  UsersResponse
-} from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
+  PaginatedUsersResponse
+} from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 
 export function getFriendsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
   const logger = logs.getLogger('get-friends-service')
 
-  return async function* (request: GetFriendsPayload, context: RpcServerContext): AsyncGenerator<UsersResponse> {
-    let friendsGenerator: AsyncGenerator<Friendship> | undefined
+  return async function (request: GetFriendsPayload, context: RpcServerContext): Promise<PaginatedUsersResponse> {
     const { pagination, status: _status } = request
     try {
-      friendsGenerator = db.getFriends(context.address, { pagination })
+      const [friends, total] = await Promise.all([
+        db.getFriends(context.address, { pagination }),
+        db.getFriendsCount(context.address)
+      ])
+
       // TODO: retrieve peers and filter by connectivity status
+      // connecting to NATS and maintaining the same logic as stats/peers
+
+      return {
+        users: friends.map((friend: Friendship) => ({ address: friend.address_requested })),
+        paginationData: {
+          total,
+          page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)
+        }
+      }
     } catch (error) {
       logger.error(error as any)
       // throw an error bc there is no sense to create a generator to send an error
       // as it's done in the previous Social Service
       throw new Error(INTERNAL_SERVER_ERROR)
-    }
-
-    let users = []
-
-    for await (const friendship of friendsGenerator) {
-      const { address_requested, address_requester } = friendship
-      if (context.address === address_requested) {
-        users.push({ address: address_requester })
-      } else {
-        users.push({ address: address_requested })
-      }
-
-      if (users.length === FRIENDSHIPS_COUNT_PAGE_STREAM) {
-        const response = {
-          users: [...users]
-        }
-        users = []
-        yield response
-      }
-    }
-
-    if (users.length) {
-      const response = {
-        users
-      }
-      yield response
     }
   }
 }

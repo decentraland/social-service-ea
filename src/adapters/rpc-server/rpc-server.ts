@@ -7,7 +7,7 @@ import { getMutualFriendsService } from './services/get-mutual-friends'
 import { getPendingFriendshipRequestsService } from './services/get-pending-friendship-requests'
 import { upsertFriendshipService } from './services/upsert-friendship'
 import { subscribeToFriendshipUpdatesService } from './services/subscribe-to-friendship-updates'
-import { SocialServiceV2Definition } from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
+import { SocialServiceDefinition } from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 
 export type IRPCServerComponent = IBaseComponent & {
@@ -31,19 +31,22 @@ export async function createRpcServerComponent(
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
 
+  // TODO: return pagination data too
   const getFriends = getFriendsService({ components: { logs, db } })
   const getMutualFriends = getMutualFriendsService({ components: { logs, db } })
   const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
   const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })
   const upsertFriendship = upsertFriendshipService({ components: { logs, db, pubsub } })
   const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({ components: { logs } })
+  // const getFriendshipStatus = getFriendshipStatusService({ components: { logs } })
 
   rpcServer.setHandler(async function handler(port) {
-    registerService(port, SocialServiceV2Definition, async () => ({
+    registerService(port, SocialServiceDefinition, async () => ({
       getFriends,
       getMutualFriends,
       getPendingFriendshipRequests,
       getSentFriendshipRequests,
+      getFriendshipStatus: async () => ({ response: { $case: 'internalServerError', internalServerError: {} } }),
       upsertFriendship,
       subscribeToFriendshipUpdates
     }))

@@ -2,7 +2,7 @@ import { Action, FriendshipStatus, RpcServerContext, RPCServiceContext } from '.
 import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse
-} from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
+} from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 import {
   parseUpsertFriendshipRequest,
   validateNewFriendshipAction,
@@ -108,8 +108,7 @@ export function upsertFriendshipService({
           $case: 'accepted',
           accepted: {
             id: id,
-            createdAt,
-            updatedAt: 0 // TODO: remove it from proto
+            createdAt
           }
         }
       }

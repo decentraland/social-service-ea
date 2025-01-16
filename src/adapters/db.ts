@@ -1,11 +1,11 @@
 import SQL, { SQLStatement } from 'sql-template-strings'
 import { randomUUID } from 'node:crypto'
 import { PoolClient } from 'pg'
-import { Action, AppComponents, Friendship, FriendshipAction, FriendshipRequest, Pagination } from '../types'
-import { FRIENDSHIPS_COUNT_PAGE_STREAM } from './rpc-server/constants'
+import { Action, AppComponents, Friendship, FriendshipAction, FriendshipRequest, Mutual, Pagination } from '../types'
+import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 
 const getPaginationOrDefaults = (pagination?: Pagination) => {
-  return pagination || { limit: FRIENDSHIPS_COUNT_PAGE_STREAM, offset: 0 }
+  return pagination || { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }
 }
 
 export interface IDatabaseComponent {
@@ -24,14 +24,18 @@ export interface IDatabaseComponent {
       pagination?: Pagination
       onlyActive?: boolean
     }
-  ): AsyncGenerator<Friendship>
-  getMutualFriends(
-    userAddress1: string,
-    userAddress2: string,
-    pagination?: Pagination
-  ): AsyncGenerator<{ address: string }>
+  ): Promise<Friendship[]>
+  getFriendsCount(
+    userAddress: string,
+    options?: {
+      onlyActive?: boolean
+    }
+  ): Promise<number>
+  getMutualFriends(userAddress1: string, userAddress2: string, pagination?: Pagination): Promise<Mutual[]>
+  getMutualFriendsCount(userAddress1: string, userAddress2: string): Promise<number>
   getFriendship(userAddresses: [string, string]): Promise<Friendship | undefined>
   getLastFriendshipAction(friendshipId: string): Promise<FriendshipAction | undefined>
+  getLastFriendshipActionByUsers(userAddresses: [string, string]): Promise<FriendshipAction | undefined>
   recordFriendshipAction(
     friendshipId: string,
     actingUser: string,
@@ -50,24 +54,33 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
   const logger = logs.getLogger('db-component')
 
   return {
-    getFriends(userAddress, { onlyActive, pagination } = { onlyActive: true }) {
+    async getFriends(userAddress, { onlyActive, pagination } = { onlyActive: true }) {
       const { limit, offset } = getPaginationOrDefaults(pagination)
 
       const query: SQLStatement = SQL`SELECT * FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
 
       if (onlyActive) {
-        query.append(SQL`AND is_active = true`)
+        query.append(SQL` AND is_active = true`)
       }
 
-      query.append(SQL`ORDER BY created_at DESC OFFSET ${offset} LIMIT ${limit}`)
+      query.append(SQL` ORDER BY created_at DESC OFFSET ${offset} LIMIT ${limit}`)
 
-      const generator = pg.streamQuery<Friendship>(query)
-
-      return generator
+      const result = await pg.query<Friendship>(query)
+      return result.rows
     },
-    getMutualFriends(userAddress1, userAddress2, pagination) {
+    async getFriendsCount(userAddress, { onlyActive } = { onlyActive: true }) {
+      const query: SQLStatement = SQL`SELECT COUNT(*) FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
+
+      if (onlyActive) {
+        query.append(SQL` AND is_active = true`)
+      }
+
+      const result = await pg.query<{ count: number }>(query)
+      return result.rows[0].count
+    },
+    async getMutualFriends(userAddress1, userAddress2, pagination) {
       const { limit, offset } = getPaginationOrDefaults(pagination)
-      const generator = pg.streamQuery<{ address: string }>(
+      const result = await pg.query<Mutual>(
         SQL`WITH friendsA as (
           SELECT
             CASE
@@ -116,16 +129,62 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
           OFFSET ${offset};`
       )
 
-      return generator
+      return result.rows
+    },
+    async getMutualFriendsCount(userAddress1, userAddress2) {
+      const result = await pg.query<{ count: number }>(
+        SQL`WITH friendsA as (
+          SELECT
+            CASE
+              WHEN address_requester = ${userAddress1} then address_requested
+              else address_requester
+            end as address
+          FROM
+            (
+              SELECT
+                f_a.*
+              from
+                friendships f_a
+              where
+                (
+                  f_a.address_requester = ${userAddress1}
+                  or f_a.address_requested = ${userAddress1}
+                ) and f_a.is_active = true
+            ) as friends_a
+        )
+        SELECT
+          COUNT(address)
+        FROM
+          friendsA f_b
+        WHERE
+          address IN (
+            SELECT
+              CASE
+                WHEN address_requester = ${userAddress2} then address_requested
+                else address_requester
+              end as address_a
+            FROM
+              (
+                SELECT
+                  f_b.*
+                from
+                  friendships f_b
+                where
+                  (
+                    f_b.address_requester = ${userAddress2}
+                    or f_b.address_requested = ${userAddress2}
+                  ) and f_b.is_active = true
+              ) as friends_b
+          );`
+      )
+
+      return result.rows[0].count
     },
     async getFriendship(users) {
       const [userAddress1, userAddress2] = users
       const query = SQL`
         SELECT * FROM friendships 
-          WHERE 
-          (address_requester = ${userAddress1} AND address_requested = ${userAddress2}) 
-          OR 
-          (address_requester = ${userAddress2} AND address_requested = ${userAddress1})
+          WHERE (address_requester, address_requested) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))
       `
 
       const results = await pg.query<Friendship>(query)
@@ -135,6 +194,19 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async getLastFriendshipAction(friendshipId) {
       const query = SQL`
         SELECT * FROM friendship_actions where friendship_id = ${friendshipId} ORDER BY timestamp DESC LIMIT 1
+      `
+      const results = await pg.query<FriendshipAction>(query)
+
+      return results.rows[0]
+    },
+    async getLastFriendshipActionByUsers(users) {
+      const [userAddress1, userAddress2] = users
+      const query = SQL`
+        SELECT fa.*
+        FROM friendships f
+        INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
+        WHERE WHERE (address_requester, address_requested) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))
+        ORDER BY fa.timestamp DESC LIMIT 1
       `
       const results = await pg.query<FriendshipAction>(query)
 
@@ -160,10 +232,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async updateFriendshipStatus(friendshipId, isActive, txClient) {
       logger.debug(`updating ${friendshipId} - ${isActive}`)
-      const query = SQL`
-      UPDATE friendships SET is_active = ${isActive}, updated_at = now()
-      WHERE id = ${friendshipId}
-      RETURNING updated_at`
+      const query = SQL`UPDATE friendships SET is_active = ${isActive}, updated_at = now() WHERE id = ${friendshipId}`
 
       const results = txClient ? await txClient?.query(query) : await pg.query(query)
       return results.rowCount === 1
