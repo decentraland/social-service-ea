@@ -21,7 +21,6 @@ describe('getFriendsService', () => {
     const mockFriends = [
       createMockFriendship('0x123', '0x456'),
       createMockFriendship('0x123', '0x789'),
-
       createMockFriendship('0x987', '0x123')
     ]
     const totalFriends = 2
