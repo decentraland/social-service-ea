@@ -4,10 +4,6 @@ import { PoolClient } from 'pg'
 import { Action, AppComponents, Friendship, FriendshipAction, FriendshipRequest, Mutual, Pagination } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 
-const getPaginationOrDefaults = (pagination?: Pagination) => {
-  return pagination || { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }
-}
-
 export interface IDatabaseComponent {
   createFriendship(
     users: [string, string],
@@ -54,8 +50,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
   const logger = logs.getLogger('db-component')
 
   return {
-    async getFriends(userAddress, { onlyActive, pagination } = { onlyActive: true }) {
-      const { limit, offset } = getPaginationOrDefaults(pagination)
+    async getFriends(userAddress, { onlyActive = true, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } } = {}) {
+      const { limit, offset } = pagination
 
       const query: SQLStatement = SQL`SELECT * FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
 
@@ -78,8 +74,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const result = await pg.query<{ count: number }>(query)
       return result.rows[0].count
     },
-    async getMutualFriends(userAddress1, userAddress2, pagination) {
-      const { limit, offset } = getPaginationOrDefaults(pagination)
+    async getMutualFriends(userAddress1, userAddress2, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }) {
+      const { limit, offset } = pagination
       const result = await pg.query<Mutual>(
         SQL`WITH friendsA as (
           SELECT
