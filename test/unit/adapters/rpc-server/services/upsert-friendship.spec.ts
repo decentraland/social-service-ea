@@ -5,7 +5,7 @@ import * as FriendshipsLogic from '../../../../../src/logic/friendships'
 import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse
-} from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
+} from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
 import { ParsedUpsertFriendshipRequest } from '../../../../../src/logic/friendships'
 
 jest.mock('../../../../../src/logic/friendships')

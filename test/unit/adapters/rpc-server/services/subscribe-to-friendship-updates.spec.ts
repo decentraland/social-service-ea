@@ -1,5 +1,5 @@
 import { subscribeToFriendshipUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friendship-updates'
-import { Empty } from '@dcl/protocol/out-ts/google/protobuf/empty.gen'
+import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, AppComponents } from '../../../../../src/types'
 import { mockLogs } from '../../../../mocks/components'
 

@@ -1,6 +1,6 @@
-import { Empty } from '@dcl/protocol/out-ts/google/protobuf/empty.gen'
+import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
-import { FriendshipUpdate } from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
+import { FriendshipUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
 import mitt from 'mitt'
 import { parseEmittedUpdateToFriendshipUpdate } from '../../../logic/friendships'
 import emitterToAsyncGenerator from '../../../utils/emitterToGenerator'
