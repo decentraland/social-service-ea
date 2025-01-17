@@ -1,6 +1,7 @@
 import {
   FriendshipUpdate,
-  UpsertFriendshipPayload
+  UpsertFriendshipPayload,
+  FriendshipStatus as FriendshipRequestStatus
 } from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 import {
   Action,
@@ -10,6 +11,19 @@ import {
   SubscriptionEventsEmitter
 } from '../types'
 import { normalizeAddress } from '../utils/address'
+
+const FRIENDSHIP_STATUS_BY_ACTION: Record<
+  Action,
+  (actingUser: string, contextAddress: string) => FriendshipRequestStatus | undefined
+> = {
+  [Action.ACCEPT]: () => FriendshipRequestStatus.ACCEPTED,
+  [Action.CANCEL]: () => FriendshipRequestStatus.CANCELED,
+  [Action.DELETE]: () => FriendshipRequestStatus.DELETED,
+  [Action.REJECT]: () => FriendshipRequestStatus.REJECTED,
+  [Action.REQUEST]: (actingUser, contextAddress) =>
+    actingUser === contextAddress ? FriendshipRequestStatus.REQUEST_SENT : FriendshipRequestStatus.REQUEST_RECEIVED
+  // TODO: [Action.BLOCK]: () => FriendshipRequestStatus.BLOCKED,
+}
 
 export function isFriendshipActionValid(from: Action | null, to: Action) {
   return FRIENDSHIP_ACTION_TRANSITIONS[to].includes(from)
@@ -172,4 +186,12 @@ export function parseEmittedUpdateToFriendshipUpdate(
     default:
       return null
   }
+}
+
+export function getFriendshipRequestStatus(
+  { action, acting_user }: FriendshipAction,
+  loggedUserAddress: string
+): FriendshipRequestStatus {
+  const statusResolver = FRIENDSHIP_STATUS_BY_ACTION[action]
+  return statusResolver?.(acting_user, loggedUserAddress) ?? FriendshipRequestStatus.UNRECOGNIZED
 }

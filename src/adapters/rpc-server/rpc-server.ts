@@ -9,6 +9,7 @@ import { upsertFriendshipService } from './services/upsert-friendship'
 import { subscribeToFriendshipUpdatesService } from './services/subscribe-to-friendship-updates'
 import { SocialServiceDefinition } from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
+import { getFriendshipStatusService } from './services/get-friendship-status'
 
 export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
@@ -31,14 +32,13 @@ export async function createRpcServerComponent(
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
 
-  // TODO: return pagination data too
   const getFriends = getFriendsService({ components: { logs, db } })
   const getMutualFriends = getMutualFriendsService({ components: { logs, db } })
   const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
   const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })
   const upsertFriendship = upsertFriendshipService({ components: { logs, db, pubsub } })
   const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({ components: { logs } })
-  // const getFriendshipStatus = getFriendshipStatusService({ components: { logs } })
+  const getFriendshipStatus = getFriendshipStatusService({ components: { logs, db } })
 
   rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
@@ -46,7 +46,7 @@ export async function createRpcServerComponent(
       getMutualFriends,
       getPendingFriendshipRequests,
       getSentFriendshipRequests,
-      getFriendshipStatus: async () => ({ response: { $case: 'internalServerError', internalServerError: {} } }),
+      getFriendshipStatus,
       upsertFriendship,
       subscribeToFriendshipUpdates
     }))

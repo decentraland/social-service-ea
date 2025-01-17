@@ -40,7 +40,7 @@ describe('getFriendshipStatusService', () => {
 
     const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
 
-    expect(mockDb.getLastFriendshipActionByUsers).toHaveBeenCalledWith(['0x123', '0x456'])
+    expect(mockDb.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
     expect(result).toEqual({
       response: {
         $case: 'accepted',
@@ -56,7 +56,7 @@ describe('getFriendshipStatusService', () => {
 
     const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
 
-    expect(mockDb.getLastFriendshipActionByUsers).toHaveBeenCalledWith(['0x123', '0x456'])
+    expect(mockDb.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
     expect(result).toEqual({
       response: {
         $case: 'internalServerError',

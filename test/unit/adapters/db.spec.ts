@@ -1,7 +1,7 @@
 import { createDBComponent } from '../../../src/adapters/db'
 import { Action } from '../../../src/types'
 import SQL from 'sql-template-strings'
-import { mockLogs, mockPg } from '../../mocks/components'
+import { mockDb, mockLogs, mockPg } from '../../mocks/components'
 
 describe('db', () => {
   let dbComponent: ReturnType<typeof createDBComponent>
@@ -89,6 +89,30 @@ describe('db', () => {
 
       expect(result).toBe(mockCount)
       expect(mockPg.query).toHaveBeenCalled()
+    })
+  })
+
+  describe('getLastFriendshipActionByUsers', () => {
+    it('should return the most recent friendship action between two users', async () => {
+      const mockAction = {
+        id: 'action-1',
+        friendship_id: 'friendship-1',
+        action: Action.REQUEST,
+        acting_user: '0x123',
+        metadata: null,
+        timestamp: '2025-01-01T00:00:00.000Z'
+      }
+      mockPg.query.mockResolvedValueOnce({ rows: [mockAction], rowCount: 1 })
+
+      const result = await dbComponent.getLastFriendshipActionByUsers('0x123', '0x456')
+
+      expect(result).toEqual(mockAction)
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('WHERE (f.address_requester, f.address_requested) IN'),
+          values: expect.arrayContaining(['0x123', '0x456', '0x456', '0x123'])
+        })
+      )
     })
   })
 
@@ -184,9 +208,17 @@ describe('db', () => {
       ]
       mockPg.query.mockResolvedValueOnce({ rows: mockRequests, rowCount: mockRequests.length })
 
-      const result = await dbComponent.getReceivedFriendshipRequests('0x456')
+      const result = await dbComponent.getReceivedFriendshipRequests('0x456', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('f.address_requested ='),
+          values: expect.arrayContaining(['0x456'])
+        })
+      )
+
+      expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(10, 5)
     })
   })
 
@@ -201,20 +233,28 @@ describe('db', () => {
       ]
       mockPg.query.mockResolvedValueOnce({ rows: mockRequests, rowCount: mockRequests.length })
 
-      const result = await dbComponent.getSentFriendshipRequests('0x123')
+      const result = await dbComponent.getSentFriendshipRequests('0x123', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
+      expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(10, 5)
     })
   })
 
   describe('recordFriendshipAction', () => {
-    it('should record a friendship action', async () => {
-      const result = await dbComponent.recordFriendshipAction('friendship-id', '0x123', Action.REQUEST, {
-        message: 'Hi'
-      })
+    it.each([false, true])('should record a friendship action', async (withTxClient: boolean) => {
+      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
+      const result = await dbComponent.recordFriendshipAction(
+        'friendship-id',
+        '0x123',
+        Action.REQUEST,
+        {
+          message: 'Hi'
+        },
+        mockClient
+      )
 
       expect(result).toBe(true)
-      expect(mockPg.query).toHaveBeenCalledWith(
+      expect(withTxClient ? mockClient.query : mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
             'INSERT INTO friendship_actions (id, friendship_id, action, acting_user, metadata)'
@@ -259,4 +299,22 @@ describe('db', () => {
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
     })
   })
+
+  // Helpers
+
+  function expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(limit, offset) {
+    expect(mockPg.query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('LIMIT'),
+        values: expect.arrayContaining([limit])
+      })
+    )
+
+    expect(mockPg.query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('OFFSET'),
+        values: expect.arrayContaining([offset])
+      })
+    )
+  }
 })

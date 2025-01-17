@@ -31,7 +31,7 @@ export interface IDatabaseComponent {
   getMutualFriendsCount(userAddress1: string, userAddress2: string): Promise<number>
   getFriendship(userAddresses: [string, string]): Promise<Friendship | undefined>
   getLastFriendshipAction(friendshipId: string): Promise<FriendshipAction | undefined>
-  getLastFriendshipActionByUsers(userAddresses: [string, string]): Promise<FriendshipAction | undefined>
+  getLastFriendshipActionByUsers(loggedUser: string, friendUser: string): Promise<FriendshipAction | undefined>
   recordFriendshipAction(
     friendshipId: string,
     actingUser: string,
@@ -195,13 +195,12 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       return results.rows[0]
     },
-    async getLastFriendshipActionByUsers(users) {
-      const [userAddress1, userAddress2] = users
+    async getLastFriendshipActionByUsers(loggedUser: string, friendUser: string) {
       const query = SQL`
-        SELECT fa.*
+        SELECT fa.action, fa.acting_user as by 
         FROM friendships f
         INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-        WHERE WHERE (f.address_requester, f.address_requested) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))
+        WHERE (f.address_requester, f.address_requested) IN ((${loggedUser}, ${friendUser}), (${friendUser}, ${loggedUser}))
         ORDER BY fa.timestamp DESC LIMIT 1
       `
       const results = await pg.query<FriendshipAction>(query)
@@ -270,7 +269,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         query.append(SQL` LIMIT ${limit}`)
       }
 
-      if (offset) {
+      if (!!offset) {
         query.append(SQL` OFFSET ${offset}`)
       }
 
