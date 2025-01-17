@@ -269,7 +269,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         query.append(SQL` LIMIT ${limit}`)
       }
 
-      if (!!offset) {
+      if (offset) {
         query.append(SQL` OFFSET ${offset}`)
       }
 
