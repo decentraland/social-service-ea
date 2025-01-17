@@ -7,7 +7,7 @@ import { getMutualFriendsService } from './services/get-mutual-friends'
 import { getPendingFriendshipRequestsService } from './services/get-pending-friendship-requests'
 import { upsertFriendshipService } from './services/upsert-friendship'
 import { subscribeToFriendshipUpdatesService } from './services/subscribe-to-friendship-updates'
-import { SocialServiceDefinition } from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
+import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 import { getFriendshipStatusService } from './services/get-friendship-status'
 

@@ -8,7 +8,7 @@ import {
   validateNewFriendshipAction
 } from '../../../src/logic/friendships'
 import { Action, FriendshipStatus } from '../../../src/types'
-import { FriendshipStatus as FriendshipRequestStatus } from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
+import { FriendshipStatus as FriendshipRequestStatus } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
 
 describe('isFriendshipActionValid()', () => {
   test('it should be valid if from is null and to is REQUEST ', () => {

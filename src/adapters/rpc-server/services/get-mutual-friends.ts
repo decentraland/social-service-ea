@@ -3,7 +3,7 @@ import { INTERNAL_SERVER_ERROR, FRIENDSHIPS_PER_PAGE } from '../constants'
 import {
   GetMutualFriendsPayload,
   PaginatedUsersResponse
-} from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
+} from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
 import { normalizeAddress } from '../../../utils/address'
 import { getPage } from '../../../utils/pagination'
 

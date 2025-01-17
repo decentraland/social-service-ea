@@ -4,7 +4,7 @@ import { FRIENDSHIPS_PER_PAGE, INTERNAL_SERVER_ERROR } from '../constants'
 import {
   GetFriendsPayload,
   PaginatedUsersResponse
-} from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
+} from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
 
 export function getFriendsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
   const logger = logs.getLogger('get-friends-service')
