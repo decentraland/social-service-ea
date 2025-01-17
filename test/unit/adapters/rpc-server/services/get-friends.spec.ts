@@ -18,7 +18,12 @@ describe('getFriendsService', () => {
   })
 
   it('should return the correct list of friends with pagination data', async () => {
-    const mockFriends = [createMockFriendship('0x123', '0x456'), createMockFriendship('0x123', '0x789')]
+    const mockFriends = [
+      createMockFriendship('0x123', '0x456'),
+      createMockFriendship('0x123', '0x789'),
+
+      createMockFriendship('0x987', '0x123')
+    ]
     const totalFriends = 2
 
     mockDb.getFriends.mockResolvedValueOnce(mockFriends)
@@ -27,7 +32,7 @@ describe('getFriendsService', () => {
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
     expect(response).toEqual({
-      users: [{ address: '0x456' }, { address: '0x789' }],
+      users: [{ address: '0x456' }, { address: '0x789' }, { address: '0x987' }],
       paginationData: {
         total: totalFriends,
         page: 1

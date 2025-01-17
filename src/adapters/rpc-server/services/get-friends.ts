@@ -11,17 +11,20 @@ export function getFriendsService({ components: { logs, db } }: RPCServiceContex
 
   return async function (request: GetFriendsPayload, context: RpcServerContext): Promise<PaginatedUsersResponse> {
     const { pagination, status: _status } = request
+    const { address: loggedUserAddress } = context
     try {
       const [friends, total] = await Promise.all([
-        db.getFriends(context.address, { pagination }),
-        db.getFriendsCount(context.address)
+        db.getFriends(loggedUserAddress, { pagination }),
+        db.getFriendsCount(loggedUserAddress)
       ])
 
       // TODO: retrieve peers and filter by connectivity status
       // connecting to NATS and maintaining the same logic as stats/peers
 
       return {
-        users: friends.map((friend: Friendship) => ({ address: friend.address_requested })),
+        users: friends.map((friend) => ({
+          address: friend.address_requested === loggedUserAddress ? friend.address_requester : friend.address_requested
+        })),
         paginationData: {
           total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)
