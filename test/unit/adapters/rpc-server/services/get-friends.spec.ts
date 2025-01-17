@@ -1,8 +1,7 @@
 import { mockDb, mockLogs } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/adapters/rpc-server/services/get-friends'
-import { FRIENDSHIPS_COUNT_PAGE_STREAM, INTERNAL_SERVER_ERROR } from '../../../../../src/adapters/rpc-server/constants'
+import { FRIENDSHIPS_PER_PAGE, INTERNAL_SERVER_ERROR } from '../../../../../src/adapters/rpc-server/constants'
 import { RpcServerContext, Friendship, AppComponents } from '../../../../../src/types'
-import { emptyRequest } from '../../../../mocks/empty-request'
 
 describe('getFriendsService', () => {
   let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
@@ -18,38 +17,55 @@ describe('getFriendsService', () => {
     getFriends = getFriendsService({ components })
   })
 
-  it('should return the correct list of friends', async () => {
-    const mockGetFriendsGenerator = async function* () {
-      yield createMockFriendship('0x456', '0x123')
-      yield createMockFriendship('0x789', '0x123')
-    }
-    mockDb.getFriends.mockReturnValueOnce(mockGetFriendsGenerator())
+  it('should return the correct list of friends with pagination data', async () => {
+    const mockFriends = [createMockFriendship('0x123', '0x456'), createMockFriendship('0x123', '0x789')]
+    const totalFriends = 2
 
-    const generator = getFriends(emptyRequest, rpcContext)
+    mockDb.getFriends.mockResolvedValueOnce(mockFriends)
+    mockDb.getFriendsCount.mockResolvedValueOnce(totalFriends)
 
-    const result1 = await generator.next()
-    expect(result1.value).toEqual({ users: [{ address: '0x456' }, { address: '0x789' }] })
+    const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
-    const result2 = await generator.next()
-    expect(result2.done).toBe(true)
+    expect(response).toEqual({
+      users: [{ address: '0x456' }, { address: '0x789' }],
+      paginationData: {
+        total: totalFriends,
+        page: 1
+      }
+    })
   })
 
   it('should respect the pagination limit', async () => {
-    const mockFriendsGenerator = async function* () {
-      for (let i = 0; i < FRIENDSHIPS_COUNT_PAGE_STREAM + 1; i++) {
-        yield createMockFriendship(`0x${i + 1}`, '0x123')
+    const mockFriends = Array.from({ length: FRIENDSHIPS_PER_PAGE }, (_, i) =>
+      createMockFriendship(`0x${i + 1}`, '0x123')
+    )
+    const totalFriends = FRIENDSHIPS_PER_PAGE + 5
+
+    mockDb.getFriends.mockResolvedValueOnce(mockFriends)
+    mockDb.getFriendsCount.mockResolvedValueOnce(totalFriends)
+
+    const response = await getFriends({ pagination: { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } }, rpcContext)
+
+    expect(response.users).toHaveLength(FRIENDSHIPS_PER_PAGE)
+    expect(response.paginationData).toEqual({
+      total: totalFriends,
+      page: 1
+    })
+  })
+
+  it('should return an empty list if no friends are found', async () => {
+    mockDb.getFriends.mockResolvedValueOnce([])
+    mockDb.getFriendsCount.mockResolvedValueOnce(0)
+
+    const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
+
+    expect(response).toEqual({
+      users: [],
+      paginationData: {
+        total: 0,
+        page: 1
       }
-    }
-    mockDb.getFriends.mockReturnValueOnce(mockFriendsGenerator())
-
-    const generator = getFriends(emptyRequest, rpcContext)
-
-    const result1 = await generator.next()
-    expect(result1.value.users).toHaveLength(FRIENDSHIPS_COUNT_PAGE_STREAM)
-
-    const result2 = await generator.next()
-    expect(result2.value.users).toHaveLength(1)
-    expect(result2.done).toBe(false) // Generator still has values
+    })
   })
 
   it('should handle errors from the database gracefully', async () => {
@@ -57,9 +73,9 @@ describe('getFriendsService', () => {
       throw new Error('Database error')
     })
 
-    const generator = getFriends(emptyRequest, rpcContext)
-
-    await expect(generator.next()).rejects.toThrow(INTERNAL_SERVER_ERROR)
+    await expect(getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)).rejects.toThrow(
+      INTERNAL_SERVER_ERROR
+    )
   })
 
   // Helper to create a mock friendship object

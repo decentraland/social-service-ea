@@ -110,6 +110,10 @@ export type Friendship = {
   updated_at: string
 }
 
+export type Mutual = {
+  address: string
+}
+
 export enum Action {
   REQUEST = 'request', // request a friendship
   CANCEL = 'cancel', // cancel a friendship request
@@ -156,4 +160,9 @@ export type SubscriptionEventsEmitter = {
     timestamp: number
     metadata?: { message: string }
   }
+}
+
+export type Pagination = {
+  limit: number
+  offset: number
 }

@@ -1,7 +1,7 @@
 import { createDBComponent } from '../../../src/adapters/db'
 import { Action } from '../../../src/types'
 import SQL from 'sql-template-strings'
-import { mockLogs, mockPg } from '../../mocks/components'
+import { mockDb, mockLogs, mockPg } from '../../mocks/components'
 
 describe('db', () => {
   let dbComponent: ReturnType<typeof createDBComponent>
@@ -11,75 +11,140 @@ describe('db', () => {
   })
 
   describe('getFriends', () => {
-    it('should stream active friendships', async () => {
-      const mockGenerator = (async function* () {
-        yield { id: 'friendship-1', address_requester: '0x123', address_requested: '0x456', is_active: true }
-      })()
-      mockPg.streamQuery.mockReturnValueOnce(mockGenerator)
+    it('should return active friendships', async () => {
+      const mockFriends = [
+        { id: 'friendship-1', address_requester: '0x123', address_requested: '0x456', is_active: true }
+      ]
+      mockPg.query.mockResolvedValueOnce({ rows: mockFriends, rowCount: mockFriends.length })
 
-      const generator = dbComponent.getFriends('0x123', true)
-      const result = await generator.next()
+      const result = await dbComponent.getFriends('0x123', { onlyActive: true })
 
-      expect(mockPg.streamQuery).toHaveBeenCalledWith(
-        SQL`SELECT * FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) AND is_active = true`
+      expect(mockPg.query).toHaveBeenCalledWith(
+        SQL`SELECT * FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) AND is_active = true ORDER BY created_at DESC OFFSET ${expect.any(Number)} LIMIT ${expect.any(Number)}`
       )
-      expect(result.value).toEqual({
-        id: 'friendship-1',
-        address_requester: '0x123',
-        address_requested: '0x456',
-        is_active: true
-      })
+      expect(result).toEqual(mockFriends)
     })
 
-    it('should stream all friendships (including inactive)', async () => {
-      const mockGenerator = (async function* () {
-        yield { id: 'friendship-1', address_requester: '0x123', address_requested: '0x456', is_active: false }
-      })()
-      mockPg.streamQuery.mockReturnValueOnce(mockGenerator)
+    it('should return all friendships including inactive', async () => {
+      const mockFriends = [
+        { id: 'friendship-1', address_requester: '0x123', address_requested: '0x456', is_active: false }
+      ]
+      mockPg.query.mockResolvedValueOnce({ rows: mockFriends, rowCount: mockFriends.length })
 
-      const generator = dbComponent.getFriends('0x123', false)
-      const result = await generator.next()
+      const result = await dbComponent.getFriends('0x123', { onlyActive: false })
 
-      expect(mockPg.streamQuery).toHaveBeenCalledWith(
-        SQL`SELECT * FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'})`
+      expect(mockPg.query).toHaveBeenCalledWith(
+        SQL`SELECT * FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) ORDER BY created_at DESC OFFSET ${expect.any(Number)} LIMIT ${expect.any(Number)}`
       )
-      expect(result.value).toEqual({
-        id: 'friendship-1',
-        address_requester: '0x123',
-        address_requested: '0x456',
-        is_active: false
-      })
+      expect(result).toEqual(mockFriends)
+    })
+  })
+
+  describe('getFriendsCount', () => {
+    it('should return the count of active friendships', async () => {
+      const mockCount = 5
+      mockPg.query.mockResolvedValueOnce({ rows: [{ count: mockCount }], rowCount: 1 })
+
+      const result = await dbComponent.getFriendsCount('0x123', { onlyActive: true })
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        SQL`SELECT COUNT(*) FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) AND is_active = true`
+      )
+      expect(result).toBe(mockCount)
+    })
+
+    it('should return the count of all friendships', async () => {
+      const mockCount = 10
+      mockPg.query.mockResolvedValueOnce({ rows: [{ count: mockCount }], rowCount: 1 })
+
+      const result = await dbComponent.getFriendsCount('0x123', { onlyActive: false })
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        SQL`SELECT COUNT(*) FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'})`
+      )
+      expect(result).toBe(mockCount)
     })
   })
 
   describe('getMutualFriends', () => {
-    it('should stream mutual friends', async () => {
-      const mockGenerator = (async function* () {
-        yield { address: '0x789' }
-      })()
-      mockPg.streamQuery.mockReturnValueOnce(mockGenerator)
+    // TODO improve this test
+    it('should return mutual friends', async () => {
+      const mockMutualFriends = [{ address: '0x789' }]
+      mockPg.query.mockResolvedValueOnce({ rows: mockMutualFriends, rowCount: mockMutualFriends.length })
 
-      const generator = dbComponent.getMutualFriends('0x123', '0x456')
-      const result = await generator.next()
+      const result = await dbComponent.getMutualFriends('0x123', '0x456')
 
-      expect(result.value).toEqual({ address: '0x789' })
-      expect(mockPg.streamQuery).toHaveBeenCalled()
+      expect(result).toEqual(mockMutualFriends)
+      expect(mockPg.query).toHaveBeenCalled()
+    })
+  })
+
+  describe('getMutualFriendsCount', () => {
+    // TODO improve this test
+    it('should return the count of mutual friends', async () => {
+      const mockCount = 3
+      mockPg.query.mockResolvedValueOnce({ rows: [{ count: mockCount }], rowCount: 1 })
+
+      const result = await dbComponent.getMutualFriendsCount('0x123', '0x456')
+
+      expect(result).toBe(mockCount)
+      expect(mockPg.query).toHaveBeenCalled()
+    })
+  })
+
+  describe('getLastFriendshipActionByUsers', () => {
+    it('should return the most recent friendship action between two users', async () => {
+      const mockAction = {
+        id: 'action-1',
+        friendship_id: 'friendship-1',
+        action: Action.REQUEST,
+        acting_user: '0x123',
+        metadata: null,
+        timestamp: '2025-01-01T00:00:00.000Z'
+      }
+      mockPg.query.mockResolvedValueOnce({ rows: [mockAction], rowCount: 1 })
+
+      const result = await dbComponent.getLastFriendshipActionByUsers('0x123', '0x456')
+
+      expect(result).toEqual(mockAction)
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('WHERE (f.address_requester, f.address_requested) IN'),
+          values: expect.arrayContaining(['0x123', '0x456', '0x456', '0x123'])
+        })
+      )
     })
   })
 
   describe('createFriendship', () => {
     it('should create a new friendship', async () => {
-      await dbComponent.createFriendship(['0x123', '0x456'], true)
+      mockPg.query.mockResolvedValueOnce({
+        rows: [{ id: 'friendship-1', created_at: '2025-01-01T00:00:00.000Z' }],
+        rowCount: 1
+      })
+
+      const result = await dbComponent.createFriendship(['0x123', '0x456'], true)
 
       expect(mockPg.query).toHaveBeenCalledWith(
-        SQL`INSERT INTO friendships (id, address_requester, address_requested, is_active) VALUES (${expect.any(String)}, ${'0x123'}, ${'0x456'}, ${true})`
+        expect.objectContaining({
+          text: expect.stringContaining(
+            'INSERT INTO friendships (id, address_requester, address_requested, is_active)'
+          ),
+          values: expect.arrayContaining([expect.any(String), '0x123', '0x456', true])
+        })
       )
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('RETURNING id, created_at')
+        })
+      )
+      expect(result).toEqual({ id: 'friendship-1', created_at: '2025-01-01T00:00:00.000Z' })
     })
   })
 
   describe('updateFriendshipStatus', () => {
     it('should update friendship status', async () => {
-      mockPg.query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] })
+      mockPg.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ updated_at: '2025-01-01T00:00:00.000Z' }] })
 
       const result = await dbComponent.updateFriendshipStatus('friendship-id', false)
 
@@ -111,7 +176,6 @@ describe('db', () => {
       const result = await dbComponent.getFriendship(['0x123', '0x456'])
 
       expect(result).toEqual(mockFriendship)
-      expect(mockPg.query).toHaveBeenCalled()
     })
   })
 
@@ -142,11 +206,19 @@ describe('db', () => {
           metadata: { message: 'Hello' }
         }
       ]
-      mockPg.query.mockResolvedValueOnce({ rows: mockRequests, rowCount: 1 })
+      mockPg.query.mockResolvedValueOnce({ rows: mockRequests, rowCount: mockRequests.length })
 
-      const result = await dbComponent.getReceivedFriendshipRequests('0x456')
+      const result = await dbComponent.getReceivedFriendshipRequests('0x456', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('f.address_requested ='),
+          values: expect.arrayContaining(['0x456'])
+        })
+      )
+
+      expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(10, 5)
     })
   })
 
@@ -159,27 +231,41 @@ describe('db', () => {
           metadata: { message: 'Hi there' }
         }
       ]
-      mockPg.query.mockResolvedValueOnce({ rows: mockRequests, rowCount: 1 })
+      mockPg.query.mockResolvedValueOnce({ rows: mockRequests, rowCount: mockRequests.length })
 
-      const result = await dbComponent.getSentFriendshipRequests('0x123')
+      const result = await dbComponent.getSentFriendshipRequests('0x123', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
+      expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(10, 5)
     })
   })
 
   describe('recordFriendshipAction', () => {
-    it('should record a friendship action', async () => {
-      const result = await dbComponent.recordFriendshipAction('friendship-id', '0x123', Action.REQUEST, {
-        message: 'Hi'
-      })
+    it.each([false, true])('should record a friendship action', async (withTxClient: boolean) => {
+      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
+      const result = await dbComponent.recordFriendshipAction(
+        'friendship-id',
+        '0x123',
+        Action.REQUEST,
+        {
+          message: 'Hi'
+        },
+        mockClient
+      )
 
       expect(result).toBe(true)
-      expect(mockPg.query).toHaveBeenCalledWith(
+      expect(withTxClient ? mockClient.query : mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
             'INSERT INTO friendship_actions (id, friendship_id, action, acting_user, metadata)'
           ),
-          values: expect.arrayContaining(['friendship-id', '0x123', Action.REQUEST, { message: 'Hi' }])
+          values: expect.arrayContaining([
+            expect.any(String),
+            'friendship-id',
+            Action.REQUEST,
+            '0x123',
+            { message: 'Hi' }
+          ])
         })
       )
     })
@@ -213,4 +299,22 @@ describe('db', () => {
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
     })
   })
+
+  // Helpers
+
+  function expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(limit, offset) {
+    expect(mockPg.query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('LIMIT'),
+        values: expect.arrayContaining([limit])
+      })
+    )
+
+    expect(mockPg.query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('OFFSET'),
+        values: expect.arrayContaining([offset])
+      })
+    )
+  }
 })

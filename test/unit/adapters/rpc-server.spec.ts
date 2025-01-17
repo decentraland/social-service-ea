@@ -1,7 +1,6 @@
 import { createRpcServerComponent, IRPCServerComponent } from ' ../../../src/adapters/rpc-server/rpc-server'
-import { RpcServerContext, SubscriptionEventsEmitter } from '../../../src/types'
+import { RpcServerContext } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
-import mitt from 'mitt'
 import { mockConfig, mockDb, mockLogs, mockPubSub, mockUWs } from '../../mocks/components'
 
 jest.mock('@dcl/rpc', () => ({

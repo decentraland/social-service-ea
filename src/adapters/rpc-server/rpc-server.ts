@@ -1,5 +1,4 @@
 import { Transport, createRpcServer } from '@dcl/rpc'
-import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service_v2/social_service.gen'
 import { registerService } from '@dcl/rpc/dist/codegen'
 import { IBaseComponent } from '@well-known-components/interfaces'
 import { AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../../types'
@@ -8,6 +7,9 @@ import { getMutualFriendsService } from './services/get-mutual-friends'
 import { getPendingFriendshipRequestsService } from './services/get-pending-friendship-requests'
 import { upsertFriendshipService } from './services/upsert-friendship'
 import { subscribeToFriendshipUpdatesService } from './services/subscribe-to-friendship-updates'
+import { SocialServiceDefinition } from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
+import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
+import { getFriendshipStatusService } from './services/get-friendship-status'
 
 export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
@@ -33,9 +35,10 @@ export async function createRpcServerComponent(
   const getFriends = getFriendsService({ components: { logs, db } })
   const getMutualFriends = getMutualFriendsService({ components: { logs, db } })
   const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
-  const getSentFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
+  const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })
   const upsertFriendship = upsertFriendshipService({ components: { logs, db, pubsub } })
   const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({ components: { logs } })
+  const getFriendshipStatus = getFriendshipStatusService({ components: { logs, db } })
 
   rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
@@ -43,6 +46,7 @@ export async function createRpcServerComponent(
       getMutualFriends,
       getPendingFriendshipRequests,
       getSentFriendshipRequests,
+      getFriendshipStatus,
       upsertFriendship,
       subscribeToFriendshipUpdates
     }))

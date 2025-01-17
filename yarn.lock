@@ -344,10 +344,10 @@
     "@well-known-components/fetch-component" "^2.0.2"
     "@well-known-components/interfaces" "^1.4.2"
 
-"@dcl/protocol@^1.0.0-8789372854.commit-f692c7a":
-  version "1.0.0-8789372854.commit-f692c7a"
-  resolved "https://registry.yarnpkg.com/@dcl/protocol/-/protocol-1.0.0-8789372854.commit-f692c7a.tgz#1d817d50852dbbc143e2507d3eb617d1c79f9914"
-  integrity sha512-emLWfF/8Iciz0nnXFShZXBSbpsdbTHAJuh8st3de5C+4hlNV00Gs5pDBehsxENqHiq9yqL8rDng8EzTXhryAXw==
+"@dcl/protocol@^1.0.0-12815643167.commit-c4162c4":
+  version "1.0.0-12815778152.commit-3614ead"
+  resolved "https://registry.yarnpkg.com/@dcl/protocol/-/protocol-1.0.0-12815778152.commit-3614ead.tgz#5f61db13d426e61ecda6c6a237d148fcdfcb6f8e"
+  integrity sha512-JrtwOtKICHVdwFRC9c4XQbmsw8QpGkFwAiuHp7MBuBbfITIx8ZlWELBlmQH6sq18jzTl83Uz7IohTeAmz5U/wg==
   dependencies:
     "@dcl/ts-proto" "1.154.0"
 
@@ -3874,9 +3874,9 @@ ts-node@^10.9.2:
     yn "3.1.1"
 
 ts-poet@^6.4.1:
-  version "6.8.1"
-  resolved "https://registry.yarnpkg.com/ts-poet/-/ts-poet-6.8.1.tgz#7202e9fda7ad428ae7b42cfa19291e77e23cfc51"
-  integrity sha512-uqdjJGnQQjBwUeJggUi4o8VhRjUmEdRfo+uqEL+K8w7mKPfLUFAQ1dSURyhFfbA4T/cWPh8Xa7iBgO7jJNsc1A==
+  version "6.9.0"
+  resolved "https://registry.yarnpkg.com/ts-poet/-/ts-poet-6.9.0.tgz#e63ac8d8a9e91a2e0e5d2bf0755db71346728bd2"
+  integrity sha512-roe6W6MeZmCjRmppyfOURklO5tQFQ6Sg7swURKkwYJvV7dbGCrK28um5+51iW3twdPRKtwarqFAVMU6G1mvnuQ==
   dependencies:
     dprint-node "^1.0.8"
 
@@ -3887,10 +3887,18 @@ ts-poet@^6.7.0:
   dependencies:
     dprint-node "^1.0.8"
 
-ts-proto-descriptors@1.15.0, ts-proto-descriptors@^1.15.0:
+ts-proto-descriptors@1.15.0:
   version "1.15.0"
   resolved "https://registry.yarnpkg.com/ts-proto-descriptors/-/ts-proto-descriptors-1.15.0.tgz#e859e3a2887da2d954c552524719b80bdb6ee355"
   integrity sha512-TYyJ7+H+7Jsqawdv+mfsEpZPTIj9siDHS6EMCzG/z3b/PZiphsX+mWtqFfFVe5/N0Th6V3elK9lQqjnrgTOfrg==
+  dependencies:
+    long "^5.2.3"
+    protobufjs "^7.2.4"
+
+ts-proto-descriptors@^1.15.0:
+  version "1.16.0"
+  resolved "https://registry.yarnpkg.com/ts-proto-descriptors/-/ts-proto-descriptors-1.16.0.tgz#e9f15d5d23774088f8573fa5a2d75130c64a565a"
+  integrity sha512-3yKuzMLpltdpcyQji1PJZRfoo4OJjNieKTYkQY8pF7xGKsYz/RHe3aEe4KiRxcinoBmnEhmuI+yJTxLb922ULA==
   dependencies:
     long "^5.2.3"
     protobufjs "^7.2.4"
@@ -3938,9 +3946,9 @@ typed-url-params@^1.0.1:
   integrity sha512-762imXO+myoSDHD9+YxUfSmfT0yGH1j+3s9UJ6uqKkOYIwHH6/gsFo67ZoST0Ey/RSoaps1zGu1N+eiuuCxfeg==
 
 typescript@^5.4.5:
-  version "5.4.5"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.4.5.tgz#42ccef2c571fdbd0f6718b1d1f5e6e5ef006f611"
-  integrity sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ==
+  version "5.7.3"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.7.3.tgz#919b44a7dbb8583a9b856d162be24a54bf80073e"
+  integrity sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw==
 
 "uWebSockets.js@github:uNetworking/uWebSockets.js#v20.43.0":
   version "20.43.0"

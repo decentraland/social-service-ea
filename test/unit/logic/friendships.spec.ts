@@ -1,4 +1,5 @@
 import {
+  getFriendshipRequestStatus,
   getNewFriendshipStatus,
   isFriendshipActionValid,
   isUserActionValid,
@@ -7,6 +8,7 @@ import {
   validateNewFriendshipAction
 } from '../../../src/logic/friendships'
 import { Action, FriendshipStatus } from '../../../src/types'
+import { FriendshipStatus as FriendshipRequestStatus } from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 
 describe('isFriendshipActionValid()', () => {
   test('it should be valid if from is null and to is REQUEST ', () => {
@@ -507,5 +509,34 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
         to: '0xB'
       })
     ).toBe(null)
+  })
+})
+
+describe('getFriendshipRequestStatus()', () => {
+  const friendshipAction = {
+    id: '1111',
+    acting_user: '0x123',
+    friendship_id: '1111',
+    timestamp: new Date().toISOString()
+  }
+
+  test.each([
+    [Action.ACCEPT, 'accepted', FriendshipRequestStatus.ACCEPTED],
+    [Action.CANCEL, 'canceled', FriendshipRequestStatus.CANCELED],
+    [Action.DELETE, 'deleted', FriendshipRequestStatus.DELETED],
+    [Action.REJECT, 'rejected', FriendshipRequestStatus.REJECTED]
+  ])('when the last action is %s it should return %s', (action, __, expected) => {
+    expect(getFriendshipRequestStatus({ ...friendshipAction, action }, '0x123')).toBe(expected)
+  })
+
+  test('when the last action is request and the acting user is the logged user it should return request sent', () => {
+    expect(getFriendshipRequestStatus({ ...friendshipAction, action: Action.REQUEST }, '0x123')).toBe(
+      FriendshipRequestStatus.REQUEST_SENT
+    )
+  })
+
+  test('when the last action is request and the acting user is not the logged user it should return request received', () => {
+    const requestMadeByAnotherUser = { ...friendshipAction, acting_user: '0x456', action: Action.REQUEST }
+    expect(getFriendshipRequestStatus(requestMadeByAnotherUser, '0x123')).toBe(FriendshipRequestStatus.REQUEST_RECEIVED)
   })
 })

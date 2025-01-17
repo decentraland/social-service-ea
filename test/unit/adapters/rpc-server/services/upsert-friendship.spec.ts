@@ -5,7 +5,7 @@ import * as FriendshipsLogic from '../../../../../src/logic/friendships'
 import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse
-} from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
+} from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 import { ParsedUpsertFriendshipRequest } from '../../../../../src/logic/friendships'
 
 jest.mock('../../../../../src/logic/friendships')
@@ -33,7 +33,6 @@ describe('upsertFriendshipService', () => {
 
   const existingFriendship = {
     id: 'friendship-id',
-    status: FriendshipStatus.Requested,
     address_requester: rpcContext.address,
     address_requested: userAddress,
     is_active: true,
@@ -103,7 +102,10 @@ describe('upsertFriendshipService', () => {
     expect(result).toEqual({
       response: {
         $case: 'accepted',
-        accepted: {}
+        accepted: {
+          id: existingFriendship.id,
+          createdAt: expect.any(Number)
+        }
       }
     })
   })
@@ -114,7 +116,10 @@ describe('upsertFriendshipService', () => {
     jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Requested)
 
     mockDb.getFriendship.mockResolvedValueOnce(null)
-    mockDb.createFriendship.mockResolvedValueOnce('new-friendship-id')
+    mockDb.createFriendship.mockResolvedValueOnce({
+      id: 'new-friendship-id',
+      created_at: new Date()
+    })
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
@@ -129,9 +134,32 @@ describe('upsertFriendshipService', () => {
     expect(result).toEqual({
       response: {
         $case: 'accepted',
-        accepted: {}
+        accepted: {
+          id: 'new-friendship-id',
+          createdAt: expect.any(Number)
+        }
       }
     })
+  })
+
+  it('should publish an event after a successful friendship update', async () => {
+    jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockParsedRequest)
+    jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
+    jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
+
+    mockDb.getFriendship.mockResolvedValueOnce(existingFriendship)
+    mockDb.getLastFriendshipAction.mockResolvedValueOnce(lastFriendshipAction)
+
+    const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
+
+    expect(components.pubsub.publishFriendshipUpdate).toHaveBeenCalledWith({
+      from: rpcContext.address,
+      to: userAddress,
+      action: mockParsedRequest.action,
+      timestamp: expect.any(Number),
+      metadata: mockParsedRequest.metadata
+    })
+    expect(result.response.$case).toBe('accepted')
   })
 
   it('should handle errors gracefully', async () => {

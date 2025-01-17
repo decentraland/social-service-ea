@@ -1,7 +1,7 @@
 import { mockDb, mockLogs } from '../../../../mocks/components'
 import { getPendingFriendshipRequestsService } from '../../../../../src/adapters/rpc-server/services/get-pending-friendship-requests'
 import { RpcServerContext, AppComponents } from '../../../../../src/types'
-import { FriendshipRequestsResponse } from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
+import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 import { emptyRequest } from '../../../../mocks/empty-request'
 import { createMockFriendshipRequest, createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'
 
@@ -27,7 +27,7 @@ describe('getPendingFriendshipRequestsService', () => {
 
     mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
 
-    const result: FriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
+    const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
 
     expect(result).toEqual({
       response: {
@@ -47,7 +47,7 @@ describe('getPendingFriendshipRequestsService', () => {
       throw new Error('Database error')
     })
 
-    const result: FriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
+    const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
 
     expect(result).toEqual({
       response: {
@@ -62,7 +62,7 @@ describe('getPendingFriendshipRequestsService', () => {
 
     mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
 
-    const result: FriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
+    const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
 
     expect(result).toEqual({
       response: {

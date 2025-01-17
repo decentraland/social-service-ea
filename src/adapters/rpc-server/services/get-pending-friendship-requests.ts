@@ -1,13 +1,18 @@
-import { Empty } from '@dcl/protocol/out-ts/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
-import { FriendshipRequestsResponse } from '@dcl/protocol/out-ts/decentraland/social_service_v2/social_service.gen'
+import {
+  PaginatedFriendshipRequestsResponse,
+  GetFriendshipRequestsPayload
+} from '@dcl/protocol/out-ts/decentraland/social_service/v3/social_service_v3.gen'
 
 export function getPendingFriendshipRequestsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
   const logger = logs.getLogger('get-pending-friendship-requests-service')
 
-  return async function (_request: Empty, context: RpcServerContext): Promise<FriendshipRequestsResponse> {
+  return async function (
+    request: GetFriendshipRequestsPayload,
+    context: RpcServerContext
+  ): Promise<PaginatedFriendshipRequestsResponse> {
     try {
-      const pendingRequests = await db.getReceivedFriendshipRequests(context.address)
+      const pendingRequests = await db.getReceivedFriendshipRequests(context.address, request.pagination)
       const mappedRequests = pendingRequests.map(({ address, timestamp, metadata }) => ({
         user: { address },
         createdAt: new Date(timestamp).getTime(),
