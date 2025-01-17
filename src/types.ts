@@ -16,6 +16,7 @@ import { IRPCServerComponent } from './adapters/rpc-server/rpc-server'
 import { IPubSubComponent } from './adapters/pubsub'
 import { HttpRequest, HttpResponse, IUWsComponent, WebSocket } from '@well-known-components/uws-http-server'
 import { IUWebSocketEventMap } from './utils/UWebSocketTransport'
+import { IArchipelagoStatsComponent } from './adapters/archipelago-stats'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -33,6 +34,7 @@ export type BaseComponents = {
   fetcher: IFetchComponent
   redis: IRedisComponent
   pubsub: IPubSubComponent
+  archipelagoStats: IArchipelagoStatsComponent
 }
 
 // components used in runtime

@@ -11,6 +11,7 @@ import { createRpcServerComponent } from './adapters/rpc-server'
 import createRedisComponent from './adapters/redis'
 import createPubSubComponent from './adapters/pubsub'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
+import { createArchipelagoStatsComponent } from './adapters/archipelago-stats'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -49,6 +50,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
+  const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher })
   const rpcServer = await createRpcServerComponent({ logs, db, pubsub, server, config })
 
   return {

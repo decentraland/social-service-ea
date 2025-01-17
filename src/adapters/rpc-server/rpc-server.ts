@@ -15,11 +15,17 @@ export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
 }
 
-export async function createRpcServerComponent(
-  components: Pick<AppComponents, 'logs' | 'db' | 'pubsub' | 'config' | 'server'>
-): Promise<IRPCServerComponent> {
-  const { logs, db, pubsub, config, server } = components
-
+export async function createRpcServerComponent({
+  logs,
+  db,
+  pubsub,
+  config,
+  server,
+  archipelagoStats
+}: Pick<
+  AppComponents,
+  'logs' | 'db' | 'pubsub' | 'config' | 'server' | 'archipelagoStats'
+>): Promise<IRPCServerComponent> {
   const SHARED_CONTEXT: Pick<RpcServerContext, 'subscribers'> = {
     subscribers: {}
   }
@@ -32,7 +38,7 @@ export async function createRpcServerComponent(
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
 
-  const getFriends = getFriendsService({ components: { logs, db } })
+  const getFriends = getFriendsService({ components: { logs, db, archipelagoStats } })
   const getMutualFriends = getMutualFriendsService({ components: { logs, db } })
   const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
   const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })
