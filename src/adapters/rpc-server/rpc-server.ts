@@ -15,22 +15,21 @@ export async function createRpcServerComponent({
   db,
   pubsub,
   config,
-  server,
-  redis
-}: Pick<AppComponents, 'logs' | 'db' | 'pubsub' | 'config' | 'server' | 'redis'>): Promise<IRPCServerComponent> {
+  server
+}: Pick<AppComponents, 'logs' | 'db' | 'pubsub' | 'config' | 'server'>): Promise<IRPCServerComponent> {
   const SHARED_CONTEXT: Pick<RpcServerContext, 'subscribers'> = {
     subscribers: {}
   }
 
   const rpcServer = createRpcServer<RpcServerContext>({
-    logger: logs.getLogger('rpcServer')
+    logger: logs.getLogger('rpc-server')
   })
 
-  const logger = logs.getLogger('rpcServer-handler')
+  const logger = logs.getLogger('rpc-server-handler')
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
 
-  const getFriends = getFriendsService({ components: { logs, db, redis } })
+  const getFriends = getFriendsService({ components: { logs, db } })
   const getMutualFriends = getMutualFriendsService({ components: { logs, db } })
   const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
   const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })

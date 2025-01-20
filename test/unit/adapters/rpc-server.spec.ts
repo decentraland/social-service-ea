@@ -29,8 +29,7 @@ describe('createRpcServerComponent', () => {
       db: mockDb,
       pubsub: mockPubSub,
       config: mockConfig,
-      server: mockUWs,
-      redis: mockRedis
+      server: mockUWs
     })
   })
 

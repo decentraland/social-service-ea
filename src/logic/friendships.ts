@@ -1,12 +1,10 @@
 import {
   FriendshipUpdate,
   UpsertFriendshipPayload,
-  FriendshipStatus as FriendshipRequestStatus,
-  ConnectivityStatus
+  FriendshipStatus as FriendshipRequestStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
 import {
   Action,
-  Friend,
   FRIENDSHIP_ACTION_TRANSITIONS,
   FriendshipAction,
   FriendshipStatus,
@@ -196,22 +194,4 @@ export function getFriendshipRequestStatus(
 ): FriendshipRequestStatus {
   const statusResolver = FRIENDSHIP_STATUS_BY_ACTION[action]
   return statusResolver?.(acting_user, loggedUserAddress) ?? FriendshipRequestStatus.UNRECOGNIZED
-}
-
-const filtersByConnectivityStatus = {
-  [ConnectivityStatus.ONLINE]: (friend: Friend, connectedPeers: Record<string, boolean>) =>
-    connectedPeers[friend.address],
-  [ConnectivityStatus.OFFLINE]: (friend: Friend, connectedPeers: Record<string, boolean>) =>
-    !connectedPeers[friend.address],
-  [ConnectivityStatus.AWAY]: (friend: Friend, connectedPeers: Record<string, boolean>) =>
-    !connectedPeers[friend.address],
-  [ConnectivityStatus.UNRECOGNIZED]: () => true
-}
-
-export function byConnectivityStatus(status: ConnectivityStatus, connectedPeers: Record<string, boolean>) {
-  const filter = filtersByConnectivityStatus[status]
-
-  if (!filter) () => true
-
-  return (friend: Friend) => filter(friend, connectedPeers)
 }

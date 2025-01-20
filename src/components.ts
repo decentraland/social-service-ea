@@ -52,7 +52,7 @@ export async function initComponents(): Promise<AppComponents> {
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher })
-  const rpcServer = await createRpcServerComponent({ logs, db, pubsub, server, config, redis })
+  const rpcServer = await createRpcServerComponent({ logs, db, pubsub, server, config })
   const scheduler = await createSchedulerComponent({ logs, archipelagoStats, redis, config })
 
   return {
