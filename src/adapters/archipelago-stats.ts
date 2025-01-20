@@ -1,9 +1,4 @@
-import { IBaseComponent } from '@well-known-components/interfaces'
-import { AppComponents } from '../types'
-
-export type IArchipelagoStatsComponent = IBaseComponent & {
-  getPeers(): Promise<Record<string, boolean>>
-}
+import { AppComponents, IArchipelagoStatsComponent } from '../types'
 
 export async function createArchipelagoStatsComponent({
   logs,

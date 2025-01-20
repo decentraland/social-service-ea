@@ -1,10 +1,12 @@
-import { mockDb, mockLogs } from '../../../../mocks/components'
+import { mockDb, mockLogs, mockRedis } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/adapters/rpc-server/services/get-friends'
 import { FRIENDSHIPS_PER_PAGE, INTERNAL_SERVER_ERROR } from '../../../../../src/adapters/rpc-server/constants'
-import { RpcServerContext, Friendship, AppComponents } from '../../../../../src/types'
+import { RpcServerContext, Friendship, AppComponents, Friend } from '../../../../../src/types'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+import { PEERS_CACHE_KEY } from '../../../../../src/utils/peers'
 
 describe('getFriendsService', () => {
-  let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
+  let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs' | 'redis'>>
   let getFriends: ReturnType<typeof getFriendsService>
 
   const rpcContext: RpcServerContext = {
@@ -13,20 +15,17 @@ describe('getFriendsService', () => {
   }
 
   beforeEach(() => {
-    components = { db: mockDb, logs: mockLogs }
+    components = { db: mockDb, logs: mockLogs, redis: mockRedis }
     getFriends = getFriendsService({ components })
   })
 
   it('should return the correct list of friends with pagination data', async () => {
-    const mockFriends = [
-      createMockFriendship('0x123', '0x456'),
-      createMockFriendship('0x123', '0x789'),
-      createMockFriendship('0x987', '0x123')
-    ]
+    const mockFriends = [createMockFriend('0x456'), createMockFriend('0x789'), createMockFriend('0x987')]
     const totalFriends = 2
 
     mockDb.getFriends.mockResolvedValueOnce(mockFriends)
     mockDb.getFriendsCount.mockResolvedValueOnce(totalFriends)
+    mockRedis.get.mockResolvedValueOnce({})
 
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
@@ -40,13 +39,12 @@ describe('getFriendsService', () => {
   })
 
   it('should respect the pagination limit', async () => {
-    const mockFriends = Array.from({ length: FRIENDSHIPS_PER_PAGE }, (_, i) =>
-      createMockFriendship(`0x${i + 1}`, '0x123')
-    )
+    const mockFriends = Array.from({ length: FRIENDSHIPS_PER_PAGE }, (_, i) => createMockFriend(`0x${i + 1}`))
     const totalFriends = FRIENDSHIPS_PER_PAGE + 5
 
     mockDb.getFriends.mockResolvedValueOnce(mockFriends)
     mockDb.getFriendsCount.mockResolvedValueOnce(totalFriends)
+    mockRedis.get.mockResolvedValueOnce({})
 
     const response = await getFriends({ pagination: { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } }, rpcContext)
 
@@ -82,13 +80,83 @@ describe('getFriendsService', () => {
     )
   })
 
+  it('should filter online friends correctly', async () => {
+    const mockFriends = [createMockFriend('0x456'), createMockFriend('0x789')]
+
+    mockDb.getFriends.mockResolvedValueOnce(mockFriends)
+    mockDb.getFriendsCount.mockResolvedValueOnce(2)
+    mockRedis.get.mockResolvedValueOnce({ '0x456': true })
+
+    const response = await getFriends(
+      { pagination: { limit: 10, offset: 0 }, status: ConnectivityStatus.ONLINE },
+      rpcContext
+    )
+
+    expect(response.users).toHaveLength(1)
+    expect(response.users[0].address).toBe('0x456')
+  })
+
+  it('should filter offline friends correctly', async () => {
+    const mockFriends = [createMockFriend('0x456'), createMockFriend('0x789')]
+
+    mockDb.getFriends.mockResolvedValueOnce(mockFriends)
+    mockDb.getFriendsCount.mockResolvedValueOnce(2)
+    mockRedis.get.mockResolvedValueOnce({ '0x456': true })
+
+    const response = await getFriends(
+      { pagination: { limit: 10, offset: 0 }, status: ConnectivityStatus.OFFLINE },
+      rpcContext
+    )
+
+    expect(response.users).toHaveLength(1)
+    expect(response.users[0].address).toBe('0x789')
+  })
+
+  it('should return all friends when no status is specified', async () => {
+    const mockFriends = [createMockFriend('0x456'), createMockFriend('0x789')]
+
+    mockDb.getFriends.mockResolvedValueOnce(mockFriends)
+    mockDb.getFriendsCount.mockResolvedValueOnce(2)
+    mockRedis.get.mockResolvedValueOnce({ '0x456': true })
+
+    const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
+
+    expect(response.users).toHaveLength(2)
+  })
+
+  it('should handle Redis errors gracefully when filtering by status', async () => {
+    const mockFriends = [createMockFriend('0x456'), createMockFriend('0x789')]
+
+    mockDb.getFriends.mockResolvedValueOnce(mockFriends)
+    mockDb.getFriendsCount.mockResolvedValueOnce(2)
+    mockRedis.get.mockRejectedValueOnce(new Error('Redis error'))
+
+    const response = await getFriends(
+      { pagination: { limit: 10, offset: 0 }, status: ConnectivityStatus.ONLINE },
+      rpcContext
+    )
+
+    expect(response.users).toHaveLength(0)
+    expect(components.logs.getLogger('get-friends-service').error).toHaveBeenCalled()
+  })
+
+  it('should handle empty Redis response gracefully', async () => {
+    const mockFriends = [createMockFriend('0x456'), createMockFriend('0x789')]
+
+    mockDb.getFriends.mockResolvedValueOnce(mockFriends)
+    mockDb.getFriendsCount.mockResolvedValueOnce(2)
+    mockRedis.get.mockResolvedValueOnce(null)
+
+    const response = await getFriends(
+      { pagination: { limit: 10, offset: 0 }, status: ConnectivityStatus.ONLINE },
+      rpcContext
+    )
+
+    expect(response.users).toHaveLength(0)
+  })
+
   // Helper to create a mock friendship object
-  const createMockFriendship = (requester: string, requested: string): Friendship => ({
-    address_requester: requester,
-    address_requested: requested,
-    id: 'mock-friendship-id',
-    is_active: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+  const createMockFriend = (address: string): Friend => ({
+    address
   })
 })

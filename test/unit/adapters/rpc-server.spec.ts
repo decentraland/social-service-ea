@@ -1,7 +1,7 @@
-import { createRpcServerComponent, IRPCServerComponent } from ' ../../../src/adapters/rpc-server/rpc-server'
-import { RpcServerContext } from '../../../src/types'
+import { createRpcServerComponent } from ' ../../../src/adapters/rpc-server/rpc-server'
+import { IRPCServerComponent, RpcServerContext } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
-import { mockConfig, mockDb, mockLogs, mockPubSub, mockUWs } from '../../mocks/components'
+import { mockConfig, mockDb, mockLogs, mockPubSub, mockRedis, mockUWs } from '../../mocks/components'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -29,7 +29,8 @@ describe('createRpcServerComponent', () => {
       db: mockDb,
       pubsub: mockPubSub,
       config: mockConfig,
-      server: mockUWs
+      server: mockUWs,
+      redis: mockRedis
     })
   })
 

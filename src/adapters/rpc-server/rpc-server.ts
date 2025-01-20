@@ -1,7 +1,6 @@
-import { Transport, createRpcServer } from '@dcl/rpc'
+import { createRpcServer } from '@dcl/rpc'
 import { registerService } from '@dcl/rpc/dist/codegen'
-import { IBaseComponent } from '@well-known-components/interfaces'
-import { AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../../types'
+import { AppComponents, IRPCServerComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../types'
 import { getFriendsService } from './services/get-friends'
 import { getMutualFriendsService } from './services/get-mutual-friends'
 import { getPendingFriendshipRequestsService } from './services/get-pending-friendship-requests'
@@ -11,21 +10,14 @@ import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/socia
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 import { getFriendshipStatusService } from './services/get-friendship-status'
 
-export type IRPCServerComponent = IBaseComponent & {
-  attachUser(user: { transport: Transport; address: string }): void
-}
-
 export async function createRpcServerComponent({
   logs,
   db,
   pubsub,
   config,
   server,
-  archipelagoStats
-}: Pick<
-  AppComponents,
-  'logs' | 'db' | 'pubsub' | 'config' | 'server' | 'archipelagoStats'
->): Promise<IRPCServerComponent> {
+  redis
+}: Pick<AppComponents, 'logs' | 'db' | 'pubsub' | 'config' | 'server' | 'redis'>): Promise<IRPCServerComponent> {
   const SHARED_CONTEXT: Pick<RpcServerContext, 'subscribers'> = {
     subscribers: {}
   }
@@ -38,7 +30,7 @@ export async function createRpcServerComponent({
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
 
-  const getFriends = getFriendsService({ components: { logs, db, archipelagoStats } })
+  const getFriends = getFriendsService({ components: { logs, db, redis } })
   const getMutualFriends = getMutualFriendsService({ components: { logs, db } })
   const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
   const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })

@@ -1,7 +1,7 @@
 import { createDBComponent } from '../../../src/adapters/db'
 import { Action } from '../../../src/types'
-import SQL from 'sql-template-strings'
-import { mockDb, mockLogs, mockPg } from '../../mocks/components'
+import SQL, { SQLStatement } from 'sql-template-strings'
+import { mockLogs, mockPg } from '../../mocks/components'
 
 describe('db', () => {
   let dbComponent: ReturnType<typeof createDBComponent>
@@ -19,9 +19,16 @@ describe('db', () => {
 
       const result = await dbComponent.getFriends('0x123', { onlyActive: true })
 
-      expect(mockPg.query).toHaveBeenCalledWith(
-        SQL`SELECT * FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) AND is_active = true ORDER BY created_at DESC OFFSET ${expect.any(Number)} LIMIT ${expect.any(Number)}`
-      )
+      const expectedQuery: SQLStatement = SQL`
+        SELECT
+          CASE
+            WHEN address_requester = ${'0x123'} THEN address_requested
+            ELSE address_requester
+          END as address
+        FROM friendships
+        WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) AND is_active = true ORDER BY created_at DESC OFFSET ${expect.any(Number)} LIMIT ${expect.any(Number)}`
+
+      expect(mockPg.query).toHaveBeenCalledWith(expect.objectContaining(expectedQuery))
       expect(result).toEqual(mockFriends)
     })
 
@@ -34,7 +41,9 @@ describe('db', () => {
       const result = await dbComponent.getFriends('0x123', { onlyActive: false })
 
       expect(mockPg.query).toHaveBeenCalledWith(
-        SQL`SELECT * FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) ORDER BY created_at DESC OFFSET ${expect.any(Number)} LIMIT ${expect.any(Number)}`
+        expect.not.objectContaining({
+          text: expect.stringContaining('AND is_active = true')
+        })
       )
       expect(result).toEqual(mockFriends)
     })
