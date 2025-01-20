@@ -1,10 +1,9 @@
 import { byConnectivityStatus } from '../../../logic/friendships'
-import { Friend, RpcServerContext, RPCServiceContext } from '../../../types'
+import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { getPage } from '../../../utils/pagination'
 import { PEERS_CACHE_KEY } from '../../../utils/peers'
 import { FRIENDSHIPS_PER_PAGE, INTERNAL_SERVER_ERROR } from '../constants'
 import {
-  ConnectivityStatus,
   GetFriendsPayload,
   PaginatedUsersResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
