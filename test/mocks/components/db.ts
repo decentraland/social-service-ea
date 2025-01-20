@@ -1,4 +1,4 @@
-import { IDatabaseComponent } from '../../../src/adapters/db'
+import { IDatabaseComponent } from '../../../src/types'
 
 export const mockDb: jest.Mocked<IDatabaseComponent> = {
   createFriendship: jest.fn(),

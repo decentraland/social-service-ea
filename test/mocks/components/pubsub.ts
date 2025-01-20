@@ -1,4 +1,4 @@
-import { IPubSubComponent } from '../../../src/adapters/pubsub'
+import { IPubSubComponent } from '../../../src/types'
 
 export const mockPubSub: jest.Mocked<IPubSubComponent> = {
   start: jest.fn(),

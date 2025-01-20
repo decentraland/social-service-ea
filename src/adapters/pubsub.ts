@@ -1,12 +1,6 @@
-import { IBaseComponent } from '@well-known-components/interfaces'
-import { AppComponents, SubscriptionEventsEmitter } from '../types'
+import { AppComponents, IPubSubComponent } from '../types'
 
 const FRIENDSHIP_UPDATES_CHANNEL = 'FRIENDSHIP_UPDATES'
-
-export type IPubSubComponent = IBaseComponent & {
-  subscribeToFriendshipUpdates(cb: (message: string) => void): Promise<void>
-  publishFriendshipUpdate(update: SubscriptionEventsEmitter['update']): Promise<void>
-}
 
 export default function createPubSubComponent(components: Pick<AppComponents, 'logs' | 'redis'>): IPubSubComponent {
   const { logs, redis } = components

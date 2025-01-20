@@ -1,5 +1,4 @@
 import { IPgComponent } from '@well-known-components/pg-component'
-import { release } from 'os'
 
 export const mockPg: jest.Mocked<IPgComponent> = {
   streamQuery: jest.fn(),
