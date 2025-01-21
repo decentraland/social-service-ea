@@ -1,13 +1,17 @@
-import { createSchedulerComponent, FIVE_SECS_IN_MS, TEN_SECS_IN_MS } from '../../../src/adapters/scheduler'
+import {
+  createPeersSynchronizerComponent,
+  FIVE_SECS_IN_MS,
+  TEN_SECS_IN_MS
+} from '../../../src/adapters/peers-synchronizer'
 import { mockLogs, mockRedis, mockArchipelagoStats, mockConfig } from '../../mocks/components'
-import { AppComponents, ISchedulerComponent } from '../../../src/types'
+import { IPeersSynchronizer } from '../../../src/types'
 import { PEERS_CACHE_KEY } from '../../../src/utils/peers'
 
-describe('scheduler', () => {
-  let scheduler: ISchedulerComponent
+describe('peers-synchronizer', () => {
+  let scheduler: IPeersSynchronizer
 
   beforeEach(async () => {
-    scheduler = await createSchedulerComponent({
+    scheduler = await createPeersSynchronizerComponent({
       logs: mockLogs,
       archipelagoStats: mockArchipelagoStats,
       redis: mockRedis,
@@ -22,7 +26,7 @@ describe('scheduler', () => {
   })
 
   it('should sync peers on start', async () => {
-    const mockPeers = { '0x123': true, '0x456': true }
+    const mockPeers = ['0x123', '0x456']
     mockArchipelagoStats.getPeers.mockResolvedValueOnce(mockPeers)
 
     await scheduler.start({} as any)
@@ -37,7 +41,7 @@ describe('scheduler', () => {
   })
 
   it('should sync peers periodically', async () => {
-    const mockPeers = { '0x123': true }
+    const mockPeers = ['0x123']
     mockArchipelagoStats.getPeers.mockResolvedValue(mockPeers)
 
     await scheduler.start({} as any)
@@ -52,7 +56,7 @@ describe('scheduler', () => {
   })
 
   it('should stop syncing when stopped', async () => {
-    mockArchipelagoStats.getPeers.mockResolvedValue({})
+    mockArchipelagoStats.getPeers.mockResolvedValue([])
 
     await scheduler.start({} as any)
     await scheduler.stop()

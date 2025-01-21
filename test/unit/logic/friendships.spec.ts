@@ -8,7 +8,7 @@ import {
   validateNewFriendshipAction
 } from '../../../src/logic/friendships'
 import { Action, FriendshipStatus } from '../../../src/types'
-import { FriendshipStatus as FriendshipRequestStatus } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+import { FriendshipStatus as FriendshipRequestStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('isFriendshipActionValid()', () => {
   test('it should be valid if from is null and to is REQUEST ', () => {
@@ -369,10 +369,13 @@ describe('parseUpsertFriendshipRequest()', () => {
 })
 
 describe('parseEmittedUpdateToFriendshipUpdate()', () => {
+  const id = 'id'
+
   test('it should parse REQUEST update properly', () => {
     const now = Date.now()
     expect(
       parseEmittedUpdateToFriendshipUpdate({
+        id,
         action: Action.REQUEST,
         timestamp: now,
         from: '0xA',
@@ -382,6 +385,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
       update: {
         $case: 'request',
         request: {
+          id,
           createdAt: now,
           user: {
             address: '0xA'
@@ -393,6 +397,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
 
     expect(
       parseEmittedUpdateToFriendshipUpdate({
+        id,
         action: Action.REQUEST,
         timestamp: now,
         from: '0xA',
@@ -405,6 +410,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
       update: {
         $case: 'request',
         request: {
+          id,
           createdAt: now,
           user: {
             address: '0xA'
@@ -419,6 +425,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
     const now = Date.now()
     expect(
       parseEmittedUpdateToFriendshipUpdate({
+        id,
         action: Action.CANCEL,
         timestamp: now,
         from: '0xA',
@@ -440,6 +447,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
     const now = Date.now()
     expect(
       parseEmittedUpdateToFriendshipUpdate({
+        id,
         action: Action.DELETE,
         timestamp: now,
         from: '0xA',
@@ -461,6 +469,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
     const now = Date.now()
     expect(
       parseEmittedUpdateToFriendshipUpdate({
+        id,
         action: Action.REJECT,
         timestamp: now,
         from: '0xA',
@@ -482,6 +491,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
     const now = Date.now()
     expect(
       parseEmittedUpdateToFriendshipUpdate({
+        id,
         action: Action.ACCEPT,
         timestamp: now,
         from: '0xA',
@@ -503,6 +513,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
     const now = Date.now()
     expect(
       parseEmittedUpdateToFriendshipUpdate({
+        id,
         action: 'whaterver' as Action,
         timestamp: now,
         from: '0xA',

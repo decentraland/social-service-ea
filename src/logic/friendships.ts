@@ -1,8 +1,9 @@
 import {
   FriendshipUpdate,
   UpsertFriendshipPayload,
-  FriendshipStatus as FriendshipRequestStatus
-} from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+  FriendshipStatus as FriendshipRequestStatus,
+  FriendUpdate
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   Action,
   FRIENDSHIP_ACTION_TRANSITIONS,
@@ -123,7 +124,7 @@ export function parseUpsertFriendshipRequest(request: UpsertFriendshipPayload): 
 }
 
 export function parseEmittedUpdateToFriendshipUpdate(
-  update: SubscriptionEventsEmitter['update']
+  update: SubscriptionEventsEmitter['friendshipUpdate']
 ): FriendshipUpdate | null {
   switch (update.action) {
     case Action.REQUEST:
@@ -131,6 +132,7 @@ export function parseEmittedUpdateToFriendshipUpdate(
         update: {
           $case: 'request',
           request: {
+            id: update.id,
             createdAt: update.timestamp,
             user: {
               address: update.from
@@ -185,6 +187,16 @@ export function parseEmittedUpdateToFriendshipUpdate(
       }
     default:
       return null
+  }
+}
+
+export function parseEmittedUpdateToFriendStatusUpdate({
+  address,
+  status
+}: SubscriptionEventsEmitter['friendStatusUpdate']): FriendUpdate | null {
+  return {
+    user: { address },
+    status: status
   }
 }
 

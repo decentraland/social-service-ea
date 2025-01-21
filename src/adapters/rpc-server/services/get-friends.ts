@@ -4,7 +4,7 @@ import { FRIENDSHIPS_PER_PAGE, INTERNAL_SERVER_ERROR } from '../constants'
 import {
   GetFriendsPayload,
   PaginatedUsersResponse
-} from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export function getFriendsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
   const logger = logs.getLogger('get-friends-service')
@@ -14,6 +14,7 @@ export function getFriendsService({ components: { logs, db } }: RPCServiceContex
     const { address: loggedUserAddress } = context
 
     try {
+      // TODO: can use the getPeersFromCache to get the online friends and sort online friends first
       const [friends, total] = await Promise.all([
         db.getFriends(loggedUserAddress, { pagination }),
         db.getFriendsCount(loggedUserAddress)

@@ -11,6 +11,7 @@ import {
   mockRedis,
   mockUWs
 } from '../../mocks/components'
+import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -56,7 +57,8 @@ describe('createRpcServerComponent', () => {
       await rpcServer.start({} as any)
 
       expect(mockUWs.app.listen).toHaveBeenCalledWith(8085, expect.any(Function))
-      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(expect.any(Function))
+      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Function))
+      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIEND_STATUS_UPDATES_CHANNEL, expect.any(Function))
     })
   })
 

@@ -42,7 +42,7 @@ export async function registerWsHandler(
       if (isNotAuthenticated(data)) {
         data.timeout = setTimeout(() => {
           try {
-            logger.error('closing connection, no authchain received')
+            logger.error('closing connection, no auth chain received')
             ws.end()
           } catch (err) {}
         }, 30000)
@@ -66,7 +66,7 @@ export async function registerWsHandler(
           })
           const address = normalizeAddress(verifyResult.auth)
 
-          logger.debug('addresss > ', { address })
+          logger.debug('address > ', { address })
 
           const eventEmitter = mitt<IUWebSocketEventMap>()
           changeStage(data, { auth: true, address, eventEmitter, isConnected: true })

@@ -1,10 +1,12 @@
 import { AppComponents, IArchipelagoStatsComponent } from '../types'
+import { PEERS_CACHE_KEY } from '../utils/peers'
 
 export async function createArchipelagoStatsComponent({
   logs,
   config,
-  fetcher
-}: Pick<AppComponents, 'logs' | 'config' | 'fetcher'>): Promise<IArchipelagoStatsComponent> {
+  fetcher,
+  redis
+}: Pick<AppComponents, 'logs' | 'config' | 'fetcher' | 'redis'>): Promise<IArchipelagoStatsComponent> {
   const logger = logs.getLogger('archipelago-stats-component')
   const url = await config.getString('ARCHIPELAGO_STATS_URL')
 
@@ -19,14 +21,14 @@ export async function createArchipelagoStatsComponent({
 
         const { peers } = await response.json()
 
-        return peers.reduce((acc: Record<string, boolean>, peer: string) => {
-          acc[peer] = true
-          return acc
-        })
+        return peers.map((peer: { id: string }) => peer.id)
       } catch (error) {
         logger.error(error as any)
         return []
       }
+    },
+    async getPeersFromCache() {
+      return (await redis.get<string[]>(PEERS_CACHE_KEY)) || []
     }
   }
 }

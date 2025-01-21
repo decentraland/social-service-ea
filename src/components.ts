@@ -12,7 +12,9 @@ import { createRedisComponent } from './adapters/redis'
 import createPubSubComponent from './adapters/pubsub'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
 import { createArchipelagoStatsComponent } from './adapters/archipelago-stats'
-import { createSchedulerComponent } from './adapters/scheduler'
+import { createPeersSynchronizerComponent } from './adapters/peers-synchronizer'
+import { createNatsComponent } from '@well-known-components/nats-component'
+import { createPeerTrackingComponent } from './adapters/peer-tracking'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -51,9 +53,11 @@ export async function initComponents(): Promise<AppComponents> {
 
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
-  const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher })
-  const rpcServer = await createRpcServerComponent({ logs, db, pubsub, server, config })
-  const scheduler = await createSchedulerComponent({ logs, archipelagoStats, redis, config })
+  const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
+  const nats = await createNatsComponent({ logs, config })
+  const rpcServer = await createRpcServerComponent({ logs, db, pubsub, server, config, nats, archipelagoStats, redis })
+  const scheduler = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
+  const peerTracking = createPeerTrackingComponent({ logs, pubsub, nats })
 
   return {
     config,
@@ -67,6 +71,8 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     rpcServer,
     archipelagoStats,
-    scheduler
+    scheduler,
+    nats,
+    peerTracking
   }
 }

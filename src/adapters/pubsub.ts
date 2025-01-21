@@ -1,6 +1,7 @@
 import { AppComponents, IPubSubComponent } from '../types'
 
-const FRIENDSHIP_UPDATES_CHANNEL = 'FRIENDSHIP_UPDATES'
+export const FRIENDSHIP_UPDATES_CHANNEL = 'FRIENDSHIP_UPDATES'
+export const FRIEND_STATUS_UPDATES_CHANNEL = 'FRIEND_STATUS_UPDATES'
 
 export default function createPubSubComponent(components: Pick<AppComponents, 'logs' | 'redis'>): IPubSubComponent {
   const { logs, redis } = components
@@ -8,8 +9,6 @@ export default function createPubSubComponent(components: Pick<AppComponents, 'l
 
   const subClient = redis.client.duplicate()
   const pubClient = redis.client.duplicate()
-
-  let friendshipUpdatesCb: (message: string) => void | undefined
 
   return {
     async start() {
@@ -30,19 +29,18 @@ export default function createPubSubComponent(components: Pick<AppComponents, 'l
         await pubClient.disconnect()
       }
     },
-    async subscribeToFriendshipUpdates(cb) {
+    async subscribeToChannel(channel: string, cb: (message: string) => void) {
       try {
-        friendshipUpdatesCb = cb
-        await subClient.subscribe(FRIENDSHIP_UPDATES_CHANNEL, friendshipUpdatesCb)
-      } catch (error) {
-        logger.error(error as any)
+        await subClient.subscribe(channel, cb)
+      } catch (error: any) {
+        logger.error(`Error while subscribing to channel ${channel}: ${error.message}`)
       }
     },
-    async publishFriendshipUpdate(update) {
+    async publishInChannel<T>(channel: string, update: T) {
       try {
         const message = JSON.stringify(update)
-        logger.debug('publishing update to FRIENDSHIP_UPDATES > ', { update: message })
-        await pubClient.publish(FRIENDSHIP_UPDATES_CHANNEL, message)
+        logger.debug(`Publishing update to channel ${channel}:`, { update: message })
+        await pubClient.publish(channel, message)
       } catch (error) {
         logger.error(error as any)
       }

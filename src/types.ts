@@ -16,6 +16,8 @@ import { IUWebSocketEventMap } from './utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
 import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
+import { INatsComponent } from '@well-known-components/nats-component/dist/types'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -34,7 +36,9 @@ export type BaseComponents = {
   redis: IRedisComponent & ICacheComponent
   pubsub: IPubSubComponent
   archipelagoStats: IArchipelagoStatsComponent
-  scheduler: ISchedulerComponent
+  scheduler: IPeersSynchronizer
+  nats: INatsComponent
+  peerTracking: IPeerTrackingComponent
 }
 
 // components used in runtime
@@ -83,9 +87,11 @@ export interface IDatabaseComponent {
     action: Action,
     metadata: Record<string, any> | null,
     txClient?: PoolClient
-  ): Promise<boolean>
+  ): Promise<string>
   getReceivedFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
+  getOnlineFriends(userAddress: string, onlinePeers: string[]): AsyncGenerator<Friend>
+  areFriendsOf(userAddress: string, potentialFriends: string[]): Promise<Friend[]>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
 export interface IRedisComponent extends IBaseComponent {
@@ -98,15 +104,17 @@ export interface ICacheComponent extends IBaseCacheComponent {
 }
 
 export type IPubSubComponent = IBaseComponent & {
-  subscribeToFriendshipUpdates(cb: (message: string) => void): Promise<void>
-  publishFriendshipUpdate(update: SubscriptionEventsEmitter['update']): Promise<void>
+  subscribeToChannel(channel: string, cb: (message: string) => void): Promise<void>
+  publishInChannel<T>(channel: string, update: T): Promise<void>
 }
 
 export type IArchipelagoStatsComponent = IBaseComponent & {
-  getPeers(): Promise<Record<string, boolean>>
+  getPeers(): Promise<string[]>
+  getPeersFromCache(): Promise<string[]>
 }
 
-export type ISchedulerComponent = IBaseComponent
+export type IPeersSynchronizer = IBaseComponent
+export type IPeerTrackingComponent = IBaseComponent
 
 // this type simplifies the typings of http handlers
 export type HandlerContextWithPath<
@@ -160,9 +168,26 @@ export type RPCServiceContext<ComponentNames extends keyof AppComponents> = {
 
 export type Context<Path extends string = any> = IHttpServerComponent.PathAwareContext<GlobalContext, Path>
 
+export type SubscriptionEventsEmitter = {
+  friendshipUpdate: {
+    id: string
+    to: string
+    from: string
+    action: Action
+    timestamp: number
+    metadata?: { message: string }
+  }
+  friendStatusUpdate: {
+    address: string
+    status: ConnectivityStatus
+  }
+}
+
+export type Subscribers = Record<string, Emitter<SubscriptionEventsEmitter>>
+
 export type RpcServerContext = {
   address: string
-  subscribers: Record<string, Emitter<SubscriptionEventsEmitter>>
+  subscribers: Subscribers
 }
 
 export type Friendship = {
@@ -211,19 +236,10 @@ export enum FriendshipStatus {
 }
 
 export type FriendshipRequest = {
+  id: string
   address: string
   timestamp: string
   metadata: Record<string, any> | null
-}
-
-export type SubscriptionEventsEmitter = {
-  update: {
-    to: string
-    from: string
-    action: Action
-    timestamp: number
-    metadata?: { message: string }
-  }
 }
 
 export type Pagination = {

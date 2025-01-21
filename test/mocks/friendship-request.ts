@@ -27,5 +27,5 @@ export const createMockExpectedFriendshipRequest = (
   id,
   user: { address },
   createdAt: createdAt ? new Date(createdAt).getTime() : new Date(createdAt).getTime(),
-  message
+  message: message || ''
 })

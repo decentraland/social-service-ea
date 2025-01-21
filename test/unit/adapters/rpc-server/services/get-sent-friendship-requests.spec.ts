@@ -3,7 +3,7 @@ import { getSentFriendshipRequestsService } from '../../../../../src/adapters/rp
 import { RpcServerContext, AppComponents } from '../../../../../src/types'
 import { emptyRequest } from '../../../../mocks/empty-request'
 import { createMockFriendshipRequest, createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'
-import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('getSentFriendshipRequestsService', () => {
   let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
@@ -35,7 +35,7 @@ describe('getSentFriendshipRequestsService', () => {
         requests: {
           requests: [
             createMockExpectedFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z', 'Hello!'),
-            createMockExpectedFriendshipRequest('id1', '0x789', '2025-01-02T00:00:00Z')
+            createMockExpectedFriendshipRequest('id2', '0x789', '2025-01-02T00:00:00Z')
           ]
         }
       }

@@ -6,7 +6,7 @@ export const mockDb: jest.Mocked<IDatabaseComponent> = {
   getFriends: jest.fn(),
   getFriendsCount: jest.fn(),
   getOnlineFriends: jest.fn(),
-  isFriend: jest.fn(),
+  areFriendsOf: jest.fn(),
   getMutualFriends: jest.fn(),
   getMutualFriendsCount: jest.fn(),
   getFriendship: jest.fn(),

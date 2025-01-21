@@ -3,6 +3,10 @@ import { Action } from '../../../src/types'
 import SQL, { SQLStatement } from 'sql-template-strings'
 import { mockLogs, mockPg } from '../../mocks/components'
 
+jest.mock('node:crypto', () => ({
+  randomUUID: jest.fn().mockReturnValue('mock-uuid')
+}))
+
 describe('db', () => {
   let dbComponent: ReturnType<typeof createDBComponent>
 
@@ -262,7 +266,7 @@ describe('db', () => {
         mockClient
       )
 
-      expect(result).toBe(true)
+      expect(result).toBe('mock-uuid')
       expect(withTxClient ? mockClient.query : mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
