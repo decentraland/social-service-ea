@@ -211,13 +211,13 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         await pg.query(query)
       }
 
-      return true
+      return uuid
     },
     async getReceivedFriendshipRequests(userAddress, pagination) {
       const { limit, offset } = pagination || {}
 
       const query = SQL`
-        SELECT f.address_requester as address, fa.timestamp, fa.metadata
+        SELECT fa.id, f.address_requester as address, fa.timestamp, fa.metadata
           FROM friendships f
           INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
           WHERE 
@@ -247,7 +247,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async getSentFriendshipRequests(userAddress, pagination) {
       const { limit, offset } = pagination || {}
       const query = SQL`
-        SELECT f.address_requested as address, fa.timestamp, fa.metadata
+        SELECT fa.id, f.address_requested as address, fa.timestamp, fa.metadata
           FROM friendships f
           INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
           WHERE 
@@ -273,6 +273,29 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const results = await pg.query<FriendshipRequest>(query)
 
       return results.rows
+    },
+    getOnlineFriends(userAddress: string, onlinePeers: string[]) {
+      const query: SQLStatement = SQL`
+        SELECT 
+          CASE
+            WHEN address_requester = ${userAddress} THEN address_requested
+            ELSE address_requester
+        FROM friendships
+        WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})
+        AND is_active = true
+        AND (address_requester IN (${onlinePeers}) OR address_requested IN (${onlinePeers}))`
+
+      return pg.streamQuery<Friend>(query)
+    },
+    async isFriend(userAddress: string, friendAddress: string) {
+      const query = SQL`
+        SELECT *
+        FROM friendships
+        WHERE (address_requester, address_requested) IN ((${userAddress}, ${friendAddress}), (${friendAddress}, ${userAddress}))
+        AND is_active = true
+      `
+      const results = await pg.query<Friendship>(query)
+      return results.rows.length > 0
     },
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
       const pool = pg.getPool()

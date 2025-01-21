@@ -13,7 +13,8 @@ export function getPendingFriendshipRequestsService({ components: { logs, db } }
   ): Promise<PaginatedFriendshipRequestsResponse> {
     try {
       const pendingRequests = await db.getReceivedFriendshipRequests(context.address, request.pagination)
-      const mappedRequests = pendingRequests.map(({ address, timestamp, metadata }) => ({
+      const mappedRequests = pendingRequests.map(({ id, address, timestamp, metadata }) => ({
+        id,
         user: { address },
         createdAt: new Date(timestamp).getTime(),
         message: metadata?.message || ''

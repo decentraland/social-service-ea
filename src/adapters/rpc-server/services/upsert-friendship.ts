@@ -8,6 +8,7 @@ import {
   validateNewFriendshipAction,
   getNewFriendshipStatus
 } from '../../../logic/friendships'
+import { FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
 
 export function upsertFriendshipService({
   components: { logs, db, pubsub }
@@ -60,7 +61,7 @@ export function upsertFriendshipService({
 
       logger.debug('friendship status > ', { isActive: JSON.stringify(isActive), friendshipStatus })
 
-      const { id, createdAt } = await db.executeTx(async (tx) => {
+      const { id, actionId, createdAt } = await db.executeTx(async (tx) => {
         let id: string, createdAt: number
 
         if (friendship) {
@@ -77,7 +78,7 @@ export function upsertFriendshipService({
           createdAt = new Date(created_at).getTime()
         }
 
-        await db.recordFriendshipAction(
+        const actionId = await db.recordFriendshipAction(
           id,
           context.address,
           parsedRequest.action,
@@ -85,12 +86,13 @@ export function upsertFriendshipService({
           tx
         )
 
-        return { id, createdAt }
+        return { id, actionId, createdAt }
       })
 
       logger.debug(`${id} friendship was upsert successfully`)
 
-      await pubsub.publishFriendshipUpdate({
+      await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
+        id: actionId,
         from: context.address,
         to: parsedRequest.user,
         action: parsedRequest.action,
