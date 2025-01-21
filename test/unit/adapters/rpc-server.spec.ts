@@ -1,7 +1,16 @@
 import { createRpcServerComponent } from ' ../../../src/adapters/rpc-server/rpc-server'
 import { IRPCServerComponent, RpcServerContext } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
-import { mockConfig, mockDb, mockLogs, mockPubSub, mockRedis, mockUWs } from '../../mocks/components'
+import {
+  mockArchipelagoStats,
+  mockConfig,
+  mockDb,
+  mockLogs,
+  mockNats,
+  mockPubSub,
+  mockRedis,
+  mockUWs
+} from '../../mocks/components'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -29,7 +38,10 @@ describe('createRpcServerComponent', () => {
       db: mockDb,
       pubsub: mockPubSub,
       config: mockConfig,
-      server: mockUWs
+      server: mockUWs,
+      nats: mockNats,
+      archipelagoStats: mockArchipelagoStats,
+      redis: mockRedis
     })
   })
 
@@ -44,7 +56,7 @@ describe('createRpcServerComponent', () => {
       await rpcServer.start({} as any)
 
       expect(mockUWs.app.listen).toHaveBeenCalledWith(8085, expect.any(Function))
-      expect(mockPubSub.subscribeToFriendshipUpdates).toHaveBeenCalledWith(expect.any(Function))
+      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(expect.any(Function))
     })
   })
 

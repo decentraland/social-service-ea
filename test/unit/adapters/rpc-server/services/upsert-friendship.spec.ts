@@ -152,7 +152,7 @@ describe('upsertFriendshipService', () => {
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
-    expect(components.pubsub.publishFriendshipUpdate).toHaveBeenCalledWith({
+    expect(components.pubsub.publishInChannel).toHaveBeenCalledWith({
       from: rpcContext.address,
       to: userAddress,
       action: mockParsedRequest.action,
