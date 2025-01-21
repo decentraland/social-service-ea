@@ -15,6 +15,12 @@ export function subscribeToFriendUpdatesService({
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendUpdate> {
     try {
+      const eventEmitter = context.subscribers[context.address] || mitt<SubscriptionEventsEmitter>()
+
+      if (!context.subscribers[context.address]) {
+        context.subscribers[context.address] = eventEmitter
+      }
+
       const onlinePeers = await archipelagoStats.getPeersFromCache()
       const onlineFriends = db.streamOnlineFriends(context.address, onlinePeers)
 
@@ -23,12 +29,6 @@ export function subscribeToFriendUpdatesService({
           user: { address: friend.address },
           status: ConnectivityStatus.ONLINE
         }
-      }
-
-      const eventEmitter = context.subscribers[context.address] || mitt<SubscriptionEventsEmitter>()
-
-      if (!context.subscribers[context.address]) {
-        context.subscribers[context.address] = eventEmitter
       }
 
       const updatesGenerator = emitterToAsyncGenerator(eventEmitter, 'friendStatusUpdate')

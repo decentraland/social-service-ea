@@ -40,8 +40,8 @@ export async function createRpcServerComponent({
   const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
   const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })
   const upsertFriendship = upsertFriendshipService({ components: { logs, db, pubsub } })
-  const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({ components: { logs } })
   const getFriendshipStatus = getFriendshipStatusService({ components: { logs, db } })
+  const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({ components: { logs } })
   const subscribeToFriendUpdates = subscribeToFriendUpdatesService({
     components: { logs, db, archipelagoStats }
   })
