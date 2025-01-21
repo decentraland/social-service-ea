@@ -16,7 +16,7 @@ export function subscribeToFriendUpdatesService({
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendUpdate> {
     try {
       const onlinePeers = await archipelagoStats.getPeersFromCache()
-      const onlineFriends = db.getOnlineFriends(context.address, onlinePeers)
+      const onlineFriends = db.streamOnlineFriends(context.address, onlinePeers)
 
       for await (const friend of onlineFriends) {
         yield {

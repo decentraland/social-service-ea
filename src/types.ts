@@ -90,8 +90,8 @@ export interface IDatabaseComponent {
   ): Promise<string>
   getReceivedFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
-  getOnlineFriends(userAddress: string, onlinePeers: string[]): AsyncGenerator<Friend>
-  areFriendsOf(userAddress: string, potentialFriends: string[]): Promise<Friend[]>
+  streamOnlineFriends(userAddress: string, onlinePeers: string[]): AsyncGenerator<Friend>
+  getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<Friend[]>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
 export interface IRedisComponent extends IBaseComponent {

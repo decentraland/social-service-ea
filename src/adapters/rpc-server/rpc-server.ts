@@ -64,7 +64,7 @@ export async function createRpcServerComponent({
     try {
       // TODO: this may be a problem if the user has a lot of friends or there are a lot of users online
       const update = JSON.parse(message) as SubscriptionEventsEmitter['friendStatusUpdate']
-      const friends = await db.areFriendsOf(update.address, Object.keys(SHARED_CONTEXT.subscribers))
+      const friends = await db.getOnlineFriends(update.address, Object.keys(SHARED_CONTEXT.subscribers))
 
       friends.forEach(({ address: friendAddress }) => {
         const emitter = SHARED_CONTEXT.subscribers[friendAddress]

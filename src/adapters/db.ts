@@ -9,18 +9,73 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
   const logger = logs.getLogger('db-component')
 
+  function getFriendsBaseQuery(userAddress: string) {
+    return SQL`
+      SELECT DISTINCT
+        CASE
+          WHEN address_requester = ${userAddress} THEN address_requested
+          ELSE address_requester
+        END as address
+      FROM friendships
+      WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
+  }
+
+  function getFriendshipRequestBaseQuery(userAddress: string, type: 'sent' | 'received'): SQLStatement {
+    const columnMapping = {
+      sent: SQL` f.address_requested`,
+      received: SQL` f.address_requester`
+    }
+    const filterMapping = {
+      sent: SQL`f.address_requester`,
+      received: SQL`f.address_requested`
+    }
+
+    const baseQuery = SQL`SELECT fa.id,`
+    baseQuery.append(columnMapping[type].append(', as address'))
+    baseQuery.append(SQL`
+      fa.timestamp, fa.metadata
+      FROM friendships f
+      INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
+      WHERE
+    `)
+
+    baseQuery.append(filterMapping[type].append(SQL` = ${userAddress}`))
+
+    baseQuery.append(SQL`
+      AND fa.action = 'request'
+      AND f.is_active IS FALSE
+      AND fa.timestamp = (
+        SELECT MAX(fa2.timestamp)
+        FROM friendship_actions fa2
+        WHERE fa2.friendship_id = fa.friendship_id
+      )
+      ORDER BY fa.timestamp DESC
+    `)
+
+    return baseQuery
+  }
+
+  function getFriendsFromPotentialFriends(userAddress: string, potentialFriends: string[]) {
+    return SQL`
+      SELECT DISTINCT 
+        CASE
+          WHEN address_requester = ${userAddress} THEN address_requested
+          ELSE address_requester
+        END as address
+      FROM friendships
+      WHERE (
+        (address_requester = ${userAddress} AND address_requested = ANY(${potentialFriends}))
+        OR 
+        (address_requested = ${userAddress} AND address_requester = ANY(${potentialFriends}))
+      )
+      AND is_active = true`
+  }
+
   return {
     async getFriends(userAddress, { onlyActive = true, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } } = {}) {
       const { limit, offset } = pagination
 
-      const query: SQLStatement = SQL`
-        SELECT
-          CASE
-            WHEN address_requester = ${userAddress} THEN address_requested
-            ELSE address_requester
-          END as address
-        FROM friendships
-        WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
+      const query: SQLStatement = getFriendsBaseQuery(userAddress)
 
       if (onlyActive) {
         query.append(SQL` AND is_active = true`)
@@ -216,21 +271,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async getReceivedFriendshipRequests(userAddress, pagination) {
       const { limit, offset } = pagination || {}
 
-      const query = SQL`
-        SELECT f.address_requester as address, fa.timestamp, fa.metadata
-          FROM friendships f
-          INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-          WHERE 
-            f.address_requested = ${userAddress}
-            AND fa.action = 'request'
-            AND f.is_active IS FALSE
-            AND fa.timestamp = (
-              SELECT MAX(fa2.timestamp)
-              FROM friendship_actions fa2
-              WHERE fa2.friendship_id = fa.friendship_id
-            )
-          ORDER BY fa.timestamp DESC
-      `
+      const query = getFriendshipRequestBaseQuery(userAddress, 'received')
 
       if (limit) {
         query.append(SQL` LIMIT ${limit}`)
@@ -246,21 +287,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async getSentFriendshipRequests(userAddress, pagination) {
       const { limit, offset } = pagination || {}
-      const query = SQL`
-        SELECT fa.id, f.address_requested as address, fa.timestamp, fa.metadata
-          FROM friendships f
-          INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-          WHERE 
-            f.address_requester = ${userAddress}
-            AND fa.action = 'request'
-            AND f.is_active IS FALSE
-            AND fa.timestamp = (
-              SELECT MAX(fa2.timestamp)
-              FROM friendship_actions fa2
-              WHERE fa2.friendship_id = fa.friendship_id
-            )
-          ORDER BY fa.timestamp DESC
-      `
+      const query = getFriendshipRequestBaseQuery(userAddress, 'sent')
 
       if (limit) {
         query.append(SQL` LIMIT ${limit}`)
@@ -274,41 +301,14 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       return results.rows
     },
-    getOnlineFriends(userAddress: string, onlinePeers: string[]) {
-      const query: SQLStatement = SQL`
-        SELECT 
-          CASE
-            WHEN address_requester = ${userAddress} THEN address_requested
-            ELSE address_requester
-          END as address
-        FROM friendships
-        WHERE (
-          (address_requester = ${userAddress} AND address_requested = ANY(${onlinePeers}))
-          OR 
-          (address_requested = ${userAddress} AND address_requester = ANY(${onlinePeers}))
-        )
-        AND is_active = true
-      `
-
+    streamOnlineFriends(userAddress: string, onlinePeers: string[]) {
+      const query: SQLStatement = getFriendsFromPotentialFriends(userAddress, onlinePeers)
       return pg.streamQuery<Friend>(query)
     },
-    async areFriendsOf(userAddress: string, potentialFriends: string[]) {
+    async getOnlineFriends(userAddress: string, potentialFriends: string[]) {
       if (potentialFriends.length === 0) return []
 
-      const query = SQL`
-        SELECT DISTINCT 
-          CASE 
-            WHEN address_requester = ${userAddress} THEN address_requested
-            ELSE address_requester
-          END as address
-        FROM friendships
-        WHERE (
-          (address_requester = ${userAddress} AND address_requested = ANY(${potentialFriends}))
-          OR 
-          (address_requested = ${userAddress} AND address_requester = ANY(${potentialFriends}))
-        )
-        AND is_active = true
-      `
+      const query: SQLStatement = getFriendsFromPotentialFriends(userAddress, potentialFriends)
       const results = await pg.query<Friend>(query)
       return results.rows
     },
