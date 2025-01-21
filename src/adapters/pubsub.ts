@@ -3,7 +3,7 @@ import { AppComponents, IPubSubComponent } from '../types'
 export const FRIENDSHIP_UPDATES_CHANNEL = 'FRIENDSHIP_UPDATES'
 export const FRIEND_STATUS_UPDATES_CHANNEL = 'FRIEND_STATUS_UPDATES'
 
-export default function createPubSubComponent(components: Pick<AppComponents, 'logs' | 'redis'>): IPubSubComponent {
+export function createPubSubComponent(components: Pick<AppComponents, 'logs' | 'redis'>): IPubSubComponent {
   const { logs, redis } = components
   const logger = logs.getLogger('pubsub-component')
 
@@ -41,8 +41,8 @@ export default function createPubSubComponent(components: Pick<AppComponents, 'l
         const message = JSON.stringify(update)
         logger.debug(`Publishing update to channel ${channel}:`, { update: message })
         await pubClient.publish(channel, message)
-      } catch (error) {
-        logger.error(error as any)
+      } catch (error: any) {
+        logger.error(`Error while publishing update to channel ${channel}: ${error.message}`)
       }
     }
   }
