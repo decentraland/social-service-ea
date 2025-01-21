@@ -36,7 +36,7 @@ export type BaseComponents = {
   redis: IRedisComponent & ICacheComponent
   pubsub: IPubSubComponent
   archipelagoStats: IArchipelagoStatsComponent
-  scheduler: IPeersSynchronizer
+  peersSynchronizer: IPeersSynchronizer
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
 }

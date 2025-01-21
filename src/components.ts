@@ -56,7 +56,7 @@ export async function initComponents(): Promise<AppComponents> {
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
   const nats = await createNatsComponent({ logs, config })
   const rpcServer = await createRpcServerComponent({ logs, db, pubsub, server, config, nats, archipelagoStats, redis })
-  const scheduler = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
+  const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = createPeerTrackingComponent({ logs, pubsub, nats })
 
   return {
@@ -71,7 +71,7 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     rpcServer,
     archipelagoStats,
-    scheduler,
+    peersSynchronizer,
     nats,
     peerTracking
   }
