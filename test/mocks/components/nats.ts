@@ -2,7 +2,7 @@ import { INatsComponent, NatsEvents } from '@well-known-components/nats-componen
 import { Emitter } from 'mitt'
 
 export const mockNats: jest.Mocked<INatsComponent> = {
-  subscribe: jest.fn(),
+  subscribe: jest.fn().mockReturnValue({ unsubscribe: jest.fn() }),
   publish: jest.fn(),
   start: jest.fn(),
   stop: jest.fn(),

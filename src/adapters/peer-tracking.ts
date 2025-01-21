@@ -5,13 +5,25 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { NatsMsg } from '@well-known-components/nats-component/dist/types'
 import { FRIEND_STATUS_UPDATES_CHANNEL } from './pubsub'
 
+export type PeerStatusHandler = {
+  event: string
+  pattern: string
+  status: ConnectivityStatus
+}
+
+export const PEER_STATUS_HANDLERS: PeerStatusHandler[] = [
+  { event: 'connect', pattern: 'peer.*.connect', status: ConnectivityStatus.OFFLINE },
+  { event: 'disconnect', pattern: 'peer.*.disconnect', status: ConnectivityStatus.OFFLINE },
+  { event: 'heartbeat', pattern: 'peer.*.heartbeat', status: ConnectivityStatus.ONLINE }
+]
+
 export function createPeerTrackingComponent({
   logs,
   pubsub,
   nats
 }: Pick<AppComponents, 'logs' | 'pubsub' | 'nats'>): IPeerTrackingComponent {
   const logger = logs.getLogger('peer-tracking-component')
-  let natsSubscriptions: Subscription[] = []
+  const subscriptions = new Map<string, Subscription>()
 
   async function notifyPeerStatusChange(peerId: string, status: ConnectivityStatus) {
     try {
@@ -28,29 +40,35 @@ export function createPeerTrackingComponent({
     }
   }
 
-  function handleNatsMessage(event: string, status: ConnectivityStatus) {
+  function createMessageHandler(handler: PeerStatusHandler) {
     return async (err: Error | null, message: NatsMsg) => {
       if (err) {
-        logger.error(`Error processing peer ${event} message: ${err.message}`)
+        logger.error(`Error processing peer ${handler.event} message:`, {
+          error: err.message,
+          pattern: handler.pattern
+        })
         return
       }
 
       const peerId = message.subject.split('.')[1]
-      await notifyPeerStatusChange(peerId, status)
+      await notifyPeerStatusChange(peerId, handler.status)
     }
   }
 
   return {
     async start() {
-      natsSubscriptions.push(
-        nats.subscribe('peer.*.connect', handleNatsMessage('connect', ConnectivityStatus.OFFLINE)),
-        nats.subscribe('peer.*.disconnect', handleNatsMessage('disconnect', ConnectivityStatus.OFFLINE)),
-        nats.subscribe('peer.*.heartbeat', handleNatsMessage('heartbeat', ConnectivityStatus.ONLINE))
-      )
+      PEER_STATUS_HANDLERS.forEach((handler) => {
+        const subscription = nats.subscribe(handler.pattern, createMessageHandler(handler))
+        subscriptions.set(handler.event, subscription)
+      })
     },
     async stop() {
-      natsSubscriptions.forEach((subscription) => subscription.unsubscribe())
-      natsSubscriptions = []
+      subscriptions.forEach((subscription) => subscription.unsubscribe())
+      subscriptions.clear()
+    },
+    // Exposed for testing
+    getSubscriptions() {
+      return subscriptions
     }
   }
 }

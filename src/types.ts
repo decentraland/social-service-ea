@@ -16,7 +16,7 @@ import { IUWebSocketEventMap } from './utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
 import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
-import { INatsComponent } from '@well-known-components/nats-component/dist/types'
+import { INatsComponent, Subscription } from '@well-known-components/nats-component/dist/types'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export type GlobalContext = {
@@ -114,7 +114,9 @@ export type IArchipelagoStatsComponent = IBaseComponent & {
 }
 
 export type IPeersSynchronizer = IBaseComponent
-export type IPeerTrackingComponent = IBaseComponent
+export type IPeerTrackingComponent = IBaseComponent & {
+  getSubscriptions(): Map<string, Subscription>
+}
 
 // this type simplifies the typings of http handlers
 export type HandlerContextWithPath<
