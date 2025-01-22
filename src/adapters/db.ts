@@ -108,11 +108,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
             end as address
           FROM
             (
-              SELECT
-                f_a.*
-              from
-                friendships f_a
-              where
+              SELECT f_a.*
+              FROM friendships f_a
+              WHERE
                 (
                   f_a.address_requester = ${userAddress1}
                   or f_a.address_requested = ${userAddress1}
@@ -120,11 +118,11 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
             ) as friends_a
         )
         SELECT
-          address
+          f_b.address
         FROM
           friendsA f_b
         WHERE
-          address IN (
+          f_b.address IN (
             SELECT
               CASE
                 WHEN address_requester = ${userAddress2} then address_requested
@@ -134,18 +132,18 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
               (
                 SELECT
                   f_b.*
-                from
+                FROM
                   friendships f_b
-                where
+                WHERE
                   (
                     f_b.address_requester = ${userAddress2}
                     or f_b.address_requested = ${userAddress2}
                   ) and f_b.is_active = true
               ) as friends_b
           )
-          ORDER BY f_a.address
+          ORDER BY f_b.address
           LIMIT ${limit}
-          OFFSET ${offset};`
+          OFFSET ${offset}`
       )
 
       return result.rows
@@ -155,20 +153,18 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         SQL`WITH friendsA as (
           SELECT
             CASE
-              WHEN address_requester = ${userAddress1} then address_requested
-              else address_requester
-            end as address
+              WHEN address_requester = ${userAddress1} THEN address_requested
+              ELSE address_requester
+            END as address
           FROM
             (
-              SELECT
-                f_a.*
-              from
-                friendships f_a
-              where
+              SELECT f_a.*
+              FROM friendships f_a
+              WHERE
                 (
                   f_a.address_requester = ${userAddress1}
-                  or f_a.address_requested = ${userAddress1}
-                ) and f_a.is_active = true
+                  OR f_a.address_requested = ${userAddress1}
+                ) AND f_a.is_active = true
             ) as friends_a
         )
         SELECT
@@ -179,22 +175,20 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
           address IN (
             SELECT
               CASE
-                WHEN address_requester = ${userAddress2} then address_requested
-                else address_requester
-              end as address_a
+                WHEN address_requester = ${userAddress2} THEN address_requested
+                ELSE address_requester
+              END as address_a
             FROM
               (
-                SELECT
-                  f_b.*
-                from
-                  friendships f_b
-                where
+                SELECT f_b.*
+                FROM friendships f_b
+                WHERE
                   (
                     f_b.address_requester = ${userAddress2}
-                    or f_b.address_requested = ${userAddress2}
-                  ) and f_b.is_active = true
+                    OR f_b.address_requested = ${userAddress2}
+                  ) AND f_b.is_active = true
               ) as friends_b
-          );`
+          )`
       )
 
       return result.rows[0].count
