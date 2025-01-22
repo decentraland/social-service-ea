@@ -22,9 +22,9 @@ export async function createArchipelagoStatsComponent({
         const { peers } = await response.json()
 
         return peers.map((peer: { id: string }) => peer.id)
-      } catch (error) {
-        logger.error(error as any)
-        return []
+      } catch (error: any) {
+        logger.error(`Error fetching peers from archipelago stats: ${error.message}`)
+        throw error
       }
     },
     async getPeersFromCache() {

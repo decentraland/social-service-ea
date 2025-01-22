@@ -27,10 +27,9 @@ describe('ArchipelagoStatsComponent', () => {
       expect(result).toEqual(['0x123', '0x456'])
     })
 
-    it('should return an empty array when the fetch fails', async () => {
+    it('should throw an error when the fetch fails', async () => {
       mockFetcher.fetch.mockRejectedValue(new Error('Fetch failed'))
-      const result = await archipelagoStats.getPeers()
-      expect(result).toEqual([])
+      await expect(archipelagoStats.getPeers()).rejects.toThrow('Fetch failed')
     })
   })
 
