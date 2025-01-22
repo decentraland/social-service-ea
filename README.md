@@ -44,28 +44,45 @@ This service follows the Well Known Components pattern, where each component is 
 
 ### Database Design
 
-```
-mermaid
-erDiagram
-  friendships {
-    uuid id PK
-    varchar address_requester
-    varchar address_requested
-    boolean is_active
-    timestamp created_at
-    timestamp updated_at
-  }
+```plantuml
+@startuml
+!define table(x) class x << (T,#FFAAAA) >>
+!define primary_key(x) <u>x</u>
+!define foreign_key(x) #x#
+hide methods
+hide stereotypes
 
-  friendship_actions {
-    uuid id PK
-    uuid friendship_id FK
-    varchar action
-    varchar acting_user
-    json metadata
-    timestamp timestamp
-  }
+table(friendships) {
+  primary_key(id): uuid
+  address_requester: varchar
+  address_requested: varchar
+  is_active: boolean
+  created_at: timestamp
+  updated_at: timestamp
+  --
+  indexes
+  ..
+  hash(address_requester)
+  hash(address_requested)
+  btree(LOWER(address_requester))
+  btree(LOWER(address_requested))
+}
 
-  friendships ||--o{ friendship_actions : "has"
+table(friendship_actions) {
+  primary_key(id): uuid
+  foreign_key(friendship_id): uuid
+  action: varchar
+  acting_user: varchar
+  metadata: jsonb
+  timestamp: timestamp
+  --
+  indexes
+  ..
+  btree(friendship_id)
+}
+
+friendships ||--|{ friendship_actions
+@enduml
 ```
 
 The database schema supports:
