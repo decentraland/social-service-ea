@@ -100,44 +100,57 @@ See migrations for details: [migrations](./src/migrations)
 sequenceDiagram
     participant Client
     participant WebSocket
-    participant RPC
+    participant RPC Server
     participant Redis
     participant NATS
     participant DB
 
+    Note over Client,DB: Connection Setup
     Client->>WebSocket: WS Handshake
     activate WebSocket
     WebSocket-->>Client: Connection Established
-
     Client->>WebSocket: Auth Message
-    WebSocket->>RPC: Attach Transport
-    activate RPC
+    WebSocket->>RPC Server: Attach Transport
+    activate RPC Server
 
-    RPC->>Redis: Subscribe to channels
+    Note over RPC Server,NATS: Subscriptions Setup
+    RPC Server->>Redis: Subscribe to friendship channels
     activate Redis
-    Note over Redis: Friend Status Updates
-    Note over Redis: Friendship Updates
-
-    RPC->>NATS: Subscribe to patterns
+    RPC Server->>NATS: Subscribe to patterns
     activate NATS
     Note over NATS: peer.*.connected
     Note over NATS: peer.*.disconnected
+    Note over NATS: peer.*.heartbeat
 
-    Client->>RPC: Friend Request
-    RPC->>DB: Create Friendship
-    DB-->>RPC: Friendship Created
+    Note over Client,DB: Friendship Request Flow
+    Client->>RPC Server: Friend Request
+    RPC Server->>DB: Create Friendship Record
+    DB-->>RPC Server: Friendship Created
+    RPC Server->>DB: Record Friendship Action
+    RPC Server->>Redis: Publish Friendship Update
+    RPC Server-->>Client: Request Confirmation
 
-    RPC->>Redis: Publish Update
-    Redis-->>Client: Friend Request Event
+    Note over Client,DB: Friendship Updates Flow
+    Redis-->>RPC Server: Friendship Update Event
+    RPC Server->>DB: Update Friendship Status
+    RPC Server-->>Client: Friendship Status Changed
+    Note over RPC Server: (accept/reject/delete)
 
-    Note over Client,DB: Friendship Lifecycle
+    Note over Client,DB: Friends Lifecycle
+    NATS-->>RPC Server: Peer Heartbeat
+    RPC Server->>Redis: Cache Peer Status
+    Redis-->>RPC Server: Friend Status Update
+    RPC Server->>DB: Query Online Friends
+    RPC Server-->>Client: Friend Status Event
+    Note over RPC Server: (online/offline)
 
-    NATS-->>RPC: Peer Status Update
-    RPC->>Redis: Update Status
-    Redis-->>Client: Status Update Event
-
+    Note over Client,DB: Cleanup
+    Client->>WebSocket: Connection Close
+    WebSocket->>RPC Server: Detach Transport
+    RPC Server->>Redis: Unsubscribe
+    RPC Server->>NATS: Unsubscribe
     deactivate WebSocket
-    deactivate RPC
+    deactivate RPC Server
     deactivate Redis
     deactivate NATS
 ```
