@@ -23,6 +23,7 @@ export async function createRpcServerComponent({
   AppComponents,
   'logs' | 'db' | 'pubsub' | 'config' | 'server' | 'nats' | 'archipelagoStats' | 'redis'
 >): Promise<IRPCServerComponent> {
+  // TODO: this should be a redis if we want to have more than one instance of the server
   const SHARED_CONTEXT: Pick<RpcServerContext, 'subscribers'> = {
     subscribers: {}
   }
