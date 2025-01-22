@@ -55,7 +55,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     return baseQuery
   }
 
-  function getFriendsFromPotentialFriends(userAddress: string, potentialFriends: string[]) {
+  function filterActiveFriendshipsFromAddresses(userAddress: string, userAddresses: string[]) {
     return SQL`
       SELECT DISTINCT 
         CASE
@@ -64,9 +64,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         END as address
       FROM friendships
       WHERE (
-        (address_requester = ${userAddress} AND address_requested = ANY(${potentialFriends}))
+        (address_requester = ${userAddress} AND address_requested = ANY(${userAddresses}))
         OR 
-        (address_requested = ${userAddress} AND address_requester = ANY(${potentialFriends}))
+        (address_requested = ${userAddress} AND address_requester = ANY(${userAddresses}))
       )
       AND is_active = true`
   }
@@ -302,13 +302,13 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return results.rows
     },
     streamOnlineFriends(userAddress: string, onlinePeers: string[]) {
-      const query: SQLStatement = getFriendsFromPotentialFriends(userAddress, onlinePeers)
+      const query: SQLStatement = filterActiveFriendshipsFromAddresses(userAddress, onlinePeers)
       return pg.streamQuery<Friend>(query)
     },
     async getOnlineFriends(userAddress: string, potentialFriends: string[]) {
       if (potentialFriends.length === 0) return []
 
-      const query: SQLStatement = getFriendsFromPotentialFriends(userAddress, potentialFriends)
+      const query: SQLStatement = filterActiveFriendshipsFromAddresses(userAddress, potentialFriends)
       const results = await pg.query<Friend>(query)
       return results.rows
     },
