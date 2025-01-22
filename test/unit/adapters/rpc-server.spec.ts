@@ -3,6 +3,7 @@ import { IRPCServerComponent, RpcServerContext } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import {
   mockArchipelagoStats,
+  mockCatalystClient,
   mockConfig,
   mockDb,
   mockLogs,
@@ -42,7 +43,8 @@ describe('createRpcServerComponent', () => {
       server: mockUWs,
       nats: mockNats,
       archipelagoStats: mockArchipelagoStats,
-      redis: mockRedis
+      redis: mockRedis,
+      catalystClient: mockCatalystClient
     })
   })
 

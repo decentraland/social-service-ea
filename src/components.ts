@@ -15,6 +15,7 @@ import { createArchipelagoStatsComponent } from './adapters/archipelago-stats'
 import { createPeersSynchronizerComponent } from './adapters/peers-synchronizer'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
+import { createCatalystClient } from './adapters/catalyst-client'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -55,7 +56,18 @@ export async function initComponents(): Promise<AppComponents> {
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
   const nats = await createNatsComponent({ logs, config })
-  const rpcServer = await createRpcServerComponent({ logs, db, pubsub, server, config, nats, archipelagoStats, redis })
+  const catalystClient = await createCatalystClient({ config, fetcher })
+  const rpcServer = await createRpcServerComponent({
+    logs,
+    db,
+    pubsub,
+    server,
+    config,
+    nats,
+    archipelagoStats,
+    redis,
+    catalystClient
+  })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = createPeerTrackingComponent({ logs, pubsub, nats })
 

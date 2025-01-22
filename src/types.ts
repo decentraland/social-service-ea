@@ -18,6 +18,7 @@ import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { INatsComponent, Subscription } from '@well-known-components/nats-component/dist/types'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Entity } from '@dcl/schemas'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -39,6 +40,7 @@ export type BaseComponents = {
   peersSynchronizer: IPeersSynchronizer
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
+  catalystClient: ICatalystClient
 }
 
 // components used in runtime
@@ -116,6 +118,16 @@ export type IArchipelagoStatsComponent = IBaseComponent & {
 export type IPeersSynchronizer = IBaseComponent
 export type IPeerTrackingComponent = IBaseComponent & {
   getSubscriptions(): Map<string, Subscription>
+}
+
+export type ICatalystClientRequestOptions = {
+  retries?: number
+  waitTime?: number
+  contentServerUrl?: string
+}
+
+export type ICatalystClient = {
+  getEntitiesByPointers(pointers: string[], options?: ICatalystClientRequestOptions): Promise<Entity[]>
 }
 
 // this type simplifies the typings of http handlers

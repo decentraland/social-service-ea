@@ -1,10 +1,9 @@
-import { mockDb, mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockDb, mockLogs } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/adapters/rpc-server/services/get-friends'
-import { FRIENDSHIPS_PER_PAGE, INTERNAL_SERVER_ERROR } from '../../../../../src/adapters/rpc-server/constants'
+import { FRIENDSHIPS_PER_PAGE } from '../../../../../src/adapters/rpc-server/constants'
 import { RpcServerContext, AppComponents, Friend } from '../../../../../src/types'
 
 describe('getFriendsService', () => {
-  let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
   let getFriends: ReturnType<typeof getFriendsService>
 
   const rpcContext: RpcServerContext = {
@@ -13,8 +12,7 @@ describe('getFriendsService', () => {
   }
 
   beforeEach(() => {
-    components = { db: mockDb, logs: mockLogs }
-    getFriends = getFriendsService({ components })
+    getFriends = getFriendsService({ components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient } })
   })
 
   it('should return the correct list of friends with pagination data', async () => {
