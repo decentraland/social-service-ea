@@ -5,8 +5,9 @@ import * as FriendshipsLogic from '../../../../../src/logic/friendships'
 import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse
-} from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { ParsedUpsertFriendshipRequest } from '../../../../../src/logic/friendships'
+import { FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
 
 jest.mock('../../../../../src/logic/friendships')
 
@@ -149,10 +150,12 @@ describe('upsertFriendshipService', () => {
 
     mockDb.getFriendship.mockResolvedValueOnce(existingFriendship)
     mockDb.getLastFriendshipAction.mockResolvedValueOnce(lastFriendshipAction)
+    mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
-    expect(components.pubsub.publishFriendshipUpdate).toHaveBeenCalledWith({
+    expect(components.pubsub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
+      id: lastFriendshipAction.id,
       from: rpcContext.address,
       to: userAddress,
       action: mockParsedRequest.action,

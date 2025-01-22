@@ -344,10 +344,15 @@
     "@well-known-components/fetch-component" "^2.0.2"
     "@well-known-components/interfaces" "^1.4.2"
 
-"@dcl/protocol@^1.0.0-12815643167.commit-c4162c4":
-  version "1.0.0-12815778152.commit-3614ead"
-  resolved "https://registry.yarnpkg.com/@dcl/protocol/-/protocol-1.0.0-12815778152.commit-3614ead.tgz#5f61db13d426e61ecda6c6a237d148fcdfcb6f8e"
-  integrity sha512-JrtwOtKICHVdwFRC9c4XQbmsw8QpGkFwAiuHp7MBuBbfITIx8ZlWELBlmQH6sq18jzTl83Uz7IohTeAmz5U/wg==
+"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-12875508193.commit-808a662.tgz":
+  version "1.0.0-12875508193.commit-808a662"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-12875508193.commit-808a662.tgz#53592864b3d9e7ea382363ce225ce20e6792321a"
+  dependencies:
+    "@dcl/ts-proto" "1.154.0"
+
+"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-12890706635.commit-a7e4210.tgz":
+  version "1.0.0-12890706635.commit-a7e4210"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-12890706635.commit-a7e4210.tgz#26bac792c70a98cd33346847e4298540eacd1b27"
   dependencies:
     "@dcl/ts-proto" "1.154.0"
 
@@ -1176,7 +1181,7 @@
     on-finished "^2.4.1"
     path-to-regexp "^6.2.1"
 
-"@well-known-components/interfaces@^1.1.0", "@well-known-components/interfaces@^1.4.1", "@well-known-components/interfaces@^1.4.2", "@well-known-components/interfaces@^1.4.3":
+"@well-known-components/interfaces@^1.1.0", "@well-known-components/interfaces@^1.1.1", "@well-known-components/interfaces@^1.4.1", "@well-known-components/interfaces@^1.4.2", "@well-known-components/interfaces@^1.4.3":
   version "1.4.3"
   resolved "https://registry.npmjs.org/@well-known-components/interfaces/-/interfaces-1.4.3.tgz"
   integrity sha512-roVtoOHG6uaH+nL4C0ISnAwkkopc2FLsS7fqX+roI22EdX9PAknPoImhPU8/3u6jgRAVpglX5Zj4nWZkSaXPkQ==
@@ -1197,6 +1202,16 @@
   dependencies:
     prom-client "^15.1.0"
 
+"@well-known-components/nats-component@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@well-known-components/nats-component/-/nats-component-2.0.0.tgz#abe0a1258d7e9b6fa36d0c56b9bd2d7c125ef8af"
+  integrity sha512-czUnm7Hv2BzwsgAtzFg75BYf6sKj/R4AQqHyvMk4QHIUmjUys7FL0eJKbrM3RLLLGCwugCqVBj4kfYOWdpTiHg==
+  dependencies:
+    "@well-known-components/interfaces" "^1.1.1"
+    "@well-known-components/pushable-channel" "^1.0.0"
+    mitt "^3.0.0"
+    nats "^2.7.1"
+
 "@well-known-components/pg-component@^0.2.2":
   version "0.2.2"
   resolved "https://registry.npmjs.org/@well-known-components/pg-component/-/pg-component-0.2.2.tgz"
@@ -1208,6 +1223,13 @@
     pg "^8.7.3"
     pg-query-stream "^4.2.3"
     sql-template-strings "^2.2.2"
+
+"@well-known-components/pushable-channel@^1.0.0":
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/@well-known-components/pushable-channel/-/pushable-channel-1.0.3.tgz#b8a803c483bb52c03339a98813dd370857129059"
+  integrity sha512-8ibswJXQx7YfmUgzXp02xsIBTw6zrVXgNybV8asvEr1vE/0m/xmZi41+NwTcZmLCNRzsE/i+aRUzNO+oyq/g2g==
+  dependencies:
+    mitt "^3.0.0"
 
 "@well-known-components/test-helpers@^1.5.6":
   version "1.5.6"
@@ -2946,6 +2968,11 @@ long@^5.0.0, long@^5.2.3:
   resolved "https://registry.yarnpkg.com/long/-/long-5.2.3.tgz#a3ba97f3877cf1d778eccbcb048525ebb77499e1"
   integrity sha512-lcHwpNoggQTObv5apGNCTdJrO69eHOZMi4BNC+rTLER8iHAqGrUVeLh/irVIM7zTw2bOXA8T6uNPeujwOLg/2Q==
 
+lru-cache@^10.4.3:
+  version "10.4.3"
+  resolved "https://registry.yarnpkg.com/lru-cache/-/lru-cache-10.4.3.tgz#410fc8a17b70e598013df257c2446b7f3383f119"
+  integrity sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==
+
 lru-cache@^5.1.1:
   version "5.1.1"
   resolved "https://registry.npmjs.org/lru-cache/-/lru-cache-5.1.1.tgz"
@@ -3048,6 +3075,13 @@ ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz#574c8138ce1d2b5861f0b44579dbadd60c6615b2"
   integrity sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==
 
+nats@^2.7.1:
+  version "2.29.1"
+  resolved "https://registry.yarnpkg.com/nats/-/nats-2.29.1.tgz#0612053e030dfb31107987d6083d17e50fb295c7"
+  integrity sha512-OHVsxrQCITTdMKG3So0jhtnBd5jS2u1xpS91UCws7VklsaCbctwg5vT/8lYpVldPW0x3aHGF8uuAoMfCoJy7Sg==
+  dependencies:
+    nkeys.js "1.1.0"
+
 natural-compare@^1.4.0:
   version "1.4.0"
   resolved "https://registry.npmjs.org/natural-compare/-/natural-compare-1.4.0.tgz"
@@ -3063,6 +3097,13 @@ nise@^5.1.5:
     "@sinonjs/text-encoding" "^0.7.2"
     just-extend "^6.2.0"
     path-to-regexp "^6.2.1"
+
+nkeys.js@1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/nkeys.js/-/nkeys.js-1.1.0.tgz#de83a9a13f396c5b6d7c412788f4b9f7f35d4c18"
+  integrity sha512-tB/a0shZL5UZWSwsoeyqfTszONTt4k2YS0tuQioMOD180+MbombYVgzDUYHlx+gejYK6rgf08n/2Df99WY0Sxg==
+  dependencies:
+    tweetnacl "1.0.3"
 
 node-fetch@^2.6.12, node-fetch@^2.6.9:
   version "2.7.0"
@@ -3917,6 +3958,11 @@ tslib@^2.6.2:
   version "2.6.2"
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.6.2.tgz#703ac29425e7b37cd6fd456e92404d46d1f3e4ae"
   integrity sha512-AEYxH93jGFPn/a2iVAwW87VuUIkR1FVUKB77NwMF7nBTDkDrrT/Hpt/IrCJ0QXhW27jTBDcf5ZY7w6RiqTMw2Q==
+
+tweetnacl@1.0.3:
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/tweetnacl/-/tweetnacl-1.0.3.tgz#ac0af71680458d8a6378d0d0d050ab1407d35596"
+  integrity sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==
 
 type-check@^0.4.0, type-check@~0.4.0:
   version "0.4.0"

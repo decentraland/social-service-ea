@@ -3,7 +3,7 @@ import { getSentFriendshipRequestsService } from '../../../../../src/adapters/rp
 import { RpcServerContext, AppComponents } from '../../../../../src/types'
 import { emptyRequest } from '../../../../mocks/empty-request'
 import { createMockFriendshipRequest, createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'
-import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('getSentFriendshipRequestsService', () => {
   let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
@@ -21,8 +21,8 @@ describe('getSentFriendshipRequestsService', () => {
 
   it('should return the correct list of sent friendship requests', async () => {
     const mockSentRequests = [
-      createMockFriendshipRequest('0x456', '2025-01-01T00:00:00Z', 'Hello!'),
-      createMockFriendshipRequest('0x789', '2025-01-02T00:00:00Z')
+      createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z', 'Hello!'),
+      createMockFriendshipRequest('id2', '0x789', '2025-01-02T00:00:00Z')
     ]
 
     mockDb.getSentFriendshipRequests.mockResolvedValueOnce(mockSentRequests)
@@ -34,8 +34,8 @@ describe('getSentFriendshipRequestsService', () => {
         $case: 'requests',
         requests: {
           requests: [
-            createMockExpectedFriendshipRequest('0x456', '2025-01-01T00:00:00Z', 'Hello!'),
-            createMockExpectedFriendshipRequest('0x789', '2025-01-02T00:00:00Z', '')
+            createMockExpectedFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z', 'Hello!'),
+            createMockExpectedFriendshipRequest('id2', '0x789', '2025-01-02T00:00:00Z')
           ]
         }
       }
@@ -56,9 +56,8 @@ describe('getSentFriendshipRequestsService', () => {
       }
     })
   })
-
   it('should map metadata.message to an empty string if undefined', async () => {
-    const mockSentRequests = [createMockFriendshipRequest('0x456', '2025-01-01T00:00:00Z')]
+    const mockSentRequests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
 
     mockDb.getSentFriendshipRequests.mockResolvedValueOnce(mockSentRequests)
 
@@ -68,7 +67,7 @@ describe('getSentFriendshipRequestsService', () => {
       response: {
         $case: 'requests',
         requests: {
-          requests: [createMockExpectedFriendshipRequest('0x456', '2025-01-01T00:00:00Z', '')]
+          requests: [createMockExpectedFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
         }
       }
     })

@@ -1,6 +1,6 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
-import { FriendshipUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+import { FriendshipUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import mitt from 'mitt'
 import { parseEmittedUpdateToFriendshipUpdate } from '../../../logic/friendships'
 import emitterToAsyncGenerator from '../../../utils/emitterToGenerator'
@@ -15,15 +15,15 @@ export function subscribeToFriendshipUpdatesService({ components: { logs } }: RP
       context.subscribers[context.address] = eventEmitter
     }
 
-    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, 'update')
+    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, 'friendshipUpdate')
 
     for await (const update of updatesGenerator) {
-      logger.debug('> friendship update received, sending: ', { update: update as any })
+      logger.debug('Friendship update received:', { update: JSON.stringify(update) })
       const updateToResponse = parseEmittedUpdateToFriendshipUpdate(update)
       if (updateToResponse) {
         yield updateToResponse
       } else {
-        logger.error('> unable to parse update to FriendshipUpdate > ', { update: update as any })
+        logger.error('Unable to parse friendship update: ', { update: JSON.stringify(update) })
       }
     }
   }

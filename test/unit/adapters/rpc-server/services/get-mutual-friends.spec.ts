@@ -1,7 +1,7 @@
 import { mockDb, mockLogs } from '../../../../mocks/components'
 import { getMutualFriendsService } from '../../../../../src/adapters/rpc-server/services/get-mutual-friends'
 import { INTERNAL_SERVER_ERROR, FRIENDSHIPS_PER_PAGE } from '../../../../../src/adapters/rpc-server/constants'
-import { GetMutualFriendsPayload } from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+import { GetMutualFriendsPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext, AppComponents } from '../../../../../src/types'
 
 describe('getMutualFriendsService', () => {

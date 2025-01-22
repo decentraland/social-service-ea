@@ -2,7 +2,7 @@ import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   PaginatedFriendshipRequestsResponse,
   GetFriendshipRequestsPayload
-} from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export function getPendingFriendshipRequestsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
   const logger = logs.getLogger('get-pending-friendship-requests-service')
@@ -13,7 +13,8 @@ export function getPendingFriendshipRequestsService({ components: { logs, db } }
   ): Promise<PaginatedFriendshipRequestsResponse> {
     try {
       const pendingRequests = await db.getReceivedFriendshipRequests(context.address, request.pagination)
-      const mappedRequests = pendingRequests.map(({ address, timestamp, metadata }) => ({
+      const mappedRequests = pendingRequests.map(({ id, address, timestamp, metadata }) => ({
+        id,
         user: { address },
         createdAt: new Date(timestamp).getTime(),
         message: metadata?.message || ''

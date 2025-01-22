@@ -1,7 +1,11 @@
 import { createDBComponent } from '../../../src/adapters/db'
 import { Action } from '../../../src/types'
-import SQL from 'sql-template-strings'
-import { mockDb, mockLogs, mockPg } from '../../mocks/components'
+import SQL, { SQLStatement } from 'sql-template-strings'
+import { mockLogs, mockPg } from '../../mocks/components'
+
+jest.mock('node:crypto', () => ({
+  randomUUID: jest.fn().mockReturnValue('mock-uuid')
+}))
 
 describe('db', () => {
   let dbComponent: ReturnType<typeof createDBComponent>
@@ -17,11 +21,50 @@ describe('db', () => {
       ]
       mockPg.query.mockResolvedValueOnce({ rows: mockFriends, rowCount: mockFriends.length })
 
-      const result = await dbComponent.getFriends('0x123', { onlyActive: true })
+      const userAddress = '0x123'
 
-      expect(mockPg.query).toHaveBeenCalledWith(
-        SQL`SELECT * FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) AND is_active = true ORDER BY created_at DESC OFFSET ${expect.any(Number)} LIMIT ${expect.any(Number)}`
-      )
+      const result = await dbComponent.getFriends(userAddress, { onlyActive: true })
+
+      const expectedFragmentsOfTheQuery = [
+        {
+          text: 'WHEN address_requester =',
+          values: ['0x123']
+        },
+        {
+          text: 'WHERE (address_requester =',
+          values: ['0x123']
+        },
+        {
+          text: 'OR address_requested =',
+          values: ['0x123']
+        },
+        {
+          text: 'AND is_active = true',
+          values: []
+        },
+        {
+          text: 'ORDER BY created_at DESC',
+          values: []
+        },
+        {
+          text: 'OFFSET',
+          values: [expect.any(Number)]
+        },
+        {
+          text: 'LIMIT',
+          values: [expect.any(Number)]
+        }
+      ]
+
+      expectedFragmentsOfTheQuery.forEach(({ text, values }) => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining(text),
+            values: expect.arrayContaining(values)
+          })
+        )
+      })
+
       expect(result).toEqual(mockFriends)
     })
 
@@ -34,7 +77,9 @@ describe('db', () => {
       const result = await dbComponent.getFriends('0x123', { onlyActive: false })
 
       expect(mockPg.query).toHaveBeenCalledWith(
-        SQL`SELECT * FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) ORDER BY created_at DESC OFFSET ${expect.any(Number)} LIMIT ${expect.any(Number)}`
+        expect.not.objectContaining({
+          text: expect.stringContaining('AND is_active = true')
+        })
       )
       expect(result).toEqual(mockFriends)
     })
@@ -201,6 +246,7 @@ describe('db', () => {
     it('should retrieve received friendship requests', async () => {
       const mockRequests = [
         {
+          id: expect.any(String),
           address: '0x123',
           timestamp: '2025-01-01T00:00:00.000Z',
           metadata: { message: 'Hello' }
@@ -226,6 +272,7 @@ describe('db', () => {
     it('should retrieve sent friendship requests', async () => {
       const mockRequests = [
         {
+          id: expect.any(String),
           address: '0x456',
           timestamp: '2025-01-01T00:00:00.000Z',
           metadata: { message: 'Hi there' }
@@ -236,6 +283,12 @@ describe('db', () => {
       const result = await dbComponent.getSentFriendshipRequests('0x123', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('f.address_requester ='),
+          values: expect.arrayContaining(['0x123'])
+        })
+      )
       expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(10, 5)
     })
   })
@@ -253,7 +306,7 @@ describe('db', () => {
         mockClient
       )
 
-      expect(result).toBe(true)
+      expect(result).toBe('mock-uuid')
       expect(withTxClient ? mockClient.query : mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
@@ -268,6 +321,47 @@ describe('db', () => {
           ])
         })
       )
+    })
+  })
+
+  describe('areFriendsOf', () => {
+    it('should return empty array for empty potential friends', async () => {
+      const result = await dbComponent.getOnlineFriends('0x123', [])
+      expect(result).toEqual([])
+      expect(mockPg.query).not.toHaveBeenCalled()
+    })
+
+    it('should query friendships for potential friends', async () => {
+      const mockResult = {
+        rows: [{ address: '0x456' }, { address: '0x789' }],
+        rowCount: 2
+      }
+      mockPg.query.mockResolvedValueOnce(mockResult)
+
+      const potentialFriends = ['0x456', '0x789', '0x999']
+      const result = await dbComponent.getOnlineFriends('0x123', potentialFriends)
+
+      const queryExpectations = [
+        { text: 'address_requester =', values: ['0x123'] },
+        { text: 'AND address_requested = ANY(' },
+        { text: 'address_requested =', values: ['0x123'] },
+        { text: 'address_requester = ANY(' }
+      ]
+
+      queryExpectations.forEach(({ text, values }) => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining(text)
+          })
+        )
+        if (values) {
+          expect(mockPg.query).toHaveBeenCalledWith(
+            expect.objectContaining({
+              values: expect.arrayContaining(values)
+            })
+          )
+        }
+      })
     })
   })
 

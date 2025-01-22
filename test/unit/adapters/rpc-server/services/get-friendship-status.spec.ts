@@ -4,7 +4,7 @@ import {
   FriendshipStatus,
   GetFriendshipStatusPayload,
   GetFriendshipStatusResponse
-} from '@dcl/protocol/out-js/decentraland/social_service/v3/social_service_v3.gen'
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { mockDb, mockLogs } from '../../../../mocks/components'
 
 describe('getFriendshipStatusService', () => {
