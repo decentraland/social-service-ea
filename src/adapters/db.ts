@@ -9,6 +9,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
   const logger = logs.getLogger('db-component')
 
+  // TODO: abstract common statements in a util file
   function getFriendsBaseQuery(userAddress: string) {
     return SQL`
       SELECT DISTINCT
