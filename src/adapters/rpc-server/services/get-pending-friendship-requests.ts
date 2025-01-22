@@ -28,8 +28,8 @@ export function getPendingFriendshipRequestsService({ components: { logs, db } }
           }
         }
       }
-    } catch (error) {
-      logger.error(error as any)
+    } catch (error: any) {
+      logger.error(`Error getting pending friendship requests: ${error.message}`)
       return {
         response: {
           $case: 'internalServerError',

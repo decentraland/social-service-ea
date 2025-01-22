@@ -46,8 +46,8 @@ export function getFriendshipStatusService({ components: { logs, db } }: RPCServ
           }
         }
       }
-    } catch (error) {
-      logger.error(error as any)
+    } catch (error: any) {
+      logger.error(`Error getting friendship status: ${error.message}`)
       return {
         response: {
           $case: 'internalServerError',

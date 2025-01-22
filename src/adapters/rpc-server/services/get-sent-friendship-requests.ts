@@ -28,8 +28,8 @@ export function getSentFriendshipRequestsService({ components: { logs, db } }: R
           }
         }
       }
-    } catch (error) {
-      logger.error(error as any)
+    } catch (error: any) {
+      logger.error(`Error getting sent friendship requests: ${error.message}`)
       return {
         response: {
           $case: 'internalServerError',

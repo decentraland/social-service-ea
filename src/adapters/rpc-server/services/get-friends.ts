@@ -27,9 +27,15 @@ export function getFriendsService({ components: { logs, db } }: RPCServiceContex
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)
         }
       }
-    } catch (error) {
-      logger.error(error as any)
-      throw new Error(INTERNAL_SERVER_ERROR)
+    } catch (error: any) {
+      logger.error(`Error getting friends: ${error.message}`)
+      return {
+        users: [],
+        paginationData: {
+          total: 0,
+          page: 1
+        }
+      }
     }
   }
 }

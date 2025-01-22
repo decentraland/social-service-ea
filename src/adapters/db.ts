@@ -321,8 +321,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         const res = await cb(client)
         await client.query('COMMIT')
         return res
-      } catch (error) {
-        logger.error(error as any)
+      } catch (error: any) {
+        logger.error(`Error executing transaction: ${error.message}`)
         await client.query('ROLLBACK')
         client.release()
         throw error

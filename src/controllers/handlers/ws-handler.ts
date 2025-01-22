@@ -80,9 +80,8 @@ export async function registerWsHandler(
               logger.error(err)
             }
           })
-        } catch (error) {
-          console.log(error)
-          logger.error(error as any)
+        } catch (error: any) {
+          logger.error(`Error verifying auth chain: ${error.message}`)
           ws.close()
         }
       }

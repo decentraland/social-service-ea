@@ -114,8 +114,8 @@ export function upsertFriendshipService({
           }
         }
       }
-    } catch (error) {
-      logger.error(error as any)
+    } catch (error: any) {
+      logger.error(`Error upserting friendship: ${error.message}`)
       return {
         response: {
           $case: 'internalServerError',

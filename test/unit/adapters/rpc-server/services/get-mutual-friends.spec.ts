@@ -85,6 +85,14 @@ describe('getMutualFriendsService', () => {
       throw new Error('Database error')
     })
 
-    await expect(getMutualFriends(mutualFriendsRequest, rpcContext)).rejects.toThrow(INTERNAL_SERVER_ERROR)
+    const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
+
+    expect(response).toEqual({
+      users: [],
+      paginationData: {
+        total: 0,
+        page: 1
+      }
+    })
   })
 })

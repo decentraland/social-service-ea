@@ -71,9 +71,15 @@ describe('getFriendsService', () => {
       throw new Error('Database error')
     })
 
-    await expect(getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)).rejects.toThrow(
-      INTERNAL_SERVER_ERROR
-    )
+    const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
+
+    expect(response).toEqual({
+      users: [],
+      paginationData: {
+        total: 0,
+        page: 1
+      }
+    })
   })
 
   // Helper to create a mock friendship object

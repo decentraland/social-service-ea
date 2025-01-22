@@ -27,11 +27,15 @@ export function getMutualFriendsService({ components: { logs, db } }: RPCService
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)
         }
       }
-    } catch (error) {
-      logger.error(error as any)
-      // throw an error bc there is no sense to create a generator to send an error
-      // as it's done in the previous Social Service
-      throw new Error(INTERNAL_SERVER_ERROR)
+    } catch (error: any) {
+      logger.error(`Error getting mutual friends: ${error.message}`)
+      return {
+        users: [],
+        paginationData: {
+          total: 0,
+          page: 1
+        }
+      }
     }
   }
 }
