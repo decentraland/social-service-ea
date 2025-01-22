@@ -4,11 +4,15 @@ import {
   isFriendshipActionValid,
   isUserActionValid,
   parseEmittedUpdateToFriendshipUpdate,
+  parseEmittedUpdateToFriendStatusUpdate,
   parseUpsertFriendshipRequest,
   validateNewFriendshipAction
 } from '../../../src/logic/friendships'
 import { Action, FriendshipStatus } from '../../../src/types'
-import { FriendshipStatus as FriendshipRequestStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  ConnectivityStatus,
+  FriendshipStatus as FriendshipRequestStatus
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('isFriendshipActionValid()', () => {
   test('it should be valid if from is null and to is REQUEST ', () => {
@@ -549,5 +553,14 @@ describe('getFriendshipRequestStatus()', () => {
   test('when the last action is request and the acting user is not the logged user it should return request received', () => {
     const requestMadeByAnotherUser = { ...friendshipAction, acting_user: '0x456', action: Action.REQUEST }
     expect(getFriendshipRequestStatus(requestMadeByAnotherUser, '0x123')).toBe(FriendshipRequestStatus.REQUEST_RECEIVED)
+  })
+})
+
+describe('parseEmittedUpdateToFriendStatusUpdate()', () => {
+  test('it should parse ONLINE update properly', () => {
+    expect(parseEmittedUpdateToFriendStatusUpdate({ address: '0x123', status: ConnectivityStatus.ONLINE })).toEqual({
+      user: { address: '0x123' },
+      status: ConnectivityStatus.ONLINE
+    })
   })
 })
