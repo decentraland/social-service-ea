@@ -85,6 +85,7 @@ export async function initComponents(): Promise<AppComponents> {
     archipelagoStats,
     peersSynchronizer,
     nats,
-    peerTracking
+    peerTracking,
+    catalystClient
   }
 }

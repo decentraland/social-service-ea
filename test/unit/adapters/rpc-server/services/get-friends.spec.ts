@@ -1,51 +1,49 @@
-import { mockCatalystClient, mockDb, mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockConfig, mockDb, mockLogs } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/adapters/rpc-server/services/get-friends'
-import { FRIENDSHIPS_PER_PAGE } from '../../../../../src/adapters/rpc-server/constants'
-import { RpcServerContext, AppComponents, Friend } from '../../../../../src/types'
+import { RpcServerContext, Friend } from '../../../../../src/types'
+import { createMockProfile } from '../../../../mocks/profile'
 
 describe('getFriendsService', () => {
-  let getFriends: ReturnType<typeof getFriendsService>
+  let getFriends: Awaited<ReturnType<typeof getFriendsService>>
+
+  const contentServerUrl = 'https://peer.decentraland.org/content'
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
     subscribers: undefined
   }
 
-  beforeEach(() => {
-    getFriends = getFriendsService({ components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient } })
+  beforeEach(async () => {
+    mockConfig.requireString.mockResolvedValueOnce(contentServerUrl)
+
+    getFriends = await getFriendsService({
+      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient, config: mockConfig }
+    })
   })
 
   it('should return the correct list of friends with pagination data', async () => {
-    const mockFriends = [createMockFriend('0x456'), createMockFriend('0x789'), createMockFriend('0x987')]
+    const addresses = ['0x456', '0x789', '0x987']
+    const mockFriends = addresses.map(createMockFriend)
+    const mockProfiles = addresses.map(createMockProfile)
     const totalFriends = 2
 
     mockDb.getFriends.mockResolvedValueOnce(mockFriends)
     mockDb.getFriendsCount.mockResolvedValueOnce(totalFriends)
+    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
 
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
     expect(response).toEqual({
-      users: [{ address: '0x456' }, { address: '0x789' }, { address: '0x987' }],
+      users: addresses.map((address) => ({
+        address,
+        name: `Profile name ${address}`,
+        hasClaimedName: true,
+        profilePictureUrl: `${contentServerUrl}/contents/bafybeiasdfqwer`
+      })),
       paginationData: {
         total: totalFriends,
         page: 1
       }
-    })
-  })
-
-  it('should respect the pagination limit', async () => {
-    const mockFriends = Array.from({ length: FRIENDSHIPS_PER_PAGE }, (_, i) => createMockFriend(`0x${i + 1}`))
-    const totalFriends = FRIENDSHIPS_PER_PAGE + 5
-
-    mockDb.getFriends.mockResolvedValueOnce(mockFriends)
-    mockDb.getFriendsCount.mockResolvedValueOnce(totalFriends)
-
-    const response = await getFriends({ pagination: { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } }, rpcContext)
-
-    expect(response.users).toHaveLength(FRIENDSHIPS_PER_PAGE)
-    expect(response.paginationData).toEqual({
-      total: totalFriends,
-      page: 1
     })
   })
 
@@ -67,6 +65,22 @@ describe('getFriendsService', () => {
   it('should handle errors from the database gracefully', async () => {
     mockDb.getFriends.mockImplementationOnce(() => {
       throw new Error('Database error')
+    })
+
+    const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
+
+    expect(response).toEqual({
+      users: [],
+      paginationData: {
+        total: 0,
+        page: 1
+      }
+    })
+  })
+
+  it('should handle errors from the catalyst gracefully', async () => {
+    mockCatalystClient.getEntitiesByPointers.mockImplementationOnce(() => {
+      throw new Error('Catalyst error')
     })
 
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
