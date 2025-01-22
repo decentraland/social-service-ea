@@ -1,7 +1,7 @@
 import { AppComponents, IPubSubComponent } from '../types'
 
-export const FRIENDSHIP_UPDATES_CHANNEL = 'FRIENDSHIP_UPDATES'
-export const FRIEND_STATUS_UPDATES_CHANNEL = 'FRIEND_STATUS_UPDATES'
+export const FRIENDSHIP_UPDATES_CHANNEL = 'friendship.updates'
+export const FRIEND_STATUS_UPDATES_CHANNEL = 'friend.status.updates'
 
 export function createPubSubComponent(components: Pick<AppComponents, 'logs' | 'redis'>): IPubSubComponent {
   const { logs, redis } = components

@@ -116,6 +116,8 @@ sequenceDiagram
     Note over RPC Server,NATS: Subscriptions Setup
     RPC Server->>Redis: Subscribe to friendship channels
     activate Redis
+    Note over Redis: friendship.updates
+    Note over Redis: friend.status.updates
     RPC Server->>NATS: Subscribe to patterns
     activate NATS
     Note over NATS: peer.*.connected
