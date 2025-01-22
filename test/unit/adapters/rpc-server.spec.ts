@@ -1,4 +1,4 @@
-import { createRpcServerComponent } from ' ../../../src/adapters/rpc-server/rpc-server'
+import { createRpcServerComponent } from ' ../../../src/adapters/rpc-server'
 import { IRPCServerComponent, RpcServerContext } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import {
