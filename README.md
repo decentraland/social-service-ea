@@ -114,11 +114,11 @@ sequenceDiagram
     activate RPC Server
 
     Note over RPC Server,NATS: Subscriptions Setup
-    RPC Server->>Redis: Subscribe to friendship channels
+    RPC Server->>Redis: Subscribe to updates channels
     activate Redis
     Note over Redis: friendship.updates
     Note over Redis: friend.status.updates
-    RPC Server->>NATS: Subscribe to patterns
+    RPC Server->>NATS: Subscribe to peer events
     activate NATS
     Note over NATS: peer.*.connected
     Note over NATS: peer.*.disconnected
@@ -134,16 +134,18 @@ sequenceDiagram
 
     Note over Client,DB: Friendship Updates Flow
     Redis-->>RPC Server: Friendship Update Event
-    RPC Server->>DB: Update Friendship Status
-    RPC Server-->>Client: Friendship Status Changed
-    Note over RPC Server: (accept/reject/delete)
+    RPC Server-->>Client: Stream Friendship Updates
+    Note over RPC Server: (accept/cancel/reject/delete)
 
     Note over Client,DB: Friends Lifecycle
-    NATS-->>RPC Server: Peer Heartbeat
-    RPC Server->>Redis: Cache Peer Status
+    NATS-->>Redis: Peer Heartbeat
     Redis-->>RPC Server: Friend Status Update
+    RPC Server->>Redis: Request Cached Peers
+    Redis-->>RPC Server: Cached Peers
+    RPC Server->>DB: Request Online Friends
+    DB-->>RPC Server: Online Friends
     RPC Server->>DB: Query Online Friends
-    RPC Server-->>Client: Friend Status Event
+    RPC Server-->>Client: Stream Friend Status Updates
     Note over RPC Server: (online/offline)
 
     Note over Client,DB: Cleanup
