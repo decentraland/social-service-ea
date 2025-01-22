@@ -38,7 +38,7 @@ export async function createRpcServerComponent({
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
 
   const getFriends = await getFriendsService({ components: { logs, db, catalystClient, config } })
-  const getMutualFriends = getMutualFriendsService({ components: { logs, db } })
+  const getMutualFriends = await getMutualFriendsService({ components: { logs, db, catalystClient, config } })
   const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
   const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })
   const upsertFriendship = upsertFriendshipService({ components: { logs, db, pubsub } })

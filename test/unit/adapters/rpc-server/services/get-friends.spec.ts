@@ -1,7 +1,8 @@
 import { mockCatalystClient, mockConfig, mockDb, mockLogs } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/adapters/rpc-server/services/get-friends'
-import { RpcServerContext, Friend } from '../../../../../src/types'
+import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
+import { createMockFriend, parseExpectedFriends } from '../../../../mocks/friend'
 
 describe('getFriendsService', () => {
   let getFriends: Awaited<ReturnType<typeof getFriendsService>>
@@ -34,12 +35,7 @@ describe('getFriendsService', () => {
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
     expect(response).toEqual({
-      users: addresses.map((address) => ({
-        address,
-        name: `Profile name ${address}`,
-        hasClaimedName: true,
-        profilePictureUrl: `${contentServerUrl}/contents/bafybeiasdfqwer`
-      })),
+      users: addresses.map(parseExpectedFriends(contentServerUrl)),
       paginationData: {
         total: totalFriends,
         page: 1
@@ -92,10 +88,5 @@ describe('getFriendsService', () => {
         page: 1
       }
     })
-  })
-
-  // Helper to create a mock friendship object
-  const createMockFriend = (address): Friend => ({
-    address
   })
 })

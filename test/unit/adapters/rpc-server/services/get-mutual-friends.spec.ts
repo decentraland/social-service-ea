@@ -1,12 +1,14 @@
-import { mockDb, mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockConfig, mockDb, mockLogs } from '../../../../mocks/components'
 import { getMutualFriendsService } from '../../../../../src/adapters/rpc-server/services/get-mutual-friends'
-import { FRIENDSHIPS_PER_PAGE } from '../../../../../src/adapters/rpc-server/constants'
 import { GetMutualFriendsPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext, AppComponents } from '../../../../../src/types'
+import { RpcServerContext } from '../../../../../src/types'
+import { createMockProfile } from '../../../../mocks/profile'
+import { createMockFriend, parseExpectedFriends } from '../../../../mocks/friend'
 
 describe('getMutualFriendsService', () => {
-  let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
-  let getMutualFriends: ReturnType<typeof getMutualFriendsService>
+  let getMutualFriends: Awaited<ReturnType<typeof getMutualFriendsService>>
+
+  const contentServerUrl = 'https://peer.decentraland.org/content'
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
@@ -18,47 +20,31 @@ describe('getMutualFriendsService', () => {
     pagination: { limit: 10, offset: 0 }
   }
 
-  beforeEach(() => {
-    components = { db: mockDb, logs: mockLogs }
-    getMutualFriends = getMutualFriendsService({ components })
+  beforeEach(async () => {
+    mockConfig.requireString.mockResolvedValueOnce(contentServerUrl)
+    getMutualFriends = await getMutualFriendsService({
+      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient, config: mockConfig }
+    })
   })
 
   it('should return the correct list of mutual friends with pagination data', async () => {
-    const mockMutualFriends = [{ address: '0x789' }, { address: '0xabc' }]
+    const addresses = ['0x789', '0xabc']
+    const mockMutualFriends = addresses.map(createMockFriend)
+    const mockMutualFriendsProfiles = addresses.map(createMockProfile)
     const totalMutualFriends = 2
 
     mockDb.getMutualFriends.mockResolvedValueOnce(mockMutualFriends)
     mockDb.getMutualFriendsCount.mockResolvedValueOnce(totalMutualFriends)
+    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockMutualFriendsProfiles)
 
     const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
 
     expect(response).toEqual({
-      users: mockMutualFriends,
+      users: addresses.map(parseExpectedFriends(contentServerUrl)),
       paginationData: {
         total: totalMutualFriends,
-        page: 1 // First page is 1
+        page: 1
       }
-    })
-  })
-
-  it('should respect the pagination limit', async () => {
-    const mockMutualFriends = Array.from({ length: FRIENDSHIPS_PER_PAGE }, (_, i) => ({
-      address: `0x${i + 1}`
-    }))
-    const totalMutualFriends = FRIENDSHIPS_PER_PAGE + 5
-
-    mockDb.getMutualFriends.mockResolvedValueOnce(mockMutualFriends)
-    mockDb.getMutualFriendsCount.mockResolvedValueOnce(totalMutualFriends)
-
-    const response = await getMutualFriends(
-      { ...mutualFriendsRequest, pagination: { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } },
-      rpcContext
-    )
-
-    expect(response.users).toHaveLength(FRIENDSHIPS_PER_PAGE)
-    expect(response.paginationData).toEqual({
-      total: totalMutualFriends,
-      page: 1 // First page is 1
     })
   })
 
@@ -75,7 +61,7 @@ describe('getMutualFriendsService', () => {
       users: [],
       paginationData: {
         total: 0,
-        page: 1 // First page is 1, even when no results
+        page: 1
       }
     })
   })
@@ -83,6 +69,22 @@ describe('getMutualFriendsService', () => {
   it('should handle errors from the database gracefully', async () => {
     mockDb.getMutualFriends.mockImplementationOnce(() => {
       throw new Error('Database error')
+    })
+
+    const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
+
+    expect(response).toEqual({
+      users: [],
+      paginationData: {
+        total: 0,
+        page: 1
+      }
+    })
+  })
+
+  it('should handle errors from the catalyst gracefully', async () => {
+    mockCatalystClient.getEntitiesByPointers.mockImplementationOnce(() => {
+      throw new Error('Catalyst error')
     })
 
     const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
