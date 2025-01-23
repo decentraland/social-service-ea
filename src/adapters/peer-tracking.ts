@@ -58,8 +58,14 @@ export function createPeerTrackingComponent({
   return {
     async start() {
       PEER_STATUS_HANDLERS.forEach((handler) => {
-        const subscription = nats.subscribe(handler.pattern, createMessageHandler(handler))
-        subscriptions.set(handler.event, subscription)
+        try {
+          const subscription = nats.subscribe(handler.pattern, createMessageHandler(handler))
+          subscriptions.set(handler.event, subscription)
+        } catch (error: any) {
+          logger.error(`Error subscribing to ${handler.pattern}`, {
+            error: error.message
+          })
+        }
       })
     },
     async stop() {
