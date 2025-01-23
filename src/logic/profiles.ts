@@ -1,13 +1,4 @@
-import { Entity } from '@dcl/schemas'
-
-type Avatar = {
-  userId: string
-  name: string
-  hasClaimedName: boolean
-  snapshots: {
-    face256: string
-  }
-}
+import { Entity, Avatar } from '@dcl/schemas'
 
 export function getProfileAvatar(profile: Pick<Entity, 'metadata'>): Avatar {
   const [avatar] = profile.metadata.avatars
