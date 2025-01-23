@@ -243,5 +243,5 @@ export function parseFriendshipRequestsToFriendshipRequestResponses(
 
       return parseFriendshipRequestToFriendshipRequestResponse(request, profile, profileImagesUrl)
     })
-    .filter((request) => request !== null)
+    .filter((request) => !!request)
 }
