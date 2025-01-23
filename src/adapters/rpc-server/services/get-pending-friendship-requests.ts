@@ -1,6 +1,4 @@
-import { parseProfileToFriend } from '../../../logic/friends'
 import { parseFriendshipRequestsToFriendshipRequestResponses } from '../../../logic/friendships'
-import { getProfileAvatar } from '../../../logic/profiles'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   PaginatedFriendshipRequestsResponse,
