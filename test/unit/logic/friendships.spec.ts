@@ -5,6 +5,8 @@ import {
   isUserActionValid,
   parseEmittedUpdateToFriendshipUpdate,
   parseEmittedUpdateToFriendStatusUpdate,
+  parseFriendshipRequestsToFriendshipRequestResponses,
+  parseFriendshipRequestToFriendshipRequestResponse,
   parseUpsertFriendshipRequest,
   validateNewFriendshipAction
 } from '../../../src/logic/friendships'
@@ -13,6 +15,8 @@ import {
   ConnectivityStatus,
   FriendshipStatus as FriendshipRequestStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { createMockExpectedFriendshipRequest, createMockFriendshipRequest } from '../../mocks/friendship-request'
+import { createMockProfile } from '../../mocks/profile'
 
 describe('isFriendshipActionValid()', () => {
   test('it should be valid if from is null and to is REQUEST ', () => {
@@ -562,5 +566,37 @@ describe('parseEmittedUpdateToFriendStatusUpdate()', () => {
       user: { address: '0x123' },
       status: ConnectivityStatus.ONLINE
     })
+  })
+})
+
+describe('parseFriendshipRequestToFriendshipRequestResponse()', () => {
+  test('it should parse friendship request to friendship request response', () => {
+    const request = createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')
+    const profile = createMockProfile('0x456')
+    const profileImagesUrl = 'https://profile-images.decentraland.org'
+
+    expect(parseFriendshipRequestToFriendshipRequestResponse(request, profile, profileImagesUrl)).toEqual(
+      createMockExpectedFriendshipRequest('id1', '0x456', profile, '2025-01-01T00:00:00Z', '')
+    )
+  })
+})
+
+describe('parseFriendshipRequestsToFriendshipRequestResponses()', () => {
+  test('it should parse friendship requests to friendship request responses', () => {
+    const requests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
+    const profiles = [createMockProfile('0x456')]
+    const profileImagesUrl = 'https://profile-images.decentraland.org'
+
+    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles, profileImagesUrl)).toEqual([
+      createMockExpectedFriendshipRequest('id1', '0x456', profiles[0], '2025-01-01T00:00:00Z', '')
+    ])
+  })
+
+  test('it should return an empty array if the requester/requested address is not found in the profiles', () => {
+    const requests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
+    const profiles = [createMockProfile('0x789')]
+    const profileImagesUrl = 'https://profile-images.decentraland.org'
+
+    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles, profileImagesUrl)).toEqual([])
   })
 })

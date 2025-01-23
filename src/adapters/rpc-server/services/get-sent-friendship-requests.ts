@@ -1,30 +1,37 @@
+import { parseFriendshipRequestsToFriendshipRequestResponses } from '../../../logic/friendships'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   PaginatedFriendshipRequestsResponse,
   GetFriendshipRequestsPayload
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
-export function getSentFriendshipRequestsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
+export async function getSentFriendshipRequestsService({
+  components: { logs, db, catalystClient, config }
+}: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'config'>) {
   const logger = logs.getLogger('get-sent-friendship-requests-service')
+  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function (
     request: GetFriendshipRequestsPayload,
     context: RpcServerContext
   ): Promise<PaginatedFriendshipRequestsResponse> {
     try {
-      const pendingRequests = await db.getSentFriendshipRequests(context.address, request.pagination)
-      const mappedRequests = pendingRequests.map(({ id, address, timestamp, metadata }) => ({
-        id,
-        user: { address },
-        createdAt: new Date(timestamp).getTime(),
-        message: metadata?.message || ''
-      }))
+      const sentRequests = await db.getSentFriendshipRequests(context.address, request.pagination)
+      const sentRequestsAddresses = sentRequests.map(({ address }) => address)
+
+      const sentRequestedProfiles = await catalystClient.getEntitiesByPointers(sentRequestsAddresses)
+
+      const requests = parseFriendshipRequestsToFriendshipRequestResponses(
+        sentRequests,
+        sentRequestedProfiles,
+        profileImagesUrl
+      )
 
       return {
         response: {
           $case: 'requests',
           requests: {
-            requests: mappedRequests
+            requests
           }
         }
       }

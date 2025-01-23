@@ -2,16 +2,21 @@ import {
   FriendshipUpdate,
   UpsertFriendshipPayload,
   FriendshipStatus as FriendshipRequestStatus,
-  FriendUpdate
+  FriendUpdate,
+  FriendshipRequestResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   Action,
   FRIENDSHIP_ACTION_TRANSITIONS,
   FriendshipAction,
+  FriendshipRequest,
   FriendshipStatus,
   SubscriptionEventsEmitter
 } from '../types'
 import { normalizeAddress } from '../utils/address'
+import { parseProfileToFriend } from './friends'
+import { Entity } from '@dcl/schemas'
+import { getProfileAvatar } from './profiles'
 
 const FRIENDSHIP_STATUS_BY_ACTION: Record<
   Action,
@@ -206,4 +211,37 @@ export function getFriendshipRequestStatus(
 ): FriendshipRequestStatus {
   const statusResolver = FRIENDSHIP_STATUS_BY_ACTION[action]
   return statusResolver?.(acting_user, loggedUserAddress) ?? FriendshipRequestStatus.UNRECOGNIZED
+}
+
+export function parseFriendshipRequestToFriendshipRequestResponse(
+  request: FriendshipRequest,
+  profile: Entity,
+  profileImagesUrl: string
+): FriendshipRequestResponse {
+  return {
+    id: request.id,
+    friend: parseProfileToFriend(profile, profileImagesUrl),
+    createdAt: new Date(request.timestamp).getTime(),
+    message: request.metadata?.message || ''
+  }
+}
+
+export function parseFriendshipRequestsToFriendshipRequestResponses(
+  requests: FriendshipRequest[],
+  profiles: Entity[],
+  profileImagesUrl: string
+): FriendshipRequestResponse[] {
+  const profilesMap = new Map(profiles.map((profile) => [getProfileAvatar(profile).userId, profile]))
+
+  return requests
+    .map((request) => {
+      const profile = profilesMap.get(request.address)
+
+      if (!profile) {
+        return null
+      }
+
+      return parseFriendshipRequestToFriendshipRequestResponse(request, profile, profileImagesUrl)
+    })
+    .filter((request) => request !== null)
 }

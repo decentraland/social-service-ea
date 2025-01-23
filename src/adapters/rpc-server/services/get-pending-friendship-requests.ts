@@ -1,11 +1,17 @@
+import { parseProfileToFriend } from '../../../logic/friends'
+import { parseFriendshipRequestsToFriendshipRequestResponses } from '../../../logic/friendships'
+import { getProfileAvatar } from '../../../logic/profiles'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   PaginatedFriendshipRequestsResponse,
   GetFriendshipRequestsPayload
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
-export function getPendingFriendshipRequestsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
+export async function getPendingFriendshipRequestsService({
+  components: { logs, db, catalystClient, config }
+}: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'config'>) {
   const logger = logs.getLogger('get-pending-friendship-requests-service')
+  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function (
     request: GetFriendshipRequestsPayload,
@@ -13,18 +19,20 @@ export function getPendingFriendshipRequestsService({ components: { logs, db } }
   ): Promise<PaginatedFriendshipRequestsResponse> {
     try {
       const pendingRequests = await db.getReceivedFriendshipRequests(context.address, request.pagination)
-      const mappedRequests = pendingRequests.map(({ id, address, timestamp, metadata }) => ({
-        id,
-        user: { address },
-        createdAt: new Date(timestamp).getTime(),
-        message: metadata?.message || ''
-      }))
+      const pendingRequestsAddresses = pendingRequests.map(({ address }) => address)
+
+      const pendingRequesterProfiles = await catalystClient.getEntitiesByPointers(pendingRequestsAddresses)
+      const requests = parseFriendshipRequestsToFriendshipRequestResponses(
+        pendingRequests,
+        pendingRequesterProfiles,
+        profileImagesUrl
+      )
 
       return {
         response: {
           $case: 'requests',
           requests: {
-            requests: mappedRequests
+            requests
           }
         }
       }
