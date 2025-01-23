@@ -13,7 +13,7 @@ describe('PeerTrackingComponent', () => {
 
   describe('start', () => {
     it('should subscribe to all peer status patterns', async () => {
-      await peerTracking.start({} as any)
+      await peerTracking.subscribeToPeerStatusUpdates()
 
       const subscriptions = peerTracking.getSubscriptions()
       expect(subscriptions.size).toBe(PEER_STATUS_HANDLERS.length)
@@ -27,7 +27,7 @@ describe('PeerTrackingComponent', () => {
 
   describe('stop', () => {
     it('should unsubscribe and clear all subscriptions', async () => {
-      await peerTracking.start({} as any)
+      await peerTracking.subscribeToPeerStatusUpdates()
       await peerTracking.stop()
 
       const subscriptions = peerTracking.getSubscriptions()
@@ -38,7 +38,7 @@ describe('PeerTrackingComponent', () => {
   describe('message handling', () => {
     PEER_STATUS_HANDLERS.forEach((handler) => {
       it(`should handle ${handler.event} messages correctly`, async () => {
-        await peerTracking.start({} as any)
+        await peerTracking.subscribeToPeerStatusUpdates()
 
         const messageHandler = mockNats.subscribe.mock.calls.find((call) => call[0] === handler.pattern)?.[1]
 
@@ -56,7 +56,7 @@ describe('PeerTrackingComponent', () => {
       })
 
       it(`should handle ${handler.event} message errors`, async () => {
-        await peerTracking.start({} as any)
+        await peerTracking.subscribeToPeerStatusUpdates()
 
         const messageHandler = mockNats.subscribe.mock.calls.find((call) => call[0] === handler.pattern)?.[1]
 

@@ -118,6 +118,7 @@ export type IArchipelagoStatsComponent = IBaseComponent & {
 export type IPeersSynchronizer = IBaseComponent
 export type IPeerTrackingComponent = IBaseComponent & {
   getSubscriptions(): Map<string, Subscription>
+  subscribeToPeerStatusUpdates(): Promise<void>
 }
 
 export type ICatalystClientRequestOptions = {

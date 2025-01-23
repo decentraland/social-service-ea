@@ -56,7 +56,7 @@ export function createPeerTrackingComponent({
   }
 
   return {
-    async start() {
+    async subscribeToPeerStatusUpdates() {
       PEER_STATUS_HANDLERS.forEach((handler) => {
         try {
           const subscription = nats.subscribe(handler.pattern, createMessageHandler(handler))
