@@ -2,7 +2,7 @@ import {
   FriendshipUpdate,
   UpsertFriendshipPayload,
   FriendshipStatus as FriendshipRequestStatus,
-  FriendUpdate,
+  FriendConnectivityUpdate,
   FriendshipRequestResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
@@ -139,8 +139,11 @@ export function parseEmittedUpdateToFriendshipUpdate(
           request: {
             id: update.id,
             createdAt: update.timestamp,
-            user: {
-              address: update.from
+            friend: {
+              address: update.from,
+              name: update.from,
+              hasClaimedName: false,
+              profilePictureUrl: ''
             },
             message: update.metadata?.message
           }
@@ -198,9 +201,9 @@ export function parseEmittedUpdateToFriendshipUpdate(
 export function parseEmittedUpdateToFriendStatusUpdate({
   address,
   status
-}: SubscriptionEventsEmitter['friendStatusUpdate']): FriendUpdate | null {
+}: SubscriptionEventsEmitter['friendStatusUpdate']): FriendConnectivityUpdate | null {
   return {
-    user: { address },
+    friend: { address, name: address, hasClaimedName: false, profilePictureUrl: '' },
     status: status
   }
 }
@@ -214,7 +217,7 @@ export function getFriendshipRequestStatus(
 }
 
 export function parseFriendshipRequestToFriendshipRequestResponse(
-  request: FriendshipRequest,
+  request: Pick<FriendshipRequest, 'id' | 'timestamp' | 'metadata'>,
   profile: Entity,
   profileImagesUrl: string
 ): FriendshipRequestResponse {
