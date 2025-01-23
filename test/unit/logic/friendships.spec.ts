@@ -586,11 +586,14 @@ describe('getFriendshipRequestStatus()', () => {
 })
 
 describe('parseEmittedUpdateToFriendConnectivityUpdate()', () => {
-  test('it should parse ONLINE update properly', () => {
-    const update = { address: '0x123', status: ConnectivityStatus.ONLINE }
+  test.each([
+    [ConnectivityStatus.OFFLINE, 'offline'],
+    [ConnectivityStatus.ONLINE, 'online']
+  ])('it should parse status %s update properly', (status) => {
+    const update = { address: '0x123', status }
     expect(parseEmittedUpdateToFriendConnectivityUpdate(update, mockProfile, PROFILE_IMAGES_URL)).toEqual({
       friend: parseProfileToFriend(mockProfile, PROFILE_IMAGES_URL),
-      status: ConnectivityStatus.ONLINE
+      status
     })
   })
 })
