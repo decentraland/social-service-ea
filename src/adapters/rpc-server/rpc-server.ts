@@ -39,8 +39,12 @@ export async function createRpcServerComponent({
 
   const getFriends = await getFriendsService({ components: { logs, db, catalystClient, config } })
   const getMutualFriends = await getMutualFriendsService({ components: { logs, db, catalystClient, config } })
-  const getPendingFriendshipRequests = getPendingFriendshipRequestsService({ components: { logs, db } })
-  const getSentFriendshipRequests = getSentFriendshipRequestsService({ components: { logs, db } })
+  const getPendingFriendshipRequests = await getPendingFriendshipRequestsService({
+    components: { logs, db, catalystClient, config }
+  })
+  const getSentFriendshipRequests = await getSentFriendshipRequestsService({
+    components: { logs, db, catalystClient, config }
+  })
   const upsertFriendship = upsertFriendshipService({ components: { logs, db, pubsub } })
   const getFriendshipStatus = getFriendshipStatusService({ components: { logs, db } })
   const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({ components: { logs } })

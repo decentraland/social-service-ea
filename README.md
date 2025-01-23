@@ -138,13 +138,12 @@ sequenceDiagram
     Note over RPC Server: (accept/cancel/reject/delete)
 
     Note over Client,DB: Friends Lifecycle
-    NATS-->>Redis: Peer Heartbeat
-    Redis-->>RPC Server: Friend Status Update
-    RPC Server->>Redis: Request Cached Peers
+    NATS-->>Redis: Publish Peer Connection Update Event
+    Redis-->>RPC Server: Broadcast Friend Status Update Event
+    RPC Server->>Redis: Get Cached Peers
     Redis-->>RPC Server: Cached Peers
-    RPC Server->>DB: Request Online Friends
-    DB-->>RPC Server: Online Friends
     RPC Server->>DB: Query Online Friends
+    DB-->>RPC Server: Online Friends
     RPC Server-->>Client: Stream Friend Status Updates
     Note over RPC Server: (online/offline)
 

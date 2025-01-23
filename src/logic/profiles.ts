@@ -1,15 +1,6 @@
-import { Entity } from '@dcl/schemas'
+import { Entity, Avatar } from '@dcl/schemas'
 
-type Avatar = {
-  userId: string
-  name: string
-  hasClaimedName: boolean
-  snapshots: {
-    face256: string
-  }
-}
-
-export function getProfileAvatar(profile: Entity): Avatar {
+export function getProfileAvatar(profile: Pick<Entity, 'metadata'>): Avatar {
   const [avatar] = profile.metadata.avatars
 
   if (!avatar) throw new Error('Missing profile avatar')
@@ -17,13 +8,8 @@ export function getProfileAvatar(profile: Entity): Avatar {
   return avatar
 }
 
-export function getProfilePictureUrl(baseUrl: string, profile: Entity): string {
+export function getProfilePictureUrl(baseUrl: string, { id }: Pick<Entity, 'id'>): string {
   if (!baseUrl) throw new Error('Missing baseUrl for profile picture')
 
-  const avatar = getProfileAvatar(profile)
-  const hash = avatar?.snapshots.face256
-
-  if (!hash) throw new Error('Missing snapshot hash for profile picture')
-
-  return `${baseUrl}/contents/${hash}`
+  return `${baseUrl}/entities/${id}/face.png`
 }

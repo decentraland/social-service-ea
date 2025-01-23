@@ -2,7 +2,7 @@ import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { FRIENDSHIPS_PER_PAGE } from '../constants'
 import {
   GetMutualFriendsPayload,
-  PaginatedUsersResponse
+  PaginatedFriendsProfilesResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { normalizeAddress } from '../../../utils/address'
 import { getPage } from '../../../utils/pagination'
@@ -12,9 +12,12 @@ export async function getMutualFriendsService({
   components: { logs, db, catalystClient, config }
 }: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'config'>) {
   const logger = logs.getLogger('get-mutual-friends-service')
-  const contentServerUrl = await config.requireString('CONTENT_SERVER_URL')
+  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
-  return async function (request: GetMutualFriendsPayload, context: RpcServerContext): Promise<PaginatedUsersResponse> {
+  return async function (
+    request: GetMutualFriendsPayload,
+    context: RpcServerContext
+  ): Promise<PaginatedFriendsProfilesResponse> {
     logger.debug(`Getting mutual friends ${context.address}<>${request.user!.address}`)
 
     try {
@@ -30,7 +33,7 @@ export async function getMutualFriendsService({
       const profiles = await catalystClient.getEntitiesByPointers(mutualFriends.map((friend) => friend.address))
 
       return {
-        users: parseProfilesToFriends(profiles, contentServerUrl),
+        friends: parseProfilesToFriends(profiles, profileImagesUrl),
         paginationData: {
           total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)
@@ -39,7 +42,7 @@ export async function getMutualFriendsService({
     } catch (error: any) {
       logger.error(`Error getting mutual friends: ${error.message}`)
       return {
-        users: [],
+        friends: [],
         paginationData: {
           total: 0,
           page: 1
