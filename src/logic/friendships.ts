@@ -208,9 +208,10 @@ export function parseEmittedUpdateToFriendStatusUpdate(
 }
 
 export function getFriendshipRequestStatus(
-  { action, acting_user }: FriendshipAction,
+  friendshipAction: Pick<FriendshipAction, 'action' | 'acting_user'>,
   loggedUserAddress: string
 ): FriendshipRequestStatus {
+  const { action, acting_user } = friendshipAction
   const statusResolver = FRIENDSHIP_STATUS_BY_ACTION[action]
   return statusResolver?.(acting_user, loggedUserAddress) ?? FriendshipRequestStatus.UNRECOGNIZED
 }

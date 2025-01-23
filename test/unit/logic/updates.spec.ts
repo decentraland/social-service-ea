@@ -1,8 +1,15 @@
-import { friendshipUpdateHandler, friendConnectivityUpdateHandler } from '../../../src/logic/updates'
+import {
+  friendshipUpdateHandler,
+  friendConnectivityUpdateHandler,
+  handleSubscriptionUpdates,
+  ILogger
+} from '../../../src/logic/updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { mockDb, mockLogs } from '../../mocks/components'
-import mitt from 'mitt'
+import { mockCatalystClient, mockDb, mockLogs } from '../../mocks/components'
+import mitt, { Emitter } from 'mitt'
 import { Action, RpcServerContext, SubscriptionEventsEmitter } from '../../../src/types'
+import { sleep } from '../../../src/utils/timer'
+import { mockProfile, PROFILE_IMAGES_URL } from '../../mocks/profile'
 
 describe('updates handlers', () => {
   const logger = mockLogs.getLogger('test')
@@ -131,6 +138,101 @@ describe('updates handlers', () => {
           message: JSON.stringify(update)
         })
       )
+    })
+  })
+
+  describe('handleSubscriptionUpdates', () => {
+    let eventEmitter: Emitter<SubscriptionEventsEmitter>
+    let logger: ILogger
+
+    let parser: jest.Mock
+
+    const friendshipUpdate = { id: '1', to: '0x456', from: '0x123', action: Action.REQUEST, timestamp: Date.now() }
+
+    beforeEach(() => {
+      eventEmitter = mitt<SubscriptionEventsEmitter>()
+      logger = mockLogs.getLogger('test')
+
+      parser = jest.fn()
+      mockCatalystClient.getEntityByPointer.mockResolvedValue(mockProfile)
+    })
+
+    it('should yield parsed updates', async () => {
+      parser.mockResolvedValueOnce({ parsed: true })
+
+      const generator = handleSubscriptionUpdates({
+        eventEmitter,
+        eventName: 'friendshipUpdate',
+        catalystClient: mockCatalystClient,
+        logger,
+        parser,
+        addressGetter: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        parseArgs: [PROFILE_IMAGES_URL]
+      })
+
+      // Start consuming the generator
+      const resultPromise = generator.next()
+
+      // Emit the event after starting to consume
+      eventEmitter.emit('friendshipUpdate', friendshipUpdate)
+
+      const result = await resultPromise
+      expect(result.value).toEqual({ parsed: true })
+      expect(parser).toHaveBeenCalledWith(friendshipUpdate, mockProfile, PROFILE_IMAGES_URL)
+    })
+
+    it('should skip unparsable updates', async () => {
+      parser.mockResolvedValueOnce(null)
+
+      const generator = handleSubscriptionUpdates({
+        eventEmitter,
+        eventName: 'friendshipUpdate',
+        catalystClient: mockCatalystClient,
+        logger,
+        parser,
+        addressGetter: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        parseArgs: [PROFILE_IMAGES_URL]
+      })
+
+      // Start consuming the generator
+      generator.next()
+
+      // Emit the event after starting to consume
+      eventEmitter.emit('friendshipUpdate', friendshipUpdate)
+
+      const errorSpy = jest.spyOn(logger, 'error')
+
+      await sleep(500) // Wait for the generator to consume the update (flaky test)
+
+      expect(errorSpy).toHaveBeenCalled()
+    })
+
+    it('should handle multiple updates', async () => {
+      parser.mockResolvedValueOnce({ parsed: 1 }).mockResolvedValueOnce({ parsed: 2 })
+
+      const generator = handleSubscriptionUpdates({
+        eventEmitter,
+        eventName: 'friendshipUpdate',
+        catalystClient: mockCatalystClient,
+        logger,
+        parser,
+        addressGetter: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        parseArgs: [PROFILE_IMAGES_URL]
+      })
+
+      // Start consuming the generator for first value
+      const firstPromise = generator.next()
+      eventEmitter.emit('friendshipUpdate', { ...friendshipUpdate, id: '1' })
+      const firstResult = await firstPromise
+
+      // Start consuming the generator for second value
+      const secondPromise = generator.next()
+      eventEmitter.emit('friendshipUpdate', { ...friendshipUpdate, id: '2' })
+      const secondResult = await secondPromise
+
+      expect(firstResult.value).toEqual({ parsed: 1 })
+      expect(secondResult.value).toEqual({ parsed: 2 })
+      expect(parser).toHaveBeenCalledTimes(2)
     })
   })
 })

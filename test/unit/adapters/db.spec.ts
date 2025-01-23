@@ -189,22 +189,20 @@ describe('db', () => {
 
   describe('updateFriendshipStatus', () => {
     it('should update friendship status', async () => {
-      mockPg.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ updated_at: '2025-01-01T00:00:00.000Z' }] })
+      mockPg.query.mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: 'friendship-id', created_at: '2025-01-01T00:00:00.000Z' }]
+      })
 
       const result = await dbComponent.updateFriendshipStatus('friendship-id', false)
 
-      expect(result).toBe(true)
       expect(mockPg.query).toHaveBeenCalledWith(
-        SQL`UPDATE friendships SET is_active = ${false}, updated_at = now() WHERE id = ${'friendship-id'}`
+        SQL`UPDATE friendships SET is_active = ${false}, updated_at = now() WHERE id = ${'friendship-id'} RETURNING id, created_at`
       )
-    })
-
-    it('should return false if no rows were updated', async () => {
-      mockPg.query.mockResolvedValueOnce({ rowCount: 0, rows: [] })
-
-      const result = await dbComponent.updateFriendshipStatus('friendship-id', false)
-
-      expect(result).toBe(false)
+      expect(result).toEqual({
+        id: 'friendship-id',
+        created_at: '2025-01-01T00:00:00.000Z'
+      })
     })
   })
 

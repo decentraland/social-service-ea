@@ -99,8 +99,11 @@ describe('upsertFriendshipService', () => {
     jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
     jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
 
-    mockDb.getFriendship.mockResolvedValueOnce(existingFriendship)
-    mockDb.getLastFriendshipAction.mockResolvedValueOnce(lastFriendshipAction)
+    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockDb.updateFriendshipStatus.mockResolvedValueOnce({
+      id: existingFriendship.id,
+      created_at: new Date(existingFriendship.created_at)
+    })
     mockCatalystClient.getEntityByPointer.mockResolvedValueOnce(mockProfile)
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
@@ -172,8 +175,11 @@ describe('upsertFriendshipService', () => {
     jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
     jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
 
-    mockDb.getFriendship.mockResolvedValueOnce(existingFriendship)
-    mockDb.getLastFriendshipAction.mockResolvedValueOnce(lastFriendshipAction)
+    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockDb.updateFriendshipStatus.mockResolvedValueOnce({
+      id: existingFriendship.id,
+      created_at: new Date(existingFriendship.created_at)
+    })
     mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
@@ -191,7 +197,7 @@ describe('upsertFriendshipService', () => {
 
   it('should handle errors gracefully', async () => {
     jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockParsedRequest)
-    mockDb.getFriendship.mockImplementationOnce(() => {
+    mockDb.getLastFriendshipActionByUsers.mockImplementationOnce(() => {
       throw new Error('Database error')
     })
 

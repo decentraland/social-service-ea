@@ -27,6 +27,14 @@ describe('ArchipelagoStatsComponent', () => {
       expect(result).toEqual(['0x123', '0x456'])
     })
 
+    it('should throw an error when fetch response is not ok', async () => {
+      mockFetcher.fetch.mockResolvedValue({
+        ok: false,
+        statusText: 'Not Found'
+      } as any)
+      await expect(archipelagoStats.getPeers()).rejects.toThrow('Error fetching peers: Not Found')
+    })
+
     it('should throw an error when the fetch fails', async () => {
       mockFetcher.fetch.mockRejectedValue(new Error('Fetch failed'))
       await expect(archipelagoStats.getPeers()).rejects.toThrow('Fetch failed')

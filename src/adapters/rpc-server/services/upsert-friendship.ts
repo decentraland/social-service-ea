@@ -22,6 +22,7 @@ export async function upsertFriendshipService({
     context: RpcServerContext
   ): Promise<UpsertFriendshipResponse> {
     const parsedRequest = parseUpsertFriendshipRequest(request)
+
     if (!parsedRequest) {
       logger.error('upsert friendship received unknown message: ', request as any)
       return {
@@ -35,21 +36,9 @@ export async function upsertFriendshipService({
     logger.debug(`upsert friendship > `, parsedRequest as Record<string, string>)
 
     try {
-      // TODO: use getLastFriendshipActionByUsers instead
-      const friendship = await db.getFriendship([context.address, parsedRequest.user!])
-      let lastAction = undefined
-      if (friendship) {
-        const lastRecordedAction = await db.getLastFriendshipAction(friendship.id)
-        lastAction = lastRecordedAction
-      }
+      const lastAction = await db.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
 
-      if (
-        !validateNewFriendshipAction(
-          context.address,
-          { action: parsedRequest.action, user: parsedRequest.user },
-          lastAction
-        )
-      ) {
+      if (!validateNewFriendshipAction(context.address, parsedRequest, lastAction)) {
         logger.error('invalid action for a friendship')
         return {
           response: {
@@ -65,12 +54,12 @@ export async function upsertFriendshipService({
       logger.debug('friendship status > ', { isActive: JSON.stringify(isActive), friendshipStatus })
 
       const { id, actionId, createdAt } = await db.executeTx(async (tx) => {
-        let id: string, createdAt: number
+        let id: string, createdAt: Date
 
-        if (friendship) {
-          await db.updateFriendshipStatus(friendship.id, isActive, tx)
-          id = friendship.id
-          createdAt = new Date(friendship.created_at).getTime()
+        if (lastAction) {
+          const { created_at } = await db.updateFriendshipStatus(lastAction.friendship_id, isActive, tx)
+          id = lastAction.friendship_id
+          createdAt = created_at
         } else {
           const { id: newFriendshipId, created_at } = await db.createFriendship(
             [context.address, parsedRequest.user!],
@@ -78,7 +67,7 @@ export async function upsertFriendshipService({
             tx
           )
           id = newFriendshipId
-          createdAt = new Date(created_at).getTime()
+          createdAt = created_at
         }
 
         const actionId = await db.recordFriendshipAction(

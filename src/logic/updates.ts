@@ -1,11 +1,26 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
-import { IDatabaseComponent, RpcServerContext, SubscriptionEventsEmitter } from '../types'
+import { ICatalystClientComponent, IDatabaseComponent, RpcServerContext, SubscriptionEventsEmitter } from '../types'
+import { Emitter } from 'mitt'
+import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 
-type ILogger = ILoggerComponent.ILogger
+export type ILogger = ILoggerComponent.ILogger
+
 type SharedContext = Pick<RpcServerContext, 'subscribers'>
 type UpdateHandler<T extends keyof SubscriptionEventsEmitter> = (
   update: SubscriptionEventsEmitter[T]
 ) => void | Promise<void>
+
+type UpdateParser<T, U> = (update: U, ...args: any[]) => T | null
+
+interface SubscriptionHandlerParams<T, U> {
+  eventEmitter: Emitter<SubscriptionEventsEmitter>
+  eventName: keyof SubscriptionEventsEmitter
+  parser: UpdateParser<T, U>
+  addressGetter: (update: U) => string
+  logger: ILogger
+  catalystClient: ICatalystClientComponent
+  parseArgs: any[]
+}
 
 function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>, logger: ILogger) {
   return async (message: string) => {
@@ -41,4 +56,30 @@ export function friendConnectivityUpdateHandler(sharedContext: SharedContext, lo
       }
     })
   }, logger)
+}
+
+export async function* handleSubscriptionUpdates<T, U>({
+  eventEmitter,
+  eventName,
+  parser,
+  addressGetter,
+  catalystClient,
+  logger,
+  parseArgs
+}: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
+  const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
+
+  for await (const update of updatesGenerator) {
+    const eventNameString = String(eventName)
+    logger.debug(`${eventNameString} received:`, { update: JSON.stringify(update) })
+
+    const profile = await catalystClient.getEntityByPointer(addressGetter(update as U))
+    const parsedUpdate = await parser(update as U, profile, ...parseArgs)
+
+    if (parsedUpdate) {
+      yield parsedUpdate
+    } else {
+      logger.error(`Unable to parse ${eventNameString}:`, { update: JSON.stringify(update) })
+    }
+  }
 }

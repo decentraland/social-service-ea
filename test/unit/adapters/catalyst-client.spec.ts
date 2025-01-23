@@ -1,6 +1,6 @@
 import { Entity } from '@dcl/schemas'
 import { createCatalystClient } from '../../../src/adapters/catalyst-client'
-import { ICatalystClient } from '../../../src/types'
+import { ICatalystClientComponent } from '../../../src/types'
 import { ContentClient, createContentClient } from 'dcl-catalyst-client'
 import { mockConfig, mockFetcher } from '../../mocks/components'
 
@@ -32,7 +32,7 @@ jest.mock('../../../src/utils/timer', () => ({
 const LOAD_BALANCER_URL = 'http://catalyst-server.com'
 
 describe('Catalyst client', () => {
-  let catalystClient: ICatalystClient
+  let catalystClient: ICatalystClientComponent
   let contentClientMock: ContentClient
 
   beforeEach(async () => {

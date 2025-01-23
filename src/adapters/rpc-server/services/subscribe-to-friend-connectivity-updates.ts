@@ -8,6 +8,7 @@ import mitt from 'mitt'
 import emitterToAsyncGenerator from '../../../utils/emitterToGenerator'
 import { parseEmittedUpdateToFriendStatusUpdate } from '../../../logic/friendships'
 import { parseProfileToFriend } from '../../../logic/friends'
+import { handleSubscriptionUpdates } from '../../../logic/updates'
 
 export async function subscribeToFriendConnectivityUpdatesService({
   components: { logs, db, archipelagoStats, config, catalystClient }
@@ -35,18 +36,15 @@ export async function subscribeToFriendConnectivityUpdatesService({
         }
       }
 
-      const updatesGenerator = emitterToAsyncGenerator(eventEmitter, 'friendStatusUpdate')
-      for await (const update of updatesGenerator) {
-        // TODO: move this to a separate function
-        logger.debug('Friend status update received:', { update: JSON.stringify(update) })
-        const profile = await catalystClient.getEntityByPointer(update.address)
-        const updateToResponse = parseEmittedUpdateToFriendStatusUpdate(update, profile, profileImagesUrl)
-        if (updateToResponse) {
-          yield updateToResponse
-        } else {
-          logger.error('Unable to parse friend status update: ', { update: JSON.stringify(update) })
-        }
-      }
+      yield* handleSubscriptionUpdates({
+        eventEmitter,
+        eventName: 'friendStatusUpdate',
+        catalystClient,
+        logger,
+        parser: parseEmittedUpdateToFriendStatusUpdate,
+        addressGetter: (update: SubscriptionEventsEmitter['friendStatusUpdate']) => update.address,
+        parseArgs: [profileImagesUrl]
+      })
     } catch (error: any) {
       logger.error('Error in friend updates subscription:', error)
       throw error

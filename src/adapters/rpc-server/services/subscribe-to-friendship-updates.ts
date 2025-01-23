@@ -3,7 +3,7 @@ import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '
 import { FriendshipUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import mitt from 'mitt'
 import { parseEmittedUpdateToFriendshipUpdate } from '../../../logic/friendships'
-import emitterToAsyncGenerator from '../../../utils/emitterToGenerator'
+import { handleSubscriptionUpdates } from '../../../logic/updates'
 
 export async function subscribeToFriendshipUpdatesService({
   components: { logs, config, catalystClient }
@@ -18,18 +18,14 @@ export async function subscribeToFriendshipUpdatesService({
       context.subscribers[context.address] = eventEmitter
     }
 
-    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, 'friendshipUpdate')
-
-    for await (const update of updatesGenerator) {
-      // TODO: move this to a separate function
-      logger.debug('Friendship update received:', { update: JSON.stringify(update) })
-      const profile = await catalystClient.getEntityByPointer(update.to)
-      const updateToResponse = parseEmittedUpdateToFriendshipUpdate(update, profile, profileImagesUrl)
-      if (updateToResponse) {
-        yield updateToResponse
-      } else {
-        logger.error('Unable to parse friendship update: ', { update: JSON.stringify(update) })
-      }
-    }
+    yield* handleSubscriptionUpdates<FriendshipUpdate, SubscriptionEventsEmitter['friendshipUpdate']>({
+      eventEmitter,
+      eventName: 'friendshipUpdate',
+      logger,
+      catalystClient,
+      parser: parseEmittedUpdateToFriendshipUpdate,
+      addressGetter: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+      parseArgs: [profileImagesUrl]
+    })
   }
 }
