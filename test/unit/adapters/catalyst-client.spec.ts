@@ -130,6 +130,21 @@ describe('Catalyst client', () => {
     })
   })
 
+  describe('getEntityByPointer', () => {
+    it('should throw an error if the entity is not found', async () => {
+      contentClientMock.fetchEntitiesByPointers = jest.fn().mockResolvedValue([])
+      await expect(catalystClient.getEntityByPointer('pointer')).rejects.toThrow('Entity not found for pointer pointer')
+    })
+
+    it('should return the entity if it is found', async () => {
+      contentClientMock.fetchEntitiesByPointers = jest.fn().mockResolvedValue([{ id: 'entity1' }])
+
+      const result = await catalystClient.getEntityByPointer('pointer')
+
+      expect(result).toEqual({ id: 'entity1' })
+    })
+  })
+
   // Helpers
   function expectContentClientToHaveBeenCalledWithUrl(url: string) {
     expect(createContentClient).toHaveBeenCalledWith(

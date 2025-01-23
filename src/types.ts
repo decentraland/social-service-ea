@@ -129,6 +129,7 @@ export type ICatalystClientRequestOptions = {
 
 export type ICatalystClient = {
   getEntitiesByPointers(pointers: string[], options?: ICatalystClientRequestOptions): Promise<Entity[]>
+  getEntityByPointer(pointer: string, options?: ICatalystClientRequestOptions): Promise<Entity>
 }
 
 // this type simplifies the typings of http handlers

@@ -53,5 +53,15 @@ export async function createCatalystClient({
     return retry(executeClientRequest, retries, waitTime)
   }
 
-  return { getEntitiesByPointers }
+  async function getEntityByPointer(pointer: string, options: ICatalystClientRequestOptions = {}): Promise<Entity> {
+    const [entity] = await getEntitiesByPointers([pointer], options)
+
+    if (!entity) {
+      throw new Error(`Entity not found for pointer ${pointer}`)
+    }
+
+    return entity
+  }
+
+  return { getEntitiesByPointers, getEntityByPointer }
 }

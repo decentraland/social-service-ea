@@ -1,5 +1,6 @@
 import { ICatalystClient } from '../../../src/types'
 
 export const mockCatalystClient: jest.Mocked<ICatalystClient> = {
-  getEntitiesByPointers: jest.fn()
+  getEntitiesByPointers: jest.fn(),
+  getEntityByPointer: jest.fn()
 }
