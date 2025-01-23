@@ -9,7 +9,7 @@ type Avatar = {
   }
 }
 
-export function getProfileAvatar(profile: Entity): Avatar {
+export function getProfileAvatar(profile: Pick<Entity, 'metadata'>): Avatar {
   const [avatar] = profile.metadata.avatars
 
   if (!avatar) throw new Error('Missing profile avatar')
@@ -17,7 +17,7 @@ export function getProfileAvatar(profile: Entity): Avatar {
   return avatar
 }
 
-export function getProfilePictureUrl(baseUrl: string, { id }: Entity): string {
+export function getProfilePictureUrl(baseUrl: string, { id }: Pick<Entity, 'id'>): string {
   if (!baseUrl) throw new Error('Missing baseUrl for profile picture')
 
   return `${baseUrl}/entities/${id}/face.png`
