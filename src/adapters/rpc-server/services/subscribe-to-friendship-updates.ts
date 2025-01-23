@@ -5,8 +5,11 @@ import mitt from 'mitt'
 import { parseEmittedUpdateToFriendshipUpdate } from '../../../logic/friendships'
 import emitterToAsyncGenerator from '../../../utils/emitterToGenerator'
 
-export function subscribeToFriendshipUpdatesService({ components: { logs } }: RPCServiceContext<'logs'>) {
+export async function subscribeToFriendshipUpdatesService({
+  components: { logs, config, catalystClient }
+}: RPCServiceContext<'logs' | 'config' | 'catalystClient'>) {
   const logger = logs.getLogger('subscribe-to-friendship-updates-service')
+  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendshipUpdate> {
     const eventEmitter = context.subscribers[context.address] || mitt<SubscriptionEventsEmitter>()
@@ -18,8 +21,10 @@ export function subscribeToFriendshipUpdatesService({ components: { logs } }: RP
     const updatesGenerator = emitterToAsyncGenerator(eventEmitter, 'friendshipUpdate')
 
     for await (const update of updatesGenerator) {
+      // TODO: move this to a separate function
       logger.debug('Friendship update received:', { update: JSON.stringify(update) })
-      const updateToResponse = parseEmittedUpdateToFriendshipUpdate(update)
+      const profile = await catalystClient.getEntityByPointer(update.to)
+      const updateToResponse = parseEmittedUpdateToFriendshipUpdate(update, profile, profileImagesUrl)
       if (updateToResponse) {
         yield updateToResponse
       } else {

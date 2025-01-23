@@ -1,16 +1,24 @@
 import { subscribeToFriendshipUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friendship-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, AppComponents } from '../../../../../src/types'
-import { mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockConfig, mockLogs } from '../../../../mocks/components'
+import { PROFILE_IMAGES_URL } from '../../../../mocks/profile'
 
 describe('subscribeToFriendshipUpdatesService', () => {
-  let components: Pick<AppComponents, 'logs'>
-  let subscribeToUpdates: ReturnType<typeof subscribeToFriendshipUpdatesService>
+  let subscribeToUpdates: Awaited<ReturnType<typeof subscribeToFriendshipUpdatesService>>
+
   let rpcContext: RpcServerContext
 
-  beforeEach(() => {
-    components = { logs: mockLogs }
-    subscribeToUpdates = subscribeToFriendshipUpdatesService({ components })
+  beforeEach(async () => {
+    mockConfig.requireString.mockResolvedValue(PROFILE_IMAGES_URL)
+
+    subscribeToUpdates = await subscribeToFriendshipUpdatesService({
+      components: {
+        logs: mockLogs,
+        config: mockConfig,
+        catalystClient: mockCatalystClient
+      }
+    })
 
     rpcContext = {
       address: '0x123',

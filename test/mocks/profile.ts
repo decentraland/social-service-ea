@@ -1,5 +1,7 @@
 import { Entity, EntityType } from '@dcl/schemas'
 
+export const PROFILE_IMAGES_URL = 'https://profile-images.decentraland.org'
+
 export const mockProfile: Entity = {
   version: '1',
   id: 'profile-id',

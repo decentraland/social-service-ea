@@ -9,7 +9,7 @@ import { subscribeToFriendshipUpdatesService } from './services/subscribe-to-fri
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 import { getFriendshipStatusService } from './services/get-friendship-status'
-import { subscribeToFriendUpdatesService } from './services/subscribe-to-friend-updates'
+import { subscribeToFriendConnectivityUpdatesService } from './services/subscribe-to-friend-connectivity-updates'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
 
 export async function createRpcServerComponent({
@@ -50,7 +50,7 @@ export async function createRpcServerComponent({
   const subscribeToFriendshipUpdates = await subscribeToFriendshipUpdatesService({
     components: { logs, config, catalystClient }
   })
-  const subscribeToFriendUpdates = await subscribeToFriendUpdatesService({
+  const subscribeToFriendConnectivityUpdates = await subscribeToFriendConnectivityUpdatesService({
     components: { logs, db, archipelagoStats, config, catalystClient }
   })
 
@@ -96,7 +96,7 @@ export async function createRpcServerComponent({
       getFriendshipStatus,
       upsertFriendship,
       subscribeToFriendshipUpdates,
-      subscribeToFriendUpdates
+      subscribeToFriendConnectivityUpdates
     }))
   })
 

@@ -129,7 +129,9 @@ export function parseUpsertFriendshipRequest(request: UpsertFriendshipPayload): 
 }
 
 export function parseEmittedUpdateToFriendshipUpdate(
-  update: SubscriptionEventsEmitter['friendshipUpdate']
+  update: SubscriptionEventsEmitter['friendshipUpdate'],
+  profile: Entity,
+  profileImagesUrl: string
 ): FriendshipUpdate | null {
   switch (update.action) {
     case Action.REQUEST:
@@ -139,12 +141,7 @@ export function parseEmittedUpdateToFriendshipUpdate(
           request: {
             id: update.id,
             createdAt: update.timestamp,
-            friend: {
-              address: update.from,
-              name: update.from,
-              hasClaimedName: false,
-              profilePictureUrl: ''
-            },
+            friend: parseProfileToFriend(profile, profileImagesUrl),
             message: update.metadata?.message
           }
         }
@@ -198,12 +195,14 @@ export function parseEmittedUpdateToFriendshipUpdate(
   }
 }
 
-export function parseEmittedUpdateToFriendStatusUpdate({
-  address,
-  status
-}: SubscriptionEventsEmitter['friendStatusUpdate']): FriendConnectivityUpdate | null {
+export function parseEmittedUpdateToFriendStatusUpdate(
+  update: Pick<SubscriptionEventsEmitter['friendStatusUpdate'], 'status'>,
+  profile: Entity,
+  profileImagesUrl: string
+): FriendConnectivityUpdate | null {
+  const { status } = update
   return {
-    friend: { address, name: address, hasClaimedName: false, profilePictureUrl: '' },
+    friend: parseProfileToFriend(profile, profileImagesUrl),
     status: status
   }
 }

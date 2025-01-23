@@ -11,7 +11,7 @@ import {
   parseFriendshipRequestToFriendshipRequestResponse
 } from '../../../../../src/logic/friendships'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
-import { mockProfile } from '../../../../mocks/profile'
+import { mockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
 
 jest.mock('../../../../../src/logic/friendships')
 
@@ -52,10 +52,8 @@ describe('upsertFriendshipService', () => {
     timestamp: Date.now().toString()
   }
 
-  const profileImagesUrl = 'https://profile-images.decentraland.org'
-
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValue(profileImagesUrl)
+    mockConfig.requireString.mockResolvedValue(PROFILE_IMAGES_URL)
 
     upsertFriendship = await upsertFriendshipService({
       components: {
@@ -125,7 +123,7 @@ describe('upsertFriendshipService', () => {
             metadata: mockParsedRequest.metadata
           },
           mockProfile,
-          profileImagesUrl
+          PROFILE_IMAGES_URL
         )
       }
     })
@@ -163,7 +161,7 @@ describe('upsertFriendshipService', () => {
             metadata: mockParsedRequest.metadata
           },
           mockProfile,
-          profileImagesUrl
+          PROFILE_IMAGES_URL
         )
       }
     })
