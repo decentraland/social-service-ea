@@ -45,10 +45,6 @@ describe('Catalyst client', () => {
     contentClientMock = createContentClient({ fetcher: mockFetcher, url: LOAD_BALANCER_URL })
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   describe('getEntitiesByPointers', () => {
     let pointers: string[]
     let entities: Pick<Entity, 'id'>[]

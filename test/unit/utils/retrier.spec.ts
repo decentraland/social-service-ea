@@ -9,10 +9,6 @@ describe('retry', () => {
   const mockAction = jest.fn()
   const mockSleep = sleep as jest.MockedFunction<typeof sleep>
 
-  beforeEach(() => {
-    jest.clearAllMocks()
-  })
-
   it('should return result on the first attempt without retrying', async () => {
     mockAction.mockResolvedValue('success')
 

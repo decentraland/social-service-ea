@@ -7,7 +7,6 @@ describe('PeerTrackingComponent', () => {
   let peerTracking: IPeerTrackingComponent
 
   beforeEach(() => {
-    jest.clearAllMocks()
     peerTracking = createPeerTrackingComponent({ logs: mockLogs, nats: mockNats, pubsub: mockPubSub })
   })
 

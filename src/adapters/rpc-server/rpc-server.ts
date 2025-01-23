@@ -11,6 +11,7 @@ import { getSentFriendshipRequestsService } from './services/get-sent-friendship
 import { getFriendshipStatusService } from './services/get-friendship-status'
 import { subscribeToFriendConnectivityUpdatesService } from './services/subscribe-to-friend-connectivity-updates'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
+import { friendshipUpdateHandler, friendConnectivityUpdateHandler } from '../../logic/updates'
 
 export async function createRpcServerComponent({
   logs,
@@ -54,39 +55,6 @@ export async function createRpcServerComponent({
     components: { logs, db, archipelagoStats, config, catalystClient }
   })
 
-  function handleFriendshipUpdate(message: string) {
-    try {
-      const update = JSON.parse(message) as SubscriptionEventsEmitter['friendshipUpdate']
-      const updateEmitter = SHARED_CONTEXT.subscribers[update.to]
-      if (updateEmitter) {
-        updateEmitter.emit('friendshipUpdate', update)
-      }
-    } catch (error: any) {
-      logger.error(`Error handling friendship update: ${error.message}`, {
-        message
-      })
-    }
-  }
-
-  async function handleFriendStatusUpdate(message: string) {
-    try {
-      // TODO: this may be a problem if the user has a lot of friends or there are a lot of users online
-      const update = JSON.parse(message) as SubscriptionEventsEmitter['friendStatusUpdate']
-      const friends = await db.getOnlineFriends(update.address, Object.keys(SHARED_CONTEXT.subscribers))
-
-      friends.forEach(({ address: friendAddress }) => {
-        const emitter = SHARED_CONTEXT.subscribers[friendAddress]
-        if (emitter) {
-          emitter.emit('friendStatusUpdate', update)
-        }
-      })
-    } catch (error: any) {
-      logger.error(`Error handling friend status update: ${error.message}`, {
-        message
-      })
-    }
-  }
-
   rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
       getFriends,
@@ -106,8 +74,11 @@ export async function createRpcServerComponent({
         logger.info(`[RPC] RPC Server listening on port ${rpcServerPort}`)
       })
 
-      await pubsub.subscribeToChannel(FRIENDSHIP_UPDATES_CHANNEL, handleFriendshipUpdate)
-      await pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handleFriendStatusUpdate)
+      await pubsub.subscribeToChannel(FRIENDSHIP_UPDATES_CHANNEL, friendshipUpdateHandler(SHARED_CONTEXT, logger))
+      await pubsub.subscribeToChannel(
+        FRIEND_STATUS_UPDATES_CHANNEL,
+        friendConnectivityUpdateHandler(SHARED_CONTEXT, logger, db)
+      )
     },
     attachUser({ transport, address }) {
       transport.on('close', () => {
