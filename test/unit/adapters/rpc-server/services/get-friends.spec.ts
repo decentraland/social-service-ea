@@ -7,7 +7,7 @@ import { createMockFriend, parseExpectedFriends } from '../../../../mocks/friend
 describe('getFriendsService', () => {
   let getFriends: Awaited<ReturnType<typeof getFriendsService>>
 
-  const contentServerUrl = 'https://peer.decentraland.org/content'
+  const profileImagesUrl = 'https://profile-images.decentraland.org'
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
@@ -15,7 +15,7 @@ describe('getFriendsService', () => {
   }
 
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValueOnce(contentServerUrl)
+    mockConfig.requireString.mockResolvedValueOnce(profileImagesUrl)
 
     getFriends = await getFriendsService({
       components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient, config: mockConfig }
@@ -35,7 +35,7 @@ describe('getFriendsService', () => {
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
     expect(response).toEqual({
-      users: addresses.map(parseExpectedFriends(contentServerUrl)),
+      friends: mockProfiles.map(parseExpectedFriends(profileImagesUrl)),
       paginationData: {
         total: totalFriends,
         page: 1
@@ -50,7 +50,7 @@ describe('getFriendsService', () => {
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
     expect(response).toEqual({
-      users: [],
+      friends: [],
       paginationData: {
         total: 0,
         page: 1
@@ -66,7 +66,7 @@ describe('getFriendsService', () => {
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
     expect(response).toEqual({
-      users: [],
+      friends: [],
       paginationData: {
         total: 0,
         page: 1
@@ -82,7 +82,7 @@ describe('getFriendsService', () => {
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
     expect(response).toEqual({
-      users: [],
+      friends: [],
       paginationData: {
         total: 0,
         page: 1

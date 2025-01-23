@@ -1,11 +1,9 @@
-import { Entity } from '@dcl/schemas'
 import { parseProfilesToFriends } from '../../../src/logic/friends'
-import { normalizeAddress } from '../../../src/utils/address'
 import { mockProfile } from '../../mocks/profile'
 
 describe('parseProfilesToFriends', () => {
   it('should convert profile entities to friend users', () => {
-    const contentServerUrl = 'https://peer.decentraland.org'
+    const profileImagesUrl = 'https://profile-images.decentraland.org'
     const anotherProfile = {
       ...mockProfile,
       metadata: {
@@ -22,20 +20,20 @@ describe('parseProfilesToFriends', () => {
     }
     const profiles = [mockProfile, anotherProfile]
 
-    const result = parseProfilesToFriends(profiles, contentServerUrl)
+    const result = parseProfilesToFriends(profiles, profileImagesUrl)
 
     expect(result).toEqual([
       {
         address: '0x123',
         name: 'TestUser',
         hasClaimedName: true,
-        profilePictureUrl: 'https://peer.decentraland.org/contents/bafybeiasdfqwer'
+        profilePictureUrl: `${profileImagesUrl}/entities/${mockProfile.id}/face.png`
       },
       {
         address: '0x123abcde',
         name: 'TestUser2',
         hasClaimedName: false,
-        profilePictureUrl: 'https://peer.decentraland.org/contents/bafybeiasdfqwer'
+        profilePictureUrl: `${profileImagesUrl}/entities/${anotherProfile.id}/face.png`
       }
     ])
   })

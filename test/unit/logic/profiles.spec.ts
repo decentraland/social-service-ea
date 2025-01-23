@@ -29,43 +29,12 @@ describe('getProfileAvatar', () => {
 })
 
 describe('getProfilePictureUrl', () => {
-  const baseUrl = 'https://peer.dcl.local/content'
+  const baseUrl = 'https://profile-images.decentraland.org'
 
   it('should construct correct profile picture URL', () => {
     const url = getProfilePictureUrl(baseUrl, mockProfile)
 
-    expect(url).toBe('https://peer.dcl.local/content/contents/bafybeiasdfqwer')
-  })
-
-  it('should handle missing avatar data gracefully', () => {
-    const emptyProfile: Entity = {
-      ...mockProfile,
-      metadata: {
-        avatars: []
-      }
-    }
-
-    expect(() => getProfilePictureUrl(baseUrl, emptyProfile)).toThrow('Missing profile avatar')
-  })
-
-  it('should handle missing snapshots data', () => {
-    const profileWithoutSnapshot: Entity = {
-      ...mockProfile,
-      metadata: {
-        avatars: [
-          {
-            userId: '0x123',
-            name: 'TestUser',
-            hasClaimedName: true,
-            snapshots: {}
-          }
-        ]
-      }
-    }
-
-    expect(() => getProfilePictureUrl(baseUrl, profileWithoutSnapshot)).toThrow(
-      'Missing snapshot hash for profile picture'
-    )
+    expect(url).toBe(`${baseUrl}/entities/${mockProfile.id}/face.png`)
   })
 
   it('should throw on empty baseUrl', () => {

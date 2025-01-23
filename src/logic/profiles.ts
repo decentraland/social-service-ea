@@ -17,13 +17,8 @@ export function getProfileAvatar(profile: Entity): Avatar {
   return avatar
 }
 
-export function getProfilePictureUrl(baseUrl: string, profile: Entity): string {
+export function getProfilePictureUrl(baseUrl: string, { id }: Entity): string {
   if (!baseUrl) throw new Error('Missing baseUrl for profile picture')
 
-  const avatar = getProfileAvatar(profile)
-  const hash = avatar?.snapshots.face256
-
-  if (!hash) throw new Error('Missing snapshot hash for profile picture')
-
-  return `${baseUrl}/contents/${hash}`
+  return `${baseUrl}/entities/${id}/face.png`
 }
