@@ -1,37 +1,53 @@
 import { RpcServerContext, RPCServiceContext } from '../../../types'
-import { INTERNAL_SERVER_ERROR, FRIENDSHIPS_PER_PAGE } from '../constants'
+import { FRIENDSHIPS_PER_PAGE } from '../constants'
 import {
   GetMutualFriendsPayload,
-  PaginatedUsersResponse
+  PaginatedFriendsProfilesResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { normalizeAddress } from '../../../utils/address'
 import { getPage } from '../../../utils/pagination'
+import { parseProfilesToFriends } from '../../../logic/friends'
 
-export function getMutualFriendsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
+export async function getMutualFriendsService({
+  components: { logs, db, catalystClient, config }
+}: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'config'>) {
   const logger = logs.getLogger('get-mutual-friends-service')
+  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
-  return async function (request: GetMutualFriendsPayload, context: RpcServerContext): Promise<PaginatedUsersResponse> {
-    logger.debug(`getting mutual friends ${context.address}<>${request.user!.address}`)
+  return async function (
+    request: GetMutualFriendsPayload,
+    context: RpcServerContext
+  ): Promise<PaginatedFriendsProfilesResponse> {
+    logger.debug(`Getting mutual friends ${context.address}<>${request.user!.address}`)
+
     try {
       const { address: requester } = context
       const { pagination, user } = request
       const requested = normalizeAddress(user!.address)
+
       const [mutualFriends, total] = await Promise.all([
         db.getMutualFriends(requester, requested, pagination),
         db.getMutualFriendsCount(requester, requested)
       ])
+
+      const profiles = await catalystClient.getEntitiesByPointers(mutualFriends.map((friend) => friend.address))
+
       return {
-        users: mutualFriends,
+        friends: parseProfilesToFriends(profiles, profileImagesUrl),
         paginationData: {
           total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)
         }
       }
-    } catch (error) {
-      logger.error(error as any)
-      // throw an error bc there is no sense to create a generator to send an error
-      // as it's done in the previous Social Service
-      throw new Error(INTERNAL_SERVER_ERROR)
+    } catch (error: any) {
+      logger.error(`Error getting mutual friends: ${error.message}`)
+      return {
+        friends: [],
+        paginationData: {
+          total: 0,
+          page: 1
+        }
+      }
     }
   }
 }

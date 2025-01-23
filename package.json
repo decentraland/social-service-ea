@@ -30,8 +30,9 @@
   },
   "dependencies": {
     "@dcl/platform-crypto-middleware": "^1.1.0",
-    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-12890706635.commit-a7e4210.tgz",
+    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-12916692077.commit-190ed21.tgz",
     "@dcl/rpc": "^1.1.2",
+    "@dcl/schemas": "^15.6.0",
     "@well-known-components/env-config-provider": "^1.2.0",
     "@well-known-components/fetch-component": "^2.0.2",
     "@well-known-components/http-server": "^2.1.0",
@@ -41,6 +42,7 @@
     "@well-known-components/nats-component": "^2.0.0",
     "@well-known-components/pg-component": "^0.2.2",
     "@well-known-components/uws-http-server": "^0.0.2",
+    "dcl-catalyst-client": "^21.7.0",
     "fp-future": "^1.0.1",
     "lru-cache": "^10.4.3",
     "mitt": "^3.0.1",
