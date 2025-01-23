@@ -4,7 +4,7 @@ import {
   isFriendshipActionValid,
   isUserActionValid,
   parseEmittedUpdateToFriendshipUpdate,
-  parseEmittedUpdateToFriendStatusUpdate,
+  parseEmittedUpdateToFriendConnectivityUpdate,
   parseFriendshipRequestsToFriendshipRequestResponses,
   parseFriendshipRequestToFriendshipRequestResponse,
   parseUpsertFriendshipRequest,
@@ -585,10 +585,10 @@ describe('getFriendshipRequestStatus()', () => {
   })
 })
 
-describe('parseEmittedUpdateToFriendStatusUpdate()', () => {
+describe('parseEmittedUpdateToFriendConnectivityUpdate()', () => {
   test('it should parse ONLINE update properly', () => {
     const update = { address: '0x123', status: ConnectivityStatus.ONLINE }
-    expect(parseEmittedUpdateToFriendStatusUpdate(update, mockProfile, PROFILE_IMAGES_URL)).toEqual({
+    expect(parseEmittedUpdateToFriendConnectivityUpdate(update, mockProfile, PROFILE_IMAGES_URL)).toEqual({
       friend: parseProfileToFriend(mockProfile, PROFILE_IMAGES_URL),
       status: ConnectivityStatus.ONLINE
     })

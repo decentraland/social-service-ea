@@ -87,8 +87,8 @@ describe('updates handlers', () => {
       await handler(JSON.stringify(update))
 
       expect(mockDb.getOnlineFriends).toHaveBeenCalledWith('0x123', ['0x456', '0x789'])
-      expect(emitSpy456).toHaveBeenCalledWith('friendStatusUpdate', update)
-      expect(emitSpy789).toHaveBeenCalledWith('friendStatusUpdate', update)
+      expect(emitSpy456).toHaveBeenCalledWith('friendConnectivityUpdate', update)
+      expect(emitSpy789).toHaveBeenCalledWith('friendConnectivityUpdate', update)
     })
 
     it('should handle empty online friends list', async () => {

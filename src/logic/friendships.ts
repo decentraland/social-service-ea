@@ -195,8 +195,8 @@ export function parseEmittedUpdateToFriendshipUpdate(
   }
 }
 
-export function parseEmittedUpdateToFriendStatusUpdate(
-  update: Pick<SubscriptionEventsEmitter['friendStatusUpdate'], 'status'>,
+export function parseEmittedUpdateToFriendConnectivityUpdate(
+  update: Pick<SubscriptionEventsEmitter['friendConnectivityUpdate'], 'status'>,
   profile: Entity,
   profileImagesUrl: string
 ): FriendConnectivityUpdate | null {

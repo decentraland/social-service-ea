@@ -6,7 +6,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import mitt from 'mitt'
 import emitterToAsyncGenerator from '../../../utils/emitterToGenerator'
-import { parseEmittedUpdateToFriendStatusUpdate } from '../../../logic/friendships'
+import { parseEmittedUpdateToFriendConnectivityUpdate } from '../../../logic/friendships'
 import { parseProfileToFriend } from '../../../logic/friends'
 import { handleSubscriptionUpdates } from '../../../logic/updates'
 
@@ -38,11 +38,11 @@ export async function subscribeToFriendConnectivityUpdatesService({
 
       yield* handleSubscriptionUpdates({
         eventEmitter,
-        eventName: 'friendStatusUpdate',
+        eventName: 'friendConnectivityUpdate',
         catalystClient,
         logger,
-        parser: parseEmittedUpdateToFriendStatusUpdate,
-        addressGetter: (update: SubscriptionEventsEmitter['friendStatusUpdate']) => update.address,
+        parser: parseEmittedUpdateToFriendConnectivityUpdate,
+        addressGetter: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) => update.address,
         parseArgs: [profileImagesUrl]
       })
     } catch (error: any) {

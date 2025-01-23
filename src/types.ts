@@ -200,7 +200,7 @@ export type SubscriptionEventsEmitter = {
     timestamp: number
     metadata?: { message: string }
   }
-  friendStatusUpdate: {
+  friendConnectivityUpdate: {
     address: string
     status: ConnectivityStatus
   }

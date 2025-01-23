@@ -46,13 +46,13 @@ export function friendshipUpdateHandler(sharedContext: SharedContext, logger: IL
 }
 
 export function friendConnectivityUpdateHandler(sharedContext: SharedContext, logger: ILogger, db: IDatabaseComponent) {
-  return handleUpdate<'friendStatusUpdate'>(async (update) => {
+  return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
     const friends = await db.getOnlineFriends(update.address, Object.keys(sharedContext.subscribers))
 
     friends.forEach(({ address: friendAddress }) => {
       const emitter = sharedContext.subscribers[friendAddress]
       if (emitter) {
-        emitter.emit('friendStatusUpdate', update)
+        emitter.emit('friendConnectivityUpdate', update)
       }
     })
   }, logger)
