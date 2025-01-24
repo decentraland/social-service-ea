@@ -14,5 +14,10 @@ export const mockDb: jest.Mocked<IDatabaseComponent> = {
   recordFriendshipAction: jest.fn(),
   getReceivedFriendshipRequests: jest.fn(),
   getSentFriendshipRequests: jest.fn(),
+  getBlockedUsers: jest.fn(),
+  blockUser: jest.fn(),
+  unblockUser: jest.fn(),
+  blockUsers: jest.fn(),
+  unblockUsers: jest.fn(),
   executeTx: jest.fn()
 }

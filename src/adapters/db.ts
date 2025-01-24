@@ -1,7 +1,15 @@
 import SQL, { SQLStatement } from 'sql-template-strings'
 import { randomUUID } from 'node:crypto'
 import { PoolClient } from 'pg'
-import { AppComponents, Friendship, FriendshipAction, FriendshipRequest, IDatabaseComponent, Friend } from '../types'
+import {
+  AppComponents,
+  Friendship,
+  FriendshipAction,
+  FriendshipRequest,
+  IDatabaseComponent,
+  Friend,
+  BlockedUser
+} from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
 
@@ -330,6 +338,49 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       const results = await pg.query<Friend>(query)
       return results.rows
+    },
+    async blockUser(blockerAddress, blockedAddress) {
+      const query = SQL`
+        INSERT INTO blocks (id, blocker_address, blocked_address)
+        VALUES (${randomUUID()}, ${normalizeAddress(blockerAddress)}, ${normalizeAddress(blockedAddress)})
+        ON CONFLICT DO NOTHING`
+      await pg.query(query)
+    },
+    async unblockUser(blockerAddress, blockedAddress) {
+      const query = SQL`
+        DELETE FROM blocks
+        WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
+          AND LOWER(blocked_address) = ${normalizeAddress(blockedAddress)}
+      `
+      await pg.query(query)
+    },
+    async blockUsers(blockerAddress, blockedAddresses) {
+      const query = SQL`INSERT INTO blocks (id, blocker_address, blocked_address) VALUES `
+
+      blockedAddresses.forEach((blockedAddress, index) => {
+        query.append(SQL`(${randomUUID()}, ${normalizeAddress(blockerAddress)}, ${normalizeAddress(blockedAddress)})`)
+        if (index < blockedAddresses.length - 1) {
+          query.append(SQL`, `)
+        }
+      })
+
+      query.append(SQL` ON CONFLICT DO NOTHING`)
+      await pg.query(query)
+    },
+    async unblockUsers(blockerAddress, blockedAddresses) {
+      const query = SQL`
+        DELETE FROM blocks
+        WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
+          AND LOWER(blocked_address) IN (${blockedAddresses.map(normalizeAddress)})
+      `
+      await pg.query(query)
+    },
+    async getBlockedUsers(blockerAddress) {
+      const query = SQL`
+        SELECT blocked_address as address FROM blocks WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
+      `
+      const results = await pg.query<BlockedUser>(query)
+      return results.rows.map((row) => row.address)
     },
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
       const pool = pg.getPool()

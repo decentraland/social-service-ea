@@ -381,6 +381,93 @@ describe('db', () => {
     })
   })
 
+  describe('blockUser', () => {
+    it('should block a user', async () => {
+      await dbComponent.blockUser('0x123', '0x456')
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('INSERT INTO blocks (id, blocker_address, blocked_address)'),
+          values: expect.arrayContaining([expect.any(String), normalizeAddress('0x123'), normalizeAddress('0x456')])
+        })
+      )
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('ON CONFLICT DO NOTHING')
+        })
+      )
+    })
+  })
+
+  describe('unblockUser', () => {
+    it('should unblock a user', async () => {
+      await dbComponent.unblockUser('0x123', '0x456')
+      const expectedQuery = SQL`
+        DELETE FROM blocks
+        WHERE LOWER(blocker_address) = ${normalizeAddress('0x123')}
+          AND LOWER(blocked_address) = ${normalizeAddress('0x456')}`
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(expectedQuery.text),
+          values: expectedQuery.values
+        })
+      )
+    })
+  })
+
+  describe('blockUsers', () => {
+    it('should block multiple users', async () => {
+      await dbComponent.blockUsers('0x123', ['0x456', '0x789'])
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('INSERT INTO blocks (id, blocker_address, blocked_address)'),
+          values: expect.arrayContaining([
+            expect.any(String),
+            normalizeAddress('0x123'),
+            normalizeAddress('0x456'),
+            expect.any(String),
+            normalizeAddress('0x123'),
+            normalizeAddress('0x789')
+          ])
+        })
+      )
+    })
+  })
+
+  describe('unblockUsers', () => {
+    it('should unblock multiple users', async () => {
+      await dbComponent.unblockUsers('0x123', ['0x456', '0x789'])
+      const expectedQuery = SQL`
+        DELETE FROM blocks
+        WHERE LOWER(blocker_address) = ${normalizeAddress('0x123')}
+          AND LOWER(blocked_address) IN (${['0x456', '0x789'].map(normalizeAddress)})`
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(expectedQuery.text),
+          values: expectedQuery.values
+        })
+      )
+    })
+  })
+
+  describe('getBlockedUsers', () => {
+    it('should retrieve blocked users', async () => {
+      const mockBlockedUsers = [{ address: '0x456' }, { address: '0x789' }]
+      mockPg.query.mockResolvedValueOnce({ rows: mockBlockedUsers, rowCount: mockBlockedUsers.length })
+
+      const result = await dbComponent.getBlockedUsers('0x123')
+      expect(result).toEqual(mockBlockedUsers.map((user) => user.address))
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('LOWER(blocker_address) ='),
+          values: expect.arrayContaining([normalizeAddress('0x123')])
+        })
+      )
+    })
+  })
+
   describe('executeTx', () => {
     it('should execute a transaction successfully', async () => {
       const result = await dbComponent.executeTx(async (client) => {
