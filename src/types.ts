@@ -99,7 +99,6 @@ export interface IDatabaseComponent {
   ): Promise<string>
   getReceivedFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
-  streamOnlineFriends(userAddress: string, onlinePeers: string[]): AsyncGenerator<Friend>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<Friend[]>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }

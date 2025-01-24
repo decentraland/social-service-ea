@@ -57,22 +57,6 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     return baseQuery
   }
 
-  function filterActiveFriendshipsFromAddresses(userAddress: string, userAddresses: string[]) {
-    return SQL`
-      SELECT DISTINCT 
-        CASE
-          WHEN address_requester = ${userAddress} THEN address_requested
-          ELSE address_requester
-        END as address
-      FROM friendships
-      WHERE (
-        (address_requester = ${userAddress} AND address_requested = ANY(${userAddresses}))
-        OR 
-        (address_requested = ${userAddress} AND address_requester = ANY(${userAddresses}))
-      )
-      AND is_active = true`
-  }
-
   return {
     async getFriends(userAddress, { onlyActive = true, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } } = {}) {
       const { limit, offset } = pagination
@@ -307,14 +291,23 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       return results.rows
     },
-    streamOnlineFriends(userAddress: string, onlinePeers: string[]) {
-      const query: SQLStatement = filterActiveFriendshipsFromAddresses(userAddress, onlinePeers)
-      return pg.streamQuery<Friend>(query)
-    },
-    async getOnlineFriends(userAddress: string, potentialFriends: string[]) {
-      if (potentialFriends.length === 0) return []
+    async getOnlineFriends(userAddress: string, onlinePotentialFriends: string[]) {
+      if (onlinePotentialFriends.length === 0) return []
 
-      const query: SQLStatement = filterActiveFriendshipsFromAddresses(userAddress, potentialFriends)
+      const query: SQLStatement = SQL`
+        SELECT DISTINCT
+          CASE
+            WHEN address_requester = ${userAddress} THEN address_requested
+            ELSE address_requester
+          END as address
+        FROM friendships
+        WHERE (
+          (address_requester = ${userAddress} AND address_requested IN (${onlinePotentialFriends}))
+          OR
+          (address_requested = ${userAddress} AND address_requester IN (${onlinePotentialFriends}))
+        )
+        AND is_active = true`
+
       const results = await pg.query<Friend>(query)
       return results.rows
     },

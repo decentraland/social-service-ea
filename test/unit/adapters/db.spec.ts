@@ -334,32 +334,32 @@ describe('db', () => {
         rows: [{ address: '0x456' }, { address: '0x789' }],
         rowCount: 2
       }
+      const userAddress = '0x123'
       mockPg.query.mockResolvedValueOnce(mockResult)
 
       const potentialFriends = ['0x456', '0x789', '0x999']
-      const result = await dbComponent.getOnlineFriends('0x123', potentialFriends)
+      await dbComponent.getOnlineFriends('0x123', potentialFriends)
 
       const queryExpectations = [
-        { text: 'address_requester =', values: ['0x123'] },
-        { text: 'AND address_requested = ANY(' },
-        { text: 'address_requested =', values: ['0x123'] },
-        { text: 'address_requester = ANY(' }
+        { text: 'address_requester =' },
+        { text: 'AND address_requested IN' },
+        { text: 'address_requested =' },
+        { text: 'address_requester IN' }
       ]
 
-      queryExpectations.forEach(({ text, values }) => {
+      queryExpectations.forEach(({ text }) => {
         expect(mockPg.query).toHaveBeenCalledWith(
           expect.objectContaining({
             text: expect.stringContaining(text)
           })
         )
-        if (values) {
-          expect(mockPg.query).toHaveBeenCalledWith(
-            expect.objectContaining({
-              values: expect.arrayContaining(values)
-            })
-          )
-        }
       })
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: expect.arrayContaining([userAddress, userAddress, potentialFriends, userAddress, potentialFriends])
+        })
+      )
     })
   })
 
