@@ -56,7 +56,7 @@ export async function initComponents(): Promise<AppComponents> {
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
   const nats = await createNatsComponent({ logs, config })
-  const catalystClient = await createCatalystClient({ config, fetcher })
+  const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const rpcServer = await createRpcServerComponent({
     logs,
     db,
