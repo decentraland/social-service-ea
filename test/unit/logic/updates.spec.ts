@@ -144,95 +144,147 @@ describe('updates handlers', () => {
   describe('handleSubscriptionUpdates', () => {
     let eventEmitter: Emitter<SubscriptionEventsEmitter>
     let logger: ILogger
-
     let parser: jest.Mock
+    let rpcContext: RpcServerContext
 
     const friendshipUpdate = { id: '1', to: '0x456', from: '0x123', action: Action.REQUEST, timestamp: Date.now() }
 
     beforeEach(() => {
       eventEmitter = mitt<SubscriptionEventsEmitter>()
       logger = mockLogs.getLogger('test')
-
       parser = jest.fn()
       mockCatalystClient.getEntityByPointer.mockResolvedValue(mockProfile)
+
+      rpcContext = {
+        address: '0x123',
+        subscribers: {}
+      }
     })
 
-    it('should yield parsed updates', async () => {
+    it('should create and store emitter in context if not exists', async () => {
       parser.mockResolvedValueOnce({ parsed: true })
 
       const generator = handleSubscriptionUpdates({
-        eventEmitter,
+        rpcContext,
         eventName: 'friendshipUpdate',
-        catalystClient: mockCatalystClient,
-        logger,
+        components: {
+          catalystClient: mockCatalystClient,
+          logger
+        },
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
         parser,
-        addressGetter: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
         parseArgs: [PROFILE_IMAGES_URL]
       })
 
       // Start consuming the generator
       const resultPromise = generator.next()
 
-      // Emit the event after starting to consume
-      eventEmitter.emit('friendshipUpdate', friendshipUpdate)
+      // Verify emitter was created and stored
+      expect(rpcContext.subscribers['0x123']).toBeDefined()
+      expect(rpcContext.subscribers['0x123'].all).toBeDefined()
+
+      // Emit event using the stored emitter
+      rpcContext.subscribers['0x123'].emit('friendshipUpdate', friendshipUpdate)
+
+      const result = await resultPromise
+      expect(result.value).toEqual({ parsed: true })
+    })
+
+    it('should reuse existing emitter from context', async () => {
+      const existingEmitter = mitt<SubscriptionEventsEmitter>()
+      rpcContext.subscribers['0x123'] = existingEmitter
+      parser.mockResolvedValueOnce({ parsed: true })
+
+      const generator = handleSubscriptionUpdates({
+        rpcContext,
+        eventName: 'friendshipUpdate',
+        components: {
+          catalystClient: mockCatalystClient,
+          logger
+        },
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        parser,
+        parseArgs: [PROFILE_IMAGES_URL]
+      })
+
+      // Start consuming the generator
+      const resultPromise = generator.next()
+
+      // Verify the existing emitter is being used
+      expect(rpcContext.subscribers['0x123']).toBe(existingEmitter)
+
+      // Emit event using the existing emitter
+      existingEmitter.emit('friendshipUpdate', friendshipUpdate)
+
+      const result = await resultPromise
+      expect(result.value).toEqual({ parsed: true })
+    })
+
+    it('should yield parsed updates', async () => {
+      parser.mockResolvedValueOnce({ parsed: true })
+
+      const generator = handleSubscriptionUpdates({
+        rpcContext,
+        eventName: 'friendshipUpdate',
+        components: {
+          catalystClient: mockCatalystClient,
+          logger
+        },
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        parser,
+        parseArgs: [PROFILE_IMAGES_URL]
+      })
+
+      const resultPromise = generator.next()
+      rpcContext.subscribers['0x123'].emit('friendshipUpdate', friendshipUpdate)
 
       const result = await resultPromise
       expect(result.value).toEqual({ parsed: true })
       expect(parser).toHaveBeenCalledWith(friendshipUpdate, mockProfile, PROFILE_IMAGES_URL)
     })
 
-    it('should skip unparsable updates', async () => {
-      parser.mockResolvedValueOnce(null)
-
+    it('should yield multiple updates', async () => {
       const generator = handleSubscriptionUpdates({
-        eventEmitter,
+        rpcContext,
         eventName: 'friendshipUpdate',
-        catalystClient: mockCatalystClient,
-        logger,
+        components: {
+          catalystClient: mockCatalystClient,
+          logger
+        },
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
         parser,
-        addressGetter: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
         parseArgs: [PROFILE_IMAGES_URL]
       })
 
-      // Start consuming the generator
-      generator.next()
-
-      // Emit the event after starting to consume
-      eventEmitter.emit('friendshipUpdate', friendshipUpdate)
-
-      const errorSpy = jest.spyOn(logger, 'error')
-
-      await sleep(500) // Wait for the generator to consume the update (flaky test)
-
-      expect(errorSpy).toHaveBeenCalled()
+      for (let i = 0; i < 2; i++) {
+        parser.mockResolvedValueOnce({ parsed: i })
+        const resultPromise = generator.next()
+        rpcContext.subscribers['0x123'].emit('friendshipUpdate', friendshipUpdate)
+        const result = await resultPromise
+        expect(result.value).toEqual({ parsed: i })
+        expect(parser).toHaveBeenCalledWith(friendshipUpdate, mockProfile, PROFILE_IMAGES_URL)
+      }
     })
 
-    it('should handle multiple updates', async () => {
-      parser.mockResolvedValueOnce({ parsed: 1 }).mockResolvedValueOnce({ parsed: 2 })
-
+    it('should log error if parser returns null', async () => {
+      parser.mockResolvedValueOnce(null)
       const generator = handleSubscriptionUpdates({
-        eventEmitter,
+        rpcContext,
         eventName: 'friendshipUpdate',
-        catalystClient: mockCatalystClient,
-        logger,
+        components: { catalystClient: mockCatalystClient, logger },
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
         parser,
-        addressGetter: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
         parseArgs: [PROFILE_IMAGES_URL]
       })
 
-      // Start consuming the generator for first value
-      const firstPromise = generator.next()
-      eventEmitter.emit('friendshipUpdate', { ...friendshipUpdate, id: '1' })
-      const firstResult = await firstPromise
+      const resultPromise = generator.next()
+      rpcContext.subscribers['0x123'].emit('friendshipUpdate', friendshipUpdate)
 
-      // Start consuming the generator for second value
-      const secondPromise = generator.next()
-      eventEmitter.emit('friendshipUpdate', { ...friendshipUpdate, id: '2' })
-      const secondResult = await secondPromise
+      await sleep(100) // could be flaky
 
-      expect(firstResult.value).toEqual({ parsed: 1 })
-      expect(secondResult.value).toEqual({ parsed: 2 })
-      expect(parser).toHaveBeenCalledTimes(2)
+      expect(logger.error).toHaveBeenCalledWith('Unable to parse friendshipUpdate:', {
+        update: JSON.stringify(friendshipUpdate)
+      })
     })
   })
 })

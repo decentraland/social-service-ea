@@ -1,6 +1,6 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { ICatalystClientComponent, IDatabaseComponent, RpcServerContext, SubscriptionEventsEmitter } from '../types'
-import { Emitter } from 'mitt'
+import mitt from 'mitt'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 
 export type ILogger = ILoggerComponent.ILogger
@@ -13,12 +13,14 @@ type UpdateHandler<T extends keyof SubscriptionEventsEmitter> = (
 type UpdateParser<T, U> = (update: U, ...args: any[]) => T | null
 
 interface SubscriptionHandlerParams<T, U> {
-  eventEmitter: Emitter<SubscriptionEventsEmitter>
+  rpcContext: RpcServerContext
   eventName: keyof SubscriptionEventsEmitter
+  components: {
+    logger: ILogger
+    catalystClient: ICatalystClientComponent
+  }
+  getAddressFromUpdate: (update: U) => string
   parser: UpdateParser<T, U>
-  addressGetter: (update: U) => string
-  logger: ILogger
-  catalystClient: ICatalystClientComponent
   parseArgs: any[]
 }
 
@@ -59,21 +61,26 @@ export function friendConnectivityUpdateHandler(sharedContext: SharedContext, lo
 }
 
 export async function* handleSubscriptionUpdates<T, U>({
-  eventEmitter,
+  rpcContext,
   eventName,
+  components: { catalystClient, logger },
+  getAddressFromUpdate,
   parser,
-  addressGetter,
-  catalystClient,
-  logger,
   parseArgs
 }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
+  const eventEmitter = rpcContext.subscribers[rpcContext.address] || mitt<SubscriptionEventsEmitter>()
+
+  if (!rpcContext.subscribers[rpcContext.address]) {
+    rpcContext.subscribers[rpcContext.address] = eventEmitter
+  }
+
   const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
 
   for await (const update of updatesGenerator) {
     const eventNameString = String(eventName)
     logger.debug(`${eventNameString} received:`, { update: JSON.stringify(update) })
 
-    const profile = await catalystClient.getEntityByPointer(addressGetter(update as U))
+    const profile = await catalystClient.getEntityByPointer(getAddressFromUpdate(update as U))
     const parsedUpdate = await parser(update as U, profile, ...parseArgs)
 
     if (parsedUpdate) {
