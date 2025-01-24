@@ -2,7 +2,7 @@ import { Entity } from '@dcl/schemas'
 import { createCatalystClient } from '../../../src/adapters/catalyst-client'
 import { ICatalystClientComponent } from '../../../src/types'
 import { ContentClient, createContentClient } from 'dcl-catalyst-client'
-import { mockConfig, mockFetcher } from '../../mocks/components'
+import { mockConfig, mockFetcher, mockLogs } from '../../mocks/components'
 
 jest.mock('dcl-catalyst-client', () => ({
   ...jest.requireActual('dcl-catalyst-client'),
@@ -40,7 +40,8 @@ describe('Catalyst client', () => {
 
     catalystClient = await createCatalystClient({
       fetcher: mockFetcher,
-      config: mockConfig
+      config: mockConfig,
+      logs: mockLogs
     })
     contentClientMock = createContentClient({ fetcher: mockFetcher, url: CATALYST_CONTENT_LOAD_BALANCER_URL })
   })
