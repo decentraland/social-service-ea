@@ -33,7 +33,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     }
 
     const baseQuery = SQL`SELECT fa.id,`
-    baseQuery.append(columnMapping[type].append(', as address'))
+    baseQuery.append(columnMapping[type])
+    baseQuery.append(SQL` as address`)
     baseQuery.append(SQL`
       fa.timestamp, fa.metadata
       FROM friendships f
