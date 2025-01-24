@@ -4,7 +4,7 @@ import {
   isFriendshipActionValid,
   isUserActionValid,
   parseEmittedUpdateToFriendshipUpdate,
-  parseEmittedUpdateToFriendStatusUpdate,
+  parseEmittedUpdateToFriendConnectivityUpdate,
   parseFriendshipRequestsToFriendshipRequestResponses,
   parseFriendshipRequestToFriendshipRequestResponse,
   parseUpsertFriendshipRequest,
@@ -16,7 +16,8 @@ import {
   FriendshipStatus as FriendshipRequestStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockExpectedFriendshipRequest, createMockFriendshipRequest } from '../../mocks/friendship-request'
-import { createMockProfile } from '../../mocks/profile'
+import { createMockProfile, mockProfile, PROFILE_IMAGES_URL } from '../../mocks/profile'
+import { parseProfileToFriend } from '../../../src/logic/friends'
 
 describe('isFriendshipActionValid()', () => {
   test('it should be valid if from is null and to is REQUEST ', () => {
@@ -382,47 +383,51 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
   test('it should parse REQUEST update properly', () => {
     const now = Date.now()
     expect(
-      parseEmittedUpdateToFriendshipUpdate({
-        id,
-        action: Action.REQUEST,
-        timestamp: now,
-        from: '0xA',
-        to: '0xB'
-      })
+      parseEmittedUpdateToFriendshipUpdate(
+        {
+          id,
+          action: Action.REQUEST,
+          timestamp: now,
+          from: '0xA',
+          to: '0xB'
+        },
+        mockProfile,
+        PROFILE_IMAGES_URL
+      )
     ).toEqual({
       update: {
         $case: 'request',
         request: {
           id,
           createdAt: now,
-          user: {
-            address: '0xA'
-          },
+          friend: parseProfileToFriend(mockProfile, PROFILE_IMAGES_URL),
           message: undefined
         }
       }
     })
 
     expect(
-      parseEmittedUpdateToFriendshipUpdate({
-        id,
-        action: Action.REQUEST,
-        timestamp: now,
-        from: '0xA',
-        to: '0xB',
-        metadata: {
-          message: 'Hi!'
-        }
-      })
+      parseEmittedUpdateToFriendshipUpdate(
+        {
+          id,
+          action: Action.REQUEST,
+          timestamp: now,
+          from: '0xA',
+          to: '0xB',
+          metadata: {
+            message: 'Hi!'
+          }
+        },
+        mockProfile,
+        PROFILE_IMAGES_URL
+      )
     ).toEqual({
       update: {
         $case: 'request',
         request: {
           id,
           createdAt: now,
-          user: {
-            address: '0xA'
-          },
+          friend: parseProfileToFriend(mockProfile, PROFILE_IMAGES_URL),
           message: 'Hi!'
         }
       }
@@ -432,13 +437,17 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
   test('it should parse CANCEL update properly', () => {
     const now = Date.now()
     expect(
-      parseEmittedUpdateToFriendshipUpdate({
-        id,
-        action: Action.CANCEL,
-        timestamp: now,
-        from: '0xA',
-        to: '0xB'
-      })
+      parseEmittedUpdateToFriendshipUpdate(
+        {
+          id,
+          action: Action.CANCEL,
+          timestamp: now,
+          from: '0xA',
+          to: '0xB'
+        },
+        mockProfile,
+        PROFILE_IMAGES_URL
+      )
     ).toEqual({
       update: {
         $case: 'cancel',
@@ -454,13 +463,17 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
   test('it should parse DELETE update properly', () => {
     const now = Date.now()
     expect(
-      parseEmittedUpdateToFriendshipUpdate({
-        id,
-        action: Action.DELETE,
-        timestamp: now,
-        from: '0xA',
-        to: '0xB'
-      })
+      parseEmittedUpdateToFriendshipUpdate(
+        {
+          id,
+          action: Action.DELETE,
+          timestamp: now,
+          from: '0xA',
+          to: '0xB'
+        },
+        mockProfile,
+        PROFILE_IMAGES_URL
+      )
     ).toEqual({
       update: {
         $case: 'delete',
@@ -476,13 +489,17 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
   test('it should parse REJECT update properly', () => {
     const now = Date.now()
     expect(
-      parseEmittedUpdateToFriendshipUpdate({
-        id,
-        action: Action.REJECT,
-        timestamp: now,
-        from: '0xA',
-        to: '0xB'
-      })
+      parseEmittedUpdateToFriendshipUpdate(
+        {
+          id,
+          action: Action.REJECT,
+          timestamp: now,
+          from: '0xA',
+          to: '0xB'
+        },
+        mockProfile,
+        PROFILE_IMAGES_URL
+      )
     ).toEqual({
       update: {
         $case: 'reject',
@@ -498,13 +515,17 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
   test('it should parse ACCEPT update properly', () => {
     const now = Date.now()
     expect(
-      parseEmittedUpdateToFriendshipUpdate({
-        id,
-        action: Action.ACCEPT,
-        timestamp: now,
-        from: '0xA',
-        to: '0xB'
-      })
+      parseEmittedUpdateToFriendshipUpdate(
+        {
+          id,
+          action: Action.ACCEPT,
+          timestamp: now,
+          from: '0xA',
+          to: '0xB'
+        },
+        mockProfile,
+        PROFILE_IMAGES_URL
+      )
     ).toEqual({
       update: {
         $case: 'accept',
@@ -520,13 +541,17 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
   test('it should return null', () => {
     const now = Date.now()
     expect(
-      parseEmittedUpdateToFriendshipUpdate({
-        id,
-        action: 'whaterver' as Action,
-        timestamp: now,
-        from: '0xA',
-        to: '0xB'
-      })
+      parseEmittedUpdateToFriendshipUpdate(
+        {
+          id,
+          action: 'whaterver' as Action,
+          timestamp: now,
+          from: '0xA',
+          to: '0xB'
+        },
+        mockProfile,
+        PROFILE_IMAGES_URL
+      )
     ).toBe(null)
   })
 })
@@ -560,11 +585,15 @@ describe('getFriendshipRequestStatus()', () => {
   })
 })
 
-describe('parseEmittedUpdateToFriendStatusUpdate()', () => {
-  test('it should parse ONLINE update properly', () => {
-    expect(parseEmittedUpdateToFriendStatusUpdate({ address: '0x123', status: ConnectivityStatus.ONLINE })).toEqual({
-      user: { address: '0x123' },
-      status: ConnectivityStatus.ONLINE
+describe('parseEmittedUpdateToFriendConnectivityUpdate()', () => {
+  test.each([
+    [ConnectivityStatus.OFFLINE, 'offline'],
+    [ConnectivityStatus.ONLINE, 'online']
+  ])('it should parse status %s update properly', (status) => {
+    const update = { address: '0x123', status }
+    expect(parseEmittedUpdateToFriendConnectivityUpdate(update, mockProfile, PROFILE_IMAGES_URL)).toEqual({
+      friend: parseProfileToFriend(mockProfile, PROFILE_IMAGES_URL),
+      status
     })
   })
 })
@@ -573,9 +602,8 @@ describe('parseFriendshipRequestToFriendshipRequestResponse()', () => {
   test('it should parse friendship request to friendship request response', () => {
     const request = createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')
     const profile = createMockProfile('0x456')
-    const profileImagesUrl = 'https://profile-images.decentraland.org'
 
-    expect(parseFriendshipRequestToFriendshipRequestResponse(request, profile, profileImagesUrl)).toEqual(
+    expect(parseFriendshipRequestToFriendshipRequestResponse(request, profile, PROFILE_IMAGES_URL)).toEqual(
       createMockExpectedFriendshipRequest('id1', '0x456', profile, '2025-01-01T00:00:00Z', '')
     )
   })
@@ -585,9 +613,8 @@ describe('parseFriendshipRequestsToFriendshipRequestResponses()', () => {
   test('it should parse friendship requests to friendship request responses', () => {
     const requests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
     const profiles = [createMockProfile('0x456')]
-    const profileImagesUrl = 'https://profile-images.decentraland.org'
 
-    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles, profileImagesUrl)).toEqual([
+    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles, PROFILE_IMAGES_URL)).toEqual([
       createMockExpectedFriendshipRequest('id1', '0x456', profiles[0], '2025-01-01T00:00:00Z', '')
     ])
   })
@@ -595,8 +622,7 @@ describe('parseFriendshipRequestsToFriendshipRequestResponses()', () => {
   test('it should return an empty array if the requester/requested address is not found in the profiles', () => {
     const requests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
     const profiles = [createMockProfile('0x789')]
-    const profileImagesUrl = 'https://profile-images.decentraland.org'
 
-    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles, profileImagesUrl)).toEqual([])
+    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles, PROFILE_IMAGES_URL)).toEqual([])
   })
 })

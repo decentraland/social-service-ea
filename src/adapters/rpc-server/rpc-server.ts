@@ -1,6 +1,6 @@
 import { createRpcServer } from '@dcl/rpc'
 import { registerService } from '@dcl/rpc/dist/codegen'
-import { AppComponents, IRPCServerComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../types'
+import { AppComponents, IRPCServerComponent, RpcServerContext } from '../../types'
 import { getFriendsService } from './services/get-friends'
 import { getMutualFriendsService } from './services/get-mutual-friends'
 import { getPendingFriendshipRequestsService } from './services/get-pending-friendship-requests'
@@ -9,8 +9,9 @@ import { subscribeToFriendshipUpdatesService } from './services/subscribe-to-fri
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 import { getFriendshipStatusService } from './services/get-friendship-status'
-import { subscribeToFriendUpdatesService } from './services/subscribe-to-friend-updates'
+import { subscribeToFriendConnectivityUpdatesService } from './services/subscribe-to-friend-connectivity-updates'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
+import { friendshipUpdateHandler, friendConnectivityUpdateHandler } from '../../logic/updates'
 
 export async function createRpcServerComponent({
   logs,
@@ -45,45 +46,14 @@ export async function createRpcServerComponent({
   const getSentFriendshipRequests = await getSentFriendshipRequestsService({
     components: { logs, db, catalystClient, config }
   })
-  const upsertFriendship = upsertFriendshipService({ components: { logs, db, pubsub } })
+  const upsertFriendship = await upsertFriendshipService({ components: { logs, db, pubsub, config, catalystClient } })
   const getFriendshipStatus = getFriendshipStatusService({ components: { logs, db } })
-  const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({ components: { logs } })
-  const subscribeToFriendUpdates = subscribeToFriendUpdatesService({
-    components: { logs, db, archipelagoStats }
+  const subscribeToFriendshipUpdates = await subscribeToFriendshipUpdatesService({
+    components: { logs, config, catalystClient }
   })
-
-  function handleFriendshipUpdate(message: string) {
-    try {
-      const update = JSON.parse(message) as SubscriptionEventsEmitter['friendshipUpdate']
-      const updateEmitter = SHARED_CONTEXT.subscribers[update.to]
-      if (updateEmitter) {
-        updateEmitter.emit('friendshipUpdate', update)
-      }
-    } catch (error: any) {
-      logger.error(`Error handling friendship update: ${error.message}`, {
-        message
-      })
-    }
-  }
-
-  async function handleFriendStatusUpdate(message: string) {
-    try {
-      // TODO: this may be a problem if the user has a lot of friends or there are a lot of users online
-      const update = JSON.parse(message) as SubscriptionEventsEmitter['friendStatusUpdate']
-      const friends = await db.getOnlineFriends(update.address, Object.keys(SHARED_CONTEXT.subscribers))
-
-      friends.forEach(({ address: friendAddress }) => {
-        const emitter = SHARED_CONTEXT.subscribers[friendAddress]
-        if (emitter) {
-          emitter.emit('friendStatusUpdate', update)
-        }
-      })
-    } catch (error: any) {
-      logger.error(`Error handling friend status update: ${error.message}`, {
-        message
-      })
-    }
-  }
+  const subscribeToFriendConnectivityUpdates = await subscribeToFriendConnectivityUpdatesService({
+    components: { logs, db, archipelagoStats, config, catalystClient }
+  })
 
   rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
@@ -94,7 +64,7 @@ export async function createRpcServerComponent({
       getFriendshipStatus,
       upsertFriendship,
       subscribeToFriendshipUpdates,
-      subscribeToFriendUpdates
+      subscribeToFriendConnectivityUpdates
     }))
   })
 
@@ -104,8 +74,11 @@ export async function createRpcServerComponent({
         logger.info(`[RPC] RPC Server listening on port ${rpcServerPort}`)
       })
 
-      await pubsub.subscribeToChannel(FRIENDSHIP_UPDATES_CHANNEL, handleFriendshipUpdate)
-      await pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handleFriendStatusUpdate)
+      await pubsub.subscribeToChannel(FRIENDSHIP_UPDATES_CHANNEL, friendshipUpdateHandler(SHARED_CONTEXT, logger))
+      await pubsub.subscribeToChannel(
+        FRIEND_STATUS_UPDATES_CHANNEL,
+        friendConnectivityUpdateHandler(SHARED_CONTEXT, logger, db)
+      )
     },
     attachUser({ transport, address }) {
       transport.on('close', () => {

@@ -214,7 +214,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async getLastFriendshipActionByUsers(loggedUser: string, friendUser: string) {
       const query = SQL`
-        SELECT fa.action, fa.acting_user as by 
+        SELECT fa.*
         FROM friendships f
         INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
         WHERE (f.address_requester, f.address_requested) IN ((${loggedUser}, ${friendUser}), (${friendUser}, ${loggedUser}))
@@ -235,7 +235,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       const {
         rows: [{ id, created_at }]
-      } = txClient ? await txClient.query(query) : await pg.query(query)
+      } = txClient
+        ? await txClient.query<{ id: string; created_at: Date }>(query)
+        : await pg.query<{ id: string; created_at: Date }>(query)
 
       return {
         id,
@@ -244,10 +246,18 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async updateFriendshipStatus(friendshipId, isActive, txClient) {
       logger.debug(`updating ${friendshipId} - ${isActive}`)
-      const query = SQL`UPDATE friendships SET is_active = ${isActive}, updated_at = now() WHERE id = ${friendshipId}`
+      const query = SQL`UPDATE friendships SET is_active = ${isActive}, updated_at = now() WHERE id = ${friendshipId} RETURNING id, created_at`
 
-      const results = txClient ? await txClient?.query(query) : await pg.query(query)
-      return results.rowCount === 1
+      const {
+        rows: [{ id, created_at }]
+      } = txClient
+        ? await txClient.query<{ id: string; created_at: Date }>(query)
+        : await pg.query<{ id: string; created_at: Date }>(query)
+
+      return {
+        id,
+        created_at
+      }
     },
     async recordFriendshipAction(friendshipId, actingUser, action, metadata, txClient) {
       const uuid = randomUUID()

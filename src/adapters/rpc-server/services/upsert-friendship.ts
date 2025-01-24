@@ -6,20 +6,23 @@ import {
 import {
   parseUpsertFriendshipRequest,
   validateNewFriendshipAction,
-  getNewFriendshipStatus
+  getNewFriendshipStatus,
+  parseFriendshipRequestToFriendshipRequestResponse
 } from '../../../logic/friendships'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
 
-export function upsertFriendshipService({
-  components: { logs, db, pubsub }
-}: RPCServiceContext<'logs' | 'db' | 'pubsub'>) {
+export async function upsertFriendshipService({
+  components: { logs, db, pubsub, config, catalystClient }
+}: RPCServiceContext<'logs' | 'db' | 'pubsub' | 'config' | 'catalystClient'>) {
   const logger = logs.getLogger('upsert-friendship-service')
+  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function (
     request: UpsertFriendshipPayload,
     context: RpcServerContext
   ): Promise<UpsertFriendshipResponse> {
     const parsedRequest = parseUpsertFriendshipRequest(request)
+
     if (!parsedRequest) {
       logger.error('upsert friendship received unknown message: ', request as any)
       return {
@@ -33,20 +36,9 @@ export function upsertFriendshipService({
     logger.debug(`upsert friendship > `, parsedRequest as Record<string, string>)
 
     try {
-      const friendship = await db.getFriendship([context.address, parsedRequest.user!])
-      let lastAction = undefined
-      if (friendship) {
-        const lastRecordedAction = await db.getLastFriendshipAction(friendship.id)
-        lastAction = lastRecordedAction
-      }
+      const lastAction = await db.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
 
-      if (
-        !validateNewFriendshipAction(
-          context.address,
-          { action: parsedRequest.action, user: parsedRequest.user },
-          lastAction
-        )
-      ) {
+      if (!validateNewFriendshipAction(context.address, parsedRequest, lastAction)) {
         logger.error('invalid action for a friendship')
         return {
           response: {
@@ -62,12 +54,12 @@ export function upsertFriendshipService({
       logger.debug('friendship status > ', { isActive: JSON.stringify(isActive), friendshipStatus })
 
       const { id, actionId, createdAt } = await db.executeTx(async (tx) => {
-        let id: string, createdAt: number
+        let id: string, createdAt: Date
 
-        if (friendship) {
-          await db.updateFriendshipStatus(friendship.id, isActive, tx)
-          id = friendship.id
-          createdAt = new Date(friendship.created_at).getTime()
+        if (lastAction) {
+          const { created_at } = await db.updateFriendshipStatus(lastAction.friendship_id, isActive, tx)
+          id = lastAction.friendship_id
+          createdAt = created_at
         } else {
           const { id: newFriendshipId, created_at } = await db.createFriendship(
             [context.address, parsedRequest.user!],
@@ -75,7 +67,7 @@ export function upsertFriendshipService({
             tx
           )
           id = newFriendshipId
-          createdAt = new Date(created_at).getTime()
+          createdAt = created_at
         }
 
         const actionId = await db.recordFriendshipAction(
@@ -91,27 +83,30 @@ export function upsertFriendshipService({
 
       logger.debug(`${id} friendship was upsert successfully`)
 
-      await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
-        id: actionId,
-        from: context.address,
-        to: parsedRequest.user,
-        action: parsedRequest.action,
-        timestamp: Date.now(),
-        metadata:
-          parsedRequest.action === Action.REQUEST
-            ? parsedRequest.metadata
-              ? parsedRequest.metadata
-              : undefined
-            : undefined
-      })
+      const metadata =
+        parsedRequest.action === Action.REQUEST && parsedRequest.metadata ? parsedRequest.metadata : undefined
 
+      const [_, profile] = await Promise.all([
+        await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
+          id: actionId,
+          from: context.address,
+          to: parsedRequest.user,
+          action: parsedRequest.action,
+          timestamp: Date.now(),
+          metadata
+        }),
+        catalystClient.getEntityByPointer(parsedRequest.user)
+      ])
+
+      const friendshipRequest = {
+        id,
+        timestamp: createdAt.toString(),
+        metadata: metadata || null
+      }
       return {
         response: {
           $case: 'accepted',
-          accepted: {
-            id: id,
-            createdAt
-          }
+          accepted: parseFriendshipRequestToFriendshipRequestResponse(friendshipRequest, profile, profileImagesUrl)
         }
       }
     } catch (error: any) {

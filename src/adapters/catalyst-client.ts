@@ -1,7 +1,7 @@
 import { Entity } from '@dcl/schemas'
 import { createContentClient, ContentClient } from 'dcl-catalyst-client'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
-import { AppComponents, ICatalystClient, ICatalystClientRequestOptions } from '../types'
+import { AppComponents, ICatalystClientComponent, ICatalystClientRequestOptions } from '../types'
 import { retry } from '../utils/retrier'
 import { shuffleArray } from '../utils/array'
 
@@ -11,7 +11,7 @@ const L1_TESTNET = 'sepolia'
 export async function createCatalystClient({
   fetcher,
   config
-}: Pick<AppComponents, 'fetcher' | 'config'>): Promise<ICatalystClient> {
+}: Pick<AppComponents, 'fetcher' | 'config'>): Promise<ICatalystClientComponent> {
   const loadBalancer = await config.requireString('CATALYST_CONTENT_URL_LOADBALANCER')
   const contractNetwork = (await config.getString('ENV')) === 'prod' ? L1_MAINNET : L1_TESTNET
 
@@ -53,5 +53,15 @@ export async function createCatalystClient({
     return retry(executeClientRequest, retries, waitTime)
   }
 
-  return { getEntitiesByPointers }
+  async function getEntityByPointer(pointer: string, options: ICatalystClientRequestOptions = {}): Promise<Entity> {
+    const [entity] = await getEntitiesByPointers([pointer], options)
+
+    if (!entity) {
+      throw new Error(`Entity not found for pointer ${pointer}`)
+    }
+
+    return entity
+  }
+
+  return { getEntitiesByPointers, getEntityByPointer }
 }

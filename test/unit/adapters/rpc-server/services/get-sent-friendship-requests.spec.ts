@@ -4,7 +4,7 @@ import { RpcServerContext } from '../../../../../src/types'
 import { emptyRequest } from '../../../../mocks/empty-request'
 import { createMockFriendshipRequest, createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'
 import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { createMockProfile } from '../../../../mocks/profile'
+import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
 
 describe('getSentFriendshipRequestsService', () => {
   let getSentRequests: Awaited<ReturnType<typeof getSentFriendshipRequestsService>>
@@ -14,10 +14,9 @@ describe('getSentFriendshipRequestsService', () => {
     subscribers: undefined
   }
 
-  const profileImagesUrl = 'https://profile-images.decentraland.org'
-
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValueOnce(profileImagesUrl)
+    mockConfig.requireString.mockResolvedValueOnce(PROFILE_IMAGES_URL)
+
     getSentRequests = await getSentFriendshipRequestsService({
       components: { db: mockDb, logs: mockLogs, config: mockConfig, catalystClient: mockCatalystClient }
     })

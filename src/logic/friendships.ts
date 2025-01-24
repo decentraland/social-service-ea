@@ -2,7 +2,7 @@ import {
   FriendshipUpdate,
   UpsertFriendshipPayload,
   FriendshipStatus as FriendshipRequestStatus,
-  FriendUpdate,
+  FriendConnectivityUpdate,
   FriendshipRequestResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
@@ -129,7 +129,9 @@ export function parseUpsertFriendshipRequest(request: UpsertFriendshipPayload): 
 }
 
 export function parseEmittedUpdateToFriendshipUpdate(
-  update: SubscriptionEventsEmitter['friendshipUpdate']
+  update: SubscriptionEventsEmitter['friendshipUpdate'],
+  profile: Entity,
+  profileImagesUrl: string
 ): FriendshipUpdate | null {
   switch (update.action) {
     case Action.REQUEST:
@@ -139,9 +141,7 @@ export function parseEmittedUpdateToFriendshipUpdate(
           request: {
             id: update.id,
             createdAt: update.timestamp,
-            user: {
-              address: update.from
-            },
+            friend: parseProfileToFriend(profile, profileImagesUrl),
             message: update.metadata?.message
           }
         }
@@ -195,26 +195,29 @@ export function parseEmittedUpdateToFriendshipUpdate(
   }
 }
 
-export function parseEmittedUpdateToFriendStatusUpdate({
-  address,
-  status
-}: SubscriptionEventsEmitter['friendStatusUpdate']): FriendUpdate | null {
+export function parseEmittedUpdateToFriendConnectivityUpdate(
+  update: Pick<SubscriptionEventsEmitter['friendConnectivityUpdate'], 'status'>,
+  profile: Entity,
+  profileImagesUrl: string
+): FriendConnectivityUpdate | null {
+  const { status } = update
   return {
-    user: { address },
+    friend: parseProfileToFriend(profile, profileImagesUrl),
     status: status
   }
 }
 
 export function getFriendshipRequestStatus(
-  { action, acting_user }: FriendshipAction,
+  friendshipAction: Pick<FriendshipAction, 'action' | 'acting_user'>,
   loggedUserAddress: string
 ): FriendshipRequestStatus {
+  const { action, acting_user } = friendshipAction
   const statusResolver = FRIENDSHIP_STATUS_BY_ACTION[action]
   return statusResolver?.(acting_user, loggedUserAddress) ?? FriendshipRequestStatus.UNRECOGNIZED
 }
 
 export function parseFriendshipRequestToFriendshipRequestResponse(
-  request: FriendshipRequest,
+  request: Pick<FriendshipRequest, 'id' | 'timestamp' | 'metadata'>,
   profile: Entity,
   profileImagesUrl: string
 ): FriendshipRequestResponse {

@@ -3,17 +3,17 @@ import { Entity } from '@dcl/schemas'
 import { getProfileAvatar, getProfilePictureUrl } from './profiles'
 import { normalizeAddress } from '../utils/address'
 
-export function parseProfileToFriend(profile: Entity, contentServerUrl: string): FriendProfile {
+export function parseProfileToFriend(profile: Entity, profileImagesUrl: string): FriendProfile {
   const { userId, name, hasClaimedName } = getProfileAvatar(profile)
 
   return {
     address: normalizeAddress(userId),
     name,
     hasClaimedName,
-    profilePictureUrl: getProfilePictureUrl(contentServerUrl, profile)
+    profilePictureUrl: getProfilePictureUrl(profileImagesUrl, profile)
   }
 }
 
-export function parseProfilesToFriends(profiles: Entity[], contentServerUrl: string): FriendProfile[] {
-  return profiles.map((profile) => parseProfileToFriend(profile, contentServerUrl))
+export function parseProfilesToFriends(profiles: Entity[], profileImagesUrl: string): FriendProfile[] {
+  return profiles.map((profile) => parseProfileToFriend(profile, profileImagesUrl))
 }

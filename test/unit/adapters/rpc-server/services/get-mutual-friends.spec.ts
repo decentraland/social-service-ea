@@ -2,13 +2,11 @@ import { mockCatalystClient, mockConfig, mockDb, mockLogs } from '../../../../mo
 import { getMutualFriendsService } from '../../../../../src/adapters/rpc-server/services/get-mutual-friends'
 import { GetMutualFriendsPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
-import { createMockProfile } from '../../../../mocks/profile'
+import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
 import { createMockFriend, parseExpectedFriends } from '../../../../mocks/friend'
 
 describe('getMutualFriendsService', () => {
   let getMutualFriends: Awaited<ReturnType<typeof getMutualFriendsService>>
-
-  const profileImagesUrl = 'https://profile-images.decentraland.org'
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
@@ -21,7 +19,7 @@ describe('getMutualFriendsService', () => {
   }
 
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValueOnce(profileImagesUrl)
+    mockConfig.requireString.mockResolvedValueOnce(PROFILE_IMAGES_URL)
     getMutualFriends = await getMutualFriendsService({
       components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient, config: mockConfig }
     })
@@ -40,7 +38,7 @@ describe('getMutualFriendsService', () => {
     const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
 
     expect(response).toEqual({
-      friends: mockMutualFriendsProfiles.map(parseExpectedFriends(profileImagesUrl)),
+      friends: mockMutualFriendsProfiles.map(parseExpectedFriends(PROFILE_IMAGES_URL)),
       paginationData: {
         total: totalMutualFriends,
         page: 1

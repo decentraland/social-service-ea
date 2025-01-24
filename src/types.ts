@@ -40,7 +40,7 @@ export type BaseComponents = {
   peersSynchronizer: IPeersSynchronizer
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
-  catalystClient: ICatalystClient
+  catalystClient: ICatalystClientComponent
 }
 
 // components used in runtime
@@ -64,7 +64,14 @@ export interface IDatabaseComponent {
     id: string
     created_at: Date
   }>
-  updateFriendshipStatus(friendshipId: string, isActive: boolean, txClient?: PoolClient): Promise<boolean>
+  updateFriendshipStatus(
+    friendshipId: string,
+    isActive: boolean,
+    txClient?: PoolClient
+  ): Promise<{
+    id: string
+    created_at: Date
+  }>
   getFriends(
     userAddress: string,
     options?: {
@@ -118,6 +125,7 @@ export type IArchipelagoStatsComponent = IBaseComponent & {
 export type IPeersSynchronizer = IBaseComponent
 export type IPeerTrackingComponent = IBaseComponent & {
   getSubscriptions(): Map<string, Subscription>
+  subscribeToPeerStatusUpdates(): Promise<void>
 }
 
 export type ICatalystClientRequestOptions = {
@@ -126,8 +134,9 @@ export type ICatalystClientRequestOptions = {
   contentServerUrl?: string
 }
 
-export type ICatalystClient = {
+export type ICatalystClientComponent = {
   getEntitiesByPointers(pointers: string[], options?: ICatalystClientRequestOptions): Promise<Entity[]>
+  getEntityByPointer(pointer: string, options?: ICatalystClientRequestOptions): Promise<Entity>
 }
 
 // this type simplifies the typings of http handlers
@@ -191,7 +200,7 @@ export type SubscriptionEventsEmitter = {
     timestamp: number
     metadata?: { message: string }
   }
-  friendStatusUpdate: {
+  friendConnectivityUpdate: {
     address: string
     status: ConnectivityStatus
   }

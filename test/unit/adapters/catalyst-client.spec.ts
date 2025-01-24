@@ -1,6 +1,6 @@
 import { Entity } from '@dcl/schemas'
 import { createCatalystClient } from '../../../src/adapters/catalyst-client'
-import { ICatalystClient } from '../../../src/types'
+import { ICatalystClientComponent } from '../../../src/types'
 import { ContentClient, createContentClient } from 'dcl-catalyst-client'
 import { mockConfig, mockFetcher } from '../../mocks/components'
 
@@ -32,7 +32,7 @@ jest.mock('../../../src/utils/timer', () => ({
 const LOAD_BALANCER_URL = 'http://catalyst-server.com'
 
 describe('Catalyst client', () => {
-  let catalystClient: ICatalystClient
+  let catalystClient: ICatalystClientComponent
   let contentClientMock: ContentClient
 
   beforeEach(async () => {
@@ -43,10 +43,6 @@ describe('Catalyst client', () => {
       config: mockConfig
     })
     contentClientMock = createContentClient({ fetcher: mockFetcher, url: LOAD_BALANCER_URL })
-  })
-
-  afterEach(() => {
-    jest.clearAllMocks()
   })
 
   describe('getEntitiesByPointers', () => {
@@ -127,6 +123,21 @@ describe('Catalyst client', () => {
       const uniqueUrls = new Set(urlsUsed)
 
       expect(uniqueUrls.size).toBe(urlsUsed.length)
+    })
+  })
+
+  describe('getEntityByPointer', () => {
+    it('should throw an error if the entity is not found', async () => {
+      contentClientMock.fetchEntitiesByPointers = jest.fn().mockResolvedValue([])
+      await expect(catalystClient.getEntityByPointer('pointer')).rejects.toThrow('Entity not found for pointer pointer')
+    })
+
+    it('should return the entity if it is found', async () => {
+      contentClientMock.fetchEntitiesByPointers = jest.fn().mockResolvedValue([{ id: 'entity1' }])
+
+      const result = await catalystClient.getEntityByPointer('pointer')
+
+      expect(result).toEqual({ id: 'entity1' })
     })
   })
 

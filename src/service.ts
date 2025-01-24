@@ -9,4 +9,6 @@ export async function main(program: Lifecycle.EntryPointParameters<AppComponents
   await setupRoutes(components)
 
   await startComponents()
+
+  await components.peerTracking.subscribeToPeerStatusUpdates()
 }
