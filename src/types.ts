@@ -233,15 +233,6 @@ export enum Action {
   DELETE = 'delete' // delete a friendship
 }
 
-// [to]: [from]
-export const FRIENDSHIP_ACTION_TRANSITIONS: Record<Action, (Action | null)[]> = {
-  [Action.REQUEST]: [Action.CANCEL, Action.REJECT, Action.DELETE, null],
-  [Action.ACCEPT]: [Action.REQUEST],
-  [Action.CANCEL]: [Action.REQUEST],
-  [Action.REJECT]: [Action.REQUEST],
-  [Action.DELETE]: [Action.ACCEPT]
-}
-
 export type FriendshipAction = {
   id: string
   friendship_id: string

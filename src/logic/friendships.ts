@@ -5,18 +5,20 @@ import {
   FriendConnectivityUpdate,
   FriendshipRequestResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import {
-  Action,
-  FRIENDSHIP_ACTION_TRANSITIONS,
-  FriendshipAction,
-  FriendshipRequest,
-  FriendshipStatus,
-  SubscriptionEventsEmitter
-} from '../types'
+import { Action, FriendshipAction, FriendshipRequest, FriendshipStatus, SubscriptionEventsEmitter } from '../types'
 import { normalizeAddress } from '../utils/address'
 import { parseProfileToFriend } from './friends'
 import { Entity } from '@dcl/schemas'
 import { getProfileAvatar } from './profiles'
+
+// [to]: [from]
+export const FRIENDSHIP_ACTION_TRANSITIONS: Record<Action, (Action | null)[]> = {
+  [Action.REQUEST]: [Action.CANCEL, Action.REJECT, Action.DELETE, null],
+  [Action.ACCEPT]: [Action.REQUEST],
+  [Action.CANCEL]: [Action.REQUEST],
+  [Action.REJECT]: [Action.REQUEST],
+  [Action.DELETE]: [Action.ACCEPT]
+}
 
 const FRIENDSHIP_STATUS_BY_ACTION: Record<
   Action,
@@ -80,6 +82,7 @@ export function validateNewFriendshipAction(
   lastAction?: FriendshipAction
 ): boolean {
   if (!isFriendshipActionValid(lastAction?.action || null, newAction.action)) return false
+  console.log('isUserActionValid', actingUser, newAction, lastAction)
   return isUserActionValid(actingUser, newAction, lastAction)
 }
 
