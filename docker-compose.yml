@@ -17,6 +17,12 @@ services:
     ports:
       - '6379:6379'
 
+  nats:
+    image: nats:latest
+    container_name: nats-local
+    ports:
+      - '4222:4222'
+
   app:
     image: social-service-ea:local
     build:
@@ -25,12 +31,18 @@ services:
     environment:
       PG_COMPONENT_PSQL_CONNECTION_STRING: 'postgresql://postgres:postgres@postgres:5432/social_service_ea'
       REDIS_HOST: 'redis'
+      NATS_URL: 'nats://nats:4222'
+      ARCHIPELAGO_STATS_URL: 'http://archipelago-ea-stats.decentraland.zone'
+      PROFILE_IMAGES_URL: 'https://profile-images.decentraland.zone'
+      CATALYST_URL: 'https://peer.decentraland.zone'
+      PEER_SYNC_INTERVAL_MS: '45000'
+      PEERS_SYNC_CACHE_TTL_MS: '90000'
     ports:
       - '3000:3000'
       - '8085:8085'
     depends_on:
       - postgres
       - redis
-
+      - nats
 volumes:
   postgres-data:

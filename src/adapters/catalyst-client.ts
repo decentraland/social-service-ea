@@ -16,12 +16,8 @@ export async function createCatalystClient({
   const contractNetwork = (await config.getString('ENV')) === 'prod' ? L1_MAINNET : L1_TESTNET
 
   function getContentClientOrDefault(contentServerUrl?: string): ContentClient {
-    return contentServerUrl
-      ? createContentClient({ fetcher, url: contentServerUrl })
-      : createContentClient({
-          fetcher,
-          url: loadBalancer
-        })
+    contentServerUrl = contentServerUrl?.endsWith('/content') ? contentServerUrl : `${contentServerUrl}/content`
+    return createContentClient({ fetcher, url: contentServerUrl ?? loadBalancer })
   }
 
   function rotateContentServerClient<T>(
@@ -34,7 +30,7 @@ export async function createCatalystClient({
     return (attempt: number): Promise<T> => {
       if (attempt > 1 && catalystServers.length > 0) {
         const [catalystServerUrl] = catalystServers.splice(attempt % catalystServers.length, 1)
-        contentClientToUse = getContentClientOrDefault(catalystServerUrl)
+        contentClientToUse = getContentClientOrDefault(`${catalystServerUrl}/content`)
       }
 
       return executeClientRequest(contentClientToUse)
@@ -45,6 +41,8 @@ export async function createCatalystClient({
     pointers: string[],
     options: ICatalystClientRequestOptions = {}
   ): Promise<Entity[]> {
+    if (pointers.length === 0) return []
+
     const { retries = 3, waitTime = 300, contentServerUrl } = options
     const executeClientRequest = rotateContentServerClient(
       (contentClientToUse) => contentClientToUse.fetchEntitiesByPointers(pointers),

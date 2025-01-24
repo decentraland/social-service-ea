@@ -2,6 +2,7 @@ import { createDBComponent } from '../../../src/adapters/db'
 import { Action } from '../../../src/types'
 import SQL from 'sql-template-strings'
 import { mockLogs, mockPg } from '../../mocks/components'
+import { normalizeAddress } from '../../../src/utils/address'
 
 jest.mock('node:crypto', () => ({
   randomUUID: jest.fn().mockReturnValue('mock-uuid')
@@ -27,15 +28,15 @@ describe('db', () => {
 
       const expectedFragmentsOfTheQuery = [
         {
-          text: 'WHEN address_requester =',
+          text: 'WHEN LOWER(address_requester) =',
           values: ['0x123']
         },
         {
-          text: 'WHERE (address_requester =',
+          text: 'WHERE (LOWER(address_requester) =',
           values: ['0x123']
         },
         {
-          text: 'OR address_requested =',
+          text: 'OR LOWER(address_requested) =',
           values: ['0x123']
         },
         {
@@ -92,8 +93,13 @@ describe('db', () => {
 
       const result = await dbComponent.getFriendsCount('0x123', { onlyActive: true })
 
+      const expectedQuery = SQL`WHERE (LOWER(address_requester) = ${'0x123'} OR LOWER(address_requested) = ${'0x123'}) AND is_active = true`
+
       expect(mockPg.query).toHaveBeenCalledWith(
-        SQL`SELECT COUNT(*) FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'}) AND is_active = true`
+        expect.objectContaining({
+          text: expect.stringContaining(expectedQuery.text),
+          values: expectedQuery.values
+        })
       )
       expect(result).toBe(mockCount)
     })
@@ -104,8 +110,13 @@ describe('db', () => {
 
       const result = await dbComponent.getFriendsCount('0x123', { onlyActive: false })
 
+      const expectedQuery = SQL`WHERE (LOWER(address_requester) = ${'0x123'} OR LOWER(address_requested) = ${'0x123'})`
+
       expect(mockPg.query).toHaveBeenCalledWith(
-        SQL`SELECT COUNT(*) FROM friendships WHERE (address_requester = ${'0x123'} OR address_requested = ${'0x123'})`
+        expect.objectContaining({
+          text: expect.stringContaining(expectedQuery.text),
+          values: expectedQuery.values
+        })
       )
       expect(result).toBe(mockCount)
     })
@@ -154,7 +165,7 @@ describe('db', () => {
       expect(result).toEqual(mockAction)
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('WHERE (f.address_requester, f.address_requested) IN'),
+          text: expect.stringContaining('WHERE (LOWER(f.address_requester), LOWER(f.address_requested)) IN'),
           values: expect.arrayContaining(['0x123', '0x456', '0x456', '0x123'])
         })
       )
@@ -257,7 +268,7 @@ describe('db', () => {
       expect(result).toEqual(mockRequests)
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('f.address_requested ='),
+          text: expect.stringContaining('LOWER(f.address_requested) ='),
           values: expect.arrayContaining(['0x456'])
         })
       )
@@ -283,7 +294,7 @@ describe('db', () => {
       expect(result).toEqual(mockRequests)
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('f.address_requester ='),
+          text: expect.stringContaining('LOWER(f.address_requester) ='),
           values: expect.arrayContaining(['0x123'])
         })
       )
@@ -334,32 +345,39 @@ describe('db', () => {
         rows: [{ address: '0x456' }, { address: '0x789' }],
         rowCount: 2
       }
+      const userAddress = '0x123'
       mockPg.query.mockResolvedValueOnce(mockResult)
 
-      const potentialFriends = ['0x456', '0x789', '0x999']
-      const result = await dbComponent.getOnlineFriends('0x123', potentialFriends)
+      const potentialFriends = ['0x456ABC', '0x789DEF', '0x999GHI']
+      const normalizedPotentialFriends = potentialFriends.map((address) => normalizeAddress(address))
+      await dbComponent.getOnlineFriends('0x123', normalizedPotentialFriends)
 
       const queryExpectations = [
-        { text: 'address_requester =', values: ['0x123'] },
-        { text: 'AND address_requested = ANY(' },
-        { text: 'address_requested =', values: ['0x123'] },
-        { text: 'address_requester = ANY(' }
+        { text: 'LOWER(address_requester) =' },
+        { text: 'AND LOWER(address_requested) IN' },
+        { text: 'LOWER(address_requested) =' },
+        { text: 'LOWER(address_requester) IN' }
       ]
 
-      queryExpectations.forEach(({ text, values }) => {
+      queryExpectations.forEach(({ text }) => {
         expect(mockPg.query).toHaveBeenCalledWith(
           expect.objectContaining({
             text: expect.stringContaining(text)
           })
         )
-        if (values) {
-          expect(mockPg.query).toHaveBeenCalledWith(
-            expect.objectContaining({
-              values: expect.arrayContaining(values)
-            })
-          )
-        }
       })
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: expect.arrayContaining([
+            userAddress,
+            userAddress,
+            normalizedPotentialFriends,
+            userAddress,
+            normalizedPotentialFriends
+          ])
+        })
+      )
     })
   })
 

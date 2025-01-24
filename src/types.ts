@@ -99,7 +99,6 @@ export interface IDatabaseComponent {
   ): Promise<string>
   getReceivedFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
-  streamOnlineFriends(userAddress: string, onlinePeers: string[]): AsyncGenerator<Friend>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<Friend[]>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
@@ -232,15 +231,6 @@ export enum Action {
   ACCEPT = 'accept', // accept a friendship request
   REJECT = 'reject', // reject a friendship request
   DELETE = 'delete' // delete a friendship
-}
-
-// [to]: [from]
-export const FRIENDSHIP_ACTION_TRANSITIONS: Record<Action, (Action | null)[]> = {
-  [Action.REQUEST]: [Action.CANCEL, Action.REJECT, Action.DELETE, null],
-  [Action.ACCEPT]: [Action.REQUEST],
-  [Action.CANCEL]: [Action.REQUEST],
-  [Action.REJECT]: [Action.REQUEST],
-  [Action.DELETE]: [Action.ACCEPT]
 }
 
 export type FriendshipAction = {
