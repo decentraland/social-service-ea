@@ -11,10 +11,6 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     unique: ['address_requester', 'address_requested']
   })
 
-  pgm.createConstraint('friendships', 'address_requester_smaller_than_address_requested', {
-    check: 'address_requester < address_requested'
-  })
-
   // Lowercase indexes
   pgm.createIndex('friendships', 'LOWER(address_requester) text_pattern_ops', {
     name: 'friendships_address_requester_lower',
@@ -33,7 +29,6 @@ export async function down(pgm: MigrationBuilder): Promise<void> {
   pgm.dropIndex('friendships', 'friendships_address_requester')
   pgm.dropIndex('friendships', 'friendships_address_requested')
   pgm.dropConstraint('friendships', 'unique_addresses')
-  pgm.dropConstraint('friendships', 'address_requester_smaller_than_address_requested')
   pgm.dropIndex('friendships', 'friendships_address_requester_lower')
   pgm.dropIndex('friendships', 'friendships_address_requested_lower')
   pgm.dropIndex('friendship_actions', 'friendship_actions_friendship_id')

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { PoolClient } from 'pg'
 import { AppComponents, Friendship, FriendshipAction, FriendshipRequest, IDatabaseComponent, Friend } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
+import { normalizeAddress } from '../utils/address'
 
 export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>): IDatabaseComponent {
   const { pg, logs } = components
@@ -11,15 +12,16 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
   // TODO: abstract common statements in a util file
   function getFriendsBaseQuery(userAddress: string) {
+    const normalizedUserAddress = normalizeAddress(userAddress)
     return SQL`
       SELECT DISTINCT
         CASE
-          WHEN address_requester = ${userAddress} THEN address_requested
+          WHEN LOWER(address_requester) = ${normalizedUserAddress} THEN address_requested
           ELSE address_requester
         END as address,
         created_at
       FROM friendships
-      WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
+      WHERE (LOWER(address_requester) = ${normalizedUserAddress} OR LOWER(address_requested) = ${normalizedUserAddress})`
   }
 
   function getFriendshipRequestBaseQuery(userAddress: string, type: 'sent' | 'received'): SQLStatement {
@@ -28,8 +30,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       received: SQL` f.address_requester`
     }
     const filterMapping = {
-      sent: SQL`f.address_requester`,
-      received: SQL`f.address_requested`
+      sent: SQL`LOWER(f.address_requester)`,
+      received: SQL`LOWER(f.address_requested)`
     }
 
     const baseQuery = SQL`SELECT fa.id,`
@@ -42,7 +44,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       WHERE
     `)
 
-    baseQuery.append(filterMapping[type].append(SQL` = ${userAddress}`))
+    baseQuery.append(filterMapping[type].append(SQL` = ${normalizeAddress(userAddress)}`))
 
     baseQuery.append(SQL`
       AND fa.action = 'request'
@@ -74,7 +76,11 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return result.rows
     },
     async getFriendsCount(userAddress, { onlyActive } = { onlyActive: true }) {
-      const query: SQLStatement = SQL`SELECT COUNT(*) FROM friendships WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
+      const normalizedUserAddress = normalizeAddress(userAddress)
+      const query: SQLStatement = SQL`
+        SELECT COUNT(*)
+        FROM friendships
+        WHERE (LOWER(address_requester) = ${normalizedUserAddress} OR LOWER(address_requested) = ${normalizedUserAddress})`
 
       if (onlyActive) {
         query.append(SQL` AND is_active = true`)
@@ -85,11 +91,15 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async getMutualFriends(userAddress1, userAddress2, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }) {
       const { limit, offset } = pagination
+
+      const normalizedUserAddress1 = normalizeAddress(userAddress1)
+      const normalizedUserAddress2 = normalizeAddress(userAddress2)
+
       const result = await pg.query<Friend>(
         SQL`WITH friendsA as (
           SELECT
             CASE
-              WHEN address_requester = ${userAddress1} then address_requested
+              WHEN LOWER(address_requester) = ${normalizedUserAddress1} then address_requested
               else address_requester
             end as address
           FROM
@@ -98,9 +108,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
               FROM friendships f_a
               WHERE
                 (
-                  f_a.address_requester = ${userAddress1}
-                  or f_a.address_requested = ${userAddress1}
-                ) and f_a.is_active = true
+                  LOWER(f_a.address_requester) = ${normalizedUserAddress1} or LOWER(f_a.address_requested) = ${normalizedUserAddress1}
+                ) AND f_a.is_active = true
             ) as friends_a
         )
         SELECT
@@ -111,7 +120,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
           f_b.address IN (
             SELECT
               CASE
-                WHEN address_requester = ${userAddress2} then address_requested
+                WHEN LOWER(address_requester) = ${normalizedUserAddress2} then address_requested
                 else address_requester
               end as address_a
             FROM
@@ -122,9 +131,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
                   friendships f_b
                 WHERE
                   (
-                    f_b.address_requester = ${userAddress2}
-                    or f_b.address_requested = ${userAddress2}
-                  ) and f_b.is_active = true
+                    LOWER(f_b.address_requester) = ${normalizedUserAddress2}
+                    or LOWER(f_b.address_requested) = ${normalizedUserAddress2}
+                  ) AND f_b.is_active = true
               ) as friends_b
           )
           ORDER BY f_b.address
@@ -135,11 +144,14 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return result.rows
     },
     async getMutualFriendsCount(userAddress1, userAddress2) {
+      const normalizedUserAddress1 = normalizeAddress(userAddress1)
+      const normalizedUserAddress2 = normalizeAddress(userAddress2)
+
       const result = await pg.query<{ count: number }>(
         SQL`WITH friendsA as (
           SELECT
             CASE
-              WHEN address_requester = ${userAddress1} THEN address_requested
+              WHEN LOWER(address_requester) = ${normalizedUserAddress1} THEN address_requested
               ELSE address_requester
             END as address
           FROM
@@ -148,8 +160,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
               FROM friendships f_a
               WHERE
                 (
-                  f_a.address_requester = ${userAddress1}
-                  OR f_a.address_requested = ${userAddress1}
+                  LOWER(f_a.address_requester) = ${normalizedUserAddress1}
+                  OR LOWER(f_a.address_requested) = ${normalizedUserAddress1}
                 ) AND f_a.is_active = true
             ) as friends_a
         )
@@ -161,7 +173,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
           address IN (
             SELECT
               CASE
-                WHEN address_requester = ${userAddress2} THEN address_requested
+                WHEN address_requester = ${normalizedUserAddress2} THEN address_requested
                 ELSE address_requester
               END as address_a
             FROM
@@ -170,8 +182,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
                 FROM friendships f_b
                 WHERE
                   (
-                    f_b.address_requester = ${userAddress2}
-                    OR f_b.address_requested = ${userAddress2}
+                    f_b.address_requester = ${normalizedUserAddress2}
+                    OR f_b.address_requested = ${normalizedUserAddress2}
                   ) AND f_b.is_active = true
               ) as friends_b
           )`
@@ -180,10 +192,10 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return result.rows[0].count
     },
     async getFriendship(users) {
-      const [userAddress1, userAddress2] = users
+      const [userAddress1, userAddress2] = users.map(normalizeAddress)
       const query = SQL`
         SELECT * FROM friendships 
-          WHERE (address_requester, address_requested) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))
+          WHERE (LOWER(address_requester), LOWER(address_requested)) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))
       `
 
       const results = await pg.query<Friendship>(query)
@@ -199,13 +211,17 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return results.rows[0]
     },
     async getLastFriendshipActionByUsers(loggedUser: string, friendUser: string) {
+      const normalizedLoggedUser = normalizeAddress(loggedUser)
+      const normalizedFriendUser = normalizeAddress(friendUser)
+
       const query = SQL`
         SELECT fa.*
         FROM friendships f
         INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-        WHERE (f.address_requester, f.address_requested) IN ((${loggedUser}, ${friendUser}), (${friendUser}, ${loggedUser}))
+        WHERE (LOWER(f.address_requester), LOWER(f.address_requested)) IN ((${normalizedLoggedUser}, ${normalizedFriendUser}), (${normalizedFriendUser}, ${normalizedLoggedUser}))
         ORDER BY fa.timestamp DESC LIMIT 1
       `
+
       const results = await pg.query<FriendshipAction>(query)
 
       return results.rows[0]
@@ -216,7 +232,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       const query = SQL`
       INSERT INTO friendships (id, address_requester, address_requested, is_active)
-      VALUES (${uuid}, ${addressRequester}, ${addressRequested}, ${isActive})
+      VALUES (${uuid}, ${normalizeAddress(addressRequester)}, ${normalizeAddress(addressRequested)}, ${isActive})
       RETURNING id, created_at`
 
       const {
@@ -249,7 +265,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const uuid = randomUUID()
       const query = SQL`
         INSERT INTO friendship_actions (id, friendship_id, action, acting_user, metadata) 
-        VALUES (${uuid}, ${friendshipId}, ${action}, ${actingUser}, ${metadata})`
+        VALUES (${uuid}, ${friendshipId}, ${action}, ${normalizeAddress(actingUser)}, ${metadata})`
 
       if (txClient) {
         await txClient.query(query)
@@ -295,17 +311,20 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async getOnlineFriends(userAddress: string, onlinePotentialFriends: string[]) {
       if (onlinePotentialFriends.length === 0) return []
 
+      const normalizedUserAddress = normalizeAddress(userAddress)
+      const normalizedOnlinePotentialFriends = onlinePotentialFriends.map(normalizeAddress)
+
       const query: SQLStatement = SQL`
         SELECT DISTINCT
           CASE
-            WHEN address_requester = ${userAddress} THEN address_requested
+            WHEN LOWER(address_requester) = ${normalizedUserAddress} THEN address_requested
             ELSE address_requester
           END as address
         FROM friendships
         WHERE (
-          (address_requester = ${userAddress} AND address_requested IN (${onlinePotentialFriends}))
+          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) IN (${normalizedOnlinePotentialFriends}))
           OR
-          (address_requested = ${userAddress} AND address_requester IN (${onlinePotentialFriends}))
+          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) IN (${normalizedOnlinePotentialFriends}))
         )
         AND is_active = true`
 
