@@ -16,7 +16,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         CASE
           WHEN address_requester = ${userAddress} THEN address_requested
           ELSE address_requester
-        END as address
+        END as address,
+        created_at
       FROM friendships
       WHERE (address_requester = ${userAddress} OR address_requested = ${userAddress})`
   }
