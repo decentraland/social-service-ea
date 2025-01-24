@@ -1,4 +1,3 @@
-import { json } from 'stream/consumers'
 import { createArchipelagoStatsComponent } from '../../../src/adapters/archipelago-stats'
 import { IArchipelagoStatsComponent } from '../../../src/types'
 import { mockConfig, mockFetcher, mockLogs, mockRedis } from '../../mocks/components'

@@ -1,6 +1,6 @@
 import { createRpcServer } from '@dcl/rpc'
 import { registerService } from '@dcl/rpc/dist/codegen'
-import { AppComponents, IRPCServerComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../types'
+import { AppComponents, IRPCServerComponent, RpcServerContext } from '../../types'
 import { getFriendsService } from './services/get-friends'
 import { getMutualFriendsService } from './services/get-mutual-friends'
 import { getPendingFriendshipRequestsService } from './services/get-pending-friendship-requests'

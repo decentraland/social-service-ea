@@ -1,4 +1,4 @@
-import { WsUserData, WsNotAuthenticatedUserData } from '../../../src/types'
+import { WsUserData } from '../../../src/types'
 import { isNotAuthenticated } from '../../../src/utils/wsUserData'
 import { IUWebSocketEventMap } from '../../../src/utils/UWebSocketTransport'
 import { Emitter } from 'mitt'

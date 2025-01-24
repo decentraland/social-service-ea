@@ -1,6 +1,6 @@
 import { createDBComponent } from '../../../src/adapters/db'
 import { Action } from '../../../src/types'
-import SQL, { SQLStatement } from 'sql-template-strings'
+import SQL from 'sql-template-strings'
 import { mockLogs, mockPg } from '../../mocks/components'
 
 jest.mock('node:crypto', () => ({
