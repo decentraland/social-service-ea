@@ -29,20 +29,20 @@ jest.mock('../../../src/utils/timer', () => ({
   sleep: jest.fn()
 }))
 
-const LOAD_BALANCER_URL = 'http://catalyst-server.com'
+const CATALYST_CONTENT_LOAD_BALANCER_URL = 'http://catalyst-server.com/content'
 
 describe('Catalyst client', () => {
   let catalystClient: ICatalystClientComponent
   let contentClientMock: ContentClient
 
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValue(LOAD_BALANCER_URL)
+    mockConfig.requireString.mockResolvedValue(CATALYST_CONTENT_LOAD_BALANCER_URL)
 
     catalystClient = await createCatalystClient({
       fetcher: mockFetcher,
       config: mockConfig
     })
-    contentClientMock = createContentClient({ fetcher: mockFetcher, url: LOAD_BALANCER_URL })
+    contentClientMock = createContentClient({ fetcher: mockFetcher, url: CATALYST_CONTENT_LOAD_BALANCER_URL })
   })
 
   describe('getEntitiesByPointers', () => {
@@ -53,7 +53,7 @@ describe('Catalyst client', () => {
     beforeEach(() => {
       pointers = ['pointer1', 'pointer2']
       entities = [{ id: 'entity1' }, { id: 'entity2' }]
-      customContentServer = 'http://custom-content-server.com'
+      customContentServer = 'http://custom-content-server.com/content'
     })
 
     it('should fetch entities by pointers with retries and default values', async () => {
@@ -100,9 +100,9 @@ describe('Catalyst client', () => {
 
       await catalystClient.getEntitiesByPointers(pointers)
 
-      expectContentClientToHaveBeenCalledWithUrl(LOAD_BALANCER_URL)
-      expectContentClientToHaveBeenCalledWithUrl('http://catalyst-server-3.com')
-      expectContentClientToHaveBeenCalledWithUrl('http://catalyst-server-2.com')
+      expectContentClientToHaveBeenCalledWithUrl(CATALYST_CONTENT_LOAD_BALANCER_URL)
+      expectContentClientToHaveBeenCalledWithUrl('http://catalyst-server-3.com/content')
+      expectContentClientToHaveBeenCalledWithUrl('http://catalyst-server-2.com/content')
 
       expect(contentClientMock.fetchEntitiesByPointers).toHaveBeenCalledTimes(3)
     })
