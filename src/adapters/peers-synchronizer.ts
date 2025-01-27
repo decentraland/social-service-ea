@@ -19,7 +19,7 @@ export async function createPeersSynchronizerComponent({
     try {
       const currentPeers = await archipelagoStats.getPeers()
 
-      await redis.put(PEERS_CACHE_KEY, JSON.stringify(currentPeers), {
+      await redis.put(PEERS_CACHE_KEY, currentPeers, {
         EX: cacheTTLInSeconds
       })
 
