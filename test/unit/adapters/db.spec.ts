@@ -266,6 +266,14 @@ describe('db', () => {
       const result = await dbComponent.getReceivedFriendshipRequests('0x456', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(
+            'SELECT fa.id, f.address_requester as address, fa.timestamp, fa.metadata FROM friendships f INNER JOIN friendship_actions fa ON f.id = fa.friendship_id'
+          )
+        })
+      )
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('LOWER(f.address_requested) ='),
@@ -292,6 +300,13 @@ describe('db', () => {
       const result = await dbComponent.getSentFriendshipRequests('0x123', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(
+            'SELECT fa.id, f.address_requested as address, fa.timestamp, fa.metadata FROM friendships f INNER JOIN friendship_actions fa ON f.id = fa.friendship_id'
+          )
+        })
+      )
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('LOWER(f.address_requester) ='),
