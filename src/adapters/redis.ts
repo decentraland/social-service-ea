@@ -44,9 +44,11 @@ export async function createRedisComponent(
   async function get<T>(key: string): Promise<T | null> {
     try {
       const serializedValue = await client.get(key)
+
       if (serializedValue) {
         return JSON.parse(serializedValue) as T
       }
+
       return null
     } catch (err: any) {
       logger.error(`Error getting key "${key}"`, err)
