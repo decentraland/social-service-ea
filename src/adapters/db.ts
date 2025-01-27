@@ -30,21 +30,19 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       received: SQL` f.address_requester`
     }
     const filterMapping = {
-      sent: SQL`LOWER(f.address_requester)`,
-      received: SQL`LOWER(f.address_requested)`
+      sent: SQL` LOWER(f.address_requester)`,
+      received: SQL` LOWER(f.address_requested)`
     }
 
     const baseQuery = SQL`SELECT fa.id,`
     baseQuery.append(columnMapping[type])
-    baseQuery.append(SQL` as address`)
-    baseQuery.append(SQL`
-      fa.timestamp, fa.metadata
-      FROM friendships f
-      INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-      WHERE
-    `)
+    baseQuery.append(SQL` as address, fa.timestamp, fa.metadata`)
+    baseQuery.append(SQL` FROM friendships f`)
+    baseQuery.append(SQL` INNER JOIN friendship_actions fa ON f.id = fa.friendship_id`)
+    baseQuery.append(SQL` WHERE`)
 
-    baseQuery.append(filterMapping[type].append(SQL` = ${normalizeAddress(userAddress)}`))
+    baseQuery.append(filterMapping[type])
+    baseQuery.append(SQL` = ${normalizeAddress(userAddress)}`)
 
     baseQuery.append(SQL`
       AND fa.action = 'request'
