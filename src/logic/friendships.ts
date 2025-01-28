@@ -214,7 +214,7 @@ export function getFriendshipRequestStatus(
   friendshipAction: Pick<FriendshipAction, 'action' | 'acting_user'> | undefined,
   loggedUserAddress: string
 ): FriendshipRequestStatus {
-  if (!friendshipAction) return FriendshipRequestStatus.UNRECOGNIZED
+  if (!friendshipAction) return FriendshipRequestStatus.NONE
 
   const { action, acting_user } = friendshipAction
   const statusResolver = FRIENDSHIP_STATUS_BY_ACTION[action]

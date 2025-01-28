@@ -51,7 +51,7 @@ describe('getFriendshipStatusService', () => {
     })
   })
 
-  it('should return unrecognized if no friendship action is found', async () => {
+  it('should return none if no friendship action is found', async () => {
     mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(null)
 
     const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
@@ -61,7 +61,7 @@ describe('getFriendshipStatusService', () => {
       response: {
         $case: 'accepted',
         accepted: {
-          status: FriendshipStatus.UNRECOGNIZED
+          status: FriendshipStatus.NONE
         }
       }
     })

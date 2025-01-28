@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@dcl/platform-crypto-middleware": "^1.1.0",
-    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-12933824416.commit-ed8c3aa.tgz",
+    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-13021146556.commit-7327e37.tgz",
     "@dcl/rpc": "^1.1.2",
     "@dcl/schemas": "^15.6.0",
     "@well-known-components/env-config-provider": "^1.2.0",
