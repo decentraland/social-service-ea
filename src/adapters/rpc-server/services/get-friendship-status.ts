@@ -27,17 +27,6 @@ export function getFriendshipStatusService({ components: { logs, db } }: RPCServ
 
       const lastFriendshipAction = await db.getLastFriendshipActionByUsers(loggedUserAddress, userAddress)
 
-      if (!lastFriendshipAction) {
-        return {
-          response: {
-            $case: 'internalServerError',
-            internalServerError: {
-              message: 'No friendship found'
-            }
-          }
-        }
-      }
-
       return {
         response: {
           $case: 'accepted',
