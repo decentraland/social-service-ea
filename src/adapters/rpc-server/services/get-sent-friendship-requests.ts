@@ -4,6 +4,7 @@ import {
   PaginatedFriendshipRequestsResponse,
   GetFriendshipRequestsPayload
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { getPage } from '../../../utils/pagination'
 
 export async function getSentFriendshipRequestsService({
   components: { logs, db, catalystClient, config }
@@ -16,9 +17,13 @@ export async function getSentFriendshipRequestsService({
     context: RpcServerContext
   ): Promise<PaginatedFriendshipRequestsResponse> {
     try {
-      const sentRequests = await db.getSentFriendshipRequests(context.address, request.pagination)
-      const sentRequestsAddresses = sentRequests.map(({ address }) => address)
+      const { limit, offset } = request.pagination || {}
+      const [sentRequests, sentRequestsCount] = await Promise.all([
+        db.getSentFriendshipRequests(context.address, request.pagination),
+        db.getSentFriendshipRequestsCount(context.address)
+      ])
 
+      const sentRequestsAddresses = sentRequests.map(({ address }) => address)
       const sentRequestedProfiles = await catalystClient.getEntitiesByPointers(sentRequestsAddresses)
 
       const requests = parseFriendshipRequestsToFriendshipRequestResponses(
@@ -33,6 +38,10 @@ export async function getSentFriendshipRequestsService({
           requests: {
             requests
           }
+        },
+        paginationData: {
+          total: sentRequestsCount,
+          page: getPage(limit ?? sentRequestsCount, offset)
         }
       }
     } catch (error: any) {

@@ -30,6 +30,7 @@ describe('getSentFriendshipRequestsService', () => {
     const mockProfiles = mockSentRequests.map(({ address }) => createMockProfile(address))
 
     mockDb.getSentFriendshipRequests.mockResolvedValueOnce(mockSentRequests)
+    mockDb.getSentFriendshipRequestsCount.mockResolvedValueOnce(mockSentRequests.length)
     mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
 
     const result: PaginatedFriendshipRequestsResponse = await getSentRequests(emptyRequest, rpcContext)
@@ -43,12 +44,19 @@ describe('getSentFriendshipRequestsService', () => {
             createMockExpectedFriendshipRequest('id2', '0x789', mockProfiles[1], '2025-01-02T00:00:00Z')
           ]
         }
+      },
+      paginationData: {
+        total: mockSentRequests.length,
+        page: 1
       }
     })
   })
 
-  it('should handle database errors gracefully', async () => {
-    mockDb.getSentFriendshipRequests.mockImplementationOnce(() => {
+  it.each([
+    ['getSentFriendshipRequests', mockDb.getSentFriendshipRequests],
+    ['getSentFriendshipRequestsCount', mockDb.getSentFriendshipRequestsCount]
+  ])('should handle database errors in the %s method gracefully', async (_methodName, method) => {
+    method.mockImplementationOnce(() => {
       throw new Error('Database error')
     })
 
@@ -67,6 +75,7 @@ describe('getSentFriendshipRequestsService', () => {
     const mockProfiles = mockSentRequests.map(({ address }) => createMockProfile(address))
 
     mockDb.getSentFriendshipRequests.mockResolvedValueOnce(mockSentRequests)
+    mockDb.getSentFriendshipRequestsCount.mockResolvedValueOnce(mockSentRequests.length)
     mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
 
     const result: PaginatedFriendshipRequestsResponse = await getSentRequests(emptyRequest, rpcContext)
@@ -77,6 +86,10 @@ describe('getSentFriendshipRequestsService', () => {
         requests: {
           requests: [createMockExpectedFriendshipRequest('id1', '0x456', mockProfiles[0], '2025-01-01T00:00:00Z')]
         }
+      },
+      paginationData: {
+        total: mockSentRequests.length,
+        page: 1
       }
     })
   })

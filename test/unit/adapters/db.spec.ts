@@ -285,6 +285,17 @@ describe('db', () => {
     })
   })
 
+  describe('getReceivedFriendshipRequestsCount', () => {
+    it('should return the count of received friendship requests', async () => {
+      const mockCount = 5
+      mockPg.query.mockResolvedValueOnce({ rows: [{ count: mockCount }], rowCount: 1 })
+
+      const result = await dbComponent.getReceivedFriendshipRequestsCount('0x456')
+
+      expect(result).toBe(mockCount)
+    })
+  })
+
   describe('getSentFriendshipRequests', () => {
     it('should retrieve sent friendship requests', async () => {
       const mockRequests = [
@@ -314,6 +325,17 @@ describe('db', () => {
         })
       )
       expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(10, 5)
+    })
+  })
+
+  describe('getSentFriendshipRequestsCount', () => {
+    it('should return the count of sent friendship requests', async () => {
+      const mockCount = 5
+      mockPg.query.mockResolvedValueOnce({ rows: [{ count: mockCount }], rowCount: 1 })
+
+      const result = await dbComponent.getSentFriendshipRequestsCount('0x123')
+
+      expect(result).toBe(mockCount)
     })
   })
 
@@ -426,8 +448,7 @@ describe('db', () => {
   })
 
   // Helpers
-
-  function expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(limit, offset) {
+  function expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(limit: number, offset: number) {
     expect(mockPg.query).toHaveBeenCalledWith(
       expect.objectContaining({
         text: expect.stringContaining('LIMIT'),
