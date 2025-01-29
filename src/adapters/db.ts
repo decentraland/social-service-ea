@@ -73,15 +73,18 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         FROM friendship_actions fa2
         WHERE fa2.friendship_id = fa.friendship_id
       )
-      ORDER BY fa.timestamp DESC
     `)
 
-    if (limit) {
-      baseQuery.append(SQL` LIMIT ${limit}`)
-    }
+    if (!onlyCount) {
+      baseQuery.append(SQL` ORDER BY fa.timestamp DESC`)
 
-    if (offset) {
-      baseQuery.append(SQL` OFFSET ${offset}`)
+      if (limit) {
+        baseQuery.append(SQL` LIMIT ${limit}`)
+      }
+
+      if (offset) {
+        baseQuery.append(SQL` OFFSET ${offset}`)
+      }
     }
 
     return baseQuery
