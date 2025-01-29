@@ -98,7 +98,9 @@ export interface IDatabaseComponent {
     txClient?: PoolClient
   ): Promise<string>
   getReceivedFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
+  getReceivedFriendshipRequestsCount(userAddress: string): Promise<number>
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
+  getSentFriendshipRequestsCount(userAddress: string): Promise<number>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<Friend[]>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }

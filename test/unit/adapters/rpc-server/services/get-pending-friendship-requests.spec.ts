@@ -30,6 +30,7 @@ describe('getPendingFriendshipRequestsService', () => {
     const mockProfiles = mockPendingRequests.map(({ address }) => createMockProfile(address))
 
     mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
+    mockDb.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
     mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
     const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
 
@@ -42,12 +43,19 @@ describe('getPendingFriendshipRequestsService', () => {
             createMockExpectedFriendshipRequest('id2', '0x789', mockProfiles[1], '2025-01-02T00:00:00Z')
           ]
         }
+      },
+      paginationData: {
+        total: mockPendingRequests.length,
+        page: 1
       }
     })
   })
 
-  it('should handle database errors gracefully', async () => {
-    mockDb.getReceivedFriendshipRequests.mockImplementationOnce(() => {
+  it.each([
+    ['getReceivedFriendshipRequests', mockDb.getReceivedFriendshipRequests],
+    ['getReceivedFriendshipRequestsCount', mockDb.getReceivedFriendshipRequestsCount]
+  ])('should handle database errors in the %s method gracefully', async (_methodName, method) => {
+    method.mockImplementationOnce(() => {
       throw new Error('Database error')
     })
 
@@ -66,6 +74,7 @@ describe('getPendingFriendshipRequestsService', () => {
     const mockProfiles = mockPendingRequests.map(({ address }) => createMockProfile(address))
 
     mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
+    mockDb.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
     mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
 
     const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
@@ -76,6 +85,10 @@ describe('getPendingFriendshipRequestsService', () => {
         requests: {
           requests: [createMockExpectedFriendshipRequest('id1', '0x456', mockProfiles[0], '2025-01-01T00:00:00Z', '')]
         }
+      },
+      paginationData: {
+        total: mockPendingRequests.length,
+        page: 1
       }
     })
   })

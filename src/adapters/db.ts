@@ -1,7 +1,15 @@
 import SQL, { SQLStatement } from 'sql-template-strings'
 import { randomUUID } from 'node:crypto'
 import { PoolClient } from 'pg'
-import { AppComponents, Friendship, FriendshipAction, FriendshipRequest, IDatabaseComponent, Friend } from '../types'
+import {
+  AppComponents,
+  Friendship,
+  FriendshipAction,
+  FriendshipRequest,
+  IDatabaseComponent,
+  Friend,
+  Pagination
+} from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
 
@@ -24,7 +32,13 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       WHERE (LOWER(address_requester) = ${normalizedUserAddress} OR LOWER(address_requested) = ${normalizedUserAddress})`
   }
 
-  function getFriendshipRequestBaseQuery(userAddress: string, type: 'sent' | 'received'): SQLStatement {
+  function getFriendshipRequestBaseQuery(
+    userAddress: string,
+    type: 'sent' | 'received',
+    { onlyCount, pagination }: { onlyCount?: boolean; pagination?: Pagination } = { onlyCount: false }
+  ): SQLStatement {
+    const { limit, offset } = pagination || {}
+
     const columnMapping = {
       sent: SQL` f.address_requested`,
       received: SQL` f.address_requester`
@@ -34,9 +48,16 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       received: SQL` LOWER(f.address_requested)`
     }
 
-    const baseQuery = SQL`SELECT fa.id,`
-    baseQuery.append(columnMapping[type])
-    baseQuery.append(SQL` as address, fa.timestamp, fa.metadata`)
+    const baseQuery = SQL`SELECT`
+
+    if (onlyCount) {
+      baseQuery.append(SQL` DISTINCT COUNT(1) as count`)
+    } else {
+      baseQuery.append(SQL` fa.id,`)
+      baseQuery.append(columnMapping[type])
+      baseQuery.append(SQL` as address, fa.timestamp, fa.metadata`)
+    }
+
     baseQuery.append(SQL` FROM friendships f`)
     baseQuery.append(SQL` INNER JOIN friendship_actions fa ON f.id = fa.friendship_id`)
     baseQuery.append(SQL` WHERE`)
@@ -54,6 +75,14 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       )
       ORDER BY fa.timestamp DESC
     `)
+
+    if (limit) {
+      baseQuery.append(SQL` LIMIT ${limit}`)
+    }
+
+    if (offset) {
+      baseQuery.append(SQL` OFFSET ${offset}`)
+    }
 
     return baseQuery
   }
@@ -274,37 +303,24 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return uuid
     },
     async getReceivedFriendshipRequests(userAddress, pagination) {
-      const { limit, offset } = pagination || {}
-
-      const query = getFriendshipRequestBaseQuery(userAddress, 'received')
-
-      if (limit) {
-        query.append(SQL` LIMIT ${limit}`)
-      }
-
-      if (offset) {
-        query.append(SQL` OFFSET ${offset}`)
-      }
-
+      const query = getFriendshipRequestBaseQuery(userAddress, 'received', { pagination })
       const results = await pg.query<FriendshipRequest>(query)
-
       return results.rows
     },
+    async getReceivedFriendshipRequestsCount(userAddress) {
+      const query = getFriendshipRequestBaseQuery(userAddress, 'received', { onlyCount: true })
+      const results = await pg.query<{ count: number }>(query)
+      return results.rows[0].count
+    },
     async getSentFriendshipRequests(userAddress, pagination) {
-      const { limit, offset } = pagination || {}
-      const query = getFriendshipRequestBaseQuery(userAddress, 'sent')
-
-      if (limit) {
-        query.append(SQL` LIMIT ${limit}`)
-      }
-
-      if (offset) {
-        query.append(SQL` OFFSET ${offset}`)
-      }
-
+      const query = getFriendshipRequestBaseQuery(userAddress, 'sent', { pagination })
       const results = await pg.query<FriendshipRequest>(query)
-
       return results.rows
+    },
+    async getSentFriendshipRequestsCount(userAddress) {
+      const query = getFriendshipRequestBaseQuery(userAddress, 'sent', { onlyCount: true })
+      const results = await pg.query<{ count: number }>(query)
+      return results.rows[0].count
     },
     async getOnlineFriends(userAddress: string, onlinePotentialFriends: string[]) {
       if (onlinePotentialFriends.length === 0) return []

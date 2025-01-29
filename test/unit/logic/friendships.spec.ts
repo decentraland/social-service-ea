@@ -573,6 +573,10 @@ describe('getFriendshipRequestStatus()', () => {
     expect(getFriendshipRequestStatus({ ...friendshipAction, action }, '0x123')).toBe(expected)
   })
 
+  test('when the last action is undefined it should return none', () => {
+    expect(getFriendshipRequestStatus(undefined, '0x123')).toBe(FriendshipRequestStatus.NONE)
+  })
+
   test('when the last action is request and the acting user is the logged user it should return request sent', () => {
     expect(getFriendshipRequestStatus({ ...friendshipAction, action: Action.REQUEST }, '0x123')).toBe(
       FriendshipRequestStatus.REQUEST_SENT
