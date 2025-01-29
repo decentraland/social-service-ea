@@ -293,6 +293,11 @@ describe('db', () => {
       const result = await dbComponent.getReceivedFriendshipRequestsCount('0x456')
 
       expect(result).toBe(mockCount)
+      expect(mockPg.query).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('ORDER BY fa.timestamp DESC')
+        })
+      )
     })
   })
 
@@ -336,6 +341,11 @@ describe('db', () => {
       const result = await dbComponent.getSentFriendshipRequestsCount('0x123')
 
       expect(result).toBe(mockCount)
+      expect(mockPg.query).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('ORDER BY fa.timestamp DESC')
+        })
+      )
     })
   })
 
