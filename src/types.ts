@@ -18,7 +18,8 @@ import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { INatsComponent, Subscription } from '@well-known-components/nats-component/dist/types'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Entity } from '@dcl/schemas'
+import { Entity, FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
+import { PublishCommandOutput } from '@aws-sdk/client-sns'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -138,6 +139,10 @@ export type ICatalystClientRequestOptions = {
 export type ICatalystClientComponent = {
   getEntitiesByPointers(pointers: string[], options?: ICatalystClientRequestOptions): Promise<Entity[]>
   getEntityByPointer(pointer: string, options?: ICatalystClientRequestOptions): Promise<Entity>
+}
+
+export type IPublisherComponent = {
+  publishMessage(event: FriendshipRequestEvent | FriendshipAcceptedEvent): Promise<PublishCommandOutput>
 }
 
 // this type simplifies the typings of http handlers
