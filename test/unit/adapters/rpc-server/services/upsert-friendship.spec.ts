@@ -12,6 +12,7 @@ import {
 } from '../../../../../src/logic/friendships'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
 import { mockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
+import { mockSns } from '../../../../mocks/components/sns'
 
 jest.mock('../../../../../src/logic/friendships')
 
@@ -61,7 +62,8 @@ describe('upsertFriendshipService', () => {
         logs: mockLogs,
         pubsub: mockPubSub,
         config: mockConfig,
-        catalystClient: mockCatalystClient
+        catalystClient: mockCatalystClient,
+        sns: mockSns
       }
     })
     mockDb.executeTx.mockImplementation(async (cb) => await cb({} as any))

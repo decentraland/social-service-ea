@@ -42,6 +42,7 @@ export type BaseComponents = {
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
   catalystClient: ICatalystClientComponent
+  sns: IPublisherComponent
 }
 
 // components used in runtime

@@ -20,10 +20,11 @@ export async function createRpcServerComponent({
   config,
   server,
   archipelagoStats,
-  catalystClient
+  catalystClient,
+  sns
 }: Pick<
   AppComponents,
-  'logs' | 'db' | 'pubsub' | 'config' | 'server' | 'nats' | 'archipelagoStats' | 'redis' | 'catalystClient'
+  'logs' | 'db' | 'pubsub' | 'config' | 'server' | 'nats' | 'archipelagoStats' | 'redis' | 'catalystClient' | 'sns'
 >): Promise<IRPCServerComponent> {
   // TODO: this should be a redis if we want to have more than one instance of the server
   const SHARED_CONTEXT: Pick<RpcServerContext, 'subscribers'> = {
@@ -46,7 +47,9 @@ export async function createRpcServerComponent({
   const getSentFriendshipRequests = await getSentFriendshipRequestsService({
     components: { logs, db, catalystClient, config }
   })
-  const upsertFriendship = await upsertFriendshipService({ components: { logs, db, pubsub, config, catalystClient } })
+  const upsertFriendship = await upsertFriendshipService({
+    components: { logs, db, pubsub, config, catalystClient, sns }
+  })
   const getFriendshipStatus = getFriendshipStatusService({ components: { logs, db } })
   const subscribeToFriendshipUpdates = await subscribeToFriendshipUpdatesService({
     components: { logs, config, catalystClient }

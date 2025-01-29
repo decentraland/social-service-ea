@@ -12,8 +12,8 @@ import {
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
 
 export async function upsertFriendshipService({
-  components: { logs, db, pubsub, config, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'pubsub' | 'config' | 'catalystClient'>) {
+  components: { logs, db, pubsub, config, catalystClient, sns }
+}: RPCServiceContext<'logs' | 'db' | 'pubsub' | 'config' | 'catalystClient' | 'sns'>) {
   const logger = logs.getLogger('upsert-friendship-service')
   const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
