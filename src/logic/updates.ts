@@ -20,6 +20,7 @@ interface SubscriptionHandlerParams<T, U> {
     catalystClient: ICatalystClientComponent
   }
   getAddressFromUpdate: (update: U) => string
+  shouldHandleUpdate: (update: U) => boolean
   parser: UpdateParser<T, U>
   parseArgs: any[]
 }
@@ -65,6 +66,7 @@ export async function* handleSubscriptionUpdates<T, U>({
   eventName,
   components: { catalystClient, logger },
   getAddressFromUpdate,
+  shouldHandleUpdate,
   parser,
   parseArgs
 }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
@@ -79,6 +81,11 @@ export async function* handleSubscriptionUpdates<T, U>({
   for await (const update of updatesGenerator) {
     const eventNameString = String(eventName)
     logger.debug(`${eventNameString} received:`, { update: JSON.stringify(update) })
+
+    if (!shouldHandleUpdate(update as U)) {
+      logger.debug(`Skipping update ${eventNameString} for ${rpcContext.address}`, { update: JSON.stringify(update) })
+      continue
+    }
 
     const profile = await catalystClient.getEntityByPointer(getAddressFromUpdate(update as U))
     const parsedUpdate = await parser(update as U, profile, ...parseArgs)

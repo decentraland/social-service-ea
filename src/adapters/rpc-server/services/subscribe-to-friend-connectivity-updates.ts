@@ -35,6 +35,8 @@ export async function subscribeToFriendConnectivityUpdatesService({
           logger
         },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) => update.address,
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) =>
+          update.address !== context.address,
         parser: parseEmittedUpdateToFriendConnectivityUpdate,
         parseArgs: [profileImagesUrl]
       })

@@ -171,7 +171,8 @@ describe('updates handlers', () => {
           catalystClient: mockCatalystClient,
           logger
         },
-        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
         parser,
         parseArgs: [PROFILE_IMAGES_URL]
       })
@@ -202,7 +203,8 @@ describe('updates handlers', () => {
           catalystClient: mockCatalystClient,
           logger
         },
-        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
         parser,
         parseArgs: [PROFILE_IMAGES_URL]
       })
@@ -230,7 +232,8 @@ describe('updates handlers', () => {
           catalystClient: mockCatalystClient,
           logger
         },
-        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
         parser,
         parseArgs: [PROFILE_IMAGES_URL]
       })
@@ -251,7 +254,8 @@ describe('updates handlers', () => {
           catalystClient: mockCatalystClient,
           logger
         },
-        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
         parser,
         parseArgs: [PROFILE_IMAGES_URL]
       })
@@ -272,7 +276,8 @@ describe('updates handlers', () => {
         rpcContext,
         eventName: 'friendshipUpdate',
         components: { catalystClient: mockCatalystClient, logger },
-        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
         parser,
         parseArgs: [PROFILE_IMAGES_URL]
       })
@@ -283,6 +288,29 @@ describe('updates handlers', () => {
       await sleep(100) // could be flaky
 
       expect(logger.error).toHaveBeenCalledWith('Unable to parse friendshipUpdate:', {
+        update: JSON.stringify(friendshipUpdate)
+      })
+    })
+
+    it('should skip update if shouldHandleUpdate returns false', async () => {
+      parser.mockResolvedValueOnce({ parsed: true })
+
+      const generator = handleSubscriptionUpdates({
+        rpcContext,
+        eventName: 'friendshipUpdate',
+        components: { catalystClient: mockCatalystClient, logger },
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+        shouldHandleUpdate: () => false,
+        parser,
+        parseArgs: [PROFILE_IMAGES_URL]
+      })
+
+      const resultPromise = generator.next()
+      rpcContext.subscribers['0x123'].emit('friendshipUpdate', friendshipUpdate)
+
+      await sleep(100) // could be flaky
+
+      expect(logger.debug).toHaveBeenCalledWith('Skipping update friendshipUpdate for 0x123', {
         update: JSON.stringify(friendshipUpdate)
       })
     })
