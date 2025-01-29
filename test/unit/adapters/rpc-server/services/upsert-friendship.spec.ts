@@ -30,10 +30,22 @@ describe('upsertFriendshipService', () => {
     }
   }
 
+  const mockAccept: UpsertFriendshipPayload = {
+    action: {
+      $case: 'accept',
+      accept: { user: { address: userAddress } }
+    }
+  }
+
   const mockParsedRequest: ParsedUpsertFriendshipRequest = {
     action: Action.REQUEST,
     user: userAddress,
     metadata: { message }
+  }
+
+  const mockParsedAccept: ParsedUpsertFriendshipRequest = {
+    action: Action.ACCEPT,
+    user: userAddress
   }
 
   const existingFriendship = {
@@ -183,6 +195,7 @@ describe('upsertFriendshipService', () => {
       created_at: new Date(existingFriendship.created_at)
     })
     mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
+    mockCatalystClient.getEntityByPointer.mockResolvedValueOnce(mockProfile)
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
@@ -195,6 +208,26 @@ describe('upsertFriendshipService', () => {
       metadata: mockParsedRequest.metadata
     })
     expect(result.response.$case).toBe('accepted')
+  })
+
+  it.each([
+    [Action.REQUEST, mockRequest, mockParsedRequest],
+    [Action.ACCEPT, mockAccept, mockParsedAccept]
+  ])('should send a notification after a successful friendship %s', async (_action, requestPayload, parsedAccept) => {
+    jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(parsedAccept)
+    jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
+    jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
+
+    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockDb.updateFriendshipStatus.mockResolvedValueOnce({
+      id: existingFriendship.id,
+      created_at: new Date(existingFriendship.created_at)
+    })
+    mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
+    mockCatalystClient.getEntityByPointer.mockResolvedValueOnce(mockProfile)
+    await upsertFriendship(requestPayload, rpcContext)
+
+    expect(mockSns.publishMessage).toHaveBeenCalled()
   })
 
   it('should handle errors gracefully', async () => {

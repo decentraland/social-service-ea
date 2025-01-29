@@ -10,6 +10,7 @@ import {
   parseFriendshipRequestToFriendshipRequestResponse
 } from '../../../logic/friendships'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
+import { sendNotification, shouldNotify } from '../../../logic/notifications'
 
 export async function upsertFriendshipService({
   components: { logs, db, pubsub, config, catalystClient, sns }
@@ -53,6 +54,9 @@ export async function upsertFriendshipService({
 
       logger.debug('friendship status > ', { isActive: JSON.stringify(isActive), friendshipStatus })
 
+      const metadata =
+        parsedRequest.action === Action.REQUEST && parsedRequest.metadata ? parsedRequest.metadata : undefined
+
       const { id, actionId, createdAt } = await db.executeTx(async (tx) => {
         let id: string, createdAt: Date
 
@@ -83,9 +87,6 @@ export async function upsertFriendshipService({
 
       logger.debug(`${id} friendship was upsert successfully`)
 
-      const metadata =
-        parsedRequest.action === Action.REQUEST && parsedRequest.metadata ? parsedRequest.metadata : undefined
-
       const [_, profile] = await Promise.all([
         await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
           id: actionId,
@@ -103,6 +104,21 @@ export async function upsertFriendshipService({
         timestamp: createdAt.toString(),
         metadata: metadata || null
       }
+
+      if (shouldNotify(parsedRequest.action)) {
+        await sendNotification(
+          parsedRequest.action,
+          {
+            senderAddress: context.address,
+            receiverAddress: parsedRequest.user!,
+            profile,
+            profileImagesUrl,
+            message: metadata?.message
+          },
+          { sns, logs }
+        )
+      }
+
       return {
         response: {
           $case: 'accepted',
