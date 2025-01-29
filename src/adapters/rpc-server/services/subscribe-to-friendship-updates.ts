@@ -18,8 +18,10 @@ export async function subscribeToFriendshipUpdatesService({
         logger,
         catalystClient
       },
-      getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
+      getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
       parser: parseEmittedUpdateToFriendshipUpdate,
+      shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) =>
+        update.from !== context.address && update.to === context.address,
       parseArgs: [profileImagesUrl]
     })
   }
