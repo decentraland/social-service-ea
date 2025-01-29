@@ -13,6 +13,7 @@ import {
   mockUWs
 } from '../../mocks/components'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import { mockSns } from '../../mocks/components/sns'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -44,7 +45,8 @@ describe('createRpcServerComponent', () => {
       nats: mockNats,
       archipelagoStats: mockArchipelagoStats,
       redis: mockRedis,
-      catalystClient: mockCatalystClient
+      catalystClient: mockCatalystClient,
+      sns: mockSns
     })
   })
 
