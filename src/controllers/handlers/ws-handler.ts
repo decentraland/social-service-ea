@@ -213,8 +213,9 @@ export async function registerWsHandler(
         clearTimeout(data.reconnectTimeout)
 
         metrics.increment('ws_connections', { address: data.address })
-      } else {
+      } else if (isNotAuthenticated(data)) {
         clearTimeout(data.timeout)
+        data.timeout = undefined
         metrics.increment('ws_connections')
       }
 

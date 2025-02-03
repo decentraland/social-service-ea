@@ -65,7 +65,6 @@ export function UWebSocketTransport<T extends { isConnected: boolean }>(
     isTransportActive = false
     uServerEmitter.off('message', handleMessage)
     uServerEmitter.off('close', handleClose)
-    events.all.clear()
   }
 
   function handleClose() {
