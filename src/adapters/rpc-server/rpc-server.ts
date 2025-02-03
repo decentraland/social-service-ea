@@ -90,6 +90,13 @@ export async function createRpcServerComponent({
         }
       })
       rpcServer.attachTransport(transport, { subscribers: SHARED_CONTEXT.subscribers, address })
+    },
+    detachUser(address) {
+      if (SHARED_CONTEXT.subscribers[address]) {
+        SHARED_CONTEXT.subscribers[address].all.clear()
+        delete SHARED_CONTEXT.subscribers[address]
+        logger.debug('Detached user and cleaned up subscribers', { address })
+      }
     }
   }
 }

@@ -1,18 +1,12 @@
 import mitt from 'mitt'
 import { onRequestEnd, onRequestStart } from '@well-known-components/uws-http-server'
 import { verify } from '@dcl/platform-crypto-middleware'
-import { AppComponents, WsAuthenticatedUserData, WsUserData } from '../../types'
+import { AppComponents, WsUserData } from '../../types'
 import { normalizeAddress } from '../../utils/address'
 import { IUWebSocketEventMap, UWebSocketTransport } from '../../utils/UWebSocketTransport'
 import { isNotAuthenticated } from '../../utils/wsUserData'
 
 const textDecoder = new TextDecoder()
-
-export const CONNECTION_TIMEOUT_MS = 30000
-export const HEARTBEAT_INTERVAL_MS = 30000
-export const HEARTBEAT_TIMEOUT_MS = 30000
-export const RECONNECT_INTERVAL_MS = 1000
-export const MAX_RECONNECT_ATTEMPTS = 5
 
 export async function registerWsHandler(
   components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer'>
@@ -22,77 +16,6 @@ export async function registerWsHandler(
 
   function changeStage(data: WsUserData, newData: WsUserData) {
     Object.assign(data, newData)
-  }
-
-  function setupHeartbeat(ws: any, data: WsAuthenticatedUserData) {
-    if (data.heartbeatInterval) {
-      clearInterval(data.heartbeatInterval)
-    }
-
-    data.heartbeatInterval = setInterval(async () => {
-      if (!data.isConnected) {
-        clearInterval(data.heartbeatInterval)
-        return
-      }
-
-      if (data.lastHeartbeat && Date.now() - data.lastHeartbeat > HEARTBEAT_TIMEOUT_MS) {
-        logger.warn('Heartbeat timeout', { address: data.address })
-        metrics.increment('ws_heartbeats_missed', { address: data.address })
-
-        data.isConnected = false
-        startReconnection(ws, data)
-        return
-      }
-
-      try {
-        ws.send(JSON.stringify({ type: 'heartbeat' }))
-      } catch (error: any) {
-        logger.error('Error sending heartbeat', { error, address: data.address })
-        metrics.increment('ws_errors', { address: data.address })
-      }
-    }, HEARTBEAT_INTERVAL_MS)
-  }
-
-  function startReconnection(ws: any, data: WsAuthenticatedUserData) {
-    if (data.reconnectTimeout) {
-      clearTimeout(data.reconnectTimeout)
-    }
-
-    data.reconnectAttempts = 0
-    attemptReconnection(ws, data)
-  }
-
-  function attemptReconnection(ws: any, data: WsAuthenticatedUserData) {
-    if (data.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      logger.error('Max reconnection attempts reached', { address: data.address })
-      ws.close()
-      return
-    }
-
-    try {
-      data.eventEmitter.all.clear()
-
-      const transport = UWebSocketTransport(ws, data.eventEmitter)
-
-      rpcServer.attachUser({ transport, address: data.address })
-
-      data.reconnectAttempts = 0
-      data.lastHeartbeat = Date.now()
-      data.isConnected = true
-
-      setupHeartbeat(ws, data)
-
-      logger.info('Successfully reconnected', { address: data.address })
-    } catch (error: any) {
-      logger.error('Reconnection failed', { error, address: data.address })
-      metrics.increment('ws_errors', { address: data.address })
-
-      data.reconnectAttempts++
-
-      data.reconnectTimeout = setTimeout(() => {
-        attemptReconnection(ws, data)
-      }, RECONNECT_INTERVAL_MS)
-    }
   }
 
   server.app.ws<WsUserData>('/', {
@@ -115,19 +38,6 @@ export async function registerWsHandler(
     open: (ws) => {
       const data = ws.getUserData()
       metrics.increment('ws_connections')
-
-      if (isNotAuthenticated(data)) {
-        data.timeout = setTimeout(() => {
-          try {
-            logger.error('Closing connection, no auth chain received')
-            ws.end()
-          } catch (error: any) {
-            logger.error('Error closing connection, no auth chain received', error)
-            metrics.increment('ws_errors')
-          }
-        }, CONNECTION_TIMEOUT_MS)
-      }
-
       data.isConnected = true
     },
     message: async (ws, message) => {
@@ -135,11 +45,6 @@ export async function registerWsHandler(
       metrics.increment('ws_messages_received')
 
       if (data.auth) {
-        if (message.toString() === 'heartbeat') {
-          data.lastHeartbeat = Date.now()
-          return
-        }
-
         try {
           if (!data.isConnected) {
             logger.warn('Received message but connection is marked as disconnected', { address: data.address })
@@ -177,24 +82,16 @@ export async function registerWsHandler(
             auth: true,
             address,
             eventEmitter,
-            isConnected: true,
-            lastHeartbeat: Date.now(),
-            heartbeatInterval: undefined,
-            reconnectAttempts: 0,
-            reconnectTimeout: undefined
+            isConnected: true
           })
 
           const transport = UWebSocketTransport(ws, eventEmitter)
 
           rpcServer.attachUser({ transport, address })
 
-          if (data.auth) {
-            setupHeartbeat(ws, data)
-          }
-
           transport.on('error', (err) => {
             if (err && err.message) {
-              logger.error(err)
+              logger.error(`Error on transport: ${err.message}`)
             }
           })
         } catch (error: any) {
@@ -208,10 +105,11 @@ export async function registerWsHandler(
       const data = ws.getUserData()
 
       if (data.auth) {
+        if (data.address) {
+          rpcServer.detachUser(data.address)
+        }
         data.eventEmitter.emit('close', code)
-        clearInterval(data.heartbeatInterval)
-        clearTimeout(data.reconnectTimeout)
-
+        data.eventEmitter.all.clear()
         metrics.increment('ws_connections', { address: data.address })
       } else if (isNotAuthenticated(data)) {
         clearTimeout(data.timeout)
