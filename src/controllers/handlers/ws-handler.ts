@@ -8,11 +8,11 @@ import { isNotAuthenticated } from '../../utils/wsUserData'
 
 const textDecoder = new TextDecoder()
 
-const CONNECTION_TIMEOUT_MS = 30000
-const HEARTBEAT_INTERVAL_MS = 30000
-const HEARTBEAT_TIMEOUT_MS = 5000
-const RECONNECT_INTERVAL_MS = 1000
-const MAX_RECONNECT_ATTEMPTS = 5
+export const CONNECTION_TIMEOUT_MS = 30000
+export const HEARTBEAT_INTERVAL_MS = 30000
+export const HEARTBEAT_TIMEOUT_MS = 30000
+export const RECONNECT_INTERVAL_MS = 1000
+export const MAX_RECONNECT_ATTEMPTS = 5
 
 export async function registerWsHandler(
   components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer'>

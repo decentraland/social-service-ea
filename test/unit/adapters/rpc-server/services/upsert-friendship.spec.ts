@@ -94,6 +94,25 @@ describe('upsertFriendshipService', () => {
     })
   })
 
+  it('should return an invalidFriendshipAction when the user is trying to request a friendship to themselves', async () => {
+    jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockParsedRequest)
+    const mockRequestToMyself: UpsertFriendshipPayload = {
+      action: {
+        $case: 'request',
+        request: { user: { address: rpcContext.address }, message }
+      }
+    }
+
+    const result: UpsertFriendshipResponse = await upsertFriendship(mockRequestToMyself, rpcContext)
+
+    expect(result).toEqual({
+      response: {
+        $case: 'invalidFriendshipAction',
+        invalidFriendshipAction: {}
+      }
+    })
+  })
+
   it('should return invalidFriendshipAction for an invalid action', async () => {
     jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockParsedRequest)
     jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(false)
