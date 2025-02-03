@@ -32,61 +32,72 @@ export function UWebSocketTransport<T extends { isConnected: boolean }>(
   socket: IUWebSocket<T>,
   uServerEmitter: Emitter<IUWebSocketEventMap>
 ): Transport {
-  const queue: Uint8Array[] = []
+  let isTransportActive = true
 
-  function flush() {
-    for (const $ of queue) {
-      send($)
-      queue.length = 0
+  function send(msg: Uint8Array | ArrayBuffer | SharedArrayBuffer) {
+    if (!isTransportActive || !socket.getUserData().isConnected) {
+      events.emit('error', new Error('Transport is not active or socket is not connected'))
+      return
+    }
+
+    try {
+      socket.send(msg, true)
+    } catch (error: any) {
+      events.emit('error', new Error(`Failed to send message: ${error.message}`))
     }
   }
 
-  function send(msg: string | Uint8Array | ArrayBuffer | SharedArrayBuffer) {
-    if (msg instanceof Uint8Array || msg instanceof ArrayBuffer || msg instanceof SharedArrayBuffer) {
-      socket.send(msg, true)
+  function handleMessage(message: RecognizedString) {
+    if (!isTransportActive) return
+
+    if (message instanceof ArrayBuffer) {
+      try {
+        events.emit('message', new Uint8Array(message))
+      } catch (error: any) {
+        events.emit('error', new Error(`Failed to emit message: ${error.message}`))
+      }
     } else {
-      throw new Error(`WebSocketTransport only accepts Uint8Array`)
+      events.emit('error', new Error(`WebSocketTransport: Received unknown type of message, expecting Uint8Array`))
     }
+  }
+
+  function cleanup() {
+    isTransportActive = false
+    uServerEmitter.off('message', handleMessage)
+    uServerEmitter.off('close', handleClose)
+    events.all.clear()
+  }
+
+  function handleClose() {
+    cleanup()
+    events.emit('close', {})
   }
 
   const events = mitt<TransportEvents>()
 
-  uServerEmitter.on('close', () => {
-    events.emit('close', {})
-  })
+  uServerEmitter.on('close', handleClose)
+  uServerEmitter.on('message', handleMessage)
 
-  uServerEmitter.on('message', (message) => {
-    if (message instanceof ArrayBuffer) {
-      events.emit('message', new Uint8Array(message))
-    } else {
-      throw new Error(`WebSocketTransport: Received unknown type of message, expecting Uint8Array`)
+  setImmediate(() => {
+    if (socket.getUserData().isConnected) {
+      events.emit('connect', {})
     }
-  })
-
-  // socket already connected at this point
-  setImmediate(() => {
-    events.emit('connect', {})
-  })
-  setImmediate(() => {
-    flush()
   })
 
   const api: Transport = {
     ...events,
     get isConnected() {
-      return socket.getUserData().isConnected
+      return isTransportActive && socket.getUserData().isConnected
     },
     sendMessage(message: any) {
-      if (message instanceof Uint8Array) {
-        if (true) {
-          send(message)
-        } else {
-        }
-      } else {
-        throw new Error(`WebSocketTransport: Received unknown type of message, expecting Uint8Array`)
+      if (!(message instanceof Uint8Array)) {
+        events.emit('error', new Error(`WebSocketTransport: Received unknown type of message, expecting Uint8Array`))
+        return
       }
+      send(message)
     },
     close() {
+      cleanup()
       socket.close()
     }
   }

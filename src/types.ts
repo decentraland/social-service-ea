@@ -180,6 +180,10 @@ export type WsAuthenticatedUserData = {
   eventEmitter: Emitter<IUWebSocketEventMap>
   auth: true
   address: string
+  lastHeartbeat: number
+  heartbeatInterval?: NodeJS.Timeout
+  reconnectAttempts: number
+  reconnectTimeout?: NodeJS.Timeout
 }
 
 export type WsNotAuthenticatedUserData = {
