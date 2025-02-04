@@ -1,5 +1,5 @@
 import mitt, { Emitter } from 'mitt'
-import { UWebSocketTransport, IUWebSocket, IUWebSocketEventMap } from '../../../src/utils/UWebSocketTransport'
+import { createUWebSocketTransport, IUWebSocket, IUWebSocketEventMap } from '../../../src/utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
 
 describe('UWebSocketTransport', () => {
@@ -17,7 +17,7 @@ describe('UWebSocketTransport', () => {
     } as jest.Mocked<IUWebSocket<{ isConnected: boolean }>>
 
     mockEmitter = mitt<IUWebSocketEventMap>()
-    transport = UWebSocketTransport(mockSocket, mockEmitter)
+    transport = createUWebSocketTransport(mockSocket, mockEmitter)
     errorListener = jest.fn()
     transport.on('error', errorListener)
   })
@@ -44,7 +44,7 @@ describe('UWebSocketTransport', () => {
       mockSocket.getUserData.mockReturnValue({ isConnected: false })
       const connectListener = jest.fn()
 
-      const newTransport = UWebSocketTransport(mockSocket, mockEmitter)
+      const newTransport = createUWebSocketTransport(mockSocket, mockEmitter)
       newTransport.on('connect', connectListener)
 
       await new Promise(setImmediate)
@@ -187,6 +187,48 @@ describe('UWebSocketTransport', () => {
 
       expect(mockSocket.send).not.toHaveBeenCalled()
       expect(errorListener).toHaveBeenCalledWith(new Error('Transport is not active or socket is not connected'))
+    })
+  })
+
+  describe('Transport Configuration', () => {
+    it('should use default configuration when none provided', () => {
+      const transport = createUWebSocketTransport(mockSocket, mockEmitter)
+      expect(transport.isConnected).toBe(true)
+    })
+
+    it('should use provided configuration', () => {
+      const config = {
+        maxQueueSize: 500,
+        queueDrainTimeout: 2000
+      }
+      const transport = createUWebSocketTransport(mockSocket, mockEmitter, config)
+      expect(transport.isConnected).toBe(true)
+    })
+  })
+
+  describe('Message Queue', () => {
+    it('should queue messages when limit not reached', async () => {
+      const transport = createUWebSocketTransport(mockSocket, mockEmitter, {
+        maxQueueSize: 2,
+        queueDrainTimeout: 1000
+      })
+      const message = new Uint8Array([1, 2, 3])
+
+      await transport.sendMessage(message)
+      expect(mockSocket.send).toHaveBeenCalledWith(message, true)
+    })
+
+    it('should reject messages when queue is full', async () => {
+      const transport = createUWebSocketTransport(mockSocket, mockEmitter, {
+        maxQueueSize: 1,
+        queueDrainTimeout: 100
+      })
+
+      // mockSocket.send.mockImplementation(() => Promise.resolve(1)) // Return number as expected
+      const message = new Uint8Array([1, 2, 3])
+
+      await transport.sendMessage(message) // First message queued
+      await expect(transport.sendMessage(message)).rejects.toThrow('Queue drain timeout')
     })
   })
 })

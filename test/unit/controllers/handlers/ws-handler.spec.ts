@@ -12,6 +12,24 @@ describe('ws-handler', () => {
     detachUser: jest.fn()
   }
 
+  const mockConfig = {
+    getNumber: jest.fn().mockImplementation((key) => {
+      const configs = {
+        'ws.transport.maxQueueSize': 1000,
+        'ws.transport.queueDrainTimeout': 5000,
+        WS_IDLE_TIMEOUT: 90
+      }
+      return Promise.resolve(configs[key])
+    })
+  }
+
+  const mockWsPool = {
+    acquireConnection: jest.fn().mockResolvedValue(undefined),
+    releaseConnection: jest.fn(),
+    isConnectionAvailable: jest.fn(),
+    getActiveConnections: jest.fn()
+  }
+
   let wsHandlers: any
   let mockWs: any
   let mockData: WsUserData
@@ -22,7 +40,8 @@ describe('ws-handler', () => {
   beforeEach(async () => {
     mockData = {
       isConnected: false,
-      auth: false
+      auth: false,
+      clientId: 'test-client-id'
     } as WsNotAuthenticatedUserData
 
     mockWs = {
@@ -55,20 +74,24 @@ describe('ws-handler', () => {
       server: mockUWs,
       metrics: mockMetrics,
       fetcher: mockFetcher,
-      rpcServer: mockRpcServer
+      rpcServer: mockRpcServer,
+      config: mockConfig,
+      wsPool: mockWsPool
     })
 
     wsHandlers = (mockUWs.app.ws as jest.Mock).mock.calls[0][1]
   })
 
   describe('upgrade handler', () => {
-    it('should upgrade connection with correct parameters', () => {
-      wsHandlers.upgrade(mockRes, mockReq, mockContext)
+    it('should upgrade connection with correct parameters and acquire connection', async () => {
+      await wsHandlers.upgrade(mockRes, mockReq, mockContext)
 
+      expect(mockWsPool.acquireConnection).toHaveBeenCalledWith(expect.any(String))
       expect(mockRes.upgrade).toHaveBeenCalledWith(
         {
           isConnected: false,
-          auth: false
+          auth: false,
+          clientId: expect.any(String)
         },
         'test-key',
         'test-protocol',
@@ -80,6 +103,15 @@ describe('ws-handler', () => {
         handler: '/ws',
         method: 'GET'
       })
+    })
+
+    it('should handle connection acquisition failure', async () => {
+      mockWsPool.acquireConnection.mockRejectedValueOnce(new Error('Connection limit reached'))
+
+      await wsHandlers.upgrade(mockRes, mockReq, mockContext)
+
+      expect(mockRes.writeStatus).toHaveBeenCalledWith('503 Service Unavailable')
+      expect(mockRes.end).toHaveBeenCalled()
     })
   })
 
@@ -168,12 +200,13 @@ describe('ws-handler', () => {
   })
 
   describe('close handler', () => {
-    it('should cleanup authenticated connection and RPC resources', () => {
+    it('should cleanup authenticated connection, RPC resources and release connection', () => {
       const authData: WsAuthenticatedUserData = {
         isConnected: true,
         auth: true,
         address: '0x123',
-        eventEmitter: mitt()
+        eventEmitter: mitt(),
+        clientId: 'test-client-id'
       }
       mockWs.getUserData.mockReturnValue(authData)
 
@@ -181,14 +214,16 @@ describe('ws-handler', () => {
 
       expect(authData.isConnected).toBe(false)
       expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123')
+      expect(mockWsPool.releaseConnection).toHaveBeenCalledWith('test-client-id')
       expect(mockMetrics.increment).toHaveBeenCalledWith('ws_connections', { address: '0x123' })
     })
 
-    it('should cleanup non-authenticated connection', () => {
+    it('should cleanup non-authenticated connection and release connection', () => {
       const nonAuthData: WsNotAuthenticatedUserData = {
         isConnected: true,
         auth: false,
-        timeout: setTimeout(() => {}, 1000)
+        timeout: setTimeout(() => {}, 1000),
+        clientId: 'test-client-id'
       }
       mockWs.getUserData.mockReturnValue(nonAuthData)
 
@@ -196,6 +231,7 @@ describe('ws-handler', () => {
 
       expect(nonAuthData.isConnected).toBe(false)
       expect(nonAuthData.timeout).toBeUndefined()
+      expect(mockWsPool.releaseConnection).toHaveBeenCalledWith('test-client-id')
       expect(mockMetrics.increment).toHaveBeenCalledWith('ws_connections')
     })
   })
