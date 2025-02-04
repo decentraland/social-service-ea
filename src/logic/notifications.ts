@@ -99,6 +99,5 @@ export async function sendNotification(
       senderAddress: context.senderAddress,
       receiverAddress: context.receiverAddress
     })
-    throw error
   }
 }

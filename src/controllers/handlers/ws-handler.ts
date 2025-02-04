@@ -101,7 +101,7 @@ export async function registerWsHandler(
       }
     },
     close: (ws, code, _message) => {
-      logger.debug(`Websocket closed ${code}`)
+      logger.debug(`Websocket closed ${code}, ${_message}`)
       const data = ws.getUserData()
 
       if (data.auth) {

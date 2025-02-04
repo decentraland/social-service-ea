@@ -82,7 +82,6 @@ export function validateNewFriendshipAction(
   lastAction?: FriendshipAction
 ): boolean {
   if (!isFriendshipActionValid(lastAction?.action || null, newAction.action)) return false
-  console.log('isUserActionValid', actingUser, newAction, lastAction)
   return isUserActionValid(actingUser, newAction, lastAction)
 }
 

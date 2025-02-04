@@ -79,11 +79,21 @@ describe('Notifications', () => {
       })
     })
 
-    it('should handle notification errors', async () => {
+    it('should log notification errors', async () => {
       const error = new Error('SNS error')
       mockSns.publishMessage.mockRejectedValueOnce(error)
 
-      await expect(sendNotification(Action.REQUEST, mockContext, components)).rejects.toThrow(error)
+      await sendNotification(Action.REQUEST, mockContext, components)
+
+      expect(mockLogs.getLogger('notifications').error).toHaveBeenCalledWith(
+        `Error sending notification for action ${Action.REQUEST}`,
+        {
+          error: error.message,
+          action: Action.REQUEST,
+          senderAddress: '0x123',
+          receiverAddress: '0x456'
+        }
+      )
     })
   })
 })

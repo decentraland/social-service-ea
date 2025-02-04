@@ -97,7 +97,11 @@ export function UWebSocketTransport<T extends { isConnected: boolean }>(
     },
     close() {
       cleanup()
-      socket.close()
+      try {
+        socket.close()
+      } catch (error: any) {
+        // Ignore error socket already closed
+      }
     }
   }
 
