@@ -20,6 +20,7 @@ import { INatsComponent, Subscription } from '@well-known-components/nats-compon
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Entity, FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
+import { IWSPoolComponent } from './adapters/ws-pool-component'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -43,6 +44,7 @@ export type BaseComponents = {
   peerTracking: IPeerTrackingComponent
   catalystClient: ICatalystClientComponent
   sns: IPublisherComponent
+  wsPool: IWSPoolComponent
 }
 
 // components used in runtime
@@ -181,12 +183,14 @@ export type WsAuthenticatedUserData = {
   eventEmitter: Emitter<IUWebSocketEventMap>
   auth: true
   address: string
+  clientId: string
 }
 
 export type WsNotAuthenticatedUserData = {
   isConnected: boolean
   auth: false
   timeout?: NodeJS.Timeout
+  clientId: string
 }
 
 export type WsUserData = WsAuthenticatedUserData | WsNotAuthenticatedUserData

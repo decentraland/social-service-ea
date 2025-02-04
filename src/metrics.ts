@@ -11,6 +11,11 @@ export const metricDeclarations = {
     help: 'Number of WebSocket connections',
     labelNames: ['address']
   },
+  ws_active_connections: {
+    type: IMetricsComponent.GaugeType,
+    help: 'Number of WebSocket active connections',
+    labelNames: ['type']
+  },
   ws_messages_received: {
     type: IMetricsComponent.CounterType,
     help: 'Number of WebSocket messages received',
@@ -26,9 +31,14 @@ export const metricDeclarations = {
     help: 'Number of WebSocket errors',
     labelNames: ['address']
   },
-  ws_heartbeats_missed: {
+  ws_transport_errors: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket heartbeats missed',
+    help: 'Number of WebSocket transport errors',
+    labelNames: ['address']
+  },
+  ws_auth_errors: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of WebSocket authentication errors',
     labelNames: ['address']
   }
 }

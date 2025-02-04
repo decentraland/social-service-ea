@@ -1,5 +1,6 @@
 import { Transport, TransportEvents } from '@dcl/rpc'
 import mitt, { Emitter } from 'mitt'
+import { future, IFuture } from 'fp-future'
 
 export type RecognizedString =
   | string
@@ -28,27 +29,73 @@ export interface IUWebSocket<T extends { isConnected: boolean }> {
   getUserData(): T
 }
 
-export function UWebSocketTransport<T extends { isConnected: boolean }>(
+export type WebSocketTransportConfig = {
+  maxQueueSize?: number
+  queueDrainTimeout?: number
+}
+
+const DEFAULT_CONFIG: Required<WebSocketTransportConfig> = {
+  maxQueueSize: 1000,
+  queueDrainTimeout: 5000
+}
+
+export function createUWebSocketTransport<T extends { isConnected: boolean }>(
   socket: IUWebSocket<T>,
-  uServerEmitter: Emitter<IUWebSocketEventMap>
+  uServerEmitter: Emitter<IUWebSocketEventMap>,
+  config: WebSocketTransportConfig = {}
 ): Transport {
+  const { maxQueueSize, queueDrainTimeout } = { ...DEFAULT_CONFIG, ...config }
   let isTransportActive = true
+  const messageQueue: Array<{ message: Uint8Array; future: IFuture<void> }> = []
+  let isProcessing = false
+  let isInitialized = false
 
-  function send(msg: Uint8Array | ArrayBuffer | SharedArrayBuffer) {
-    if (!isTransportActive || !socket.getUserData().isConnected) {
-      events.emit('error', new Error('Transport is not active or socket is not connected'))
-      return
+  async function processQueue() {
+    if (isProcessing || !isTransportActive || !isInitialized) return
+    isProcessing = true
+
+    while (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
+      const item = messageQueue[0]
+      try {
+        socket.send(item.message, true)
+        item.future.resolve()
+        messageQueue.shift()
+      } catch (error: any) {
+        item.future.reject(new Error(`Failed to send message: ${error.message}`))
+        messageQueue.shift()
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0))
     }
 
-    try {
-      socket.send(msg, true)
-    } catch (error: any) {
-      events.emit('error', new Error(`Failed to send message: ${error.message}`))
+    isProcessing = false
+  }
+
+  async function send(msg: Uint8Array) {
+    if (!isTransportActive || !isInitialized || !socket.getUserData().isConnected) {
+      throw new Error('Transport is not ready or socket is not connected')
     }
+
+    if (messageQueue.length >= maxQueueSize) {
+      const drainFuture = future<void>()
+      const timeout = setTimeout(() => {
+        drainFuture.reject(new Error('Queue drain timeout'))
+      }, queueDrainTimeout)
+
+      try {
+        await drainFuture
+      } finally {
+        clearTimeout(timeout)
+      }
+    }
+
+    const messageFuture = future<void>()
+    messageQueue.push({ message: msg, future: messageFuture })
+    void processQueue()
+    return messageFuture
   }
 
   function handleMessage(message: RecognizedString) {
-    if (!isTransportActive) return
+    if (!isTransportActive || !isInitialized) return
 
     if (message instanceof ArrayBuffer) {
       try {
@@ -63,6 +110,7 @@ export function UWebSocketTransport<T extends { isConnected: boolean }>(
 
   function cleanup() {
     isTransportActive = false
+    isInitialized = false
     uServerEmitter.off('message', handleMessage)
     uServerEmitter.off('close', handleClose)
   }
@@ -74,26 +122,28 @@ export function UWebSocketTransport<T extends { isConnected: boolean }>(
 
   const events = mitt<TransportEvents>()
 
-  uServerEmitter.on('close', handleClose)
-  uServerEmitter.on('message', handleMessage)
-
+  // Wait for connection to be ready before initializing
   setImmediate(() => {
     if (socket.getUserData().isConnected) {
+      isInitialized = true
       events.emit('connect', {})
     }
   })
 
+  uServerEmitter.on('close', handleClose)
+  uServerEmitter.on('message', handleMessage)
+
   const api: Transport = {
     ...events,
     get isConnected() {
-      return isTransportActive && socket.getUserData().isConnected
+      return isTransportActive && isInitialized && socket.getUserData().isConnected
     },
     sendMessage(message: any) {
       if (!(message instanceof Uint8Array)) {
         events.emit('error', new Error(`WebSocketTransport: Received unknown type of message, expecting Uint8Array`))
         return
       }
-      send(message)
+      return send(message)
     },
     close() {
       cleanup()

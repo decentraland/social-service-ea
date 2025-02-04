@@ -1,6 +1,6 @@
-import { IMetricsComponent } from '@well-known-components/interfaces'
-import { future } from 'fp-future'
-import { WsUserData } from '../types'
+import { future, IFuture } from 'fp-future'
+import { Semaphore } from 'async-mutex'
+import { AppComponents } from '../types'
 
 export type IWSPoolComponent = {
   acquireConnection(id: string): Promise<void>
@@ -9,18 +9,13 @@ export type IWSPoolComponent = {
   getActiveConnections(): number
 }
 
-export type WSPoolConfig = {
-  maxConcurrentConnections: number
-  metrics: IMetricsComponent
-}
-
 export async function createWSPoolComponent({
   metrics,
   config
 }: Pick<AppComponents, 'metrics' | 'config'>): Promise<IWSPoolComponent> {
-  const activeConnections = new Map<string, future<void>>()
   const maxConcurrentConnections = (await config.getNumber('maxConcurrentConnections')) || 100
-  const semaphore = createSemaphore(maxConcurrentConnections)
+  const activeConnections = new Map<string, IFuture<void>>()
+  const semaphore = new Semaphore(maxConcurrentConnections)
 
   return {
     async acquireConnection(id: string) {
@@ -46,29 +41,6 @@ export async function createWSPoolComponent({
 
     getActiveConnections() {
       return activeConnections.size
-    }
-  }
-}
-
-function createSemaphore(max: number) {
-  let count = 0
-  const queue: future<void>[] = []
-
-  return {
-    async acquire() {
-      if (count >= max) {
-        const waiter = future<void>()
-        queue.push(waiter)
-        await waiter
-      }
-      count++
-    },
-    release() {
-      count--
-      const next = queue.shift()
-      if (next) {
-        next.resolve()
-      }
     }
   }
 }

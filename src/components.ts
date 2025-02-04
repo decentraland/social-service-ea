@@ -17,6 +17,7 @@ import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
 import { createSnsComponent } from './adapters/sns'
+import { createWSPoolComponent } from './adapters/ws-pool-component'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -24,6 +25,7 @@ export async function initComponents(): Promise<AppComponents> {
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ metrics })
 
+  const wsPool = await createWSPoolComponent({ metrics, config })
   const server = await createUWsComponent({ config, logs })
 
   const fetcher = createFetchComponent()
@@ -90,6 +92,7 @@ export async function initComponents(): Promise<AppComponents> {
     nats,
     peerTracking,
     catalystClient,
-    sns
+    sns,
+    wsPool
   }
 }

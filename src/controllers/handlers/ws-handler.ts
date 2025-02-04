@@ -3,42 +3,66 @@ import { onRequestEnd, onRequestStart } from '@well-known-components/uws-http-se
 import { verify } from '@dcl/platform-crypto-middleware'
 import { AppComponents, WsUserData } from '../../types'
 import { normalizeAddress } from '../../utils/address'
-import { IUWebSocketEventMap, UWebSocketTransport } from '../../utils/UWebSocketTransport'
+import {
+  IUWebSocketEventMap,
+  createUWebSocketTransport,
+  WebSocketTransportConfig
+} from '../../utils/UWebSocketTransport'
 import { isNotAuthenticated } from '../../utils/wsUserData'
+import { randomUUID } from 'crypto'
 
 const textDecoder = new TextDecoder()
 
 export async function registerWsHandler(
-  components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer'>
+  components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool'>
 ) {
-  const { logs, server, metrics, fetcher, rpcServer } = components
+  const { logs, server, metrics, fetcher, rpcServer, config, wsPool } = components
   const logger = logs.getLogger('ws-handler')
 
-  function changeStage(data: WsUserData, newData: WsUserData) {
-    Object.assign(data, newData)
+  // Get transport configuration from config component
+  const maxQueueSize = await config.getNumber('ws.transport.maxQueueSize')
+  const queueDrainTimeout = await config.getNumber('ws.transport.queueDrainTimeout')
+
+  const transportConfig: WebSocketTransportConfig = {
+    maxQueueSize,
+    queueDrainTimeout
+  }
+
+  function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
+    Object.assign(data, { ...data, ...newData })
   }
 
   server.app.ws<WsUserData>('/', {
-    idleTimeout: 0,
-    upgrade: (res, req, context) => {
+    idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT')) ?? 90, // In seconds
+    upgrade: async (res, req, context) => {
       logger.debug('upgrade requested')
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
-      res.upgrade(
-        {
-          isConnected: false,
-          auth: false
-        },
-        req.getHeader('sec-websocket-key'),
-        req.getHeader('sec-websocket-protocol'),
-        req.getHeader('sec-websocket-extensions'),
-        context
-      )
-      onRequestEnd(metrics, labels, 101, end)
+      const clientId = randomUUID()
+
+      try {
+        await wsPool.acquireConnection(clientId)
+        res.upgrade(
+          {
+            isConnected: false,
+            auth: false,
+            clientId
+          },
+          req.getHeader('sec-websocket-key'),
+          req.getHeader('sec-websocket-protocol'),
+          req.getHeader('sec-websocket-extensions'),
+          context
+        )
+        onRequestEnd(metrics, labels, 101, end)
+      } catch (error: any) {
+        logger.error('Failed to acquire connection', { error, clientId })
+        onRequestEnd(metrics, labels, 503, end)
+        res.writeStatus('503 Service Unavailable').end()
+      }
     },
     open: (ws) => {
       const data = ws.getUserData()
       metrics.increment('ws_connections')
-      data.isConnected = true
+      changeStage(data, { isConnected: true })
     },
     message: async (ws, message) => {
       const data = ws.getUserData()
@@ -69,7 +93,6 @@ export async function registerWsHandler(
 
         try {
           const authChainMessage = textDecoder.decode(message)
-
           const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
             fetcher
           })
@@ -78,31 +101,43 @@ export async function registerWsHandler(
           logger.debug('address > ', { address })
 
           const eventEmitter = mitt<IUWebSocketEventMap>()
-          changeStage(data, {
-            auth: true,
-            address,
-            eventEmitter,
-            isConnected: true
+
+          // Create transport first
+          const transport = createUWebSocketTransport(ws, eventEmitter, transportConfig)
+
+          // Wait for transport to be ready
+          await new Promise<void>((resolve) => {
+            transport.on('connect', () => {
+              changeStage(data, {
+                auth: true,
+                address,
+                eventEmitter,
+                isConnected: true
+              })
+
+              // Only attach user after transport is ready and state is updated
+              rpcServer.attachUser({ transport, address })
+              resolve()
+            })
           })
-
-          const transport = UWebSocketTransport(ws, eventEmitter)
-
-          rpcServer.attachUser({ transport, address })
 
           transport.on('error', (err) => {
             if (err && err.message) {
               logger.error(`Error on transport: ${err.message}`)
+              metrics.increment('ws_transport_errors', { address })
             }
           })
         } catch (error: any) {
           logger.error(`Error verifying auth chain: ${error.message}`)
+          metrics.increment('ws_auth_errors')
           ws.close()
         }
       }
     },
     close: (ws, code, _message) => {
-      logger.debug(`Websocket closed ${code}, ${_message}`)
+      logger.debug(`Websocket closed ${code}`)
       const data = ws.getUserData()
+      const { clientId } = data
 
       if (data.auth) {
         if (data.address) {
@@ -117,8 +152,15 @@ export async function registerWsHandler(
         metrics.increment('ws_connections')
       }
 
-      data.isConnected = false
-      changeStage(data, { auth: false, isConnected: false, timeout: undefined })
+      if (clientId) {
+        wsPool.releaseConnection(clientId)
+      }
+
+      changeStage(data, {
+        auth: false,
+        isConnected: false,
+        timeout: undefined
+      })
     }
   })
 }
