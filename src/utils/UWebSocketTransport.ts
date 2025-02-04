@@ -19,7 +19,7 @@ export type IUWebSocketEventMap = {
   message: RecognizedString
 }
 
-export interface IUWebSocket<T extends { isConnected: boolean }> {
+export interface IUWebSocket<T extends { isConnected: boolean; auth?: boolean }> {
   end(code?: number, shortMessage?: RecognizedString): void
 
   send(message: RecognizedString, isBinary?: boolean, compress?: boolean): number
@@ -39,35 +39,60 @@ const DEFAULT_CONFIG: Required<WebSocketTransportConfig> = {
   queueDrainTimeout: 5000
 }
 
-export function createUWebSocketTransport<T extends { isConnected: boolean }>(
+export function createUWebSocketTransport<T extends { isConnected: boolean; auth?: boolean }>(
   socket: IUWebSocket<T>,
   uServerEmitter: Emitter<IUWebSocketEventMap>,
   config: WebSocketTransportConfig = {}
 ): Transport {
   const { maxQueueSize, queueDrainTimeout } = { ...DEFAULT_CONFIG, ...config }
   let isTransportActive = true
+  let isInitialized = false
   const messageQueue: Array<{ message: Uint8Array; future: IFuture<void> }> = []
   let isProcessing = false
-  let isInitialized = false
+  let queueProcessingTimeout: NodeJS.Timeout | null = null
 
   async function processQueue() {
     if (isProcessing || !isTransportActive || !isInitialized) return
     isProcessing = true
 
-    while (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
-      const item = messageQueue[0]
-      try {
-        socket.send(item.message, true)
-        item.future.resolve()
-        messageQueue.shift()
-      } catch (error: any) {
-        item.future.reject(new Error(`Failed to send message: ${error.message}`))
-        messageQueue.shift()
-      }
-      await new Promise((resolve) => setTimeout(resolve, 0))
+    // Clear any existing timeout
+    if (queueProcessingTimeout) {
+      clearTimeout(queueProcessingTimeout)
+      queueProcessingTimeout = null
     }
 
-    isProcessing = false
+    try {
+      while (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
+        const item = messageQueue[0]
+        try {
+          const result = socket.send(item.message, true)
+          if (result === 0) {
+            // Send failed, socket might be closed
+            item.future.reject(new Error('Failed to send message: Socket closed'))
+            messageQueue.shift()
+            cleanup()
+            return
+          }
+          item.future.resolve()
+          messageQueue.shift()
+        } catch (error: any) {
+          item.future.reject(new Error(`Failed to send message: ${error.message}`))
+          messageQueue.shift()
+          cleanup()
+          return
+        }
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+    } finally {
+      isProcessing = false
+
+      // Set timeout to retry processing if queue is not empty
+      if (messageQueue.length > 0) {
+        queueProcessingTimeout = setTimeout(() => {
+          void processQueue()
+        }, 1000) // Retry every second if there are pending messages
+      }
+    }
   }
 
   async function send(msg: Uint8Array) {
@@ -104,15 +129,32 @@ export function createUWebSocketTransport<T extends { isConnected: boolean }>(
         events.emit('error', new Error(`Failed to emit message: ${error.message}`))
       }
     } else {
-      events.emit('error', new Error(`WebSocketTransport: Received unknown type of message, expecting Uint8Array`))
+      events.emit('error', new Error(`WebSocketTransport: Received unknown type of message`))
     }
   }
 
   function cleanup() {
+    if (queueProcessingTimeout) {
+      clearTimeout(queueProcessingTimeout)
+      queueProcessingTimeout = null
+    }
+
+    // Reject all pending messages
+    while (messageQueue.length > 0) {
+      const item = messageQueue.shift()
+      item?.future.reject(new Error('Connection closed'))
+    }
+
     isTransportActive = false
     isInitialized = false
     uServerEmitter.off('message', handleMessage)
     uServerEmitter.off('close', handleClose)
+
+    try {
+      socket.close()
+    } catch (error) {
+      // Ignore close errors
+    }
   }
 
   function handleClose() {
@@ -122,13 +164,8 @@ export function createUWebSocketTransport<T extends { isConnected: boolean }>(
 
   const events = mitt<TransportEvents>()
 
-  // Wait for connection to be ready before initializing
-  setImmediate(() => {
-    if (socket.getUserData().isConnected) {
-      isInitialized = true
-      events.emit('connect', {})
-    }
-  })
+  isInitialized = true
+  events.emit('connect', {})
 
   uServerEmitter.on('close', handleClose)
   uServerEmitter.on('message', handleMessage)
@@ -147,11 +184,6 @@ export function createUWebSocketTransport<T extends { isConnected: boolean }>(
     },
     close() {
       cleanup()
-      try {
-        socket.close()
-      } catch (error: any) {
-        // Ignore error socket already closed
-      }
     }
   }
 

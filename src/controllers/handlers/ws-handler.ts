@@ -20,8 +20,8 @@ export async function registerWsHandler(
   const logger = logs.getLogger('ws-handler')
 
   // Get transport configuration from config component
-  const maxQueueSize = await config.getNumber('ws.transport.maxQueueSize')
-  const queueDrainTimeout = await config.getNumber('ws.transport.queueDrainTimeout')
+  const maxQueueSize = await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')
+  const queueDrainTimeout = await config.getNumber('WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT')
 
   const transportConfig: WebSocketTransportConfig = {
     maxQueueSize,
@@ -45,7 +45,8 @@ export async function registerWsHandler(
           {
             isConnected: false,
             auth: false,
-            clientId
+            clientId,
+            transport: null
           },
           req.getHeader('sec-websocket-key'),
           req.getHeader('sec-websocket-protocol'),
@@ -54,7 +55,7 @@ export async function registerWsHandler(
         )
         onRequestEnd(metrics, labels, 101, end)
       } catch (error: any) {
-        logger.error('Failed to acquire connection', { error, clientId })
+        logger.error('Failed to acquire connection', { error: error.message, clientId })
         onRequestEnd(metrics, labels, 503, end)
         res.writeStatus('503 Service Unavailable').end()
       }
@@ -63,6 +64,7 @@ export async function registerWsHandler(
       const data = ws.getUserData()
       metrics.increment('ws_connections')
       changeStage(data, { isConnected: true })
+      logger.debug('WebSocket opened', { clientId: data.clientId })
     },
     message: async (ws, message) => {
       const data = ws.getUserData()
@@ -71,7 +73,10 @@ export async function registerWsHandler(
       if (data.auth) {
         try {
           if (!data.isConnected) {
-            logger.warn('Received message but connection is marked as disconnected', { address: data.address })
+            logger.warn('Received message but connection is marked as disconnected', {
+              address: data.address,
+              clientId: data.clientId
+            })
             return
           }
 
@@ -81,6 +86,7 @@ export async function registerWsHandler(
           logger.error('Error emitting message', {
             error,
             address: data.address,
+            clientId: data.clientId,
             isConnected: String(data.isConnected),
             hasEventEmitter: String(!!data.eventEmitter)
           })
@@ -88,9 +94,6 @@ export async function registerWsHandler(
           ws.send(JSON.stringify({ error: 'Error processing message', message: error.message }))
         }
       } else if (isNotAuthenticated(data)) {
-        clearTimeout(data.timeout)
-        data.timeout = undefined
-
         try {
           const authChainMessage = textDecoder.decode(message)
           const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
@@ -98,57 +101,57 @@ export async function registerWsHandler(
           })
           const address = normalizeAddress(verifyResult.auth)
 
-          logger.debug('address > ', { address })
+          logger.debug('address > ', { address, clientId: data.clientId })
 
           const eventEmitter = mitt<IUWebSocketEventMap>()
-
-          // Create transport first
           const transport = createUWebSocketTransport(ws, eventEmitter, transportConfig)
 
-          // Wait for transport to be ready
-          await new Promise<void>((resolve) => {
-            transport.on('connect', () => {
-              changeStage(data, {
-                auth: true,
-                address,
-                eventEmitter,
-                isConnected: true
-              })
-
-              // Only attach user after transport is ready and state is updated
-              rpcServer.attachUser({ transport, address })
-              resolve()
-            })
+          changeStage(data, {
+            auth: true,
+            address,
+            eventEmitter,
+            isConnected: true
           })
 
-          transport.on('error', (err) => {
-            if (err && err.message) {
-              logger.error(`Error on transport: ${err.message}`)
-              metrics.increment('ws_transport_errors', { address })
-            }
+          rpcServer.attachUser({ transport, address })
+
+          transport.on('close', () => {
+            rpcServer.detachUser(address)
           })
         } catch (error: any) {
-          logger.error(`Error verifying auth chain: ${error.message}`)
+          logger.error(`Error verifying auth chain: ${error.message}`, {
+            clientId: data.clientId
+          })
           metrics.increment('ws_auth_errors')
           ws.close()
         }
       }
     },
-    close: (ws, code, _message) => {
-      logger.debug(`Websocket closed ${code}`)
+    close: (ws, code, message) => {
       const data = ws.getUserData()
       const { clientId } = data
 
-      if (data.auth) {
-        if (data.address) {
+      logger.debug('WebSocket closing', {
+        code,
+        message: textDecoder.decode(message),
+        clientId,
+        ...(data.auth && { address: data.address })
+      })
+
+      if (data.auth && data.address) {
+        try {
           rpcServer.detachUser(data.address)
+          data.eventEmitter.emit('close', code)
+          data.eventEmitter.all.clear()
+        } catch (error: any) {
+          logger.error('Error during connection cleanup', {
+            error: error.message,
+            address: data.address,
+            clientId
+          })
         }
-        data.eventEmitter.emit('close', code)
-        data.eventEmitter.all.clear()
         metrics.increment('ws_connections', { address: data.address })
-      } else if (isNotAuthenticated(data)) {
-        clearTimeout(data.timeout)
-        data.timeout = undefined
+      } else {
         metrics.increment('ws_connections')
       }
 
@@ -158,8 +161,13 @@ export async function registerWsHandler(
 
       changeStage(data, {
         auth: false,
-        isConnected: false,
-        timeout: undefined
+        isConnected: false
+      })
+
+      logger.debug('WebSocket closed', {
+        code,
+        clientId,
+        ...(data.auth && { address: data.address })
       })
     }
   })
