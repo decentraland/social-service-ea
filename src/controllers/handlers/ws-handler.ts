@@ -82,6 +82,10 @@ export async function registerWsHandler(
 
           data.eventEmitter.emit('message', message)
           metrics.increment('ws_messages_sent', { address: data.address })
+
+          if (data.clientId) {
+            wsPool.updateActivity(data.clientId)
+          }
         } catch (error: any) {
           logger.error('Error emitting message', {
             error,
@@ -118,6 +122,10 @@ export async function registerWsHandler(
           transport.on('close', () => {
             rpcServer.detachUser(address)
           })
+
+          if (data.clientId) {
+            wsPool.updateActivity(data.clientId)
+          }
         } catch (error: any) {
           logger.error(`Error verifying auth chain: ${error.message}`, {
             clientId: data.clientId
@@ -169,6 +177,12 @@ export async function registerWsHandler(
         clientId,
         ...(data.auth && { address: data.address })
       })
+    },
+    ping: (ws) => {
+      const data = ws.getUserData()
+      if (data.clientId) {
+        wsPool.updateActivity(data.clientId)
+      }
     }
   })
 }

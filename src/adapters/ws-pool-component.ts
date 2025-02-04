@@ -5,13 +5,15 @@ import { AppComponents } from '../types'
 export type IWSPoolComponent = {
   acquireConnection(id: string): Promise<void>
   releaseConnection(id: string): void
+  updateActivity(id: string): void
   isConnectionAvailable(id: string): boolean
   getActiveConnections(): number
+  cleanup(): void
 }
 
 export type WSPoolConfig = {
   maxConcurrentConnections?: number
-  connectionTimeout?: number
+  idleTimeout?: number
 }
 
 export async function createWSPoolComponent({
@@ -19,27 +21,49 @@ export async function createWSPoolComponent({
   config
 }: Pick<AppComponents, 'metrics' | 'config'>): Promise<IWSPoolComponent> {
   const maxConcurrentConnections = (await config.getNumber('maxConcurrentConnections')) || 100
-  const connectionTimeout = (await config.getNumber('connectionTimeout')) || 60000 // 1 minute default
-  const activeConnections = new Map<string, IFuture<void>>()
-  const connectionTimers = new Map<string, NodeJS.Timeout>()
+  const idleTimeout = (await config.getNumber('idleTimeout')) || 300000 // 5 minutes default
+  const activeConnections = new Map<
+    string,
+    {
+      future: IFuture<void>
+      lastActivity: number
+    }
+  >()
   const semaphore = new Semaphore(maxConcurrentConnections)
 
-  function clearConnectionTimer(id: string) {
-    const timer = connectionTimers.get(id)
-    if (timer) {
-      clearTimeout(timer)
-      connectionTimers.delete(id)
+  // Periodic cleanup of idle connections
+  const cleanupInterval = setInterval(() => {
+    const now = Date.now()
+    for (const [id, connection] of activeConnections.entries()) {
+      if (now - connection.lastActivity > idleTimeout) {
+        releaseConnection(id)
+        metrics.increment('ws_idle_timeouts')
+      }
+    }
+  }, 60000) // Check every minute
+
+  function updateActivity(id: string) {
+    const connection = activeConnections.get(id)
+    if (connection) {
+      connection.lastActivity = Date.now()
     }
   }
 
   function releaseConnection(id: string) {
     const connection = activeConnections.get(id)
     if (connection) {
-      clearConnectionTimer(id)
-      connection.resolve()
+      connection.future.resolve()
       activeConnections.delete(id)
       semaphore.release()
       metrics.observe('ws_active_connections', { type: 'total' }, activeConnections.size)
+    }
+  }
+
+  function cleanup() {
+    clearInterval(cleanupInterval)
+    // Release all connections
+    for (const [id] of activeConnections) {
+      releaseConnection(id)
     }
   }
 
@@ -47,18 +71,16 @@ export async function createWSPoolComponent({
     async acquireConnection(id: string) {
       await semaphore.acquire()
       const connectionFuture = future<void>()
-      activeConnections.set(id, connectionFuture)
-
-      // Set connection timeout
-      const timer = setTimeout(() => {
-        releaseConnection(id)
-      }, connectionTimeout)
-      connectionTimers.set(id, timer)
-
+      activeConnections.set(id, {
+        future: connectionFuture,
+        lastActivity: Date.now()
+      })
       metrics.observe('ws_active_connections', { type: 'total' }, activeConnections.size)
     },
 
     releaseConnection,
+
+    updateActivity,
 
     isConnectionAvailable(id: string) {
       return activeConnections.has(id)
@@ -66,6 +88,8 @@ export async function createWSPoolComponent({
 
     getActiveConnections() {
       return activeConnections.size
-    }
+    },
+
+    cleanup
   }
 }

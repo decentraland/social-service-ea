@@ -40,6 +40,11 @@ export const metricDeclarations = {
     type: IMetricsComponent.CounterType,
     help: 'Number of WebSocket authentication errors',
     labelNames: ['address']
+  },
+  ws_idle_timeouts: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of WebSocket idle timeouts',
+    labelNames: ['id']
   }
 }
 
