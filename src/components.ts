@@ -66,9 +66,7 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     server,
     config,
-    nats,
     archipelagoStats,
-    redis,
     catalystClient,
     sns
   })

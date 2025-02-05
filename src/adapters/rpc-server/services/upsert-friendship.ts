@@ -36,7 +36,6 @@ export async function upsertFriendshipService({
     }
 
     if (parsedRequest.action === Action.REQUEST && parsedRequest.user === context.address) {
-      console.log('You cannot send a friendship request to yourself')
       return {
         response: {
           $case: 'invalidFriendshipAction',

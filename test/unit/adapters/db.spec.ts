@@ -419,9 +419,9 @@ describe('db', () => {
           values: expect.arrayContaining([
             userAddress,
             userAddress,
-            normalizedPotentialFriends,
+            normalizedPotentialFriends.join(','),
             userAddress,
-            normalizedPotentialFriends
+            normalizedPotentialFriends.join(',')
           ])
         })
       )
