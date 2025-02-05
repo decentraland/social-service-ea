@@ -118,7 +118,7 @@ describe('upsertFriendshipService', () => {
       id: existingFriendship.id,
       created_at: new Date(existingFriendship.created_at)
     })
-    mockCatalystClient.getEntityByPointer.mockResolvedValueOnce(mockProfile)
+    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce([mockProfile, mockProfile])
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
@@ -156,7 +156,7 @@ describe('upsertFriendshipService', () => {
       id: 'new-friendship-id',
       created_at: new Date()
     })
-    mockCatalystClient.getEntityByPointer.mockResolvedValueOnce(mockProfile)
+    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce([mockProfile, mockProfile])
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
@@ -195,7 +195,7 @@ describe('upsertFriendshipService', () => {
       created_at: new Date(existingFriendship.created_at)
     })
     mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
-    mockCatalystClient.getEntityByPointer.mockResolvedValueOnce(mockProfile)
+    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce([mockProfile, mockProfile])
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
