@@ -122,4 +122,22 @@ describe('emitterToAsyncGenerator', () => {
     expect(result22.value).toBe(emittedValue2)
     expect(result22.done).toBe(false)
   })
+
+  it('should return done:true for next() after generator is done', async () => {
+    const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+
+    // First mark the generator as done by calling return()
+    await generator.return('Completed')
+
+    // Now verify that next() returns done:true
+    const result = await generator.next()
+    expect(result.done).toBe(true)
+    expect(result.value).toBeUndefined()
+
+    // Verify that emitting new events doesn't affect the done generator
+    emitter.emit('testEvent', 'New Event')
+    const result2 = await generator.next()
+    expect(result2.done).toBe(true)
+    expect(result2.value).toBeUndefined()
+  })
 })
