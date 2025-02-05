@@ -20,7 +20,8 @@ const createEvent = <T extends FriendshipRequestEvent | FriendshipAcceptedEvent>
   subType: T['subType'],
   context: NotificationContext
 ) => {
-  const { senderAddress, receiverAddress, senderProfile, receiverProfile, profileImagesUrl, message } = context
+  const { requestId, senderAddress, receiverAddress, senderProfile, receiverProfile, profileImagesUrl, message } =
+    context
   const type = Events.Type.SOCIAL_SERVICE
 
   const senderProfileAvatar = getProfileAvatar(senderProfile)
