@@ -3,11 +3,7 @@ import { onRequestEnd, onRequestStart } from '@well-known-components/uws-http-se
 import { verify } from '@dcl/platform-crypto-middleware'
 import { AppComponents, WsUserData } from '../../types'
 import { normalizeAddress } from '../../utils/address'
-import {
-  IUWebSocketEventMap,
-  createUWebSocketTransport,
-  WebSocketTransportConfig
-} from '../../utils/UWebSocketTransport'
+import { IUWebSocketEventMap, createUWebSocketTransport } from '../../utils/UWebSocketTransport'
 import { isNotAuthenticated } from '../../utils/wsUserData'
 import { randomUUID } from 'crypto'
 
@@ -19,52 +15,44 @@ export async function registerWsHandler(
   const { logs, server, metrics, fetcher, rpcServer, config, wsPool } = components
   const logger = logs.getLogger('ws-handler')
 
-  // Get transport configuration from config component
-  const maxQueueSize = await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')
-  const queueDrainTimeout = await config.getNumber('WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT')
-
-  const transportConfig: WebSocketTransportConfig = {
-    maxQueueSize,
-    queueDrainTimeout
-  }
-
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
   }
 
   server.app.ws<WsUserData>('/', {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT')) ?? 90, // In seconds
-    upgrade: async (res, req, context) => {
+    upgrade: (res, req, context) => {
       logger.debug('upgrade requested')
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
       const clientId = randomUUID()
 
-      try {
-        await wsPool.acquireConnection(clientId)
-        res.upgrade(
-          {
-            isConnected: false,
-            auth: false,
-            clientId,
-            transport: null
-          },
-          req.getHeader('sec-websocket-key'),
-          req.getHeader('sec-websocket-protocol'),
-          req.getHeader('sec-websocket-extensions'),
-          context
-        )
-        onRequestEnd(metrics, labels, 101, end)
-      } catch (error: any) {
-        logger.error('Failed to acquire connection', { error: error.message, clientId })
-        onRequestEnd(metrics, labels, 503, end)
-        res.writeStatus('503 Service Unavailable').end()
-      }
+      res.upgrade(
+        {
+          isConnected: false,
+          auth: false,
+          clientId,
+          transport: null
+        },
+        req.getHeader('sec-websocket-key'),
+        req.getHeader('sec-websocket-protocol'),
+        req.getHeader('sec-websocket-extensions'),
+        context
+      )
+
+      onRequestEnd(metrics, labels, 101, end)
     },
-    open: (ws) => {
+    open: async (ws) => {
       const data = ws.getUserData()
-      metrics.increment('ws_connections')
-      changeStage(data, { isConnected: true })
-      logger.debug('WebSocket opened', { clientId: data.clientId })
+
+      try {
+        await wsPool.acquireConnection(data.clientId)
+        metrics.increment('ws_connections')
+        changeStage(data, { isConnected: true })
+        logger.debug('WebSocket opened', { clientId: data.clientId })
+      } catch (error: any) {
+        logger.error('Failed to acquire connection', { error: error.message, clientId: data.clientId })
+        ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
+      }
     },
     message: async (ws, message) => {
       const data = ws.getUserData()
@@ -108,13 +96,14 @@ export async function registerWsHandler(
           logger.debug('address > ', { address, clientId: data.clientId })
 
           const eventEmitter = mitt<IUWebSocketEventMap>()
-          const transport = createUWebSocketTransport(ws, eventEmitter, transportConfig)
+          const transport = await createUWebSocketTransport(ws, eventEmitter, config)
 
           changeStage(data, {
             auth: true,
             address,
             eventEmitter,
-            isConnected: true
+            isConnected: true,
+            transport
           })
 
           rpcServer.attachUser({ transport, address })
@@ -138,18 +127,20 @@ export async function registerWsHandler(
     close: (ws, code, message) => {
       const data = ws.getUserData()
       const { clientId } = data
+      const messageText = textDecoder.decode(message)
 
       logger.debug('WebSocket closing', {
         code,
-        message: textDecoder.decode(message),
+        message: messageText,
         clientId,
         ...(data.auth && { address: data.address })
       })
 
       if (data.auth && data.address) {
         try {
+          data.transport.close()
           rpcServer.detachUser(data.address)
-          data.eventEmitter.emit('close', code)
+          data.eventEmitter.emit('close', { code, reason: messageText })
           data.eventEmitter.all.clear()
         } catch (error: any) {
           logger.error('Error during connection cleanup', {
@@ -174,6 +165,7 @@ export async function registerWsHandler(
 
       logger.debug('WebSocket closed', {
         code,
+        reason: messageText,
         clientId,
         ...(data.auth && { address: data.address })
       })

@@ -1,13 +1,11 @@
-import { future, IFuture } from 'fp-future'
-import { Semaphore } from 'async-mutex'
 import { AppComponents } from '../types'
 
 export type IWSPoolComponent = {
   acquireConnection(id: string): Promise<void>
   releaseConnection(id: string): void
   updateActivity(id: string): void
-  isConnectionAvailable(id: string): boolean
-  getActiveConnections(): number
+  isConnectionAvailable(id: string): Promise<boolean>
+  getActiveConnections(): Promise<number>
   cleanup(): void
 }
 
@@ -18,78 +16,100 @@ export type WSPoolConfig = {
 
 export async function createWSPoolComponent({
   metrics,
-  config
-}: Pick<AppComponents, 'metrics' | 'config'>): Promise<IWSPoolComponent> {
-  const maxConcurrentConnections = (await config.getNumber('maxConcurrentConnections')) || 100
-  const idleTimeout = (await config.getNumber('idleTimeout')) || 300000 // 5 minutes default
-  const activeConnections = new Map<
-    string,
-    {
-      future: IFuture<void>
-      lastActivity: number
-    }
-  >()
-  const semaphore = new Semaphore(maxConcurrentConnections)
+  config,
+  redis
+}: Pick<AppComponents, 'metrics' | 'config' | 'redis'>): Promise<IWSPoolComponent> {
+  const maxConcurrentConnections = (await config.getNumber('MAX_CONCURRENT_CONNECTIONS')) || 100
+  const idleTimeout = (await config.getNumber('IDLE_TIMEOUT')) || 5 * 60 * 1000 // 5 minutes default
 
-  // Periodic cleanup of idle connections
-  const cleanupInterval = setInterval(() => {
+  const cleanupInterval = setInterval(async () => {
     const now = Date.now()
-    for (const [id, connection] of activeConnections.entries()) {
-      if (now - connection.lastActivity > idleTimeout) {
-        releaseConnection(id)
-        metrics.increment('ws_idle_timeouts')
+    const pattern = 'ws:conn:*'
+
+    for await (const key of redis.client.scanIterator({ MATCH: pattern })) {
+      const data = await redis.client.get(key)
+      if (data) {
+        const parsed = JSON.parse(data)
+        if (now - parsed.lastActivity > idleTimeout) {
+          const id = key.replace('ws:conn:', '')
+          await releaseConnection(id)
+          metrics.increment('ws_idle_timeouts', { id })
+        }
       }
     }
-  }, 60000) // Check every minute
+  }, 60000)
 
-  function updateActivity(id: string) {
-    const connection = activeConnections.get(id)
-    if (connection) {
-      connection.lastActivity = Date.now()
+  async function acquireConnection(id: string) {
+    const key = `ws:conn:${id}`
+    const multi = redis.client.multi()
+
+    try {
+      // Check total connections and acquire in a transaction
+      const result = await multi
+        .zCard('ws:active_connections')
+        .set(key, JSON.stringify({ lastActivity: Date.now() }), {
+          NX: true,
+          EX: Math.ceil(idleTimeout / 1000)
+        })
+        .zAdd('ws:active_connections', { score: Date.now(), value: id })
+        .exec()
+
+      if (!result) throw new Error('Transaction failed')
+
+      const [totalConnections] = result as [number, unknown, unknown]
+
+      if (totalConnections >= maxConcurrentConnections) {
+        // Rollback if limit exceeded
+        await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
+        throw new Error('Maximum connections reached')
+      }
+
+      metrics.observe('ws_active_connections', { type: 'total' }, totalConnections + 1)
+    } catch (error) {
+      // Ensure cleanup on any error
+      await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
+      throw error
     }
   }
 
-  function releaseConnection(id: string) {
-    const connection = activeConnections.get(id)
-    if (connection) {
-      connection.future.resolve()
-      activeConnections.delete(id)
-      semaphore.release()
-      metrics.observe('ws_active_connections', { type: 'total' }, activeConnections.size)
-    }
+  async function releaseConnection(id: string) {
+    const key = `ws:conn:${id}`
+    await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
+    const totalConnections = await redis.client.zCard('ws:active_connections')
+    metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
   }
 
-  function cleanup() {
+  async function updateActivity(id: string) {
+    const key = `ws:conn:${id}`
+    await redis.client.set(key, JSON.stringify({ lastActivity: Date.now() }), {
+      XX: true, // Only update if exists
+      EX: Math.ceil(idleTimeout / 1000) // Reset TTL
+    })
+  }
+
+  async function isConnectionAvailable(id: string) {
+    return (await redis.client.exists(`ws:conn:${id}`)) === 1
+  }
+
+  async function getActiveConnections() {
+    return await redis.client.zCard('ws:active_connections')
+  }
+
+  async function cleanup() {
     clearInterval(cleanupInterval)
-    // Release all connections
-    for (const [id] of activeConnections) {
-      releaseConnection(id)
+    const pattern = 'ws:conn:*'
+    for await (const key of redis.client.scanIterator({ MATCH: pattern })) {
+      const id = key.replace('ws:conn:', '')
+      await releaseConnection(id)
     }
   }
 
   return {
-    async acquireConnection(id: string) {
-      await semaphore.acquire()
-      const connectionFuture = future<void>()
-      activeConnections.set(id, {
-        future: connectionFuture,
-        lastActivity: Date.now()
-      })
-      metrics.observe('ws_active_connections', { type: 'total' }, activeConnections.size)
-    },
-
+    acquireConnection,
     releaseConnection,
-
     updateActivity,
-
-    isConnectionAvailable(id: string) {
-      return activeConnections.has(id)
-    },
-
-    getActiveConnections() {
-      return activeConnections.size
-    },
-
+    isConnectionAvailable,
+    getActiveConnections,
     cleanup
   }
 }

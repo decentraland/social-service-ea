@@ -25,7 +25,6 @@ export async function initComponents(): Promise<AppComponents> {
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ metrics })
 
-  const wsPool = await createWSPoolComponent({ metrics, config })
   const server = await createUWsComponent({ config, logs })
 
   const fetcher = createFetchComponent()
@@ -73,6 +72,7 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     sns
   })
+  const wsPool = await createWSPoolComponent({ metrics, config, redis })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = createPeerTrackingComponent({ logs, pubsub, nats })
 

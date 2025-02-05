@@ -1,6 +1,7 @@
 import { Transport, TransportEvents } from '@dcl/rpc'
 import mitt, { Emitter } from 'mitt'
 import { future, IFuture } from 'fp-future'
+import { IConfigComponent } from '@well-known-components/interfaces'
 
 export type RecognizedString =
   | string
@@ -29,25 +30,18 @@ export interface IUWebSocket<T extends { isConnected: boolean; auth?: boolean }>
   getUserData(): T
 }
 
-export type WebSocketTransportConfig = {
-  maxQueueSize?: number
-  queueDrainTimeout?: number
-}
-
-const DEFAULT_CONFIG: Required<WebSocketTransportConfig> = {
-  maxQueueSize: 1000,
-  queueDrainTimeout: 5000
-}
-
-export function createUWebSocketTransport<T extends { isConnected: boolean; auth?: boolean }>(
+export async function createUWebSocketTransport<T extends { isConnected: boolean; auth?: boolean }>(
   socket: IUWebSocket<T>,
   uServerEmitter: Emitter<IUWebSocketEventMap>,
-  config: WebSocketTransportConfig = {}
-): Transport {
-  const { maxQueueSize, queueDrainTimeout } = { ...DEFAULT_CONFIG, ...config }
+  config: IConfigComponent
+): Promise<Transport> {
+  const maxQueueSize = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')) || 1000
+  const queueDrainTimeout = (await config.getNumber('WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT')) || 5000
+
+  const messageQueue: Array<{ message: Uint8Array; future: IFuture<void> }> = []
+
   let isTransportActive = true
   let isInitialized = false
-  const messageQueue: Array<{ message: Uint8Array; future: IFuture<void> }> = []
   let isProcessing = false
   let queueProcessingTimeout: NodeJS.Timeout | null = null
 
@@ -55,7 +49,6 @@ export function createUWebSocketTransport<T extends { isConnected: boolean; auth
     if (isProcessing || !isTransportActive || !isInitialized) return
     isProcessing = true
 
-    // Clear any existing timeout
     if (queueProcessingTimeout) {
       clearTimeout(queueProcessingTimeout)
       queueProcessingTimeout = null
@@ -86,11 +79,10 @@ export function createUWebSocketTransport<T extends { isConnected: boolean; auth
     } finally {
       isProcessing = false
 
-      // Set timeout to retry processing if queue is not empty
       if (messageQueue.length > 0) {
         queueProcessingTimeout = setTimeout(() => {
           void processQueue()
-        }, 1000) // Retry every second if there are pending messages
+        }, 1000)
       }
     }
   }
@@ -133,13 +125,12 @@ export function createUWebSocketTransport<T extends { isConnected: boolean; auth
     }
   }
 
-  function cleanup() {
+  function cleanup(code: number = 1000, reason: string = 'Normal closure') {
     if (queueProcessingTimeout) {
       clearTimeout(queueProcessingTimeout)
       queueProcessingTimeout = null
     }
 
-    // Reject all pending messages
     while (messageQueue.length > 0) {
       const item = messageQueue.shift()
       item?.future.reject(new Error('Connection closed'))
@@ -151,15 +142,17 @@ export function createUWebSocketTransport<T extends { isConnected: boolean; auth
     uServerEmitter.off('close', handleClose)
 
     try {
-      socket.close()
+      if (socket.getUserData().isConnected) {
+        socket.end(code, reason)
+      }
     } catch (error) {
-      // Ignore close errors
+      // Ignore error socket already closed
     }
   }
 
-  function handleClose() {
-    cleanup()
-    events.emit('close', {})
+  function handleClose(code: number = 1000, reason: string = '') {
+    cleanup(code, reason)
+    events.emit('close', { code, reason })
   }
 
   const events = mitt<TransportEvents>()
@@ -182,8 +175,8 @@ export function createUWebSocketTransport<T extends { isConnected: boolean; auth
       }
       return send(message)
     },
-    close() {
-      cleanup()
+    close(code: number = 1000, reason: string = 'Client requested closure') {
+      cleanup(code, reason)
     }
   }
 

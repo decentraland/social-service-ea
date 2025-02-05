@@ -184,6 +184,7 @@ export type WsAuthenticatedUserData = {
   auth: true
   address: string
   clientId: string
+  transport: Transport
 }
 
 export type WsNotAuthenticatedUserData = {
