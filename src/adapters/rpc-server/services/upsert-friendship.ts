@@ -87,7 +87,7 @@ export async function upsertFriendshipService({
 
       logger.debug(`${id} friendship was upsert successfully`)
 
-      const [_, profile] = await Promise.all([
+      const [_, [senderProfile, receiverProfile]] = await Promise.all([
         await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
           id: actionId,
           from: context.address,
@@ -96,7 +96,7 @@ export async function upsertFriendshipService({
           timestamp: Date.now(),
           metadata
         }),
-        catalystClient.getEntityByPointer(parsedRequest.user)
+        catalystClient.getEntitiesByPointers([context.address, parsedRequest.user!])
       ])
 
       const friendshipRequest = {
@@ -109,9 +109,11 @@ export async function upsertFriendshipService({
         await sendNotification(
           parsedRequest.action,
           {
+            requestId: id,
             senderAddress: context.address,
             receiverAddress: parsedRequest.user!,
-            profile,
+            senderProfile,
+            receiverProfile,
             profileImagesUrl,
             message: metadata?.message
           },
@@ -122,7 +124,11 @@ export async function upsertFriendshipService({
       return {
         response: {
           $case: 'accepted',
-          accepted: parseFriendshipRequestToFriendshipRequestResponse(friendshipRequest, profile, profileImagesUrl)
+          accepted: parseFriendshipRequestToFriendshipRequestResponse(
+            friendshipRequest,
+            receiverProfile,
+            profileImagesUrl
+          )
         }
       }
     } catch (error: any) {

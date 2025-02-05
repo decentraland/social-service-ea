@@ -5,9 +5,11 @@ import { FriendshipRequestEvent, FriendshipAcceptedEvent } from '@dcl/schemas'
 import { getProfileAvatar } from './profiles'
 
 type NotificationContext = {
+  requestId: string
   senderAddress: string
   receiverAddress: string
-  profile: Entity
+  senderProfile: Entity
+  receiverProfile: Entity
   profileImagesUrl: string
   message?: string
 }
@@ -18,8 +20,11 @@ const createEvent = <T extends FriendshipRequestEvent | FriendshipAcceptedEvent>
   subType: T['subType'],
   context: NotificationContext
 ) => {
-  const { senderAddress, receiverAddress, profile, profileImagesUrl, message } = context
+  const { senderAddress, receiverAddress, senderProfile, receiverProfile, profileImagesUrl, message } = context
   const type = Events.Type.SOCIAL_SERVICE
+
+  const senderProfileAvatar = getProfileAvatar(senderProfile)
+  const receiverProfileAvatar = getProfileAvatar(receiverProfile)
 
   const baseEvent = {
     key: `${senderAddress}-${receiverAddress}-${type}-${subType}`,
@@ -27,13 +32,18 @@ const createEvent = <T extends FriendshipRequestEvent | FriendshipAcceptedEvent>
     subType,
     timestamp: Date.now(),
     metadata: {
+      requestId,
       sender: {
         address: senderAddress,
-        name: getProfileAvatar(profile).name,
-        profileImageUrl: `${profileImagesUrl}/${senderAddress}`
+        name: senderProfileAvatar.name,
+        profileImageUrl: `${profileImagesUrl}/${senderAddress}`,
+        hasClaimedName: senderProfileAvatar.hasClaimedName
       },
       receiver: {
-        address: receiverAddress
+        address: receiverAddress,
+        name: receiverProfileAvatar.name,
+        profileImageUrl: `${profileImagesUrl}/${receiverAddress}`,
+        hasClaimedName: receiverProfileAvatar.hasClaimedName
       }
     }
   } as T
