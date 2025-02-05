@@ -34,7 +34,17 @@ export async function upsertFriendshipService({
       }
     }
 
-    logger.debug(`upsert friendship > `, parsedRequest as Record<string, string>)
+    if (parsedRequest.action === Action.REQUEST && parsedRequest.user === context.address) {
+      console.log('You cannot send a friendship request to yourself')
+      return {
+        response: {
+          $case: 'invalidFriendshipAction',
+          invalidFriendshipAction: {
+            message: 'You cannot send a friendship request to yourself'
+          }
+        }
+      }
+    }
 
     try {
       const lastAction = await db.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
