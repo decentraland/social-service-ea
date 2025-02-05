@@ -6,11 +6,16 @@ import { mockLogs } from '../../mocks/components'
 import { createMockProfile } from '../../mocks/profile'
 
 describe('Notifications', () => {
-  const mockProfile = createMockProfile('0x123')
+  const mockSenderProfile = createMockProfile('0x123')
+  const mockReceiverProfile = createMockProfile('0x456')
+
   const mockContext = {
+    requestId: 'request-id',
     senderAddress: '0x123',
     receiverAddress: '0x456',
-    profile: mockProfile,
+    senderProfile: mockSenderProfile,
+    receiverProfile: mockReceiverProfile,
+    profile: mockReceiverProfile,
     profileImagesUrl: 'http://test.com/images',
     message: 'Hello!'
   }
@@ -44,13 +49,18 @@ describe('Notifications', () => {
         subType: Events.SubType.SocialService.FRIENDSHIP_REQUEST,
         timestamp: expect.any(Number),
         metadata: {
+          requestId: 'request-id',
           sender: {
             address: '0x123',
-            name: mockProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x123'
+            name: mockSenderProfile.metadata.avatars[0].name,
+            profileImageUrl: 'http://test.com/images/0x123',
+            hasClaimedName: mockSenderProfile.metadata.avatars[0].hasClaimedName
           },
           receiver: {
-            address: '0x456'
+            address: '0x456',
+            name: mockReceiverProfile.metadata.avatars[0].name,
+            profileImageUrl: 'http://test.com/images/0x456',
+            hasClaimedName: mockReceiverProfile.metadata.avatars[0].hasClaimedName
           },
           message: 'Hello!'
         }
@@ -66,13 +76,18 @@ describe('Notifications', () => {
         subType: Events.SubType.SocialService.FRIENDSHIP_ACCEPTED,
         timestamp: expect.any(Number),
         metadata: {
+          requestId: 'request-id',
           sender: {
             address: '0x123',
-            name: mockProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x123'
+            name: mockSenderProfile.metadata.avatars[0].name,
+            profileImageUrl: 'http://test.com/images/0x123',
+            hasClaimedName: mockSenderProfile.metadata.avatars[0].hasClaimedName
           },
           receiver: {
-            address: '0x456'
+            address: '0x456',
+            name: mockReceiverProfile.metadata.avatars[0].name,
+            profileImageUrl: 'http://test.com/images/0x456',
+            hasClaimedName: mockReceiverProfile.metadata.avatars[0].hasClaimedName
           },
           message: 'Hello!'
         }

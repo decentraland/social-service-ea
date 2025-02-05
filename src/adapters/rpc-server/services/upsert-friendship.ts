@@ -11,6 +11,7 @@ import {
 } from '../../../logic/friendships'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
 import { sendNotification, shouldNotify } from '../../../logic/notifications'
+import { getProfileAvatar } from '../../../logic/profiles'
 
 export async function upsertFriendshipService({
   components: { logs, db, pubsub, config, catalystClient, sns }
@@ -34,7 +35,17 @@ export async function upsertFriendshipService({
       }
     }
 
-    logger.debug(`upsert friendship > `, parsedRequest as Record<string, string>)
+    if (parsedRequest.action === Action.REQUEST && parsedRequest.user === context.address) {
+      console.log('You cannot send a friendship request to yourself')
+      return {
+        response: {
+          $case: 'invalidFriendshipAction',
+          invalidFriendshipAction: {
+            message: 'You cannot send a friendship request to yourself'
+          }
+        }
+      }
+    }
 
     try {
       const lastAction = await db.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
@@ -87,7 +98,7 @@ export async function upsertFriendshipService({
 
       logger.debug(`${id} friendship was upsert successfully`)
 
-      const [_, profile] = await Promise.all([
+      const [_, profiles] = await Promise.all([
         await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
           id: actionId,
           from: context.address,
@@ -96,8 +107,27 @@ export async function upsertFriendshipService({
           timestamp: Date.now(),
           metadata
         }),
-        catalystClient.getEntityByPointer(parsedRequest.user)
+        catalystClient.getEntitiesByPointers([context.address, parsedRequest.user!])
       ])
+
+      const profilesMap = new Map(profiles.map((profile) => [getProfileAvatar(profile).userId, profile]))
+
+      const senderProfile = profilesMap.get(context.address)
+      const receiverProfile = profilesMap.get(parsedRequest.user!)
+
+      if (!senderProfile || !receiverProfile) {
+        logger.error('profiles not found', {
+          senderProfile: senderProfile ? getProfileAvatar(senderProfile).userId : '',
+          receiverProfile: receiverProfile ? getProfileAvatar(receiverProfile).userId : ''
+        })
+
+        return {
+          response: {
+            $case: 'internalServerError',
+            internalServerError: {}
+          }
+        }
+      }
 
       const friendshipRequest = {
         id,
@@ -105,24 +135,32 @@ export async function upsertFriendshipService({
         metadata: metadata || null
       }
 
-      if (shouldNotify(parsedRequest.action)) {
-        await sendNotification(
-          parsedRequest.action,
-          {
-            senderAddress: context.address,
-            receiverAddress: parsedRequest.user!,
-            profile,
-            profileImagesUrl,
-            message: metadata?.message
-          },
-          { sns, logs }
-        )
-      }
+      setImmediate(async () => {
+        if (shouldNotify(parsedRequest.action)) {
+          await sendNotification(
+            parsedRequest.action,
+            {
+              requestId: id,
+              senderAddress: context.address,
+              receiverAddress: parsedRequest.user!,
+              senderProfile,
+              receiverProfile,
+              profileImagesUrl,
+              message: metadata?.message
+            },
+            { sns, logs }
+          )
+        }
+      })
 
       return {
         response: {
           $case: 'accepted',
-          accepted: parseFriendshipRequestToFriendshipRequestResponse(friendshipRequest, profile, profileImagesUrl)
+          accepted: parseFriendshipRequestToFriendshipRequestResponse(
+            friendshipRequest,
+            receiverProfile,
+            profileImagesUrl
+          )
         }
       }
     } catch (error: any) {

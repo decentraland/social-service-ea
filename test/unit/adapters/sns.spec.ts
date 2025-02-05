@@ -19,12 +19,19 @@ describe('SNS Component', () => {
     subType: Events.SubType.SocialService.FRIENDSHIP_REQUEST,
     timestamp: Date.now(),
     metadata: {
+      requestId: 'requestId',
       sender: {
         address: '0x123',
         name: 'John Doe',
-        profileImageUrl: 'https://example.com/profile.png'
+        profileImageUrl: 'https://example.com/profile.png',
+        hasClaimedName: true
       },
-      receiver: { address: '0x456' },
+      receiver: {
+        address: '0x456',
+        name: 'Jane Doe',
+        profileImageUrl: 'https://example.com/profile.png',
+        hasClaimedName: true
+      },
       message: 'Hello!'
     }
   }
@@ -35,12 +42,19 @@ describe('SNS Component', () => {
     subType: Events.SubType.SocialService.FRIENDSHIP_ACCEPTED,
     timestamp: Date.now(),
     metadata: {
+      requestId: 'requestId',
       sender: {
         address: '0x123',
         name: 'John Doe',
-        profileImageUrl: 'https://example.com/profile.png'
+        profileImageUrl: 'https://example.com/profile.png',
+        hasClaimedName: true
       },
-      receiver: { address: '0x456' }
+      receiver: {
+        address: '0x456',
+        name: 'Jane Doe',
+        profileImageUrl: 'https://example.com/profile.png',
+        hasClaimedName: true
+      }
     }
   }
 
