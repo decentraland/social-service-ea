@@ -177,6 +177,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     },
     close(code: number = 1000, reason: string = 'Client requested closure') {
       cleanup(code, reason)
+      events.emit('close', { code, reason })
     }
   }
 

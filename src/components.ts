@@ -17,7 +17,7 @@ import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
 import { createSnsComponent } from './adapters/sns'
-import { createWSPoolComponent } from './adapters/ws-pool-component'
+import { createWSPoolComponent } from './adapters/ws-pool'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {

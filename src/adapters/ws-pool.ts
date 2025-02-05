@@ -1,18 +1,4 @@
-import { AppComponents } from '../types'
-
-export type IWSPoolComponent = {
-  acquireConnection(id: string): Promise<void>
-  releaseConnection(id: string): void
-  updateActivity(id: string): void
-  isConnectionAvailable(id: string): Promise<boolean>
-  getActiveConnections(): Promise<number>
-  cleanup(): void
-}
-
-export type WSPoolConfig = {
-  maxConcurrentConnections?: number
-  idleTimeout?: number
-}
+import { AppComponents, IWSPoolComponent } from '../types'
 
 export async function createWSPoolComponent({
   metrics,
@@ -20,7 +6,7 @@ export async function createWSPoolComponent({
   redis
 }: Pick<AppComponents, 'metrics' | 'config' | 'redis'>): Promise<IWSPoolComponent> {
   const maxConcurrentConnections = (await config.getNumber('MAX_CONCURRENT_CONNECTIONS')) || 100
-  const idleTimeout = (await config.getNumber('IDLE_TIMEOUT')) || 5 * 60 * 1000 // 5 minutes default
+  const idleTimeout = (await config.getNumber('IDLE_TIMEOUT')) || 300000 // 5 minutes default
 
   const cleanupInterval = setInterval(async () => {
     const now = Date.now()
@@ -41,10 +27,16 @@ export async function createWSPoolComponent({
 
   async function acquireConnection(id: string) {
     const key = `ws:conn:${id}`
+
+    // First check if connection exists
+    if (await redis.client.exists(key)) {
+      throw new Error('Connection already exists')
+    }
+
+    // Then check and acquire in a transaction
     const multi = redis.client.multi()
 
     try {
-      // Check total connections and acquire in a transaction
       const result = await multi
         .zCard('ws:active_connections')
         .set(key, JSON.stringify({ lastActivity: Date.now() }), {
@@ -54,17 +46,19 @@ export async function createWSPoolComponent({
         .zAdd('ws:active_connections', { score: Date.now(), value: id })
         .exec()
 
-      if (!result) throw new Error('Transaction failed')
+      if (!result) {
+        throw new Error('Transaction failed')
+      }
 
-      const [totalConnections] = result as [number, unknown, unknown]
+      const [totalConnections] = result as [number]
 
-      if (totalConnections >= maxConcurrentConnections) {
+      if (totalConnections && totalConnections >= maxConcurrentConnections) {
         // Rollback if limit exceeded
         await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
         throw new Error('Maximum connections reached')
       }
 
-      metrics.observe('ws_active_connections', { type: 'total' }, totalConnections + 1)
+      metrics.observe('ws_active_connections', { type: 'total' }, (totalConnections as number) + 1)
     } catch (error) {
       // Ensure cleanup on any error
       await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])

@@ -11,8 +11,16 @@ jest.mock('redis', () => {
     del: jest.fn(),
     quit: jest.fn(),
     subscribe: jest.fn(),
-    publish: jest.fn()
+    publish: jest.fn(),
+    zCard: jest.fn(),
+    exists: jest.fn(),
+    zAdd: jest.fn(),
+    multi: jest.fn(),
+    zRem: jest.fn(),
+    scanIterator: jest.fn(),
+    duplicate: jest.fn()
   }
+
   return {
     createClient: jest.fn().mockReturnValue({
       ...mockClient,
