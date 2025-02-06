@@ -10,15 +10,12 @@ const L1_TESTNET = 'sepolia'
 
 export async function createCatalystClient({
   fetcher,
-  config,
-  logs
+  config
 }: Pick<AppComponents, 'fetcher' | 'config' | 'logs'>): Promise<ICatalystClientComponent> {
   const loadBalancer = await config.requireString('CATALYST_CONTENT_URL_LOADBALANCER')
   const contractNetwork = (await config.getString('ENV')) === 'prod' ? L1_MAINNET : L1_TESTNET
-  const logger = logs.getLogger('catalyst-client')
 
   function getContentClientOrDefault(contentServerUrl?: string): ContentClient {
-    logger.debug(`Creating content client for ${contentServerUrl ?? loadBalancer}`)
     return createContentClient({ fetcher, url: contentServerUrl ?? loadBalancer })
   }
 
@@ -32,7 +29,6 @@ export async function createCatalystClient({
     return (attempt: number): Promise<T> => {
       if (attempt > 1 && catalystServers.length > 0) {
         const [catalystServerUrl] = catalystServers.splice(attempt % catalystServers.length, 1)
-        logger.debug(`Rotating content server to ${`${catalystServerUrl}/content`}`)
         contentClientToUse = getContentClientOrDefault(`${catalystServerUrl}/content`)
       }
 

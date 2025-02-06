@@ -18,8 +18,6 @@ export async function getMutualFriendsService({
     request: GetMutualFriendsPayload,
     context: RpcServerContext
   ): Promise<PaginatedFriendsProfilesResponse> {
-    logger.debug(`Getting mutual friends ${context.address}<>${request.user!.address}`)
-
     try {
       const { address: requester } = context
       const { pagination, user } = request

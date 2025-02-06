@@ -22,7 +22,6 @@ export async function registerWsHandler(
   server.app.ws<WsUserData>('/', {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? 90, // In seconds
     upgrade: (res, req, context) => {
-      logger.debug('upgrade requested')
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
       const clientId = randomUUID()
 
@@ -93,7 +92,7 @@ export async function registerWsHandler(
           })
           const address = normalizeAddress(verifyResult.auth)
 
-          logger.debug('address > ', { address, clientId: data.clientId })
+          logger.debug('Authenticated User', { address })
 
           const eventEmitter = mitt<IUWebSocketEventMap>()
           const transport = await createUWebSocketTransport(ws, eventEmitter, config)

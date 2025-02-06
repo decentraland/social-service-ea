@@ -80,7 +80,6 @@ export async function* handleSubscriptionUpdates<T, U>({
 
   for await (const update of updatesGenerator) {
     const eventNameString = String(eventName)
-    logger.debug(`${eventNameString} received:`, { update: JSON.stringify(update) })
 
     if (!shouldHandleUpdate(update as U)) {
       logger.debug(`Skipping update ${eventNameString} for ${rpcContext.address}`, { update: JSON.stringify(update) })

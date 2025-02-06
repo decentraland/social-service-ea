@@ -22,11 +22,6 @@ export async function createPeersSynchronizerComponent({
       await redis.put(PEERS_CACHE_KEY, currentPeers, {
         EX: cacheTTLInSeconds
       })
-
-      logger.debug('Synced peers to Redis', {
-        peersCount: Object.keys(currentPeers).length,
-        timestamp: Date.now()
-      })
     } catch (error: any) {
       logger.error('Error syncing peers:', error)
     }
@@ -34,13 +29,11 @@ export async function createPeersSynchronizerComponent({
 
   return {
     async start() {
-      logger.info('Starting scheduler component', { syncIntervalMs })
       await syncPeers()
       intervalId = setInterval(syncPeers, syncIntervalMs)
     },
 
     async stop() {
-      logger.info('Stopping scheduler component')
       if (intervalId) {
         clearInterval(intervalId)
         intervalId = null
