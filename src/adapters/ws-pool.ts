@@ -6,7 +6,7 @@ export async function createWSPoolComponent({
   redis
 }: Pick<AppComponents, 'metrics' | 'config' | 'redis'>): Promise<IWSPoolComponent> {
   const maxConcurrentConnections = (await config.getNumber('MAX_CONCURRENT_CONNECTIONS')) || 100
-  const idleTimeout = (await config.getNumber('IDLE_TIMEOUT')) || 300000 // 5 minutes default
+  const idleTimeoutInMs = (await config.getNumber('IDLE_TIMEOUT_IN_MS')) || 300000 // 5 minutes default
 
   const cleanupInterval = setInterval(async () => {
     const now = Date.now()
