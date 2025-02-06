@@ -90,6 +90,16 @@ describe('Notifications', () => {
       })
     })
 
+    it('should throw error if action is not valid', async () => {
+      const invalidAction = 'INVALID_ACTION' as any
+
+      await expect(sendNotification(invalidAction, mockContext, components)).rejects.toThrow(
+        `Invalid action: ${invalidAction}`
+      )
+
+      expect(mockSns.publishMessage).not.toHaveBeenCalled()
+    })
+
     it('should send notification without message when no message is provided', async () => {
       const contextWithoutMessage = {
         ...mockContext,
@@ -119,15 +129,6 @@ describe('Notifications', () => {
           }
         }
       })
-    })
-
-    it('should log notification errors after retries', async () => {
-      const error = new Error('SNS error')
-      mockSns.publishMessage.mockRejectedValue(error)
-
-      await expect(sendNotification(Action.REQUEST, mockContext, components)).rejects.toThrow(
-        'Failed after 3 attempts: SNS error'
-      )
     })
 
     describe('retry behavior', () => {
@@ -165,9 +166,7 @@ describe('Notifications', () => {
 
         mockSns.publishMessage.mockRejectedValue(error)
 
-        await expect(sendNotification(Action.REQUEST, mockContext, components)).rejects.toThrow(
-          'Failed after 3 attempts: Persistent failure'
-        )
+        await sendNotification(Action.REQUEST, mockContext, components)
 
         expect(mockSns.publishMessage).toHaveBeenCalledTimes(3)
         expect(logger.error).toHaveBeenCalledWith(
@@ -178,16 +177,6 @@ describe('Notifications', () => {
           })
         )
       })
-    })
-
-    it('should do nothing if no handler is found for the action', async () => {
-      const invalidAction = 'INVALID_ACTION' as any
-
-      await expect(sendNotification(invalidAction, mockContext, components)).rejects.toThrow(
-        `Invalid action: ${invalidAction}`
-      )
-
-      expect(mockSns.publishMessage).not.toHaveBeenCalled()
     })
   })
 })

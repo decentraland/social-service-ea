@@ -89,11 +89,11 @@ export async function sendNotification(
   const { logs } = components
   const logger = logs.getLogger('notifications')
 
-  try {
-    if (!shouldNotify(action)) {
-      throw new Error(`Invalid action: ${action}`)
-    }
+  if (!shouldNotify(action)) {
+    throw new Error(`Invalid action: ${action}`)
+  }
 
+  try {
     const handler = notificationHandlers[action]
     if (handler) {
       await sendNotificationWithRetry(action, context, components, handler)
@@ -105,7 +105,6 @@ export async function sendNotification(
       senderAddress: context.senderAddress,
       receiverAddress: context.receiverAddress
     })
-    throw error
   }
 }
 async function sendNotificationWithRetry(
