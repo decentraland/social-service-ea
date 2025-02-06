@@ -36,7 +36,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   config: IConfigComponent
 ): Promise<Transport> {
   const maxQueueSize = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')) || 1000
-  const queueDrainTimeout = (await config.getNumber('WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT')) || 5000
+  const queueDrainTimeoutInMs = (await config.getNumber('WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT_IN_MS')) || 5000
 
   const messageQueue: Array<{ message: Uint8Array; future: IFuture<void> }> = []
 
@@ -96,7 +96,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       const drainFuture = future<void>()
       const timeout = setTimeout(() => {
         drainFuture.reject(new Error('Queue drain timeout'))
-      }, queueDrainTimeout)
+      }, queueDrainTimeoutInMs)
 
       try {
         await drainFuture

@@ -62,8 +62,6 @@ export async function upsertFriendshipService({
       const friendshipStatus = getNewFriendshipStatus(parsedRequest.action)
       const isActive = friendshipStatus === FriendshipStatus.Friends
 
-      logger.debug('friendship status > ', { isActive: JSON.stringify(isActive), friendshipStatus })
-
       const metadata =
         parsedRequest.action === Action.REQUEST && parsedRequest.metadata ? parsedRequest.metadata : undefined
 
@@ -94,8 +92,6 @@ export async function upsertFriendshipService({
 
         return { id, actionId, createdAt }
       })
-
-      logger.debug(`${id} friendship was upsert successfully`)
 
       const [_, profiles] = await Promise.all([
         await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {

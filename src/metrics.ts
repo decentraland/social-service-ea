@@ -6,11 +6,6 @@ import { IMetricsComponent } from '@well-known-components/interfaces'
 export const metricDeclarations = {
   ...getDefaultHttpMetrics(),
   ...logsMetricsDeclarations,
-  ws_connections: {
-    type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket connections',
-    labelNames: ['address']
-  },
   ws_active_connections: {
     type: IMetricsComponent.GaugeType,
     help: 'Number of WebSocket active connections',
