@@ -3,6 +3,7 @@ import { AppComponents, IPublisherComponent } from '../types'
 import { Action } from '../types'
 import { FriendshipRequestEvent, FriendshipAcceptedEvent } from '@dcl/schemas'
 import { getProfileAvatar } from './profiles'
+import { retry } from '../utils/retrier'
 
 type NotificationContext = {
   requestId: string
@@ -85,7 +86,7 @@ export async function sendNotification(
   context: NotificationContext,
   components: Pick<AppComponents, 'sns' | 'logs'>
 ): Promise<void> {
-  const { sns, logs } = components
+  const { logs } = components
   const logger = logs.getLogger('notifications')
 
   try {
@@ -94,14 +95,8 @@ export async function sendNotification(
     }
 
     const handler = notificationHandlers[action]
-
     if (handler) {
-      await handler(sns, context)
-      logger.info(`Notification sent for action ${action}`, {
-        action,
-        senderAddress: context.senderAddress,
-        receiverAddress: context.receiverAddress
-      })
+      await sendNotificationWithRetry(action, context, components, handler)
     }
   } catch (error: any) {
     logger.error(`Error sending notification for action ${action}`, {
@@ -110,5 +105,34 @@ export async function sendNotification(
       senderAddress: context.senderAddress,
       receiverAddress: context.receiverAddress
     })
+    throw error
   }
+}
+async function sendNotificationWithRetry(
+  action: Action,
+  context: NotificationContext,
+  components: Pick<AppComponents, 'sns' | 'logs'>,
+  handler: NotificationHandler
+) {
+  const { sns, logs } = components
+  const logger = logs.getLogger('notifications')
+
+  await retry(async (attempt) => {
+    try {
+      await handler(sns, context)
+      logger.info(`Notification sent for action ${action}`, {
+        action,
+        senderAddress: context.senderAddress,
+        receiverAddress: context.receiverAddress
+      })
+    } catch (error: any) {
+      logger.warn(`Attempt ${attempt} failed for action ${action}`, {
+        error: error.message,
+        action,
+        senderAddress: context.senderAddress,
+        receiverAddress: context.receiverAddress
+      })
+      throw error
+    }
+  })
 }
