@@ -45,7 +45,6 @@ export async function registerWsHandler(
 
       try {
         await wsPool.acquireConnection(data.clientId)
-        metrics.increment('ws_connections')
         changeStage(data, { isConnected: true })
         logger.debug('WebSocket opened', { clientId: data.clientId })
       } catch (error: any) {
@@ -148,9 +147,6 @@ export async function registerWsHandler(
             clientId
           })
         }
-        metrics.increment('ws_connections', { address: data.address })
-      } else {
-        metrics.increment('ws_connections')
       }
 
       if (clientId) {
