@@ -20,7 +20,7 @@ export async function registerWsHandler(
   }
 
   server.app.ws<WsUserData>('/', {
-    idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT')) ?? 90, // In seconds
+    idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? 90, // In seconds
     upgrade: (res, req, context) => {
       logger.debug('upgrade requested')
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
