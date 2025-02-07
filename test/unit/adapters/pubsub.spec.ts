@@ -44,6 +44,22 @@ describe('PubSubComponent', () => {
 
       expect(mockPubClient.publish).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, JSON.stringify(update))
     })
+
+    it('should handle publish errors gracefully', async () => {
+      const error = new Error('Redis publish error')
+      mockPubClient.publish.mockRejectedValueOnce(error)
+
+      const update = {
+        address: '0x123',
+        status: ConnectivityStatus.ONLINE
+      }
+
+      await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, update)
+
+      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(
+        `Error while publishing update to channel ${FRIEND_STATUS_UPDATES_CHANNEL}: ${error.message}`
+      )
+    })
   })
 
   describe('subscribeToChannel', () => {
@@ -59,6 +75,28 @@ describe('PubSubComponent', () => {
       await pubsub.subscribeToChannel(FRIENDSHIP_UPDATES_CHANNEL, handler)
 
       expect(mockSubClient.subscribe).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, handler)
+    })
+
+    it('should handle subscription errors gracefully', async () => {
+      const error = new Error('Redis subscribe error')
+      mockSubClient.subscribe.mockRejectedValueOnce(error)
+
+      const handler = jest.fn()
+      await pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)
+
+      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(
+        `Error while subscribing to channel ${FRIEND_STATUS_UPDATES_CHANNEL}: ${error.message}`
+      )
+    })
+
+    it('should not call handler when subscription fails', async () => {
+      const error = new Error('Redis subscribe error')
+      mockSubClient.subscribe.mockRejectedValueOnce(error)
+
+      const handler = jest.fn()
+      await pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)
+
+      expect(handler).not.toHaveBeenCalled()
     })
   })
 

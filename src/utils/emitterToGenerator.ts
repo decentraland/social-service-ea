@@ -18,13 +18,16 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
   const valueQueue: Events[T][] = []
 
   function eventHandler(value: Events[T]) {
-    if (isDone) return
+    if (isDone) {
+      return
+    }
 
     if (nextQueue.length > 0) {
       const { resolve } = nextQueue.shift()!
       resolve({ done: false, value })
       return
     }
+
     valueQueue.push(value)
   }
 

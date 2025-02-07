@@ -52,9 +52,7 @@ describe('createRpcServerComponent', () => {
       pubsub: mockPubSub,
       config: mockConfig,
       server: mockUWs,
-      nats: mockNats,
       archipelagoStats: mockArchipelagoStats,
-      redis: mockRedis,
       catalystClient: mockCatalystClient,
       sns: mockSns
     })
