@@ -1,39 +1,47 @@
-import { parseProfilesToFriends } from '../../../src/logic/friends'
+import { parseProfilesToFriends, parseProfileToFriend } from '../../../src/logic/friends'
 import { mockProfile } from '../../mocks/profile'
 
+describe('parseProfileToFriend', () => {
+  it('should parse profile to friend', () => {
+    const friend = parseProfileToFriend(mockProfile)
+    expect(friend).toEqual({
+      address: mockProfile.avatars[0].userId,
+      name: mockProfile.avatars[0].name,
+      hasClaimedName: mockProfile.avatars[0].hasClaimedName,
+      profilePictureUrl: mockProfile.avatars[0].avatar.snapshots.face256
+    })
+  })
+})
+
 describe('parseProfilesToFriends', () => {
-  it('should convert profile entities to friend users', () => {
-    const profileImagesUrl = 'https://profile-images.decentraland.org'
+  it('should convert profiles to friend users', () => {
     const anotherProfile = {
       ...mockProfile,
-      metadata: {
-        ...mockProfile.metadata,
-        avatars: [
-          {
-            ...mockProfile.metadata.avatars[0],
-            userId: '0x123aBcDE',
-            name: 'TestUser2',
-            hasClaimedName: false
-          }
-        ]
-      }
+      avatars: [
+        {
+          ...mockProfile.avatars[0],
+          userId: '0x123aBcDE',
+          name: 'TestUser2',
+          hasClaimedName: false
+        }
+      ]
     }
     const profiles = [mockProfile, anotherProfile]
 
-    const result = parseProfilesToFriends(profiles, profileImagesUrl)
+    const result = parseProfilesToFriends(profiles)
 
     expect(result).toEqual([
       {
         address: '0x123',
         name: 'TestUser',
         hasClaimedName: true,
-        profilePictureUrl: `${profileImagesUrl}/entities/${mockProfile.id}/face.png`
+        profilePictureUrl: mockProfile.avatars[0].avatar.snapshots.face256
       },
       {
         address: '0x123abcde',
         name: 'TestUser2',
         hasClaimedName: false,
-        profilePictureUrl: `${profileImagesUrl}/entities/${anotherProfile.id}/face.png`
+        profilePictureUrl: anotherProfile.avatars[0].avatar.snapshots.face256
       }
     ])
   })

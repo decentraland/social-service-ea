@@ -154,7 +154,7 @@ describe('updates handlers', () => {
       eventEmitter = mitt<SubscriptionEventsEmitter>()
       logger = mockLogs.getLogger('test')
       parser = jest.fn()
-      mockCatalystClient.getEntityByPointer.mockResolvedValue(mockProfile)
+      mockCatalystClient.getProfile.mockResolvedValue(mockProfile)
       
       subscribersContext = createSubscribersContext()
       subscribersContext.addSubscriber('0x123', eventEmitter)

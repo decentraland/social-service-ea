@@ -1,8 +1,8 @@
 import { subscribeToFriendshipUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friendship-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { Action, RpcServerContext } from '../../../../../src/types'
-import { mockCatalystClient, mockConfig, mockLogs } from '../../../../mocks/components'
-import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
+import { mockCatalystClient, mockLogs } from '../../../../mocks/components'
+import { createMockProfile } from '../../../../mocks/profile'
 import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
@@ -10,19 +10,16 @@ import { createSubscribersContext } from '../../../../../src/adapters/rpc-server
 jest.mock('../../../../../src/logic/updates')
 
 describe('subscribeToFriendshipUpdatesService', () => {
-  let subscribeToFriendshipUpdates: Awaited<ReturnType<typeof subscribeToFriendshipUpdatesService>>
+  let subscribeToFriendshipUpdates: ReturnType<typeof subscribeToFriendshipUpdatesService>
   let rpcContext: RpcServerContext
   const subscribersContext = createSubscribersContext()
   const mockFriendProfile = createMockProfile('0x456')
   const mockHandler = handleSubscriptionUpdates as jest.Mock
 
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValue(PROFILE_IMAGES_URL)
-
     subscribeToFriendshipUpdates = await subscribeToFriendshipUpdatesService({
       components: {
         logs: mockLogs,
-        config: mockConfig,
         catalystClient: mockCatalystClient
       }
     })
@@ -44,7 +41,7 @@ describe('subscribeToFriendshipUpdatesService', () => {
 
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile, PROFILE_IMAGES_URL),
+        friend: parseProfileToFriend(mockFriendProfile),
         action: mockUpdate.action,
         createdAt: mockUpdate.timestamp
       }
@@ -54,7 +51,7 @@ describe('subscribeToFriendshipUpdatesService', () => {
     const result = await generator.next()
 
     expect(result.value).toEqual({
-      friend: parseProfileToFriend(mockFriendProfile, PROFILE_IMAGES_URL),
+      friend: parseProfileToFriend(mockFriendProfile),
       action: mockUpdate.action,
       createdAt: mockUpdate.timestamp
     })

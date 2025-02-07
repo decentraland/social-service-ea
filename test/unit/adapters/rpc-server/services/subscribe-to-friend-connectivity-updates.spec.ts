@@ -3,7 +3,7 @@ import { RpcServerContext } from '../../../../../src/types'
 import { mockLogs, mockArchipelagoStats, mockDb, mockConfig, mockCatalystClient } from '../../../../mocks/components'
 import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friend-connectivity-updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
+import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
@@ -11,7 +11,7 @@ import { createSubscribersContext } from '../../../../../src/adapters/rpc-server
 jest.mock('../../../../../src/logic/updates')
 
 describe('subscribeToFriendConnectivityUpdatesService', () => {
-  let subscribeToFriendConnectivityUpdates: Awaited<ReturnType<typeof subscribeToFriendConnectivityUpdatesService>>
+  let subscribeToFriendConnectivityUpdates: ReturnType<typeof subscribeToFriendConnectivityUpdatesService>
   let rpcContext: RpcServerContext
   const mockFriendProfile = createMockProfile('0x456')
   const mockHandler = handleSubscriptionUpdates as jest.Mock
@@ -21,14 +21,11 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   const subscribersContext = createSubscribersContext()
 
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValue(PROFILE_IMAGES_URL)
-
     subscribeToFriendConnectivityUpdates = await subscribeToFriendConnectivityUpdatesService({
       components: {
         logs: mockLogs,
         db: mockDb,
         archipelagoStats: mockArchipelagoStats,
-        config: mockConfig,
         catalystClient: mockCatalystClient
       }
     })
@@ -41,11 +38,11 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
 
   it('should get initial online friends from archipelago stats and then receive updates', async () => {
     mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
-    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce([mockFriendProfile])
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
     mockArchipelagoStats.getPeers.mockResolvedValue(['0x456', '0x789'])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile, PROFILE_IMAGES_URL),
+        friend: parseProfileToFriend(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
       }
     })
@@ -55,7 +52,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
 
     expect(mockArchipelagoStats.getPeersFromCache).toHaveBeenCalled()
     expect(result.value).toEqual({
-      friend: parseProfileToFriend(mockFriendProfile, PROFILE_IMAGES_URL),
+      friend: parseProfileToFriend(mockFriendProfile),
       status: ConnectivityStatus.ONLINE
     })
 
@@ -65,10 +62,10 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
 
   it('should handle empty online friends list and then receive updates', async () => {
     mockDb.getOnlineFriends.mockResolvedValueOnce([])
-    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce([])
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile, PROFILE_IMAGES_URL),
+        friend: parseProfileToFriend(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
       }
     })
@@ -76,7 +73,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
 
     const result = await generator.next()
-    expect(mockCatalystClient.getEntitiesByPointers).toHaveBeenCalledWith([])
+    expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
     expect(result.done).toBe(false)
 
     const result2 = await generator.next()

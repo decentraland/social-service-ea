@@ -1,45 +1,30 @@
-import { Entity, EntityType } from '@dcl/schemas'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
-export const PROFILE_IMAGES_URL = 'https://profile-images.decentraland.org'
+const PROFILE_IMAGES_URL = 'https://profile-images.decentraland.org'
 
-export const mockProfile: Entity = {
-  version: '1',
-  id: 'profile-id',
-  type: EntityType.PROFILE,
-  metadata: {
-    avatars: [
-      {
-        userId: '0x123',
-        name: 'TestUser',
-        hasClaimedName: true,
+export const mockProfile: Profile = {
+  avatars: [
+    {
+      userId: '0x123',
+      name: 'TestUser',
+      hasClaimedName: true,
+      avatar: {
         snapshots: {
-          face256: 'bafybeiasdfqwer'
+          face256: `${PROFILE_IMAGES_URL}/entities/bafybeiasdfqwer/face.png`
         }
       }
-    ]
-  },
-  pointers: ['0x123'],
-  timestamp: new Date().getTime(),
-  content: [
-    {
-      file: 'face256',
-      hash: 'bafybeiasdfqwer'
     }
   ]
 }
 
-export const createMockProfile = (address: string): Entity => ({
+export const createMockProfile = (address: string): Profile => ({
   ...mockProfile,
-  pointers: [address],
-  metadata: {
-    ...mockProfile.metadata,
-    avatars: [
-      {
-        ...mockProfile.metadata.avatars[0],
-        userId: address,
-        name: `Profile name ${address}`,
-        hasClaimedName: true
-      }
-    ]
-  }
+  avatars: [
+    {
+      ...mockProfile.avatars[0],
+      userId: address,
+      name: `Profile name ${address}`,
+      hasClaimedName: true
+    }
+  ]
 })

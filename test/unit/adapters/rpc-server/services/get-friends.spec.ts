@@ -1,22 +1,20 @@
-import { mockCatalystClient, mockConfig, mockDb, mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockDb, mockLogs } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/adapters/rpc-server/services/get-friends'
 import { RpcServerContext } from '../../../../../src/types'
-import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
+import { createMockProfile } from '../../../../mocks/profile'
 import { createMockFriend, parseExpectedFriends } from '../../../../mocks/friend'
 
 describe('getFriendsService', () => {
-  let getFriends: Awaited<ReturnType<typeof getFriendsService>>
+  let getFriends: ReturnType<typeof getFriendsService>
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
     subscribersContext: undefined
   }
 
-  beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValueOnce(PROFILE_IMAGES_URL)
-
-    getFriends = await getFriendsService({
-      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient, config: mockConfig }
+  beforeEach(() => {
+    getFriends = getFriendsService({
+      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 
@@ -28,12 +26,12 @@ describe('getFriendsService', () => {
 
     mockDb.getFriends.mockResolvedValueOnce(mockFriends)
     mockDb.getFriendsCount.mockResolvedValueOnce(totalFriends)
-    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
 
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
     expect(response).toEqual({
-      friends: mockProfiles.map(parseExpectedFriends(PROFILE_IMAGES_URL)),
+      friends: mockProfiles.map(parseExpectedFriends()),
       paginationData: {
         total: totalFriends,
         page: 1
@@ -73,7 +71,7 @@ describe('getFriendsService', () => {
   })
 
   it('should handle errors from the catalyst gracefully', async () => {
-    mockCatalystClient.getEntitiesByPointers.mockImplementationOnce(() => {
+    mockCatalystClient.getProfiles.mockImplementationOnce(() => {
       throw new Error('Catalyst error')
     })
 
