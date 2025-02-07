@@ -2,7 +2,6 @@ import { createPeerTrackingComponent, PEER_STATUS_HANDLERS } from '../../src/ada
 import { FRIEND_STATUS_UPDATES_CHANNEL } from '../../src/adapters/pubsub'
 import { mockConfig, mockLogs, mockNats, mockPubSub, mockRedis } from '../mocks/components'
 import { IPeerTrackingComponent } from '../../src/types'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('PeerTrackingComponent', () => {
   let peerTracking: IPeerTrackingComponent
