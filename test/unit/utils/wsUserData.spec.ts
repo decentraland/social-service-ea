@@ -4,7 +4,7 @@ import { IUWebSocketEventMap } from '../../../src/utils/UWebSocketTransport'
 import { Emitter } from 'mitt'
 
 describe('wsUserData', () => {
-  const clientId = 'random-uuid'
+  const wsConnectionId = 'random-uuid'
 
   describe('isNotAuthenticated', () => {
     it('should return false if the user is authenticated', () => {
@@ -13,7 +13,7 @@ describe('wsUserData', () => {
         isConnected: false,
         eventEmitter: { emit: jest.fn() } as unknown as Emitter<IUWebSocketEventMap>,
         address: '0x123',
-        clientId,
+        wsConnectionId,
         transport: null
       }
 
@@ -24,7 +24,7 @@ describe('wsUserData', () => {
       const data: WsUserData = {
         auth: false,
         isConnected: false,
-        clientId
+        wsConnectionId
       }
 
       expect(isNotAuthenticated(data)).toBe(true)

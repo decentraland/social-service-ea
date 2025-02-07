@@ -28,7 +28,7 @@ describe('ws-handler', () => {
     mockData = {
       isConnected: false,
       auth: false,
-      clientId: 'test-client-id'
+      wsConnectionId: 'test-client-id'
     } as WsNotAuthenticatedUserData
 
     mockWs = {
@@ -73,7 +73,7 @@ describe('ws-handler', () => {
         expect.objectContaining({
           isConnected: false,
           auth: false,
-          clientId: expect.any(String),
+          wsConnectionId: expect.any(String),
           transport: null
         }),
         'test-key',
@@ -107,7 +107,7 @@ describe('ws-handler', () => {
           isConnected: true,
           auth: true,
           address: '0x123',
-          clientId: 'test-client-id',
+          wsConnectionId: 'test-client-id',
           eventEmitter: mitt(),
           transport: { close: jest.fn() } as any
         }
@@ -153,7 +153,7 @@ describe('ws-handler', () => {
         mockWs.getUserData.mockReturnValue({
           isConnected: true,
           auth: false,
-          clientId: 'test-client-id'
+          wsConnectionId: 'test-client-id'
         } as WsNotAuthenticatedUserData)
       })
 
@@ -190,7 +190,7 @@ describe('ws-handler', () => {
         auth: true,
         address: '0x123',
         eventEmitter: mitt(),
-        clientId: 'test-client-id',
+        wsConnectionId: 'test-client-id',
         transport: { close: jest.fn() } as any
       }
       mockWs.getUserData.mockReturnValue(authData)
@@ -218,7 +218,7 @@ describe('ws-handler', () => {
         auth: true,
         address: '0x123',
         eventEmitter: mitt(),
-        clientId: 'test-client-id',
+        wsConnectionId: 'test-client-id',
         transport: {
           close: jest.fn().mockImplementationOnce(() => {
             throw new Error('Cleanup failed')

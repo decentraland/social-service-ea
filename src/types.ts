@@ -191,7 +191,7 @@ export type WsAuthenticatedUserData = {
   eventEmitter: Emitter<IUWebSocketEventMap>
   auth: true
   address: string
-  clientId: string
+  wsConnectionId: string
   transport: Transport
 }
 
@@ -199,7 +199,7 @@ export type WsNotAuthenticatedUserData = {
   isConnected: boolean
   auth: false
   timeout?: NodeJS.Timeout
-  clientId: string
+  wsConnectionId: string
 }
 
 export type WsUserData = WsAuthenticatedUserData | WsNotAuthenticatedUserData

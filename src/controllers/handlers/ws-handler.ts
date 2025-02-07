@@ -23,13 +23,13 @@ export async function registerWsHandler(
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? 90, // In seconds
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
-      const clientId = randomUUID()
+      const wsConnectionId = randomUUID()
 
       res.upgrade(
         {
           isConnected: false,
           auth: false,
-          clientId,
+          wsConnectionId,
           transport: null
         },
         req.getHeader('sec-websocket-key'),
@@ -44,11 +44,11 @@ export async function registerWsHandler(
       const data = ws.getUserData()
 
       try {
-        await wsPool.acquireConnection(data.clientId)
+        await wsPool.acquireConnection(data.wsConnectionId)
         changeStage(data, { isConnected: true })
-        logger.debug('WebSocket opened', { clientId: data.clientId })
+        logger.debug('WebSocket opened', { wsConnectionId: data.wsConnectionId })
       } catch (error: any) {
-        logger.error('Failed to acquire connection', { error: error.message, clientId: data.clientId })
+        logger.error('Failed to acquire connection', { error: error.message, wsConnectionId: data.wsConnectionId })
         ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
       }
     },
@@ -83,12 +83,12 @@ export async function registerWsHandler(
             rpcServer.detachUser(address)
           })
 
-          if (data.clientId) {
-            wsPool.updateActivity(data.clientId)
+          if (data.wsConnectionId) {
+            wsPool.updateActivity(data.wsConnectionId)
           }
         } catch (error: any) {
           logger.error(`Error verifying auth chain: ${error.message}`, {
-            clientId: data.clientId
+            wsConnectionId: data.wsConnectionId
           })
           metrics.increment('ws_auth_errors')
           ws.close()
@@ -98,7 +98,7 @@ export async function registerWsHandler(
           if (!data.isConnected) {
             logger.warn('Received message but connection is marked as disconnected', {
               address: data.address,
-              clientId: data.clientId
+              wsConnectionId: data.wsConnectionId
             })
             return
           }
@@ -106,14 +106,14 @@ export async function registerWsHandler(
           data.eventEmitter.emit('message', message)
           metrics.increment('ws_messages_sent', { address: data.address })
 
-          if (data.clientId) {
-            wsPool.updateActivity(data.clientId)
+          if (data.wsConnectionId) {
+            wsPool.updateActivity(data.wsConnectionId)
           }
         } catch (error: any) {
           logger.error('Error emitting message', {
             error,
             address: data.address,
-            clientId: data.clientId,
+            wsConnectionId: data.wsConnectionId,
             isConnected: String(data.isConnected),
             hasEventEmitter: String(!!data.eventEmitter)
           })
@@ -124,13 +124,13 @@ export async function registerWsHandler(
     },
     close: (ws, code, message) => {
       const data = ws.getUserData()
-      const { clientId } = data
+      const { wsConnectionId } = data
       const messageText = textDecoder.decode(message)
 
       logger.debug('WebSocket closing', {
         code,
         message: messageText,
-        clientId,
+        wsConnectionId,
         ...(data.auth && { address: data.address })
       })
 
@@ -144,13 +144,13 @@ export async function registerWsHandler(
           logger.error('Error during connection cleanup', {
             error: error.message,
             address: data.address,
-            clientId
+            wsConnectionId
           })
         }
       }
 
-      if (clientId) {
-        wsPool.releaseConnection(clientId)
+      if (wsConnectionId) {
+        wsPool.releaseConnection(wsConnectionId)
       }
 
       changeStage(data, {
@@ -161,14 +161,14 @@ export async function registerWsHandler(
       logger.debug('WebSocket closed', {
         code,
         reason: messageText,
-        clientId,
+        wsConnectionId,
         ...(data.auth && { address: data.address })
       })
     },
     ping: (ws) => {
-      const data = ws.getUserData()
-      if (data.clientId) {
-        wsPool.updateActivity(data.clientId)
+      const { wsConnectionId } = ws.getUserData()
+      if (wsConnectionId) {
+        wsPool.updateActivity(wsConnectionId)
       }
     }
   })
