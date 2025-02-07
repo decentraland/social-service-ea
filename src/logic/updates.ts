@@ -1,7 +1,7 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { ICatalystClientComponent, IDatabaseComponent, RpcServerContext, SubscriptionEventsEmitter } from '../types'
-import mitt from 'mitt'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
+import { normalizeAddress } from '../utils/address'
 
 export type ILogger = ILoggerComponent.ILogger
 
@@ -39,21 +39,31 @@ function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: Update
   }
 }
 
-export function friendshipUpdateHandler(sharedContext: SharedContext, logger: ILogger) {
+export function friendshipUpdateHandler(getContext: () => SharedContext, logger: ILogger) {
   return handleUpdate<'friendshipUpdate'>((update) => {
-    const updateEmitter = sharedContext.subscribers[update.to]
+    const context = getContext()
+    const updateEmitter = context.subscribers[update.to]
     if (updateEmitter) {
       updateEmitter.emit('friendshipUpdate', update)
     }
   }, logger)
 }
 
-export function friendConnectivityUpdateHandler(sharedContext: SharedContext, logger: ILogger, db: IDatabaseComponent) {
+export function friendConnectivityUpdateHandler(
+  getContext: () => SharedContext,
+  logger: ILogger,
+  db: IDatabaseComponent
+) {
   return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
-    const friends = await db.getOnlineFriends(update.address, Object.keys(sharedContext.subscribers))
+    const context = getContext()
+
+    const onlineSubscribers = Object.keys(context.subscribers)
+    const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
 
     friends.forEach(({ address: friendAddress }) => {
-      const emitter = sharedContext.subscribers[friendAddress]
+      const normalizedAddress = normalizeAddress(friendAddress)
+
+      const emitter = context.subscribers[normalizedAddress]
       if (emitter) {
         emitter.emit('friendConnectivityUpdate', update)
       }
@@ -70,30 +80,46 @@ export async function* handleSubscriptionUpdates<T, U>({
   parser,
   parseArgs
 }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
-  const eventEmitter = rpcContext.subscribers[rpcContext.address] || mitt<SubscriptionEventsEmitter>()
+  const normalizedAddress = normalizeAddress(rpcContext.address)
+  const eventEmitter = rpcContext.subscribers[normalizedAddress]
+  const eventNameString = String(eventName)
 
-  if (!rpcContext.subscribers[rpcContext.address]) {
-    rpcContext.subscribers[rpcContext.address] = eventEmitter
+  if (!eventEmitter) {
+    logger.error(`No emitter found for ${eventNameString}`, {
+      address: normalizedAddress
+    })
+    return
   }
 
   const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
 
-  for await (const update of updatesGenerator) {
-    const eventNameString = String(eventName)
-    logger.debug(`${eventNameString} received:`, { update: JSON.stringify(update) })
+  try {
+    for await (const update of updatesGenerator) {
+      logger.debug(`Generator received update for ${eventNameString}`, {
+        update: JSON.stringify(update),
+        address: rpcContext.address
+      })
 
-    if (!shouldHandleUpdate(update as U)) {
-      logger.debug(`Skipping update ${eventNameString} for ${rpcContext.address}`, { update: JSON.stringify(update) })
-      continue
+      if (!shouldHandleUpdate(update as U)) {
+        logger.debug(`Skipping update ${eventNameString} for ${rpcContext.address}`, { update: JSON.stringify(update) })
+        continue
+      }
+
+      const profile = await catalystClient.getEntityByPointer(getAddressFromUpdate(update as U))
+      const parsedUpdate = await parser(update as U, profile, ...parseArgs)
+
+      if (parsedUpdate) {
+        yield parsedUpdate
+      } else {
+        logger.error(`Unable to parse ${eventNameString}`, { update: JSON.stringify(update) })
+      }
     }
-
-    const profile = await catalystClient.getEntityByPointer(getAddressFromUpdate(update as U))
-    const parsedUpdate = await parser(update as U, profile, ...parseArgs)
-
-    if (parsedUpdate) {
-      yield parsedUpdate
-    } else {
-      logger.error(`Unable to parse ${eventNameString}:`, { update: JSON.stringify(update) })
-    }
+  } catch (error) {
+    logger.error('Error in generator loop', {
+      error: JSON.stringify(error),
+      address: rpcContext.address,
+      event: eventNameString
+    })
+    throw error
   }
 }

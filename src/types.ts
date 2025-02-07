@@ -43,6 +43,7 @@ export type BaseComponents = {
   peerTracking: IPeerTrackingComponent
   catalystClient: ICatalystClientComponent
   sns: IPublisherComponent
+  wsPool: IWSPoolComponent
 }
 
 // components used in runtime
@@ -56,6 +57,7 @@ export type TestComponents = BaseComponents & {
 
 export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
+  detachUser(address: string): void
 }
 export interface IDatabaseComponent {
   createFriendship(
@@ -146,6 +148,15 @@ export type IPublisherComponent = {
   publishMessage(event: FriendshipRequestEvent | FriendshipAcceptedEvent): Promise<PublishCommandOutput>
 }
 
+export type IWSPoolComponent = {
+  acquireConnection(id: string): Promise<void>
+  releaseConnection(id: string): void
+  updateActivity(id: string): void
+  isConnectionAvailable(id: string): Promise<boolean>
+  getActiveConnections(): Promise<number>
+  cleanup(): void
+}
+
 // this type simplifies the typings of http handlers
 export type HandlerContextWithPath<
   ComponentNames extends keyof AppComponents,
@@ -180,12 +191,15 @@ export type WsAuthenticatedUserData = {
   eventEmitter: Emitter<IUWebSocketEventMap>
   auth: true
   address: string
+  wsConnectionId: string
+  transport: Transport
 }
 
 export type WsNotAuthenticatedUserData = {
   isConnected: boolean
   auth: false
   timeout?: NodeJS.Timeout
+  wsConnectionId: string
 }
 
 export type WsUserData = WsAuthenticatedUserData | WsNotAuthenticatedUserData

@@ -17,6 +17,7 @@ import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
 import { createSnsComponent } from './adapters/sns'
+import { createWSPoolComponent } from './adapters/ws-pool'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -65,14 +66,13 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     server,
     config,
-    nats,
     archipelagoStats,
-    redis,
     catalystClient,
     sns
   })
+  const wsPool = await createWSPoolComponent({ metrics, config, redis })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
-  const peerTracking = createPeerTrackingComponent({ logs, pubsub, nats })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config })
 
   return {
     config,
@@ -90,6 +90,7 @@ export async function initComponents(): Promise<AppComponents> {
     nats,
     peerTracking,
     catalystClient,
-    sns
+    sns,
+    wsPool
   }
 }

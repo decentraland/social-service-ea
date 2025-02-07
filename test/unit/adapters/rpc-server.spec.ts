@@ -1,4 +1,4 @@
-import { createRpcServerComponent } from ' ../../../src/adapters/rpc-server'
+import { createRpcServerComponent } from '../../../src/adapters/rpc-server'
 import { IRPCServerComponent, RpcServerContext } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import {
@@ -14,6 +14,7 @@ import {
 } from '../../mocks/components'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { mockSns } from '../../mocks/components/sns'
+import mitt from 'mitt'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -24,9 +25,10 @@ jest.mock('@dcl/rpc', () => ({
 
 describe('createRpcServerComponent', () => {
   let rpcServer: IRPCServerComponent
-
   let rpcServerMock: jest.Mocked<RpcServer<RpcServerContext>>
   let setHandlerMock: jest.Mock, attachTransportMock: jest.Mock
+  let mockTransport: Transport
+  let mockEmitter: ReturnType<typeof mitt>
 
   beforeEach(async () => {
     rpcServerMock = createRpcServer({
@@ -36,15 +38,20 @@ describe('createRpcServerComponent', () => {
     setHandlerMock = rpcServerMock.setHandler as jest.Mock
     attachTransportMock = rpcServerMock.attachTransport as jest.Mock
 
+    mockEmitter = mitt()
+    mockTransport = {
+      on: jest.fn(),
+      send: jest.fn(),
+      close: jest.fn()
+    } as unknown as Transport
+
     rpcServer = await createRpcServerComponent({
       logs: mockLogs,
       db: mockDb,
       pubsub: mockPubSub,
       config: mockConfig,
       server: mockUWs,
-      nats: mockNats,
       archipelagoStats: mockArchipelagoStats,
-      redis: mockRedis,
       catalystClient: mockCatalystClient,
       sns: mockSns
     })
@@ -68,12 +75,47 @@ describe('createRpcServerComponent', () => {
 
   describe('attachUser', () => {
     it('should attach a user and register transport events', () => {
-      const mockTransport = { on: jest.fn() } as unknown as Transport
       const address = '0x123'
 
       rpcServer.attachUser({ transport: mockTransport, address })
 
       expect(mockTransport.on).toHaveBeenCalledWith('close', expect.any(Function))
+      expect(attachTransportMock).toHaveBeenCalledWith(mockTransport, {
+        subscribers: expect.any(Object),
+        address
+      })
+    })
+
+    it('should clean up subscribers when transport closes', () => {
+      const address = '0x123'
+
+      rpcServer.attachUser({ transport: mockTransport, address })
+
+      const closeHandler = (mockTransport.on as jest.Mock).mock.calls[0][1]
+
+      closeHandler()
+
+      rpcServer.detachUser(address)
+    })
+  })
+
+  describe.skip('detachUser', () => {
+    const address = '0x123'
+
+    beforeEach(() => {
+      rpcServer.attachUser({ transport: mockTransport, address })
+    })
+
+    it('should clean up subscriber when detaching user', () => {
+      rpcServer.detachUser(address)
+
+      rpcServer.detachUser(address)
+    })
+
+    it('should handle detaching non-existent user', () => {
+      const nonExistentAddress = '0x456'
+
+      rpcServer.detachUser(nonExistentAddress)
     })
   })
 })

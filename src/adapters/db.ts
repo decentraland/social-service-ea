@@ -277,7 +277,6 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       }
     },
     async updateFriendshipStatus(friendshipId, isActive, txClient) {
-      logger.debug(`updating ${friendshipId} - ${isActive}`)
       const query = SQL`UPDATE friendships SET is_active = ${isActive}, updated_at = now() WHERE id = ${friendshipId} RETURNING id, created_at`
 
       const {
@@ -334,14 +333,14 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query: SQLStatement = SQL`
         SELECT DISTINCT
           CASE
-            WHEN LOWER(address_requester) = ${normalizedUserAddress} THEN address_requested
-            ELSE address_requester
+            WHEN LOWER(address_requester) = ${normalizedUserAddress} THEN LOWER(address_requested)
+            ELSE LOWER(address_requester)
           END as address
         FROM friendships
         WHERE (
-          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) IN (${normalizedOnlinePotentialFriends}))
+          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) IN (${normalizedOnlinePotentialFriends.join(',')}))
           OR
-          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) IN (${normalizedOnlinePotentialFriends}))
+          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) IN (${normalizedOnlinePotentialFriends.join(',')}))
         )
         AND is_active = true`
 

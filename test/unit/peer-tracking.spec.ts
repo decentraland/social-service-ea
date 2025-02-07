@@ -1,13 +1,21 @@
 import { createPeerTrackingComponent, PEER_STATUS_HANDLERS } from '../../src/adapters/peer-tracking'
 import { FRIEND_STATUS_UPDATES_CHANNEL } from '../../src/adapters/pubsub'
-import { mockLogs, mockNats, mockPubSub } from '../mocks/components'
+import { mockConfig, mockLogs, mockNats, mockPubSub, mockRedis } from '../mocks/components'
 import { IPeerTrackingComponent } from '../../src/types'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('PeerTrackingComponent', () => {
   let peerTracking: IPeerTrackingComponent
 
-  beforeEach(() => {
-    peerTracking = createPeerTrackingComponent({ logs: mockLogs, nats: mockNats, pubsub: mockPubSub })
+  beforeEach(async () => {
+    jest.clearAllMocks()
+    peerTracking = await createPeerTrackingComponent({
+      logs: mockLogs,
+      nats: mockNats,
+      pubsub: mockPubSub,
+      redis: mockRedis,
+      config: mockConfig
+    })
   })
 
   describe('start', () => {
@@ -36,22 +44,36 @@ describe('PeerTrackingComponent', () => {
 
   describe('message handling', () => {
     PEER_STATUS_HANDLERS.forEach((handler) => {
-      it(`should handle ${handler.event} messages correctly`, async () => {
+      it(`should handle ${handler.event} messages and update cache only when status changes`, async () => {
         await peerTracking.subscribeToPeerStatusUpdates()
 
         const messageHandler = mockNats.subscribe.mock.calls.find((call) => call[0] === handler.pattern)?.[1]
-
         expect(messageHandler).toBeDefined()
+
+        mockRedis.get.mockResolvedValueOnce(null)
 
         await messageHandler(null, {
           subject: `peer.0x123.${handler.event}`,
           data: undefined
         })
 
+        expect(mockRedis.put).toHaveBeenCalledWith('peer-status:0x123', handler.status, expect.any(Object))
         expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIEND_STATUS_UPDATES_CHANNEL, {
           address: '0x123',
           status: handler.status
         })
+
+        jest.clearAllMocks()
+
+        mockRedis.get.mockResolvedValueOnce(handler.status)
+
+        await messageHandler(null, {
+          subject: `peer.0x123.${handler.event}`,
+          data: undefined
+        })
+
+        expect(mockRedis.put).not.toHaveBeenCalled()
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
 
       it(`should handle ${handler.event} message errors`, async () => {
@@ -65,8 +87,48 @@ describe('PeerTrackingComponent', () => {
           data: undefined
         })
 
+        expect(mockRedis.put).not.toHaveBeenCalled()
         expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
+
+      it(`should handle Redis errors gracefully`, async () => {
+        await peerTracking.subscribeToPeerStatusUpdates()
+
+        const messageHandler = mockNats.subscribe.mock.calls.find((call) => call[0] === handler.pattern)?.[1]
+
+        mockRedis.get.mockRejectedValueOnce(new Error('Redis error'))
+
+        await messageHandler(null, {
+          subject: `peer.0x123.${handler.event}`,
+          data: undefined
+        })
+
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('subscribeToPeerStatusUpdates', () => {
+    it('should handle subscription errors gracefully', async () => {
+      // Mock nats.subscribe to throw an error for one of the patterns
+      const subscribeError = new Error('NATS subscription failed')
+      mockNats.subscribe.mockImplementationOnce(() => {
+        throw subscribeError
+      })
+
+      await peerTracking.subscribeToPeerStatusUpdates()
+
+      // Verify error was logged
+      expect(mockLogs.getLogger('peer-tracking-component').error).toHaveBeenCalledWith(
+        `Error subscribing to ${PEER_STATUS_HANDLERS[0].pattern}`,
+        {
+          error: subscribeError.message
+        }
+      )
+
+      // Verify other subscriptions were still created
+      const subscriptions = peerTracking.getSubscriptions()
+      expect(subscriptions.size).toBe(PEER_STATUS_HANDLERS.length - 1)
     })
   })
 })
