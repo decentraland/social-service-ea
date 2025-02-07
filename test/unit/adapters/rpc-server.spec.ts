@@ -7,9 +7,7 @@ import {
   mockConfig,
   mockDb,
   mockLogs,
-  mockNats,
   mockPubSub,
-  mockRedis,
   mockUWs
 } from '../../mocks/components'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
@@ -78,9 +76,9 @@ describe('createRpcServerComponent', () => {
   })
 
   describe('attachUser', () => {
-    it('should attach a user and register transport events', () => {
-      const address = '0x123'
+    const address = '0x123'
 
+    it('should attach a user and register transport events', () => {
       rpcServer.attachUser({ transport: mockTransport, address })
 
       expect(mockTransport.on).toHaveBeenCalledWith('close', expect.any(Function))
@@ -90,36 +88,86 @@ describe('createRpcServerComponent', () => {
       })
     })
 
-    it('should clean up subscribers when transport closes', () => {
-      const address = '0x123'
-
+    it('should create and store a new emitter for the user', () => {
       rpcServer.attachUser({ transport: mockTransport, address })
 
-      const closeHandler = (mockTransport.on as jest.Mock).mock.calls[0][1]
+      const subscriber = subscribersContext.getSubscriber(address)
+      expect(subscriber).toBeDefined()
+      expect(subscriber.all).toBeDefined()
+      expect(subscribersContext.getSubscribersAddresses()).toContain(address)
+    })
 
+    it('should not override existing subscriber for the same address', () => {
+      rpcServer.attachUser({ transport: mockTransport, address })
+      const firstSubscriber = subscribersContext.getSubscriber(address)
+
+      rpcServer.attachUser({ transport: mockTransport, address })
+      const secondSubscriber = subscribersContext.getSubscriber(address)
+
+      expect(secondSubscriber).toBe(firstSubscriber)
+    })
+
+    it('should clean up subscribers when transport closes', () => {
+      rpcServer.attachUser({ transport: mockTransport, address })
+      
+      const closeHandler = (mockTransport.on as jest.Mock).mock.calls[0][1]
+      
       closeHandler()
 
-      rpcServer.detachUser(address)
+      expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
+    })
+
+    it('should maintain separate subscribers for different addresses', () => {
+      const address2 = '0x456'
+      
+      rpcServer.attachUser({ transport: mockTransport, address })
+      rpcServer.attachUser({ transport: mockTransport, address: address2 })
+
+      const subscriber1 = subscribersContext.getSubscriber(address)
+      const subscriber2 = subscribersContext.getSubscriber(address2)
+
+      expect(subscriber1).not.toBe(subscriber2)
+      expect(subscribersContext.getSubscribersAddresses()).toContain(address)
+      expect(subscribersContext.getSubscribersAddresses()).toContain(address2)
     })
   })
 
-  describe.skip('detachUser', () => {
+  describe('detachUser', () => {
     const address = '0x123'
 
     beforeEach(() => {
       rpcServer.attachUser({ transport: mockTransport, address })
     })
 
-    it('should clean up subscriber when detaching user', () => {
+    it('should remove subscriber when detaching user', () => {
+      expect(subscribersContext.getSubscribersAddresses()).toContain(address)
+      
       rpcServer.detachUser(address)
+      
+      expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
+    })
+
+    it('should clear subscriber events when detaching', () => {
+      const subscriber = subscribersContext.getSubscriber(address)
+      const clearSpy = jest.spyOn(subscriber.all, 'clear')
 
       rpcServer.detachUser(address)
+
+      expect(clearSpy).toHaveBeenCalled()
     })
 
     it('should handle detaching non-existent user', () => {
       const nonExistentAddress = '0x456'
 
-      rpcServer.detachUser(nonExistentAddress)
+      expect(() => rpcServer.detachUser(nonExistentAddress)).not.toThrow()
+      expect(subscribersContext.getSubscribersAddresses()).not.toContain(nonExistentAddress)
+    })
+
+    it('should handle multiple detach calls for same user', () => {
+      rpcServer.detachUser(address)
+      rpcServer.detachUser(address)
+
+      expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
     })
   })
 })
