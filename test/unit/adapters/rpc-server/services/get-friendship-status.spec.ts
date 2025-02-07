@@ -13,7 +13,7 @@ describe('getFriendshipStatusService', () => {
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
-    subscribers: undefined
+    subscribersContext: undefined
   }
 
   const userAddress = '0x456'

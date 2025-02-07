@@ -41,7 +41,7 @@ describe('Notifications', () => {
       await sendNotification(Action.REQUEST, mockContext, components)
 
       expect(mockSns.publishMessage).toHaveBeenCalledWith({
-        key: `0x123-0x456-${Events.Type.SOCIAL_SERVICE}-${Events.SubType.SocialService.FRIENDSHIP_REQUEST}`,
+        key: 'request-id',
         type: Events.Type.SOCIAL_SERVICE,
         subType: Events.SubType.SocialService.FRIENDSHIP_REQUEST,
         timestamp: expect.any(Number),
@@ -68,7 +68,7 @@ describe('Notifications', () => {
       await sendNotification(Action.ACCEPT, mockContext, components)
 
       expect(mockSns.publishMessage).toHaveBeenCalledWith({
-        key: `0x123-0x456-${Events.Type.SOCIAL_SERVICE}-${Events.SubType.SocialService.FRIENDSHIP_ACCEPTED}`,
+        key: 'request-id',
         type: Events.Type.SOCIAL_SERVICE,
         subType: Events.SubType.SocialService.FRIENDSHIP_ACCEPTED,
         timestamp: expect.any(Number),
@@ -110,7 +110,7 @@ describe('Notifications', () => {
       await sendNotification(Action.REQUEST, contextWithoutMessage, components)
 
       expect(mockSns.publishMessage).toHaveBeenCalledWith({
-        key: `0x123-0x456-${Events.Type.SOCIAL_SERVICE}-${Events.SubType.SocialService.FRIENDSHIP_REQUEST}`,
+        key: 'request-id',
         type: Events.Type.SOCIAL_SERVICE,
         subType: Events.SubType.SocialService.FRIENDSHIP_REQUEST,
         timestamp: expect.any(Number),
