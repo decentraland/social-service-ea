@@ -8,11 +8,10 @@ import { normalizeAddress } from '../../../utils/address'
 import { getPage } from '../../../utils/pagination'
 import { parseProfilesToFriends } from '../../../logic/friends'
 
-export async function getMutualFriendsService({
-  components: { logs, db, catalystClient, config }
-}: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'config'>) {
+export function getMutualFriendsService({
+  components: { logs, db, catalystClient }
+}: RPCServiceContext<'logs' | 'db' | 'catalystClient'>) {
   const logger = logs.getLogger('get-mutual-friends-service')
-  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function (
     request: GetMutualFriendsPayload,
@@ -28,10 +27,10 @@ export async function getMutualFriendsService({
         db.getMutualFriendsCount(requester, requested)
       ])
 
-      const profiles = await catalystClient.getEntitiesByPointers(mutualFriends.map((friend) => friend.address))
+      const profiles = await catalystClient.getProfiles(mutualFriends.map((friend) => friend.address))
 
       return {
-        friends: parseProfilesToFriends(profiles, profileImagesUrl),
+        friends: parseProfilesToFriends(profiles),
         paginationData: {
           total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)

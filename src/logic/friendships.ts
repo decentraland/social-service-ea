@@ -8,8 +8,8 @@ import {
 import { Action, FriendshipAction, FriendshipRequest, FriendshipStatus, SubscriptionEventsEmitter } from '../types'
 import { normalizeAddress } from '../utils/address'
 import { parseProfileToFriend } from './friends'
-import { Entity } from '@dcl/schemas'
-import { getProfileAvatar } from './profiles'
+import { getProfileUserId } from './profiles'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 // [to]: [from]
 export const FRIENDSHIP_ACTION_TRANSITIONS: Record<Action, (Action | null)[]> = {
@@ -132,8 +132,7 @@ export function parseUpsertFriendshipRequest(request: UpsertFriendshipPayload): 
 
 export function parseEmittedUpdateToFriendshipUpdate(
   update: SubscriptionEventsEmitter['friendshipUpdate'],
-  profile: Entity,
-  profileImagesUrl: string
+  profile: Pick<Profile, 'avatars'>
 ): FriendshipUpdate | null {
   switch (update.action) {
     case Action.REQUEST:
@@ -143,7 +142,7 @@ export function parseEmittedUpdateToFriendshipUpdate(
           request: {
             id: update.id,
             createdAt: update.timestamp,
-            friend: parseProfileToFriend(profile, profileImagesUrl),
+            friend: parseProfileToFriend(profile),
             message: update.metadata?.message
           }
         }
@@ -199,12 +198,11 @@ export function parseEmittedUpdateToFriendshipUpdate(
 
 export function parseEmittedUpdateToFriendConnectivityUpdate(
   update: Pick<SubscriptionEventsEmitter['friendConnectivityUpdate'], 'status'>,
-  profile: Entity,
-  profileImagesUrl: string
+  profile: Pick<Profile, 'avatars'>
 ): FriendConnectivityUpdate | null {
   const { status } = update
   return {
-    friend: parseProfileToFriend(profile, profileImagesUrl),
+    friend: parseProfileToFriend(profile),
     status: status
   }
 }
@@ -222,12 +220,11 @@ export function getFriendshipRequestStatus(
 
 export function parseFriendshipRequestToFriendshipRequestResponse(
   request: Pick<FriendshipRequest, 'id' | 'timestamp' | 'metadata'>,
-  profile: Entity,
-  profileImagesUrl: string
+  profile: Pick<Profile, 'avatars'>
 ): FriendshipRequestResponse {
   return {
     id: request.id,
-    friend: parseProfileToFriend(profile, profileImagesUrl),
+    friend: parseProfileToFriend(profile),
     createdAt: new Date(request.timestamp).getTime(),
     message: request.metadata?.message || ''
   }
@@ -235,10 +232,9 @@ export function parseFriendshipRequestToFriendshipRequestResponse(
 
 export function parseFriendshipRequestsToFriendshipRequestResponses(
   requests: FriendshipRequest[],
-  profiles: Entity[],
-  profileImagesUrl: string
+  profiles: Pick<Profile, 'avatars'>[]
 ): FriendshipRequestResponse[] {
-  const profilesMap = new Map(profiles.map((profile) => [getProfileAvatar(profile).userId, profile]))
+  const profilesMap = new Map(profiles.map((profile) => [getProfileUserId(profile), profile]))
 
   return requests
     .map((request) => {
@@ -248,7 +244,7 @@ export function parseFriendshipRequestsToFriendshipRequestResponses(
         return null
       }
 
-      return parseFriendshipRequestToFriendshipRequestResponse(request, profile, profileImagesUrl)
+      return parseFriendshipRequestToFriendshipRequestResponse(request, profile)
     })
     .filter((request) => !!request)
 }

@@ -35,23 +35,23 @@ export async function createRpcServerComponent({
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
 
-  const getFriends = await getFriendsService({ components: { logs, db, catalystClient, config } })
-  const getMutualFriends = await getMutualFriendsService({ components: { logs, db, catalystClient, config } })
-  const getPendingFriendshipRequests = await getPendingFriendshipRequestsService({
-    components: { logs, db, catalystClient, config }
+  const getFriends = getFriendsService({ components: { logs, db, catalystClient } })
+  const getMutualFriends = getMutualFriendsService({ components: { logs, db, catalystClient } })
+  const getPendingFriendshipRequests = getPendingFriendshipRequestsService({
+    components: { logs, db, catalystClient }
   })
-  const getSentFriendshipRequests = await getSentFriendshipRequestsService({
-    components: { logs, db, catalystClient, config }
+  const getSentFriendshipRequests = getSentFriendshipRequestsService({
+    components: { logs, db, catalystClient }
   })
-  const upsertFriendship = await upsertFriendshipService({
-    components: { logs, db, pubsub, config, catalystClient, sns }
+  const upsertFriendship = upsertFriendshipService({
+    components: { logs, db, pubsub, catalystClient, sns }
   })
   const getFriendshipStatus = getFriendshipStatusService({ components: { logs, db } })
-  const subscribeToFriendshipUpdates = await subscribeToFriendshipUpdatesService({
-    components: { logs, config, catalystClient }
+  const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({
+    components: { logs, catalystClient }
   })
-  const subscribeToFriendConnectivityUpdates = await subscribeToFriendConnectivityUpdatesService({
-    components: { logs, db, archipelagoStats, config, catalystClient }
+  const subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
+    components: { logs, db, archipelagoStats, catalystClient }
   })
 
   rpcServer.setHandler(async function handler(port) {

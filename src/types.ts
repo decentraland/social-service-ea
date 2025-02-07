@@ -18,8 +18,9 @@ import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { INatsComponent, Subscription } from '@well-known-components/nats-component/dist/types'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Entity, FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
+import { FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -137,12 +138,12 @@ export type IPeerTrackingComponent = IBaseComponent & {
 export type ICatalystClientRequestOptions = {
   retries?: number
   waitTime?: number
-  contentServerUrl?: string
+  lambdasServerUrl?: string
 }
 
 export type ICatalystClientComponent = {
-  getEntitiesByPointers(pointers: string[], options?: ICatalystClientRequestOptions): Promise<Entity[]>
-  getEntityByPointer(pointer: string, options?: ICatalystClientRequestOptions): Promise<Entity>
+  getProfiles(ids: string[], options?: ICatalystClientRequestOptions): Promise<Profile[]>
+  getProfile(id: string, options?: ICatalystClientRequestOptions): Promise<Profile>
 }
 
 export type IPublisherComponent = {
