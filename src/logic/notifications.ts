@@ -29,7 +29,7 @@ const createEvent = <T extends FriendshipRequestEvent | FriendshipAcceptedEvent>
   const receiverProfileAvatar = getProfileAvatar(receiverProfile)
 
   const baseEvent = {
-    key: `${senderAddress}-${receiverAddress}-${type}-${subType}`,
+    key: requestId,
     type,
     subType,
     timestamp: Date.now(),
