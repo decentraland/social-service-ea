@@ -21,7 +21,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   const subscribersContext = createSubscribersContext()
 
   beforeEach(async () => {
-    subscribeToFriendConnectivityUpdates = await subscribeToFriendConnectivityUpdatesService({
+    subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
       components: {
         logs: mockLogs,
         db: mockDb,
@@ -100,5 +100,54 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     const result = await generator.return(undefined)
 
     expect(result.done).toBe(true)
+  })
+
+  it('should get the address from the update', async () => {
+    mockDb.getOnlineFriends.mockResolvedValueOnce([])
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([])
+    mockHandler.mockImplementationOnce(async function* () {
+      yield {
+        friend: parseProfileToFriend(mockFriendProfile),
+        status: ConnectivityStatus.ONLINE
+      }
+    })
+
+    const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+    await generator.next()
+
+    const getAddressFromUpdate = mockHandler.mock.calls[0][0].getAddressFromUpdate
+    const mockUpdate = { address: '0x456', status: ConnectivityStatus.ONLINE }
+    expect(getAddressFromUpdate(mockUpdate)).toBe('0x456')
+  })
+
+  it('should filter connectivity updates based on address conditions', async () => {
+    mockDb.getOnlineFriends.mockResolvedValueOnce([])
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([])
+    mockHandler.mockImplementationOnce(async function* () {
+      yield {
+        friend: parseProfileToFriend(mockFriendProfile),
+        status: ConnectivityStatus.ONLINE
+      }
+    })
+
+    const mockUpdateFromOther = {
+      address: '0x456', // different from context.address
+      status: ConnectivityStatus.ONLINE
+    }
+
+    const mockUpdateFromSelf = {
+      address: '0x123', // same as context.address
+      status: ConnectivityStatus.ONLINE
+    }
+
+    const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+    await generator.next()
+
+    // Extract the shouldHandleUpdate function from the handler call
+    const shouldHandleUpdate = mockHandler.mock.calls[0][0].shouldHandleUpdate
+
+    // Verify filtering logic
+    expect(shouldHandleUpdate(mockUpdateFromOther)).toBe(true) // Should handle: from different address
+    expect(shouldHandleUpdate(mockUpdateFromSelf)).toBe(false) // Should not handle: from self
   })
 })

@@ -15,7 +15,7 @@ describe('getPendingFriendshipRequestsService', () => {
   }
 
   beforeEach(async () => {
-    getPendingRequests = await getPendingFriendshipRequestsService({
+    getPendingRequests = getPendingFriendshipRequestsService({
       components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })

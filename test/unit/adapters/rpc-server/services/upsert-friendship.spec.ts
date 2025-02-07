@@ -70,7 +70,7 @@ describe('upsertFriendshipService', () => {
 
   beforeEach(async () => {
 
-    upsertFriendship = await upsertFriendshipService({
+    upsertFriendship = upsertFriendshipService({
       components: {
         db: mockDb,
         logs: mockLogs,

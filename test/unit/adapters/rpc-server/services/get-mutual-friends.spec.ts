@@ -19,7 +19,7 @@ describe('getMutualFriendsService', () => {
   }
 
   beforeEach(async () => {
-    getMutualFriends = await getMutualFriendsService({
+    getMutualFriends = getMutualFriendsService({
       components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })

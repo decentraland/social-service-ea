@@ -16,7 +16,7 @@ import {
   FriendshipStatus as FriendshipRequestStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockExpectedFriendshipRequest, createMockFriendshipRequest } from '../../mocks/friendship-request'
-import { createMockProfile, mockProfile, PROFILE_IMAGES_URL } from '../../mocks/profile'
+import { createMockProfile, mockProfile } from '../../mocks/profile'
 import { parseProfileToFriend } from '../../../src/logic/friends'
 
 describe('isFriendshipActionValid()', () => {
