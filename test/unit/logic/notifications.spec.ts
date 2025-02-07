@@ -4,6 +4,7 @@ import { sendNotification, shouldNotify } from '../../../src/logic/notifications
 import { mockSns } from '../../mocks/components/sns'
 import { mockLogs } from '../../mocks/components'
 import { createMockProfile } from '../../mocks/profile'
+import { getProfilePictureUrl } from '../../../src/logic/profiles'
 
 describe('Notifications', () => {
   const mockSenderProfile = createMockProfile('0x123')
@@ -36,10 +37,6 @@ describe('Notifications', () => {
       logs: mockLogs
     }
 
-    beforeEach(() => {
-      jest.clearAllMocks()
-    })
-
     it('should send friendship request notification', async () => {
       await sendNotification(Action.REQUEST, mockContext, components)
 
@@ -53,13 +50,13 @@ describe('Notifications', () => {
           sender: {
             address: '0x123',
             name: mockSenderProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x123',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockSenderProfile),
             hasClaimedName: mockSenderProfile.metadata.avatars[0].hasClaimedName
           },
           receiver: {
             address: '0x456',
             name: mockReceiverProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x456',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockReceiverProfile),
             hasClaimedName: mockReceiverProfile.metadata.avatars[0].hasClaimedName
           },
           message: 'Hello!'
@@ -80,13 +77,13 @@ describe('Notifications', () => {
           sender: {
             address: '0x123',
             name: mockSenderProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x123',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockSenderProfile),
             hasClaimedName: mockSenderProfile.metadata.avatars[0].hasClaimedName
           },
           receiver: {
             address: '0x456',
             name: mockReceiverProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x456',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockReceiverProfile),
             hasClaimedName: mockReceiverProfile.metadata.avatars[0].hasClaimedName
           },
           message: 'Hello!'
@@ -94,21 +91,93 @@ describe('Notifications', () => {
       })
     })
 
-    it('should log notification errors', async () => {
-      const error = new Error('SNS error')
-      mockSns.publishMessage.mockRejectedValueOnce(error)
+    it('should throw error if action is not valid', async () => {
+      const invalidAction = 'INVALID_ACTION' as any
 
-      await sendNotification(Action.REQUEST, mockContext, components)
-
-      expect(mockLogs.getLogger('notifications').error).toHaveBeenCalledWith(
-        `Error sending notification for action ${Action.REQUEST}`,
-        {
-          error: error.message,
-          action: Action.REQUEST,
-          senderAddress: '0x123',
-          receiverAddress: '0x456'
-        }
+      await expect(sendNotification(invalidAction, mockContext, components)).rejects.toThrow(
+        `Invalid action: ${invalidAction}`
       )
+
+      expect(mockSns.publishMessage).not.toHaveBeenCalled()
+    })
+
+    it('should send notification without message when no message is provided', async () => {
+      const contextWithoutMessage = {
+        ...mockContext,
+        message: undefined
+      }
+
+      await sendNotification(Action.REQUEST, contextWithoutMessage, components)
+
+      expect(mockSns.publishMessage).toHaveBeenCalledWith({
+        key: `0x123-0x456-${Events.Type.SOCIAL_SERVICE}-${Events.SubType.SocialService.FRIENDSHIP_REQUEST}`,
+        type: Events.Type.SOCIAL_SERVICE,
+        subType: Events.SubType.SocialService.FRIENDSHIP_REQUEST,
+        timestamp: expect.any(Number),
+        metadata: {
+          requestId: 'request-id',
+          sender: {
+            address: '0x123',
+            name: mockSenderProfile.metadata.avatars[0].name,
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockSenderProfile),
+            hasClaimedName: mockSenderProfile.metadata.avatars[0].hasClaimedName
+          },
+          receiver: {
+            address: '0x456',
+            name: mockReceiverProfile.metadata.avatars[0].name,
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockReceiverProfile),
+            hasClaimedName: mockReceiverProfile.metadata.avatars[0].hasClaimedName
+          }
+        }
+      })
+    })
+
+    describe('retry behavior', () => {
+      it('should retry failed notifications and succeed eventually', async () => {
+        const logger = mockLogs.getLogger('notifications')
+
+        mockSns.publishMessage
+          .mockRejectedValueOnce(new Error('First failure'))
+          .mockRejectedValueOnce(new Error('Second failure'))
+          .mockResolvedValueOnce(undefined)
+
+        await sendNotification(Action.REQUEST, mockContext, components)
+
+        expect(mockSns.publishMessage).toHaveBeenCalledTimes(3)
+        expect(logger.warn).toHaveBeenCalledWith(
+          'Attempt 1 failed for action request',
+          expect.objectContaining({
+            error: 'First failure',
+            action: Action.REQUEST
+          })
+        )
+        expect(logger.warn).toHaveBeenCalledWith(
+          'Attempt 2 failed for action request',
+          expect.objectContaining({
+            error: 'Second failure',
+            action: Action.REQUEST
+          })
+        )
+        expect(logger.info).toHaveBeenCalledWith('Notification sent for action request', expect.any(Object))
+      })
+
+      it('should fail after all retries are exhausted', async () => {
+        const logger = mockLogs.getLogger('notifications')
+        const error = new Error('Persistent failure')
+
+        mockSns.publishMessage.mockRejectedValue(error)
+
+        await sendNotification(Action.REQUEST, mockContext, components)
+
+        expect(mockSns.publishMessage).toHaveBeenCalledTimes(3)
+        expect(logger.error).toHaveBeenCalledWith(
+          'Error sending notification for action request',
+          expect.objectContaining({
+            error: expect.stringContaining('Failed after 3 attempts'),
+            action: Action.REQUEST
+          })
+        )
+      })
     })
   })
 })
