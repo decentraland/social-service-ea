@@ -50,7 +50,6 @@ export async function upsertFriendshipService({
       const lastAction = await db.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
 
       if (!validateNewFriendshipAction(context.address, parsedRequest, lastAction)) {
-        logger.error('invalid action for a friendship')
         return {
           response: {
             $case: 'invalidFriendshipAction',
