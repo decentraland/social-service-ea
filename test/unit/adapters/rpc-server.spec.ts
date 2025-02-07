@@ -1,5 +1,5 @@
-import { createRpcServerComponent } from '../../../src/adapters/rpc-server'
-import { IRPCServerComponent, RpcServerContext } from '../../../src/types'
+import { createRpcServerComponent, createSubscribersContext } from '../../../src/adapters/rpc-server'
+import { IRPCServerComponent, ISubscribersContext, RpcServerContext } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import {
   mockArchipelagoStats,
@@ -29,8 +29,11 @@ describe('createRpcServerComponent', () => {
   let setHandlerMock: jest.Mock, attachTransportMock: jest.Mock
   let mockTransport: Transport
   let mockEmitter: ReturnType<typeof mitt>
-
+  let subscribersContext: ISubscribersContext
+  
   beforeEach(async () => {
+    subscribersContext = createSubscribersContext()
+
     rpcServerMock = createRpcServer({
       logger: mockLogs.getLogger('rpcServer-test')
     }) as jest.Mocked<RpcServer<RpcServerContext>>
@@ -53,7 +56,8 @@ describe('createRpcServerComponent', () => {
       server: mockUWs,
       archipelagoStats: mockArchipelagoStats,
       catalystClient: mockCatalystClient,
-      sns: mockSns
+      sns: mockSns,
+      subscribersContext
     })
   })
 
@@ -81,7 +85,7 @@ describe('createRpcServerComponent', () => {
 
       expect(mockTransport.on).toHaveBeenCalledWith('close', expect.any(Function))
       expect(attachTransportMock).toHaveBeenCalledWith(mockTransport, {
-        subscribers: expect.any(Object),
+        subscribersContext: expect.any(Object),
         address
       })
     })

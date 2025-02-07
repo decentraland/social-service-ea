@@ -6,6 +6,7 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
+import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 
 jest.mock('../../../../../src/logic/updates')
 
@@ -17,6 +18,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   const friend = {
     address: '0x456'
   }
+  const subscribersContext = createSubscribersContext()
 
   beforeEach(async () => {
     mockConfig.requireString.mockResolvedValue(PROFILE_IMAGES_URL)
@@ -33,7 +35,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
 
     rpcContext = {
       address: '0x123',
-      subscribers: {}
+      subscribersContext
     }
   })
 

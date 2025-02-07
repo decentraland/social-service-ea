@@ -44,6 +44,7 @@ export type BaseComponents = {
   catalystClient: ICatalystClientComponent
   sns: IPublisherComponent
   wsPool: IWSPoolComponent
+  subscribersContext: ISubscribersContext
 }
 
 // components used in runtime
@@ -157,6 +158,14 @@ export type IWSPoolComponent = {
   cleanup(): void
 }
 
+export type ISubscribersContext = {
+  getSubscribers: () => Subscribers
+  getSubscribersAddresses: () => string[]
+  getSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
+  addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => void
+  removeSubscriber: (address: string) => void
+}
+
 // this type simplifies the typings of http handlers
 export type HandlerContextWithPath<
   ComponentNames extends keyof AppComponents,
@@ -231,7 +240,7 @@ export type Subscribers = Record<string, Emitter<SubscriptionEventsEmitter>>
 
 export type RpcServerContext = {
   address: string
-  subscribers: Subscribers
+  subscribersContext: ISubscribersContext
 }
 
 export type Friendship = {

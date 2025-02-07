@@ -11,7 +11,7 @@ describe('getSentFriendshipRequestsService', () => {
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
-    subscribers: undefined
+    subscribersContext: undefined
   }
 
   beforeEach(async () => {

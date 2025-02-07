@@ -1,11 +1,16 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
-import { ICatalystClientComponent, IDatabaseComponent, RpcServerContext, SubscriptionEventsEmitter } from '../types'
+import {
+  ICatalystClientComponent,
+  IDatabaseComponent,
+  ISubscribersContext,
+  RpcServerContext,
+  SubscriptionEventsEmitter
+} from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
 
 export type ILogger = ILoggerComponent.ILogger
 
-type SharedContext = Pick<RpcServerContext, 'subscribers'>
 type UpdateHandler<T extends keyof SubscriptionEventsEmitter> = (
   update: SubscriptionEventsEmitter[T]
 ) => void | Promise<void>
@@ -39,10 +44,9 @@ function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: Update
   }
 }
 
-export function friendshipUpdateHandler(getContext: () => SharedContext, logger: ILogger) {
+export function friendshipUpdateHandler(rpcContext: ISubscribersContext, logger: ILogger) {
   return handleUpdate<'friendshipUpdate'>((update) => {
-    const context = getContext()
-    const updateEmitter = context.subscribers[update.to]
+    const updateEmitter = rpcContext.getSubscriber(update.to)
     if (updateEmitter) {
       updateEmitter.emit('friendshipUpdate', update)
     }
@@ -50,20 +54,18 @@ export function friendshipUpdateHandler(getContext: () => SharedContext, logger:
 }
 
 export function friendConnectivityUpdateHandler(
-  getContext: () => SharedContext,
+  rpcContext: ISubscribersContext,
   logger: ILogger,
   db: IDatabaseComponent
 ) {
   return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
-    const context = getContext()
-
-    const onlineSubscribers = Object.keys(context.subscribers)
+    const onlineSubscribers = rpcContext.getSubscribersAddresses()
     const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
 
     friends.forEach(({ address: friendAddress }) => {
       const normalizedAddress = normalizeAddress(friendAddress)
 
-      const emitter = context.subscribers[normalizedAddress]
+      const emitter = rpcContext.getSubscriber(normalizedAddress)
       if (emitter) {
         emitter.emit('friendConnectivityUpdate', update)
       }
@@ -81,7 +83,7 @@ export async function* handleSubscriptionUpdates<T, U>({
   parseArgs
 }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
   const normalizedAddress = normalizeAddress(rpcContext.address)
-  const eventEmitter = rpcContext.subscribers[normalizedAddress]
+  const eventEmitter = rpcContext.subscribersContext.getSubscribers()[normalizedAddress]
   const eventNameString = String(eventName)
 
   if (!eventEmitter) {

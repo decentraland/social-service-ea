@@ -7,7 +7,7 @@ import { createPgComponent } from '@well-known-components/pg-component'
 import { AppComponents } from './types'
 import { metricDeclarations } from './metrics'
 import { createDBComponent } from './adapters/db'
-import { createRpcServerComponent } from './adapters/rpc-server'
+import { createSubscribersContext, createRpcServerComponent } from './adapters/rpc-server'
 import { createRedisComponent } from './adapters/redis'
 import { createPubSubComponent } from './adapters/pubsub'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
@@ -60,6 +60,7 @@ export async function initComponents(): Promise<AppComponents> {
   const nats = await createNatsComponent({ logs, config })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const sns = await createSnsComponent({ config })
+  const subscribersContext = createSubscribersContext()
   const rpcServer = await createRpcServerComponent({
     logs,
     db,
@@ -68,7 +69,8 @@ export async function initComponents(): Promise<AppComponents> {
     config,
     archipelagoStats,
     catalystClient,
-    sns
+    sns,
+    subscribersContext
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
@@ -91,6 +93,7 @@ export async function initComponents(): Promise<AppComponents> {
     peerTracking,
     catalystClient,
     sns,
-    wsPool
+    wsPool,
+    subscribersContext
   }
 }

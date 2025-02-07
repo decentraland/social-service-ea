@@ -19,7 +19,7 @@ jest.mock('../../../../../src/logic/friendships')
 describe('upsertFriendshipService', () => {
   let upsertFriendship: Awaited<ReturnType<typeof upsertFriendshipService>>
 
-  const rpcContext: RpcServerContext = { address: '0x123', subscribers: undefined }
+  const rpcContext: RpcServerContext = { address: '0x123', subscribersContext: undefined }
   const userAddress = '0x456'
   const message = 'Hello'
 

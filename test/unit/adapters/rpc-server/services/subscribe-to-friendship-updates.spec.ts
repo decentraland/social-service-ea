@@ -5,12 +5,14 @@ import { mockCatalystClient, mockConfig, mockLogs } from '../../../../mocks/comp
 import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
 import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
+import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 
 jest.mock('../../../../../src/logic/updates')
 
 describe('subscribeToFriendshipUpdatesService', () => {
   let subscribeToFriendshipUpdates: Awaited<ReturnType<typeof subscribeToFriendshipUpdatesService>>
   let rpcContext: RpcServerContext
+  const subscribersContext = createSubscribersContext()
   const mockFriendProfile = createMockProfile('0x456')
   const mockHandler = handleSubscriptionUpdates as jest.Mock
 
@@ -27,7 +29,7 @@ describe('subscribeToFriendshipUpdatesService', () => {
 
     rpcContext = {
       address: '0x123',
-      subscribers: {}
+      subscribersContext
     }
   })
 
