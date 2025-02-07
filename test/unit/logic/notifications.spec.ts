@@ -4,6 +4,7 @@ import { sendNotification, shouldNotify } from '../../../src/logic/notifications
 import { mockSns } from '../../mocks/components/sns'
 import { mockLogs } from '../../mocks/components'
 import { createMockProfile } from '../../mocks/profile'
+import { getProfilePictureUrl } from '../../../src/logic/profiles'
 
 describe('Notifications', () => {
   const mockSenderProfile = createMockProfile('0x123')
@@ -49,13 +50,13 @@ describe('Notifications', () => {
           sender: {
             address: '0x123',
             name: mockSenderProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x123',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockSenderProfile),
             hasClaimedName: mockSenderProfile.metadata.avatars[0].hasClaimedName
           },
           receiver: {
             address: '0x456',
             name: mockReceiverProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x456',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockReceiverProfile),
             hasClaimedName: mockReceiverProfile.metadata.avatars[0].hasClaimedName
           },
           message: 'Hello!'
@@ -76,13 +77,13 @@ describe('Notifications', () => {
           sender: {
             address: '0x123',
             name: mockSenderProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x123',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockSenderProfile),
             hasClaimedName: mockSenderProfile.metadata.avatars[0].hasClaimedName
           },
           receiver: {
             address: '0x456',
             name: mockReceiverProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x456',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockReceiverProfile),
             hasClaimedName: mockReceiverProfile.metadata.avatars[0].hasClaimedName
           },
           message: 'Hello!'
@@ -118,13 +119,13 @@ describe('Notifications', () => {
           sender: {
             address: '0x123',
             name: mockSenderProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x123',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockSenderProfile),
             hasClaimedName: mockSenderProfile.metadata.avatars[0].hasClaimedName
           },
           receiver: {
             address: '0x456',
             name: mockReceiverProfile.metadata.avatars[0].name,
-            profileImageUrl: 'http://test.com/images/0x456',
+            profileImageUrl: getProfilePictureUrl(mockContext.profileImagesUrl, mockReceiverProfile),
             hasClaimedName: mockReceiverProfile.metadata.avatars[0].hasClaimedName
           }
         }

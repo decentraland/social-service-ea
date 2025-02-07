@@ -2,7 +2,7 @@ import { Events, Entity } from '@dcl/schemas'
 import { AppComponents, IPublisherComponent } from '../types'
 import { Action } from '../types'
 import { FriendshipRequestEvent, FriendshipAcceptedEvent } from '@dcl/schemas'
-import { getProfileAvatar } from './profiles'
+import { getProfileAvatar, getProfilePictureUrl } from './profiles'
 import { retry } from '../utils/retrier'
 
 type NotificationContext = {
@@ -38,13 +38,13 @@ const createEvent = <T extends FriendshipRequestEvent | FriendshipAcceptedEvent>
       sender: {
         address: senderAddress,
         name: senderProfileAvatar.name,
-        profileImageUrl: `${profileImagesUrl}/${senderAddress}`,
+        profileImageUrl: getProfilePictureUrl(profileImagesUrl, senderProfile),
         hasClaimedName: senderProfileAvatar.hasClaimedName
       },
       receiver: {
         address: receiverAddress,
         name: receiverProfileAvatar.name,
-        profileImageUrl: `${profileImagesUrl}/${receiverAddress}`,
+        profileImageUrl: getProfilePictureUrl(profileImagesUrl, receiverProfile),
         hasClaimedName: receiverProfileAvatar.hasClaimedName
       }
     }
