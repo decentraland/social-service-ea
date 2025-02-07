@@ -69,7 +69,6 @@ describe('ws-pool-component', () => {
       const mockIterator = ['ws:conn:test-1', 'ws:conn:test-2'][Symbol.iterator]()
       mockRedisClient.scanIterator.mockReturnValue(mockIterator)
 
-      // Mock Redis get for connection data
       mockRedis.get
         .mockResolvedValueOnce({ lastActivity: Date.now() - 400000 }) // Expired
         .mockResolvedValueOnce({ lastActivity: Date.now() - 100000 }) // Not expired
@@ -144,6 +143,30 @@ describe('ws-pool-component', () => {
       })
 
       await expect(wsPool.acquireConnection('test-1')).rejects.toThrow('Transaction failed')
+    })
+
+    it('should set connection data in Redis with correct parameters', async () => {
+      const now = Date.now()
+      jest.spyOn(Date, 'now').mockReturnValue(now)
+
+      mockRedisClient.multi.mockReturnValue({
+        zCard: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        zAdd: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue(['OK', 1])
+      })
+
+      await wsPool.acquireConnection('test-1')
+
+      const multiSetCall = mockRedisClient.multi().set.mock.calls[0]
+      expect(multiSetCall[0]).toBe('ws:conn:test-1')
+      expect(multiSetCall[1]).toBe(JSON.stringify({ lastActivity: now }))
+      expect(multiSetCall[2]).toEqual({
+        NX: true,
+        EX: Math.ceil(300000 / 1000)
+      })
+
+      jest.restoreAllMocks()
     })
   })
 
