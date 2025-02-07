@@ -161,7 +161,7 @@ export type IWSPoolComponent = {
 export type ISubscribersContext = {
   getSubscribers: () => Subscribers
   getSubscribersAddresses: () => string[]
-  getSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
+  getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
   addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => void
   removeSubscriber: (address: string) => void
 }

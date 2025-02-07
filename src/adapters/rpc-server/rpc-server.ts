@@ -12,7 +12,6 @@ import { getFriendshipStatusService } from './services/get-friendship-status'
 import { subscribeToFriendConnectivityUpdatesService } from './services/subscribe-to-friend-connectivity-updates'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
 import { friendshipUpdateHandler, friendConnectivityUpdateHandler } from '../../logic/updates'
-import { normalizeAddress } from '../../utils/address'
 
 export async function createRpcServerComponent({
   logs,
@@ -81,24 +80,21 @@ export async function createRpcServerComponent({
       )
     },
     attachUser({ transport, address }) {
-      const normalizedAddress = normalizeAddress(address)
-
       transport.on('close', () => {
-        subscribersContext.removeSubscriber(normalizedAddress)
-        logger.debug('User disconnected and removed from subscribers', { address: normalizedAddress })
+        subscribersContext.removeSubscriber(address)
+        logger.debug('User disconnected and removed from subscribers', { address })
       })
 
-      const eventEmitter = subscribersContext.getSubscriber(normalizedAddress)
-      subscribersContext.addSubscriber(normalizedAddress, eventEmitter)
+      const eventEmitter = subscribersContext.getOrAddSubscriber(address)
+      subscribersContext.addSubscriber(address, eventEmitter)
       rpcServer.attachTransport(transport, {
         subscribersContext,
-        address: normalizedAddress
+        address
       })
     },
     detachUser(address) {
-      const normalizedAddress = normalizeAddress(address)
-      subscribersContext.removeSubscriber(normalizedAddress)
-      logger.debug('Detached user and cleaned up subscribers', { address: normalizedAddress })
+      subscribersContext.removeSubscriber(address)
+      logger.debug('Detached user and cleaned up subscribers', { address })
     }
   }
 }

@@ -25,7 +25,7 @@ describe('updates handlers', () => {
   describe('friendshipUpdateHandler', () => {
     it('should emit friendship update to the correct subscriber', () => {
       const handler = friendshipUpdateHandler(subscribersContext, logger)
-      const subscriber = subscribersContext.getSubscriber('0x456')
+      const subscriber = subscribersContext.getOrAddSubscriber('0x456')
       const emitSpy = jest.spyOn(subscriber, 'emit')
 
       const update = {
@@ -71,8 +71,8 @@ describe('updates handlers', () => {
   describe('friendConnectivityUpdateHandler', () => {
     it('should emit status update to all online friends', async () => {
       const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockDb)
-      const subscriber456 = subscribersContext.getSubscriber('0x456')
-      const subscriber789 = subscribersContext.getSubscriber('0x789')
+      const subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
+      const subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
       const emitSpy456 = jest.spyOn(subscriber456, 'emit')
       const emitSpy789 = jest.spyOn(subscriber789, 'emit')
 
@@ -182,7 +182,7 @@ describe('updates handlers', () => {
       })
 
       const resultPromise = generator.next()
-      rpcContext.subscribersContext.getSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+      rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
 
       const result = await resultPromise
       expect(result.value).toEqual({ parsed: true })
@@ -205,7 +205,7 @@ describe('updates handlers', () => {
       })
 
       const resultPromise = generator.next()
-      rpcContext.subscribersContext.getSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+      rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
 
       const result = await resultPromise
       expect(result.value).toEqual({ parsed: true })
@@ -229,7 +229,7 @@ describe('updates handlers', () => {
       for (let i = 0; i < 2; i++) {
         parser.mockResolvedValueOnce({ parsed: i })
         const resultPromise = generator.next()
-        rpcContext.subscribersContext.getSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
         const result = await resultPromise
         expect(result.value).toEqual({ parsed: i })
         expect(parser).toHaveBeenCalledWith(friendshipUpdate, mockProfile, PROFILE_IMAGES_URL)
@@ -249,7 +249,7 @@ describe('updates handlers', () => {
       })
 
       generator.next()
-      rpcContext.subscribersContext.getSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+      rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
 
       await sleep(100)
 
@@ -272,7 +272,7 @@ describe('updates handlers', () => {
       })
 
       const resultPromise = generator.next()
-      rpcContext.subscribersContext.getSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+      rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
 
       await sleep(100)
 
@@ -282,29 +282,6 @@ describe('updates handlers', () => {
       })
       expect(logger.debug).toHaveBeenCalledWith('Skipping update friendshipUpdate for 0x123', {
         update: JSON.stringify(friendshipUpdate)
-      })
-    })
-
-    it('should handle missing emitter gracefully', async () => {
-      const contextWithoutEmitter: RpcServerContext = {
-        address: '0xnoemitter',
-        subscribersContext: createSubscribersContext()
-      }
-
-      const generator = handleSubscriptionUpdates({
-        rpcContext: contextWithoutEmitter,
-        eventName: 'friendshipUpdate',
-        components: { catalystClient: mockCatalystClient, logger },
-        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
-        shouldHandleUpdate: () => true,
-        parser,
-        parseArgs: [PROFILE_IMAGES_URL]
-      })
-
-      const result = await generator.next()
-      expect(result.done).toBe(true)
-      expect(logger.error).toHaveBeenCalledWith('No emitter found for friendshipUpdate', {
-        address: '0xnoemitter'
       })
     })
 
@@ -323,7 +300,7 @@ describe('updates handlers', () => {
       })
 
       const resultPromise = generator.next()
-      rpcContext.subscribersContext.getSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+      rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
 
       await expect(resultPromise).rejects.toThrow('Test error')
       expect(logger.error).toHaveBeenCalledWith('Error in generator loop', {

@@ -91,7 +91,7 @@ describe('createRpcServerComponent', () => {
     it('should create and store a new emitter for the user', () => {
       rpcServer.attachUser({ transport: mockTransport, address })
 
-      const subscriber = subscribersContext.getSubscriber(address)
+      const subscriber = subscribersContext.getOrAddSubscriber(address)
       expect(subscriber).toBeDefined()
       expect(subscriber.all).toBeDefined()
       expect(subscribersContext.getSubscribersAddresses()).toContain(address)
@@ -99,10 +99,10 @@ describe('createRpcServerComponent', () => {
 
     it('should not override existing subscriber for the same address', () => {
       rpcServer.attachUser({ transport: mockTransport, address })
-      const firstSubscriber = subscribersContext.getSubscriber(address)
+      const firstSubscriber = subscribersContext.getOrAddSubscriber(address)
 
       rpcServer.attachUser({ transport: mockTransport, address })
-      const secondSubscriber = subscribersContext.getSubscriber(address)
+      const secondSubscriber = subscribersContext.getOrAddSubscriber(address)
 
       expect(secondSubscriber).toBe(firstSubscriber)
     })
@@ -123,8 +123,8 @@ describe('createRpcServerComponent', () => {
       rpcServer.attachUser({ transport: mockTransport, address })
       rpcServer.attachUser({ transport: mockTransport, address: address2 })
 
-      const subscriber1 = subscribersContext.getSubscriber(address)
-      const subscriber2 = subscribersContext.getSubscriber(address2)
+      const subscriber1 = subscribersContext.getOrAddSubscriber(address)
+      const subscriber2 = subscribersContext.getOrAddSubscriber(address2)
 
       expect(subscriber1).not.toBe(subscriber2)
       expect(subscribersContext.getSubscribersAddresses()).toContain(address)
@@ -148,7 +148,7 @@ describe('createRpcServerComponent', () => {
     })
 
     it('should clear subscriber events when detaching', () => {
-      const subscriber = subscribersContext.getSubscriber(address)
+      const subscriber = subscribersContext.getOrAddSubscriber(address)
       const clearSpy = jest.spyOn(subscriber.all, 'clear')
 
       rpcServer.detachUser(address)

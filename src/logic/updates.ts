@@ -46,7 +46,7 @@ function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: Update
 
 export function friendshipUpdateHandler(rpcContext: ISubscribersContext, logger: ILogger) {
   return handleUpdate<'friendshipUpdate'>((update) => {
-    const updateEmitter = rpcContext.getSubscriber(update.to)
+    const updateEmitter = rpcContext.getOrAddSubscriber(update.to)
     if (updateEmitter) {
       updateEmitter.emit('friendshipUpdate', update)
     }
@@ -63,9 +63,7 @@ export function friendConnectivityUpdateHandler(
     const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
 
     friends.forEach(({ address: friendAddress }) => {
-      const normalizedAddress = normalizeAddress(friendAddress)
-
-      const emitter = rpcContext.getSubscriber(normalizedAddress)
+      const emitter = rpcContext.getOrAddSubscriber(friendAddress)
       if (emitter) {
         emitter.emit('friendConnectivityUpdate', update)
       }
@@ -83,15 +81,8 @@ export async function* handleSubscriptionUpdates<T, U>({
   parseArgs
 }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
   const normalizedAddress = normalizeAddress(rpcContext.address)
-  const eventEmitter = rpcContext.subscribersContext.getSubscribers()[normalizedAddress]
+  const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
   const eventNameString = String(eventName)
-
-  if (!eventEmitter) {
-    logger.error(`No emitter found for ${eventNameString}`, {
-      address: normalizedAddress
-    })
-    return
-  }
 
   const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
 

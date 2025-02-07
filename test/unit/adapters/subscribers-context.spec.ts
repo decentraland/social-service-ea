@@ -2,100 +2,92 @@ import { createSubscribersContext } from '../../../src/adapters/rpc-server/subsc
 import mitt from 'mitt'
 import { SubscriptionEventsEmitter } from '../../../src/types'
 
-describe('SubscribersContext', () => {
-  describe('createSubscribersContext', () => {
-    it('should create an RPC context with empty subscribers', () => {
-      const context = createSubscribersContext()
+describe('SubscribersContext Component', () => {
+  function createTestContext() {
+    return {
+      context: createSubscribersContext(),
+      subscriber: mitt<SubscriptionEventsEmitter>(),
+      address: '0x123'
+    }
+  }
+
+  describe('initialization', () => {
+    it('should initialize with empty subscribers', () => {
+      const { context } = createTestContext()
       expect(context.getSubscribers()).toEqual({})
     })
+  })
 
-    it('should add a subscriber', () => {
-      const context = createSubscribersContext()
-      const subscriber = mitt<SubscriptionEventsEmitter>()
-      const address = '0x123'
-
-      context.addSubscriber(address, subscriber)
-
-      const subscribers = context.getSubscribers()
-      expect(subscribers[address]).toBe(subscriber)
-    })
-
-    it('should not override existing subscriber', () => {
-      const context = createSubscribersContext()
-      const subscriber1 = mitt<SubscriptionEventsEmitter>()
-      const subscriber2 = mitt<SubscriptionEventsEmitter>()
-      const address = '0x123'
-
-      context.addSubscriber(address, subscriber1)
-      context.addSubscriber(address, subscriber2)
-
-      const subscribers = context.getSubscribers()
-      expect(subscribers[address]).toBe(subscriber1)
-    })
-
-    it('should remove a subscriber', () => {
-      const context = createSubscribersContext()
-      const subscriber = mitt<SubscriptionEventsEmitter>()
-      const address = '0x123'
-
-      context.addSubscriber(address, subscriber)
-      context.removeSubscriber(address)
-
-      const subscribers = context.getSubscribers()
-      expect(subscribers[address]).toBeUndefined()
-    })
-
-    it('should handle removing non-existent subscriber', () => {
-      const context = createSubscribersContext()
-      const address = '0x123'
-
-      context.removeSubscriber(address)
-
-      const subscribers = context.getSubscribers()
-      expect(subscribers[address]).toBeUndefined()
-    })
-
-    it('should get subscribers addresses', () => {
-      const context = createSubscribersContext()
-      const addresses = ['0x123', '0x456', '0x789']
-
-      addresses.forEach((address) => {
-        context.addSubscriber(address, mitt())
+  describe('subscriber management', () => {
+    describe('adding subscribers', () => {
+      it('should add a new subscriber', () => {
+        const { context, subscriber, address } = createTestContext()
+        
+        context.addSubscriber(address, subscriber)
+        
+        expect(context.getSubscribers()[address]).toBe(subscriber)
       })
 
+      it('should preserve existing subscriber when adding duplicate', () => {
+        const { context, subscriber, address } = createTestContext()
+        const newSubscriber = mitt<SubscriptionEventsEmitter>()
+        
+        context.addSubscriber(address, subscriber)
+        context.addSubscriber(address, newSubscriber)
+        
+        expect(context.getSubscribers()[address]).toBe(subscriber)
+      })
+    })
+
+    describe('removing subscribers', () => {
+      it('should remove existing subscriber and clear its events', () => {
+        const { context, subscriber, address } = createTestContext()
+        const clearSpy = jest.spyOn(subscriber.all, 'clear')
+        
+        context.addSubscriber(address, subscriber)
+        context.removeSubscriber(address)
+        
+        expect(context.getSubscribers()[address]).toBeUndefined()
+        expect(clearSpy).toHaveBeenCalled()
+      })
+
+      it('should handle removing non-existent subscriber gracefully', () => {
+        const { context, address } = createTestContext()
+        
+        context.removeSubscriber(address)
+        
+        expect(context.getSubscribers()[address]).toBeUndefined()
+      })
+    })
+  })
+
+  describe('subscriber queries', () => {
+    it('should return all subscriber addresses', () => {
+      const { context } = createTestContext()
+      const addresses = ['0x123', '0x456', '0x789']
+      
+      addresses.forEach(address => context.addSubscriber(address, mitt()))
+      
       expect(context.getSubscribersAddresses()).toEqual(addresses)
     })
 
-    it('should get existing subscriber', () => {
-      const context = createSubscribersContext()
-      const subscriber = mitt<SubscriptionEventsEmitter>()
-      const address = '0x123'
+    describe('getOrAddSubscriber', () => {
+      it('should return existing subscriber', () => {
+        const { context, subscriber, address } = createTestContext()
+        
+        context.addSubscriber(address, subscriber)
+        
+        expect(context.getOrAddSubscriber(address)).toBe(subscriber)
+      })
 
-      context.addSubscriber(address, subscriber)
-
-      expect(context.getSubscriber(address)).toBe(subscriber)
-    })
-
-    it('should return new emitter for non-existent subscriber', () => {
-      const context = createSubscribersContext()
-      const address = '0x123'
-
-      const subscriber = context.getSubscriber(address)
-
-      expect(subscriber).toBeDefined()
-      expect(subscriber.all).toBeDefined()
-    })
-
-    it('should clear subscriber events on removal', () => {
-      const context = createSubscribersContext()
-      const subscriber = mitt<SubscriptionEventsEmitter>()
-      const address = '0x123'
-      const clearSpy = jest.spyOn(subscriber.all, 'clear')
-
-      context.addSubscriber(address, subscriber)
-      context.removeSubscriber(address)
-
-      expect(clearSpy).toHaveBeenCalled()
+      it('should create and return new subscriber if none exists', () => {
+        const { context, address } = createTestContext()
+        
+        const newSubscriber = context.getOrAddSubscriber(address)
+        
+        expect(newSubscriber).toBeDefined()
+        expect(newSubscriber.all).toBeDefined()
+      })
     })
   })
 })
