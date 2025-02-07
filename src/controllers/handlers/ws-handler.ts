@@ -56,34 +56,7 @@ export async function registerWsHandler(
       const data = ws.getUserData()
       metrics.increment('ws_messages_received')
 
-      if (data.auth) {
-        try {
-          if (!data.isConnected) {
-            logger.warn('Received message but connection is marked as disconnected', {
-              address: data.address,
-              clientId: data.clientId
-            })
-            return
-          }
-
-          data.eventEmitter.emit('message', message)
-          metrics.increment('ws_messages_sent', { address: data.address })
-
-          if (data.clientId) {
-            wsPool.updateActivity(data.clientId)
-          }
-        } catch (error: any) {
-          logger.error('Error emitting message', {
-            error,
-            address: data.address,
-            clientId: data.clientId,
-            isConnected: String(data.isConnected),
-            hasEventEmitter: String(!!data.eventEmitter)
-          })
-          metrics.increment('ws_errors', { address: data.address })
-          ws.send(JSON.stringify({ error: 'Error processing message', message: error.message }))
-        }
-      } else if (isNotAuthenticated(data)) {
+      if (isNotAuthenticated(data)) {
         try {
           const authChainMessage = textDecoder.decode(message)
           const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
@@ -119,6 +92,33 @@ export async function registerWsHandler(
           })
           metrics.increment('ws_auth_errors')
           ws.close()
+        }
+      } else {
+        try {
+          if (!data.isConnected) {
+            logger.warn('Received message but connection is marked as disconnected', {
+              address: data.address,
+              clientId: data.clientId
+            })
+            return
+          }
+
+          data.eventEmitter.emit('message', message)
+          metrics.increment('ws_messages_sent', { address: data.address })
+
+          if (data.clientId) {
+            wsPool.updateActivity(data.clientId)
+          }
+        } catch (error: any) {
+          logger.error('Error emitting message', {
+            error,
+            address: data.address,
+            clientId: data.clientId,
+            isConnected: String(data.isConnected),
+            hasEventEmitter: String(!!data.eventEmitter)
+          })
+          metrics.increment('ws_errors', { address: data.address })
+          ws.send(JSON.stringify({ error: 'Error processing message', message: error.message }))
         }
       }
     },
