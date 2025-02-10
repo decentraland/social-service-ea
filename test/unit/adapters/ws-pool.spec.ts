@@ -20,11 +20,15 @@ describe('ws-pool-component', () => {
     global.clearInterval = mockClearInterval
 
     mockRedisClient = mockRedis.client as jest.Mocked<any>
+    // Set isReady to true by default
+    Object.defineProperty(mockRedisClient, 'isReady', { value: true, configurable: true })
+
     mockRedisClient.zCard.mockResolvedValue(0)
     mockRedisClient.exists.mockResolvedValue(0)
     mockRedisClient.set.mockResolvedValue('OK')
     mockRedisClient.zAdd.mockResolvedValue(1)
     mockRedisClient.multi.mockReturnValue({
+      zCard: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       zAdd: jest.fn().mockReturnThis(),
       exec: jest.fn().mockResolvedValue(['OK', 1])
@@ -44,6 +48,8 @@ describe('ws-pool-component', () => {
 
   afterEach(() => {
     global.setInterval = originalSetInterval
+    // Reset isReady to default state
+    Object.defineProperty(mockRedisClient, 'isReady', { value: true, configurable: true })
   })
 
   describe('initialization', () => {
@@ -68,6 +74,11 @@ describe('ws-pool-component', () => {
       const cleanupFn = mockSetInterval.mock.calls[0][0]
       const mockIterator = ['ws:conn:test-1', 'ws:conn:test-2'][Symbol.iterator]()
       mockRedisClient.scanIterator.mockReturnValue(mockIterator)
+
+      // Mock successful Redis operations
+      mockRedisClient.del.mockResolvedValue(1)
+      mockRedisClient.zRem.mockResolvedValue(1)
+      mockRedisClient.zCard.mockResolvedValue(0)
 
       mockRedis.get
         .mockResolvedValueOnce({ lastActivity: Date.now() - 400000 }) // Expired
@@ -172,14 +183,25 @@ describe('ws-pool-component', () => {
 
   describe('releaseConnection', () => {
     it('should release existing connection', async () => {
+      // Mock successful Redis operations
+      mockRedisClient.del.mockResolvedValue(1)
+      mockRedisClient.zRem.mockResolvedValue(1)
+      mockRedisClient.zCard.mockResolvedValue(0)
+
       await wsPool.releaseConnection('test-1')
+
       expect(mockRedisClient.del).toHaveBeenCalledWith('ws:conn:test-1')
       expect(mockRedisClient.zRem).toHaveBeenCalledWith('ws:active_connections', 'test-1')
     })
 
     it('should update metrics after release', async () => {
+      // Mock successful Redis operations
+      mockRedisClient.del.mockResolvedValue(1)
+      mockRedisClient.zRem.mockResolvedValue(1)
       mockRedisClient.zCard.mockResolvedValue(0)
+
       await wsPool.releaseConnection('test-1')
+
       expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, 0)
     })
   })
@@ -220,13 +242,32 @@ describe('ws-pool-component', () => {
   describe('cleanup', () => {
     it('should cleanup all connections and clear interval', async () => {
       const mockIterator = ['ws:conn:test-1', 'ws:conn:test-2'][Symbol.iterator]()
-      mockRedisClient.scanIterator.mockReturnValue(mockIterator as any)
+      mockRedisClient.scanIterator.mockReturnValue(mockIterator)
+
+      // Mock successful Redis operations
+      mockRedisClient.del.mockResolvedValue(1)
+      mockRedisClient.zRem.mockResolvedValue(1)
+      mockRedisClient.zCard.mockResolvedValue(0)
 
       await wsPool.cleanup()
 
       expect(mockRedisClient.del).toHaveBeenCalledTimes(2)
       expect(mockRedisClient.zRem).toHaveBeenCalledTimes(2)
       expect(mockClearInterval).toHaveBeenCalled()
+    })
+
+    it('should handle Redis client closure gracefully', async () => {
+      const mockIterator = ['ws:conn:test-1'][Symbol.iterator]()
+      mockRedisClient.scanIterator.mockReturnValue(mockIterator)
+
+      // Simulate Redis client closure
+      Object.defineProperty(mockRedisClient, 'isReady', { value: false, configurable: true })
+      mockRedisClient.del.mockRejectedValueOnce(new Error('The client is closed'))
+
+      await wsPool.cleanup()
+
+      expect(mockClearInterval).toHaveBeenCalled()
+      // Should not throw error
     })
   })
 })

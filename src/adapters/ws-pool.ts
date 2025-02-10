@@ -53,10 +53,19 @@ export async function createWSPoolComponent({
   }
 
   async function releaseConnection(id: string) {
-    const key = `ws:conn:${id}`
-    await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
-    const totalConnections = await redis.client.zCard('ws:active_connections')
-    metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
+    try {
+      const key = `ws:conn:${id}`
+      if (redis.client.isReady) {
+        await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
+        const totalConnections = await redis.client.zCard('ws:active_connections')
+        metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
+      }
+    } catch (error: any) {
+      if (error.message === 'The client is closed') {
+        return
+      }
+      throw error
+    }
   }
 
   async function updateActivity(id: string) {
@@ -81,10 +90,21 @@ export async function createWSPoolComponent({
 
   async function cleanup() {
     clearInterval(cleanupInterval)
-    const pattern = 'ws:conn:*'
-    for await (const key of redis.client.scanIterator({ MATCH: pattern })) {
-      const id = key.replace('ws:conn:', '')
-      await releaseConnection(id)
+    try {
+      const pattern = 'ws:conn:*'
+      // Check if Redis client is still available
+      if (redis.client.isReady) {
+        for await (const key of redis.client.scanIterator({ MATCH: pattern })) {
+          const id = key.replace('ws:conn:', '')
+          await releaseConnection(id)
+        }
+      }
+    } catch (error: any) {
+      // Gracefully handle Redis client closure
+      if (error.message === 'The client is closed') {
+        return
+      }
+      throw error
     }
   }
 
