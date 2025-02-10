@@ -10,10 +10,15 @@ const L1_TESTNET = 'sepolia'
 
 export async function createCatalystClient({
   fetcher,
-  config
+  config,
+  logs
 }: Pick<AppComponents, 'fetcher' | 'config' | 'logs'>): Promise<ICatalystClientComponent> {
   const loadBalancer = await config.requireString('CATALYST_LAMBDAS_URL_LOADBALANCER')
-  const contractNetwork = (await config.getString('ENV')) === 'prd' ? L1_MAINNET : L1_TESTNET
+  const logger = logs.getLogger('catalyst-client')
+  const env = await config.getString('ENV')
+  const contractNetwork = env === 'prd' ? L1_MAINNET : L1_TESTNET
+
+  logger.info('Creating catalyst client', { loadBalancer, env: env ?? 'unknown', contractNetwork })
 
   function getLambdasClientOrDefault(lambdasServerUrl?: string): LambdasClient {
     return createLambdasClient({ fetcher, url: lambdasServerUrl ?? loadBalancer })
