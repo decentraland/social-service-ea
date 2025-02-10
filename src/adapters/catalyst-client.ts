@@ -12,8 +12,8 @@ export async function createCatalystClient({
   fetcher,
   config
 }: Pick<AppComponents, 'fetcher' | 'config' | 'logs'>): Promise<ICatalystClientComponent> {
-  const loadBalancer = await config.requireString('CATALYST_CONTENT_URL_LOADBALANCER')
-  const contractNetwork = (await config.getString('ENV')) === 'prod' ? L1_MAINNET : L1_TESTNET
+  const loadBalancer = await config.requireString('CATALYST_LAMBDAS_URL_LOADBALANCER')
+  const contractNetwork = (await config.getString('ENV')) === 'prd' ? L1_MAINNET : L1_TESTNET
 
   function getLambdasClientOrDefault(lambdasServerUrl?: string): LambdasClient {
     return createLambdasClient({ fetcher, url: lambdasServerUrl ?? loadBalancer })
