@@ -46,6 +46,10 @@ function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: Update
 
 export function friendshipUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
   return handleUpdate<'friendshipUpdate'>((update) => {
+    logger.info('Friendship update', {
+      update: JSON.stringify(update)
+    })
+
     const updateEmitter = subscribersContext.getOrAddSubscriber(update.to)
     if (updateEmitter) {
       updateEmitter.emit('friendshipUpdate', update)
@@ -64,8 +68,9 @@ export function friendConnectivityUpdateHandler(
 
     logger.info('Friend connectivity update', {
       update: JSON.stringify(update),
-      friendsCount: friends.length,
-      onlineSubscribersCount: onlineSubscribers.length
+      onlineSubscribersCount: onlineSubscribers.length,
+      onlineSubscribers: onlineSubscribers.join(', '),
+      onlineFriendsCount: friends.length
     })
 
     friends.forEach(({ address: friendAddress }) => {
