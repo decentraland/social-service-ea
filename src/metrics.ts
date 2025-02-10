@@ -13,33 +13,27 @@ export const metricDeclarations = {
   },
   ws_messages_received: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket messages received',
-    labelNames: ['address']
+    help: 'Number of WebSocket messages received'
   },
   ws_messages_sent: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket messages sent',
-    labelNames: ['address']
+    help: 'Number of WebSocket messages sent'
   },
   ws_errors: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket errors',
-    labelNames: ['address']
+    help: 'Number of WebSocket errors'
   },
   ws_transport_errors: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket transport errors',
-    labelNames: ['address']
+    help: 'Number of WebSocket transport errors'
   },
   ws_auth_errors: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket authentication errors',
-    labelNames: ['address']
+    help: 'Number of WebSocket authentication errors'
   },
   ws_idle_timeouts: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket idle timeouts',
-    labelNames: ['id']
+    help: 'Number of WebSocket idle timeouts'
   }
 }
 

@@ -104,7 +104,7 @@ export async function registerWsHandler(
           }
 
           data.eventEmitter.emit('message', message)
-          metrics.increment('ws_messages_sent', { address: data.address })
+          metrics.increment('ws_messages_sent')
 
           if (data.wsConnectionId) {
             wsPool.updateActivity(data.wsConnectionId)
@@ -117,7 +117,7 @@ export async function registerWsHandler(
             isConnected: String(data.isConnected),
             hasEventEmitter: String(!!data.eventEmitter)
           })
-          metrics.increment('ws_errors', { address: data.address })
+          metrics.increment('ws_errors')
           ws.send(JSON.stringify({ error: 'Error processing message', message: error.message }))
         }
       }
