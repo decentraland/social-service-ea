@@ -14,6 +14,8 @@ export function subscribeToFriendConnectivityUpdatesService({
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
+    let cleanup: (() => void) | undefined
+
     try {
       const onlinePeers = await archipelagoStats.getPeersFromCache()
       const onlineFriends = await db.getOnlineFriends(context.address, onlinePeers)
@@ -26,7 +28,7 @@ export function subscribeToFriendConnectivityUpdatesService({
 
       yield* parsedProfiles
 
-      yield* handleSubscriptionUpdates({
+      cleanup = yield* handleSubscriptionUpdates({
         rpcContext: context,
         eventName: 'friendConnectivityUpdate',
         components: {
@@ -39,8 +41,11 @@ export function subscribeToFriendConnectivityUpdatesService({
         parser: parseEmittedUpdateToFriendConnectivityUpdate
       })
     } catch (error: any) {
-      logger.error('Error in friend updates subscription:', error)
+      logger.error('Error in friend connectivity updates subscription:', error)
       throw error
+    } finally {
+      logger.info('Cleaning up friend connectivity updates subscription')
+      cleanup?.()
     }
   }
 }
