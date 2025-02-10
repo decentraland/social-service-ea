@@ -22,6 +22,8 @@ export function upsertFriendshipService({
     request: UpsertFriendshipPayload,
     context: RpcServerContext
   ): Promise<UpsertFriendshipResponse> {
+    logger.info('Upserting friendship', { request: JSON.stringify(request) })
+
     const parsedRequest = parseUpsertFriendshipRequest(request)
 
     if (!parsedRequest) {

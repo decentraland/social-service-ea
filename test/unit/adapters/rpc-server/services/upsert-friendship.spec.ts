@@ -69,7 +69,6 @@ describe('upsertFriendshipService', () => {
   const mockReceiverProfile = createMockProfile(userAddress)
 
   beforeEach(async () => {
-
     upsertFriendship = upsertFriendshipService({
       components: {
         db: mockDb,
@@ -166,7 +165,7 @@ describe('upsertFriendshipService', () => {
             timestamp: lastFriendshipAction.timestamp,
             metadata: mockParsedRequest.metadata
           },
-          mockSenderProfile,
+          mockSenderProfile
         )
       }
     })
@@ -203,7 +202,7 @@ describe('upsertFriendshipService', () => {
             timestamp: lastFriendshipAction.timestamp,
             metadata: mockParsedRequest.metadata
           },
-          mockSenderProfile,
+          mockSenderProfile
         )
       }
     })

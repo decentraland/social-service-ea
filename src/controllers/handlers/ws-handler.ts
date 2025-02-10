@@ -45,6 +45,16 @@ export async function registerWsHandler(
 
       try {
         await wsPool.acquireConnection(data.wsConnectionId)
+
+        if (isNotAuthenticated(data)) {
+          data.timeout = setTimeout(() => {
+            try {
+              logger.error('Closing connection, no auth chain received')
+              ws.end()
+            } catch (err) {}
+          }, 30000)
+        }
+
         changeStage(data, { isConnected: true })
         logger.debug('WebSocket opened', { wsConnectionId: data.wsConnectionId })
       } catch (error: any) {
@@ -59,6 +69,7 @@ export async function registerWsHandler(
       if (isNotAuthenticated(data)) {
         try {
           const authChainMessage = textDecoder.decode(message)
+
           const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
             fetcher
           })
@@ -76,6 +87,11 @@ export async function registerWsHandler(
             isConnected: true,
             transport
           })
+
+          if (data.timeout) {
+            clearTimeout(data.timeout)
+            delete data.timeout
+          }
 
           rpcServer.attachUser({ transport, address })
 
@@ -95,6 +111,8 @@ export async function registerWsHandler(
         }
       } else {
         try {
+          logger.info('Received message', { message: textDecoder.decode(message) })
+
           if (!data.isConnected) {
             logger.warn('Received message but connection is marked as disconnected', {
               address: data.address,
@@ -147,6 +165,11 @@ export async function registerWsHandler(
             wsConnectionId
           })
         }
+      }
+
+      if (isNotAuthenticated(data) && data.timeout) {
+        clearTimeout(data.timeout)
+        delete data.timeout
       }
 
       if (wsConnectionId) {

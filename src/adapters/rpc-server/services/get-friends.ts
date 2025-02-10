@@ -16,6 +16,8 @@ export function getFriendsService({
     request: GetFriendsPayload,
     context: RpcServerContext
   ): Promise<PaginatedFriendsProfilesResponse> {
+    logger.info('Getting friends', { request: JSON.stringify(request) })
+
     const { pagination } = request
     const { address: loggedUserAddress } = context
 

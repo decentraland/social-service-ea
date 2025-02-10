@@ -15,6 +15,7 @@ export function getPendingFriendshipRequestsService({
     request: GetFriendshipRequestsPayload,
     context: RpcServerContext
   ): Promise<PaginatedFriendshipRequestsResponse> {
+    logger.info('Getting pending friendship requests', { request: JSON.stringify(request) })
     try {
       const { limit, offset } = request.pagination || {}
       const [pendingRequests, pendingRequestsCount] = await Promise.all([
