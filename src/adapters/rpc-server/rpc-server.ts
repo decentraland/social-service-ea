@@ -80,9 +80,16 @@ export async function createRpcServerComponent({
       )
     },
     attachUser({ transport, address }) {
+      logger.debug('[DEBUGGING CONNECTION] Attaching user to RPC', {
+        address,
+        transportConnected: String(transport.isConnected)
+      })
+
       transport.on('close', () => {
+        logger.debug('[DEBUGGING CONNECTION] Transport closed, removing subscriber', {
+          address
+        })
         subscribersContext.removeSubscriber(address)
-        logger.debug('User disconnected and removed from subscribers', { address })
       })
 
       const eventEmitter = subscribersContext.getOrAddSubscriber(address)
@@ -93,8 +100,10 @@ export async function createRpcServerComponent({
       })
     },
     detachUser(address) {
+      logger.debug('[DEBUGGING CONNECTION] Detaching user from RPC', {
+        address
+      })
       subscribersContext.removeSubscriber(address)
-      logger.debug('Detached user and cleaned up subscribers', { address })
     }
   }
 }

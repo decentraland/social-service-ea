@@ -1,7 +1,7 @@
 import mitt, { Emitter } from 'mitt'
 import { createUWebSocketTransport, IUWebSocket, IUWebSocketEventMap } from '../../../src/utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
-import { mockConfig } from '../../mocks/components'
+import { mockConfig, mockLogs } from '../../mocks/components'
 
 describe('UWebSocketTransport', () => {
   let mockSocket: jest.Mocked<IUWebSocket<{ isConnected: boolean }>>
@@ -28,7 +28,7 @@ describe('UWebSocketTransport', () => {
     } as jest.Mocked<IUWebSocket<{ isConnected: boolean }>>
 
     mockEmitter = mitt<IUWebSocketEventMap>()
-    transport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig)
+    transport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs)
     errorListener = jest.fn()
     transport.on('error', errorListener)
   })
@@ -48,7 +48,7 @@ describe('UWebSocketTransport', () => {
         return null
       })
 
-      const customTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig)
+      const customTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs)
       expect(customTransport.isConnected).toBe(true)
       expect(mockConfig.getNumber).toHaveBeenCalledWith('WS_TRANSPORT_MAX_QUEUE_SIZE')
     })
@@ -90,7 +90,7 @@ describe('UWebSocketTransport', () => {
         return values[key] || null
       })
 
-      const customTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig)
+      const customTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs)
       mockSocket.send.mockReturnValue(0)
 
       const message = new Uint8Array([1, 2, 3])
@@ -223,7 +223,7 @@ describe('UWebSocketTransport', () => {
 
   describe('Connection Management', () => {
     it('should handle message send when transport is not initialized', async () => {
-      const uninitializedTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig)
+      const uninitializedTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs)
       // Force transport to be not ready
       mockSocket.getUserData.mockReturnValue({ isConnected: false })
 

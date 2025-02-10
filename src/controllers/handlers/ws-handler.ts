@@ -21,9 +21,16 @@ export async function registerWsHandler(
 
   server.app.ws<WsUserData>('/', {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? 90, // In seconds
+    sendPingsAutomatically: true,
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
       const wsConnectionId = randomUUID()
+
+      logger.debug('[DEBUGGING CONNECTION] Upgrade requested', {
+        wsConnectionId,
+        ip: req.getHeader('x-forwarded-for'),
+        protocol: req.getHeader('sec-websocket-protocol')
+      })
 
       res.upgrade(
         {
@@ -43,8 +50,17 @@ export async function registerWsHandler(
     open: async (ws) => {
       const data = ws.getUserData()
 
+      logger.debug('[DEBUGGING CONNECTION] Opening connection', {
+        wsConnectionId: data.wsConnectionId,
+        isConnected: String(data.isConnected),
+        auth: String(data.auth)
+      })
+
       try {
         await wsPool.acquireConnection(data.wsConnectionId)
+        logger.debug('[DEBUGGING CONNECTION] Connection acquired', {
+          wsConnectionId: data.wsConnectionId
+        })
 
         if (isNotAuthenticated(data)) {
           data.timeout = setTimeout(() => {
@@ -58,12 +74,21 @@ export async function registerWsHandler(
         changeStage(data, { isConnected: true })
         logger.debug('WebSocket opened', { wsConnectionId: data.wsConnectionId })
       } catch (error: any) {
-        logger.error('Failed to acquire connection', { error: error.message, wsConnectionId: data.wsConnectionId })
+        logger.debug('[DEBUGGING CONNECTION] Failed to acquire connection', {
+          wsConnectionId: data.wsConnectionId,
+          error: error.message
+        })
         ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
       }
     },
     message: async (ws, message) => {
       const data = ws.getUserData()
+      logger.debug('[DEBUGGING CONNECTION] Message received', {
+        wsConnectionId: data.wsConnectionId,
+        isConnected: String(data.isConnected),
+        auth: String(data.auth),
+        messageSize: message.byteLength
+      })
       metrics.increment('ws_messages_received')
 
       if (isNotAuthenticated(data)) {
@@ -78,7 +103,7 @@ export async function registerWsHandler(
           logger.debug('Authenticated User', { address })
 
           const eventEmitter = mitt<IUWebSocketEventMap>()
-          const transport = await createUWebSocketTransport(ws, eventEmitter, config)
+          const transport = await createUWebSocketTransport(ws, eventEmitter, config, logs)
 
           changeStage(data, {
             auth: true,
@@ -96,6 +121,10 @@ export async function registerWsHandler(
           rpcServer.attachUser({ transport, address })
 
           transport.on('close', () => {
+            logger.debug('[DEBUGGING CONNECTION] Transport close event received', {
+              wsConnectionId: data.wsConnectionId,
+              address
+            })
             rpcServer.detachUser(address)
           })
 
@@ -145,11 +174,12 @@ export async function registerWsHandler(
       const { wsConnectionId } = data
       const messageText = textDecoder.decode(message)
 
-      logger.debug('WebSocket closing', {
+      logger.debug('[DEBUGGING CONNECTION] Connection closing', {
+        wsConnectionId,
         code,
         message: messageText,
-        wsConnectionId,
-        ...(data.auth && { address: data.address })
+        isConnected: String(data.isConnected),
+        auth: String(data.auth)
       })
 
       if (data.auth && data.address) {
@@ -181,6 +211,11 @@ export async function registerWsHandler(
         isConnected: false
       })
 
+      logger.debug('[DEBUGGING CONNECTION] Connection cleanup completed', {
+        wsConnectionId,
+        code
+      })
+
       logger.debug('WebSocket closed', {
         code,
         reason: messageText,
@@ -189,9 +224,13 @@ export async function registerWsHandler(
       })
     },
     ping: (ws) => {
-      const { wsConnectionId } = ws.getUserData()
-      if (wsConnectionId) {
-        wsPool.updateActivity(wsConnectionId)
+      const data = ws.getUserData()
+      logger.debug('[DEBUGGING CONNECTION] Ping received', {
+        wsConnectionId: data.wsConnectionId,
+        isConnected: String(data.isConnected)
+      })
+      if (data.wsConnectionId) {
+        wsPool.updateActivity(data.wsConnectionId)
       }
     }
   })

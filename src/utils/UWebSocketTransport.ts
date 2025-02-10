@@ -1,7 +1,8 @@
 import { Transport, TransportEvents } from '@dcl/rpc'
 import mitt, { Emitter } from 'mitt'
 import { future, IFuture } from 'fp-future'
-import { IConfigComponent } from '@well-known-components/interfaces'
+import { IConfigComponent, ILoggerComponent } from '@well-known-components/interfaces'
+import { randomUUID } from 'crypto'
 
 export type RecognizedString =
   | string
@@ -33,8 +34,12 @@ export interface IUWebSocket<T extends { isConnected: boolean; auth?: boolean }>
 export async function createUWebSocketTransport<T extends { isConnected: boolean; auth?: boolean }>(
   socket: IUWebSocket<T>,
   uServerEmitter: Emitter<IUWebSocketEventMap>,
-  config: IConfigComponent
+  config: IConfigComponent,
+  logs: ILoggerComponent
 ): Promise<Transport> {
+  const logger = logs.getLogger('ws-transport')
+  const transportId = randomUUID()
+
   const maxQueueSize = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')) || 1000
   const queueDrainTimeoutInMs = (await config.getNumber('WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT_IN_MS')) || 5000
 
@@ -46,7 +51,22 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   let queueProcessingTimeout: NodeJS.Timeout | null = null
 
   async function processQueue() {
-    if (isProcessing || !isTransportActive || !isInitialized) return
+    if (isProcessing || !isTransportActive || !isInitialized) {
+      logger.debug('[DEBUGGING CONNECTION] Queue processing skipped', {
+        transportId,
+        isProcessing: String(isProcessing),
+        isTransportActive: String(isTransportActive),
+        isInitialized: String(isInitialized),
+        queueLength: messageQueue.length
+      })
+      return
+    }
+
+    logger.debug('[DEBUGGING CONNECTION] Processing queue', {
+      transportId,
+      queueLength: messageQueue.length
+    })
+
     isProcessing = true
 
     if (queueProcessingTimeout) {
@@ -88,6 +108,15 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   async function send(msg: Uint8Array) {
+    logger.debug('[DEBUGGING CONNECTION] Attempting to send message', {
+      transportId,
+      messageSize: msg.byteLength,
+      queueLength: messageQueue.length,
+      isTransportActive: String(isTransportActive),
+      isInitialized: String(isInitialized),
+      isConnected: String(socket.getUserData().isConnected)
+    })
+
     if (!isTransportActive || !isInitialized || !socket.getUserData().isConnected) {
       throw new Error('Transport is not ready or socket is not connected')
     }
@@ -112,6 +141,13 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   function handleMessage(message: RecognizedString) {
+    logger.debug('[DEBUGGING CONNECTION] Handling incoming message', {
+      transportId,
+      messageType: message.constructor.name,
+      isTransportActive: String(isTransportActive),
+      isInitialized: String(isInitialized)
+    })
+
     if (!isTransportActive || !isInitialized) return
 
     if (message instanceof ArrayBuffer) {
@@ -126,6 +162,15 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   function cleanup(code: number = 1000, reason: string = 'Normal closure') {
+    logger.debug('[DEBUGGING CONNECTION] Cleaning up transport', {
+      transportId,
+      code,
+      reason,
+      queueLength: messageQueue.length,
+      isTransportActive: String(isTransportActive),
+      isInitialized: String(isInitialized)
+    })
+
     if (queueProcessingTimeout) {
       clearTimeout(queueProcessingTimeout)
       queueProcessingTimeout = null

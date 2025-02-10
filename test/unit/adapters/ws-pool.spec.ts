@@ -1,5 +1,5 @@
 import { createWSPoolComponent } from '../../../src/adapters/ws-pool'
-import { mockConfig, mockMetrics, mockRedis } from '../../mocks/components'
+import { mockConfig, mockMetrics, mockRedis, mockLogs } from '../../mocks/components'
 import { IWSPoolComponent } from '../../../src/types'
 
 describe('ws-pool-component', () => {
@@ -39,7 +39,7 @@ describe('ws-pool-component', () => {
       return 0
     })
 
-    wsPool = await createWSPoolComponent({ metrics: mockMetrics, config: mockConfig, redis: mockRedis })
+    wsPool = await createWSPoolComponent({ metrics: mockMetrics, config: mockConfig, redis: mockRedis, logs: mockLogs })
   })
 
   afterEach(() => {
@@ -49,14 +49,24 @@ describe('ws-pool-component', () => {
   describe('initialization', () => {
     it('should initialize with default idle timeout if config returns falsy', async () => {
       mockConfig.getNumber.mockResolvedValueOnce(0)
-      const pool = await createWSPoolComponent({ metrics: mockMetrics, config: mockConfig, redis: mockRedis })
+      const pool = await createWSPoolComponent({
+        metrics: mockMetrics,
+        config: mockConfig,
+        redis: mockRedis,
+        logs: mockLogs
+      })
       expect(pool).toBeDefined()
     })
 
     it('should use configured idle timeout', async () => {
       const customTimeout = 60000
       mockConfig.getNumber.mockImplementation(async (key) => (key === 'IDLE_TIMEOUT_IN_MS' ? customTimeout : 0))
-      const pool = await createWSPoolComponent({ metrics: mockMetrics, config: mockConfig, redis: mockRedis })
+      const pool = await createWSPoolComponent({
+        metrics: mockMetrics,
+        config: mockConfig,
+        redis: mockRedis,
+        logs: mockLogs
+      })
       expect(pool).toBeDefined()
     })
 

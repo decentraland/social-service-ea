@@ -44,36 +44,63 @@ function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: Update
   }
 }
 
-export function friendshipUpdateHandler(rpcContext: ISubscribersContext, logger: ILogger) {
-  return handleUpdate<'friendshipUpdate'>((update) => {
-    const updateEmitter = rpcContext.getOrAddSubscriber(update.to)
-    if (updateEmitter) {
-      updateEmitter.emit('friendshipUpdate', update)
+export function friendshipUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
+  return async (message: string) => {
+    logger.debug('[DEBUGGING CONNECTION] Processing friendship update', {
+      subscriberCount: subscribersContext.getSubscribersAddresses().length
+    })
+    try {
+      const update = JSON.parse(message) as SubscriptionEventsEmitter['friendshipUpdate']
+      const updateEmitter = subscribersContext.getOrAddSubscriber(update.to)
+      if (updateEmitter) {
+        updateEmitter.emit('friendshipUpdate', update)
+      }
+    } catch (error: any) {
+      logger.error(`Error handling update: ${error.message}`, {
+        error,
+        message
+      })
     }
-  }, logger)
+  }
 }
 
 export function friendConnectivityUpdateHandler(
-  rpcContext: ISubscribersContext,
+  subscribersContext: ISubscribersContext,
   logger: ILogger,
   db: IDatabaseComponent
 ) {
-  return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
-    logger.info('Friend connectivity update', { update: JSON.stringify(update) })
-    const onlineSubscribers = rpcContext.getSubscribersAddresses()
-    logger.info('Friend connectivity update > Online subscribers', {
-      onlineSubscribers: JSON.stringify(onlineSubscribers)
+  return async (message: string) => {
+    logger.debug('[DEBUGGING CONNECTION] Processing connectivity update', {
+      subscriberCount: subscribersContext.getSubscribersAddresses().length
     })
-    const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
-    logger.info('Friend connectivity update > Friends', { friends: JSON.stringify(friends) })
+    try {
+      const update = JSON.parse(message) as SubscriptionEventsEmitter['friendConnectivityUpdate']
+      const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+      const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
 
-    friends.forEach(({ address: friendAddress }) => {
-      const emitter = rpcContext.getOrAddSubscriber(friendAddress)
-      if (emitter) {
-        emitter.emit('friendConnectivityUpdate', update)
-      }
-    })
-  }, logger)
+      logger.info('Friend connectivity update', {
+        update: JSON.stringify(update),
+        onlineSubscribersCount: onlineSubscribers.length,
+        friendsCount: friends.length
+      })
+
+      friends.forEach(({ address: friendAddress }) => {
+        const emitter = subscribersContext.getOrAddSubscriber(friendAddress)
+        if (emitter) {
+          logger.info('Emitting friend connectivity update', {
+            friendAddress,
+            update: JSON.stringify(update)
+          })
+          emitter.emit('friendConnectivityUpdate', update)
+        }
+      })
+    } catch (error: any) {
+      logger.error(`Error handling update: ${error.message}`, {
+        error,
+        message
+      })
+    }
+  }
 }
 
 export async function* handleSubscriptionUpdates<T, U>({
