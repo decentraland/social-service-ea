@@ -77,7 +77,7 @@ describe('ws-pool-component', () => {
 
       expect(mockRedisClient.del).toHaveBeenCalledWith('ws:conn:test-1')
       expect(mockRedisClient.zRem).toHaveBeenCalledWith('ws:active_connections', 'test-1')
-      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_idle_timeouts', { id: 'test-1' })
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_idle_timeouts')
 
       expect(mockRedisClient.del).not.toHaveBeenCalledWith('ws:conn:test-2')
       expect(mockRedisClient.zRem).not.toHaveBeenCalledWith('ws:active_connections', 'test-2')

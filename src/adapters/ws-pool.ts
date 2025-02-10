@@ -16,7 +16,7 @@ export async function createWSPoolComponent({
       if (data && now - data.lastActivity > idleTimeoutInMs) {
         const id = key.replace('ws:conn:', '')
         await releaseConnection(id)
-        metrics.increment('ws_idle_timeouts', { id })
+        metrics.increment('ws_idle_timeouts')
       }
     }
   }, 60000)
