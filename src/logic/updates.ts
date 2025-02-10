@@ -104,28 +104,8 @@ export async function* handleSubscriptionUpdates<T, U>({
         continue
       }
 
-      const profile = await Promise.race([
-        catalystClient.getProfile(getAddressFromUpdate(update as U)),
-        new Promise((resolve) => setTimeout(() => resolve(null), 1000))
-      ]).catch((error) => {
-        logger.error(`Error fetching profile: ${error.message}`, { error })
-        return null
-      })
-
-      if (!profile) {
-        logger.error(`Unable to fetch profile for ${getAddressFromUpdate(update as U)}`, {
-          update: JSON.stringify(update)
-        })
-        continue
-      }
-
-      const parsedUpdate = (await Promise.race([
-        parser(update as U, profile, ...parseArgs),
-        new Promise((resolve) => setTimeout(() => resolve(null), 1000))
-      ]).catch((error) => {
-        logger.error(`Error parsing update: ${error.message}`, { error })
-        return null
-      })) as T | null
+      const profile = await catalystClient.getProfile(getAddressFromUpdate(update as U))
+      const parsedUpdate = await parser(update as U, profile, ...parseArgs)
 
       if (parsedUpdate) {
         logger.debug(`Yielding parsed update ${eventNameString}`, { update: JSON.stringify(parsedUpdate) })
