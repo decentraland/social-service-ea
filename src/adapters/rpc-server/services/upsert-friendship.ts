@@ -11,13 +11,12 @@ import {
 } from '../../../logic/friendships'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
 import { sendNotification, shouldNotify } from '../../../logic/notifications'
-import { getProfileAvatar } from '../../../logic/profiles'
+import { getProfileUserId } from '../../../logic/profiles'
 
-export async function upsertFriendshipService({
-  components: { logs, db, pubsub, config, catalystClient, sns }
-}: RPCServiceContext<'logs' | 'db' | 'pubsub' | 'config' | 'catalystClient' | 'sns'>) {
+export function upsertFriendshipService({
+  components: { logs, db, pubsub, catalystClient, sns }
+}: RPCServiceContext<'logs' | 'db' | 'pubsub' | 'catalystClient' | 'sns'>) {
   const logger = logs.getLogger('upsert-friendship-service')
-  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function (
     request: UpsertFriendshipPayload,
@@ -101,18 +100,18 @@ export async function upsertFriendshipService({
           timestamp: Date.now(),
           metadata
         }),
-        catalystClient.getEntitiesByPointers([context.address, parsedRequest.user!])
+        catalystClient.getProfiles([context.address, parsedRequest.user!])
       ])
 
-      const profilesMap = new Map(profiles.map((profile) => [getProfileAvatar(profile).userId, profile]))
+      const profilesMap = new Map(profiles.map((profile) => [getProfileUserId(profile), profile]))
 
       const senderProfile = profilesMap.get(context.address)
       const receiverProfile = profilesMap.get(parsedRequest.user!)
 
       if (!senderProfile || !receiverProfile) {
         logger.error('profiles not found', {
-          senderProfile: senderProfile ? getProfileAvatar(senderProfile).userId : '',
-          receiverProfile: receiverProfile ? getProfileAvatar(receiverProfile).userId : ''
+          senderProfile: senderProfile ? getProfileUserId(senderProfile) : '',
+          receiverProfile: receiverProfile ? getProfileUserId(receiverProfile) : ''
         })
 
         return {
@@ -139,7 +138,6 @@ export async function upsertFriendshipService({
               receiverAddress: parsedRequest.user!,
               senderProfile,
               receiverProfile,
-              profileImagesUrl,
               message: metadata?.message
             },
             { sns, logs }
@@ -150,11 +148,7 @@ export async function upsertFriendshipService({
       return {
         response: {
           $case: 'accepted',
-          accepted: parseFriendshipRequestToFriendshipRequestResponse(
-            friendshipRequest,
-            receiverProfile,
-            profileImagesUrl
-          )
+          accepted: parseFriendshipRequestToFriendshipRequestResponse(friendshipRequest, receiverProfile)
         }
       }
     } catch (error: any) {

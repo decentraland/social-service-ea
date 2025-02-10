@@ -4,10 +4,10 @@ import { RpcServerContext } from '../../../../../src/types'
 import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { emptyRequest } from '../../../../mocks/empty-request'
 import { createMockFriendshipRequest, createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'
-import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
+import { createMockProfile } from '../../../../mocks/profile'
 
 describe('getPendingFriendshipRequestsService', () => {
-  let getPendingRequests: Awaited<ReturnType<typeof getPendingFriendshipRequestsService>>
+  let getPendingRequests: ReturnType<typeof getPendingFriendshipRequestsService>
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
@@ -15,10 +15,8 @@ describe('getPendingFriendshipRequestsService', () => {
   }
 
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValueOnce(PROFILE_IMAGES_URL)
-
-    getPendingRequests = await getPendingFriendshipRequestsService({
-      components: { db: mockDb, logs: mockLogs, config: mockConfig, catalystClient: mockCatalystClient }
+    getPendingRequests = getPendingFriendshipRequestsService({
+      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 
@@ -31,7 +29,7 @@ describe('getPendingFriendshipRequestsService', () => {
 
     mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
     mockDb.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
-    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
     const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
 
     expect(result).toEqual({
@@ -75,7 +73,7 @@ describe('getPendingFriendshipRequestsService', () => {
 
     mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
     mockDb.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
-    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
 
     const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
 

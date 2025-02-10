@@ -6,11 +6,10 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getPage } from '../../../utils/pagination'
 
-export async function getPendingFriendshipRequestsService({
-  components: { logs, db, catalystClient, config }
-}: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'config'>) {
+export function getPendingFriendshipRequestsService({
+  components: { logs, db, catalystClient }
+}: RPCServiceContext<'logs' | 'db' | 'catalystClient'>) {
   const logger = logs.getLogger('get-pending-friendship-requests-service')
-  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function (
     request: GetFriendshipRequestsPayload,
@@ -23,13 +22,9 @@ export async function getPendingFriendshipRequestsService({
         db.getReceivedFriendshipRequestsCount(context.address)
       ])
       const pendingRequestsAddresses = pendingRequests.map(({ address }) => address)
-      const pendingRequesterProfiles = await catalystClient.getEntitiesByPointers(pendingRequestsAddresses)
+      const pendingRequesterProfiles = await catalystClient.getProfiles(pendingRequestsAddresses)
 
-      const requests = parseFriendshipRequestsToFriendshipRequestResponses(
-        pendingRequests,
-        pendingRequesterProfiles,
-        profileImagesUrl
-      )
+      const requests = parseFriendshipRequestsToFriendshipRequestResponses(pendingRequests, pendingRequesterProfiles)
 
       return {
         response: {

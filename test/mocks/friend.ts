@@ -1,16 +1,16 @@
-import { Entity } from '@dcl/schemas'
 import { Friend } from '../../src/types'
-import { getProfileAvatar } from '../../src/logic/profiles'
+import { getProfileHasClaimedName, getProfileName, getProfilePictureUrl, getProfileUserId } from '../../src/logic/profiles'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 export const createMockFriend = (address: string): Friend => ({
   address
 })
 
-export function parseExpectedFriends(profileImagesUrl: string) {
-  return (profile: Entity) => ({
-    address: getProfileAvatar(profile).userId,
-    name: getProfileAvatar(profile).name,
-    hasClaimedName: true,
-    profilePictureUrl: `${profileImagesUrl}/entities/${profile.id}/face.png`
+export function parseExpectedFriends() {
+  return (profile: Pick<Profile, 'avatars'>) => ({
+    address: getProfileUserId(profile),
+    name: getProfileName(profile),
+    hasClaimedName: getProfileHasClaimedName(profile),
+    profilePictureUrl: getProfilePictureUrl(profile)
   })
 }

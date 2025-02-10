@@ -1,17 +1,17 @@
-import { Events, Entity } from '@dcl/schemas'
+import { Events } from '@dcl/schemas'
 import { AppComponents, IPublisherComponent } from '../types'
 import { Action } from '../types'
 import { FriendshipRequestEvent, FriendshipAcceptedEvent } from '@dcl/schemas'
-import { getProfileAvatar, getProfilePictureUrl } from './profiles'
+import { getProfileHasClaimedName, getProfileName, getProfilePictureUrl } from './profiles'
 import { retry } from '../utils/retrier'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 type NotificationContext = {
   requestId: string
   senderAddress: string
   receiverAddress: string
-  senderProfile: Entity
-  receiverProfile: Entity
-  profileImagesUrl: string
+  senderProfile: Pick<Profile, 'avatars'>
+  receiverProfile: Pick<Profile, 'avatars'>
   message?: string
 }
 
@@ -21,12 +21,8 @@ const createEvent = <T extends FriendshipRequestEvent | FriendshipAcceptedEvent>
   subType: T['subType'],
   context: NotificationContext
 ) => {
-  const { requestId, senderAddress, receiverAddress, senderProfile, receiverProfile, profileImagesUrl, message } =
-    context
+  const { requestId, senderAddress, receiverAddress, senderProfile, receiverProfile, message } = context
   const type = Events.Type.SOCIAL_SERVICE
-
-  const senderProfileAvatar = getProfileAvatar(senderProfile)
-  const receiverProfileAvatar = getProfileAvatar(receiverProfile)
 
   const baseEvent = {
     key: requestId,
@@ -37,15 +33,15 @@ const createEvent = <T extends FriendshipRequestEvent | FriendshipAcceptedEvent>
       requestId,
       sender: {
         address: senderAddress,
-        name: senderProfileAvatar.name,
-        profileImageUrl: getProfilePictureUrl(profileImagesUrl, senderProfile),
-        hasClaimedName: senderProfileAvatar.hasClaimedName
+        name: getProfileName(senderProfile),
+        profileImageUrl: getProfilePictureUrl(senderProfile),
+        hasClaimedName: getProfileHasClaimedName(senderProfile)
       },
       receiver: {
         address: receiverAddress,
-        name: receiverProfileAvatar.name,
-        profileImageUrl: getProfilePictureUrl(profileImagesUrl, receiverProfile),
-        hasClaimedName: receiverProfileAvatar.hasClaimedName
+        name: getProfileName(receiverProfile),
+        profileImageUrl: getProfilePictureUrl(receiverProfile),
+        hasClaimedName: getProfileHasClaimedName(receiverProfile)
       }
     }
   } as T

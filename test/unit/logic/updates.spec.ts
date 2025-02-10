@@ -9,7 +9,7 @@ import { mockCatalystClient, mockDb, mockLogs } from '../../mocks/components'
 import mitt, { Emitter } from 'mitt'
 import { Action, ISubscribersContext, RpcServerContext, SubscriptionEventsEmitter } from '../../../src/types'
 import { sleep } from '../../../src/utils/timer'
-import { mockProfile, PROFILE_IMAGES_URL } from '../../mocks/profile'
+import { mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
 
 describe('updates handlers', () => {
@@ -154,7 +154,7 @@ describe('updates handlers', () => {
       eventEmitter = mitt<SubscriptionEventsEmitter>()
       logger = mockLogs.getLogger('test')
       parser = jest.fn()
-      mockCatalystClient.getEntityByPointer.mockResolvedValue(mockProfile)
+      mockCatalystClient.getProfile.mockResolvedValue(mockProfile)
       
       subscribersContext = createSubscribersContext()
       subscribersContext.addSubscriber('0x123', eventEmitter)
@@ -177,8 +177,7 @@ describe('updates handlers', () => {
         },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
-        parser,
-        parseArgs: [PROFILE_IMAGES_URL]
+        parser
       })
 
       const resultPromise = generator.next()
@@ -200,8 +199,7 @@ describe('updates handlers', () => {
         },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
-        parser,
-        parseArgs: [PROFILE_IMAGES_URL]
+        parser
       })
 
       const resultPromise = generator.next()
@@ -209,7 +207,7 @@ describe('updates handlers', () => {
 
       const result = await resultPromise
       expect(result.value).toEqual({ parsed: true })
-      expect(parser).toHaveBeenCalledWith(friendshipUpdate, mockProfile, PROFILE_IMAGES_URL)
+      expect(parser).toHaveBeenCalledWith(friendshipUpdate, mockProfile)
     })
 
     it('should yield multiple updates', async () => {
@@ -222,8 +220,7 @@ describe('updates handlers', () => {
         },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
-        parser,
-        parseArgs: [PROFILE_IMAGES_URL]
+        parser
       })
 
       for (let i = 0; i < 2; i++) {
@@ -232,7 +229,7 @@ describe('updates handlers', () => {
         rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
         const result = await resultPromise
         expect(result.value).toEqual({ parsed: i })
-        expect(parser).toHaveBeenCalledWith(friendshipUpdate, mockProfile, PROFILE_IMAGES_URL)
+        expect(parser).toHaveBeenCalledWith(friendshipUpdate, mockProfile)
       }
     })
 
@@ -244,8 +241,7 @@ describe('updates handlers', () => {
         components: { catalystClient: mockCatalystClient, logger },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
-        parser,
-        parseArgs: [PROFILE_IMAGES_URL]
+        parser
       })
 
       generator.next()
@@ -267,8 +263,7 @@ describe('updates handlers', () => {
         components: { catalystClient: mockCatalystClient, logger },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
         shouldHandleUpdate: () => false,
-        parser,
-        parseArgs: [PROFILE_IMAGES_URL]
+        parser
       })
 
       const resultPromise = generator.next()
@@ -295,8 +290,7 @@ describe('updates handlers', () => {
         components: { catalystClient: mockCatalystClient, logger },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
         shouldHandleUpdate: () => true,
-        parser,
-        parseArgs: [PROFILE_IMAGES_URL]
+        parser
       })
 
       const resultPromise = generator.next()

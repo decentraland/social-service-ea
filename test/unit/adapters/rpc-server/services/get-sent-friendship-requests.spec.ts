@@ -4,10 +4,10 @@ import { RpcServerContext } from '../../../../../src/types'
 import { emptyRequest } from '../../../../mocks/empty-request'
 import { createMockFriendshipRequest, createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'
 import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
+import { createMockProfile } from '../../../../mocks/profile'
 
 describe('getSentFriendshipRequestsService', () => {
-  let getSentRequests: Awaited<ReturnType<typeof getSentFriendshipRequestsService>>
+  let getSentRequests: ReturnType<typeof getSentFriendshipRequestsService>
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
@@ -15,10 +15,8 @@ describe('getSentFriendshipRequestsService', () => {
   }
 
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValueOnce(PROFILE_IMAGES_URL)
-
-    getSentRequests = await getSentFriendshipRequestsService({
-      components: { db: mockDb, logs: mockLogs, config: mockConfig, catalystClient: mockCatalystClient }
+    getSentRequests = getSentFriendshipRequestsService({
+      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 
@@ -31,7 +29,7 @@ describe('getSentFriendshipRequestsService', () => {
 
     mockDb.getSentFriendshipRequests.mockResolvedValueOnce(mockSentRequests)
     mockDb.getSentFriendshipRequestsCount.mockResolvedValueOnce(mockSentRequests.length)
-    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
 
     const result: PaginatedFriendshipRequestsResponse = await getSentRequests(emptyRequest, rpcContext)
 
@@ -76,7 +74,7 @@ describe('getSentFriendshipRequestsService', () => {
 
     mockDb.getSentFriendshipRequests.mockResolvedValueOnce(mockSentRequests)
     mockDb.getSentFriendshipRequestsCount.mockResolvedValueOnce(mockSentRequests.length)
-    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
 
     const result: PaginatedFriendshipRequestsResponse = await getSentRequests(emptyRequest, rpcContext)
 

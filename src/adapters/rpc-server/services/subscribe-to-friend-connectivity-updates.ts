@@ -8,19 +8,18 @@ import { parseEmittedUpdateToFriendConnectivityUpdate } from '../../../logic/fri
 import { parseProfilesToFriends } from '../../../logic/friends'
 import { handleSubscriptionUpdates } from '../../../logic/updates'
 
-export async function subscribeToFriendConnectivityUpdatesService({
-  components: { logs, db, archipelagoStats, config, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'archipelagoStats' | 'config' | 'catalystClient'>) {
+export function subscribeToFriendConnectivityUpdatesService({
+  components: { logs, db, archipelagoStats, catalystClient }
+}: RPCServiceContext<'logs' | 'db' | 'archipelagoStats' | 'catalystClient'>) {
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
-  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
     try {
       const onlinePeers = await archipelagoStats.getPeersFromCache()
       const onlineFriends = await db.getOnlineFriends(context.address, onlinePeers)
 
-      const profiles = await catalystClient.getEntitiesByPointers(onlineFriends.map((friend) => friend.address))
-      const parsedProfiles = parseProfilesToFriends(profiles, profileImagesUrl).map((friend) => ({
+      const profiles = await catalystClient.getProfiles(onlineFriends.map((friend) => friend.address))
+      const parsedProfiles = parseProfilesToFriends(profiles).map((friend) => ({
         friend,
         status: ConnectivityStatus.ONLINE
       }))
@@ -37,8 +36,7 @@ export async function subscribeToFriendConnectivityUpdatesService({
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) => update.address,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) =>
           update.address !== context.address,
-        parser: parseEmittedUpdateToFriendConnectivityUpdate,
-        parseArgs: [profileImagesUrl]
+        parser: parseEmittedUpdateToFriendConnectivityUpdate
       })
     } catch (error: any) {
       logger.error('Error in friend updates subscription:', error)

@@ -27,7 +27,7 @@ interface SubscriptionHandlerParams<T, U> {
   getAddressFromUpdate: (update: U) => string
   shouldHandleUpdate: (update: U) => boolean
   parser: UpdateParser<T, U>
-  parseArgs: any[]
+  parseArgs?: any[]
 }
 
 function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>, logger: ILogger) {
@@ -78,7 +78,7 @@ export async function* handleSubscriptionUpdates<T, U>({
   getAddressFromUpdate,
   shouldHandleUpdate,
   parser,
-  parseArgs
+  parseArgs = []
 }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
   const normalizedAddress = normalizeAddress(rpcContext.address)
   const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
@@ -98,7 +98,7 @@ export async function* handleSubscriptionUpdates<T, U>({
         continue
       }
 
-      const profile = await catalystClient.getEntityByPointer(getAddressFromUpdate(update as U))
+      const profile = await catalystClient.getProfile(getAddressFromUpdate(update as U))
       const parsedUpdate = await parser(update as U, profile, ...parseArgs)
 
       if (parsedUpdate) {

@@ -1,7 +1,8 @@
 import { Entity } from '@dcl/schemas'
 import { FriendshipRequest } from '../../src/types'
-import { getProfileAvatar } from '../../src/logic/profiles'
+import { getProfileHasClaimedName, getProfileName, getProfilePictureUrl } from '../../src/logic/profiles'
 import { FriendshipRequestResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 /**
  * Creates a mock friendship request from given parameters.
@@ -24,17 +25,16 @@ export const createMockFriendshipRequest = (
 export const createMockExpectedFriendshipRequest = (
   id: string,
   address: string,
-  profile: Entity,
+  profile: Pick<Profile, 'avatars'>,
   createdAt?: string,
-  message: string = '',
-  profileImagesUrl: string = 'https://profile-images.decentraland.org'
+  message: string = ''
 ): FriendshipRequestResponse => ({
   id,
   friend: {
     address,
-    name: getProfileAvatar(profile).name,
-    hasClaimedName: getProfileAvatar(profile).hasClaimedName,
-    profilePictureUrl: `${profileImagesUrl}/entities/${profile.id}/face.png`
+    name: getProfileName(profile),
+    hasClaimedName: getProfileHasClaimedName(profile),
+    profilePictureUrl: getProfilePictureUrl(profile)
   },
   createdAt: createdAt ? new Date(createdAt).getTime() : new Date().getTime(),
   message
