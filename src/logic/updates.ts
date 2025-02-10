@@ -59,8 +59,13 @@ export function friendConnectivityUpdateHandler(
   db: IDatabaseComponent
 ) {
   return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
+    logger.info('Friend connectivity update', { update: JSON.stringify(update) })
     const onlineSubscribers = rpcContext.getSubscribersAddresses()
+    logger.info('Friend connectivity update > Online subscribers', {
+      onlineSubscribers: JSON.stringify(onlineSubscribers)
+    })
     const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
+    logger.info('Friend connectivity update > Friends', { friends: JSON.stringify(friends) })
 
     friends.forEach(({ address: friendAddress }) => {
       const emitter = rpcContext.getOrAddSubscriber(friendAddress)
@@ -102,6 +107,7 @@ export async function* handleSubscriptionUpdates<T, U>({
       const parsedUpdate = await parser(update as U, profile, ...parseArgs)
 
       if (parsedUpdate) {
+        logger.debug(`Yielding parsed update ${eventNameString}`, { update: JSON.stringify(parsedUpdate) })
         yield parsedUpdate
       } else {
         logger.error(`Unable to parse ${eventNameString}`, { update: JSON.stringify(update) })
