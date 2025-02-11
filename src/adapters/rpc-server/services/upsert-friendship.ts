@@ -130,22 +130,20 @@ export function upsertFriendshipService({
         metadata: metadata || null
       }
 
-      setImmediate(async () => {
-        if (shouldNotify(parsedRequest.action)) {
-          await sendNotification(
-            parsedRequest.action,
-            {
-              requestId: id,
-              senderAddress: context.address,
-              receiverAddress: parsedRequest.user!,
-              senderProfile,
-              receiverProfile,
-              message: metadata?.message
-            },
-            { sns, logs }
-          )
-        }
-      })
+      if (shouldNotify(parsedRequest.action)) {
+        await sendNotification(
+          parsedRequest.action,
+          {
+            requestId: id,
+            senderAddress: context.address,
+            receiverAddress: parsedRequest.user!,
+            senderProfile,
+            receiverProfile,
+            message: metadata?.message
+          },
+          { sns, logs }
+        )
+      }
 
       return {
         response: {
