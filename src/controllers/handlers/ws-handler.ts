@@ -67,7 +67,9 @@ export async function registerWsHandler(
         if (isNotAuthenticated(data)) {
           data.timeout = setTimeout(() => {
             try {
-              logger.error('Closing connection, no auth chain received')
+              logger.error('Closing connection, no auth chain received', {
+                wsConnectionId: data.wsConnectionId
+              })
               ws.end()
             } catch (err) {}
           }, 30000)
