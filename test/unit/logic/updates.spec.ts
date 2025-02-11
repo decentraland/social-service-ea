@@ -155,7 +155,7 @@ describe('updates handlers', () => {
       logger = mockLogs.getLogger('test')
       parser = jest.fn()
       mockCatalystClient.getProfile.mockResolvedValue(mockProfile)
-      
+
       subscribersContext = createSubscribersContext()
       subscribersContext.addSubscriber('0x123', eventEmitter)
 
