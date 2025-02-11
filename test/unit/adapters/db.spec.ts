@@ -441,6 +441,7 @@ describe('db', () => {
       expect(mockClient.query).toHaveBeenCalledWith('SELECT 1')
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT')
       expect(result).toBe('success')
+      expect(mockClient.release).toHaveBeenCalled()
     })
 
     it('should rollback the transaction on error', async () => {
@@ -454,6 +455,7 @@ describe('db', () => {
 
       expect(mockClient.query).toHaveBeenCalledWith('BEGIN')
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
     })
   })
 

@@ -351,6 +351,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const pool = pg.getPool()
       const client = await pool.connect()
       await client.query('BEGIN')
+
       try {
         const res = await cb(client)
         await client.query('COMMIT')
@@ -358,8 +359,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       } catch (error: any) {
         logger.error(`Error executing transaction: ${error.message}`)
         await client.query('ROLLBACK')
-        client.release()
         throw error
+      } finally {
+        client.release()
       }
     }
   }
