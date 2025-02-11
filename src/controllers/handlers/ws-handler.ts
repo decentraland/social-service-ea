@@ -53,13 +53,15 @@ export async function registerWsHandler(
       logger.debug('[DEBUGGING CONNECTION] Opening connection', {
         wsConnectionId: data.wsConnectionId,
         isConnected: String(data.isConnected),
-        auth: String(data.auth)
+        auth: String(data.auth),
+        address: data.auth ? data.address : 'Not authenticated'
       })
 
       try {
         await wsPool.acquireConnection(data.wsConnectionId)
         logger.debug('[DEBUGGING CONNECTION] Connection acquired', {
-          wsConnectionId: data.wsConnectionId
+          wsConnectionId: data.wsConnectionId,
+          address: data.auth ? data.address : 'Not authenticated'
         })
 
         if (isNotAuthenticated(data)) {
@@ -87,7 +89,8 @@ export async function registerWsHandler(
         wsConnectionId: data.wsConnectionId,
         isConnected: String(data.isConnected),
         auth: String(data.auth),
-        messageSize: message.byteLength
+        messageSize: message.byteLength,
+        address: data.auth ? data.address : 'Not authenticated'
       })
       metrics.increment('ws_messages_received')
 
@@ -100,7 +103,7 @@ export async function registerWsHandler(
           })
           const address = normalizeAddress(verifyResult.auth)
 
-          logger.debug('Authenticated User', { address })
+          logger.debug('Authenticated User', { address, wsConnectionId: data.wsConnectionId })
 
           const eventEmitter = mitt<IUWebSocketEventMap>()
           const transport = await createUWebSocketTransport(ws, eventEmitter, config, logs)
@@ -227,7 +230,8 @@ export async function registerWsHandler(
       const data = ws.getUserData()
       logger.debug('[DEBUGGING CONNECTION] Ping received', {
         wsConnectionId: data.wsConnectionId,
-        isConnected: String(data.isConnected)
+        isConnected: String(data.isConnected),
+        address: data.auth ? data.address : 'Not authenticated'
       })
       if (data.wsConnectionId) {
         wsPool.updateActivity(data.wsConnectionId)
