@@ -145,7 +145,10 @@ export async function registerWsHandler(
         }
       } else {
         try {
-          logger.info('Received message', { message: textDecoder.decode(message) })
+          logger.info('Received message', {
+            wsConnectionId: data.wsConnectionId,
+            address: data.auth ? data.address : 'Not authenticated'
+          })
 
           if (!data.isConnected) {
             logger.warn('Received message but connection is marked as disconnected', {
