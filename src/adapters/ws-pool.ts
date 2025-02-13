@@ -52,13 +52,9 @@ export async function createWSPoolComponent({
         throw new Error('Transaction failed')
       }
 
-      const connections = await redis.client.zRange('ws:active_connections', 0, -1)
+      const totalConnections = await getActiveConnections()
 
-      logger.debug('[DEBUGGING CONNECTION] Active connections', {
-        connections: connections.map((c) => c.replace('ws:conn:', '')).join(', ')
-      })
-
-      const totalConnections = connections.length
+      logger.debug(`[DEBUGGING CONNECTION] Active connections ${totalConnections}`)
       metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
     } catch (error) {
       await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])

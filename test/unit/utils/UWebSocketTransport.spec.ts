@@ -103,7 +103,8 @@ describe('UWebSocketTransport', () => {
       mockSocket.getUserData.mockReturnValue({ isConnected: false })
       const message = new Uint8Array([1, 2, 3])
 
-      await expect(transport.sendMessage(message)).rejects.toThrow('Transport is not ready or socket is not connected')
+      await transport.sendMessage(message)
+      expect(errorListener).toHaveBeenCalledWith(new Error('Transport is not ready or socket is not connected'))
     })
 
     it('should handle cleanup on close', () => {
@@ -226,11 +227,12 @@ describe('UWebSocketTransport', () => {
       const uninitializedTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs)
       // Force transport to be not ready
       mockSocket.getUserData.mockReturnValue({ isConnected: false })
+      const errorListener = jest.fn()
+      uninitializedTransport.on('error', errorListener)
 
       const message = new Uint8Array([1])
-      await expect(uninitializedTransport.sendMessage(message)).rejects.toThrow(
-        'Transport is not ready or socket is not connected'
-      )
+      await uninitializedTransport.sendMessage(message)
+      expect(errorListener).toHaveBeenCalledWith(new Error('Transport is not ready or socket is not connected'))
     })
 
     it('should handle cleanup during active message processing', async () => {
