@@ -35,18 +35,7 @@ export async function createPeerTrackingComponent({
       const key = PEER_STATUS_KEY_PREFIX + peerId
       const currentStatus = await redis.get<ConnectivityStatus>(key)
 
-      logger.debug('[DEBUGGING] notifyPeerStatusChange', {
-        key,
-        currentStatus: String(currentStatus),
-        status: String(status)
-      })
-
       if (currentStatus !== status) {
-        logger.debug('[DEBUGGING] notifyPeerStatusChange - updating redis', {
-          key,
-          status: String(status)
-        })
-
         await redis.put(key, status, {
           EX: statusCacheTtlInSeconds
         })
@@ -66,8 +55,6 @@ export async function createPeerTrackingComponent({
 
   function createMessageHandler(handler: PeerStatusHandler) {
     return async (err: Error | null, message: NatsMsg) => {
-      logger.debug('[DEBUGGING] Creating Message Handler...')
-
       if (err) {
         logger.error(`Error processing peer ${handler.event} message:`, {
           error: err.message,
@@ -75,8 +62,6 @@ export async function createPeerTrackingComponent({
         })
         return
       }
-
-      logger.debug(`[DEBUGGING] createMessageHandler with subject ${message.subject}`)
 
       const peerId = message.subject.split('.')[1]
       await notifyPeerStatusChange(peerId, handler.status)

@@ -64,14 +64,12 @@ export function friendConnectivityUpdateHandler(
 ) {
   return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
     const onlineSubscribers = rpcContext.getSubscribersAddresses()
+    const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
+
     logger.debug('Processing connectivity update:', {
       update: JSON.stringify(update),
       subscribersCount: onlineSubscribers.length,
-      subscribers: onlineSubscribers.join(', ')
-    })
-
-    const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
-    logger.debug('Found online friends:', {
+      subscribers: onlineSubscribers.join(', '),
       friendsCount: friends.length,
       friends: JSON.stringify(friends)
     })
