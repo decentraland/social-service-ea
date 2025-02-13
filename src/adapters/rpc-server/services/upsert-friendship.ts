@@ -22,8 +22,6 @@ export function upsertFriendshipService({
     request: UpsertFriendshipPayload,
     context: RpcServerContext
   ): Promise<UpsertFriendshipResponse> {
-    logger.info('Upserting friendship', { request: JSON.stringify(request) })
-
     const parsedRequest = parseUpsertFriendshipRequest(request)
 
     if (!parsedRequest) {
@@ -130,20 +128,22 @@ export function upsertFriendshipService({
         metadata: metadata || null
       }
 
-      if (shouldNotify(parsedRequest.action)) {
-        await sendNotification(
-          parsedRequest.action,
-          {
-            requestId: id,
-            senderAddress: context.address,
-            receiverAddress: parsedRequest.user!,
-            senderProfile,
-            receiverProfile,
-            message: metadata?.message
-          },
-          { sns, logs }
-        )
-      }
+      setImmediate(async () => {
+        if (shouldNotify(parsedRequest.action)) {
+          await sendNotification(
+            parsedRequest.action,
+            {
+              requestId: id,
+              senderAddress: context.address,
+              receiverAddress: parsedRequest.user!,
+              senderProfile,
+              receiverProfile,
+              message: metadata?.message
+            },
+            { sns, logs }
+          )
+        }
+      })
 
       return {
         response: {

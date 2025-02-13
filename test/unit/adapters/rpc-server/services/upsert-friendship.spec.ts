@@ -254,8 +254,11 @@ describe('upsertFriendshipService', () => {
     })
     mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
+    jest.useFakeTimers()
     await upsertFriendship(requestPayload, rpcContext)
+    jest.runAllTimers()
     expect(mockSns.publishMessage).toHaveBeenCalled()
+    jest.useRealTimers()
   })
 
   it('should handle empty profiles gracefully', async () => {
