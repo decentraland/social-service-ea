@@ -17,8 +17,6 @@ export function getMutualFriendsService({
     request: GetMutualFriendsPayload,
     context: RpcServerContext
   ): Promise<PaginatedFriendsProfilesResponse> {
-    logger.info('Getting mutual friends', { request: JSON.stringify(request) })
-
     try {
       const { address: requester } = context
       const { pagination, user } = request

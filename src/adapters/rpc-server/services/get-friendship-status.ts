@@ -12,7 +12,6 @@ export function getFriendshipStatusService({ components: { logs, db } }: RPCServ
     request: GetFriendshipStatusPayload,
     context: RpcServerContext
   ): Promise<GetFriendshipStatusResponse> {
-    logger.info('Getting friendship status', { request: JSON.stringify(request) })
     try {
       const { address: loggedUserAddress } = context
       const userAddress = request.user?.address
