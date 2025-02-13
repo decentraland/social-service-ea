@@ -76,9 +76,7 @@ export async function createPeerTrackingComponent({
         return
       }
 
-      logger.debug('[DEBUGGING] createMessageHandler', {
-        message: JSON.stringify(message)
-      })
+      logger.debug(`[DEBUGGING] createMessageHandler with subject ${message.subject}`)
 
       const peerId = message.subject.split('.')[1]
       await notifyPeerStatusChange(peerId, handler.status)
