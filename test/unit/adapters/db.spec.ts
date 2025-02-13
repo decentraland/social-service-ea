@@ -401,9 +401,9 @@ describe('db', () => {
 
       const queryExpectations = [
         { text: 'LOWER(address_requester) =' },
-        { text: 'AND LOWER(address_requested) IN' },
+        { text: 'AND LOWER(address_requested) = ANY(' },
         { text: 'LOWER(address_requested) =' },
-        { text: 'LOWER(address_requester) IN' }
+        { text: 'LOWER(address_requester) = ANY(' }
       ]
 
       queryExpectations.forEach(({ text }) => {
@@ -419,9 +419,9 @@ describe('db', () => {
           values: expect.arrayContaining([
             userAddress,
             userAddress,
-            normalizedPotentialFriends.join(','),
+            normalizedPotentialFriends,
             userAddress,
-            normalizedPotentialFriends.join(',')
+            normalizedPotentialFriends
           ])
         })
       )

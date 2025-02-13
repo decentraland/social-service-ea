@@ -338,9 +338,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
           END as address
         FROM friendships
         WHERE (
-          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) IN (${normalizedOnlinePotentialFriends.join(',')}))
+          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) = ANY(${normalizedOnlinePotentialFriends}))
           OR
-          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) IN (${normalizedOnlinePotentialFriends.join(',')}))
+          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) = ANY(${normalizedOnlinePotentialFriends}))
         )
         AND is_active = true`
 
