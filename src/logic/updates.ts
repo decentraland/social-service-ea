@@ -64,19 +64,25 @@ export function friendConnectivityUpdateHandler(
 ) {
   return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
     const onlineSubscribers = rpcContext.getSubscribersAddresses()
-    const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
-
-    logger.info('Friend connectivity update', {
+    logger.debug('Processing connectivity update:', {
       update: JSON.stringify(update),
-      onlineSubscribersCount: onlineSubscribers.length,
-      onlineSubscribers: onlineSubscribers.join(', '),
-      onlineFriendsCount: friends.length
+      subscribersCount: onlineSubscribers.length,
+      subscribers: onlineSubscribers.join(', ')
+    })
+
+    const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
+    logger.debug('Found online friends:', {
+      friendsCount: friends.length,
+      friends: JSON.stringify(friends)
     })
 
     friends.forEach(({ address: friendAddress }) => {
       const emitter = rpcContext.getOrAddSubscriber(friendAddress)
       if (emitter) {
+        logger.debug('Emitting update to friend:', { friendAddress })
         emitter.emit('friendConnectivityUpdate', update)
+      } else {
+        logger.warn('No emitter found for friend:', { friendAddress })
       }
     })
   }, logger)
