@@ -117,8 +117,16 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       isConnected: String(socket.getUserData().isConnected)
     })
 
+    // TODO: we could retry a couple of times before returning an error
     if (!isTransportActive || !isInitialized || !socket.getUserData().isConnected) {
-      throw new Error('Transport is not ready or socket is not connected')
+      logger.error('[DEBUGGING CONNECTION] Transport is not ready or socket is not connected', {
+        transportId,
+        isTransportActive: String(isTransportActive),
+        isInitialized: String(isInitialized),
+        isConnected: String(socket.getUserData().isConnected)
+      })
+      events.emit('error', new Error('Transport is not ready or socket is not connected'))
+      return
     }
 
     if (messageQueue.length >= maxQueueSize) {
