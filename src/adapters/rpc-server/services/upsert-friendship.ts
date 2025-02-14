@@ -133,7 +133,7 @@ export function upsertFriendshipService({
           await sendNotification(
             parsedRequest.action,
             {
-              requestId: id,
+              requestId: actionId,
               senderAddress: context.address,
               receiverAddress: parsedRequest.user!,
               senderProfile,
