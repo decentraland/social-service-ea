@@ -400,31 +400,20 @@ describe('db', () => {
       await dbComponent.getOnlineFriends('0x123', normalizedPotentialFriends)
 
       const queryExpectations = [
-        { text: 'LOWER(address_requester) =' },
-        { text: 'AND LOWER(address_requested) = ANY(' },
-        { text: 'LOWER(address_requested) =' },
-        { text: 'LOWER(address_requester) = ANY(' }
+        SQL`WHEN LOWER(address_requester) = ${userAddress} THEN LOWER(address_requested)`,
+        SQL`ELSE LOWER(address_requester)`,
+        SQL`(LOWER(address_requester) = ${userAddress} AND LOWER(address_requested) = ANY(${normalizedPotentialFriends}))`,
+        SQL`(LOWER(address_requested) = ${userAddress} AND LOWER(address_requester) = ANY(${normalizedPotentialFriends}))`
       ]
 
-      queryExpectations.forEach(({ text }) => {
+      queryExpectations.forEach((query) => {
         expect(mockPg.query).toHaveBeenCalledWith(
           expect.objectContaining({
-            text: expect.stringContaining(text)
+            text: expect.stringContaining((query as any).strings[0]),
+            values: expect.arrayContaining(query.values)
           })
         )
       })
-
-      expect(mockPg.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          values: expect.arrayContaining([
-            userAddress,
-            userAddress,
-            normalizedPotentialFriends,
-            userAddress,
-            normalizedPotentialFriends
-          ])
-        })
-      )
     })
   })
 
