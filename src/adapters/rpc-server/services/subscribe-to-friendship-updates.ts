@@ -17,8 +17,8 @@ export function subscribeToFriendshipUpdatesService({
         rpcContext: context,
         eventName: 'friendshipUpdate',
         components: {
-          logger,
-          catalystClient
+          catalystClient,
+          logger
         },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
         parser: parseEmittedUpdateToFriendshipUpdate,

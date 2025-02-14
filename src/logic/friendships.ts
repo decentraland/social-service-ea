@@ -203,7 +203,7 @@ export function parseEmittedUpdateToFriendConnectivityUpdate(
   const { status } = update
   return {
     friend: parseProfileToFriend(profile),
-    status: status
+    status
   }
 }
 

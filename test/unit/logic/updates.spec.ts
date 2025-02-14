@@ -2,7 +2,8 @@ import {
   friendshipUpdateHandler,
   friendConnectivityUpdateHandler,
   handleSubscriptionUpdates,
-  ILogger
+  ILogger,
+  friendshipAcceptedUpdateHandler
 } from '../../../src/logic/updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { mockCatalystClient, mockDb, mockLogs } from '../../mocks/components'
@@ -57,6 +58,71 @@ describe('updates handlers', () => {
 
     it('should log error on invalid JSON', () => {
       const handler = friendshipUpdateHandler(subscribersContext, logger)
+      const errorSpy = jest.spyOn(logger, 'error')
+
+      handler('invalid json')
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error handling update:'),
+        expect.objectContaining({ message: 'invalid json' })
+      )
+    })
+  })
+
+  describe('friendshipAcceptedUpdateHandler', () => {
+    it('should emit friendship update to the correct subscriber', () => {
+      const handler = friendshipAcceptedUpdateHandler(subscribersContext, logger)
+      const subscriber = subscribersContext.getOrAddSubscriber('0x456')
+      const emitSpy = jest.spyOn(subscriber, 'emit')
+
+      const update = {
+        id: 'update-1',
+        from: '0x123',
+        to: '0x456',
+        action: Action.ACCEPT,
+        timestamp: Date.now(),
+        metadata: { message: 'Hello!' }
+      }
+
+      handler(JSON.stringify(update))
+
+      expect(emitSpy).toHaveBeenCalledWith('friendConnectivityUpdate', {
+        address: '0x123',
+        status: ConnectivityStatus.ONLINE
+      })
+    })
+
+    it.each([Action.DELETE, Action.REQUEST, Action.REJECT, Action.CANCEL])(
+      'should ignore the update if the action is %s',
+      (action) => {
+        const handler = friendshipAcceptedUpdateHandler(subscribersContext, logger)
+        const nonExistentUpdate = {
+          id: 'update-1',
+          from: '0x123',
+          to: '0x456',
+          action,
+          timestamp: Date.now()
+        }
+
+        expect(handler(JSON.stringify(nonExistentUpdate))).resolves.toBeUndefined()
+      }
+    )
+
+    it('should not emit if subscriber does not exist', () => {
+      const handler = friendshipAcceptedUpdateHandler(subscribersContext, logger)
+      const nonExistentUpdate = {
+        id: 'update-1',
+        from: '0x123',
+        to: '0xNONEXISTENT',
+        action: Action.REQUEST,
+        timestamp: Date.now()
+      }
+
+      expect(handler(JSON.stringify(nonExistentUpdate))).resolves.toBeUndefined()
+    })
+
+    it('should log error on invalid JSON', () => {
+      const handler = friendshipAcceptedUpdateHandler(subscribersContext, logger)
       const errorSpy = jest.spyOn(logger, 'error')
 
       handler('invalid json')
