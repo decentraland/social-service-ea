@@ -70,13 +70,20 @@ export function friendshipAcceptedUpdateHandler(subscribersContext: ISubscribers
       return
     }
 
-    const updateEmitter = subscribersContext.getOrAddSubscriber(update.to)
-    if (updateEmitter) {
-      updateEmitter.emit('friendConnectivityUpdate', {
-        address: update.from,
-        status: ConnectivityStatus.ONLINE
-      })
-    }
+    const notifications = [
+      { subscriber: update.to, friend: update.from },
+      { subscriber: update.from, friend: update.to }
+    ]
+
+    notifications.forEach(({ subscriber, friend }) => {
+      const emitter = subscribersContext.getOrAddSubscriber(subscriber)
+      if (emitter) {
+        emitter.emit('friendConnectivityUpdate', {
+          address: friend,
+          status: ConnectivityStatus.ONLINE
+        })
+      }
+    })
   }, logger)
 }
 

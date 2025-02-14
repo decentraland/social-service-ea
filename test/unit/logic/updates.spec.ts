@@ -70,10 +70,12 @@ describe('updates handlers', () => {
   })
 
   describe('friendshipAcceptedUpdateHandler', () => {
-    it('should emit friendship update to the correct subscriber', () => {
+    it('should emit friendship update to the correct subscribers', () => {
       const handler = friendshipAcceptedUpdateHandler(subscribersContext, logger)
-      const subscriber = subscribersContext.getOrAddSubscriber('0x456')
-      const emitSpy = jest.spyOn(subscriber, 'emit')
+      const subscriber123 = subscribersContext.getOrAddSubscriber('0x123')
+      const subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
+      const emitSpy123 = jest.spyOn(subscriber123, 'emit')
+      const emitSpy456 = jest.spyOn(subscriber456, 'emit')
 
       const update = {
         id: 'update-1',
@@ -86,7 +88,12 @@ describe('updates handlers', () => {
 
       handler(JSON.stringify(update))
 
-      expect(emitSpy).toHaveBeenCalledWith('friendConnectivityUpdate', {
+      expect(emitSpy123).toHaveBeenCalledWith('friendConnectivityUpdate', {
+        address: '0x456',
+        status: ConnectivityStatus.ONLINE
+      })
+
+      expect(emitSpy456).toHaveBeenCalledWith('friendConnectivityUpdate', {
         address: '0x123',
         status: ConnectivityStatus.ONLINE
       })
