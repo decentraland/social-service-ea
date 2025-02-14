@@ -13,6 +13,7 @@ import {
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
 import { createMockProfile } from '../../../../mocks/profile'
 import { mockSns } from '../../../../mocks/components/sns'
+import * as Notifications from '../../../../../src/logic/notifications'
 
 jest.mock('../../../../../src/logic/friendships')
 
@@ -241,6 +242,7 @@ describe('upsertFriendshipService', () => {
     jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(parsedAccept)
     jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
     jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
+    jest.spyOn(Notifications, 'sendNotification').mockResolvedValueOnce()
 
     const [mockSenderProfile, mockReceiverProfile] = [
       createMockProfile(rpcContext.address),
@@ -257,7 +259,20 @@ describe('upsertFriendshipService', () => {
     jest.useFakeTimers()
     await upsertFriendship(requestPayload, rpcContext)
     jest.runAllTimers()
-    expect(mockSns.publishMessage).toHaveBeenCalled()
+    expect(Notifications.sendNotification).toHaveBeenCalledWith(
+      parsedAccept.action,
+      expect.objectContaining({
+        requestId: lastFriendshipAction.id,
+        senderAddress: rpcContext.address,
+        receiverAddress: userAddress,
+        senderProfile: mockSenderProfile,
+        receiverProfile: mockReceiverProfile
+      }),
+      {
+        logs: mockLogs,
+        sns: mockSns
+      }
+    )
     jest.useRealTimers()
   })
 

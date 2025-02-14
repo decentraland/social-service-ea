@@ -11,7 +11,11 @@ import { getSentFriendshipRequestsService } from './services/get-sent-friendship
 import { getFriendshipStatusService } from './services/get-friendship-status'
 import { subscribeToFriendConnectivityUpdatesService } from './services/subscribe-to-friend-connectivity-updates'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
-import { friendshipUpdateHandler, friendConnectivityUpdateHandler } from '../../logic/updates'
+import {
+  friendshipUpdateHandler,
+  friendConnectivityUpdateHandler,
+  friendshipAcceptedUpdateHandler
+} from '../../logic/updates'
 
 export async function createRpcServerComponent({
   logs,
@@ -74,6 +78,10 @@ export async function createRpcServerComponent({
       })
 
       await pubsub.subscribeToChannel(FRIENDSHIP_UPDATES_CHANNEL, friendshipUpdateHandler(subscribersContext, logger))
+      await pubsub.subscribeToChannel(
+        FRIENDSHIP_UPDATES_CHANNEL,
+        friendshipAcceptedUpdateHandler(subscribersContext, logger)
+      )
       await pubsub.subscribeToChannel(
         FRIEND_STATUS_UPDATES_CHANNEL,
         friendConnectivityUpdateHandler(subscribersContext, logger, db)

@@ -1,5 +1,6 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import {
+  Action,
   ICatalystClientComponent,
   IDatabaseComponent,
   ISubscribersContext,
@@ -8,6 +9,7 @@ import {
 } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export type ILogger = ILoggerComponent.ILogger
 
@@ -54,6 +56,34 @@ export function friendshipUpdateHandler(subscribersContext: ISubscribersContext,
     if (updateEmitter) {
       updateEmitter.emit('friendshipUpdate', update)
     }
+  }, logger)
+}
+
+export function friendshipAcceptedUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
+  return handleUpdate<'friendshipUpdate'>((update) => {
+    logger.info('Friendship accepted update', {
+      update: JSON.stringify(update)
+    })
+
+    if (update.action !== Action.ACCEPT) {
+      logger.debug(`Friendship update with status ${update.action} ignored`)
+      return
+    }
+
+    const notifications = [
+      { subscriber: update.to, friend: update.from },
+      { subscriber: update.from, friend: update.to }
+    ]
+
+    notifications.forEach(({ subscriber, friend }) => {
+      const emitter = subscribersContext.getOrAddSubscriber(subscriber)
+      if (emitter) {
+        emitter.emit('friendConnectivityUpdate', {
+          address: friend,
+          status: ConnectivityStatus.ONLINE
+        })
+      }
+    })
   }, logger)
 }
 
