@@ -35,54 +35,36 @@ A microservice that handles social interactions (friendships) for Decentraland, 
 This service follows the Well Known Components pattern, where each component is a self-contained unit with a clear interface. The main components are:
 
 - **Database (PostgreSQL)**: Stores friendship relationships and actions
-- **Cache (Redis)**: Handles temporary data and real-time status
-- **RPC Server**: Manages client-server RPC communication
+- **Cache (Redis)**: Handles temporary information, real-time status, and frequently accessed data
+- **RPC Server**: Manages client-server RPC communication following the [Protocol definition](https://github.com/decentraland/protocol/blob/main/proto/decentraland/social_service/v2/social_service_v2.proto)
 - **PubSub**: Handles real-time updates
 - **Archipelago Stats**: Integrates with Decentraland's peer discovery system
 - **Peer Tracking**: Monitors online status of users through the NATS messaging system
+- **Catalyst Client**: Fetches profiles from the Catalyst Lambdas API
 - **Peers Synchronization**: Synchronizes peers with the Archipelago Stats service and store them in Redis
 
 ### Database Design
 
-```plantuml
-@startuml
-!define table(x) class x << (T,#FFAAAA) >>
-!define primary_key(x) <u>x</u>
-!define foreign_key(x) #x#
-hide methods
-hide stereotypes
+```
+erDiagram
+  FRIENDSHIPS {
+    uuid id PK
+    varchar address_requester
+    varchar address_requested
+    boolean is_active
+    timestamp created_at
+    timestamp updated_at
+  }
+  FRIENDSHIP_ACTIONS {
+    uuid id PK
+    uuid friendship_id FK
+    varchar action
+    varchar acting_user
+    jsonb metadata
+    timestamp timestamp
+  }
 
-table(friendships) {
-  primary_key(id): uuid
-  address_requester: varchar
-  address_requested: varchar
-  is_active: boolean
-  created_at: timestamp
-  updated_at: timestamp
-  --
-  indexes
-  ..
-  hash(address_requester)
-  hash(address_requested)
-  btree(LOWER(address_requester))
-  btree(LOWER(address_requested))
-}
-
-table(friendship_actions) {
-  primary_key(id): uuid
-  foreign_key(friendship_id): uuid
-  action: varchar
-  acting_user: varchar
-  metadata: jsonb
-  timestamp: timestamp
-  --
-  indexes
-  ..
-  btree(friendship_id)
-}
-
-friendships ||--|{ friendship_actions
-@enduml
+  FRIENDSHIPS ||--o{ FRIENDSHIP_ACTIONS : "has"
 ```
 
 The database schema supports:
@@ -98,64 +80,71 @@ See migrations for details: [migrations](./src/migrations)
 
 ```mermaid
 sequenceDiagram
-    participant Client
-    participant WebSocket
-    participant RPC Server
-    participant Redis
-    participant NATS
-    participant DB
+  participant Client
+  participant WebSocket
+  participant RPC Server
+  participant Redis
+  participant NATS
+  participant DB
 
-    Note over Client,DB: Connection Setup
-    Client->>WebSocket: WS Handshake
-    activate WebSocket
-    WebSocket-->>Client: Connection Established
-    Client->>WebSocket: Auth Message
-    WebSocket->>RPC Server: Attach Transport
-    activate RPC Server
+  Note over Client,DB: Connection Setup
+  Client->>WebSocket: WS Handshake
+  activate WebSocket
+  WebSocket-->>Client: Connection Established
+  Client->>WebSocket: Auth Message
+  WebSocket->>RPC Server: Attach Transport
+  activate RPC Server
 
-    Note over RPC Server,NATS: Subscriptions Setup
-    RPC Server->>Redis: Subscribe to updates channels
-    activate Redis
-    Note over Redis: friendship.updates
-    Note over Redis: friend.status.updates
-    RPC Server->>NATS: Subscribe to peer events
-    activate NATS
-    Note over NATS: peer.*.connected
-    Note over NATS: peer.*.disconnected
-    Note over NATS: peer.*.heartbeat
+  Note over RPC Server,NATS: Subscriptions Setup
+  RPC Server->>Redis: Subscribe to updates channels
+  activate Redis
+  Note over Redis: friendship.updates
+  Note over Redis: friend.status.updates
+  RPC Server->>NATS: Subscribe to peer events
+  activate NATS
+  Note over NATS: peer.*.connected
+  Note over NATS: peer.*.disconnected
+  Note over NATS: peer.*.heartbeat
 
-    Note over Client,DB: Friendship Request Flow
-    Client->>RPC Server: Friend Request
-    RPC Server->>DB: Create Friendship Record
-    DB-->>RPC Server: Friendship Created
-    RPC Server->>DB: Record Friendship Action
-    RPC Server->>Redis: Publish Friendship Update
-    RPC Server-->>Client: Request Confirmation
+  Note over Client,DB: Friendship Requests
+  Client->>RPC Server: Friend Request
+  RPC Server->>DB: Create Friendship Record
+  DB-->>RPC Server: Friendship Created
+  RPC Server->>DB: Record Friendship Action
+  RPC Server->>Redis: Publish Friendship Update
+  RPC Server-->>Client: Request Confirmation
 
-    Note over Client,DB: Friendship Updates Flow
-    Redis-->>RPC Server: Friendship Update Event
+  loop Friendship Status Updates
+    Redis-->>RPC Server: Friendship Update
     RPC Server-->>Client: Stream Friendship Updates
     Note over RPC Server: (accept/cancel/reject/delete)
+  end
 
-    Note over Client,DB: Friends Lifecycle
-    NATS-->>Redis: Publish Peer Connection Update Event
-    Redis-->>RPC Server: Broadcast Friend Status Update Event
+  Note over Client,DB: Friends Connectivity Status
+  loop connectivity updates
+    NATS-->>Redis: Publish Peer Connection/Disconnection Update
+    Redis-->>RPC Server: Broadcast Friend Connectivity Status Update
     RPC Server->>Redis: Get Cached Peers
     Redis-->>RPC Server: Cached Peers
     RPC Server->>DB: Query Online Friends
     DB-->>RPC Server: Online Friends
-    RPC Server-->>Client: Stream Friend Status Updates
+    RPC Server-->>Client: Stream Friend Connectivity Status to Connected Friends
     Note over RPC Server: (online/offline)
+  end
+  loop friendship accepted
+    Redis-->>RPC Server: Friendship Accepted
+    RPC Server-->>Client: Stream Friend Connectivity Status Update to both friends
+  end
 
-    Note over Client,DB: Cleanup
-    Client->>WebSocket: Connection Close
-    WebSocket->>RPC Server: Detach Transport
-    RPC Server->>Redis: Unsubscribe
-    RPC Server->>NATS: Unsubscribe
-    deactivate WebSocket
-    deactivate RPC Server
-    deactivate Redis
-    deactivate NATS
+  Note over Client,DB: Cleanup
+  Client->>WebSocket: Connection Close
+  WebSocket->>RPC Server: Detach Transport
+  RPC Server->>Redis: Unsubscribe
+  RPC Server->>NATS: Unsubscribe
+  deactivate WebSocket
+  deactivate RPC Server
+  deactivate Redis
+  deactivate NATS
 ```
 
 ## 🚀 Getting Started
@@ -191,7 +180,7 @@ yarn migrate up
 5. Run the service:
 
 ```bash
-yarn start
+yarn dev
 ```
 
 ### Environment Variables
@@ -199,8 +188,13 @@ yarn start
 Key environment variables needed:
 
 - `REDIS_HOST`: URL of the Redis instance
+- `RPC_SERVER_PORT`: Port of the RPC server
 - `PG_COMPONENT_PSQL_CONNECTION_STRING`: URL of the PostgreSQL instance
 - `ARCHIPELAGO_STATS_URL`: URL of the Archipelago Stats service
+- `NATS_URL`: URL of the NATS instance
+- `CATALYST_LAMBDAS_URL_LOADBALANCER`: URL of the Catalyst Lambdas Load Balancer
+- `PEER_SYNC_INTERVAL_MS`: Interval for peer synchronization
+- `PEERS_SYNC_CACHE_TTL_MS`: Cache TTL for peer synchronization
 
 See `.env.default` for all available options.
 
