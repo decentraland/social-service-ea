@@ -13,6 +13,7 @@ import {
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { mockSns } from '../../mocks/components/sns'
 import mitt from 'mitt'
+import * as updates from '../../../src/logic/updates'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -28,7 +29,7 @@ describe('createRpcServerComponent', () => {
   let mockTransport: Transport
   let mockEmitter: ReturnType<typeof mitt>
   let subscribersContext: ISubscribersContext
-  
+
   beforeEach(async () => {
     subscribersContext = createSubscribersContext()
 
@@ -64,14 +65,31 @@ describe('createRpcServerComponent', () => {
   })
 
   describe('start', () => {
-    it('should start the server and subscribe to pubsub updates', async () => {
-      mockConfig.getNumber.mockResolvedValueOnce(8085)
+    beforeEach(() => {
+      jest.spyOn(updates, 'friendshipUpdateHandler')
+      jest.spyOn(updates, 'friendshipAcceptedUpdateHandler')
+      jest.spyOn(updates, 'friendConnectivityUpdateHandler')
 
+      mockConfig.getNumber.mockResolvedValueOnce(8085)
+    })
+
+    it('should start the server and subscribe to pubsub updates', async () => {
       await rpcServer.start({} as any)
 
       expect(mockUWs.app.listen).toHaveBeenCalledWith(8085, expect.any(Function))
       expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Function))
+      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Function))
       expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIEND_STATUS_UPDATES_CHANNEL, expect.any(Function))
+    })
+
+    it('should call the correct handlers', async () => {
+      const mockLogger = mockLogs.getLogger('rpcServer-test')
+
+      await rpcServer.start({} as any)
+
+      expect(updates.friendshipUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
+      expect(updates.friendshipAcceptedUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
+      expect(updates.friendConnectivityUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger, mockDb)
     })
   })
 
@@ -109,9 +127,9 @@ describe('createRpcServerComponent', () => {
 
     it('should clean up subscribers when transport closes', () => {
       rpcServer.attachUser({ transport: mockTransport, address })
-      
+
       const closeHandler = (mockTransport.on as jest.Mock).mock.calls[0][1]
-      
+
       closeHandler()
 
       expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
@@ -119,7 +137,7 @@ describe('createRpcServerComponent', () => {
 
     it('should maintain separate subscribers for different addresses', () => {
       const address2 = '0x456'
-      
+
       rpcServer.attachUser({ transport: mockTransport, address })
       rpcServer.attachUser({ transport: mockTransport, address: address2 })
 
@@ -141,9 +159,9 @@ describe('createRpcServerComponent', () => {
 
     it('should remove subscriber when detaching user', () => {
       expect(subscribersContext.getSubscribersAddresses()).toContain(address)
-      
+
       rpcServer.detachUser(address)
-      
+
       expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
     })
 
