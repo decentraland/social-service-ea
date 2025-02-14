@@ -338,9 +338,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
           END as address
         FROM friendships
         WHERE (
-          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) IN (${normalizedOnlinePotentialFriends.join(',')}))
+          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) = ANY(${normalizedOnlinePotentialFriends}))
           OR
-          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) IN (${normalizedOnlinePotentialFriends.join(',')}))
+          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) = ANY(${normalizedOnlinePotentialFriends}))
         )
         AND is_active = true`
 
@@ -351,6 +351,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const pool = pg.getPool()
       const client = await pool.connect()
       await client.query('BEGIN')
+
       try {
         const res = await cb(client)
         await client.query('COMMIT')
@@ -358,8 +359,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       } catch (error: any) {
         logger.error(`Error executing transaction: ${error.message}`)
         await client.query('ROLLBACK')
-        client.release()
         throw error
+      } finally {
+        client.release()
       }
     }
   }

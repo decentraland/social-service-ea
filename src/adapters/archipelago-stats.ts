@@ -13,7 +13,7 @@ export async function createArchipelagoStatsComponent({
   return {
     async getPeers() {
       try {
-        const response = await fetcher.fetch(`${url}/comms/peers`)
+        const response = await fetcher.fetch(`${url}/peers`)
 
         if (!response.ok) {
           throw new Error(`Error fetching peers: ${response.statusText}`)

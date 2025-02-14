@@ -3,8 +3,11 @@ import { AppComponents, IWSPoolComponent } from '../types'
 export async function createWSPoolComponent({
   metrics,
   config,
-  redis
-}: Pick<AppComponents, 'metrics' | 'config' | 'redis'>): Promise<IWSPoolComponent> {
+  redis,
+  logs
+}: Pick<AppComponents, 'metrics' | 'config' | 'redis' | 'logs'>): Promise<IWSPoolComponent> {
+  const logger = logs.getLogger('ws-pool')
+
   const idleTimeoutInMs = (await config.getNumber('IDLE_TIMEOUT_IN_MS')) || 300000 // 5 minutes default
 
   const cleanupInterval = setInterval(async () => {
@@ -22,6 +25,11 @@ export async function createWSPoolComponent({
   }, 60000)
 
   async function acquireConnection(id: string) {
+    logger.debug('[DEBUGGING CONNECTION] Attempting to acquire connection', {
+      connectionId: id,
+      timestamp: new Date().toISOString()
+    })
+
     const key = `ws:conn:${id}`
 
     if (await redis.client.exists(key)) {
@@ -44,7 +52,9 @@ export async function createWSPoolComponent({
         throw new Error('Transaction failed')
       }
 
-      const totalConnections: number = await redis.client.zCard('ws:active_connections')
+      const totalConnections = await getActiveConnections()
+
+      logger.debug(`[DEBUGGING CONNECTION] Active connections ${totalConnections}`)
       metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
     } catch (error) {
       await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
@@ -53,6 +63,11 @@ export async function createWSPoolComponent({
   }
 
   async function releaseConnection(id: string) {
+    logger.debug('[DEBUGGING CONNECTION] Releasing connection', {
+      connectionId: id,
+      timestamp: new Date().toISOString()
+    })
+
     const key = `ws:conn:${id}`
     await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
     const totalConnections = await redis.client.zCard('ws:active_connections')
@@ -60,6 +75,11 @@ export async function createWSPoolComponent({
   }
 
   async function updateActivity(id: string) {
+    logger.debug('[DEBUGGING CONNECTION] Updating connection activity', {
+      connectionId: id,
+      timestamp: new Date().toISOString()
+    })
+
     const key = `ws:conn:${id}`
     await redis.put(
       key,

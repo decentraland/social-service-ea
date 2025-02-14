@@ -400,31 +400,20 @@ describe('db', () => {
       await dbComponent.getOnlineFriends('0x123', normalizedPotentialFriends)
 
       const queryExpectations = [
-        { text: 'LOWER(address_requester) =' },
-        { text: 'AND LOWER(address_requested) IN' },
-        { text: 'LOWER(address_requested) =' },
-        { text: 'LOWER(address_requester) IN' }
+        SQL`WHEN LOWER(address_requester) = ${userAddress} THEN LOWER(address_requested)`,
+        SQL`ELSE LOWER(address_requester)`,
+        SQL`(LOWER(address_requester) = ${userAddress} AND LOWER(address_requested) = ANY(${normalizedPotentialFriends}))`,
+        SQL`(LOWER(address_requested) = ${userAddress} AND LOWER(address_requester) = ANY(${normalizedPotentialFriends}))`
       ]
 
-      queryExpectations.forEach(({ text }) => {
+      queryExpectations.forEach((query) => {
         expect(mockPg.query).toHaveBeenCalledWith(
           expect.objectContaining({
-            text: expect.stringContaining(text)
+            text: expect.stringContaining((query as any).strings[0]),
+            values: expect.arrayContaining(query.values)
           })
         )
       })
-
-      expect(mockPg.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          values: expect.arrayContaining([
-            userAddress,
-            userAddress,
-            normalizedPotentialFriends.join(','),
-            userAddress,
-            normalizedPotentialFriends.join(',')
-          ])
-        })
-      )
     })
   })
 
@@ -441,6 +430,7 @@ describe('db', () => {
       expect(mockClient.query).toHaveBeenCalledWith('SELECT 1')
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT')
       expect(result).toBe('success')
+      expect(mockClient.release).toHaveBeenCalled()
     })
 
     it('should rollback the transaction on error', async () => {
@@ -454,6 +444,7 @@ describe('db', () => {
 
       expect(mockClient.query).toHaveBeenCalledWith('BEGIN')
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
     })
   })
 
