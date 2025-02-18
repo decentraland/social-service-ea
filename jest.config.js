@@ -9,5 +9,5 @@ module.exports = {
   collectCoverageFrom: ['src/**/*.ts', 'src/**/*.js', '!src/migrations/**'],
   testMatch: ['**/test/unit/**/*.spec.(ts)'],
   testEnvironment: 'node',
-  setupFilesAfterEnv: ['<rootDir>/test/setupTests.ts']
+  setupFilesAfterEnv: ['<rootDir>/test/unit/setupTests.ts']
 }

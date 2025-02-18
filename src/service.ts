@@ -10,5 +10,7 @@ export async function main(program: Lifecycle.EntryPointParameters<AppComponents
 
   await startComponents()
 
+  // TODO: start syncing peers too
+
   await components.peerTracking.subscribeToPeerStatusUpdates()
 }
