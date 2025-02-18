@@ -2,11 +2,19 @@ import { FriendProfile } from '@dcl/protocol/out-js/decentraland/social_service/
 import { getProfileName, getProfileHasClaimedName, getProfileUserId, getProfilePictureUrl } from './profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
+function getOrDefault<T>(fn: (profile: Profile) => T, profile: Profile, defaultValue: T): T {
+  try {
+    return fn(profile)
+  } catch (error) {
+    return defaultValue
+  }
+}
+
 export function parseProfileToFriend(profile: Profile): FriendProfile {
-  const name = getProfileName(profile)
-  const userId = getProfileUserId(profile)
-  const hasClaimedName = getProfileHasClaimedName(profile)
-  const profilePictureUrl = getProfilePictureUrl(profile)
+  const name = getOrDefault(getProfileName, profile, '')
+  const userId = getOrDefault(getProfileUserId, profile, '')
+  const hasClaimedName = getOrDefault(getProfileHasClaimedName, profile, false)
+  const profilePictureUrl = getOrDefault(getProfilePictureUrl, profile, '') // TODO: use a default profile picture
 
   return {
     address: userId,

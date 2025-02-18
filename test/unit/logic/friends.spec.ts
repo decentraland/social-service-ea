@@ -11,6 +11,30 @@ describe('parseProfileToFriend', () => {
       profilePictureUrl: mockProfile.avatars[0].avatar.snapshots.face256
     })
   })
+
+  describe('when profile avatar is missing', () => {
+    const profileWithoutAvatars = { ...mockProfile, avatars: [] }
+
+    it('should return empty string for name if profile is missing', () => {
+      const friend = parseProfileToFriend(profileWithoutAvatars)
+      expect(friend.name).toEqual('')
+    })
+
+    it('should return empty string for userId if profile is missing', () => {
+      const friend = parseProfileToFriend(profileWithoutAvatars)
+      expect(friend.address).toEqual('')
+    })
+
+    it('should return false for hasClaimedName if profile is missing', () => {
+      const friend = parseProfileToFriend(profileWithoutAvatars)
+      expect(friend.hasClaimedName).toEqual(false)
+    })
+
+    it('should return empty string for profilePictureUrl if profile is missing', () => {
+      const friend = parseProfileToFriend(profileWithoutAvatars)
+      expect(friend.profilePictureUrl).toEqual('')
+    })
+  })
 })
 
 describe('parseProfilesToFriends', () => {
