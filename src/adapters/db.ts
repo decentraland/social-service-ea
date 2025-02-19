@@ -8,7 +8,8 @@ import {
   FriendshipRequest,
   IDatabaseComponent,
   Friend,
-  Pagination
+  Pagination,
+  Action
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
@@ -32,7 +33,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       WHERE (LOWER(address_requester) = ${normalizedUserAddress} OR LOWER(address_requested) = ${normalizedUserAddress})`
   }
 
-  function getFriendshipRequestBaseQuery(
+  function getFriendshipRequestsBaseQuery(
     userAddress: string,
     type: 'sent' | 'received',
     { onlyCount, pagination }: { onlyCount?: boolean; pagination?: Pagination } = { onlyCount: false }
@@ -57,7 +58,6 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     const baseQuery = SQL`WITH latest_requests AS (
         SELECT DISTINCT ON (friendship_id) *
         FROM friendship_actions
-        WHERE action = 'request'
         ORDER BY friendship_id, timestamp DESC
       ) SELECT`
 
@@ -73,6 +73,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     baseQuery.append(SQL` INNER JOIN latest_requests lr ON f.id = lr.friendship_id`)
     baseQuery.append(SQL` WHERE`)
     baseQuery.append(filterMapping[type])
+    baseQuery.append(SQL` AND action = ${Action.REQUEST}`)
 
     baseQuery.append(SQL` AND f.is_active IS FALSE`)
 
@@ -306,22 +307,22 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return uuid
     },
     async getReceivedFriendshipRequests(userAddress, pagination) {
-      const query = getFriendshipRequestBaseQuery(userAddress, 'received', { pagination })
+      const query = getFriendshipRequestsBaseQuery(userAddress, 'received', { pagination })
       const results = await pg.query<FriendshipRequest>(query)
       return results.rows
     },
     async getReceivedFriendshipRequestsCount(userAddress) {
-      const query = getFriendshipRequestBaseQuery(userAddress, 'received', { onlyCount: true })
+      const query = getFriendshipRequestsBaseQuery(userAddress, 'received', { onlyCount: true })
       const results = await pg.query<{ count: number }>(query)
       return results.rows[0].count
     },
     async getSentFriendshipRequests(userAddress, pagination) {
-      const query = getFriendshipRequestBaseQuery(userAddress, 'sent', { pagination })
+      const query = getFriendshipRequestsBaseQuery(userAddress, 'sent', { pagination })
       const results = await pg.query<FriendshipRequest>(query)
       return results.rows
     },
     async getSentFriendshipRequestsCount(userAddress) {
-      const query = getFriendshipRequestBaseQuery(userAddress, 'sent', { onlyCount: true })
+      const query = getFriendshipRequestsBaseQuery(userAddress, 'sent', { onlyCount: true })
       const results = await pg.query<{ count: number }>(query)
       return results.rows[0].count
     },

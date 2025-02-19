@@ -274,7 +274,14 @@ describe('db', () => {
           )
         })
       )
-      // LOWER(lr.acting_user) <> ${normalizedUserAddress} AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('action = '),
+          values: expect.arrayContaining([Action.REQUEST])
+        })
+      )
+
       const normalizedUserAddress = normalizeAddress('0x456')
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -282,7 +289,7 @@ describe('db', () => {
             SQL`LOWER(lr.acting_user) <> ${normalizedUserAddress} AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})`
               .text
           ),
-          values: expect.arrayContaining(['0x456'])
+          values: expect.arrayContaining([normalizedUserAddress])
         })
       )
 
@@ -331,6 +338,12 @@ describe('db', () => {
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(`ELSE LOWER(f.address_requester)`)
+        })
+      )
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('action = '),
+          values: expect.arrayContaining([Action.REQUEST])
         })
       )
       expect(mockPg.query).toHaveBeenCalledWith(
