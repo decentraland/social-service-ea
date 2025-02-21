@@ -14,7 +14,9 @@ export type PeerStatusHandler = {
 export const PEER_STATUS_HANDLERS: PeerStatusHandler[] = [
   { event: 'connect', pattern: 'peer.*.connect', status: ConnectivityStatus.OFFLINE },
   { event: 'disconnect', pattern: 'peer.*.disconnect', status: ConnectivityStatus.OFFLINE },
-  { event: 'heartbeat', pattern: 'peer.*.heartbeat', status: ConnectivityStatus.ONLINE }
+  { event: 'heartbeat', pattern: 'peer.*.heartbeat', status: ConnectivityStatus.ONLINE },
+  { event: 'participant_join_world', pattern: 'peer.*.join_world', status: ConnectivityStatus.ONLINE },
+  { event: 'participant_leave_world', pattern: 'peer.*.leave_world', status: ConnectivityStatus.OFFLINE }
 ]
 
 export async function createPeerTrackingComponent({
