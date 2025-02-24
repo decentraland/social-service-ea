@@ -39,6 +39,7 @@ export type BaseComponents = {
   redis: IRedisComponent & ICacheComponent
   pubsub: IPubSubComponent
   archipelagoStats: IArchipelagoStatsComponent
+  worldsStats: IWorldsStatsComponent
   peersSynchronizer: IPeersSynchronizer
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
@@ -124,12 +125,19 @@ export type IPubSubComponent = IBaseComponent & {
   publishInChannel<T>(channel: string, update: T): Promise<void>
 }
 
-export type IArchipelagoStatsComponent = IBaseComponent & {
+export type IArchipelagoStatsComponent = {
   getPeers(): Promise<string[]>
   getPeersFromCache(): Promise<string[]>
 }
 
+export type IWorldsStatsComponent = {
+  onPeerConnect(address: string): Promise<void>
+  onPeerDisconnect(address: string): Promise<void>
+  getPeers(): Promise<string[]>
+}
+
 export type IPeersSynchronizer = IBaseComponent
+
 export type IPeerTrackingComponent = IBaseComponent & {
   getSubscriptions(): Map<string, Subscription>
   subscribeToPeerStatusUpdates(): Promise<void>

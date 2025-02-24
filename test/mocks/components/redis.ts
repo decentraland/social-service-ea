@@ -18,7 +18,11 @@ jest.mock('redis', () => {
     multi: jest.fn(),
     zRem: jest.fn(),
     scanIterator: jest.fn(),
-    duplicate: jest.fn()
+    duplicate: jest.fn(),
+    sAdd: jest.fn(),
+    sRem: jest.fn(),
+    sMembers: jest.fn(),
+    expire: jest.fn()
   }
 
   return {

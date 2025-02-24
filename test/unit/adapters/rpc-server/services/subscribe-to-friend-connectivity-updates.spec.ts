@@ -7,6 +7,7 @@ import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
+import { mockWorldsStats } from '../../../../mocks/components/worlds-stats'
 
 jest.mock('../../../../../src/logic/updates')
 
@@ -26,7 +27,8 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
         logs: mockLogs,
         db: mockDb,
         archipelagoStats: mockArchipelagoStats,
-        catalystClient: mockCatalystClient
+        catalystClient: mockCatalystClient,
+        worldsStats: mockWorldsStats
       }
     })
 
@@ -39,7 +41,8 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   it('should get initial online friends from archipelago stats and then receive updates', async () => {
     mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
-    mockArchipelagoStats.getPeers.mockResolvedValue(['0x456', '0x789'])
+    mockArchipelagoStats.getPeersFromCache.mockResolvedValue(['0x456', '0x789'])
+    mockWorldsStats.getPeers.mockResolvedValue(['0x654', '0x987'])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
         friend: parseProfileToFriend(mockFriendProfile),
@@ -51,6 +54,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     const result = await generator.next()
 
     expect(mockArchipelagoStats.getPeersFromCache).toHaveBeenCalled()
+    expect(mockWorldsStats.getPeers).toHaveBeenCalled()
     expect(result.value).toEqual({
       friend: parseProfileToFriend(mockFriendProfile),
       status: ConnectivityStatus.ONLINE

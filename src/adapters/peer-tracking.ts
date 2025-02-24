@@ -6,26 +6,40 @@ import { NatsMsg } from '@well-known-components/nats-component/dist/types'
 import { FRIEND_STATUS_UPDATES_CHANNEL } from './pubsub'
 
 export type PeerStatusHandler = {
-  event: string
+  event: PeerStatusHandlerEvent
   pattern: string
   status: ConnectivityStatus
 }
 
+enum PeerStatusHandlerEvent {
+  CONNECT = 'connect',
+  DISCONNECT = 'disconnect',
+  HEARTBEAT = 'heartbeat',
+  JOIN_WORLD = 'join_world',
+  LEAVE_WORLD = 'leave_world'
+}
+
 export const PEER_STATUS_HANDLERS: PeerStatusHandler[] = [
-  { event: 'connect', pattern: 'peer.*.connect', status: ConnectivityStatus.OFFLINE },
-  { event: 'disconnect', pattern: 'peer.*.disconnect', status: ConnectivityStatus.OFFLINE },
-  { event: 'heartbeat', pattern: 'peer.*.heartbeat', status: ConnectivityStatus.ONLINE },
-  { event: 'join_world', pattern: 'peer.*.world.join', status: ConnectivityStatus.ONLINE },
-  { event: 'leave_world', pattern: 'peer.*.world.leave', status: ConnectivityStatus.OFFLINE }
+  { event: PeerStatusHandlerEvent.CONNECT, pattern: 'peer.*.connect', status: ConnectivityStatus.OFFLINE },
+  { event: PeerStatusHandlerEvent.DISCONNECT, pattern: 'peer.*.disconnect', status: ConnectivityStatus.OFFLINE },
+  { event: PeerStatusHandlerEvent.HEARTBEAT, pattern: 'peer.*.heartbeat', status: ConnectivityStatus.ONLINE },
+  { event: PeerStatusHandlerEvent.JOIN_WORLD, pattern: 'peer.*.world.join', status: ConnectivityStatus.ONLINE },
+  { event: PeerStatusHandlerEvent.LEAVE_WORLD, pattern: 'peer.*.world.leave', status: ConnectivityStatus.OFFLINE }
 ]
+
+const WORLD_EVENTS = [PeerStatusHandlerEvent.JOIN_WORLD, PeerStatusHandlerEvent.LEAVE_WORLD]
 
 export async function createPeerTrackingComponent({
   logs,
   pubsub,
   nats,
   redis,
-  config
-}: Pick<AppComponents, 'logs' | 'pubsub' | 'nats' | 'redis' | 'config'>): Promise<IPeerTrackingComponent> {
+  config,
+  worldsStats
+}: Pick<
+  AppComponents,
+  'logs' | 'pubsub' | 'nats' | 'redis' | 'config' | 'worldsStats'
+>): Promise<IPeerTrackingComponent> {
   const logger = logs.getLogger('peer-tracking-component')
   const subscriptions = new Map<string, Subscription>()
   const statusCacheTtlInSeconds = (await config.getNumber('STATUS_CACHE_TTL_IN_SECONDS')) || 3600
@@ -55,6 +69,25 @@ export async function createPeerTrackingComponent({
     }
   }
 
+  async function handleWorldEvent(peerId: string, event: PeerStatusHandlerEvent) {
+    try {
+      switch (event) {
+        case PeerStatusHandlerEvent.JOIN_WORLD:
+          await worldsStats.onPeerConnect(peerId)
+          break
+        case PeerStatusHandlerEvent.LEAVE_WORLD:
+          await worldsStats.onPeerDisconnect(peerId)
+          break
+      }
+    } catch (error: any) {
+      logger.error('Error handling world event:', {
+        error: error.message,
+        peerId,
+        event
+      })
+    }
+  }
+
   function createMessageHandler(handler: PeerStatusHandler) {
     return async (err: Error | null, message: NatsMsg) => {
       if (err) {
@@ -66,7 +99,12 @@ export async function createPeerTrackingComponent({
       }
 
       const peerId = message.subject.split('.')[1]
+
       await notifyPeerStatusChange(peerId, handler.status)
+
+      if (WORLD_EVENTS.includes(handler.event)) {
+        await handleWorldEvent(peerId, handler.event)
+      }
     }
   }
 

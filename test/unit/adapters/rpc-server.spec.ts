@@ -14,6 +14,7 @@ import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../..
 import { mockSns } from '../../mocks/components/sns'
 import mitt from 'mitt'
 import * as updates from '../../../src/logic/updates'
+import { mockWorldsStats } from '../../mocks/components/worlds-stats'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -56,7 +57,8 @@ describe('createRpcServerComponent', () => {
       archipelagoStats: mockArchipelagoStats,
       catalystClient: mockCatalystClient,
       sns: mockSns,
-      subscribersContext
+      subscribersContext,
+      worldsStats: mockWorldsStats
     })
   })
 

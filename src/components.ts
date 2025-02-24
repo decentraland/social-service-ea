@@ -18,6 +18,7 @@ import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
 import { createSnsComponent } from './adapters/sns'
 import { createWSPoolComponent } from './adapters/ws-pool'
+import { createWorldsStatsComponent } from './adapters/worlds-stats'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -57,6 +58,7 @@ export async function initComponents(): Promise<AppComponents> {
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
+  const worldsStats = await createWorldsStatsComponent({ logs, redis, config })
   const nats = await createNatsComponent({ logs, config })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const sns = await createSnsComponent({ config })
@@ -70,30 +72,32 @@ export async function initComponents(): Promise<AppComponents> {
     archipelagoStats,
     catalystClient,
     sns,
-    subscribersContext
+    subscribersContext,
+    worldsStats
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
-  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   return {
+    archipelagoStats,
+    catalystClient,
     config,
-    logs,
-    server,
-    metrics,
-    pg,
     db,
     fetcher,
-    redis,
-    pubsub,
-    rpcServer,
-    archipelagoStats,
-    peersSynchronizer,
+    logs,
+    metrics,
     nats,
     peerTracking,
-    catalystClient,
+    peersSynchronizer,
+    pg,
+    pubsub,
+    redis,
+    rpcServer,
+    server,
     sns,
-    wsPool,
-    subscribersContext
+    subscribersContext,
+    worldsStats,
+    wsPool
   }
 }
