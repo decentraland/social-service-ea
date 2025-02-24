@@ -16,6 +16,7 @@ import {
   friendConnectivityUpdateHandler,
   friendshipAcceptedUpdateHandler
 } from '../../logic/updates'
+import { getOnlineFriendsService } from './services/get-online-friends'
 
 export async function createRpcServerComponent({
   logs,
@@ -47,6 +48,7 @@ export async function createRpcServerComponent({
   const getSentFriendshipRequests = getSentFriendshipRequestsService({
     components: { logs, db, catalystClient }
   })
+  const getOnlineFriends = getOnlineFriendsService({ components: { logs, db, catalystClient, archipelagoStats } })
   const upsertFriendship = upsertFriendshipService({
     components: { logs, db, pubsub, catalystClient, sns }
   })
@@ -65,6 +67,7 @@ export async function createRpcServerComponent({
       getPendingFriendshipRequests,
       getSentFriendshipRequests,
       getFriendshipStatus,
+      getOnlineFriends,
       upsertFriendship,
       subscribeToFriendshipUpdates,
       subscribeToFriendConnectivityUpdates

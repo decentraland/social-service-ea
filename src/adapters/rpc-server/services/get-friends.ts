@@ -20,7 +20,6 @@ export function getFriendsService({
     const { address: loggedUserAddress } = context
 
     try {
-      // TODO: can use the getPeersFromCache to get the online friends and sort online friends first
       const [friends, total] = await Promise.all([
         db.getFriends(loggedUserAddress, { pagination }),
         db.getFriendsCount(loggedUserAddress)
