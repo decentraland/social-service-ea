@@ -15,8 +15,8 @@ export function subscribeToFriendConnectivityUpdatesService({
 
   async function getConnectedPeers() {
     const [archipelagoOnlinePeers, worldsOnlinePeers] = await Promise.all([
-      archipelagoStats.getPeersFromCache(),
-      worldsStats.getPeers()
+      archipelagoStats.getPeersFromCache().catch(() => []),
+      worldsStats.getPeers().catch(() => [])
     ])
 
     return Array.from(new Set([...archipelagoOnlinePeers, ...worldsOnlinePeers]))

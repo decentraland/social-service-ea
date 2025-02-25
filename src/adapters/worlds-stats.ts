@@ -44,7 +44,7 @@ export async function createWorldsStatsComponent({
         logger.error('Error getting world connected peers:', {
           error: error.message
         })
-        return []
+        throw error
       }
     }
   }

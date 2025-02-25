@@ -84,6 +84,50 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     expect(result2.done).toBe(true)
   })
 
+  it('should handle errors from archipelago stats', async () => {
+    mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
+    mockArchipelagoStats.getPeersFromCache.mockRejectedValueOnce(new Error('Archipelago error'))
+    mockWorldsStats.getPeers.mockResolvedValue(['0x456'])
+    mockHandler.mockImplementationOnce(async function* () {
+      yield {
+        friend: parseProfileToFriend(mockFriendProfile),
+        status: ConnectivityStatus.ONLINE
+      }
+    })
+
+    const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+
+    const result = await generator.next()
+    expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([friend.address])
+    expect(result.done).toBe(false)
+
+    const result2 = await generator.next()
+    expect(result2.done).toBe(false)
+  })
+
+  it('should handle errors from worlds stats', async () => {
+    mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
+    mockArchipelagoStats.getPeersFromCache.mockResolvedValueOnce(['0x456'])
+    mockWorldsStats.getPeers.mockRejectedValueOnce(new Error('Worlds error'))
+    mockHandler.mockImplementationOnce(async function* () {
+      yield {
+        friend: parseProfileToFriend(mockFriendProfile),
+        status: ConnectivityStatus.ONLINE
+      }
+    })
+
+    const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+
+    const result = await generator.next()
+    expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([friend.address])
+    expect(result.done).toBe(false)
+
+    const result2 = await generator.next()
+    expect(result2.done).toBe(false)
+  })
+
   it('should handle errors during subscription', async () => {
     const testError = new Error('Test error')
     mockDb.getOnlineFriends.mockRejectedValue(testError)

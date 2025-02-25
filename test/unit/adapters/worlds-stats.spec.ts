@@ -59,11 +59,10 @@ describe('WorldsStatsComponent', () => {
       expect(result).toEqual(users)
     })
 
-    it('should return empty array on error', async () => {
+    it('should handle errors from redis', async () => {
       mockRedisClient.sMembers.mockRejectedValueOnce(new Error('Redis error'))
 
-      const result = await worldsStats.getPeers()
-      expect(result).toEqual([])
+      await expect(worldsStats.getPeers()).rejects.toThrow('Redis error')
     })
   })
 })
