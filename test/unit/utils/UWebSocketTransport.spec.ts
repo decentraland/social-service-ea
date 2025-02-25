@@ -10,8 +10,6 @@ describe('UWebSocketTransport', () => {
   let errorListener: jest.Mock
 
   beforeEach(async () => {
-    jest.clearAllMocks()
-
     mockConfig.getNumber.mockImplementation(async (key) => {
       const defaults: Record<string, number> = {
         WS_TRANSPORT_MAX_QUEUE_SIZE: 1000,

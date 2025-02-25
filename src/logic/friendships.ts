@@ -7,7 +7,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, FriendshipAction, FriendshipRequest, FriendshipStatus, SubscriptionEventsEmitter } from '../types'
 import { normalizeAddress } from '../utils/address'
-import { parseProfileToFriend } from './friends'
+import { parseCatalystProfileToProfile } from './friends'
 import { getProfileUserId } from './profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
@@ -142,7 +142,7 @@ export function parseEmittedUpdateToFriendshipUpdate(
           request: {
             id: update.id,
             createdAt: update.timestamp,
-            friend: parseProfileToFriend(profile),
+            friend: parseCatalystProfileToProfile(profile),
             message: update.metadata?.message
           }
         }
@@ -202,7 +202,7 @@ export function parseEmittedUpdateToFriendConnectivityUpdate(
 ): FriendConnectivityUpdate | null {
   const { status } = update
   return {
-    friend: parseProfileToFriend(profile),
+    friend: parseCatalystProfileToProfile(profile),
     status
   }
 }
@@ -224,7 +224,7 @@ export function parseFriendshipRequestToFriendshipRequestResponse(
 ): FriendshipRequestResponse {
   return {
     id: request.id,
-    friend: parseProfileToFriend(profile),
+    friend: parseCatalystProfileToProfile(profile),
     createdAt: new Date(request.timestamp).getTime(),
     message: request.metadata?.message || ''
   }

@@ -109,6 +109,11 @@ export interface IDatabaseComponent {
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   getSentFriendshipRequestsCount(userAddress: string): Promise<number>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<Friend[]>
+  blockUser(blockerAddress: string, blockedAddress: string): Promise<void>
+  unblockUser(blockerAddress: string, blockedAddress: string): Promise<void>
+  blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
+  unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
+  getBlockedUsers(blockerAddress: string): Promise<string[]>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
 export interface IRedisComponent extends IBaseComponent {
@@ -265,6 +270,11 @@ export type Friendship = {
 
 export type Friend = {
   address: string
+}
+
+export type BlockedUser = {
+  address: string
+  blocked_at: string
 }
 
 export enum Action {

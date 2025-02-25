@@ -10,7 +10,7 @@ import {
 import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friend-connectivity-updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockProfile } from '../../../../mocks/profile'
-import { parseProfileToFriend } from '../../../../../src/logic/friends'
+import { parseCatalystProfileToProfile } from '../../../../../src/logic/friends'
 import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 
@@ -50,7 +50,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     mockWorldsStats.getPeers.mockResolvedValue(['0x654', '0x987'])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile),
+        friend: parseCatalystProfileToProfile(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
       }
     })
@@ -61,7 +61,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     expect(mockArchipelagoStats.getPeers).toHaveBeenCalled()
     expect(mockWorldsStats.getPeers).toHaveBeenCalled()
     expect(result.value).toEqual({
-      friend: parseProfileToFriend(mockFriendProfile),
+      friend: parseCatalystProfileToProfile(mockFriendProfile),
       status: ConnectivityStatus.ONLINE
     })
 
@@ -74,7 +74,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     mockCatalystClient.getProfiles.mockResolvedValueOnce([])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile),
+        friend: parseCatalystProfileToProfile(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
       }
     })
@@ -160,7 +160,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     mockCatalystClient.getProfiles.mockResolvedValueOnce([])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile),
+        friend: parseCatalystProfileToProfile(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
       }
     })
@@ -178,7 +178,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     mockCatalystClient.getProfiles.mockResolvedValueOnce([])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile),
+        friend: parseCatalystProfileToProfile(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
       }
     })
