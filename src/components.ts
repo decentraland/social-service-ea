@@ -58,7 +58,7 @@ export async function initComponents(): Promise<AppComponents> {
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
-  const worldsStats = await createWorldsStatsComponent({ logs, redis, config })
+  const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const sns = await createSnsComponent({ config })

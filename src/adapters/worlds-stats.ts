@@ -4,18 +4,14 @@ import { normalizeAddress } from '../utils/address'
 
 export async function createWorldsStatsComponent({
   logs,
-  redis,
-  config
-}: Pick<AppComponents, 'logs' | 'redis' | 'config'>): Promise<IWorldsStatsComponent> {
+  redis
+}: Pick<AppComponents, 'logs' | 'redis'>): Promise<IWorldsStatsComponent> {
   const logger = logs.getLogger('worlds-stats-component')
-  const worldUsersTtlInSeconds = (await config.getNumber('WORLD_USERS_TTL_IN_SECONDS')) || 3600
 
   return {
     async onPeerConnect(address: string): Promise<void> {
       try {
         await redis.client.sAdd(WORLD_PEERS_CACHE_KEY, normalizeAddress(address))
-        // Set TTL for the entire set to handle edge cases where users don't properly disconnect
-        await redis.client.expire(WORLD_PEERS_CACHE_KEY, worldUsersTtlInSeconds)
       } catch (error: any) {
         logger.error('Error handling peer connection:', {
           error: error.message,

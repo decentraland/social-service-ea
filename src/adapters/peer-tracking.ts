@@ -11,7 +11,7 @@ export type PeerStatusHandler = {
   status: ConnectivityStatus
 }
 
-enum PeerStatusHandlerEvent {
+export enum PeerStatusHandlerEvent {
   CONNECT = 'connect',
   DISCONNECT = 'disconnect',
   HEARTBEAT = 'heartbeat',
@@ -26,8 +26,6 @@ export const PEER_STATUS_HANDLERS: PeerStatusHandler[] = [
   { event: PeerStatusHandlerEvent.JOIN_WORLD, pattern: 'peer.*.world.join', status: ConnectivityStatus.ONLINE },
   { event: PeerStatusHandlerEvent.LEAVE_WORLD, pattern: 'peer.*.world.leave', status: ConnectivityStatus.OFFLINE }
 ]
-
-const WORLD_EVENTS = [PeerStatusHandlerEvent.JOIN_WORLD, PeerStatusHandlerEvent.LEAVE_WORLD]
 
 export async function createPeerTrackingComponent({
   logs,
@@ -47,43 +45,38 @@ export async function createPeerTrackingComponent({
   const PEER_STATUS_KEY_PREFIX = 'peer-status:'
 
   async function notifyPeerStatusChange(peerId: string, status: ConnectivityStatus) {
-    try {
-      const key = PEER_STATUS_KEY_PREFIX + peerId
-      const currentStatus = await redis.get<ConnectivityStatus>(key)
+    const key = PEER_STATUS_KEY_PREFIX + peerId
+    const currentStatus = await redis.get<ConnectivityStatus>(key)
 
-      if (currentStatus !== status) {
-        await redis.put(key, status, {
-          EX: statusCacheTtlInSeconds
-        })
-        await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
-          address: peerId,
-          status
-        })
-      }
-    } catch (error: any) {
-      logger.error('Error notifying peer status change:', {
-        error: error.message,
-        peerId,
+    if (currentStatus !== status) {
+      await redis.put(key, status, {
+        EX: statusCacheTtlInSeconds
+      })
+      await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
+        address: peerId,
         status
       })
     }
   }
 
-  async function handleWorldEvent(peerId: string, event: PeerStatusHandlerEvent) {
+  async function updateWorldsStats(peerId: string, handler: PeerStatusHandler) {
+    if (handler.event === PeerStatusHandlerEvent.JOIN_WORLD) {
+      await worldsStats.onPeerConnect(peerId)
+    } else {
+      // This works as a backup mechanism to ensure we don't miss a world.leave event
+      await worldsStats.onPeerDisconnect(peerId)
+    }
+  }
+
+  async function handlePeerEvent(peerId: string, handler: PeerStatusHandler) {
     try {
-      switch (event) {
-        case PeerStatusHandlerEvent.JOIN_WORLD:
-          await worldsStats.onPeerConnect(peerId)
-          break
-        case PeerStatusHandlerEvent.LEAVE_WORLD:
-          await worldsStats.onPeerDisconnect(peerId)
-          break
-      }
+      await notifyPeerStatusChange(peerId, handler.status)
+      await updateWorldsStats(peerId, handler)
     } catch (error: any) {
-      logger.error('Error handling world event:', {
+      logger.error('Error handling peer event:', {
         error: error.message,
         peerId,
-        event
+        event: handler.event
       })
     }
   }
@@ -99,12 +92,7 @@ export async function createPeerTrackingComponent({
       }
 
       const peerId = message.subject.split('.')[1]
-
-      await notifyPeerStatusChange(peerId, handler.status)
-
-      if (WORLD_EVENTS.includes(handler.event)) {
-        await handleWorldEvent(peerId, handler.event)
-      }
+      await handlePeerEvent(peerId, handler)
     }
   }
 

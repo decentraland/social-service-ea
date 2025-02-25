@@ -1,13 +1,18 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext } from '../../../../../src/types'
-import { mockLogs, mockArchipelagoStats, mockDb, mockConfig, mockCatalystClient } from '../../../../mocks/components'
+import {
+  mockLogs,
+  mockArchipelagoStats,
+  mockDb,
+  mockCatalystClient,
+  mockWorldsStats
+} from '../../../../mocks/components'
 import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friend-connectivity-updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
-import { mockWorldsStats } from '../../../../mocks/components/worlds-stats'
 
 jest.mock('../../../../../src/logic/updates')
 

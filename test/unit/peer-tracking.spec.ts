@@ -1,8 +1,11 @@
-import { createPeerTrackingComponent, PEER_STATUS_HANDLERS } from '../../src/adapters/peer-tracking'
+import {
+  createPeerTrackingComponent,
+  PEER_STATUS_HANDLERS,
+  PeerStatusHandlerEvent
+} from '../../src/adapters/peer-tracking'
 import { FRIEND_STATUS_UPDATES_CHANNEL } from '../../src/adapters/pubsub'
-import { mockConfig, mockLogs, mockNats, mockPubSub, mockRedis } from '../mocks/components'
+import { mockConfig, mockLogs, mockNats, mockPubSub, mockRedis, mockWorldsStats } from '../mocks/components'
 import { IPeerTrackingComponent } from '../../src/types'
-import { mockWorldsStats } from '../mocks/components/worlds-stats'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('PeerTrackingComponent', () => {
@@ -134,7 +137,7 @@ describe('PeerTrackingComponent', () => {
     })
   })
 
-  describe('world events handling', () => {
+  describe('peer events handling', () => {
     it('should handle join_world event and notify world stats', async () => {
       await peerTracking.subscribeToPeerStatusUpdates()
 
@@ -172,16 +175,27 @@ describe('PeerTrackingComponent', () => {
         data: undefined
       })
 
-      // Verify status update
-      expect(mockRedis.put).toHaveBeenCalledWith('peer-status:0x123', ConnectivityStatus.OFFLINE, expect.any(Object))
-      expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIEND_STATUS_UPDATES_CHANNEL, {
-        address: '0x123',
-        status: ConnectivityStatus.OFFLINE
-      })
-
-      // Verify world stats update
       expect(mockWorldsStats.onPeerDisconnect).toHaveBeenCalledWith('0x123')
     })
+
+    it.each([PeerStatusHandlerEvent.CONNECT, PeerStatusHandlerEvent.DISCONNECT, PeerStatusHandlerEvent.HEARTBEAT])(
+      'should notify world disconnection when %s message is received',
+      async (event) => {
+        await peerTracking.subscribeToPeerStatusUpdates()
+
+        const handler = mockNats.subscribe.mock.calls.find((call) => call[0] === `peer.*.${event}`)?.[1]
+        expect(handler).toBeDefined()
+
+        mockRedis.get.mockResolvedValueOnce(null)
+
+        await handler(null, {
+          subject: `peer.0x123.${event}`,
+          data: undefined
+        })
+
+        expect(mockWorldsStats.onPeerDisconnect).toHaveBeenCalledWith('0x123')
+      }
+    )
 
     it('should handle world stats errors gracefully', async () => {
       await peerTracking.subscribeToPeerStatusUpdates()
@@ -206,29 +220,12 @@ describe('PeerTrackingComponent', () => {
 
       // Verify error was logged
       expect(mockLogs.getLogger('peer-tracking-component').error).toHaveBeenCalledWith(
-        'Error handling world event:',
+        'Error handling peer event:',
         expect.objectContaining({
           error: 'World stats error',
           peerId: '0x123'
         })
       )
-    })
-
-    it('should not call world stats for non-world events', async () => {
-      await peerTracking.subscribeToPeerStatusUpdates()
-
-      const heartbeatHandler = mockNats.subscribe.mock.calls.find((call) => call[0] === 'peer.*.heartbeat')?.[1]
-      expect(heartbeatHandler).toBeDefined()
-
-      mockRedis.get.mockResolvedValueOnce(null)
-
-      await heartbeatHandler(null, {
-        subject: 'peer.0x123.heartbeat',
-        data: undefined
-      })
-
-      expect(mockWorldsStats.onPeerConnect).not.toHaveBeenCalled()
-      expect(mockWorldsStats.onPeerDisconnect).not.toHaveBeenCalled()
     })
   })
 })

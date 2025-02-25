@@ -1,7 +1,7 @@
 import { createWorldsStatsComponent } from '../../../src/adapters/worlds-stats'
 import { IWorldsStatsComponent } from '../../../src/types'
 import { WORLD_PEERS_CACHE_KEY } from '../../../src/utils/peers'
-import { mockConfig, mockLogs, mockRedis } from '../../mocks/components'
+import { mockLogs, mockRedis } from '../../mocks/components'
 
 describe('WorldsStatsComponent', () => {
   let worldsStats: IWorldsStatsComponent
@@ -10,8 +10,7 @@ describe('WorldsStatsComponent', () => {
   beforeEach(async () => {
     worldsStats = await createWorldsStatsComponent({
       logs: mockLogs,
-      redis: mockRedis,
-      config: mockConfig
+      redis: mockRedis
     })
 
     mockRedisClient = mockRedis.client as jest.Mocked<any>
@@ -23,7 +22,6 @@ describe('WorldsStatsComponent', () => {
       await worldsStats.onPeerConnect(address)
 
       expect(mockRedisClient.sAdd).toHaveBeenCalledWith(WORLD_PEERS_CACHE_KEY, address)
-      expect(mockRedisClient.expire).toHaveBeenCalledWith(WORLD_PEERS_CACHE_KEY, expect.any(Number))
     })
 
     it('should handle errors', async () => {

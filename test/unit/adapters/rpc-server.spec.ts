@@ -8,13 +8,13 @@ import {
   mockDb,
   mockLogs,
   mockPubSub,
-  mockUWs
+  mockUWs,
+  mockWorldsStats
 } from '../../mocks/components'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { mockSns } from '../../mocks/components/sns'
 import mitt from 'mitt'
 import * as updates from '../../../src/logic/updates'
-import { mockWorldsStats } from '../../mocks/components/worlds-stats'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
