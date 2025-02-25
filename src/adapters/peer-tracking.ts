@@ -6,15 +6,25 @@ import { NatsMsg } from '@well-known-components/nats-component/dist/types'
 import { FRIEND_STATUS_UPDATES_CHANNEL } from './pubsub'
 
 export type PeerStatusHandler = {
-  event: string
+  event: PeerStatusHandlerEvent
   pattern: string
   status: ConnectivityStatus
 }
 
+export enum PeerStatusHandlerEvent {
+  CONNECT = 'connect',
+  DISCONNECT = 'disconnect',
+  HEARTBEAT = 'heartbeat',
+  JOIN_WORLD = 'join_world',
+  LEAVE_WORLD = 'leave_world'
+}
+
 export const PEER_STATUS_HANDLERS: PeerStatusHandler[] = [
-  { event: 'connect', pattern: 'peer.*.connect', status: ConnectivityStatus.OFFLINE },
-  { event: 'disconnect', pattern: 'peer.*.disconnect', status: ConnectivityStatus.OFFLINE },
-  { event: 'heartbeat', pattern: 'peer.*.heartbeat', status: ConnectivityStatus.ONLINE }
+  { event: PeerStatusHandlerEvent.CONNECT, pattern: 'peer.*.connect', status: ConnectivityStatus.OFFLINE },
+  { event: PeerStatusHandlerEvent.DISCONNECT, pattern: 'peer.*.disconnect', status: ConnectivityStatus.OFFLINE },
+  { event: PeerStatusHandlerEvent.HEARTBEAT, pattern: 'peer.*.heartbeat', status: ConnectivityStatus.ONLINE },
+  { event: PeerStatusHandlerEvent.JOIN_WORLD, pattern: 'peer.*.world.join', status: ConnectivityStatus.ONLINE },
+  { event: PeerStatusHandlerEvent.LEAVE_WORLD, pattern: 'peer.*.world.leave', status: ConnectivityStatus.OFFLINE }
 ]
 
 export async function createPeerTrackingComponent({
@@ -22,8 +32,12 @@ export async function createPeerTrackingComponent({
   pubsub,
   nats,
   redis,
-  config
-}: Pick<AppComponents, 'logs' | 'pubsub' | 'nats' | 'redis' | 'config'>): Promise<IPeerTrackingComponent> {
+  config,
+  worldsStats
+}: Pick<
+  AppComponents,
+  'logs' | 'pubsub' | 'nats' | 'redis' | 'config' | 'worldsStats'
+>): Promise<IPeerTrackingComponent> {
   const logger = logs.getLogger('peer-tracking-component')
   const subscriptions = new Map<string, Subscription>()
   const statusCacheTtlInSeconds = (await config.getNumber('STATUS_CACHE_TTL_IN_SECONDS')) || 3600
@@ -31,24 +45,38 @@ export async function createPeerTrackingComponent({
   const PEER_STATUS_KEY_PREFIX = 'peer-status:'
 
   async function notifyPeerStatusChange(peerId: string, status: ConnectivityStatus) {
-    try {
-      const key = PEER_STATUS_KEY_PREFIX + peerId
-      const currentStatus = await redis.get<ConnectivityStatus>(key)
+    const key = PEER_STATUS_KEY_PREFIX + peerId
+    const currentStatus = await redis.get<ConnectivityStatus>(key)
 
-      if (currentStatus !== status) {
-        await redis.put(key, status, {
-          EX: statusCacheTtlInSeconds
-        })
-        await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
-          address: peerId,
-          status
-        })
-      }
+    if (currentStatus !== status) {
+      await redis.put(key, status, {
+        EX: statusCacheTtlInSeconds
+      })
+      await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
+        address: peerId,
+        status
+      })
+    }
+  }
+
+  async function updateWorldsStats(peerId: string, handler: PeerStatusHandler) {
+    if (handler.event === PeerStatusHandlerEvent.JOIN_WORLD) {
+      await worldsStats.onPeerConnect(peerId)
+    } else {
+      // This works as a backup mechanism to ensure we don't miss a world.leave event
+      await worldsStats.onPeerDisconnect(peerId)
+    }
+  }
+
+  async function handlePeerEvent(peerId: string, handler: PeerStatusHandler) {
+    try {
+      await notifyPeerStatusChange(peerId, handler.status)
+      await updateWorldsStats(peerId, handler)
     } catch (error: any) {
-      logger.error('Error notifying peer status change:', {
+      logger.error('Error handling peer event:', {
         error: error.message,
         peerId,
-        status
+        event: handler.event
       })
     }
   }
@@ -64,7 +92,7 @@ export async function createPeerTrackingComponent({
       }
 
       const peerId = message.subject.split('.')[1]
-      await notifyPeerStatusChange(peerId, handler.status)
+      await handlePeerEvent(peerId, handler)
     }
   }
 
