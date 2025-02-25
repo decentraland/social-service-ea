@@ -16,7 +16,7 @@ describe('db', () => {
   })
 
   describe('getFriends', () => {
-    it('should return active friendships', async () => {
+    it('should return active friendships excluding blocked users', async () => {
       const mockFriends = [
         { id: 'friendship-1', address_requester: '0x123', address_requested: '0x456', is_active: true }
       ]
@@ -36,31 +36,27 @@ describe('db', () => {
           values: ['0x123']
         },
         {
-          text: 'OR LOWER(f.address_requested) =',
-          values: ['0x123']
+          text: 'AND NOT EXISTS (SELECT 1 FROM blocks b WHERE',
+          values: []
         },
         {
-          text: 'AND f.is_active = true',
+          text: 'AND b.blocked_address = CASE',
           values: []
+        },
+        {
+          text: 'WHEN LOWER(f.address_requester) =',
+          values: ['0x123']
         },
         {
           text: 'ORDER BY f.created_at DESC',
           values: []
-        },
-        {
-          text: 'OFFSET',
-          values: [expect.any(Number)]
-        },
-        {
-          text: 'LIMIT',
-          values: [expect.any(Number)]
         }
       ]
 
       expectedFragmentsOfTheQuery.forEach(({ text, values }) => {
         expect(mockPg.query).toHaveBeenCalledWith(
           expect.objectContaining({
-            text: expect.stringContaining(text),
+            strings: expect.arrayContaining([expect.stringContaining(text)]),
             values: expect.arrayContaining(values)
           })
         )
@@ -69,7 +65,7 @@ describe('db', () => {
       expect(result).toEqual(mockFriends)
     })
 
-    it('should return all friendships including inactive', async () => {
+    it('should return all friendships including inactive but excluding blocked users', async () => {
       const mockFriends = [
         { id: 'friendship-1', address_requester: '0x123', address_requested: '0x456', is_active: false }
       ]
@@ -78,8 +74,11 @@ describe('db', () => {
       const result = await dbComponent.getFriends('0x123', { onlyActive: false })
 
       expect(mockPg.query).toHaveBeenCalledWith(
-        expect.not.objectContaining({
-          text: expect.stringContaining('AND is_active = true')
+        expect.objectContaining({
+          strings: expect.arrayContaining([
+            expect.not.stringContaining('AND f.is_active = true'),
+            expect.stringContaining('AND NOT EXISTS (SELECT 1 FROM blocks b WHERE')
+          ])
         })
       )
       expect(result).toEqual(mockFriends)
@@ -87,37 +86,67 @@ describe('db', () => {
   })
 
   describe('getFriendsCount', () => {
-    it('should return the count of active friendships', async () => {
+    it('should return the count of active friendships excluding blocked users', async () => {
       const mockCount = 5
       mockPg.query.mockResolvedValueOnce({ rows: [{ count: mockCount }], rowCount: 1 })
 
       const result = await dbComponent.getFriendsCount('0x123', { onlyActive: true })
 
-      const expectedQuery = SQL`WHERE (LOWER(f.address_requester) = ${'0x123'} OR LOWER(f.address_requested) = ${'0x123'}) AND f.is_active = true`
+      const expectedQueryFragments = [
+        {
+          text: 'SELECT DISTINCT COUNT(*) FROM friendships f',
+          values: []
+        },
+        {
+          text: 'WHERE (LOWER(f.address_requester) =',
+          values: ['0x123']
+        },
+        {
+          text: 'AND NOT EXISTS (SELECT 1 FROM blocks b WHERE',
+          values: []
+        }
+      ]
 
-      expect(mockPg.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining(expectedQuery.text),
-          values: expect.arrayContaining(expectedQuery.values)
-        })
-      )
+      expectedQueryFragments.forEach(({ text, values }) => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            strings: expect.arrayContaining([expect.stringContaining(text)]),
+            values: expect.arrayContaining(values)
+          })
+        )
+      })
       expect(result).toBe(mockCount)
     })
 
-    it('should return the count of all friendships', async () => {
+    it('should return the count of all friendships excluding blocked users', async () => {
       const mockCount = 10
       mockPg.query.mockResolvedValueOnce({ rows: [{ count: mockCount }], rowCount: 1 })
 
       const result = await dbComponent.getFriendsCount('0x123', { onlyActive: false })
 
-      const expectedQuery = SQL`WHERE (LOWER(f.address_requester) = ${'0x123'} OR LOWER(f.address_requested) = ${'0x123'})`
+      const expectedQueryFragments = [
+        {
+          text: 'SELECT DISTINCT COUNT(*) FROM friendships f',
+          values: []
+        },
+        {
+          text: 'WHERE (LOWER(f.address_requester) =',
+          values: ['0x123']
+        },
+        {
+          text: 'AND NOT EXISTS (SELECT 1 FROM blocks b WHERE',
+          values: []
+        }
+      ]
 
-      expect(mockPg.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining(expectedQuery.text),
-          values: expect.arrayContaining(expectedQuery.values)
-        })
-      )
+      expectedQueryFragments.forEach(({ text, values }) => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            strings: expect.arrayContaining([expect.stringContaining(text)]),
+            values: expect.arrayContaining(values)
+          })
+        )
+      })
       expect(result).toBe(mockCount)
     })
   })
