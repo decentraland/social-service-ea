@@ -18,8 +18,8 @@ export function unblockUserService({
       if (!blockedAddress) {
         return {
           response: {
-            $case: 'invalidRequest',
-            invalidRequest: { message: 'User address is missing in the request payload' }
+            $case: 'internalServerError',
+            internalServerError: { message: 'User address is missing in the request payload' }
           }
         }
       }
@@ -28,7 +28,10 @@ export function unblockUserService({
 
       if (!profile) {
         return {
-          response: { $case: 'invalidRequest', invalidRequest: { message: 'Profile not found' } }
+          response: {
+            $case: 'internalServerError',
+            internalServerError: { message: 'Profile not found' }
+          }
         }
       }
 
@@ -36,8 +39,8 @@ export function unblockUserService({
 
       return {
         response: {
-          $case: 'unblocked',
-          unblocked: {
+          $case: 'ok',
+          ok: {
             profile: parseProfileToFriend(profile)
           }
         }

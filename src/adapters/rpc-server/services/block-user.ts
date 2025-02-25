@@ -18,8 +18,8 @@ export function blockUserService({
       if (!blockedAddress) {
         return {
           response: {
-            $case: 'invalidRequest',
-            invalidRequest: { message: 'User address is missing in the request payload' }
+            $case: 'internalServerError',
+            internalServerError: { message: 'User address is missing in the request payload' }
           }
         }
       }
@@ -29,8 +29,8 @@ export function blockUserService({
       if (!profile) {
         return {
           response: {
-            $case: 'invalidRequest',
-            invalidRequest: {
+            $case: 'internalServerError',
+            internalServerError: {
               message: 'Profile not found'
             }
           }
@@ -41,8 +41,8 @@ export function blockUserService({
 
       return {
         response: {
-          $case: 'blocked',
-          blocked: {
+          $case: 'ok',
+          ok: {
             profile: parseProfileToFriend(profile)
           }
         }

@@ -33,7 +33,7 @@ export function getBlockedUsersService({
         stack: error.stack
       })
       return {
-        friends: [],
+        profiles: [],
         paginationData: {
           total: 0,
           page: 1

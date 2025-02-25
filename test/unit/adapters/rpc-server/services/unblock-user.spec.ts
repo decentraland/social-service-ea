@@ -3,6 +3,7 @@ import { unblockUserService } from '../../../../../src/adapters/rpc-server/servi
 import { UnblockUserPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
+import { parseProfileToFriend } from '../../../../../src/logic/friends'
 
 describe('unblockUserService', () => {
   let unblockUser: ReturnType<typeof unblockUserService>
@@ -29,28 +30,35 @@ describe('unblockUserService', () => {
 
     const response = await unblockUser(request, rpcContext)
 
-    expect(response.response.$case).toBe('unblocked')
-    expect(response.response.unblocked.profile).toEqual({
-      address: mockProfile.address,
-      name: mockProfile.name,
-      avatarUrl: mockProfile.avatarUrl
+    expect(response).toEqual({
+      response: {
+        $case: 'ok',
+        ok: {
+          profile: parseProfileToFriend(mockProfile)
+        }
+      }
     })
     expect(mockDb.unblockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress)
+    expect(mockLogs.getLogger('unblock-user-service')).toBeDefined()
   })
 
-  it('should return invalidRequest when user address is missing', async () => {
+  it('should return internalServerError when user address is missing', async () => {
     const request: UnblockUserPayload = {
       user: { address: '' }
     }
 
     const response = await unblockUser(request, rpcContext)
 
-    expect(response.response.$case).toBe('invalidRequest')
-    expect(response.response.invalidRequest.message).toBe('User address is missing in the request payload')
+    expect(response).toEqual({
+      response: {
+        $case: 'internalServerError',
+        internalServerError: { message: 'User address is missing in the request payload' }
+      }
+    })
     expect(mockDb.unblockUser).not.toHaveBeenCalled()
   })
 
-  it('should return invalidRequest when profile is not found', async () => {
+  it('should return internalServerError when profile is not found', async () => {
     const blockedAddress = '0x456'
     const request: UnblockUserPayload = {
       user: { address: blockedAddress }
@@ -60,24 +68,34 @@ describe('unblockUserService', () => {
 
     const response = await unblockUser(request, rpcContext)
 
-    expect(response.response.$case).toBe('invalidRequest')
-    expect(response.response.invalidRequest.message).toBe('Profile not found')
+    expect(response).toEqual({
+      response: {
+        $case: 'internalServerError',
+        internalServerError: { message: 'Profile not found' }
+      }
+    })
     expect(mockDb.unblockUser).not.toHaveBeenCalled()
   })
 
-  it('should handle internal server errors', async () => {
+  it('should handle database errors', async () => {
     const blockedAddress = '0x456'
     const mockProfile = createMockProfile(blockedAddress)
     const request: UnblockUserPayload = {
       user: { address: blockedAddress }
     }
+    const error = new Error('Database error')
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.unblockUser.mockRejectedValueOnce(new Error('Database error'))
+    mockDb.unblockUser.mockRejectedValueOnce(error)
 
     const response = await unblockUser(request, rpcContext)
 
-    expect(response.response.$case).toBe('internalServerError')
-    expect(response.response.internalServerError.message).toBe('Database error')
+    expect(response).toEqual({
+      response: {
+        $case: 'internalServerError',
+        internalServerError: { message: error.message }
+      }
+    })
+    expect(mockLogs.getLogger('unblock-user-service')).toBeDefined()
   })
 })
