@@ -4,7 +4,7 @@ import { Action, RpcServerContext } from '../../../../../src/types'
 import { mockCatalystClient, mockLogs } from '../../../../mocks/components'
 import { createMockProfile } from '../../../../mocks/profile'
 import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
-import { parseProfileToFriend } from '../../../../../src/logic/friends'
+import { parseCatalystProfileToProfile } from '../../../../../src/logic/friends'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 
 jest.mock('../../../../../src/logic/updates')
@@ -41,7 +41,7 @@ describe('subscribeToFriendshipUpdatesService', () => {
   it('should handle subscription updates', async () => {
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile),
+        friend: parseCatalystProfileToProfile(mockFriendProfile),
         action: mockUpdate.action,
         createdAt: mockUpdate.timestamp
       }
@@ -51,7 +51,7 @@ describe('subscribeToFriendshipUpdatesService', () => {
     const result = await generator.next()
 
     expect(result.value).toEqual({
-      friend: parseProfileToFriend(mockFriendProfile),
+      friend: parseCatalystProfileToProfile(mockFriendProfile),
       action: mockUpdate.action,
       createdAt: mockUpdate.timestamp
     })
@@ -84,7 +84,7 @@ describe('subscribeToFriendshipUpdatesService', () => {
   it('should get the proper address from the update', async () => {
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile),
+        friend: parseCatalystProfileToProfile(mockFriendProfile),
         action: mockUpdate.action,
         createdAt: mockUpdate.timestamp
       }
@@ -100,7 +100,7 @@ describe('subscribeToFriendshipUpdatesService', () => {
   it('should filter updates based on address conditions', async () => {
     mockHandler.mockImplementationOnce(async function* () {
       yield {
-        friend: parseProfileToFriend(mockFriendProfile),
+        friend: parseCatalystProfileToProfile(mockFriendProfile),
         action: mockUpdate.action,
         createdAt: mockUpdate.timestamp
       }

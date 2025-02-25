@@ -1,4 +1,4 @@
-import { parseProfileToFriend } from '../../../logic/friends'
+import { parseCatalystProfileToProfile } from '../../../logic/friends'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   BlockUserPayload,
@@ -43,7 +43,7 @@ export function blockUserService({
         response: {
           $case: 'ok',
           ok: {
-            profile: parseProfileToFriend(profile)
+            profile: parseCatalystProfileToProfile(profile)
           }
         }
       }

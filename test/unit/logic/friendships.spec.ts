@@ -17,7 +17,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockExpectedFriendshipRequest, createMockFriendshipRequest } from '../../mocks/friendship-request'
 import { createMockProfile, mockProfile } from '../../mocks/profile'
-import { parseProfileToFriend } from '../../../src/logic/friends'
+import { parseCatalystProfileToProfile } from '../../../src/logic/friends'
 
 describe('isFriendshipActionValid()', () => {
   test('it should be valid if from is null and to is REQUEST ', () => {
@@ -399,7 +399,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
         request: {
           id,
           createdAt: now,
-          friend: parseProfileToFriend(mockProfile),
+          friend: parseCatalystProfileToProfile(mockProfile),
           message: undefined
         }
       }
@@ -425,7 +425,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
         request: {
           id,
           createdAt: now,
-          friend: parseProfileToFriend(mockProfile),
+          friend: parseCatalystProfileToProfile(mockProfile),
           message: 'Hi!'
         }
       }
@@ -493,7 +493,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           from: '0xA',
           to: '0xB'
         },
-        mockProfile,
+        mockProfile
       )
     ).toEqual({
       update: {
@@ -518,7 +518,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           from: '0xA',
           to: '0xB'
         },
-        mockProfile,
+        mockProfile
       )
     ).toEqual({
       update: {
@@ -543,7 +543,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           from: '0xA',
           to: '0xB'
         },
-        mockProfile,
+        mockProfile
       )
     ).toBe(null)
   })
@@ -589,7 +589,7 @@ describe('parseEmittedUpdateToFriendConnectivityUpdate()', () => {
   ])('it should parse status %s update properly', (status) => {
     const update = { address: '0x123', status }
     expect(parseEmittedUpdateToFriendConnectivityUpdate(update, mockProfile)).toEqual({
-      friend: parseProfileToFriend(mockProfile),
+      friend: parseCatalystProfileToProfile(mockProfile),
       status
     })
   })

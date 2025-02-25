@@ -1,9 +1,9 @@
-import { parseProfilesToFriends, parseProfileToFriend } from '../../../src/logic/friends'
+import { parseCatalystProfilesToProfiles, parseCatalystProfileToProfile } from '../../../src/logic/friends'
 import { mockProfile } from '../../mocks/profile'
 
 describe('parseProfileToFriend', () => {
   it('should parse profile to friend', () => {
-    const friend = parseProfileToFriend(mockProfile)
+    const friend = parseCatalystProfileToProfile(mockProfile)
     expect(friend).toEqual({
       address: mockProfile.avatars[0].userId,
       name: mockProfile.avatars[0].name,
@@ -28,7 +28,7 @@ describe('parseProfilesToFriends', () => {
     }
     const profiles = [mockProfile, anotherProfile]
 
-    const result = parseProfilesToFriends(profiles)
+    const result = parseCatalystProfilesToProfiles(profiles)
 
     expect(result).toEqual([
       {

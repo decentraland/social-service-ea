@@ -3,7 +3,7 @@ import { blockUserService } from '../../../../../src/adapters/rpc-server/service
 import { BlockUserPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
-import { parseProfileToFriend } from '../../../../../src/logic/friends'
+import { parseCatalystProfileToProfile } from '../../../../../src/logic/friends'
 
 describe('blockUserService', () => {
   let blockUser: ReturnType<typeof blockUserService>
@@ -34,7 +34,7 @@ describe('blockUserService', () => {
       response: {
         $case: 'ok',
         ok: {
-          profile: parseProfileToFriend(mockProfile)
+          profile: parseCatalystProfileToProfile(mockProfile)
         }
       }
     })
