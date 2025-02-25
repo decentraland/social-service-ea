@@ -46,7 +46,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   it('should get initial online friends from archipelago stats and then receive updates', async () => {
     mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
-    mockArchipelagoStats.getPeersFromCache.mockResolvedValue(['0x456', '0x789'])
+    mockArchipelagoStats.getPeers.mockResolvedValue(['0x456', '0x789'])
     mockWorldsStats.getPeers.mockResolvedValue(['0x654', '0x987'])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
@@ -58,7 +58,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
     const result = await generator.next()
 
-    expect(mockArchipelagoStats.getPeersFromCache).toHaveBeenCalled()
+    expect(mockArchipelagoStats.getPeers).toHaveBeenCalled()
     expect(mockWorldsStats.getPeers).toHaveBeenCalled()
     expect(result.value).toEqual({
       friend: parseProfileToFriend(mockFriendProfile),
@@ -92,7 +92,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   it('should handle errors from archipelago stats', async () => {
     mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
-    mockArchipelagoStats.getPeersFromCache.mockRejectedValueOnce(new Error('Archipelago error'))
+    mockArchipelagoStats.getPeers.mockRejectedValueOnce(new Error('Archipelago error'))
     mockWorldsStats.getPeers.mockResolvedValue(['0x456'])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
@@ -114,7 +114,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   it('should handle errors from worlds stats', async () => {
     mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
-    mockArchipelagoStats.getPeersFromCache.mockResolvedValueOnce(['0x456'])
+    mockArchipelagoStats.getPeers.mockResolvedValueOnce(['0x456'])
     mockWorldsStats.getPeers.mockRejectedValueOnce(new Error('Worlds error'))
     mockHandler.mockImplementationOnce(async function* () {
       yield {

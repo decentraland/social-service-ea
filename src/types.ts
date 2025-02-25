@@ -125,15 +125,17 @@ export type IPubSubComponent = IBaseComponent & {
   publishInChannel<T>(channel: string, update: T): Promise<void>
 }
 
-export type IArchipelagoStatsComponent = {
+export interface IStatsComponent {
   getPeers(): Promise<string[]>
-  getPeersFromCache(): Promise<string[]>
 }
 
-export type IWorldsStatsComponent = {
+export type IArchipelagoStatsComponent = IStatsComponent & {
+  fetchPeers(): Promise<string[]>
+}
+
+export type IWorldsStatsComponent = IStatsComponent & {
   onPeerConnect(address: string): Promise<void>
   onPeerDisconnect(address: string): Promise<void>
-  getPeers(): Promise<string[]>
 }
 
 export type IPeersSynchronizer = IBaseComponent

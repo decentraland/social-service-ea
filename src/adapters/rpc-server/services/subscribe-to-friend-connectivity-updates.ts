@@ -1,5 +1,5 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { SubscriptionEventsEmitter, RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionEventsEmitter, RpcServerContext, RPCServiceContext, IStatsComponent } from '../../../types'
 import {
   FriendConnectivityUpdate,
   ConnectivityStatus
@@ -14,12 +14,9 @@ export function subscribeToFriendConnectivityUpdatesService({
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
 
   async function getConnectedPeers() {
-    const [archipelagoOnlinePeers, worldsOnlinePeers] = await Promise.all([
-      archipelagoStats.getPeersFromCache().catch(() => []),
-      worldsStats.getPeers().catch(() => [])
-    ])
-
-    return Array.from(new Set([...archipelagoOnlinePeers, ...worldsOnlinePeers]))
+    const peersGetters: IStatsComponent[] = [archipelagoStats, worldsStats]
+    const peers = await Promise.all(peersGetters.map((peersGetter) => peersGetter.getPeers().catch(() => [])))
+    return Array.from(new Set(peers.flat()))
   }
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
