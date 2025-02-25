@@ -9,220 +9,55 @@ import {
   IDatabaseComponent,
   Friend,
   BlockedUser,
-  Pagination,
-  Action
+  Pagination
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
+import { getFriendsBaseQuery, getFriendshipRequestsBaseQuery, getMutualFriendsBaseQuery } from '../logic/queries'
+
+type FriendshipRequestType = 'sent' | 'received'
 
 export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>): IDatabaseComponent {
   const { pg, logs } = components
 
   const logger = logs.getLogger('db-component')
 
-  // TODO: abstract common statements in a util file
-  function getFriendsBaseQuery(userAddress: string) {
-    const normalizedUserAddress = normalizeAddress(userAddress)
-    return SQL`
-      SELECT DISTINCT
-        CASE
-          WHEN LOWER(address_requester) = ${normalizedUserAddress} THEN address_requested
-          ELSE address_requester
-        END as address,
-        created_at
-      FROM friendships
-      WHERE (LOWER(address_requester) = ${normalizedUserAddress} OR LOWER(address_requested) = ${normalizedUserAddress})`
+  async function getCount(query: SQLStatement) {
+    const result = await pg.query<{ count: number }>(query)
+    return result.rows[0].count
   }
 
-  function getFriendshipRequestsBaseQuery(
-    userAddress: string,
-    type: 'sent' | 'received',
-    { onlyCount, pagination }: { onlyCount?: boolean; pagination?: Pagination } = { onlyCount: false }
-  ): SQLStatement {
-    const { limit, offset } = pagination || {}
-    const normalizedUserAddress = normalizeAddress(userAddress)
-
-    const columnMapping = {
-      sent: SQL`
-        CASE
-          WHEN LOWER(f.address_requester) = lr.acting_user THEN LOWER(f.address_requested)
-          ELSE LOWER(f.address_requester)
-        END`,
-      received: SQL` LOWER(lr.acting_user)`
+  function getFriendshipRequests(type: FriendshipRequestType) {
+    return async (userAddress: string, pagination?: Pagination) => {
+      const query = getFriendshipRequestsBaseQuery(userAddress, type, { pagination })
+      const result = await pg.query<FriendshipRequest>(query)
+      return result.rows
     }
+  }
 
-    const filterMapping = {
-      sent: SQL` LOWER(lr.acting_user) = ${normalizedUserAddress}`,
-      received: SQL` LOWER(lr.acting_user) <> ${normalizedUserAddress} AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})`
+  function getFriendshipRequestsCount(type: FriendshipRequestType) {
+    return async (userAddress: string) => {
+      const query = getFriendshipRequestsBaseQuery(userAddress, type, { onlyCount: true })
+      return getCount(query)
     }
-
-    const baseQuery = SQL`WITH latest_requests AS (
-        SELECT DISTINCT ON (friendship_id) *
-        FROM friendship_actions
-        ORDER BY friendship_id, timestamp DESC
-      ) SELECT`
-
-    if (onlyCount) {
-      baseQuery.append(SQL` DISTINCT COUNT(1) as count`)
-    } else {
-      baseQuery.append(SQL` lr.id,`)
-      baseQuery.append(columnMapping[type])
-      baseQuery.append(SQL` as address, lr.timestamp, lr.metadata`)
-    }
-
-    baseQuery.append(SQL` FROM friendships f`)
-    baseQuery.append(SQL` INNER JOIN latest_requests lr ON f.id = lr.friendship_id`)
-    baseQuery.append(SQL` WHERE`)
-    baseQuery.append(filterMapping[type])
-    baseQuery.append(SQL` AND action = ${Action.REQUEST}`)
-
-    baseQuery.append(SQL` AND f.is_active IS FALSE`)
-
-    if (!onlyCount) {
-      baseQuery.append(SQL` ORDER BY lr.timestamp DESC`)
-
-      if (limit) {
-        baseQuery.append(SQL` LIMIT ${limit}`)
-      }
-
-      if (offset) {
-        baseQuery.append(SQL` OFFSET ${offset}`)
-      }
-    }
-
-    return baseQuery
   }
 
   return {
-    async getFriends(userAddress, { onlyActive = true, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } } = {}) {
-      const { limit, offset } = pagination
-
-      const query: SQLStatement = getFriendsBaseQuery(userAddress)
-
-      if (onlyActive) {
-        query.append(SQL` AND is_active = true`)
-      }
-
-      query.append(SQL` ORDER BY created_at DESC OFFSET ${offset} LIMIT ${limit}`)
-
+    async getFriends(userAddress, { onlyActive, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } } = {}) {
+      const query: SQLStatement = getFriendsBaseQuery(userAddress, { onlyActive, pagination })
       const result = await pg.query<Friend>(query)
       return result.rows
     },
     async getFriendsCount(userAddress, { onlyActive } = { onlyActive: true }) {
-      const normalizedUserAddress = normalizeAddress(userAddress)
-      const query: SQLStatement = SQL`
-        SELECT COUNT(*)
-        FROM friendships
-        WHERE (LOWER(address_requester) = ${normalizedUserAddress} OR LOWER(address_requested) = ${normalizedUserAddress})`
-
-      if (onlyActive) {
-        query.append(SQL` AND is_active = true`)
-      }
-
-      const result = await pg.query<{ count: number }>(query)
-      return result.rows[0].count
+      const query: SQLStatement = getFriendsBaseQuery(userAddress, { onlyActive, onlyCount: true })
+      return getCount(query)
     },
     async getMutualFriends(userAddress1, userAddress2, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }) {
-      const { limit, offset } = pagination
-
-      const normalizedUserAddress1 = normalizeAddress(userAddress1)
-      const normalizedUserAddress2 = normalizeAddress(userAddress2)
-
-      const result = await pg.query<Friend>(
-        SQL`WITH friendsA as (
-          SELECT
-            CASE
-              WHEN LOWER(address_requester) = ${normalizedUserAddress1} then address_requested
-              else address_requester
-            end as address
-          FROM
-            (
-              SELECT f_a.*
-              FROM friendships f_a
-              WHERE
-                (
-                  LOWER(f_a.address_requester) = ${normalizedUserAddress1} or LOWER(f_a.address_requested) = ${normalizedUserAddress1}
-                ) AND f_a.is_active = true
-            ) as friends_a
-        )
-        SELECT
-          f_b.address
-        FROM
-          friendsA f_b
-        WHERE
-          f_b.address IN (
-            SELECT
-              CASE
-                WHEN LOWER(address_requester) = ${normalizedUserAddress2} then address_requested
-                else address_requester
-              end as address_a
-            FROM
-              (
-                SELECT
-                  f_b.*
-                FROM
-                  friendships f_b
-                WHERE
-                  (
-                    LOWER(f_b.address_requester) = ${normalizedUserAddress2}
-                    or LOWER(f_b.address_requested) = ${normalizedUserAddress2}
-                  ) AND f_b.is_active = true
-              ) as friends_b
-          )
-          ORDER BY f_b.address
-          LIMIT ${limit}
-          OFFSET ${offset}`
-      )
-
+      const result = await pg.query<Friend>(getMutualFriendsBaseQuery(userAddress1, userAddress2, { pagination }))
       return result.rows
     },
     async getMutualFriendsCount(userAddress1, userAddress2) {
-      const normalizedUserAddress1 = normalizeAddress(userAddress1)
-      const normalizedUserAddress2 = normalizeAddress(userAddress2)
-
-      const result = await pg.query<{ count: number }>(
-        SQL`WITH friendsA as (
-          SELECT
-            CASE
-              WHEN LOWER(address_requester) = ${normalizedUserAddress1} THEN address_requested
-              ELSE address_requester
-            END as address
-          FROM
-            (
-              SELECT f_a.*
-              FROM friendships f_a
-              WHERE
-                (
-                  LOWER(f_a.address_requester) = ${normalizedUserAddress1}
-                  OR LOWER(f_a.address_requested) = ${normalizedUserAddress1}
-                ) AND f_a.is_active = true
-            ) as friends_a
-        )
-        SELECT
-          COUNT(address)
-        FROM
-          friendsA f_b
-        WHERE
-          address IN (
-            SELECT
-              CASE
-                WHEN address_requester = ${normalizedUserAddress2} THEN address_requested
-                ELSE address_requester
-              END as address_a
-            FROM
-              (
-                SELECT f_b.*
-                FROM friendships f_b
-                WHERE
-                  (
-                    f_b.address_requester = ${normalizedUserAddress2}
-                    OR f_b.address_requested = ${normalizedUserAddress2}
-                  ) AND f_b.is_active = true
-              ) as friends_b
-          )`
-      )
-
-      return result.rows[0].count
+      return getCount(getMutualFriendsBaseQuery(userAddress1, userAddress2, { onlyCount: true }))
     },
     async getFriendship(users) {
       const [userAddress1, userAddress2] = users.map(normalizeAddress)
@@ -307,26 +142,10 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       return uuid
     },
-    async getReceivedFriendshipRequests(userAddress, pagination) {
-      const query = getFriendshipRequestsBaseQuery(userAddress, 'received', { pagination })
-      const results = await pg.query<FriendshipRequest>(query)
-      return results.rows
-    },
-    async getReceivedFriendshipRequestsCount(userAddress) {
-      const query = getFriendshipRequestsBaseQuery(userAddress, 'received', { onlyCount: true })
-      const results = await pg.query<{ count: number }>(query)
-      return results.rows[0].count
-    },
-    async getSentFriendshipRequests(userAddress, pagination) {
-      const query = getFriendshipRequestsBaseQuery(userAddress, 'sent', { pagination })
-      const results = await pg.query<FriendshipRequest>(query)
-      return results.rows
-    },
-    async getSentFriendshipRequestsCount(userAddress) {
-      const query = getFriendshipRequestsBaseQuery(userAddress, 'sent', { onlyCount: true })
-      const results = await pg.query<{ count: number }>(query)
-      return results.rows[0].count
-    },
+    getReceivedFriendshipRequests: getFriendshipRequests('received'),
+    getReceivedFriendshipRequestsCount: getFriendshipRequestsCount('received'),
+    getSentFriendshipRequests: getFriendshipRequests('sent'),
+    getSentFriendshipRequestsCount: getFriendshipRequestsCount('sent'),
     async getOnlineFriends(userAddress: string, onlinePotentialFriends: string[]) {
       if (onlinePotentialFriends.length === 0) return []
 
@@ -382,7 +201,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query = SQL`
         DELETE FROM blocks
         WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
-          AND LOWER(blocked_address) IN (${blockedAddresses.map(normalizeAddress)})
+          AND LOWER(blocked_address) = ANY(${blockedAddresses.map(normalizeAddress)})
       `
       await pg.query(query)
     },
