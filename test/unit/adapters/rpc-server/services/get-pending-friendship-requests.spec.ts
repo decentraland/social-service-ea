@@ -4,21 +4,19 @@ import { RpcServerContext } from '../../../../../src/types'
 import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { emptyRequest } from '../../../../mocks/empty-request'
 import { createMockFriendshipRequest, createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'
-import { createMockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
+import { createMockProfile } from '../../../../mocks/profile'
 
 describe('getPendingFriendshipRequestsService', () => {
-  let getPendingRequests: Awaited<ReturnType<typeof getPendingFriendshipRequestsService>>
+  let getPendingRequests: ReturnType<typeof getPendingFriendshipRequestsService>
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
-    subscribers: undefined
+    subscribersContext: undefined
   }
 
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValueOnce(PROFILE_IMAGES_URL)
-
-    getPendingRequests = await getPendingFriendshipRequestsService({
-      components: { db: mockDb, logs: mockLogs, config: mockConfig, catalystClient: mockCatalystClient }
+    getPendingRequests = getPendingFriendshipRequestsService({
+      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 
@@ -30,7 +28,8 @@ describe('getPendingFriendshipRequestsService', () => {
     const mockProfiles = mockPendingRequests.map(({ address }) => createMockProfile(address))
 
     mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
-    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
+    mockDb.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
     const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
 
     expect(result).toEqual({
@@ -42,12 +41,19 @@ describe('getPendingFriendshipRequestsService', () => {
             createMockExpectedFriendshipRequest('id2', '0x789', mockProfiles[1], '2025-01-02T00:00:00Z')
           ]
         }
+      },
+      paginationData: {
+        total: mockPendingRequests.length,
+        page: 1
       }
     })
   })
 
-  it('should handle database errors gracefully', async () => {
-    mockDb.getReceivedFriendshipRequests.mockImplementationOnce(() => {
+  it.each([
+    ['getReceivedFriendshipRequests', mockDb.getReceivedFriendshipRequests],
+    ['getReceivedFriendshipRequestsCount', mockDb.getReceivedFriendshipRequestsCount]
+  ])('should handle database errors in the %s method gracefully', async (_methodName, method) => {
+    method.mockImplementationOnce(() => {
       throw new Error('Database error')
     })
 
@@ -66,7 +72,8 @@ describe('getPendingFriendshipRequestsService', () => {
     const mockProfiles = mockPendingRequests.map(({ address }) => createMockProfile(address))
 
     mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
-    mockCatalystClient.getEntitiesByPointers.mockResolvedValueOnce(mockProfiles)
+    mockDb.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
 
     const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
 
@@ -76,6 +83,10 @@ describe('getPendingFriendshipRequestsService', () => {
         requests: {
           requests: [createMockExpectedFriendshipRequest('id1', '0x456', mockProfiles[0], '2025-01-01T00:00:00Z', '')]
         }
+      },
+      paginationData: {
+        total: mockPendingRequests.length,
+        page: 1
       }
     })
   })

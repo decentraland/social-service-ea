@@ -35,7 +35,7 @@ describe('peers-synchronizer', () => {
     expect(mockArchipelagoStats.getPeers).toHaveBeenCalled()
     expect(mockRedis.put).toHaveBeenCalledWith(
       PEERS_CACHE_KEY,
-      JSON.stringify(mockPeers),
+      mockPeers,
       expect.objectContaining({ EX: TEN_SECS_IN_MS / 1000 })
     )
   })

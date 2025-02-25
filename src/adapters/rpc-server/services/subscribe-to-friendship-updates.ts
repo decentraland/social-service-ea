@@ -4,23 +4,33 @@ import { FriendshipUpdate } from '@dcl/protocol/out-js/decentraland/social_servi
 import { parseEmittedUpdateToFriendshipUpdate } from '../../../logic/friendships'
 import { handleSubscriptionUpdates } from '../../../logic/updates'
 
-export async function subscribeToFriendshipUpdatesService({
-  components: { logs, config, catalystClient }
-}: RPCServiceContext<'logs' | 'config' | 'catalystClient'>) {
+export function subscribeToFriendshipUpdatesService({
+  components: { logs, catalystClient }
+}: RPCServiceContext<'logs' | 'catalystClient'>) {
   const logger = logs.getLogger('subscribe-to-friendship-updates-service')
-  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendshipUpdate> {
-    yield* handleSubscriptionUpdates<FriendshipUpdate, SubscriptionEventsEmitter['friendshipUpdate']>({
-      rpcContext: context,
-      eventName: 'friendshipUpdate',
-      components: {
-        logger,
-        catalystClient
-      },
-      getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.to,
-      parser: parseEmittedUpdateToFriendshipUpdate,
-      parseArgs: [profileImagesUrl]
-    })
+    let cleanup: (() => void) | undefined
+
+    try {
+      cleanup = yield* handleSubscriptionUpdates<FriendshipUpdate, SubscriptionEventsEmitter['friendshipUpdate']>({
+        rpcContext: context,
+        eventName: 'friendshipUpdate',
+        components: {
+          catalystClient,
+          logger
+        },
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+        parser: parseEmittedUpdateToFriendshipUpdate,
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) =>
+          update.from !== context.address && update.to === context.address
+      })
+    } catch (error: any) {
+      logger.error('Error in friendship updates subscription:', error)
+      throw error
+    } finally {
+      logger.info('Closing friendship updates subscription')
+      cleanup?.()
+    }
   }
 }

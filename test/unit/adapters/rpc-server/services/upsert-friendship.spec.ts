@@ -1,4 +1,4 @@
-import { mockCatalystClient, mockConfig, mockDb, mockLogs, mockPubSub } from '../../../../mocks/components'
+import { mockCatalystClient, mockDb, mockLogs, mockPubSub } from '../../../../mocks/components'
 import { upsertFriendshipService } from '../../../../../src/adapters/rpc-server/services/upsert-friendship'
 import { Action, FriendshipStatus, RpcServerContext } from '../../../../../src/types'
 import * as FriendshipsLogic from '../../../../../src/logic/friendships'
@@ -11,14 +11,16 @@ import {
   parseFriendshipRequestToFriendshipRequestResponse
 } from '../../../../../src/logic/friendships'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
-import { mockProfile, PROFILE_IMAGES_URL } from '../../../../mocks/profile'
+import { createMockProfile } from '../../../../mocks/profile'
+import { mockSns } from '../../../../mocks/components/sns'
+import * as Notifications from '../../../../../src/logic/notifications'
 
 jest.mock('../../../../../src/logic/friendships')
 
 describe('upsertFriendshipService', () => {
-  let upsertFriendship: Awaited<ReturnType<typeof upsertFriendshipService>>
+  let upsertFriendship: ReturnType<typeof upsertFriendshipService>
 
-  const rpcContext: RpcServerContext = { address: '0x123', subscribers: undefined }
+  const rpcContext: RpcServerContext = { address: '0x123', subscribersContext: undefined }
   const userAddress = '0x456'
   const message = 'Hello'
 
@@ -29,10 +31,22 @@ describe('upsertFriendshipService', () => {
     }
   }
 
+  const mockAccept: UpsertFriendshipPayload = {
+    action: {
+      $case: 'accept',
+      accept: { user: { address: userAddress } }
+    }
+  }
+
   const mockParsedRequest: ParsedUpsertFriendshipRequest = {
     action: Action.REQUEST,
     user: userAddress,
     metadata: { message }
+  }
+
+  const mockParsedAccept: ParsedUpsertFriendshipRequest = {
+    action: Action.ACCEPT,
+    user: userAddress
   }
 
   const existingFriendship = {
@@ -52,16 +66,17 @@ describe('upsertFriendshipService', () => {
     timestamp: Date.now().toString()
   }
 
-  beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValue(PROFILE_IMAGES_URL)
+  const mockSenderProfile = createMockProfile(rpcContext.address)
+  const mockReceiverProfile = createMockProfile(userAddress)
 
-    upsertFriendship = await upsertFriendshipService({
+  beforeEach(async () => {
+    upsertFriendship = upsertFriendshipService({
       components: {
         db: mockDb,
         logs: mockLogs,
         pubsub: mockPubSub,
-        config: mockConfig,
-        catalystClient: mockCatalystClient
+        catalystClient: mockCatalystClient,
+        sns: mockSns
       }
     })
     mockDb.executeTx.mockImplementation(async (cb) => await cb({} as any))
@@ -76,6 +91,32 @@ describe('upsertFriendshipService', () => {
       response: {
         $case: 'internalServerError',
         internalServerError: {}
+      }
+    })
+  })
+
+  it('should return invalidFriendshipAction for a self-request', async () => {
+    const mockSelfRequest: UpsertFriendshipPayload = {
+      action: {
+        $case: 'request',
+        request: { user: { address: rpcContext.address }, message }
+      }
+    }
+    const mockSelfRequestParsed = {
+      action: Action.REQUEST,
+      user: rpcContext.address,
+      metadata: { message: 'Hello' }
+    }
+    jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockSelfRequestParsed)
+
+    const result: UpsertFriendshipResponse = await upsertFriendship(mockSelfRequest, rpcContext)
+
+    expect(result).toEqual({
+      response: {
+        $case: 'invalidFriendshipAction',
+        invalidFriendshipAction: {
+          message: 'You cannot send a friendship request to yourself'
+        }
       }
     })
   })
@@ -104,7 +145,7 @@ describe('upsertFriendshipService', () => {
       id: existingFriendship.id,
       created_at: new Date(existingFriendship.created_at)
     })
-    mockCatalystClient.getEntityByPointer.mockResolvedValueOnce(mockProfile)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
@@ -125,8 +166,7 @@ describe('upsertFriendshipService', () => {
             timestamp: lastFriendshipAction.timestamp,
             metadata: mockParsedRequest.metadata
           },
-          mockProfile,
-          PROFILE_IMAGES_URL
+          mockSenderProfile
         )
       }
     })
@@ -142,7 +182,7 @@ describe('upsertFriendshipService', () => {
       id: 'new-friendship-id',
       created_at: new Date()
     })
-    mockCatalystClient.getEntityByPointer.mockResolvedValueOnce(mockProfile)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
@@ -163,8 +203,7 @@ describe('upsertFriendshipService', () => {
             timestamp: lastFriendshipAction.timestamp,
             metadata: mockParsedRequest.metadata
           },
-          mockProfile,
-          PROFILE_IMAGES_URL
+          mockSenderProfile
         )
       }
     })
@@ -181,6 +220,7 @@ describe('upsertFriendshipService', () => {
       created_at: new Date(existingFriendship.created_at)
     })
     mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
@@ -193,6 +233,68 @@ describe('upsertFriendshipService', () => {
       metadata: mockParsedRequest.metadata
     })
     expect(result.response.$case).toBe('accepted')
+  })
+
+  it.each([
+    [Action.REQUEST, mockRequest, mockParsedRequest],
+    [Action.ACCEPT, mockAccept, mockParsedAccept]
+  ])('should send a notification after a successful friendship %s', async (_action, requestPayload, parsedAccept) => {
+    jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(parsedAccept)
+    jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
+    jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
+    jest.spyOn(Notifications, 'sendNotification').mockResolvedValueOnce()
+
+    const [mockSenderProfile, mockReceiverProfile] = [
+      createMockProfile(rpcContext.address),
+      createMockProfile(userAddress)
+    ]
+
+    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockDb.updateFriendshipStatus.mockResolvedValueOnce({
+      id: existingFriendship.id,
+      created_at: new Date(existingFriendship.created_at)
+    })
+    mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
+    jest.useFakeTimers()
+    await upsertFriendship(requestPayload, rpcContext)
+    jest.runAllTimers()
+    expect(Notifications.sendNotification).toHaveBeenCalledWith(
+      parsedAccept.action,
+      expect.objectContaining({
+        requestId: lastFriendshipAction.id,
+        senderAddress: rpcContext.address,
+        receiverAddress: userAddress,
+        senderProfile: mockSenderProfile,
+        receiverProfile: mockReceiverProfile
+      }),
+      {
+        logs: mockLogs,
+        sns: mockSns
+      }
+    )
+    jest.useRealTimers()
+  })
+
+  it('should handle empty profiles gracefully', async () => {
+    jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockParsedRequest)
+    jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
+    jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
+
+    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockDb.updateFriendshipStatus.mockResolvedValueOnce({
+      id: existingFriendship.id,
+      created_at: new Date(existingFriendship.created_at)
+    })
+    mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([null, null])
+    const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
+    expect(result).toEqual({
+      response: {
+        $case: 'internalServerError',
+        internalServerError: {}
+      }
+    })
   })
 
   it('should handle errors gracefully', async () => {

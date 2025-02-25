@@ -8,7 +8,9 @@ import {
   FriendshipRequest,
   IDatabaseComponent,
   Friend,
-  BlockedUser
+  BlockedUser,
+  Pagination,
+  Action
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
@@ -32,38 +34,61 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       WHERE (LOWER(address_requester) = ${normalizedUserAddress} OR LOWER(address_requested) = ${normalizedUserAddress})`
   }
 
-  function getFriendshipRequestBaseQuery(userAddress: string, type: 'sent' | 'received'): SQLStatement {
+  function getFriendshipRequestsBaseQuery(
+    userAddress: string,
+    type: 'sent' | 'received',
+    { onlyCount, pagination }: { onlyCount?: boolean; pagination?: Pagination } = { onlyCount: false }
+  ): SQLStatement {
+    const { limit, offset } = pagination || {}
+    const normalizedUserAddress = normalizeAddress(userAddress)
+
     const columnMapping = {
-      sent: SQL` f.address_requested`,
-      received: SQL` f.address_requester`
+      sent: SQL`
+        CASE
+          WHEN LOWER(f.address_requester) = lr.acting_user THEN LOWER(f.address_requested)
+          ELSE LOWER(f.address_requester)
+        END`,
+      received: SQL` LOWER(lr.acting_user)`
     }
+
     const filterMapping = {
-      sent: SQL`LOWER(f.address_requester)`,
-      received: SQL`LOWER(f.address_requested)`
+      sent: SQL` LOWER(lr.acting_user) = ${normalizedUserAddress}`,
+      received: SQL` LOWER(lr.acting_user) <> ${normalizedUserAddress} AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})`
     }
 
-    const baseQuery = SQL`SELECT fa.id,`
-    baseQuery.append(columnMapping[type])
-    baseQuery.append(SQL` as address`)
-    baseQuery.append(SQL`
-      fa.timestamp, fa.metadata
-      FROM friendships f
-      INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-      WHERE
-    `)
+    const baseQuery = SQL`WITH latest_requests AS (
+        SELECT DISTINCT ON (friendship_id) *
+        FROM friendship_actions
+        ORDER BY friendship_id, timestamp DESC
+      ) SELECT`
 
-    baseQuery.append(filterMapping[type].append(SQL` = ${normalizeAddress(userAddress)}`))
+    if (onlyCount) {
+      baseQuery.append(SQL` DISTINCT COUNT(1) as count`)
+    } else {
+      baseQuery.append(SQL` lr.id,`)
+      baseQuery.append(columnMapping[type])
+      baseQuery.append(SQL` as address, lr.timestamp, lr.metadata`)
+    }
 
-    baseQuery.append(SQL`
-      AND fa.action = 'request'
-      AND f.is_active IS FALSE
-      AND fa.timestamp = (
-        SELECT MAX(fa2.timestamp)
-        FROM friendship_actions fa2
-        WHERE fa2.friendship_id = fa.friendship_id
-      )
-      ORDER BY fa.timestamp DESC
-    `)
+    baseQuery.append(SQL` FROM friendships f`)
+    baseQuery.append(SQL` INNER JOIN latest_requests lr ON f.id = lr.friendship_id`)
+    baseQuery.append(SQL` WHERE`)
+    baseQuery.append(filterMapping[type])
+    baseQuery.append(SQL` AND action = ${Action.REQUEST}`)
+
+    baseQuery.append(SQL` AND f.is_active IS FALSE`)
+
+    if (!onlyCount) {
+      baseQuery.append(SQL` ORDER BY lr.timestamp DESC`)
+
+      if (limit) {
+        baseQuery.append(SQL` LIMIT ${limit}`)
+      }
+
+      if (offset) {
+        baseQuery.append(SQL` OFFSET ${offset}`)
+      }
+    }
 
     return baseQuery
   }
@@ -255,7 +280,6 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       }
     },
     async updateFriendshipStatus(friendshipId, isActive, txClient) {
-      logger.debug(`updating ${friendshipId} - ${isActive}`)
       const query = SQL`UPDATE friendships SET is_active = ${isActive}, updated_at = now() WHERE id = ${friendshipId} RETURNING id, created_at`
 
       const {
@@ -284,37 +308,24 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return uuid
     },
     async getReceivedFriendshipRequests(userAddress, pagination) {
-      const { limit, offset } = pagination || {}
-
-      const query = getFriendshipRequestBaseQuery(userAddress, 'received')
-
-      if (limit) {
-        query.append(SQL` LIMIT ${limit}`)
-      }
-
-      if (offset) {
-        query.append(SQL` OFFSET ${offset}`)
-      }
-
+      const query = getFriendshipRequestsBaseQuery(userAddress, 'received', { pagination })
       const results = await pg.query<FriendshipRequest>(query)
-
       return results.rows
     },
+    async getReceivedFriendshipRequestsCount(userAddress) {
+      const query = getFriendshipRequestsBaseQuery(userAddress, 'received', { onlyCount: true })
+      const results = await pg.query<{ count: number }>(query)
+      return results.rows[0].count
+    },
     async getSentFriendshipRequests(userAddress, pagination) {
-      const { limit, offset } = pagination || {}
-      const query = getFriendshipRequestBaseQuery(userAddress, 'sent')
-
-      if (limit) {
-        query.append(SQL` LIMIT ${limit}`)
-      }
-
-      if (offset) {
-        query.append(SQL` OFFSET ${offset}`)
-      }
-
+      const query = getFriendshipRequestsBaseQuery(userAddress, 'sent', { pagination })
       const results = await pg.query<FriendshipRequest>(query)
-
       return results.rows
+    },
+    async getSentFriendshipRequestsCount(userAddress) {
+      const query = getFriendshipRequestsBaseQuery(userAddress, 'sent', { onlyCount: true })
+      const results = await pg.query<{ count: number }>(query)
+      return results.rows[0].count
     },
     async getOnlineFriends(userAddress: string, onlinePotentialFriends: string[]) {
       if (onlinePotentialFriends.length === 0) return []
@@ -325,14 +336,14 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query: SQLStatement = SQL`
         SELECT DISTINCT
           CASE
-            WHEN LOWER(address_requester) = ${normalizedUserAddress} THEN address_requested
-            ELSE address_requester
+            WHEN LOWER(address_requester) = ${normalizedUserAddress} THEN LOWER(address_requested)
+            ELSE LOWER(address_requester)
           END as address
         FROM friendships
         WHERE (
-          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) IN (${normalizedOnlinePotentialFriends}))
+          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) = ANY(${normalizedOnlinePotentialFriends}))
           OR
-          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) IN (${normalizedOnlinePotentialFriends}))
+          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) = ANY(${normalizedOnlinePotentialFriends}))
         )
         AND is_active = true`
 
@@ -386,6 +397,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const pool = pg.getPool()
       const client = await pool.connect()
       await client.query('BEGIN')
+
       try {
         const res = await cb(client)
         await client.query('COMMIT')
@@ -393,8 +405,9 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       } catch (error: any) {
         logger.error(`Error executing transaction: ${error.message}`)
         await client.query('ROLLBACK')
-        client.release()
         throw error
+      } finally {
+        client.release()
       }
     }
   }

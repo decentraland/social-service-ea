@@ -7,11 +7,10 @@ import {
   PaginatedFriendsProfilesResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
-export async function getFriendsService({
-  components: { logs, db, catalystClient, config }
-}: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'config'>) {
+export function getFriendsService({
+  components: { logs, db, catalystClient }
+}: RPCServiceContext<'logs' | 'db' | 'catalystClient'>) {
   const logger = logs.getLogger('get-friends-service')
-  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function (
     request: GetFriendsPayload,
@@ -27,10 +26,10 @@ export async function getFriendsService({
         db.getFriendsCount(loggedUserAddress)
       ])
 
-      const profiles = await catalystClient.getEntitiesByPointers(friends.map((friend) => friend.address))
+      const profiles = await catalystClient.getProfiles(friends.map((friend) => friend.address))
 
       return {
-        friends: parseProfilesToFriends(profiles, profileImagesUrl),
+        friends: parseProfilesToFriends(profiles),
         paginationData: {
           total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)

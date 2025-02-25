@@ -16,7 +16,7 @@ import {
   FriendshipStatus as FriendshipRequestStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockExpectedFriendshipRequest, createMockFriendshipRequest } from '../../mocks/friendship-request'
-import { createMockProfile, mockProfile, PROFILE_IMAGES_URL } from '../../mocks/profile'
+import { createMockProfile, mockProfile } from '../../mocks/profile'
 import { parseProfileToFriend } from '../../../src/logic/friends'
 
 describe('isFriendshipActionValid()', () => {
@@ -391,8 +391,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           from: '0xA',
           to: '0xB'
         },
-        mockProfile,
-        PROFILE_IMAGES_URL
+        mockProfile
       )
     ).toEqual({
       update: {
@@ -400,7 +399,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
         request: {
           id,
           createdAt: now,
-          friend: parseProfileToFriend(mockProfile, PROFILE_IMAGES_URL),
+          friend: parseProfileToFriend(mockProfile),
           message: undefined
         }
       }
@@ -418,8 +417,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
             message: 'Hi!'
           }
         },
-        mockProfile,
-        PROFILE_IMAGES_URL
+        mockProfile
       )
     ).toEqual({
       update: {
@@ -427,7 +425,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
         request: {
           id,
           createdAt: now,
-          friend: parseProfileToFriend(mockProfile, PROFILE_IMAGES_URL),
+          friend: parseProfileToFriend(mockProfile),
           message: 'Hi!'
         }
       }
@@ -445,8 +443,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           from: '0xA',
           to: '0xB'
         },
-        mockProfile,
-        PROFILE_IMAGES_URL
+        mockProfile
       )
     ).toEqual({
       update: {
@@ -471,8 +468,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           from: '0xA',
           to: '0xB'
         },
-        mockProfile,
-        PROFILE_IMAGES_URL
+        mockProfile
       )
     ).toEqual({
       update: {
@@ -498,7 +494,6 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           to: '0xB'
         },
         mockProfile,
-        PROFILE_IMAGES_URL
       )
     ).toEqual({
       update: {
@@ -524,7 +519,6 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           to: '0xB'
         },
         mockProfile,
-        PROFILE_IMAGES_URL
       )
     ).toEqual({
       update: {
@@ -550,7 +544,6 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           to: '0xB'
         },
         mockProfile,
-        PROFILE_IMAGES_URL
       )
     ).toBe(null)
   })
@@ -573,6 +566,10 @@ describe('getFriendshipRequestStatus()', () => {
     expect(getFriendshipRequestStatus({ ...friendshipAction, action }, '0x123')).toBe(expected)
   })
 
+  test('when the last action is undefined it should return none', () => {
+    expect(getFriendshipRequestStatus(undefined, '0x123')).toBe(FriendshipRequestStatus.NONE)
+  })
+
   test('when the last action is request and the acting user is the logged user it should return request sent', () => {
     expect(getFriendshipRequestStatus({ ...friendshipAction, action: Action.REQUEST }, '0x123')).toBe(
       FriendshipRequestStatus.REQUEST_SENT
@@ -591,8 +588,8 @@ describe('parseEmittedUpdateToFriendConnectivityUpdate()', () => {
     [ConnectivityStatus.ONLINE, 'online']
   ])('it should parse status %s update properly', (status) => {
     const update = { address: '0x123', status }
-    expect(parseEmittedUpdateToFriendConnectivityUpdate(update, mockProfile, PROFILE_IMAGES_URL)).toEqual({
-      friend: parseProfileToFriend(mockProfile, PROFILE_IMAGES_URL),
+    expect(parseEmittedUpdateToFriendConnectivityUpdate(update, mockProfile)).toEqual({
+      friend: parseProfileToFriend(mockProfile),
       status
     })
   })
@@ -603,7 +600,7 @@ describe('parseFriendshipRequestToFriendshipRequestResponse()', () => {
     const request = createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')
     const profile = createMockProfile('0x456')
 
-    expect(parseFriendshipRequestToFriendshipRequestResponse(request, profile, PROFILE_IMAGES_URL)).toEqual(
+    expect(parseFriendshipRequestToFriendshipRequestResponse(request, profile)).toEqual(
       createMockExpectedFriendshipRequest('id1', '0x456', profile, '2025-01-01T00:00:00Z', '')
     )
   })
@@ -614,7 +611,7 @@ describe('parseFriendshipRequestsToFriendshipRequestResponses()', () => {
     const requests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
     const profiles = [createMockProfile('0x456')]
 
-    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles, PROFILE_IMAGES_URL)).toEqual([
+    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles)).toEqual([
       createMockExpectedFriendshipRequest('id1', '0x456', profiles[0], '2025-01-01T00:00:00Z', '')
     ])
   })
@@ -623,6 +620,6 @@ describe('parseFriendshipRequestsToFriendshipRequestResponses()', () => {
     const requests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
     const profiles = [createMockProfile('0x789')]
 
-    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles, PROFILE_IMAGES_URL)).toEqual([])
+    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles)).toEqual([])
   })
 })

@@ -22,9 +22,7 @@ export async function createRedisComponent(
 
   async function start() {
     try {
-      logger.debug('Connecting to Redis', { url })
       await client.connect()
-      logger.debug('Successfully connected to Redis')
     } catch (err: any) {
       logger.error('Error connecting to Redis', err)
       throw err
@@ -33,9 +31,7 @@ export async function createRedisComponent(
 
   async function stop() {
     try {
-      logger.debug('Disconnecting from Redis')
       await client.disconnect()
-      logger.debug('Successfully disconnected from Redis')
     } catch (err: any) {
       logger.error('Error disconnecting from Redis', err)
     }
@@ -60,7 +56,6 @@ export async function createRedisComponent(
       await client.set(key, serializedValue, {
         EX: options?.EX || TWO_HOURS_IN_SECONDS
       })
-      logger.debug(`Successfully set key "${key}"`)
     } catch (err: any) {
       logger.error(`Error setting key "${key}"`, err)
       throw err

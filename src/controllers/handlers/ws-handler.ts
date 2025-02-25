@@ -3,61 +3,100 @@ import { onRequestEnd, onRequestStart } from '@well-known-components/uws-http-se
 import { verify } from '@dcl/platform-crypto-middleware'
 import { AppComponents, WsUserData } from '../../types'
 import { normalizeAddress } from '../../utils/address'
-import { IUWebSocketEventMap, UWebSocketTransport } from '../../utils/UWebSocketTransport'
+import { IUWebSocketEventMap, createUWebSocketTransport } from '../../utils/UWebSocketTransport'
 import { isNotAuthenticated } from '../../utils/wsUserData'
+import { randomUUID } from 'crypto'
 
 const textDecoder = new TextDecoder()
 
 export async function registerWsHandler(
-  components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer'>
+  components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool'>
 ) {
-  const { logs, server, metrics, fetcher, rpcServer } = components
+  const { logs, server, metrics, fetcher, rpcServer, config, wsPool } = components
   const logger = logs.getLogger('ws-handler')
 
-  function changeStage(data: WsUserData, newData: WsUserData) {
-    Object.assign(data, newData)
+  function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
+    Object.assign(data, { ...data, ...newData })
   }
 
   server.app.ws<WsUserData>('/', {
-    idleTimeout: 0,
+    idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? 90, // In seconds
+    sendPingsAutomatically: true,
     upgrade: (res, req, context) => {
-      logger.debug('upgrade requested')
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
+      const wsConnectionId = randomUUID()
+
+      logger.debug('[DEBUGGING CONNECTION] Upgrade requested', {
+        wsConnectionId,
+        ip: req.getHeader('x-forwarded-for'),
+        protocol: req.getHeader('sec-websocket-protocol')
+      })
+
       res.upgrade(
         {
           isConnected: false,
-          auth: false
+          auth: false,
+          wsConnectionId,
+          transport: null
         },
         req.getHeader('sec-websocket-key'),
         req.getHeader('sec-websocket-protocol'),
         req.getHeader('sec-websocket-extensions'),
         context
       )
+
       onRequestEnd(metrics, labels, 101, end)
     },
-    open: (ws) => {
-      logger.debug('ws open')
+    open: async (ws) => {
       const data = ws.getUserData()
-      // just for type assertion
-      if (isNotAuthenticated(data)) {
-        data.timeout = setTimeout(() => {
-          try {
-            logger.error('closing connection, no auth chain received')
-            ws.end()
-          } catch (err) {}
-        }, 30000)
+
+      logger.debug('[DEBUGGING CONNECTION] Opening connection', {
+        wsConnectionId: data.wsConnectionId,
+        isConnected: String(data.isConnected),
+        auth: String(data.auth),
+        address: data.auth ? data.address : 'Not authenticated'
+      })
+
+      try {
+        await wsPool.acquireConnection(data.wsConnectionId)
+        logger.debug('[DEBUGGING CONNECTION] Connection acquired', {
+          wsConnectionId: data.wsConnectionId,
+          address: data.auth ? data.address : 'Not authenticated'
+        })
+
+        if (isNotAuthenticated(data)) {
+          data.timeout = setTimeout(() => {
+            try {
+              logger.error('Closing connection, no auth chain received', {
+                wsConnectionId: data.wsConnectionId
+              })
+              ws.end()
+            } catch (err) {}
+          }, 30000)
+        }
+
+        changeStage(data, { isConnected: true })
+        logger.debug('WebSocket opened', { wsConnectionId: data.wsConnectionId })
+      } catch (error: any) {
+        logger.debug('[DEBUGGING CONNECTION] Failed to acquire connection', {
+          wsConnectionId: data.wsConnectionId,
+          error: error.message
+        })
+        ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
       }
-      data.isConnected = true
     },
     message: async (ws, message) => {
       const data = ws.getUserData()
+      logger.debug('[DEBUGGING CONNECTION] Message received', {
+        wsConnectionId: data.wsConnectionId,
+        isConnected: String(data.isConnected),
+        auth: String(data.auth),
+        messageSize: message.byteLength,
+        address: data.auth ? data.address : 'Not authenticated'
+      })
+      metrics.increment('ws_messages_received')
 
-      if (data.auth) {
-        data.eventEmitter.emit('message', message)
-      } else if (isNotAuthenticated(data)) {
-        clearTimeout(data.timeout)
-        data.timeout = undefined
-
+      if (isNotAuthenticated(data)) {
         try {
           const authChainMessage = textDecoder.decode(message)
 
@@ -66,32 +105,141 @@ export async function registerWsHandler(
           })
           const address = normalizeAddress(verifyResult.auth)
 
-          logger.debug('address > ', { address })
+          logger.debug('Authenticated User', { address, wsConnectionId: data.wsConnectionId })
 
           const eventEmitter = mitt<IUWebSocketEventMap>()
-          changeStage(data, { auth: true, address, eventEmitter, isConnected: true })
+          const transport = await createUWebSocketTransport(ws, eventEmitter, config, logs)
 
-          const transport = UWebSocketTransport(ws, eventEmitter)
+          changeStage(data, {
+            auth: true,
+            address,
+            eventEmitter,
+            isConnected: true,
+            transport
+          })
+
+          if (data.timeout) {
+            clearTimeout(data.timeout)
+            delete data.timeout
+          }
 
           rpcServer.attachUser({ transport, address })
 
-          transport.on('error', (err) => {
-            if (err && err.message) {
-              logger.error(err)
-            }
+          transport.on('close', () => {
+            logger.debug('[DEBUGGING CONNECTION] Transport close event received', {
+              wsConnectionId: data.wsConnectionId,
+              address
+            })
+            rpcServer.detachUser(address)
           })
+
+          if (data.wsConnectionId) {
+            wsPool.updateActivity(data.wsConnectionId)
+          }
         } catch (error: any) {
-          logger.error(`Error verifying auth chain: ${error.message}`)
+          logger.error(`Error verifying auth chain: ${error.message}`, {
+            wsConnectionId: data.wsConnectionId
+          })
+          metrics.increment('ws_auth_errors')
           ws.close()
+        }
+      } else {
+        try {
+          logger.info('Received message', {
+            wsConnectionId: data.wsConnectionId,
+            address: data.auth ? data.address : 'Not authenticated'
+          })
+
+          if (!data.isConnected) {
+            logger.warn('Received message but connection is marked as disconnected', {
+              address: data.address,
+              wsConnectionId: data.wsConnectionId
+            })
+            return
+          }
+
+          data.eventEmitter.emit('message', message)
+          metrics.increment('ws_messages_sent')
+
+          if (data.wsConnectionId) {
+            wsPool.updateActivity(data.wsConnectionId)
+          }
+        } catch (error: any) {
+          logger.error('Error emitting message', {
+            error,
+            address: data.address,
+            wsConnectionId: data.wsConnectionId,
+            isConnected: String(data.isConnected),
+            hasEventEmitter: String(!!data.eventEmitter)
+          })
+          metrics.increment('ws_errors')
+          ws.send(JSON.stringify({ error: 'Error processing message', message: error.message }))
         }
       }
     },
-    close: (ws, code, _message) => {
-      logger.debug(`Websocket closed ${code}`)
+    close: (ws, code, message) => {
       const data = ws.getUserData()
-      if (data.auth) {
-        data.isConnected = false
-        data.eventEmitter.emit('close', code)
+      const { wsConnectionId } = data
+      const messageText = textDecoder.decode(message)
+
+      logger.debug('[DEBUGGING CONNECTION] Connection closing', {
+        wsConnectionId,
+        code,
+        message: messageText,
+        isConnected: String(data.isConnected),
+        auth: String(data.auth)
+      })
+
+      if (data.auth && data.address) {
+        try {
+          data.transport.close()
+          rpcServer.detachUser(data.address)
+          data.eventEmitter.emit('close', { code, reason: messageText })
+          data.eventEmitter.all.clear()
+        } catch (error: any) {
+          logger.error('Error during connection cleanup', {
+            error: error.message,
+            address: data.address,
+            wsConnectionId
+          })
+        }
+      }
+
+      if (isNotAuthenticated(data) && data.timeout) {
+        clearTimeout(data.timeout)
+        delete data.timeout
+      }
+
+      if (wsConnectionId) {
+        wsPool.releaseConnection(wsConnectionId)
+      }
+
+      changeStage(data, {
+        auth: false,
+        isConnected: false
+      })
+
+      logger.debug('[DEBUGGING CONNECTION] Connection cleanup completed', {
+        wsConnectionId,
+        code
+      })
+
+      logger.debug('WebSocket closed', {
+        code,
+        reason: messageText,
+        wsConnectionId,
+        ...(data.auth && { address: data.address })
+      })
+    },
+    ping: (ws) => {
+      const data = ws.getUserData()
+      logger.debug('[DEBUGGING CONNECTION] Ping received', {
+        wsConnectionId: data.wsConnectionId,
+        isConnected: String(data.isConnected),
+        address: data.auth ? data.address : 'Not authenticated'
+      })
+      if (data.wsConnectionId) {
+        wsPool.updateActivity(data.wsConnectionId)
       }
     }
   })

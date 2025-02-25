@@ -1,43 +1,76 @@
-import { Entity } from '@dcl/schemas'
-import { getProfileAvatar, getProfilePictureUrl } from '../../../src/logic/profiles'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { getProfileAvatarItem, getProfileName, getProfileUserId, getProfilePictureUrl } from '../../../src/logic/profiles'
 import { mockProfile } from '../../mocks/profile'
 
-describe('getProfileAvatar', () => {
+describe('getProfileAvatarItem', () => {
   it('should extract avatar information from profile entity', () => {
-    const avatar = getProfileAvatar(mockProfile)
-
-    expect(avatar).toEqual({
-      userId: '0x123',
-      name: 'TestUser',
-      hasClaimedName: true,
-      snapshots: {
-        face256: 'bafybeiasdfqwer'
-      }
-    })
+    const avatar = getProfileAvatarItem(mockProfile)
+    expect(avatar).toEqual(mockProfile.avatars[0])
   })
 
-  it('should handle profile without avatars gracefully', () => {
-    const emptyProfile: Entity = {
+  it('should throw on profile without avatars', () => {
+    const emptyProfile: Profile = {
       ...mockProfile,
-      metadata: {
-        avatars: []
-      }
+      avatars: []
     }
 
-    expect(() => getProfileAvatar(emptyProfile)).toThrow('Missing profile avatar')
+    expect(() => getProfileAvatarItem(emptyProfile)).toThrow('Missing profile avatar')
+  })
+})
+
+describe('getProfileAvatarName', () => {
+  it('should extract avatar name from profile entity', () => {
+    const name = getProfileName(mockProfile)
+    expect(name).toEqual(mockProfile.avatars[0].name)
+  })
+
+  it('should throw on profile without name', () => {
+    const profileWithoutName: Profile = {
+      ...mockProfile,
+      avatars: [
+        {
+          ...mockProfile.avatars[0],
+          name: undefined
+        }
+      ]
+    }
+    expect(() => getProfileName(profileWithoutName)).toThrow('Missing profile avatar name')
+  })
+})
+
+describe('getProfileAvatarUserId', () => {
+  it('should extract avatar userId from profile entity', () => {
+    const userId = getProfileUserId(mockProfile)
+    expect(userId).toEqual(mockProfile.avatars[0].userId)
+  })
+
+  it('should throw on profile without user id', () => {
+    const profileWithoutUserId: Profile = {
+      ...mockProfile,
+      avatars: [
+        {
+          ...mockProfile.avatars[0],
+          userId: undefined
+        }
+      ]
+    }
+    expect(() => getProfileUserId(profileWithoutUserId)).toThrow('Missing profile avatar userId')
   })
 })
 
 describe('getProfilePictureUrl', () => {
-  const baseUrl = 'https://profile-images.decentraland.org'
-
   it('should construct correct profile picture URL', () => {
-    const url = getProfilePictureUrl(baseUrl, mockProfile)
-
-    expect(url).toBe(`${baseUrl}/entities/${mockProfile.id}/face.png`)
+    const url = getProfilePictureUrl(mockProfile)
+    expect(url).toBe(mockProfile.avatars[0].avatar.snapshots.face256)
   })
 
-  it('should throw on empty baseUrl', () => {
-    expect(() => getProfilePictureUrl('', mockProfile)).toThrow('Missing baseUrl')
+  it('should throw on profile without avatar snapshots', () => {
+    const profileWithoutSnapshots: Profile = {
+      ...mockProfile,
+      avatars: [
+        { ...mockProfile.avatars[0], avatar: { ...mockProfile.avatars[0].avatar, snapshots: undefined } }
+      ]
+    }
+    expect(() => getProfilePictureUrl(profileWithoutSnapshots)).toThrow('Missing profile avatar picture url')
   })
 })

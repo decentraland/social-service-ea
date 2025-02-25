@@ -1,4 +1,5 @@
 import { IUWsComponent } from '@well-known-components/uws-http-server'
+import * as uws from 'uWebSockets.js'
 
 export const mockUWs: jest.Mocked<IUWsComponent> = {
   start: jest.fn(),
@@ -24,5 +25,5 @@ export const mockUWs: jest.Mocked<IUWsComponent> = {
     missingServerName: jest.fn(),
     filter: jest.fn(),
     close: jest.fn()
-  }
+  } as unknown as jest.Mocked<uws.TemplatedApp>
 }

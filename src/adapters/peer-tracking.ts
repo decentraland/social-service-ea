@@ -17,20 +17,33 @@ export const PEER_STATUS_HANDLERS: PeerStatusHandler[] = [
   { event: 'heartbeat', pattern: 'peer.*.heartbeat', status: ConnectivityStatus.ONLINE }
 ]
 
-export function createPeerTrackingComponent({
+export async function createPeerTrackingComponent({
   logs,
   pubsub,
-  nats
-}: Pick<AppComponents, 'logs' | 'pubsub' | 'nats'>): IPeerTrackingComponent {
+  nats,
+  redis,
+  config
+}: Pick<AppComponents, 'logs' | 'pubsub' | 'nats' | 'redis' | 'config'>): Promise<IPeerTrackingComponent> {
   const logger = logs.getLogger('peer-tracking-component')
   const subscriptions = new Map<string, Subscription>()
+  const statusCacheTtlInSeconds = (await config.getNumber('STATUS_CACHE_TTL_IN_SECONDS')) || 3600
+
+  const PEER_STATUS_KEY_PREFIX = 'peer-status:'
 
   async function notifyPeerStatusChange(peerId: string, status: ConnectivityStatus) {
     try {
-      await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
-        address: peerId,
-        status
-      })
+      const key = PEER_STATUS_KEY_PREFIX + peerId
+      const currentStatus = await redis.get<ConnectivityStatus>(key)
+
+      if (currentStatus !== status) {
+        await redis.put(key, status, {
+          EX: statusCacheTtlInSeconds
+        })
+        await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
+          address: peerId,
+          status
+        })
+      }
     } catch (error: any) {
       logger.error('Error notifying peer status change:', {
         error: error.message,

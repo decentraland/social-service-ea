@@ -10,7 +10,7 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
   emitter: Emitter<Events>,
   event: T
 ): AsyncGenerator<Events[T]> {
-  const isDone = false
+  let isDone = false
   const nextQueue: {
     resolve: (value: IteratorResult<Events[T], any> | PromiseLike<IteratorResult<Events[T], any>>) => void
     reject: (reason?: any) => void
@@ -18,11 +18,16 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
   const valueQueue: Events[T][] = []
 
   function eventHandler(value: Events[T]) {
+    if (isDone) {
+      return
+    }
+
     if (nextQueue.length > 0) {
       const { resolve } = nextQueue.shift()!
       resolve({ done: false, value })
       return
     }
+
     valueQueue.push(value)
   }
 
@@ -33,12 +38,13 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
       return this
     },
     async next() {
+      if (isDone) {
+        return { done: true, value: undefined }
+      }
+
       if (valueQueue.length) {
         const value = valueQueue.shift()!
-        return {
-          done: isDone && valueQueue.length === 0,
-          value
-        }
+        return { done: false, value }
       }
 
       return new Promise((resolve, reject) => {
@@ -46,12 +52,16 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
       })
     },
     async return(value) {
+      isDone = true
+      emitter.off(event, eventHandler)
       return {
         done: true,
         value
       }
     },
     async throw(e) {
+      isDone = true
+      emitter.off(event, eventHandler)
       throw e
     }
   }

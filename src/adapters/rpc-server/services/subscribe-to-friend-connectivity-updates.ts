@@ -8,26 +8,27 @@ import { parseEmittedUpdateToFriendConnectivityUpdate } from '../../../logic/fri
 import { parseProfilesToFriends } from '../../../logic/friends'
 import { handleSubscriptionUpdates } from '../../../logic/updates'
 
-export async function subscribeToFriendConnectivityUpdatesService({
-  components: { logs, db, archipelagoStats, config, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'archipelagoStats' | 'config' | 'catalystClient'>) {
+export function subscribeToFriendConnectivityUpdatesService({
+  components: { logs, db, archipelagoStats, catalystClient }
+}: RPCServiceContext<'logs' | 'db' | 'archipelagoStats' | 'catalystClient'>) {
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
-  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
+    let cleanup: (() => void) | undefined
+
     try {
       const onlinePeers = await archipelagoStats.getPeersFromCache()
       const onlineFriends = await db.getOnlineFriends(context.address, onlinePeers)
 
-      const profiles = await catalystClient.getEntitiesByPointers(onlineFriends.map((friend) => friend.address))
-      const parsedProfiles = parseProfilesToFriends(profiles, profileImagesUrl).map((friend) => ({
+      const profiles = await catalystClient.getProfiles(onlineFriends.map((friend) => friend.address))
+      const parsedProfiles = parseProfilesToFriends(profiles).map((friend) => ({
         friend,
         status: ConnectivityStatus.ONLINE
       }))
 
       yield* parsedProfiles
 
-      yield* handleSubscriptionUpdates({
+      cleanup = yield* handleSubscriptionUpdates({
         rpcContext: context,
         eventName: 'friendConnectivityUpdate',
         components: {
@@ -35,12 +36,16 @@ export async function subscribeToFriendConnectivityUpdatesService({
           logger
         },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) => update.address,
-        parser: parseEmittedUpdateToFriendConnectivityUpdate,
-        parseArgs: [profileImagesUrl]
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) =>
+          update.address !== context.address,
+        parser: parseEmittedUpdateToFriendConnectivityUpdate
       })
     } catch (error: any) {
-      logger.error('Error in friend updates subscription:', error)
+      logger.error('Error in friend connectivity updates subscription:', error)
       throw error
+    } finally {
+      logger.info('Cleaning up friend connectivity updates subscription')
+      cleanup?.()
     }
   }
 }

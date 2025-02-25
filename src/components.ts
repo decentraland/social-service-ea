@@ -7,7 +7,7 @@ import { createPgComponent } from '@well-known-components/pg-component'
 import { AppComponents } from './types'
 import { metricDeclarations } from './metrics'
 import { createDBComponent } from './adapters/db'
-import { createRpcServerComponent } from './adapters/rpc-server'
+import { createSubscribersContext, createRpcServerComponent } from './adapters/rpc-server'
 import { createRedisComponent } from './adapters/redis'
 import { createPubSubComponent } from './adapters/pubsub'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
@@ -16,6 +16,8 @@ import { createPeersSynchronizerComponent } from './adapters/peers-synchronizer'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
+import { createSnsComponent } from './adapters/sns'
+import { createWSPoolComponent } from './adapters/ws-pool'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -56,20 +58,23 @@ export async function initComponents(): Promise<AppComponents> {
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
   const nats = await createNatsComponent({ logs, config })
-  const catalystClient = await createCatalystClient({ config, fetcher })
+  const catalystClient = await createCatalystClient({ config, fetcher, logs })
+  const sns = await createSnsComponent({ config })
+  const subscribersContext = createSubscribersContext()
   const rpcServer = await createRpcServerComponent({
     logs,
     db,
     pubsub,
     server,
     config,
-    nats,
     archipelagoStats,
-    redis,
-    catalystClient
+    catalystClient,
+    sns,
+    subscribersContext
   })
+  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
-  const peerTracking = createPeerTrackingComponent({ logs, pubsub, nats })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config })
 
   return {
     config,
@@ -86,6 +91,9 @@ export async function initComponents(): Promise<AppComponents> {
     peersSynchronizer,
     nats,
     peerTracking,
-    catalystClient
+    catalystClient,
+    sns,
+    wsPool,
+    subscribersContext
   }
 }

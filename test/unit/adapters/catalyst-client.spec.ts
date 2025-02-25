@@ -1,13 +1,15 @@
-import { Entity } from '@dcl/schemas'
 import { createCatalystClient } from '../../../src/adapters/catalyst-client'
 import { ICatalystClientComponent } from '../../../src/types'
-import { ContentClient, createContentClient } from 'dcl-catalyst-client'
-import { mockConfig, mockFetcher } from '../../mocks/components'
+import { createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
+import { mockConfig, mockFetcher, mockLogs } from '../../mocks/components'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { mockProfile } from '../../mocks/profile'
 
 jest.mock('dcl-catalyst-client', () => ({
   ...jest.requireActual('dcl-catalyst-client'),
-  createContentClient: jest.fn().mockReturnValue({
-    fetchEntitiesByPointers: jest.fn()
+  createLambdasClient: jest.fn().mockReturnValue({
+    getAvatarsDetailsByPost: jest.fn(),
+    getAvatarDetails: jest.fn()
   })
 }))
 
@@ -29,95 +31,103 @@ jest.mock('../../../src/utils/timer', () => ({
   sleep: jest.fn()
 }))
 
-const CATALYST_CONTENT_LOAD_BALANCER_URL = 'http://catalyst-server.com/content'
+const CATALYST_LAMBDAS_LOAD_BALANCER_URL = 'http://catalyst-server.com/lambdas'
 
 describe('Catalyst client', () => {
   let catalystClient: ICatalystClientComponent
-  let contentClientMock: ContentClient
+  let lambdasClientMock: LambdasClient
 
   beforeEach(async () => {
-    mockConfig.requireString.mockResolvedValue(CATALYST_CONTENT_LOAD_BALANCER_URL)
+    mockConfig.requireString.mockResolvedValue(CATALYST_LAMBDAS_LOAD_BALANCER_URL)
 
     catalystClient = await createCatalystClient({
       fetcher: mockFetcher,
-      config: mockConfig
+      config: mockConfig,
+      logs: mockLogs
     })
-    contentClientMock = createContentClient({ fetcher: mockFetcher, url: CATALYST_CONTENT_LOAD_BALANCER_URL })
+    lambdasClientMock = createLambdasClient({ fetcher: mockFetcher, url: CATALYST_LAMBDAS_LOAD_BALANCER_URL })
   })
 
-  describe('getEntitiesByPointers', () => {
-    let pointers: string[]
-    let entities: Pick<Entity, 'id'>[]
-    let customContentServer: string
+  describe('getProfiles', () => {
+    let ids: string[]
+    let profiles: Profile[]
+    let customLambdasServer: string
 
     beforeEach(() => {
-      pointers = ['pointer1', 'pointer2']
-      entities = [{ id: 'entity1' }, { id: 'entity2' }]
-      customContentServer = 'http://custom-content-server.com/content'
+      ids = ['id1', 'id2']
+      profiles = [
+        {
+          avatars: [{ userId: 'id1' }]
+        },
+        {
+          avatars: [{ userId: 'id2' }]
+        }
+      ]
+      customLambdasServer = 'http://custom-content-server.com/lambdas'
     })
 
-    it('should fetch entities by pointers with retries and default values', async () => {
-      contentClientMock.fetchEntitiesByPointers = jest
+    it('should fetch profiles with retries and default values', async () => {
+      lambdasClientMock.getAvatarsDetailsByPost = jest
         .fn()
         .mockRejectedValueOnce(new Error('Failure on first attempt'))
-        .mockResolvedValueOnce(entities)
+        .mockResolvedValueOnce(profiles)
 
-      const result = await catalystClient.getEntitiesByPointers(pointers)
+      const result = await catalystClient.getProfiles(ids)
 
-      expect(contentClientMock.fetchEntitiesByPointers).toHaveBeenCalledTimes(2)
-      expect(result).toEqual(entities)
+      expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledTimes(2)
+      expect(result).toEqual(profiles)
     })
 
-    it('should fetch entities by pointers with custom retries and wait time', async () => {
-      contentClientMock.fetchEntitiesByPointers = jest
+    it('should fetch profiles with custom retries and wait time', async () => {
+      lambdasClientMock.getAvatarsDetailsByPost = jest
         .fn()
         .mockRejectedValueOnce(new Error('Failure'))
-        .mockResolvedValueOnce(entities)
+        .mockResolvedValueOnce(profiles)
 
-      const result = await catalystClient.getEntitiesByPointers(pointers, { retries: 5, waitTime: 500 })
+      const result = await catalystClient.getProfiles(ids, { retries: 5, waitTime: 500 })
 
-      expect(contentClientMock.fetchEntitiesByPointers).toHaveBeenCalledTimes(2)
-      expect(result).toEqual(entities)
+      expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledTimes(2)
+      expect(result).toEqual(profiles)
     })
 
-    it('should fetch entities by pointers from custom content server on the first attempt', async () => {
-      contentClientMock.fetchEntitiesByPointers = jest.fn().mockResolvedValue(entities)
+    it('should fetch profiles from custom content server on the first attempt', async () => {
+      lambdasClientMock.getAvatarsDetailsByPost = jest.fn().mockResolvedValue(profiles)
 
-      const result = await catalystClient.getEntitiesByPointers(pointers, { contentServerUrl: customContentServer })
+      const result = await catalystClient.getProfiles(ids, { lambdasServerUrl: customLambdasServer })
 
-      expectContentClientToHaveBeenCalledWithUrl(customContentServer)
-      expect(contentClientMock.fetchEntitiesByPointers).toHaveBeenCalledTimes(1)
+      expectLambdasClientToHaveBeenCalledWithUrl(customLambdasServer)
+      expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledTimes(1)
 
-      expect(result).toEqual(entities)
+      expect(result).toEqual(profiles)
     })
 
     it('should rotate among catalyst server URLs on subsequent attempts', async () => {
-      contentClientMock.fetchEntitiesByPointers = jest
+      lambdasClientMock.getAvatarsDetailsByPost = jest
         .fn()
         .mockRejectedValueOnce(new Error('Failure on first attempt'))
         .mockRejectedValueOnce(new Error('Failure on second attempt'))
-        .mockResolvedValueOnce(entities)
+        .mockResolvedValueOnce(profiles)
 
-      await catalystClient.getEntitiesByPointers(pointers)
+      await catalystClient.getProfiles(ids)
 
-      expectContentClientToHaveBeenCalledWithUrl(CATALYST_CONTENT_LOAD_BALANCER_URL)
-      expectContentClientToHaveBeenCalledWithUrl('http://catalyst-server-3.com/content')
-      expectContentClientToHaveBeenCalledWithUrl('http://catalyst-server-2.com/content')
+      expectLambdasClientToHaveBeenCalledWithUrl(CATALYST_LAMBDAS_LOAD_BALANCER_URL)
+      expectLambdasClientToHaveBeenCalledWithUrl('http://catalyst-server-3.com/lambdas')
+      expectLambdasClientToHaveBeenCalledWithUrl('http://catalyst-server-2.com/lambdas')
 
-      expect(contentClientMock.fetchEntitiesByPointers).toHaveBeenCalledTimes(3)
+      expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledTimes(3)
     })
 
     it('should not reuse the same catalyst server URL on different attempts', async () => {
-      contentClientMock.fetchEntitiesByPointers = jest
+      lambdasClientMock.getAvatarsDetailsByPost = jest
         .fn()
         .mockRejectedValueOnce(new Error('Failure on first attempt'))
         .mockRejectedValueOnce(new Error('Failure on second attempt'))
         .mockRejectedValueOnce(new Error('Failure on third attempt'))
 
-      await catalystClient.getEntitiesByPointers(pointers, { retries: 3 }).catch(() => {})
+      await catalystClient.getProfiles(ids, { retries: 3 }).catch(() => {})
 
-      const createContentClientMock = createContentClient as jest.Mock
-      const currentCalls = createContentClientMock.mock.calls.slice(1) // Avoid the first call which is the one made in the beforeEach
+      const createLambdasClientMock = createLambdasClient as jest.Mock
+      const currentCalls = createLambdasClientMock.mock.calls.slice(1) // Avoid the first call which is the one made in the beforeEach
 
       const urlsUsed = currentCalls.map((args) => args[0].url)
       const uniqueUrls = new Set(urlsUsed)
@@ -126,24 +136,98 @@ describe('Catalyst client', () => {
     })
   })
 
-  describe('getEntityByPointer', () => {
-    it('should throw an error if the entity is not found', async () => {
-      contentClientMock.fetchEntitiesByPointers = jest.fn().mockResolvedValue([])
-      await expect(catalystClient.getEntityByPointer('pointer')).rejects.toThrow('Entity not found for pointer pointer')
+  describe('getProfile', () => {
+    let customLambdasServer: string
+
+    beforeEach(() => {
+      customLambdasServer = 'http://custom-content-server.com/lambdas'
     })
 
-    it('should return the entity if it is found', async () => {
-      contentClientMock.fetchEntitiesByPointers = jest.fn().mockResolvedValue([{ id: 'entity1' }])
+    it('should throw an error if the profile is not found', async () => {
+      lambdasClientMock.getAvatarDetails = jest.fn().mockRejectedValue(new Error('Profile not found'))
+      await expect(catalystClient.getProfile('id')).rejects.toThrow('Profile not found')
+    })
 
-      const result = await catalystClient.getEntityByPointer('pointer')
+    it('should return the profile if it is found', async () => {
+      lambdasClientMock.getAvatarDetails = jest.fn().mockResolvedValue(mockProfile)
 
-      expect(result).toEqual({ id: 'entity1' })
+      const result = await catalystClient.getProfile('id')
+
+      expect(result).toEqual(mockProfile)
+    })
+
+    it('should fetch profile with retries and default values', async () => {
+      lambdasClientMock.getAvatarDetails = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Failure on first attempt'))
+        .mockResolvedValueOnce(mockProfile)
+
+      const result = await catalystClient.getProfile('id')
+
+      expect(lambdasClientMock.getAvatarDetails).toHaveBeenCalledTimes(2)
+      expect(result).toEqual(mockProfile)
+    })
+
+    it('should fetch profile with custom retries and wait time', async () => {
+      lambdasClientMock.getAvatarDetails = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Failure'))
+        .mockResolvedValueOnce(mockProfile)
+
+      const result = await catalystClient.getProfile('id', { retries: 5, waitTime: 500 })
+
+      expect(lambdasClientMock.getAvatarDetails).toHaveBeenCalledTimes(2)
+      expect(result).toEqual(mockProfile)
+    })
+
+    it('should fetch profile from custom content server on the first attempt', async () => {
+      lambdasClientMock.getAvatarDetails = jest.fn().mockResolvedValue(mockProfile)
+
+      const result = await catalystClient.getProfile('id', { lambdasServerUrl: customLambdasServer })
+
+      expectLambdasClientToHaveBeenCalledWithUrl(customLambdasServer)
+      expect(lambdasClientMock.getAvatarDetails).toHaveBeenCalledTimes(1)
+      expect(result).toEqual(mockProfile)
+    })
+
+    it('should rotate among catalyst server URLs on subsequent attempts', async () => {
+      lambdasClientMock.getAvatarDetails = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Failure on first attempt'))
+        .mockRejectedValueOnce(new Error('Failure on second attempt'))
+        .mockResolvedValueOnce(mockProfile)
+
+      await catalystClient.getProfile('id')
+
+      expectLambdasClientToHaveBeenCalledWithUrl(CATALYST_LAMBDAS_LOAD_BALANCER_URL)
+      expectLambdasClientToHaveBeenCalledWithUrl('http://catalyst-server-3.com/lambdas')
+      expectLambdasClientToHaveBeenCalledWithUrl('http://catalyst-server-2.com/lambdas')
+
+      expect(lambdasClientMock.getAvatarDetails).toHaveBeenCalledTimes(3)
+    })
+
+    it('should not reuse the same catalyst server URL on different attempts', async () => {
+      lambdasClientMock.getAvatarDetails = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Failure on first attempt'))
+        .mockRejectedValueOnce(new Error('Failure on second attempt'))
+        .mockRejectedValueOnce(new Error('Failure on third attempt'))
+
+      await catalystClient.getProfile('id', { retries: 3 }).catch(() => {})
+
+      const createLambdasClientMock = createLambdasClient as jest.Mock
+      const currentCalls = createLambdasClientMock.mock.calls.slice(1) // Avoid the first call which is the one made in the beforeEach
+
+      const urlsUsed = currentCalls.map((args) => args[0].url)
+      const uniqueUrls = new Set(urlsUsed)
+
+      expect(uniqueUrls.size).toBe(urlsUsed.length)
     })
   })
 
   // Helpers
-  function expectContentClientToHaveBeenCalledWithUrl(url: string) {
-    expect(createContentClient).toHaveBeenCalledWith(
+  function expectLambdasClientToHaveBeenCalledWithUrl(url: string) {
+    expect(createLambdasClient).toHaveBeenCalledWith(
       expect.objectContaining({
         url
       })

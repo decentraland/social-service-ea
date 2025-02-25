@@ -10,12 +10,13 @@ import {
   parseFriendshipRequestToFriendshipRequestResponse
 } from '../../../logic/friendships'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
+import { sendNotification, shouldNotify } from '../../../logic/notifications'
+import { getProfileUserId } from '../../../logic/profiles'
 
-export async function upsertFriendshipService({
-  components: { logs, db, pubsub, config, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'pubsub' | 'config' | 'catalystClient'>) {
+export function upsertFriendshipService({
+  components: { logs, db, pubsub, catalystClient, sns }
+}: RPCServiceContext<'logs' | 'db' | 'pubsub' | 'catalystClient' | 'sns'>) {
   const logger = logs.getLogger('upsert-friendship-service')
-  const profileImagesUrl = await config.requireString('PROFILE_IMAGES_URL')
 
   return async function (
     request: UpsertFriendshipPayload,
@@ -33,13 +34,21 @@ export async function upsertFriendshipService({
       }
     }
 
-    logger.debug(`upsert friendship > `, parsedRequest as Record<string, string>)
+    if (parsedRequest.action === Action.REQUEST && parsedRequest.user === context.address) {
+      return {
+        response: {
+          $case: 'invalidFriendshipAction',
+          invalidFriendshipAction: {
+            message: 'You cannot send a friendship request to yourself'
+          }
+        }
+      }
+    }
 
     try {
       const lastAction = await db.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
 
       if (!validateNewFriendshipAction(context.address, parsedRequest, lastAction)) {
-        logger.error('invalid action for a friendship')
         return {
           response: {
             $case: 'invalidFriendshipAction',
@@ -51,7 +60,8 @@ export async function upsertFriendshipService({
       const friendshipStatus = getNewFriendshipStatus(parsedRequest.action)
       const isActive = friendshipStatus === FriendshipStatus.Friends
 
-      logger.debug('friendship status > ', { isActive: JSON.stringify(isActive), friendshipStatus })
+      const metadata =
+        parsedRequest.action === Action.REQUEST && parsedRequest.metadata ? parsedRequest.metadata : undefined
 
       const { id, actionId, createdAt } = await db.executeTx(async (tx) => {
         let id: string, createdAt: Date
@@ -81,12 +91,7 @@ export async function upsertFriendshipService({
         return { id, actionId, createdAt }
       })
 
-      logger.debug(`${id} friendship was upsert successfully`)
-
-      const metadata =
-        parsedRequest.action === Action.REQUEST && parsedRequest.metadata ? parsedRequest.metadata : undefined
-
-      const [_, profile] = await Promise.all([
+      const [_, profiles] = await Promise.all([
         await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
           id: actionId,
           from: context.address,
@@ -95,18 +100,55 @@ export async function upsertFriendshipService({
           timestamp: Date.now(),
           metadata
         }),
-        catalystClient.getEntityByPointer(parsedRequest.user)
+        catalystClient.getProfiles([context.address, parsedRequest.user!])
       ])
+
+      const profilesMap = new Map(profiles.map((profile) => [getProfileUserId(profile), profile]))
+
+      const senderProfile = profilesMap.get(context.address)
+      const receiverProfile = profilesMap.get(parsedRequest.user!)
+
+      if (!senderProfile || !receiverProfile) {
+        logger.error('profiles not found', {
+          senderProfile: senderProfile ? getProfileUserId(senderProfile) : '',
+          receiverProfile: receiverProfile ? getProfileUserId(receiverProfile) : ''
+        })
+
+        return {
+          response: {
+            $case: 'internalServerError',
+            internalServerError: {}
+          }
+        }
+      }
 
       const friendshipRequest = {
         id,
         timestamp: createdAt.toString(),
         metadata: metadata || null
       }
+
+      setImmediate(async () => {
+        if (shouldNotify(parsedRequest.action)) {
+          await sendNotification(
+            parsedRequest.action,
+            {
+              requestId: actionId,
+              senderAddress: context.address,
+              receiverAddress: parsedRequest.user!,
+              senderProfile,
+              receiverProfile,
+              message: metadata?.message
+            },
+            { sns, logs }
+          )
+        }
+      })
+
       return {
         response: {
           $case: 'accepted',
-          accepted: parseFriendshipRequestToFriendshipRequestResponse(friendshipRequest, profile, profileImagesUrl)
+          accepted: parseFriendshipRequestToFriendshipRequestResponse(friendshipRequest, receiverProfile)
         }
       }
     } catch (error: any) {

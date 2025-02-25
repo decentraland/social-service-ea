@@ -1,8 +1,7 @@
 import { createClient } from 'redis'
 import { createRedisComponent } from '../../../src/adapters/redis'
 import { mockConfig, mockLogs } from '../../mocks/components'
-import { IRedisComponent } from '../../../src/types'
-import { ICacheComponent } from '@well-known-components/interfaces'
+import { ICacheComponent, IRedisComponent } from '../../../src/types'
 
 jest.mock('redis', () => ({
   createClient: jest.fn().mockReturnValue({
@@ -65,6 +64,11 @@ describe('redis', () => {
     it('should set a value in the redis client', async () => {
       await redis.put('key', 'value')
       expect(mockClient.set).toHaveBeenCalledWith('key', JSON.stringify('value'), { EX: 7200 })
+    })
+
+    it('should set a value in the redis client with the given options', async () => {
+      await redis.put('key', [], { EX: 3600 })
+      expect(mockClient.set).toHaveBeenCalledWith('key', JSON.stringify([]), { EX: 3600 })
     })
 
     it('when put fails, should throw an error', async () => {

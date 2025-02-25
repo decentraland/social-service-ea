@@ -29,10 +29,11 @@
     "tabWidth": 2
   },
   "dependencies": {
+    "@aws-sdk/client-sns": "^3.734.0",
     "@dcl/platform-crypto-middleware": "^1.1.0",
-    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-12933824416.commit-ed8c3aa.tgz",
+    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-13021146556.commit-7327e37.tgz",
     "@dcl/rpc": "^1.1.2",
-    "@dcl/schemas": "^15.6.0",
+    "@dcl/schemas": "^16.0.0",
     "@well-known-components/env-config-provider": "^1.2.0",
     "@well-known-components/fetch-component": "^2.0.2",
     "@well-known-components/http-server": "^2.1.0",

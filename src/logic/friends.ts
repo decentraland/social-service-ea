@@ -1,19 +1,21 @@
 import { FriendProfile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Entity } from '@dcl/schemas'
-import { getProfileAvatar, getProfilePictureUrl } from './profiles'
-import { normalizeAddress } from '../utils/address'
+import { getProfileName, getProfileHasClaimedName, getProfileUserId, getProfilePictureUrl } from './profiles'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
-export function parseProfileToFriend(profile: Entity, profileImagesUrl: string): FriendProfile {
-  const { userId, name, hasClaimedName } = getProfileAvatar(profile)
+export function parseProfileToFriend(profile: Profile): FriendProfile {
+  const name = getProfileName(profile)
+  const userId = getProfileUserId(profile)
+  const hasClaimedName = getProfileHasClaimedName(profile)
+  const profilePictureUrl = getProfilePictureUrl(profile)
 
   return {
-    address: normalizeAddress(userId),
+    address: userId,
     name,
     hasClaimedName,
-    profilePictureUrl: getProfilePictureUrl(profileImagesUrl, profile)
+    profilePictureUrl
   }
 }
 
-export function parseProfilesToFriends(profiles: Entity[], profileImagesUrl: string): FriendProfile[] {
-  return profiles.map((profile) => parseProfileToFriend(profile, profileImagesUrl))
+export function parseProfilesToFriends(profiles: Profile[]): FriendProfile[] {
+  return profiles.map((profile) => parseProfileToFriend(profile))
 }

@@ -266,14 +266,50 @@ describe('db', () => {
       const result = await dbComponent.getReceivedFriendshipRequests('0x456', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
+
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('LOWER(f.address_requested) ='),
-          values: expect.arrayContaining(['0x456'])
+          text: expect.stringContaining(
+            'SELECT lr.id, LOWER(lr.acting_user) as address, lr.timestamp, lr.metadata FROM friendships f INNER JOIN latest_requests lr ON f.id = lr.friendship_id'
+          )
+        })
+      )
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('action = '),
+          values: expect.arrayContaining([Action.REQUEST])
+        })
+      )
+
+      const normalizedUserAddress = normalizeAddress('0x456')
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(
+            SQL`LOWER(lr.acting_user) <> ${normalizedUserAddress} AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})`
+              .text
+          ),
+          values: expect.arrayContaining([normalizedUserAddress])
         })
       )
 
       expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(10, 5)
+    })
+  })
+
+  describe('getReceivedFriendshipRequestsCount', () => {
+    it('should return the count of received friendship requests', async () => {
+      const mockCount = 5
+      mockPg.query.mockResolvedValueOnce({ rows: [{ count: mockCount }], rowCount: 1 })
+
+      const result = await dbComponent.getReceivedFriendshipRequestsCount('0x456')
+
+      expect(result).toBe(mockCount)
+      expect(mockPg.query).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('ORDER BY fa.timestamp DESC')
+        })
+      )
     })
   })
 
@@ -294,11 +330,45 @@ describe('db', () => {
       expect(result).toEqual(mockRequests)
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('LOWER(f.address_requester) ='),
+          text: expect.stringContaining(
+            `WHEN LOWER(f.address_requester) = lr.acting_user THEN LOWER(f.address_requested)`
+          )
+        })
+      )
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(`ELSE LOWER(f.address_requester)`)
+        })
+      )
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('action = '),
+          values: expect.arrayContaining([Action.REQUEST])
+        })
+      )
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('LOWER(lr.acting_user) ='),
           values: expect.arrayContaining(['0x123'])
         })
       )
       expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(10, 5)
+    })
+  })
+
+  describe('getSentFriendshipRequestsCount', () => {
+    it('should return the count of sent friendship requests', async () => {
+      const mockCount = 5
+      mockPg.query.mockResolvedValueOnce({ rows: [{ count: mockCount }], rowCount: 1 })
+
+      const result = await dbComponent.getSentFriendshipRequestsCount('0x123')
+
+      expect(result).toBe(mockCount)
+      expect(mockPg.query).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('ORDER BY fa.timestamp DESC')
+        })
+      )
     })
   })
 
@@ -353,31 +423,20 @@ describe('db', () => {
       await dbComponent.getOnlineFriends('0x123', normalizedPotentialFriends)
 
       const queryExpectations = [
-        { text: 'LOWER(address_requester) =' },
-        { text: 'AND LOWER(address_requested) IN' },
-        { text: 'LOWER(address_requested) =' },
-        { text: 'LOWER(address_requester) IN' }
+        SQL`WHEN LOWER(address_requester) = ${userAddress} THEN LOWER(address_requested)`,
+        SQL`ELSE LOWER(address_requester)`,
+        SQL`(LOWER(address_requester) = ${userAddress} AND LOWER(address_requested) = ANY(${normalizedPotentialFriends}))`,
+        SQL`(LOWER(address_requested) = ${userAddress} AND LOWER(address_requester) = ANY(${normalizedPotentialFriends}))`
       ]
 
-      queryExpectations.forEach(({ text }) => {
+      queryExpectations.forEach((query) => {
         expect(mockPg.query).toHaveBeenCalledWith(
           expect.objectContaining({
-            text: expect.stringContaining(text)
+            text: expect.stringContaining((query as any).strings[0]),
+            values: expect.arrayContaining(query.values)
           })
         )
       })
-
-      expect(mockPg.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          values: expect.arrayContaining([
-            userAddress,
-            userAddress,
-            normalizedPotentialFriends,
-            userAddress,
-            normalizedPotentialFriends
-          ])
-        })
-      )
     })
   })
 
@@ -481,6 +540,7 @@ describe('db', () => {
       expect(mockClient.query).toHaveBeenCalledWith('SELECT 1')
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT')
       expect(result).toBe('success')
+      expect(mockClient.release).toHaveBeenCalled()
     })
 
     it('should rollback the transaction on error', async () => {
@@ -494,12 +554,12 @@ describe('db', () => {
 
       expect(mockClient.query).toHaveBeenCalledWith('BEGIN')
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK')
+      expect(mockClient.release).toHaveBeenCalled()
     })
   })
 
   // Helpers
-
-  function expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(limit, offset) {
+  function expectPaginatedQueryToHaveBeenCalledWithProperLimitAndOffset(limit: number, offset: number) {
     expect(mockPg.query).toHaveBeenCalledWith(
       expect.objectContaining({
         text: expect.stringContaining('LIMIT'),

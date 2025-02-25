@@ -18,7 +18,9 @@ import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { INatsComponent, Subscription } from '@well-known-components/nats-component/dist/types'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Entity } from '@dcl/schemas'
+import { FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
+import { PublishCommandOutput } from '@aws-sdk/client-sns'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -41,6 +43,9 @@ export type BaseComponents = {
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
   catalystClient: ICatalystClientComponent
+  sns: IPublisherComponent
+  wsPool: IWSPoolComponent
+  subscribersContext: ISubscribersContext
 }
 
 // components used in runtime
@@ -54,6 +59,7 @@ export type TestComponents = BaseComponents & {
 
 export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
+  detachUser(address: string): void
 }
 export interface IDatabaseComponent {
   createFriendship(
@@ -98,7 +104,9 @@ export interface IDatabaseComponent {
     txClient?: PoolClient
   ): Promise<string>
   getReceivedFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
+  getReceivedFriendshipRequestsCount(userAddress: string): Promise<number>
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
+  getSentFriendshipRequestsCount(userAddress: string): Promise<number>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<Friend[]>
   blockUser(blockerAddress: string, blockedAddress: string): Promise<void>
   unblockUser(blockerAddress: string, blockedAddress: string): Promise<void>
@@ -135,12 +143,33 @@ export type IPeerTrackingComponent = IBaseComponent & {
 export type ICatalystClientRequestOptions = {
   retries?: number
   waitTime?: number
-  contentServerUrl?: string
+  lambdasServerUrl?: string
 }
 
 export type ICatalystClientComponent = {
-  getEntitiesByPointers(pointers: string[], options?: ICatalystClientRequestOptions): Promise<Entity[]>
-  getEntityByPointer(pointer: string, options?: ICatalystClientRequestOptions): Promise<Entity>
+  getProfiles(ids: string[], options?: ICatalystClientRequestOptions): Promise<Profile[]>
+  getProfile(id: string, options?: ICatalystClientRequestOptions): Promise<Profile>
+}
+
+export type IPublisherComponent = {
+  publishMessage(event: FriendshipRequestEvent | FriendshipAcceptedEvent): Promise<PublishCommandOutput>
+}
+
+export type IWSPoolComponent = {
+  acquireConnection(id: string): Promise<void>
+  releaseConnection(id: string): void
+  updateActivity(id: string): void
+  isConnectionAvailable(id: string): Promise<boolean>
+  getActiveConnections(): Promise<number>
+  cleanup(): void
+}
+
+export type ISubscribersContext = {
+  getSubscribers: () => Subscribers
+  getSubscribersAddresses: () => string[]
+  getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
+  addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => void
+  removeSubscriber: (address: string) => void
 }
 
 // this type simplifies the typings of http handlers
@@ -177,12 +206,15 @@ export type WsAuthenticatedUserData = {
   eventEmitter: Emitter<IUWebSocketEventMap>
   auth: true
   address: string
+  wsConnectionId: string
+  transport: Transport
 }
 
 export type WsNotAuthenticatedUserData = {
   isConnected: boolean
   auth: false
   timeout?: NodeJS.Timeout
+  wsConnectionId: string
 }
 
 export type WsUserData = WsAuthenticatedUserData | WsNotAuthenticatedUserData
@@ -214,7 +246,7 @@ export type Subscribers = Record<string, Emitter<SubscriptionEventsEmitter>>
 
 export type RpcServerContext = {
   address: string
-  subscribers: Subscribers
+  subscribersContext: ISubscribersContext
 }
 
 export type Friendship = {

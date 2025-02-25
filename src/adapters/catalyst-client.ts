@@ -1,9 +1,9 @@
-import { Entity } from '@dcl/schemas'
-import { createContentClient, ContentClient } from 'dcl-catalyst-client'
+import { createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { AppComponents, ICatalystClientComponent, ICatalystClientRequestOptions } from '../types'
 import { retry } from '../utils/retrier'
 import { shuffleArray } from '../utils/array'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 const L1_MAINNET = 'mainnet'
 const L1_TESTNET = 'sepolia'
@@ -11,55 +11,53 @@ const L1_TESTNET = 'sepolia'
 export async function createCatalystClient({
   fetcher,
   config
-}: Pick<AppComponents, 'fetcher' | 'config'>): Promise<ICatalystClientComponent> {
-  const loadBalancer = await config.requireString('CATALYST_CONTENT_URL_LOADBALANCER')
-  const contractNetwork = (await config.getString('ENV')) === 'prod' ? L1_MAINNET : L1_TESTNET
+}: Pick<AppComponents, 'fetcher' | 'config' | 'logs'>): Promise<ICatalystClientComponent> {
+  const loadBalancer = await config.requireString('CATALYST_LAMBDAS_URL_LOADBALANCER')
+  const env = await config.getString('ENV')
+  const contractNetwork = env === 'prd' ? L1_MAINNET : L1_TESTNET
 
-  function getContentClientOrDefault(contentServerUrl?: string): ContentClient {
-    contentServerUrl = contentServerUrl?.endsWith('/content') ? contentServerUrl : `${contentServerUrl}/content`
-    return createContentClient({ fetcher, url: contentServerUrl ?? loadBalancer })
+  function getLambdasClientOrDefault(lambdasServerUrl?: string): LambdasClient {
+    return createLambdasClient({ fetcher, url: lambdasServerUrl ?? loadBalancer })
   }
 
-  function rotateContentServerClient<T>(
-    executeClientRequest: (client: ContentClient) => Promise<T>,
-    contentServerUrl?: string
+  function rotateLambdasServerClient<T>(
+    executeClientRequest: (client: LambdasClient) => Promise<T>,
+    lambdasServerUrl?: string
   ) {
     const catalystServers = shuffleArray(getCatalystServersFromCache(contractNetwork)).map((server) => server.address)
-    let contentClientToUse: ContentClient = getContentClientOrDefault(contentServerUrl)
+    let lambdasClientToUse: LambdasClient = getLambdasClientOrDefault(lambdasServerUrl)
 
     return (attempt: number): Promise<T> => {
       if (attempt > 1 && catalystServers.length > 0) {
         const [catalystServerUrl] = catalystServers.splice(attempt % catalystServers.length, 1)
-        contentClientToUse = getContentClientOrDefault(`${catalystServerUrl}/content`)
+        lambdasClientToUse = getLambdasClientOrDefault(`${catalystServerUrl}/lambdas`)
       }
 
-      return executeClientRequest(contentClientToUse)
+      return executeClientRequest(lambdasClientToUse)
     }
   }
 
-  async function getEntitiesByPointers(
-    pointers: string[],
-    options: ICatalystClientRequestOptions = {}
-  ): Promise<Entity[]> {
-    if (pointers.length === 0) return []
+  async function getProfiles(ids: string[], options: ICatalystClientRequestOptions = {}): Promise<Profile[]> {
+    if (ids.length === 0) return []
 
-    const { retries = 3, waitTime = 300, contentServerUrl } = options
-    const executeClientRequest = rotateContentServerClient(
-      (contentClientToUse) => contentClientToUse.fetchEntitiesByPointers(pointers),
-      contentServerUrl
+    const { retries = 3, waitTime = 300, lambdasServerUrl } = options
+    const executeClientRequest = rotateLambdasServerClient(
+      (lambdasClientToUse) => lambdasClientToUse.getAvatarsDetailsByPost({ ids: ids }),
+      lambdasServerUrl
     )
     return retry(executeClientRequest, retries, waitTime)
   }
 
-  async function getEntityByPointer(pointer: string, options: ICatalystClientRequestOptions = {}): Promise<Entity> {
-    const [entity] = await getEntitiesByPointers([pointer], options)
+  async function getProfile(id: string, options: ICatalystClientRequestOptions = {}): Promise<Profile> {
+    const { retries = 3, waitTime = 300, lambdasServerUrl } = options
 
-    if (!entity) {
-      throw new Error(`Entity not found for pointer ${pointer}`)
-    }
+    const executeClientRequest = rotateLambdasServerClient(
+      (lambdasClientToUse) => lambdasClientToUse.getAvatarDetails(id),
+      lambdasServerUrl
+    )
 
-    return entity
+    return retry(executeClientRequest, retries, waitTime)
   }
 
-  return { getEntitiesByPointers, getEntityByPointer }
+  return { getProfiles, getProfile }
 }

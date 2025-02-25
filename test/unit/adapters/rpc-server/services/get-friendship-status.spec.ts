@@ -13,7 +13,7 @@ describe('getFriendshipStatusService', () => {
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
-    subscribers: undefined
+    subscribersContext: undefined
   }
 
   const userAddress = '0x456'
@@ -51,7 +51,7 @@ describe('getFriendshipStatusService', () => {
     })
   })
 
-  it('should return internalServerError if no friendship action is found', async () => {
+  it('should return none if no friendship action is found', async () => {
     mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(null)
 
     const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
@@ -59,9 +59,9 @@ describe('getFriendshipStatusService', () => {
     expect(mockDb.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
     expect(result).toEqual({
       response: {
-        $case: 'internalServerError',
-        internalServerError: {
-          message: 'No friendship found'
+        $case: 'accepted',
+        accepted: {
+          status: FriendshipStatus.NONE
         }
       }
     })
