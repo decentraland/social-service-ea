@@ -124,6 +124,7 @@ export function getFriendshipRequestsBaseQuery(
   baseQuery.append(SQL` AND action = ${Action.REQUEST}`)
 
   baseQuery.append(SQL` AND f.is_active IS FALSE`)
+  baseQuery.append(SQL` AND `).append(getBlockingCondition(userAddress))
 
   if (!onlyCount) {
     baseQuery.append(SQL` ORDER BY lr.timestamp DESC`)
@@ -161,8 +162,10 @@ export function getMutualFriendsBaseQuery(
       .append(SQL` WHERE `)
       .append(getFriendshipCondition(address, tableAlias))
       .append(SQL` AND `)
-      .append(tableAlias).append(SQL`.is_active = true
-  `)
+      .append(tableAlias)
+      .append(SQL`.is_active = true`)
+      .append(SQL` AND `)
+      .append(getBlockingCondition(address))
 
   const query = SQL`WITH friendsA as (`.append(friendsSubquery(normalizedUserAddress1, 'f_a')).append(SQL`) SELECT `)
 

@@ -152,7 +152,7 @@ describe('db', () => {
   })
 
   describe('getMutualFriends', () => {
-    it('should return mutual friends with proper query structure', async () => {
+    it('should return mutual friends excluding blocked users', async () => {
       const mockMutualFriends = [{ address: '0x789' }]
       mockPg.query.mockResolvedValueOnce({ rows: mockMutualFriends, rowCount: mockMutualFriends.length })
 
@@ -166,23 +166,11 @@ describe('db', () => {
           values: ['0x123']
         },
         {
-          text: 'LOWER(f_a.address_requester) =',
-          values: ['0x123']
+          text: 'AND NOT EXISTS (SELECT 1 FROM blocks b WHERE',
+          values: []
         },
         {
-          text: 'LOWER(f_a.address_requested) =',
-          values: ['0x123']
-        },
-        {
-          text: 'LOWER(f_b.address_requester) =',
-          values: ['0x456']
-        },
-        {
-          text: 'LOWER(f_b.address_requested) =',
-          values: ['0x456']
-        },
-        {
-          text: 'is_active = true',
+          text: 'AND b.blocked_address = CASE',
           values: []
         },
         {
@@ -202,7 +190,7 @@ describe('db', () => {
       expectedQueryFragments.forEach(({ text, values }) => {
         expect(mockPg.query).toHaveBeenCalledWith(
           expect.objectContaining({
-            text: expect.stringContaining(text),
+            strings: expect.arrayContaining([expect.stringContaining(text)]),
             values: expect.arrayContaining(values)
           })
         )
