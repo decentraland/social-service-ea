@@ -8,7 +8,8 @@ import {
   mockDb,
   mockLogs,
   mockPubSub,
-  mockUWs
+  mockUWs,
+  mockWorldsStats
 } from '../../mocks/components'
 import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { mockSns } from '../../mocks/components/sns'
@@ -56,7 +57,8 @@ describe('createRpcServerComponent', () => {
       archipelagoStats: mockArchipelagoStats,
       catalystClient: mockCatalystClient,
       sns: mockSns,
-      subscribersContext
+      subscribersContext,
+      worldsStats: mockWorldsStats
     })
   })
 

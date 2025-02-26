@@ -11,7 +11,7 @@ export async function createArchipelagoStatsComponent({
   const url = await config.getString('ARCHIPELAGO_STATS_URL')
 
   return {
-    async getPeers() {
+    async fetchPeers() {
       try {
         const response = await fetcher.fetch(`${url}/peers`)
 
@@ -27,7 +27,7 @@ export async function createArchipelagoStatsComponent({
         throw error
       }
     },
-    async getPeersFromCache() {
+    async getPeers() {
       return (await redis.get<string[]>(PEERS_CACHE_KEY)) || []
     }
   }

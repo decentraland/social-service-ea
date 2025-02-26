@@ -27,12 +27,12 @@ describe('peers-synchronizer', () => {
 
   it('should sync peers on start', async () => {
     const mockPeers = ['0x123', '0x456']
-    mockArchipelagoStats.getPeers.mockResolvedValueOnce(mockPeers)
+    mockArchipelagoStats.fetchPeers.mockResolvedValueOnce(mockPeers)
 
     await scheduler.start({} as any)
     await scheduler.stop()
 
-    expect(mockArchipelagoStats.getPeers).toHaveBeenCalled()
+    expect(mockArchipelagoStats.fetchPeers).toHaveBeenCalled()
     expect(mockRedis.put).toHaveBeenCalledWith(
       PEERS_CACHE_KEY,
       mockPeers,
@@ -42,7 +42,7 @@ describe('peers-synchronizer', () => {
 
   it('should sync peers periodically', async () => {
     const mockPeers = ['0x123']
-    mockArchipelagoStats.getPeers.mockResolvedValue(mockPeers)
+    mockArchipelagoStats.fetchPeers.mockResolvedValue(mockPeers)
 
     await scheduler.start({} as any)
 
@@ -51,12 +51,12 @@ describe('peers-synchronizer', () => {
 
     await scheduler.stop()
 
-    expect(mockArchipelagoStats.getPeers).toHaveBeenCalledTimes(2)
+    expect(mockArchipelagoStats.fetchPeers).toHaveBeenCalledTimes(2)
     expect(mockRedis.put).toHaveBeenCalledTimes(2)
   })
 
   it('should stop syncing when stopped', async () => {
-    mockArchipelagoStats.getPeers.mockResolvedValue([])
+    mockArchipelagoStats.fetchPeers.mockResolvedValue([])
 
     await scheduler.start({} as any)
     await scheduler.stop()
@@ -64,11 +64,11 @@ describe('peers-synchronizer', () => {
     jest.advanceTimersByTime(FIVE_SECS_IN_MS)
 
     // Should only have the initial sync
-    expect(mockArchipelagoStats.getPeers).toHaveBeenCalledTimes(1)
+    expect(mockArchipelagoStats.fetchPeers).toHaveBeenCalledTimes(1)
   })
 
   it('should handle errors gracefully', async () => {
-    mockArchipelagoStats.getPeers.mockRejectedValue(new Error('Network error'))
+    mockArchipelagoStats.fetchPeers.mockRejectedValue(new Error('Network error'))
 
     await scheduler.start({} as any)
     await scheduler.stop()
