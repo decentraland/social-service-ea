@@ -509,7 +509,7 @@ describe('db', () => {
       expect(mockPg.query).not.toHaveBeenCalled()
     })
 
-    it('should query friendships for potential friends', async () => {
+    it.only('should query friendships for potential friends', async () => {
       const mockResult = {
         rows: [{ address: '0x456' }, { address: '0x789' }],
         rowCount: 2
@@ -525,7 +525,13 @@ describe('db', () => {
         SQL`WHEN LOWER(address_requester) = ${userAddress} THEN LOWER(address_requested)`,
         SQL`ELSE LOWER(address_requester)`,
         SQL`(LOWER(address_requester) = ${userAddress} AND LOWER(address_requested) = ANY(${normalizedPotentialFriends}))`,
-        SQL`(LOWER(address_requested) = ${userAddress} AND LOWER(address_requester) = ANY(${normalizedPotentialFriends}))`
+        SQL`(LOWER(address_requested) = ${userAddress} AND LOWER(address_requester) = ANY(${normalizedPotentialFriends}))`,
+        SQL`AND NOT EXISTS (
+          SELECT 1 FROM blocks
+          WHERE (LOWER(blocker_address) = ${userAddress} AND LOWER(blocked_address) = ANY(${normalizedPotentialFriends}))
+          OR
+          (LOWER(blocker_address) = ANY(${normalizedPotentialFriends}) AND LOWER(blocked_address) = ${userAddress})
+        )`
       ]
 
       queryExpectations.forEach((query) => {

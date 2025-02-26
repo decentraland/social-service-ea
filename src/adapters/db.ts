@@ -156,6 +156,12 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
           OR
           (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) = ANY(${normalizedOnlinePotentialFriends}))
         )
+        AND NOT EXISTS (
+          SELECT 1 FROM blocks
+          WHERE (LOWER(blocker_address) = ${normalizedUserAddress} AND LOWER(blocked_address) = ANY(${normalizedOnlinePotentialFriends}))
+          OR
+          (LOWER(blocker_address) = ANY(${normalizedOnlinePotentialFriends}) AND LOWER(blocked_address) = ${normalizedUserAddress})
+        )
         AND is_active = true`
 
       const results = await pg.query<Friend>(query)
