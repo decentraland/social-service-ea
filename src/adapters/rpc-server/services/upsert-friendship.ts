@@ -46,6 +46,7 @@ export function upsertFriendshipService({
     }
 
     try {
+      // TODO(feat/blocks): check if someone is blocked by the other user first
       const lastAction = await db.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
 
       if (!validateNewFriendshipAction(context.address, parsedRequest, lastAction)) {

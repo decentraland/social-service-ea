@@ -70,14 +70,6 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       return results.rows[0]
     },
-    async getLastFriendshipAction(friendshipId) {
-      const query = SQL`
-        SELECT * FROM friendship_actions where friendship_id = ${friendshipId} ORDER BY timestamp DESC LIMIT 1
-      `
-      const results = await pg.query<FriendshipAction>(query)
-
-      return results.rows[0]
-    },
     async getLastFriendshipActionByUsers(loggedUser: string, friendUser: string) {
       const normalizedLoggedUser = normalizeAddress(loggedUser)
       const normalizedFriendUser = normalizeAddress(friendUser)

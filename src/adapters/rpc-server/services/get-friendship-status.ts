@@ -5,7 +5,7 @@ import {
   GetFriendshipStatusResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
-// TODO: What should happen if one of the users is blocked?
+// TODO(feat/blocks): What should happen if one of the users is blocked?
 export function getFriendshipStatusService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
   const logger = logs.getLogger('get-sent-friendship-requests-service')
 

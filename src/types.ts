@@ -94,7 +94,6 @@ export interface IDatabaseComponent {
   getMutualFriends(userAddress1: string, userAddress2: string, pagination?: Pagination): Promise<Friend[]>
   getMutualFriendsCount(userAddress1: string, userAddress2: string): Promise<number>
   getFriendship(userAddresses: [string, string]): Promise<Friendship | undefined>
-  getLastFriendshipAction(friendshipId: string): Promise<FriendshipAction | undefined>
   getLastFriendshipActionByUsers(loggedUser: string, friendUser: string): Promise<FriendshipAction | undefined>
   recordFriendshipAction(
     friendshipId: string,

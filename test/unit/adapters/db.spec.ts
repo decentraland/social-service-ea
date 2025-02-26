@@ -350,24 +350,6 @@ describe('db', () => {
     })
   })
 
-  describe('getLastFriendshipAction', () => {
-    it('should return the most recent friendship action', async () => {
-      const mockAction = {
-        id: 'action-1',
-        friendship_id: 'friendship-1',
-        action: Action.REQUEST,
-        acting_user: '0x123',
-        metadata: null,
-        timestamp: '2025-01-01T00:00:00.000Z'
-      }
-      mockPg.query.mockResolvedValueOnce({ rows: [mockAction], rowCount: 1 })
-
-      const result = await dbComponent.getLastFriendshipAction('friendship-1')
-
-      expect(result).toEqual(mockAction)
-    })
-  })
-
   describe('getReceivedFriendshipRequests', () => {
     it('should retrieve received friendship requests', async () => {
       const mockRequests = [
