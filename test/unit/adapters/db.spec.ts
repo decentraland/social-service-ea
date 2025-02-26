@@ -509,7 +509,7 @@ describe('db', () => {
       expect(mockPg.query).not.toHaveBeenCalled()
     })
 
-    it.only('should query friendships for potential friends', async () => {
+    it('should query friendships for potential friends', async () => {
       const mockResult = {
         rows: [{ address: '0x456' }, { address: '0x789' }],
         rowCount: 2
@@ -629,6 +629,33 @@ describe('db', () => {
           values: expect.arrayContaining([normalizeAddress('0x123')])
         })
       )
+    })
+  })
+
+  describe('isFriendshipBlocked', () => {
+    it('should check if exists a blocked friendship', async () => {
+      mockPg.query.mockResolvedValueOnce({ rows: [{ exists: true }], rowCount: 1 })
+      await dbComponent.isFriendshipBlocked('0x123', '0x456')
+
+      const expectedQuery = SQL`
+        SELECT EXISTS (
+          SELECT 1 FROM blocks
+          WHERE (LOWER(blocker_address), LOWER(blocked_address)) IN ((${'0x123'}, ${'0x456'}), (${'0x456'}, ${'0x123'}))
+        )
+      `
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(expectedQuery.text),
+          values: expectedQuery.values
+        })
+      )
+    })
+
+    it.each([false, true])('should return %s if the friendship is %s', async (isBlocked: boolean) => {
+      mockPg.query.mockResolvedValueOnce({ rows: [{ exists: isBlocked }], rowCount: 1 })
+      const result = await dbComponent.isFriendshipBlocked('0x123', '0x456')
+      expect(result).toBe(isBlocked)
     })
   })
 

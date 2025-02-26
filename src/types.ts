@@ -112,6 +112,7 @@ export interface IDatabaseComponent {
   blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   getBlockedUsers(blockerAddress: string): Promise<string[]>
+  isFriendshipBlocked(blockerAddress: string, blockedAddress: string): Promise<boolean>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
 export interface IRedisComponent extends IBaseComponent {

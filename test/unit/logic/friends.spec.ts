@@ -1,7 +1,7 @@
 import { parseCatalystProfilesToProfiles, parseCatalystProfileToProfile } from '../../../src/logic/friends'
 import { mockProfile } from '../../mocks/profile'
 
-describe('parseProfileToFriend', () => {
+describe('parseCatalystProfileToProfile', () => {
   it('should parse profile to friend', () => {
     const friend = parseCatalystProfileToProfile(mockProfile)
     expect(friend).toEqual({
@@ -13,7 +13,7 @@ describe('parseProfileToFriend', () => {
   })
 })
 
-describe('parseProfilesToFriends', () => {
+describe('parseCatalystProfilesToProfiles', () => {
   it('should convert profiles to friend users', () => {
     const anotherProfile = {
       ...mockProfile,

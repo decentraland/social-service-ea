@@ -210,6 +210,20 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const results = await pg.query<BlockedUser>(query)
       return results.rows.map((row) => row.address)
     },
+    async isFriendshipBlocked(loggedUserAddress, anotherUserAddress) {
+      const normalizedLoggedUserAddress = normalizeAddress(loggedUserAddress)
+      const normalizedAnotherUserAddress = normalizeAddress(anotherUserAddress)
+
+      const query = SQL`
+        SELECT EXISTS (
+          SELECT 1 FROM blocks
+          WHERE (LOWER(blocker_address), LOWER(blocked_address)) IN ((${normalizedLoggedUserAddress}, ${normalizedAnotherUserAddress}), (${normalizedAnotherUserAddress}, ${normalizedLoggedUserAddress}))
+        )
+      `
+      const results = await pg.query<{ exists: boolean }>(query)
+      return results.rows[0].exists
+    },
+
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
       const pool = pg.getPool()
       const client = await pool.connect()
