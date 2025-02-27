@@ -5,7 +5,6 @@ import { resolve } from 'path'
 import { createRunner, createLocalFetchCompoment } from '@well-known-components/test-helpers'
 import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
-import { metricDeclarations } from '@well-known-components/logger/dist/metrics'
 import { createLogComponent } from '@well-known-components/logger'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
 import { createFetchComponent } from '@well-known-components/fetch-component'
@@ -25,6 +24,8 @@ import { createPeersSynchronizerComponent } from '../src/adapters/peers-synchron
 import { createPeerTrackingComponent } from '../src/adapters/peer-tracking'
 import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-stats'
 import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
+import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
+import { metricDeclarations } from '../src/metrics'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -77,6 +78,7 @@ async function initComponents(): Promise<TestComponents> {
   const sns = await createSnsComponent({ config })
   const subscribersContext = createSubscribersContext()
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
+  const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const rpcServer = await createRpcServerComponent({
     logs,
     db,
@@ -86,33 +88,35 @@ async function initComponents(): Promise<TestComponents> {
     archipelagoStats,
     catalystClient,
     sns,
-    subscribersContext
+    subscribersContext,
+    worldsStats
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
-  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   const localFetch = await createLocalFetchCompoment(config)
 
   return {
+    archipelagoStats,
+    catalystClient,
+    config,
+    db,
+    fetcher,
+    localFetch,
     logs,
     metrics,
-    pg,
-    config,
-    localFetch,
-    server,
-    fetcher,
-    db,
-    redis,
-    pubsub,
-    archipelagoStats,
     nats,
-    catalystClient,
+    peerTracking,
+    peersSynchronizer,
+    pg,
+    pubsub,
+    redis,
+    rpcServer,
+    server,
     sns,
     subscribersContext,
-    rpcServer,
-    wsPool,
-    peersSynchronizer,
-    peerTracking
+    worldsStats,
+    wsPool
   }
 }

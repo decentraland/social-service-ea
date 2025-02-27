@@ -14,7 +14,6 @@ export async function setupRoutes(components: AppComponents | TestComponents): P
 
   function wrap(h: IHandler) {
     return async (res: HttpResponse, req: HttpRequest) => {
-      console.log('handling...', h.path)
       const { labels, end } = onRequestStart(metrics, req.getMethod(), h.path)
       let status = 500
       try {
