@@ -5,7 +5,7 @@ import {
   ConnectivityStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { parseEmittedUpdateToFriendConnectivityUpdate } from '../../../logic/friendships'
-import { parseProfilesToUserProfiles } from '../../../logic/friends'
+import { parseProfilesToFriends } from '../../../logic/friends'
 import { handleSubscriptionUpdates } from '../../../logic/updates'
 
 export function subscribeToFriendConnectivityUpdatesService({
@@ -21,7 +21,7 @@ export function subscribeToFriendConnectivityUpdatesService({
       const onlineFriends = await db.getOnlineFriends(context.address, onlinePeers)
 
       const profiles = await catalystClient.getProfiles(onlineFriends.map((friend) => friend.address))
-      const parsedProfiles = parseProfilesToUserProfiles(profiles).map((friend) => ({
+      const parsedProfiles = parseProfilesToFriends(profiles).map((friend) => ({
         friend,
         status: ConnectivityStatus.ONLINE
       }))

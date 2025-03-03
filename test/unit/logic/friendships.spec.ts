@@ -17,7 +17,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockExpectedFriendshipRequest, createMockFriendshipRequest } from '../../mocks/friendship-request'
 import { createMockProfile, mockProfile } from '../../mocks/profile'
-import { parseProfileToUserProfile } from '../../../src/logic/friends'
+import { parseProfileToFriend } from '../../../src/logic/friends'
 
 describe('isFriendshipActionValid()', () => {
   test('it should be valid if from is null and to is REQUEST ', () => {
@@ -399,7 +399,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
         request: {
           id,
           createdAt: now,
-          friend: parseProfileToUserProfile(mockProfile),
+          friend: parseProfileToFriend(mockProfile),
           message: undefined
         }
       }
@@ -425,7 +425,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
         request: {
           id,
           createdAt: now,
-          friend: parseProfileToUserProfile(mockProfile),
+          friend: parseProfileToFriend(mockProfile),
           message: 'Hi!'
         }
       }
@@ -589,7 +589,7 @@ describe('parseEmittedUpdateToFriendConnectivityUpdate()', () => {
   ])('it should parse status %s update properly', (status) => {
     const update = { address: '0x123', status }
     expect(parseEmittedUpdateToFriendConnectivityUpdate(update, mockProfile)).toEqual({
-      friend: parseProfileToUserProfile(mockProfile),
+      friend: parseProfileToFriend(mockProfile),
       status
     })
   })

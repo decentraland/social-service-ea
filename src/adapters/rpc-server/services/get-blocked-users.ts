@@ -1,4 +1,4 @@
-import { parseProfilesToUserProfiles } from '../../../logic/friends'
+import { parseProfilesToFriends } from '../../../logic/friends'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { getPage } from '../../../utils/pagination'
 import { FRIENDSHIPS_PER_PAGE } from '../constants'
@@ -21,7 +21,7 @@ export function getBlockedUsersService({
       const profiles = await catalystClient.getProfiles(blockedAddresses)
 
       return {
-        profiles: parseProfilesToUserProfiles(profiles),
+        profiles: parseProfilesToFriends(profiles),
         paginationData: {
           total: blockedAddresses.length,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)

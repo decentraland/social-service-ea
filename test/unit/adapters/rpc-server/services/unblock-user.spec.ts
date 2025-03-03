@@ -3,7 +3,7 @@ import { unblockUserService } from '../../../../../src/adapters/rpc-server/servi
 import { UnblockUserPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
-import { parseProfileToUserProfile } from '../../../../../src/logic/friends'
+import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { PoolClient } from 'pg'
 
 describe('unblockUserService', () => {
@@ -40,7 +40,7 @@ describe('unblockUserService', () => {
       response: {
         $case: 'ok',
         ok: {
-          profile: parseProfileToUserProfile(mockProfile)
+          profile: parseProfileToFriend(mockProfile)
         }
       }
     })
@@ -70,7 +70,7 @@ describe('unblockUserService', () => {
     expect(response).toEqual({
       response: {
         $case: 'ok',
-        ok: { profile: parseProfileToUserProfile(mockProfile) }
+        ok: { profile: parseProfileToFriend(mockProfile) }
       }
     })
 
