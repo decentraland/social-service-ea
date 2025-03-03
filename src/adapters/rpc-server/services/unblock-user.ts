@@ -1,5 +1,5 @@
-import { parseCatalystProfileToProfile } from '../../../logic/friends'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
+import { parseProfileToUserProfile } from '../../../logic/friends'
+import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   UnblockUserPayload,
   UnblockUserResponse
@@ -35,13 +35,20 @@ export function unblockUserService({
         }
       }
 
-      await db.unblockUser(blockerAddress, blockedAddress)
+      await db.executeTx(async (tx) => {
+        await db.unblockUser(blockerAddress, blockedAddress, tx)
+
+        const friendship = await db.getFriendship([blockerAddress, blockedAddress], tx)
+        if (!friendship) return
+
+        await db.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
+      })
 
       return {
         response: {
           $case: 'ok',
           ok: {
-            profile: parseCatalystProfileToProfile(profile)
+            profile: parseProfileToUserProfile(profile)
           }
         }
       }

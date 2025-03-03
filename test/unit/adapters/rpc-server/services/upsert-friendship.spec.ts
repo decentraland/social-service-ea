@@ -106,7 +106,7 @@ describe('upsertFriendshipService', () => {
       action: Action.REQUEST,
       user: rpcContext.address,
       metadata: { message: 'Hello' }
-    }
+    } as const
     jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockSelfRequestParsed)
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockSelfRequest, rpcContext)

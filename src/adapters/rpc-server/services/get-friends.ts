@@ -1,4 +1,4 @@
-import { parseCatalystProfilesToProfiles } from '../../../logic/friends'
+import { parseProfilesToUserProfiles } from '../../../logic/friends'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { getPage } from '../../../utils/pagination'
 import { FRIENDSHIPS_PER_PAGE } from '../constants'
@@ -28,7 +28,7 @@ export function getFriendsService({
       const profiles = await catalystClient.getProfiles(friends.map((friend) => friend.address))
 
       return {
-        friends: parseCatalystProfilesToProfiles(profiles),
+        friends: parseProfilesToUserProfiles(profiles),
         paginationData: {
           total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)

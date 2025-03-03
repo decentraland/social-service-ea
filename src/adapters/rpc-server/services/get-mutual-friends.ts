@@ -6,7 +6,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { normalizeAddress } from '../../../utils/address'
 import { getPage } from '../../../utils/pagination'
-import { parseCatalystProfilesToProfiles } from '../../../logic/friends'
+import { parseProfilesToUserProfiles } from '../../../logic/friends'
 
 export function getMutualFriendsService({
   components: { logs, db, catalystClient }
@@ -30,7 +30,7 @@ export function getMutualFriendsService({
       const profiles = await catalystClient.getProfiles(mutualFriends.map((friend) => friend.address))
 
       return {
-        friends: parseCatalystProfilesToProfiles(profiles),
+        friends: parseProfilesToUserProfiles(profiles),
         paginationData: {
           total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)

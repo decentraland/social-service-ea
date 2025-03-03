@@ -3,7 +3,7 @@ import { getBlockedUsersService } from '../../../../../src/adapters/rpc-server/s
 import { GetBlockedUsersPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
-import { parseCatalystProfilesToProfiles } from '../../../../../src/logic/friends'
+import { parseProfilesToUserProfiles } from '../../../../../src/logic/friends'
 
 describe('getBlockedUsersService', () => {
   let getBlockedUsers: ReturnType<typeof getBlockedUsersService>
@@ -32,7 +32,7 @@ describe('getBlockedUsersService', () => {
     const response = await getBlockedUsers(request, rpcContext)
 
     expect(response).toEqual({
-      profiles: parseCatalystProfilesToProfiles(mockProfiles),
+      profiles: parseProfilesToUserProfiles(mockProfiles),
       paginationData: {
         total: blockedAddresses.length,
         page: 1
@@ -52,7 +52,7 @@ describe('getBlockedUsersService', () => {
     const response = await getBlockedUsers(request, rpcContext)
 
     expect(response.paginationData.page).toBe(1)
-    expect(response.profiles).toEqual(parseCatalystProfilesToProfiles(mockProfiles))
+    expect(response.profiles).toEqual(parseProfilesToUserProfiles(mockProfiles))
   })
 
   it('should handle errors gracefully', async () => {

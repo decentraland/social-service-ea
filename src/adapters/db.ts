@@ -63,15 +63,11 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async getMutualFriendsCount(userAddress1, userAddress2) {
       return getCount(getMutualFriendsBaseQuery(userAddress1, userAddress2, { onlyCount: true }))
     },
-    async getFriendship(users) {
+    async getFriendship(users, txClient) {
       const [userAddress1, userAddress2] = users.map(normalizeAddress)
-      const query = SQL`
-        SELECT * FROM friendships 
-          WHERE (LOWER(address_requester), LOWER(address_requested)) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))
-      `
+      const query = SQL`SELECT * FROM friendships WHERE (LOWER(address_requester), LOWER(address_requested)) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))`
 
-      const results = await pg.query<Friendship>(query)
-
+      const results = txClient ? await txClient.query<Friendship>(query) : await pg.query<Friendship>(query)
       return results.rows[0]
     },
     async getLastFriendshipActionByUsers(loggedUser: string, friendUser: string) {
@@ -171,20 +167,29 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const results = await pg.query<User>(query)
       return results.rows
     },
-    async blockUser(blockerAddress, blockedAddress) {
+    async blockUser(blockerAddress, blockedAddress, txClient) {
       const query = SQL`
         INSERT INTO blocks (id, blocker_address, blocked_address)
         VALUES (${randomUUID()}, ${normalizeAddress(blockerAddress)}, ${normalizeAddress(blockedAddress)})
         ON CONFLICT DO NOTHING`
-      await pg.query(query)
+
+      if (txClient) {
+        await txClient.query(query)
+      } else {
+        await pg.query(query)
+      }
     },
-    async unblockUser(blockerAddress, blockedAddress) {
+    async unblockUser(blockerAddress, blockedAddress, txClient) {
       const query = SQL`
         DELETE FROM blocks
         WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
           AND LOWER(blocked_address) = ${normalizeAddress(blockedAddress)}
       `
-      await pg.query(query)
+      if (txClient) {
+        await txClient.query(query)
+      } else {
+        await pg.query(query)
+      }
     },
     async blockUsers(blockerAddress, blockedAddresses) {
       const query = SQL`INSERT INTO blocks (id, blocker_address, blocked_address) VALUES `

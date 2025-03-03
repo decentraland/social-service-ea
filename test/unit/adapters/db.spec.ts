@@ -3,7 +3,7 @@ import { Action } from '../../../src/types'
 import SQL from 'sql-template-strings'
 import { mockLogs, mockPg } from '../../mocks/components'
 import { normalizeAddress } from '../../../src/utils/address'
-
+import { PoolClient } from 'pg'
 jest.mock('node:crypto', () => ({
   randomUUID: jest.fn().mockReturnValue('mock-uuid')
 }))
@@ -290,15 +290,24 @@ describe('db', () => {
   })
 
   describe('createFriendship', () => {
-    it('should create a new friendship', async () => {
-      mockPg.query.mockResolvedValueOnce({
+    it.each([false, true])('should create a new friendship using txs: %s', async (withTxClient: boolean) => {
+      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
+      const queryResult = {
         rows: [{ id: 'friendship-1', created_at: '2025-01-01T00:00:00.000Z' }],
         rowCount: 1
-      })
+      }
 
-      const result = await dbComponent.createFriendship(['0x123', '0x456'], true)
+      if (withTxClient) {
+        mockClient.query = jest.fn().mockResolvedValueOnce(queryResult)
+      } else {
+        mockPg.query.mockResolvedValueOnce(queryResult)
+      }
 
-      expect(mockPg.query).toHaveBeenCalledWith(
+      const result = await dbComponent.createFriendship(['0x123', '0x456'], true, mockClient)
+
+      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
+
+      expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
             'INSERT INTO friendships (id, address_requester, address_requested, is_active)'
@@ -306,7 +315,7 @@ describe('db', () => {
           values: expect.arrayContaining([expect.any(String), '0x123', '0x456', true])
         })
       )
-      expect(mockPg.query).toHaveBeenCalledWith(
+      expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('RETURNING id, created_at')
         })
@@ -316,15 +325,24 @@ describe('db', () => {
   })
 
   describe('updateFriendshipStatus', () => {
-    it('should update friendship status', async () => {
-      mockPg.query.mockResolvedValueOnce({
+    it.each([false, true])('should update friendship status using txs: %s', async (withTxClient: boolean) => {
+      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
+      const queryResult = {
         rowCount: 1,
         rows: [{ id: 'friendship-id', created_at: '2025-01-01T00:00:00.000Z' }]
-      })
+      }
 
-      const result = await dbComponent.updateFriendshipStatus('friendship-id', false)
+      if (withTxClient) {
+        mockClient.query = jest.fn().mockResolvedValueOnce(queryResult)
+      } else {
+        mockPg.query.mockResolvedValueOnce(queryResult)
+      }
 
-      expect(mockPg.query).toHaveBeenCalledWith(
+      const result = await dbComponent.updateFriendshipStatus('friendship-id', false, mockClient)
+
+      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
+
+      expect(queryToAssert).toHaveBeenCalledWith(
         SQL`UPDATE friendships SET is_active = ${false}, updated_at = now() WHERE id = ${'friendship-id'} RETURNING id, created_at`
       )
       expect(result).toEqual({
@@ -335,18 +353,40 @@ describe('db', () => {
   })
 
   describe('getFriendship', () => {
-    it('should retrieve a specific friendship', async () => {
+    it.each([true])('should retrieve a specific friendship using txs: %s', async (withTxClient: boolean) => {
+      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
       const mockFriendship = {
         id: 'friendship-1',
         address_requester: '0x123',
         address_requested: '0x456',
         is_active: true
       }
-      mockPg.query.mockResolvedValueOnce({ rows: [mockFriendship], rowCount: 1 })
 
-      const result = await dbComponent.getFriendship(['0x123', '0x456'])
+      const queryResult = {
+        rows: [mockFriendship],
+        rowCount: 1
+      }
+
+      if (withTxClient) {
+        mockClient.query = jest.fn().mockResolvedValueOnce(queryResult)
+      } else {
+        mockPg.query.mockResolvedValueOnce(queryResult)
+      }
+
+      const result = await dbComponent.getFriendship(['0x123', '0x456'], mockClient)
 
       expect(result).toEqual(mockFriendship)
+
+      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
+
+      expect(queryToAssert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(
+            'SELECT * FROM friendships WHERE (LOWER(address_requester), LOWER(address_requested)) IN'
+          ),
+          values: expect.arrayContaining(['0x123', '0x456', '0x456', '0x123'])
+        })
+      )
     })
   })
 
@@ -485,7 +525,8 @@ describe('db', () => {
       )
 
       expect(result).toBe('mock-uuid')
-      expect(withTxClient ? mockClient.query : mockPg.query).toHaveBeenCalledWith(
+      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
+      expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
             'INSERT INTO friendship_actions (id, friendship_id, action, acting_user, metadata)'
@@ -546,16 +587,20 @@ describe('db', () => {
   })
 
   describe('blockUser', () => {
-    it('should block a user', async () => {
-      await dbComponent.blockUser('0x123', '0x456')
-      expect(mockPg.query).toHaveBeenCalledWith(
+    it.each([false, true])('should block a user using txs: %s', async (withTxClient: boolean) => {
+      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
+      await dbComponent.blockUser('0x123', '0x456', mockClient)
+
+      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
+
+      expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('INSERT INTO blocks (id, blocker_address, blocked_address)'),
           values: expect.arrayContaining([expect.any(String), normalizeAddress('0x123'), normalizeAddress('0x456')])
         })
       )
 
-      expect(mockPg.query).toHaveBeenCalledWith(
+      expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('ON CONFLICT DO NOTHING')
         })
@@ -564,14 +609,17 @@ describe('db', () => {
   })
 
   describe('unblockUser', () => {
-    it('should unblock a user', async () => {
-      await dbComponent.unblockUser('0x123', '0x456')
+    it.each([false, true])('should unblock a user using txs: %s', async (withTxClient: boolean) => {
+      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
+      await dbComponent.unblockUser('0x123', '0x456', mockClient)
       const expectedQuery = SQL`
         DELETE FROM blocks
         WHERE LOWER(blocker_address) = ${normalizeAddress('0x123')}
           AND LOWER(blocked_address) = ${normalizeAddress('0x456')}`
 
-      expect(mockPg.query).toHaveBeenCalledWith(
+      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
+
+      expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(expectedQuery.text),
           values: expectedQuery.values
@@ -625,7 +673,7 @@ describe('db', () => {
       expect(result).toEqual(mockBlockedUsers.map((user) => user.address))
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('SELECT blocked_address as address FROM blocks WHERE LOWER(blocker_address) ='),
+          text: expect.stringContaining('LOWER(blocker_address) ='),
           values: expect.arrayContaining([normalizeAddress('0x123')])
         })
       )

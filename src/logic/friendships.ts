@@ -7,7 +7,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, FriendshipAction, FriendshipRequest, FriendshipStatus, SubscriptionEventsEmitter } from '../types'
 import { normalizeAddress } from '../utils/address'
-import { parseCatalystProfileToProfile } from './friends'
+import { parseProfileToUserProfile } from './friends'
 import { getProfileUserId } from './profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
@@ -17,7 +17,8 @@ export const FRIENDSHIP_ACTION_TRANSITIONS: Record<Action, (Action | null)[]> = 
   [Action.ACCEPT]: [Action.REQUEST],
   [Action.CANCEL]: [Action.REQUEST],
   [Action.REJECT]: [Action.REQUEST],
-  [Action.DELETE]: [Action.ACCEPT]
+  [Action.DELETE]: [Action.ACCEPT, Action.BLOCK],
+  [Action.BLOCK]: [Action.REQUEST, Action.CANCEL, Action.REJECT, Action.DELETE, Action.ACCEPT, null]
 }
 
 const FRIENDSHIP_STATUS_BY_ACTION: Record<
@@ -29,8 +30,8 @@ const FRIENDSHIP_STATUS_BY_ACTION: Record<
   [Action.DELETE]: () => FriendshipRequestStatus.DELETED,
   [Action.REJECT]: () => FriendshipRequestStatus.REJECTED,
   [Action.REQUEST]: (actingUser, contextAddress) =>
-    actingUser === contextAddress ? FriendshipRequestStatus.REQUEST_SENT : FriendshipRequestStatus.REQUEST_RECEIVED
-  // TODO: [Action.BLOCK]: () => FriendshipRequestStatus.BLOCKED,
+    actingUser === contextAddress ? FriendshipRequestStatus.REQUEST_SENT : FriendshipRequestStatus.REQUEST_RECEIVED,
+  [Action.BLOCK]: () => FriendshipRequestStatus.BLOCKED
 }
 
 export function isFriendshipActionValid(from: Action | null, to: Action) {
@@ -142,7 +143,7 @@ export function parseEmittedUpdateToFriendshipUpdate(
           request: {
             id: update.id,
             createdAt: update.timestamp,
-            friend: parseCatalystProfileToProfile(profile),
+            friend: parseProfileToUserProfile(profile),
             message: update.metadata?.message
           }
         }
@@ -202,7 +203,7 @@ export function parseEmittedUpdateToFriendConnectivityUpdate(
 ): FriendConnectivityUpdate | null {
   const { status } = update
   return {
-    friend: parseCatalystProfileToProfile(profile),
+    friend: parseProfileToUserProfile(profile),
     status
   }
 }
@@ -224,7 +225,7 @@ export function parseFriendshipRequestToFriendshipRequestResponse(
 ): FriendshipRequestResponse {
   return {
     id: request.id,
-    friend: parseCatalystProfileToProfile(profile),
+    friend: parseProfileToUserProfile(profile),
     createdAt: new Date(request.timestamp).getTime(),
     message: request.metadata?.message || ''
   }

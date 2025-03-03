@@ -93,7 +93,7 @@ export interface IDatabaseComponent {
   ): Promise<number>
   getMutualFriends(userAddress1: string, userAddress2: string, pagination?: Pagination): Promise<User[]>
   getMutualFriendsCount(userAddress1: string, userAddress2: string): Promise<number>
-  getFriendship(userAddresses: [string, string]): Promise<Friendship | undefined>
+  getFriendship(userAddresses: [string, string], txClient?: PoolClient): Promise<Friendship | undefined>
   getLastFriendshipActionByUsers(loggedUser: string, friendUser: string): Promise<FriendshipAction | undefined>
   recordFriendshipAction(
     friendshipId: string,
@@ -107,8 +107,8 @@ export interface IDatabaseComponent {
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   getSentFriendshipRequestsCount(userAddress: string): Promise<number>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<User[]>
-  blockUser(blockerAddress: string, blockedAddress: string): Promise<void>
-  unblockUser(blockerAddress: string, blockedAddress: string): Promise<void>
+  blockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<void>
+  unblockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<void>
   blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   getBlockedUsers(blockerAddress: string): Promise<string[]>
@@ -268,7 +268,8 @@ export enum Action {
   CANCEL = 'cancel', // cancel a friendship request
   ACCEPT = 'accept', // accept a friendship request
   REJECT = 'reject', // reject a friendship request
-  DELETE = 'delete' // delete a friendship
+  DELETE = 'delete', // delete a friendship
+  BLOCK = 'block' // block a user
 }
 
 export type FriendshipAction = {

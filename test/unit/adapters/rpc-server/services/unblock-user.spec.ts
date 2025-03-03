@@ -1,25 +1,30 @@
-import { mockCatalystClient, mockDb, mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockDb, mockLogs, mockPg } from '../../../../mocks/components'
 import { unblockUserService } from '../../../../../src/adapters/rpc-server/services/unblock-user'
 import { UnblockUserPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { RpcServerContext } from '../../../../../src/types'
+import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
-import { parseCatalystProfileToProfile } from '../../../../../src/logic/friends'
+import { parseProfileToUserProfile } from '../../../../../src/logic/friends'
+import { PoolClient } from 'pg'
 
 describe('unblockUserService', () => {
   let unblockUser: ReturnType<typeof unblockUserService>
+  let mockClient: jest.Mocked<PoolClient>
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
     subscribersContext: undefined
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     unblockUser = unblockUserService({
       components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
     })
+
+    mockClient = (await mockPg.getPool().connect()) as jest.Mocked<PoolClient>
+    mockDb.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
   })
 
-  it('should unblock a user successfully', async () => {
+  it('should unblock a user successfully and mark as deleted if friendship exists', async () => {
     const blockedAddress = '0x456'
     const mockProfile = createMockProfile(blockedAddress)
     const request: UnblockUserPayload = {
@@ -27,6 +32,7 @@ describe('unblockUserService', () => {
     }
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+    mockDb.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
 
     const response = await unblockUser(request, rpcContext)
 
@@ -34,12 +40,43 @@ describe('unblockUserService', () => {
       response: {
         $case: 'ok',
         ok: {
-          profile: parseCatalystProfileToProfile(mockProfile)
+          profile: parseProfileToUserProfile(mockProfile)
         }
       }
     })
-    expect(mockDb.unblockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress)
-    expect(mockLogs.getLogger('unblock-user-service')).toBeDefined()
+    expect(mockDb.unblockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
+    expect(mockDb.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
+    expect(mockDb.recordFriendshipAction).toHaveBeenCalledWith(
+      expect.any(String),
+      rpcContext.address,
+      Action.DELETE,
+      null,
+      mockClient
+    )
+  })
+
+  it('should unblock a user successfully and do nothing else if friendship does not exist', async () => {
+    const blockedAddress = '0x456'
+    const mockProfile = createMockProfile(blockedAddress)
+    const request: UnblockUserPayload = {
+      user: { address: blockedAddress }
+    }
+
+    mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+    mockDb.getFriendship.mockResolvedValueOnce(null)
+
+    const response = await unblockUser(request, rpcContext)
+
+    expect(response).toEqual({
+      response: {
+        $case: 'ok',
+        ok: { profile: parseProfileToUserProfile(mockProfile) }
+      }
+    })
+
+    expect(mockDb.unblockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
+    expect(mockDb.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
+    expect(mockDb.recordFriendshipAction).not.toHaveBeenCalled()
   })
 
   it('should return internalServerError when user address is missing', async () => {
