@@ -625,7 +625,23 @@ describe('db', () => {
       expect(result).toEqual(mockBlockedUsers.map((user) => user.address))
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('LOWER(blocker_address) ='),
+          text: expect.stringContaining('SELECT blocked_address as address FROM blocks WHERE LOWER(blocker_address) ='),
+          values: expect.arrayContaining([normalizeAddress('0x123')])
+        })
+      )
+    })
+  })
+
+  describe('getBlockedByUsers', () => {
+    it('should retrieve blocked by users', async () => {
+      const mockBlockedByUsers = [{ address: '0x456' }, { address: '0x789' }]
+      mockPg.query.mockResolvedValueOnce({ rows: mockBlockedByUsers, rowCount: mockBlockedByUsers.length })
+
+      const result = await dbComponent.getBlockedByUsers('0x123')
+      expect(result).toEqual(mockBlockedByUsers.map((user) => user.address))
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('SELECT blocker_address as address FROM blocks WHERE LOWER(blocked_address) ='),
           values: expect.arrayContaining([normalizeAddress('0x123')])
         })
       )

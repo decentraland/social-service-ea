@@ -7,8 +7,7 @@ import {
   FriendshipAction,
   FriendshipRequest,
   IDatabaseComponent,
-  Friend,
-  BlockedUser,
+  User,
   Pagination
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
@@ -42,10 +41,15 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     }
   }
 
+  async function getAddressesFromQuery<T extends User>(query: SQLStatement): Promise<string[]> {
+    const result = await pg.query<T>(query)
+    return result.rows.map((row) => row.address)
+  }
+
   return {
     async getFriends(userAddress, { onlyActive, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } } = {}) {
       const query: SQLStatement = getFriendsBaseQuery(userAddress, { onlyActive, pagination })
-      const result = await pg.query<Friend>(query)
+      const result = await pg.query<User>(query)
       return result.rows
     },
     async getFriendsCount(userAddress, { onlyActive } = { onlyActive: true }) {
@@ -53,7 +57,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return getCount(query)
     },
     async getMutualFriends(userAddress1, userAddress2, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }) {
-      const result = await pg.query<Friend>(getMutualFriendsBaseQuery(userAddress1, userAddress2, { pagination }))
+      const result = await pg.query<User>(getMutualFriendsBaseQuery(userAddress1, userAddress2, { pagination }))
       return result.rows
     },
     async getMutualFriendsCount(userAddress1, userAddress2) {
@@ -164,7 +168,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         )
         AND is_active = true`
 
-      const results = await pg.query<Friend>(query)
+      const results = await pg.query<User>(query)
       return results.rows
     },
     async blockUser(blockerAddress, blockedAddress) {
@@ -207,8 +211,13 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query = SQL`
         SELECT blocked_address as address FROM blocks WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
       `
-      const results = await pg.query<BlockedUser>(query)
-      return results.rows.map((row) => row.address)
+      return getAddressesFromQuery(query)
+    },
+    async getBlockedByUsers(blockedAddress) {
+      const query = SQL`
+        SELECT blocker_address as address FROM blocks WHERE LOWER(blocked_address) = ${normalizeAddress(blockedAddress)}
+      `
+      return getAddressesFromQuery(query)
     },
     async isFriendshipBlocked(loggedUserAddress, anotherUserAddress) {
       const normalizedLoggedUserAddress = normalizeAddress(loggedUserAddress)

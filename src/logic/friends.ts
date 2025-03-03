@@ -1,8 +1,8 @@
-import { Profile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { UserProfile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getProfileName, getProfileHasClaimedName, getProfileUserId, getProfilePictureUrl } from './profiles'
-import { Profile as LambdasProfile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
-export function parseCatalystProfileToProfile(profile: LambdasProfile): Profile {
+export function parseCatalystProfileToProfile(profile: Profile): UserProfile {
   const name = getProfileName(profile)
   const userId = getProfileUserId(profile)
   const hasClaimedName = getProfileHasClaimedName(profile)
@@ -16,6 +16,6 @@ export function parseCatalystProfileToProfile(profile: LambdasProfile): Profile 
   }
 }
 
-export function parseCatalystProfilesToProfiles(profiles: LambdasProfile[]): Profile[] {
+export function parseCatalystProfilesToProfiles(profiles: Profile[]): UserProfile[] {
   return profiles.map((profile) => parseCatalystProfileToProfile(profile))
 }

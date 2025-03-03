@@ -4,7 +4,6 @@ import { GetBlockedUsersPayload } from '@dcl/protocol/out-js/decentraland/social
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseCatalystProfilesToProfiles } from '../../../../../src/logic/friends'
-import { FRIENDSHIPS_PER_PAGE } from '../../../../../src/adapters/rpc-server/constants'
 
 describe('getBlockedUsersService', () => {
   let getBlockedUsers: ReturnType<typeof getBlockedUsersService>

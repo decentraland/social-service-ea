@@ -84,14 +84,14 @@ export interface IDatabaseComponent {
       pagination?: Pagination
       onlyActive?: boolean
     }
-  ): Promise<Friend[]>
+  ): Promise<User[]>
   getFriendsCount(
     userAddress: string,
     options?: {
       onlyActive?: boolean
     }
   ): Promise<number>
-  getMutualFriends(userAddress1: string, userAddress2: string, pagination?: Pagination): Promise<Friend[]>
+  getMutualFriends(userAddress1: string, userAddress2: string, pagination?: Pagination): Promise<User[]>
   getMutualFriendsCount(userAddress1: string, userAddress2: string): Promise<number>
   getFriendship(userAddresses: [string, string]): Promise<Friendship | undefined>
   getLastFriendshipActionByUsers(loggedUser: string, friendUser: string): Promise<FriendshipAction | undefined>
@@ -106,12 +106,13 @@ export interface IDatabaseComponent {
   getReceivedFriendshipRequestsCount(userAddress: string): Promise<number>
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   getSentFriendshipRequestsCount(userAddress: string): Promise<number>
-  getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<Friend[]>
+  getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<User[]>
   blockUser(blockerAddress: string, blockedAddress: string): Promise<void>
   unblockUser(blockerAddress: string, blockedAddress: string): Promise<void>
   blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   getBlockedUsers(blockerAddress: string): Promise<string[]>
+  getBlockedByUsers(blockedAddress: string): Promise<string[]>
   isFriendshipBlocked(blockerAddress: string, blockedAddress: string): Promise<boolean>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
@@ -258,13 +259,8 @@ export type Friendship = {
   updated_at: string
 }
 
-export type Friend = {
+export type User = {
   address: string
-}
-
-export type BlockedUser = {
-  address: string
-  blocked_at: string
 }
 
 export enum Action {

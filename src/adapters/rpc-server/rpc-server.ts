@@ -19,7 +19,7 @@ import {
 import { blockUserService } from './services/block-user'
 import { getBlockedUsersService } from './services/get-blocked-users'
 import { unblockUserService } from './services/unblock-user'
-
+import { getBlockingStatusService } from './services/get-blocking-status'
 export async function createRpcServerComponent({
   logs,
   db,
@@ -64,6 +64,7 @@ export async function createRpcServerComponent({
   const blockUser = blockUserService({ components: { logs, db, catalystClient } })
   const unblockUser = unblockUserService({ components: { logs, db, catalystClient } })
   const getBlockedUsers = getBlockedUsersService({ components: { logs, db, catalystClient } })
+  const getBlockingStatus = getBlockingStatusService({ components: { logs, db } })
 
   rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
@@ -76,6 +77,7 @@ export async function createRpcServerComponent({
       blockUser,
       unblockUser,
       getBlockedUsers,
+      getBlockingStatus,
       subscribeToFriendshipUpdates,
       subscribeToFriendConnectivityUpdates
     }))
