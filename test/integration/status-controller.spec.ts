@@ -2,7 +2,7 @@ import nock from 'nock'
 import { test } from '../components'
 import { ARCHIPELAGO_STATS_URL } from '../mocks/components'
 
-test('status handler', function ({ components, spyComponents, beforeStart }) {
+test('status handler', function ({ components, beforeStart }) {
   beforeStart(async () => {
     nock(ARCHIPELAGO_STATS_URL)
       .get('/peers')
