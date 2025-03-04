@@ -222,6 +222,7 @@ describe('updates handlers', () => {
     let subscribersContext: ISubscribersContext
 
     const friendshipUpdate = { id: '1', to: '0x456', from: '0x123', action: Action.REQUEST, timestamp: Date.now() }
+    const blockUpdate = { address: '0x123', isBlocked: true }
 
     beforeEach(() => {
       eventEmitter = mitt<SubscriptionEventsEmitter>()
@@ -339,7 +340,7 @@ describe('updates handlers', () => {
         parser
       })
 
-      const resultPromise = generator.next()
+      generator.next()
       rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
 
       await sleep(100)
@@ -375,6 +376,31 @@ describe('updates handlers', () => {
         address: '0x123',
         event: 'friendshipUpdate'
       })
+    })
+
+    it('should skip retrieving profile if shouldRetrieveProfile is false', async () => {
+      parser.mockResolvedValueOnce({ parsed: true })
+
+      const generator = handleSubscriptionUpdates({
+        rpcContext,
+        eventName: 'blockUpdate',
+        components: {
+          catalystClient: mockCatalystClient,
+          logger
+        },
+        shouldRetrieveProfile: false,
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.address,
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.address === '0x123',
+        parser
+      })
+
+      const resultPromise = generator.next()
+      rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('blockUpdate', blockUpdate)
+
+      const result = await resultPromise
+      expect(result.value).toEqual({ parsed: true })
+      expect(parser).toHaveBeenCalledWith(blockUpdate, null)
+      expect(mockCatalystClient.getProfile).not.toHaveBeenCalled()
     })
   })
 })

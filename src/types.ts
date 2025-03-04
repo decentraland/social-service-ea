@@ -107,7 +107,11 @@ export interface IDatabaseComponent {
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   getSentFriendshipRequestsCount(userAddress: string): Promise<number>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<User[]>
-  blockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<void>
+  blockUser(
+    blockerAddress: string,
+    blockedAddress: string,
+    txClient?: PoolClient
+  ): Promise<{ id: string; blocked_at: Date }>
   unblockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<void>
   blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
@@ -240,6 +244,10 @@ export type SubscriptionEventsEmitter = {
   friendConnectivityUpdate: {
     address: string
     status: ConnectivityStatus
+  }
+  blockUpdate: {
+    address: string
+    isBlocked: boolean
   }
 }
 

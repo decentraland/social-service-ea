@@ -4,6 +4,7 @@ import SQL from 'sql-template-strings'
 import { mockLogs, mockPg } from '../../mocks/components'
 import { normalizeAddress } from '../../../src/utils/address'
 import { PoolClient } from 'pg'
+
 jest.mock('node:crypto', () => ({
   randomUUID: jest.fn().mockReturnValue('mock-uuid')
 }))
@@ -291,21 +292,12 @@ describe('db', () => {
 
   describe('createFriendship', () => {
     it.each([false, true])('should create a new friendship using txs: %s', async (withTxClient: boolean) => {
-      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
-      const queryResult = {
+      const { query: queryToAssert, mockClient } = await mockQuery(withTxClient, {
         rows: [{ id: 'friendship-1', created_at: '2025-01-01T00:00:00.000Z' }],
         rowCount: 1
-      }
-
-      if (withTxClient) {
-        mockClient.query = jest.fn().mockResolvedValueOnce(queryResult)
-      } else {
-        mockPg.query.mockResolvedValueOnce(queryResult)
-      }
+      })
 
       const result = await dbComponent.createFriendship(['0x123', '0x456'], true, mockClient)
-
-      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
 
       expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -326,21 +318,12 @@ describe('db', () => {
 
   describe('updateFriendshipStatus', () => {
     it.each([false, true])('should update friendship status using txs: %s', async (withTxClient: boolean) => {
-      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
-      const queryResult = {
+      const { query: queryToAssert, mockClient } = await mockQuery(withTxClient, {
         rowCount: 1,
         rows: [{ id: 'friendship-id', created_at: '2025-01-01T00:00:00.000Z' }]
-      }
-
-      if (withTxClient) {
-        mockClient.query = jest.fn().mockResolvedValueOnce(queryResult)
-      } else {
-        mockPg.query.mockResolvedValueOnce(queryResult)
-      }
+      })
 
       const result = await dbComponent.updateFriendshipStatus('friendship-id', false, mockClient)
-
-      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
 
       expect(queryToAssert).toHaveBeenCalledWith(
         SQL`UPDATE friendships SET is_active = ${false}, updated_at = now() WHERE id = ${'friendship-id'} RETURNING id, created_at`
@@ -354,30 +337,20 @@ describe('db', () => {
 
   describe('getFriendship', () => {
     it.each([true])('should retrieve a specific friendship using txs: %s', async (withTxClient: boolean) => {
-      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
       const mockFriendship = {
         id: 'friendship-1',
         address_requester: '0x123',
         address_requested: '0x456',
         is_active: true
       }
-
-      const queryResult = {
+      const { query: queryToAssert, mockClient } = await mockQuery(withTxClient, {
         rows: [mockFriendship],
         rowCount: 1
-      }
-
-      if (withTxClient) {
-        mockClient.query = jest.fn().mockResolvedValueOnce(queryResult)
-      } else {
-        mockPg.query.mockResolvedValueOnce(queryResult)
-      }
+      })
 
       const result = await dbComponent.getFriendship(['0x123', '0x456'], mockClient)
 
       expect(result).toEqual(mockFriendship)
-
-      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
 
       expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -512,8 +485,12 @@ describe('db', () => {
   })
 
   describe('recordFriendshipAction', () => {
-    it.each([false, true])('should record a friendship action', async (withTxClient: boolean) => {
-      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
+    it.each([false, true])('should record a friendship action using txs: %s', async (withTxClient: boolean) => {
+      const { query: queryToAssert, mockClient } = await mockQuery(withTxClient, {
+        rows: [{ id: 'mock-uuid' }],
+        rowCount: 1
+      })
+
       const result = await dbComponent.recordFriendshipAction(
         'friendship-id',
         '0x123',
@@ -525,7 +502,6 @@ describe('db', () => {
       )
 
       expect(result).toBe('mock-uuid')
-      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
       expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
@@ -588,10 +564,12 @@ describe('db', () => {
 
   describe('blockUser', () => {
     it.each([false, true])('should block a user using txs: %s', async (withTxClient: boolean) => {
-      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
-      await dbComponent.blockUser('0x123', '0x456', mockClient)
+      const { query: queryToAssert, mockClient } = await mockQuery(withTxClient, {
+        rows: [{ id: 'block-id', blocked_at: new Date() }],
+        rowCount: 1
+      })
 
-      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
+      await dbComponent.blockUser('0x123', '0x456', mockClient)
 
       expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -610,14 +588,16 @@ describe('db', () => {
 
   describe('unblockUser', () => {
     it.each([false, true])('should unblock a user using txs: %s', async (withTxClient: boolean) => {
-      const mockClient = withTxClient ? await mockPg.getPool().connect() : undefined
+      const { query: queryToAssert, mockClient } = await mockQuery(withTxClient, {
+        rows: [{ id: 'block-id', blocked_at: new Date() }],
+        rowCount: 1
+      })
+
       await dbComponent.unblockUser('0x123', '0x456', mockClient)
       const expectedQuery = SQL`
         DELETE FROM blocks
         WHERE LOWER(blocker_address) = ${normalizeAddress('0x123')}
           AND LOWER(blocked_address) = ${normalizeAddress('0x456')}`
-
-      const queryToAssert = withTxClient ? mockClient.query : mockPg.query
 
       expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -769,5 +749,16 @@ describe('db', () => {
         values: expect.arrayContaining([offset])
       })
     )
+  }
+
+  async function mockQuery(withTxClient: boolean, result?: any) {
+    if (withTxClient) {
+      const mockClient = await mockPg.getPool().connect()
+      mockClient.query = jest.fn().mockResolvedValueOnce(result)
+      return { mockClient, query: mockClient.query }
+    } else {
+      mockPg.query.mockResolvedValueOnce(result)
+      return { query: mockPg.query }
+    }
   }
 })

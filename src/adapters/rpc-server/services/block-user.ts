@@ -1,13 +1,14 @@
-import { parseProfileToFriend } from '../../../logic/friends'
 import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   BlockUserPayload,
   BlockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { BLOCK_UPDATES_CHANNEL } from '../../pubsub'
+import { parseProfileToBlockedUser } from '../../../logic/blocks'
 
 export function blockUserService({
-  components: { logs, db, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'catalystClient'>) {
+  components: { logs, db, catalystClient, pubsub }
+}: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'pubsub'>) {
   const logger = logs.getLogger('block-user-service')
 
   return async function (request: BlockUserPayload, context: RpcServerContext): Promise<BlockUserResponse> {
@@ -37,23 +38,30 @@ export function blockUserService({
         }
       }
 
-      await db.executeTx(async (tx) => {
-        await db.blockUser(blockerAddress, blockedAddress, tx)
+      const blockedAt = await db.executeTx(async (tx) => {
+        const { blocked_at } = await db.blockUser(blockerAddress, blockedAddress, tx)
 
         const friendship = await db.getFriendship([blockerAddress, blockedAddress], tx)
-        if (!friendship) return
+        if (!friendship) return blocked_at
 
         await Promise.all([
           db.updateFriendshipStatus(friendship.id, false, tx),
           db.recordFriendshipAction(friendship.id, blockerAddress, Action.BLOCK, null, tx)
         ])
+
+        return blocked_at
+      })
+
+      await pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
+        address: blockedAddress,
+        isBlocked: true
       })
 
       return {
         response: {
           $case: 'ok',
           ok: {
-            profile: parseProfileToFriend(profile)
+            profile: parseProfileToBlockedUser(profile, blockedAt)
           }
         }
       }

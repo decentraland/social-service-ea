@@ -20,6 +20,8 @@ import { blockUserService } from './services/block-user'
 import { getBlockedUsersService } from './services/get-blocked-users'
 import { unblockUserService } from './services/unblock-user'
 import { getBlockingStatusService } from './services/get-blocking-status'
+import { subscribeToBlockUpdatesService } from './services/subscribe-to-block-updates'
+
 export async function createRpcServerComponent({
   logs,
   db,
@@ -60,9 +62,12 @@ export async function createRpcServerComponent({
   const subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
     components: { logs, db, archipelagoStats, catalystClient }
   })
+  const subscribeToBlockUpdates = subscribeToBlockUpdatesService({
+    components: { logs, catalystClient }
+  })
 
-  const blockUser = blockUserService({ components: { logs, db, catalystClient } })
-  const unblockUser = unblockUserService({ components: { logs, db, catalystClient } })
+  const blockUser = blockUserService({ components: { logs, db, catalystClient, pubsub } })
+  const unblockUser = unblockUserService({ components: { logs, db, catalystClient, pubsub } })
   const getBlockedUsers = getBlockedUsersService({ components: { logs, db, catalystClient } })
   const getBlockingStatus = getBlockingStatusService({ components: { logs, db } })
 
@@ -79,7 +84,8 @@ export async function createRpcServerComponent({
       getBlockedUsers,
       getBlockingStatus,
       subscribeToFriendshipUpdates,
-      subscribeToFriendConnectivityUpdates
+      subscribeToFriendConnectivityUpdates,
+      subscribeToBlockUpdates
     }))
   })
 

@@ -1,13 +1,14 @@
-import { parseProfileToFriend } from '../../../logic/friends'
 import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   UnblockUserPayload,
   UnblockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { BLOCK_UPDATES_CHANNEL } from '../../pubsub'
+import { parseProfileToBlockedUser } from '../../../logic/blocks'
 
 export function unblockUserService({
-  components: { logs, db, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'catalystClient'>) {
+  components: { logs, db, catalystClient, pubsub }
+}: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'pubsub'>) {
   const logger = logs.getLogger('unblock-user-service')
 
   return async function (request: UnblockUserPayload, context: RpcServerContext): Promise<UnblockUserResponse> {
@@ -44,11 +45,16 @@ export function unblockUserService({
         await db.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
       })
 
+      await pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
+        address: blockedAddress,
+        isBlocked: false
+      })
+
       return {
         response: {
           $case: 'ok',
           ok: {
-            profile: parseProfileToFriend(profile)
+            profile: parseProfileToBlockedUser(profile)
           }
         }
       }

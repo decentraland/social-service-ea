@@ -171,12 +171,18 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query = SQL`
         INSERT INTO blocks (id, blocker_address, blocked_address)
         VALUES (${randomUUID()}, ${normalizeAddress(blockerAddress)}, ${normalizeAddress(blockedAddress)})
-        ON CONFLICT DO NOTHING`
+        ON CONFLICT DO NOTHING
+        RETURNING id, blocked_at`
 
-      if (txClient) {
-        await txClient.query(query)
-      } else {
-        await pg.query(query)
+      const {
+        rows: [{ id, blocked_at }]
+      } = txClient
+        ? await txClient.query<{ id: string; blocked_at: Date }>(query)
+        : await pg.query<{ id: string; blocked_at: Date }>(query)
+
+      return {
+        id,
+        blocked_at
       }
     },
     async unblockUser(blockerAddress, blockedAddress, txClient) {
