@@ -1,5 +1,5 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { SubscriptionEventsEmitter, RpcServerContext, RPCServiceContext } from '../../../types'
+import { SubscriptionEventsEmitter, RpcServerContext, RPCServiceContext, IStatsComponent } from '../../../types'
 import {
   FriendConnectivityUpdate,
   ConnectivityStatus
@@ -9,15 +9,21 @@ import { parseProfilesToFriends } from '../../../logic/friends'
 import { handleSubscriptionUpdates } from '../../../logic/updates'
 
 export function subscribeToFriendConnectivityUpdatesService({
-  components: { logs, db, archipelagoStats, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'archipelagoStats' | 'catalystClient'>) {
+  components: { logs, db, archipelagoStats, catalystClient, worldsStats }
+}: RPCServiceContext<'logs' | 'db' | 'archipelagoStats' | 'catalystClient' | 'worldsStats'>) {
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
+
+  async function getConnectedPeers() {
+    const peersGetters: IStatsComponent[] = [archipelagoStats, worldsStats]
+    const peers = await Promise.all(peersGetters.map((peersGetter) => peersGetter.getPeers().catch(() => [])))
+    return Array.from(new Set(peers.flat()))
+  }
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
     let cleanup: (() => void) | undefined
 
     try {
-      const onlinePeers = await archipelagoStats.getPeersFromCache()
+      const onlinePeers = await getConnectedPeers()
       const onlineFriends = await db.getOnlineFriends(context.address, onlinePeers)
 
       const profiles = await catalystClient.getProfiles(onlineFriends.map((friend) => friend.address))

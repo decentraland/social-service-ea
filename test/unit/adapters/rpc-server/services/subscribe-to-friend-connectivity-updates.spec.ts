@@ -1,6 +1,12 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext } from '../../../../../src/types'
-import { mockLogs, mockArchipelagoStats, mockDb, mockConfig, mockCatalystClient } from '../../../../mocks/components'
+import {
+  mockLogs,
+  mockArchipelagoStats,
+  mockDb,
+  mockCatalystClient,
+  mockWorldsStats
+} from '../../../../mocks/components'
 import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friend-connectivity-updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockProfile } from '../../../../mocks/profile'
@@ -26,7 +32,8 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
         logs: mockLogs,
         db: mockDb,
         archipelagoStats: mockArchipelagoStats,
-        catalystClient: mockCatalystClient
+        catalystClient: mockCatalystClient,
+        worldsStats: mockWorldsStats
       }
     })
 
@@ -40,6 +47,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
     mockArchipelagoStats.getPeers.mockResolvedValue(['0x456', '0x789'])
+    mockWorldsStats.getPeers.mockResolvedValue(['0x654', '0x987'])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
         friend: parseProfileToFriend(mockFriendProfile),
@@ -50,7 +58,8 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
     const result = await generator.next()
 
-    expect(mockArchipelagoStats.getPeersFromCache).toHaveBeenCalled()
+    expect(mockArchipelagoStats.getPeers).toHaveBeenCalled()
+    expect(mockWorldsStats.getPeers).toHaveBeenCalled()
     expect(result.value).toEqual({
       friend: parseProfileToFriend(mockFriendProfile),
       status: ConnectivityStatus.ONLINE
@@ -78,6 +87,50 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
 
     const result2 = await generator.next()
     expect(result2.done).toBe(true)
+  })
+
+  it('should handle errors from archipelago stats', async () => {
+    mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
+    mockArchipelagoStats.getPeers.mockRejectedValueOnce(new Error('Archipelago error'))
+    mockWorldsStats.getPeers.mockResolvedValue(['0x456'])
+    mockHandler.mockImplementationOnce(async function* () {
+      yield {
+        friend: parseProfileToFriend(mockFriendProfile),
+        status: ConnectivityStatus.ONLINE
+      }
+    })
+
+    const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+
+    const result = await generator.next()
+    expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([friend.address])
+    expect(result.done).toBe(false)
+
+    const result2 = await generator.next()
+    expect(result2.done).toBe(false)
+  })
+
+  it('should handle errors from worlds stats', async () => {
+    mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
+    mockArchipelagoStats.getPeers.mockResolvedValueOnce(['0x456'])
+    mockWorldsStats.getPeers.mockRejectedValueOnce(new Error('Worlds error'))
+    mockHandler.mockImplementationOnce(async function* () {
+      yield {
+        friend: parseProfileToFriend(mockFriendProfile),
+        status: ConnectivityStatus.ONLINE
+      }
+    })
+
+    const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+
+    const result = await generator.next()
+    expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([friend.address])
+    expect(result.done).toBe(false)
+
+    const result2 = await generator.next()
+    expect(result2.done).toBe(false)
   })
 
   it('should handle errors during subscription', async () => {

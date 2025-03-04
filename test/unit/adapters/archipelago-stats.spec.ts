@@ -22,7 +22,7 @@ describe('ArchipelagoStatsComponent', () => {
           peers: [{ id: '0x123' }, { id: '0x456' }]
         })
       } as any)
-      const result = await archipelagoStats.getPeers()
+      const result = await archipelagoStats.fetchPeers()
       expect(result).toEqual(['0x123', '0x456'])
     })
 
@@ -31,25 +31,25 @@ describe('ArchipelagoStatsComponent', () => {
         ok: false,
         statusText: 'Not Found'
       } as any)
-      await expect(archipelagoStats.getPeers()).rejects.toThrow('Error fetching peers: Not Found')
+      await expect(archipelagoStats.fetchPeers()).rejects.toThrow('Error fetching peers: Not Found')
     })
 
     it('should throw an error when the fetch fails', async () => {
       mockFetcher.fetch.mockRejectedValue(new Error('Fetch failed'))
-      await expect(archipelagoStats.getPeers()).rejects.toThrow('Fetch failed')
+      await expect(archipelagoStats.fetchPeers()).rejects.toThrow('Fetch failed')
     })
   })
 
   describe('getPeersFromCache', () => {
     it('should return cached peers', async () => {
       mockRedis.get.mockResolvedValue(['0x123', '0x456'])
-      const result = await archipelagoStats.getPeersFromCache()
+      const result = await archipelagoStats.getPeers()
       expect(result).toEqual(['0x123', '0x456'])
     })
 
     it('should return an empty array when no peers are cached', async () => {
       mockRedis.get.mockResolvedValue(null)
-      const result = await archipelagoStats.getPeersFromCache()
+      const result = await archipelagoStats.getPeers()
       expect(result).toEqual([])
     })
   })

@@ -31,10 +31,20 @@ export async function createRpcServerComponent({
   archipelagoStats,
   catalystClient,
   sns,
-  subscribersContext
+  subscribersContext,
+  worldsStats
 }: Pick<
   AppComponents,
-  'logs' | 'db' | 'pubsub' | 'config' | 'server' | 'archipelagoStats' | 'catalystClient' | 'sns' | 'subscribersContext'
+  | 'logs'
+  | 'db'
+  | 'pubsub'
+  | 'config'
+  | 'server'
+  | 'archipelagoStats'
+  | 'catalystClient'
+  | 'sns'
+  | 'subscribersContext'
+  | 'worldsStats'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -60,7 +70,7 @@ export async function createRpcServerComponent({
     components: { logs, catalystClient }
   })
   const subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
-    components: { logs, db, archipelagoStats, catalystClient }
+    components: { logs, db, archipelagoStats, catalystClient, worldsStats }
   })
   const subscribeToBlockUpdates = subscribeToBlockUpdatesService({
     components: { logs, catalystClient }
