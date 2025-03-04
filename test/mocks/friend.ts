@@ -1,8 +1,13 @@
-import { Friend } from '../../src/types'
-import { getProfileHasClaimedName, getProfileName, getProfilePictureUrl, getProfileUserId } from '../../src/logic/profiles'
+import { User } from '../../src/types'
+import {
+  getProfileHasClaimedName,
+  getProfileName,
+  getProfilePictureUrl,
+  getProfileUserId
+} from '../../src/logic/profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
-export const createMockFriend = (address: string): Friend => ({
+export const createMockFriend = (address: string): User => ({
   address
 })
 

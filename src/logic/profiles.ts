@@ -38,3 +38,17 @@ export function getProfilePictureUrl(profile: Pick<Profile, 'avatars'>): string 
 
   return face256
 }
+
+export function getProfileInfo(profile: Profile) {
+  const name = getProfileName(profile)
+  const userId = getProfileUserId(profile)
+  const hasClaimedName = getProfileHasClaimedName(profile)
+  const profilePictureUrl = getProfilePictureUrl(profile)
+
+  return {
+    name,
+    userId,
+    hasClaimedName,
+    profilePictureUrl
+  }
+}
