@@ -31,7 +31,8 @@ const FRIENDSHIP_STATUS_BY_ACTION: Record<
   [Action.REJECT]: () => FriendshipRequestStatus.REJECTED,
   [Action.REQUEST]: (actingUser, contextAddress) =>
     actingUser === contextAddress ? FriendshipRequestStatus.REQUEST_SENT : FriendshipRequestStatus.REQUEST_RECEIVED,
-  [Action.BLOCK]: () => FriendshipRequestStatus.BLOCKED
+  [Action.BLOCK]: (actingUser, contextAddress) =>
+    actingUser === contextAddress ? FriendshipRequestStatus.BLOCKED : FriendshipRequestStatus.BLOCKED_BY
 }
 
 export function isFriendshipActionValid(from: Action | null, to: Action) {
