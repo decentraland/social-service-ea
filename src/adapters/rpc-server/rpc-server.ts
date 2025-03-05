@@ -16,6 +16,11 @@ import {
   friendConnectivityUpdateHandler,
   friendshipAcceptedUpdateHandler
 } from '../../logic/updates'
+import { blockUserService } from './services/block-user'
+import { getBlockedUsersService } from './services/get-blocked-users'
+import { unblockUserService } from './services/unblock-user'
+import { getBlockingStatusService } from './services/get-blocking-status'
+import { subscribeToBlockUpdatesService } from './services/subscribe-to-block-updates'
 
 export async function createRpcServerComponent({
   logs,
@@ -67,6 +72,14 @@ export async function createRpcServerComponent({
   const subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
     components: { logs, db, archipelagoStats, catalystClient, worldsStats }
   })
+  const subscribeToBlockUpdates = subscribeToBlockUpdatesService({
+    components: { logs, catalystClient }
+  })
+
+  const blockUser = blockUserService({ components: { logs, db, catalystClient, pubsub } })
+  const unblockUser = unblockUserService({ components: { logs, db, catalystClient, pubsub } })
+  const getBlockedUsers = getBlockedUsersService({ components: { logs, db, catalystClient } })
+  const getBlockingStatus = getBlockingStatusService({ components: { logs, db } })
 
   rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
@@ -76,8 +89,13 @@ export async function createRpcServerComponent({
       getSentFriendshipRequests,
       getFriendshipStatus,
       upsertFriendship,
+      blockUser,
+      unblockUser,
+      getBlockedUsers,
+      getBlockingStatus,
       subscribeToFriendshipUpdates,
-      subscribeToFriendConnectivityUpdates
+      subscribeToFriendConnectivityUpdates,
+      subscribeToBlockUpdates
     }))
   })
 

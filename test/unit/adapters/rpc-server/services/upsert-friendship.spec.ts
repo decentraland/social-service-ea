@@ -106,7 +106,7 @@ describe('upsertFriendshipService', () => {
       action: Action.REQUEST,
       user: rpcContext.address,
       metadata: { message: 'Hello' }
-    }
+    } as const
     jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockSelfRequestParsed)
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockSelfRequest, rpcContext)
@@ -117,6 +117,20 @@ describe('upsertFriendshipService', () => {
         invalidFriendshipAction: {
           message: 'You cannot send a friendship request to yourself'
         }
+      }
+    })
+  })
+
+  it('should return invalidFriendshipAction for a blocked friendship', async () => {
+    jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockParsedRequest)
+    mockDb.isFriendshipBlocked.mockResolvedValueOnce(true)
+
+    const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
+
+    expect(result).toEqual({
+      response: {
+        $case: 'invalidFriendshipAction',
+        invalidFriendshipAction: {}
       }
     })
   })
@@ -177,12 +191,13 @@ describe('upsertFriendshipService', () => {
     jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
     jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Requested)
 
+    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(null)
     mockDb.getFriendship.mockResolvedValueOnce(null)
+    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
     mockDb.createFriendship.mockResolvedValueOnce({
       id: 'new-friendship-id',
       created_at: new Date()
     })
-    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 

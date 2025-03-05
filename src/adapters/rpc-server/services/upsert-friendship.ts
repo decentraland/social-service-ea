@@ -46,6 +46,17 @@ export function upsertFriendshipService({
     }
 
     try {
+      const isBlocked = await db.isFriendshipBlocked(context.address, parsedRequest.user!)
+
+      if (isBlocked) {
+        return {
+          response: {
+            $case: 'invalidFriendshipAction',
+            invalidFriendshipAction: {}
+          }
+        }
+      }
+
       const lastAction = await db.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
 
       if (!validateNewFriendshipAction(context.address, parsedRequest, lastAction)) {

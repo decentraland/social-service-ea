@@ -10,8 +10,6 @@ describe('ws-pool-component', () => {
   let mockClearInterval: jest.Mock
 
   beforeEach(async () => {
-    jest.clearAllMocks()
-
     // Mock setInterval/clearInterval
     originalSetInterval = global.setInterval
     mockSetInterval = jest.fn()

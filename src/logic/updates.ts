@@ -26,6 +26,7 @@ interface SubscriptionHandlerParams<T, U> {
     logger: ILogger
     catalystClient: ICatalystClientComponent
   }
+  shouldRetrieveProfile?: boolean
   getAddressFromUpdate: (update: U) => string
   shouldHandleUpdate: (update: U) => boolean
   parser: UpdateParser<T, U>
@@ -120,6 +121,7 @@ export async function* handleSubscriptionUpdates<T, U>({
   rpcContext,
   eventName,
   components: { catalystClient, logger },
+  shouldRetrieveProfile = true,
   getAddressFromUpdate,
   shouldHandleUpdate,
   parser,
@@ -143,7 +145,7 @@ export async function* handleSubscriptionUpdates<T, U>({
         continue
       }
 
-      const profile = await catalystClient.getProfile(getAddressFromUpdate(update as U))
+      const profile = shouldRetrieveProfile ? await catalystClient.getProfile(getAddressFromUpdate(update as U)) : null
       const parsedUpdate = await parser(update as U, profile, ...parseArgs)
 
       if (parsedUpdate) {

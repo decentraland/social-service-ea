@@ -23,8 +23,6 @@ describe('ws-handler', () => {
   let mockContext: any
 
   beforeEach(async () => {
-    jest.clearAllMocks()
-
     mockData = {
       isConnected: false,
       auth: false,
