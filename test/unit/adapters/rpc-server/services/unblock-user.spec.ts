@@ -3,10 +3,9 @@ import { unblockUserService } from '../../../../../src/adapters/rpc-server/servi
 import { UnblockUserPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
-import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { PoolClient } from 'pg'
 import { parseProfileToBlockedUser } from '../../../../../src/logic/blocks'
-import { BLOCK_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
+import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
 
 describe('unblockUserService', () => {
   let unblockUser: ReturnType<typeof unblockUserService>
@@ -79,6 +78,28 @@ describe('unblockUserService', () => {
     expect(mockDb.unblockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
     expect(mockDb.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
     expect(mockDb.recordFriendshipAction).not.toHaveBeenCalled()
+  })
+
+  it('should publish a friendship update event after unblocking a user if friendship exists', async () => {
+    const blockedAddress = '0x456'
+    const mockProfile = createMockProfile(blockedAddress)
+    const request: UnblockUserPayload = {
+      user: { address: blockedAddress }
+    }
+
+    mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+    mockDb.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    mockDb.recordFriendshipAction.mockResolvedValueOnce('action-id')
+
+    await unblockUser(request, rpcContext)
+
+    expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
+      id: 'action-id',
+      from: rpcContext.address,
+      to: blockedAddress,
+      action: Action.DELETE,
+      timestamp: Date.now()
+    })
   })
 
   it('should publish a block update event after unblocking a user', async () => {

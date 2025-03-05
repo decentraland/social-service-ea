@@ -3,7 +3,7 @@ import {
   UnblockUserPayload,
   UnblockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { BLOCK_UPDATES_CHANNEL } from '../../pubsub'
+import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
 import { parseProfileToBlockedUser } from '../../../logic/blocks'
 
 export function unblockUserService({
@@ -36,14 +36,25 @@ export function unblockUserService({
         }
       }
 
-      await db.executeTx(async (tx) => {
+      const actionId = await db.executeTx(async (tx) => {
         await db.unblockUser(blockerAddress, blockedAddress, tx)
 
         const friendship = await db.getFriendship([blockerAddress, blockedAddress], tx)
         if (!friendship) return
 
-        await db.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
+        const actionId = await db.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
+        return actionId
       })
+
+      if (actionId) {
+        await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
+          id: actionId,
+          from: blockerAddress,
+          to: blockedAddress,
+          action: Action.DELETE,
+          timestamp: Date.now()
+        })
+      }
 
       await pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
         address: blockedAddress,

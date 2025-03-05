@@ -3,7 +3,7 @@ import {
   BlockUserPayload,
   BlockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { BLOCK_UPDATES_CHANNEL } from '../../pubsub'
+import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
 import { parseProfileToBlockedUser } from '../../../logic/blocks'
 
 export function blockUserService({
@@ -38,19 +38,29 @@ export function blockUserService({
         }
       }
 
-      const blockedAt = await db.executeTx(async (tx) => {
-        const { blocked_at } = await db.blockUser(blockerAddress, blockedAddress, tx)
+      const { actionId, blockedAt } = await db.executeTx(async (tx) => {
+        const { blocked_at: blockedAt } = await db.blockUser(blockerAddress, blockedAddress, tx)
 
         const friendship = await db.getFriendship([blockerAddress, blockedAddress], tx)
-        if (!friendship) return blocked_at
+        if (!friendship) return { blockedAt }
 
-        await Promise.all([
+        const [_, actionId] = await Promise.all([
           db.updateFriendshipStatus(friendship.id, false, tx),
           db.recordFriendshipAction(friendship.id, blockerAddress, Action.BLOCK, null, tx)
         ])
 
-        return blocked_at
+        return { actionId, blockedAt }
       })
+
+      if (actionId) {
+        await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
+          id: actionId,
+          from: blockerAddress,
+          to: blockedAddress,
+          action: Action.BLOCK,
+          timestamp: blockedAt.getTime()
+        })
+      }
 
       await pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
         address: blockedAddress,

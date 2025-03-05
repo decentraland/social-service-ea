@@ -4,7 +4,7 @@ import { BlockUserPayload } from '@dcl/protocol/out-js/decentraland/social_servi
 import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { PoolClient } from 'pg'
-import { BLOCK_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
+import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
 import { parseProfileToBlockedUser } from '../../../../../src/logic/blocks'
 
 describe('blockUserService', () => {
@@ -85,6 +85,29 @@ describe('blockUserService', () => {
     expect(mockDb.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
     expect(mockDb.updateFriendshipStatus).not.toHaveBeenCalled()
     expect(mockDb.recordFriendshipAction).not.toHaveBeenCalled()
+  })
+
+  it('should publish a friendship update event after blocking a user if friendship exists', async () => {
+    const blockedAddress = '0x456'
+    const mockProfile = createMockProfile(blockedAddress)
+    const request: BlockUserPayload = {
+      user: { address: blockedAddress }
+    }
+
+    mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+    mockDb.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    mockDb.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+    mockDb.recordFriendshipAction.mockResolvedValueOnce('action-id')
+
+    await blockUser(request, rpcContext)
+
+    expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
+      id: 'action-id',
+      from: rpcContext.address,
+      to: blockedAddress,
+      action: Action.BLOCK,
+      timestamp: blockedAt.getTime()
+    })
   })
 
   it('should publish a block update event after blocking a user', async () => {
