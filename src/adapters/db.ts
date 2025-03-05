@@ -8,7 +8,8 @@ import {
   FriendshipRequest,
   IDatabaseComponent,
   User,
-  Pagination
+  Pagination,
+  BlockUserWithDate
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
@@ -39,11 +40,6 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query = getFriendshipRequestsBaseQuery(userAddress, type, { onlyCount: true })
       return getCount(query)
     }
-  }
-
-  async function getAddressesFromQuery<T extends User>(query: SQLStatement): Promise<string[]> {
-    const result = await pg.query<T>(query)
-    return result.rows.map((row) => row.address)
   }
 
   return {
@@ -220,15 +216,17 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async getBlockedUsers(blockerAddress) {
       const query = SQL`
-        SELECT blocked_address as address FROM blocks WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
+        SELECT blocked_address as address, blocked_at FROM blocks WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
       `
-      return getAddressesFromQuery(query)
+      const result = await pg.query<BlockUserWithDate>(query)
+      return result.rows
     },
     async getBlockedByUsers(blockedAddress) {
       const query = SQL`
-        SELECT blocker_address as address FROM blocks WHERE LOWER(blocked_address) = ${normalizeAddress(blockedAddress)}
+        SELECT blocker_address as address, blocked_at FROM blocks WHERE LOWER(blocked_address) = ${normalizeAddress(blockedAddress)}
       `
-      return getAddressesFromQuery(query)
+      const result = await pg.query<BlockUserWithDate>(query)
+      return result.rows
     },
     async isFriendshipBlocked(loggedUserAddress, anotherUserAddress) {
       const normalizedLoggedUserAddress = normalizeAddress(loggedUserAddress)

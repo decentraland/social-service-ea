@@ -9,10 +9,13 @@ export function getBlockingStatusService({ components: { logs, db } }: RPCServic
     const { address } = context
 
     try {
-      const [blockedAddresses, blockedByAddresses] = await Promise.all([
+      const [blockedUsers, blockedByUsers] = await Promise.all([
         db.getBlockedUsers(address),
         db.getBlockedByUsers(address)
       ])
+
+      const blockedAddresses = blockedUsers.map((user) => user.address)
+      const blockedByAddresses = blockedByUsers.map((user) => user.address)
 
       return {
         blockedUsers: blockedAddresses,

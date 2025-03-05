@@ -30,8 +30,8 @@ describe('parseProfilesToBlockedUsers', () => {
     }
     const profiles = [mockProfile, anotherProfile]
     const blockedAt123 = new Date()
-    const blockedAtByAddress = new Map([['0x123', blockedAt123]])
-    const result = parseProfilesToBlockedUsers(profiles, blockedAtByAddress)
+    const blockedUsers = [{ address: '0x123', blocked_at: blockedAt123 }]
+    const result = parseProfilesToBlockedUsers(profiles, blockedUsers)
 
     expect(result).toEqual([
       {

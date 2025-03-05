@@ -116,8 +116,8 @@ export interface IDatabaseComponent {
   unblockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<void>
   blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
-  getBlockedUsers(blockerAddress: string): Promise<string[]>
-  getBlockedByUsers(blockedAddress: string): Promise<string[]>
+  getBlockedUsers(blockerAddress: string): Promise<BlockUserWithDate[]>
+  getBlockedByUsers(blockedAddress: string): Promise<BlockUserWithDate[]>
   isFriendshipBlocked(blockerAddress: string, blockedAddress: string): Promise<boolean>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
@@ -279,6 +279,10 @@ export type Friendship = {
 
 export type User = {
   address: string
+}
+
+export type BlockUserWithDate = User & {
+  blocked_at: Date
 }
 
 export enum Action {

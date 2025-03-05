@@ -17,16 +17,16 @@ describe('getBlockingStatusService', () => {
   })
 
   it('should return blocked users and blocked by users addresses', async () => {
-    const blockedAddresses = ['0x456', '0x789']
-    const blockedByAddresses = ['0x123', '0x456']
+    const blockedUsers = [{ address: '0x456', blocked_at: new Date() }, { address: '0x789', blocked_at: new Date() }]
+    const blockedByUsers = [{ address: '0x123', blocked_at: new Date() }, { address: '0x456', blocked_at: new Date() }]
 
-    mockDb.getBlockedUsers.mockResolvedValueOnce(blockedAddresses)
-    mockDb.getBlockedByUsers.mockResolvedValueOnce(blockedByAddresses)
+    mockDb.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
+    mockDb.getBlockedByUsers.mockResolvedValueOnce(blockedByUsers)
     const response = await getBlockingStatus({}, rpcContext)
 
     expect(response).toEqual({
-      blockedUsers: blockedAddresses,
-      blockedByUsers: blockedByAddresses
+      blockedUsers: blockedUsers.map((user) => user.address),
+      blockedByUsers: blockedByUsers.map((user) => user.address)
     })
   })
 
