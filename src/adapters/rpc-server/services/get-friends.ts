@@ -21,8 +21,8 @@ export function getFriendsService({
 
     try {
       const [friends, total] = await Promise.all([
-        db.getFriends(loggedUserAddress, { pagination }),
-        db.getFriendsCount(loggedUserAddress)
+        db.getFriends(loggedUserAddress, { pagination, onlyActive: true }),
+        db.getFriendsCount(loggedUserAddress, { onlyActive: true })
       ])
 
       const profiles = await catalystClient.getProfiles(friends.map((friend) => friend.address))
