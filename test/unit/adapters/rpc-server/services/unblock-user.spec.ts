@@ -114,7 +114,8 @@ describe('unblockUserService', () => {
     await unblockUser(request, rpcContext)
 
     expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
-      address: blockedAddress,
+      blockerAddress: rpcContext.address,
+      blockedAddress,
       isBlocked: false
     })
   })

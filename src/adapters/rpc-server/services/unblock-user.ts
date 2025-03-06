@@ -66,7 +66,8 @@ export function unblockUserService({
       }
 
       await pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
-        address: blockedAddress,
+        blockerAddress,
+        blockedAddress,
         isBlocked: false
       })
 

@@ -1,4 +1,4 @@
-import { parseProfilesToBlockedUsers, parseProfileToBlockedUser } from '../../../src/logic/blocks'
+import { parseEmittedUpdateToBlockUpdate, parseProfilesToBlockedUsers, parseProfileToBlockedUser } from '../../../src/logic/blocks'
 import { mockProfile } from '../../mocks/profile'
 
 describe('parseProfileToBlockedUser', () => {
@@ -48,5 +48,13 @@ describe('parseProfilesToBlockedUsers', () => {
         profilePictureUrl: anotherProfile.avatars[0].avatar.snapshots.face256
       }
     ])
+  })
+})
+
+describe('parseEmittedUpdateToBlockUpdate', () => {
+  it('should parse emitted update to block update', () => {
+    const update = { blockerAddress: '0x123', blockedAddress: '0x456', isBlocked: true }
+    const result = parseEmittedUpdateToBlockUpdate(update)
+    expect(result).toEqual({ address: '0x123', isBlocked: true })
   })
 })

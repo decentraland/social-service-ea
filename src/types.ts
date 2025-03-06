@@ -256,7 +256,8 @@ export type SubscriptionEventsEmitter = {
     status: ConnectivityStatus
   }
   blockUpdate: {
-    address: string
+    blockerAddress: string
+    blockedAddress: string
     isBlocked: boolean
   }
 }

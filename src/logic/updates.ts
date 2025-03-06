@@ -121,7 +121,7 @@ export function blockUpdateHandler(subscribersContext: ISubscribersContext, logg
       update: JSON.stringify(update)
     })
 
-    const updateEmitter = subscribersContext.getOrAddSubscriber(update.address)
+    const updateEmitter = subscribersContext.getOrAddSubscriber(update.blockedAddress)
     if (updateEmitter) {
       updateEmitter.emit('blockUpdate', update)
     }

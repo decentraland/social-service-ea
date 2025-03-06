@@ -73,7 +73,8 @@ export function blockUserService({
       }
 
       await pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
-        address: blockedAddress,
+        blockerAddress,
+        blockedAddress,
         isBlocked: true
       })
 

@@ -14,7 +14,8 @@ describe('subscribeToBlockUpdatesService', () => {
   const mockHandler = handleSubscriptionUpdates as jest.Mock
 
   const mockUpdate = {
-    address: '0x456',
+    blockerAddress: '0x123',
+    blockedAddress: '0x456',
     isBlocked: true
   }
 
@@ -76,7 +77,7 @@ describe('subscribeToBlockUpdatesService', () => {
     const result = await generator.next()
 
     const getAddressFromUpdate = mockHandler.mock.calls[0][0].getAddressFromUpdate
-    expect(getAddressFromUpdate(mockUpdate)).toBe(mockUpdate.address)
+    expect(getAddressFromUpdate(mockUpdate)).toBe(mockUpdate.blockerAddress)
   })
 
   it('should filter updates based on address conditions', async () => {
@@ -87,12 +88,14 @@ describe('subscribeToBlockUpdatesService', () => {
     const loggedUserAddress = '0x123'
 
     const mockUpdateBlockingNonLoggedUser = {
-      address: '0x456',
+      blockedAddress: '0x456',
+      blockerAddress: loggedUserAddress,
       isBlocked: true
     }
 
     const mockUpdateBlockingLoggedUser = {
-      address: loggedUserAddress,
+      blockedAddress: loggedUserAddress,
+      blockerAddress: '0x456',
       isBlocked: true
     }
 

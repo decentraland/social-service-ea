@@ -30,10 +30,12 @@ export function parseProfilesToBlockedUsers(
   })
 }
 
-export function parseEmittedUpdateToBlockUpdate(update: SubscriptionEventsEmitter['blockUpdate']): BlockUpdate | null {
-  const { address, isBlocked } = update
+export function parseEmittedUpdateToBlockUpdate(
+  update: Pick<SubscriptionEventsEmitter['blockUpdate'], 'blockerAddress' | 'isBlocked'>
+): BlockUpdate | null {
+  const { blockerAddress, isBlocked } = update
   return {
-    address,
+    address: blockerAddress,
     isBlocked
   }
 }
