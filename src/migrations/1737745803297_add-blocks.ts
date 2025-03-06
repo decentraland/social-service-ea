@@ -28,8 +28,8 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropTable('blocks')
   pgm.dropIndex('blocks', ['blocker_address'])
   pgm.dropIndex('blocks', ['blocked_address'])
   pgm.dropIndex('blocks', ['blocker_address', 'blocked_address'])
+  pgm.dropTable('blocks')
 }
