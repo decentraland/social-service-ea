@@ -100,9 +100,7 @@ export function friendConnectivityUpdateHandler(
     logger.debug('Processing connectivity update:', {
       update: JSON.stringify(update),
       subscribersCount: onlineSubscribers.length,
-      subscribers: onlineSubscribers.join(', '),
-      friendsCount: friends.length,
-      friends: JSON.stringify(friends)
+      friendsCount: friends.length
     })
 
     friends.forEach(({ address: friendAddress }) => {
