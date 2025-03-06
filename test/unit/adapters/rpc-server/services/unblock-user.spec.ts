@@ -6,10 +6,14 @@ import { createMockProfile } from '../../../../mocks/profile'
 import { PoolClient } from 'pg'
 import { parseProfileToBlockedUser } from '../../../../../src/logic/blocks'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
+import { EthAddress } from '@dcl/schemas'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 describe('unblockUserService', () => {
   let unblockUser: ReturnType<typeof unblockUserService>
   let mockClient: jest.Mocked<PoolClient>
+  let blockedAddress: EthAddress
+  let mockProfile: Profile
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
@@ -23,11 +27,12 @@ describe('unblockUserService', () => {
 
     mockClient = (await mockPg.getPool().connect()) as jest.Mocked<PoolClient>
     mockDb.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
+
+    blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+    mockProfile = createMockProfile(blockedAddress)
   })
 
   it('should unblock a user successfully and mark as deleted if friendship exists', async () => {
-    const blockedAddress = '0x456'
-    const mockProfile = createMockProfile(blockedAddress)
     const request: UnblockUserPayload = {
       user: { address: blockedAddress }
     }
@@ -57,8 +62,6 @@ describe('unblockUserService', () => {
   })
 
   it('should unblock a user successfully and do nothing else if friendship does not exist', async () => {
-    const blockedAddress = '0x456'
-    const mockProfile = createMockProfile(blockedAddress)
     const request: UnblockUserPayload = {
       user: { address: blockedAddress }
     }
@@ -81,8 +84,6 @@ describe('unblockUserService', () => {
   })
 
   it('should publish a friendship update event after unblocking a user if friendship exists', async () => {
-    const blockedAddress = '0x456'
-    const mockProfile = createMockProfile(blockedAddress)
     const request: UnblockUserPayload = {
       user: { address: blockedAddress }
     }
@@ -103,8 +104,6 @@ describe('unblockUserService', () => {
   })
 
   it('should publish a block update event after unblocking a user', async () => {
-    const blockedAddress = '0x456'
-    const mockProfile = createMockProfile(blockedAddress)
     const request: UnblockUserPayload = {
       user: { address: blockedAddress }
     }
@@ -120,7 +119,7 @@ describe('unblockUserService', () => {
     })
   })
 
-  it('should return internalServerError when user address is missing', async () => {
+  it('should return invalidRequest when user address is missing', async () => {
     const request: UnblockUserPayload = {
       user: { address: '' }
     }
@@ -129,15 +128,30 @@ describe('unblockUserService', () => {
 
     expect(response).toEqual({
       response: {
-        $case: 'internalServerError',
-        internalServerError: { message: 'User address is missing in the request payload' }
+        $case: 'invalidRequest',
+        invalidRequest: { message: 'Invalid user address in the request payload' }
       }
     })
     expect(mockDb.unblockUser).not.toHaveBeenCalled()
   })
 
-  it('should return internalServerError when profile is not found', async () => {
-    const blockedAddress = '0x456'
+  it('should return invalidRequest when user address is invalid', async () => {
+    const request: UnblockUserPayload = {
+      user: { address: 'invalid-address' }
+    }
+
+    const response = await unblockUser(request, rpcContext)
+
+    expect(response).toEqual({
+      response: {
+        $case: 'invalidRequest',
+        invalidRequest: { message: 'Invalid user address in the request payload' }
+      }
+    })
+    expect(mockDb.unblockUser).not.toHaveBeenCalled()
+  })
+
+  it('should return profileNotFound when profile is not found', async () => {
     const request: UnblockUserPayload = {
       user: { address: blockedAddress }
     }
@@ -148,16 +162,14 @@ describe('unblockUserService', () => {
 
     expect(response).toEqual({
       response: {
-        $case: 'internalServerError',
-        internalServerError: { message: 'Profile not found' }
+        $case: 'profileNotFound',
+        profileNotFound: { message: `Profile not found for address ${blockedAddress}` }
       }
     })
     expect(mockDb.unblockUser).not.toHaveBeenCalled()
   })
 
   it('should handle database errors', async () => {
-    const blockedAddress = '0x456'
-    const mockProfile = createMockProfile(blockedAddress)
     const request: UnblockUserPayload = {
       user: { address: blockedAddress }
     }

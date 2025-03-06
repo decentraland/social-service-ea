@@ -5,6 +5,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
 import { parseProfileToBlockedUser } from '../../../logic/blocks'
+import { EthAddress } from '@dcl/schemas'
 
 export function blockUserService({
   components: { logs, db, catalystClient, pubsub }
@@ -16,11 +17,11 @@ export function blockUserService({
       const { address: blockerAddress } = context
       const blockedAddress = request.user?.address
 
-      if (!blockedAddress) {
+      if (!EthAddress.validate(blockedAddress)) {
         return {
           response: {
-            $case: 'internalServerError',
-            internalServerError: { message: 'User address is missing in the request payload' }
+            $case: 'invalidRequest',
+            invalidRequest: { message: 'Invalid user address in the request payload' }
           }
         }
       }
@@ -30,9 +31,9 @@ export function blockUserService({
       if (!profile) {
         return {
           response: {
-            $case: 'internalServerError',
-            internalServerError: {
-              message: 'Profile not found'
+            $case: 'profileNotFound',
+            profileNotFound: {
+              message: `Profile not found for address ${blockedAddress}`
             }
           }
         }
