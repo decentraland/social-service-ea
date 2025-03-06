@@ -193,6 +193,17 @@ export function parseEmittedUpdateToFriendshipUpdate(
           }
         }
       }
+    case Action.BLOCK:
+      return {
+        update: {
+          $case: 'block',
+          block: {
+            user: {
+              address: update.from
+            }
+          }
+        }
+      }
     default:
       return null
   }

@@ -10,11 +10,12 @@ import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/socia
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 import { getFriendshipStatusService } from './services/get-friendship-status'
 import { subscribeToFriendConnectivityUpdatesService } from './services/subscribe-to-friend-connectivity-updates'
-import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
+import { BLOCK_UPDATES_CHANNEL, FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
 import {
   friendshipUpdateHandler,
   friendConnectivityUpdateHandler,
-  friendshipAcceptedUpdateHandler
+  friendshipAcceptedUpdateHandler,
+  blockUpdateHandler
 } from '../../logic/updates'
 import { blockUserService } from './services/block-user'
 import { getBlockedUsersService } from './services/get-blocked-users'
@@ -114,6 +115,7 @@ export async function createRpcServerComponent({
         FRIEND_STATUS_UPDATES_CHANNEL,
         friendConnectivityUpdateHandler(subscribersContext, logger, db)
       )
+      await pubsub.subscribeToChannel(BLOCK_UPDATES_CHANNEL, blockUpdateHandler(subscribersContext, logger))
     },
     attachUser({ transport, address }) {
       logger.debug('[DEBUGGING CONNECTION] Attaching user to RPC', {

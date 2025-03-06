@@ -17,6 +17,15 @@ export function blockUserService({
       const { address: blockerAddress } = context
       const blockedAddress = request.user?.address
 
+      if (blockerAddress === blockedAddress) {
+        return {
+          response: {
+            $case: 'invalidRequest',
+            invalidRequest: { message: 'Cannot block yourself' }
+          }
+        }
+      }
+
       if (!EthAddress.validate(blockedAddress)) {
         return {
           response: {

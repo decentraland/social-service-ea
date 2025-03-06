@@ -117,6 +117,19 @@ export function friendConnectivityUpdateHandler(
   }, logger)
 }
 
+export function blockUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
+  return handleUpdate<'blockUpdate'>((update) => {
+    logger.info('Block update', {
+      update: JSON.stringify(update)
+    })
+
+    const updateEmitter = subscribersContext.getOrAddSubscriber(update.address)
+    if (updateEmitter) {
+      updateEmitter.emit('blockUpdate', update)
+    }
+  }, logger)
+}
+
 export async function* handleSubscriptionUpdates<T, U>({
   rpcContext,
   eventName,

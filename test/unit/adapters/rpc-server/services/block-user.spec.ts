@@ -125,6 +125,22 @@ describe('blockUserService', () => {
     })
   })
 
+  it('should return invalidRequest when user is trying to block himself', async () => {
+    const request: BlockUserPayload = {
+      user: { address: rpcContext.address }
+    }
+
+    const response = await blockUser(request, rpcContext)
+
+    expect(response).toEqual({
+      response: {
+        $case: 'invalidRequest',
+        invalidRequest: { message: 'Cannot block yourself' }
+      }
+    })
+    expect(mockDb.blockUser).not.toHaveBeenCalled()
+  })
+
   it('should return invalidRequest when user address is missing', async () => {
     const request: BlockUserPayload = {
       user: { address: '' }

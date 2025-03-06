@@ -119,6 +119,22 @@ describe('unblockUserService', () => {
     })
   })
 
+  it('should return invalidRequest when user is trying to unblock himself', async () => {
+    const request: UnblockUserPayload = {
+      user: { address: rpcContext.address }
+    }
+
+    const response = await unblockUser(request, rpcContext)
+
+    expect(response).toEqual({
+      response: {
+        $case: 'invalidRequest',
+        invalidRequest: { message: 'Cannot unblock yourself' }
+      }
+    })
+    expect(mockDb.unblockUser).not.toHaveBeenCalled()
+  })
+
   it('should return invalidRequest when user address is missing', async () => {
     const request: UnblockUserPayload = {
       user: { address: '' }
