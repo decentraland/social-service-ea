@@ -150,10 +150,11 @@ export function getMutualFriendsBaseQuery(
   const normalizedUserAddress2 = normalizeAddress(userAddress2)
   const { pagination, onlyCount } = options
 
-  const friendsSubquery = (address: string, tableAlias: string) =>
-    SQL`
+  const friendsSubquery = (address: string, tableAlias: string) => {
+    const friendAddressCase = getFriendAddressCase(address, tableAlias)
+    return SQL`
     SELECT `
-      .append(getFriendAddressCase(address))
+      .append(friendAddressCase)
       .append(
         SQL` as address
     FROM friendships `
@@ -165,7 +166,8 @@ export function getMutualFriendsBaseQuery(
       .append(tableAlias)
       .append(SQL`.is_active = true`)
       .append(SQL` AND `)
-      .append(getBlockingCondition(address))
+      .append(getBlockingCondition(address, friendAddressCase))
+  }
 
   const query = SQL`WITH friendsA as (`.append(friendsSubquery(normalizedUserAddress1, 'f_a')).append(SQL`) SELECT `)
 

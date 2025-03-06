@@ -53,11 +53,13 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       return getCount(query)
     },
     async getMutualFriends(userAddress1, userAddress2, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }) {
-      const result = await pg.query<User>(getMutualFriendsBaseQuery(userAddress1, userAddress2, { pagination }))
+      const query = getMutualFriendsBaseQuery(userAddress1, userAddress2, { pagination })
+      const result = await pg.query<User>(query)
       return result.rows
     },
     async getMutualFriendsCount(userAddress1, userAddress2) {
-      return getCount(getMutualFriendsBaseQuery(userAddress1, userAddress2, { onlyCount: true }))
+      const query = getMutualFriendsBaseQuery(userAddress1, userAddress2, { onlyCount: true })
+      return getCount(query)
     },
     async getFriendship(users, txClient) {
       const [userAddress1, userAddress2] = users.map(normalizeAddress)

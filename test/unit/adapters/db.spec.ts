@@ -163,7 +163,7 @@ describe('db', () => {
 
       const expectedQueryFragments = [
         {
-          text: 'WHEN LOWER(address_requester) =',
+          text: 'WHEN LOWER(f_a.address_requester) =',
           values: ['0x123']
         },
         {
@@ -226,7 +226,7 @@ describe('db', () => {
           values: []
         },
         {
-          text: 'WHEN LOWER(address_requester) =',
+          text: 'WHEN LOWER(f_a.address_requester) =',
           values: ['0x123']
         },
         {
