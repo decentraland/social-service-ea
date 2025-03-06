@@ -11,9 +11,8 @@ import {
   mockUWs,
   mockWorldsStats
 } from '../../mocks/components'
-import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import { BLOCK_UPDATES_CHANNEL, FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { mockSns } from '../../mocks/components/sns'
-import mitt from 'mitt'
 import * as updates from '../../../src/logic/updates'
 
 jest.mock('@dcl/rpc', () => ({
@@ -28,7 +27,6 @@ describe('createRpcServerComponent', () => {
   let rpcServerMock: jest.Mocked<RpcServer<RpcServerContext>>
   let setHandlerMock: jest.Mock, attachTransportMock: jest.Mock
   let mockTransport: Transport
-  let mockEmitter: ReturnType<typeof mitt>
   let subscribersContext: ISubscribersContext
 
   beforeEach(async () => {
@@ -41,7 +39,6 @@ describe('createRpcServerComponent', () => {
     setHandlerMock = rpcServerMock.setHandler as jest.Mock
     attachTransportMock = rpcServerMock.attachTransport as jest.Mock
 
-    mockEmitter = mitt()
     mockTransport = {
       on: jest.fn(),
       send: jest.fn(),
@@ -71,6 +68,7 @@ describe('createRpcServerComponent', () => {
       jest.spyOn(updates, 'friendshipUpdateHandler')
       jest.spyOn(updates, 'friendshipAcceptedUpdateHandler')
       jest.spyOn(updates, 'friendConnectivityUpdateHandler')
+      jest.spyOn(updates, 'blockUpdateHandler')
 
       mockConfig.getNumber.mockResolvedValueOnce(8085)
     })
@@ -82,6 +80,7 @@ describe('createRpcServerComponent', () => {
       expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Function))
       expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Function))
       expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIEND_STATUS_UPDATES_CHANNEL, expect.any(Function))
+      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, expect.any(Function))
     })
 
     it('should call the correct handlers', async () => {
@@ -92,6 +91,7 @@ describe('createRpcServerComponent', () => {
       expect(updates.friendshipUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
       expect(updates.friendshipAcceptedUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
       expect(updates.friendConnectivityUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger, mockDb)
+      expect(updates.blockUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
     })
   })
 

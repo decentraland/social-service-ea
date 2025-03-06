@@ -10,12 +10,18 @@ import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/socia
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 import { getFriendshipStatusService } from './services/get-friendship-status'
 import { subscribeToFriendConnectivityUpdatesService } from './services/subscribe-to-friend-connectivity-updates'
-import { FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
+import { BLOCK_UPDATES_CHANNEL, FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
 import {
   friendshipUpdateHandler,
   friendConnectivityUpdateHandler,
-  friendshipAcceptedUpdateHandler
+  friendshipAcceptedUpdateHandler,
+  blockUpdateHandler
 } from '../../logic/updates'
+import { blockUserService } from './services/block-user'
+import { getBlockedUsersService } from './services/get-blocked-users'
+import { unblockUserService } from './services/unblock-user'
+import { getBlockingStatusService } from './services/get-blocking-status'
+import { subscribeToBlockUpdatesService } from './services/subscribe-to-block-updates'
 
 export async function createRpcServerComponent({
   logs,
@@ -67,6 +73,14 @@ export async function createRpcServerComponent({
   const subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
     components: { logs, db, archipelagoStats, catalystClient, worldsStats }
   })
+  const subscribeToBlockUpdates = subscribeToBlockUpdatesService({
+    components: { logs, catalystClient }
+  })
+
+  const blockUser = blockUserService({ components: { logs, db, catalystClient, pubsub } })
+  const unblockUser = unblockUserService({ components: { logs, db, catalystClient, pubsub } })
+  const getBlockedUsers = getBlockedUsersService({ components: { logs, db, catalystClient } })
+  const getBlockingStatus = getBlockingStatusService({ components: { logs, db } })
 
   rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
@@ -76,8 +90,13 @@ export async function createRpcServerComponent({
       getSentFriendshipRequests,
       getFriendshipStatus,
       upsertFriendship,
+      blockUser,
+      unblockUser,
+      getBlockedUsers,
+      getBlockingStatus,
       subscribeToFriendshipUpdates,
-      subscribeToFriendConnectivityUpdates
+      subscribeToFriendConnectivityUpdates,
+      subscribeToBlockUpdates
     }))
   })
 
@@ -96,6 +115,7 @@ export async function createRpcServerComponent({
         FRIEND_STATUS_UPDATES_CHANNEL,
         friendConnectivityUpdateHandler(subscribersContext, logger, db)
       )
+      await pubsub.subscribeToChannel(BLOCK_UPDATES_CHANNEL, blockUpdateHandler(subscribersContext, logger))
     },
     attachUser({ transport, address }) {
       logger.debug('[DEBUGGING CONNECTION] Attaching user to RPC', {
