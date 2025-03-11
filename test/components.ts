@@ -51,7 +51,7 @@ async function initComponents(): Promise<TestComponents> {
     }
   )
   const metrics = createTestMetricsComponent(metricDeclarations)
-  const logs = await createLogComponent({ metrics })
+  const logs = await createLogComponent({ metrics, config })
 
   const server = await createUWsComponent({ config, logs })
   const fetcher = createFetchComponent()
