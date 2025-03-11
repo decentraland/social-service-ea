@@ -1,0 +1,22 @@
+{
+  "name": "initial-migration",
+  "version": "1.0.0",
+  "description": "Initial DB Migration",
+  "main": "run.ts",
+  "scripts": {
+    "start": "NODE_ENV=production ts-node run.ts 2>&1 | tee -a logs-prd.txt",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
