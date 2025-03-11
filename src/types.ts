@@ -12,7 +12,7 @@ import { WebSocketServer } from 'ws'
 import { Emitter } from 'mitt'
 import { metricDeclarations } from './metrics'
 import { HttpRequest, HttpResponse, IUWsComponent, WebSocket } from '@well-known-components/uws-http-server'
-import { IUWebSocketEventMap } from './utils/UWebSocketTransport'
+import { IUWebSocketEventMap, UWebSocketTransport } from './utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
 import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
@@ -206,20 +206,21 @@ export type IHandler = {
   f: (res: HttpResponse, req: HttpRequest) => Promise<IHandlerResult>
 }
 
-export type WsAuthenticatedUserData = {
-  isConnected: boolean
-  eventEmitter: Emitter<IUWebSocketEventMap>
-  auth: true
-  address: string
+export type WsUserDataBase = {
   wsConnectionId: string
-  transport: Transport
+  isConnected: boolean
+  transport: UWebSocketTransport
+  eventEmitter: Emitter<IUWebSocketEventMap>
 }
 
-export type WsNotAuthenticatedUserData = {
-  isConnected: boolean
+export type WsAuthenticatedUserData = WsUserDataBase & {
+  auth: true
+  address: string
+}
+
+export type WsNotAuthenticatedUserData = WsUserDataBase & {
   auth: false
   timeout?: NodeJS.Timeout
-  wsConnectionId: string
 }
 
 export type WsUserData = WsAuthenticatedUserData | WsNotAuthenticatedUserData

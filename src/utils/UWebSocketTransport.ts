@@ -21,6 +21,10 @@ export type IUWebSocketEventMap = {
   message: RecognizedString
 }
 
+export type UWebSocketTransport = Transport & {
+  close(code?: number, shortMessage?: RecognizedString): void
+}
+
 export interface IUWebSocket<T extends { isConnected: boolean; auth?: boolean }> {
   end(code?: number, shortMessage?: RecognizedString): void
 
@@ -36,7 +40,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   uServerEmitter: Emitter<IUWebSocketEventMap>,
   config: IConfigComponent,
   logs: ILoggerComponent
-): Promise<Transport> {
+): Promise<UWebSocketTransport> {
   const logger = logs.getLogger('ws-transport')
   const transportId = randomUUID()
 
@@ -204,8 +208,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   function handleClose(code: number = 1000, reason: string = '') {
-    cleanup(code, reason)
     events.emit('close', { code, reason })
+    cleanup(code, reason)
   }
 
   const events = mitt<TransportEvents>()
@@ -229,8 +233,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       return send(message)
     },
     close(code: number = 1000, reason: string = 'Client requested closure') {
-      cleanup(code, reason)
       events.emit('close', { code, reason })
+      cleanup(code, reason)
     }
   }
 

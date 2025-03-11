@@ -67,18 +67,21 @@ export async function registerWsHandler(
           address: data.auth ? data.address : 'Not authenticated'
         })
 
+        const eventEmitter = mitt<IUWebSocketEventMap>()
+        const transport = await createUWebSocketTransport(ws, eventEmitter, config, logs)
+
         if (isNotAuthenticated(data)) {
           data.timeout = setTimeout(() => {
             try {
               logger.error('Closing connection, no auth chain received', {
                 wsConnectionId: data.wsConnectionId
               })
-              ws.end()
+              transport.close(4001, 'No auth chain received')
             } catch (err) {}
-          }, THREE_MINUTES_IN_MS)
+          }, 5000)
         }
 
-        changeStage(data, { isConnected: true })
+        changeStage(data, { isConnected: true, eventEmitter, transport })
         logger.debug('WebSocket opened', { wsConnectionId: data.wsConnectionId })
       } catch (error: any) {
         logger.debug('[DEBUGGING CONNECTION] Failed to acquire connection', {
@@ -110,21 +113,17 @@ export async function registerWsHandler(
 
           logger.debug('Authenticated User', { address, wsConnectionId: data.wsConnectionId })
 
-          const eventEmitter = mitt<IUWebSocketEventMap>()
-          const transport = await createUWebSocketTransport(ws, eventEmitter, config, logs)
-
           changeStage(data, {
             auth: true,
-            address,
-            eventEmitter,
-            isConnected: true,
-            transport
+            address
           })
 
           if (data.timeout) {
             clearTimeout(data.timeout)
             delete data.timeout
           }
+
+          const { transport } = data
 
           rpcServer.attachUser({ transport, address })
 
@@ -193,12 +192,13 @@ export async function registerWsHandler(
         auth: String(data.auth)
       })
 
+      data.transport.close(code, messageText)
+      data.eventEmitter.emit('close', { code, reason: messageText })
+      data.eventEmitter.all.clear()
+
       if (data.auth && data.address) {
         try {
-          data.transport.close()
           rpcServer.detachUser(data.address)
-          data.eventEmitter.emit('close', { code, reason: messageText })
-          data.eventEmitter.all.clear()
         } catch (error: any) {
           logger.error('Error during connection cleanup', {
             error: error.message,
