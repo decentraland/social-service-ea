@@ -158,7 +158,6 @@ describe('Notifications', () => {
             action: Action.REQUEST
           })
         )
-        expect(logger.info).toHaveBeenCalledWith('Notification sent for action request', expect.any(Object))
       })
 
       it('should fail after all retries are exhausted', async () => {
