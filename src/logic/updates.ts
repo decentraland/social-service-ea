@@ -48,10 +48,6 @@ function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: Update
 
 export function friendshipUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
   return handleUpdate<'friendshipUpdate'>((update) => {
-    logger.info('Friendship update', {
-      update: JSON.stringify(update)
-    })
-
     const updateEmitter = subscribersContext.getOrAddSubscriber(update.to)
     if (updateEmitter) {
       updateEmitter.emit('friendshipUpdate', update)
@@ -61,12 +57,7 @@ export function friendshipUpdateHandler(subscribersContext: ISubscribersContext,
 
 export function friendshipAcceptedUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
   return handleUpdate<'friendshipUpdate'>((update) => {
-    logger.info('Friendship accepted update', {
-      update: JSON.stringify(update)
-    })
-
     if (update.action !== Action.ACCEPT) {
-      logger.debug(`Friendship update with status ${update.action} ignored`)
       return
     }
 
@@ -96,18 +87,9 @@ export function friendConnectivityUpdateHandler(
     const onlineSubscribers = rpcContext.getSubscribersAddresses()
     const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
 
-    logger.debug('Processing connectivity update:', {
-      update: JSON.stringify(update),
-      subscribersCount: onlineSubscribers.length,
-      subscribers: onlineSubscribers.join(', '),
-      friendsCount: friends.length,
-      friends: JSON.stringify(friends)
-    })
-
     friends.forEach(({ address: friendAddress }) => {
       const emitter = rpcContext.getOrAddSubscriber(friendAddress)
       if (emitter) {
-        logger.debug('Emitting update to friend:', { friendAddress })
         emitter.emit('friendConnectivityUpdate', update)
       } else {
         logger.warn('No emitter found for friend:', { friendAddress })
@@ -133,13 +115,7 @@ export async function* handleSubscriptionUpdates<T, U>({
 
   try {
     for await (const update of updatesGenerator) {
-      logger.debug(`Generator received update for ${eventNameString}`, {
-        update: JSON.stringify(update),
-        address: rpcContext.address
-      })
-
       if (!shouldHandleUpdate(update as U)) {
-        logger.debug(`Skipping update ${eventNameString} for ${rpcContext.address}`, { update: JSON.stringify(update) })
         continue
       }
 
@@ -147,7 +123,6 @@ export async function* handleSubscriptionUpdates<T, U>({
       const parsedUpdate = await parser(update as U, profile, ...parseArgs)
 
       if (parsedUpdate) {
-        logger.debug(`Yielding parsed update ${eventNameString}`, { update: JSON.stringify(parsedUpdate) })
         yield parsedUpdate
       } else {
         logger.error(`Unable to parse ${eventNameString}`, { update: JSON.stringify(update) })
@@ -161,10 +136,6 @@ export async function* handleSubscriptionUpdates<T, U>({
     })
     throw error
   } finally {
-    logger.debug('Generator loop finished', {
-      address: rpcContext.address,
-      event: eventNameString
-    })
     await updatesGenerator.return(undefined)
   }
 
