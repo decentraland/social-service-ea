@@ -9,6 +9,9 @@ import { randomUUID } from 'crypto'
 
 const textDecoder = new TextDecoder()
 
+const FIVE_MINUTES_IN_SECONDS = 300
+const THREE_MINUTES_IN_MS = 180000
+
 export async function registerWsHandler(
   components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool'>
 ) {
@@ -20,7 +23,7 @@ export async function registerWsHandler(
   }
 
   server.app.ws<WsUserData>('/', {
-    idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? 90, // In seconds
+    idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS, // In seconds
     sendPingsAutomatically: true,
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
@@ -72,7 +75,7 @@ export async function registerWsHandler(
               })
               ws.end()
             } catch (err) {}
-          }, 30000)
+          }, THREE_MINUTES_IN_MS)
         }
 
         changeStage(data, { isConnected: true })
