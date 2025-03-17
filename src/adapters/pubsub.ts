@@ -22,6 +22,7 @@ export function createPubSubComponent(components: Pick<AppComponents, 'logs' | '
     },
     async stop() {
       if (subClient.isReady) {
+        await subClient.unsubscribe()
         await subClient.disconnect()
       }
 

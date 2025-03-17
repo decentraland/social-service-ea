@@ -7,7 +7,8 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js'],
   coverageDirectory: 'coverage',
   collectCoverageFrom: ['src/**/*.ts', 'src/**/*.js', '!src/migrations/**'],
-  testMatch: ['**/test/unit/**/*.spec.(ts)'],
+  testMatch: ['**/test/integration/**/*.spec.(ts)'],
   testEnvironment: 'node',
-  setupFilesAfterEnv: ['<rootDir>/test/unit/setupTests.ts']
+  setupFilesAfterEnv: ['<rootDir>/test/integration/setupTests.ts'],
+  resetMocks: true
 }
