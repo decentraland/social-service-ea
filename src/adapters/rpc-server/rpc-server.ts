@@ -16,6 +16,9 @@ import {
   friendConnectivityUpdateHandler,
   friendshipAcceptedUpdateHandler
 } from '../../logic/updates'
+import { getPrivateMessagesSettingsService } from './services/get-private-messages-settings'
+import { upsertSocialSettingsService } from './services/upsert-social-settings'
+import { getSocialSettingsService } from './services/get-social-settings'
 
 export async function createRpcServerComponent({
   logs,
@@ -67,6 +70,9 @@ export async function createRpcServerComponent({
   const subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
     components: { logs, db, archipelagoStats, catalystClient, worldsStats }
   })
+  const getPrivateMessagesSettings = getPrivateMessagesSettingsService({ components: { logs, db } })
+  const upsertSocialSettings = upsertSocialSettingsService({ components: { logs, db } })
+  const getSocialSettings = getSocialSettingsService({ components: { logs, db } })
 
   rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
@@ -77,7 +83,10 @@ export async function createRpcServerComponent({
       getFriendshipStatus,
       upsertFriendship,
       subscribeToFriendshipUpdates,
-      subscribeToFriendConnectivityUpdates
+      subscribeToFriendConnectivityUpdates,
+      getPrivateMessagesSettings,
+      upsertSocialSettings,
+      getSocialSettings
     }))
   })
 

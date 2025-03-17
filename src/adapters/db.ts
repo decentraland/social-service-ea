@@ -9,7 +9,8 @@ import {
   IDatabaseComponent,
   Friend,
   Pagination,
-  Action
+  Action,
+  SocialSettings
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
@@ -348,6 +349,33 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       const results = await pg.query<Friend>(query)
       return results.rows
+    },
+    async getSocialSettings(userAddresses: string[]): Promise<SocialSettings[]> {
+      const query = SQL`
+        SELECT * FROM social_settings WHERE user_address = IN ${userAddresses}
+      `
+      const results = await pg.query<{ private_messages_privacy: string }>(query)
+      return results.rows as SocialSettings[]
+    },
+    async upsertSocialSettings(
+      userAddress: string,
+      settings: Partial<Omit<SocialSettings, 'address'>>
+    ): Promise<SocialSettings> {
+      const keys = Object.keys(settings)
+      const values = Object.values(settings)
+      const update = Object.entries(settings).reduce(
+        (acc, [key, value], index) =>
+          acc.append(`${key} = `).append(SQL`${value}${index === values.length - 1 ? '' : ', '}`),
+        SQL``
+      )
+      const query = SQL`INSERT INTO social_settings (user_address, `
+        .append(keys.join(', '))
+        .append(SQL`) VALUES (${userAddress}, ${values.join(', ')})`)
+        .append(`ON CONFLICT (user_address) DO UPDATE SET `)
+        .append(update)
+        .append(` RETURNING *`)
+      const results = await pg.query<SocialSettings>(query)
+      return results.rows[0]
     },
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
       const pool = pg.getPool()
