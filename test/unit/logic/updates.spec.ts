@@ -384,7 +384,7 @@ describe('updates handlers', () => {
         parser
       })
 
-      generator.next()
+      const resultPromise = generator.next()
       rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
 
       await sleep(100)
