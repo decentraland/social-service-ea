@@ -17,7 +17,8 @@ export const FRIENDSHIP_ACTION_TRANSITIONS: Record<Action, (Action | null)[]> = 
   [Action.ACCEPT]: [Action.REQUEST],
   [Action.CANCEL]: [Action.REQUEST],
   [Action.REJECT]: [Action.REQUEST],
-  [Action.DELETE]: [Action.ACCEPT]
+  [Action.DELETE]: [Action.ACCEPT, Action.BLOCK],
+  [Action.BLOCK]: [Action.REQUEST, Action.CANCEL, Action.REJECT, Action.DELETE, Action.ACCEPT, null]
 }
 
 const FRIENDSHIP_STATUS_BY_ACTION: Record<
@@ -29,8 +30,9 @@ const FRIENDSHIP_STATUS_BY_ACTION: Record<
   [Action.DELETE]: () => FriendshipRequestStatus.DELETED,
   [Action.REJECT]: () => FriendshipRequestStatus.REJECTED,
   [Action.REQUEST]: (actingUser, contextAddress) =>
-    actingUser === contextAddress ? FriendshipRequestStatus.REQUEST_SENT : FriendshipRequestStatus.REQUEST_RECEIVED
-  // TODO: [Action.BLOCK]: () => FriendshipRequestStatus.BLOCKED,
+    actingUser === contextAddress ? FriendshipRequestStatus.REQUEST_SENT : FriendshipRequestStatus.REQUEST_RECEIVED,
+  [Action.BLOCK]: (actingUser, contextAddress) =>
+    actingUser === contextAddress ? FriendshipRequestStatus.BLOCKED : FriendshipRequestStatus.BLOCKED_BY
 }
 
 export function isFriendshipActionValid(from: Action | null, to: Action) {
@@ -185,6 +187,17 @@ export function parseEmittedUpdateToFriendshipUpdate(
         update: {
           $case: 'accept',
           accept: {
+            user: {
+              address: update.from
+            }
+          }
+        }
+      }
+    case Action.BLOCK:
+      return {
+        update: {
+          $case: 'block',
+          block: {
             user: {
               address: update.from
             }

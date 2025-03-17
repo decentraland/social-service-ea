@@ -10,7 +10,8 @@ A microservice that handles social interactions (friendships) for Decentraland, 
 - [🏗 Architecture](#-architecture)
   - [Component-Based Architecture](#component-based-architecture)
   - [Database Design](#database-design)
-  - [Flow Diagrams](#flow-diagrams)
+  - [Friendship Flow Diagrams](#friendship-flow-diagrams)
+  - [Block System Flow](#block-system-flow)
 - [🚀 Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
   - [Local Development](#local-development)
@@ -27,6 +28,7 @@ A microservice that handles social interactions (friendships) for Decentraland, 
 - Mutual friends discovery
 - Online status tracking
 - Integration with Archipelago for peer synchronization
+- User blocking system
 
 ## 🏗 Architecture
 
@@ -63,20 +65,28 @@ erDiagram
     jsonb metadata
     timestamp timestamp
   }
+  BLOCKS {
+    uuid id PK
+    varchar blocker_address
+    varchar blocked_address
+    timestamp blocked_at
+  }
 
   FRIENDSHIPS ||--o{ FRIENDSHIP_ACTIONS : "has"
+  BLOCKS ||--o{ FRIENDSHIPS : "blocks"
 ```
 
 The database schema supports:
 
 - Bidirectional friendships
 - Action history tracking
+- User blocking system
 - Metadata for requests
 - Optimized queries with proper indexes
 
 See migrations for details: [migrations](./src/migrations)
 
-### Flow Diagrams
+### Friendship Flow Diagrams
 
 ```mermaid
 sequenceDiagram
@@ -145,6 +155,37 @@ sequenceDiagram
   deactivate RPC Server
   deactivate Redis
   deactivate NATS
+```
+
+### Block System Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant RPC Server
+    participant DB
+    participant Redis
+    participant PubSub
+
+    Note over Client,PubSub: Block User Flow
+    Client->>RPC Server: Block User Request
+    RPC Server->>DB: Create Block Record
+    RPC Server->>DB: Update Friendship Status (if exists)
+    RPC Server->>PubSub: Publish Block Update
+    PubSub-->>Client: Block Status Update
+
+    Note over Client,PubSub: Unblock User Flow
+    Client->>RPC Server: Unblock User Request
+    RPC Server->>DB: Remove Block Record
+    RPC Server->>PubSub: Publish Unblock Update
+    PubSub-->>Client: Block Status Update
+
+    Note over Client,PubSub: Block Status Updates
+    Client->>RPC Server: Subscribe to Block Updates
+    loop Block Updates
+        PubSub-->>RPC Server: Block Status Change
+        RPC Server-->>Client: Stream Block Update
+    end
 ```
 
 ## 🚀 Getting Started

@@ -3,7 +3,8 @@ import {
   friendConnectivityUpdateHandler,
   handleSubscriptionUpdates,
   ILogger,
-  friendshipAcceptedUpdateHandler
+  friendshipAcceptedUpdateHandler,
+  blockUpdateHandler
 } from '../../../src/logic/updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { mockCatalystClient, mockDb, mockLogs } from '../../mocks/components'
@@ -214,6 +215,49 @@ describe('updates handlers', () => {
     })
   })
 
+  describe('blockUpdateHandler', () => {
+    it('should emit block update to the correct subscriber', () => {
+      const handler = blockUpdateHandler(subscribersContext, logger)
+      const subscriber = subscribersContext.getOrAddSubscriber('0x456')
+      const emitSpy = jest.spyOn(subscriber, 'emit')
+
+      const update = {
+        blockerAddress: '0x123',
+        blockedAddress: '0x456',
+        isBlocked: true
+      }
+
+      handler(JSON.stringify(update))
+
+      expect(emitSpy).toHaveBeenCalledWith('blockUpdate', update)
+    })
+
+    it('should not emit if subscriber does not exist', () => {
+      const handler = blockUpdateHandler(subscribersContext, logger)
+      const nonExistentUpdate = {
+        id: 'update-1',
+        from: '0x123',
+        to: '0xNONEXISTENT',
+        action: Action.REQUEST,
+        timestamp: Date.now()
+      }
+
+      expect(handler(JSON.stringify(nonExistentUpdate))).resolves.toBeUndefined()
+    })
+
+    it('should log error on invalid JSON', () => {
+      const handler = blockUpdateHandler(subscribersContext, logger)
+      const errorSpy = jest.spyOn(logger, 'error')
+
+      handler('invalid json')
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error handling update:'),
+        expect.objectContaining({ message: 'invalid json' })
+      )
+    })
+  })
+
   describe('handleSubscriptionUpdates', () => {
     let eventEmitter: Emitter<SubscriptionEventsEmitter>
     let logger: ILogger
@@ -222,6 +266,7 @@ describe('updates handlers', () => {
     let subscribersContext: ISubscribersContext
 
     const friendshipUpdate = { id: '1', to: '0x456', from: '0x123', action: Action.REQUEST, timestamp: Date.now() }
+    const blockUpdate = { blockerAddress: '0x456', blockedAddress: '0x123', isBlocked: true }
 
     beforeEach(() => {
       eventEmitter = mitt<SubscriptionEventsEmitter>()
@@ -369,6 +414,31 @@ describe('updates handlers', () => {
         address: '0x123',
         event: 'friendshipUpdate'
       })
+    })
+
+    it('should skip retrieving profile if shouldRetrieveProfile is false', async () => {
+      parser.mockResolvedValueOnce({ parsed: true })
+
+      const generator = handleSubscriptionUpdates({
+        rpcContext,
+        eventName: 'blockUpdate',
+        components: {
+          catalystClient: mockCatalystClient,
+          logger
+        },
+        shouldRetrieveProfile: false,
+        getAddressFromUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.blockerAddress,
+        shouldHandleUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.blockedAddress === '0x123',
+        parser
+      })
+
+      const resultPromise = generator.next()
+      rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('blockUpdate', blockUpdate)
+
+      const result = await resultPromise
+      expect(result.value).toEqual({ parsed: true })
+      expect(parser).toHaveBeenCalledWith(blockUpdate, null)
+      expect(mockCatalystClient.getProfile).not.toHaveBeenCalled()
     })
   })
 })
