@@ -115,11 +115,6 @@ async function sendNotificationWithRetry(
   await retry(async (attempt) => {
     try {
       await handler(sns, context)
-      logger.info(`Notification sent for action ${action}`, {
-        action,
-        senderAddress: context.senderAddress,
-        receiverAddress: context.receiverAddress
-      })
     } catch (error: any) {
       logger.warn(`Attempt ${attempt} failed for action ${action}`, {
         error: error.message,

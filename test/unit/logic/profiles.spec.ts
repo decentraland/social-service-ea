@@ -1,5 +1,11 @@
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { getProfileAvatarItem, getProfileName, getProfileUserId, getProfilePictureUrl } from '../../../src/logic/profiles'
+import {
+  getProfileAvatarItem,
+  getProfileName,
+  getProfileUserId,
+  getProfilePictureUrl,
+  getProfileInfo
+} from '../../../src/logic/profiles'
 import { mockProfile } from '../../mocks/profile'
 
 describe('getProfileAvatarItem', () => {
@@ -67,10 +73,20 @@ describe('getProfilePictureUrl', () => {
   it('should throw on profile without avatar snapshots', () => {
     const profileWithoutSnapshots: Profile = {
       ...mockProfile,
-      avatars: [
-        { ...mockProfile.avatars[0], avatar: { ...mockProfile.avatars[0].avatar, snapshots: undefined } }
-      ]
+      avatars: [{ ...mockProfile.avatars[0], avatar: { ...mockProfile.avatars[0].avatar, snapshots: undefined } }]
     }
     expect(() => getProfilePictureUrl(profileWithoutSnapshots)).toThrow('Missing profile avatar picture url')
+  })
+})
+
+describe('getProfileInfo', () => {
+  it('should extract profile info from profile entity', () => {
+    const info = getProfileInfo(mockProfile)
+    expect(info).toEqual({
+      name: mockProfile.avatars[0].name,
+      userId: mockProfile.avatars[0].userId,
+      hasClaimedName: mockProfile.avatars[0].hasClaimedName,
+      profilePictureUrl: mockProfile.avatars[0].avatar.snapshots.face256
+    })
   })
 })

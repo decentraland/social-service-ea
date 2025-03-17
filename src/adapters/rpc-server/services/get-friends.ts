@@ -20,10 +20,9 @@ export function getFriendsService({
     const { address: loggedUserAddress } = context
 
     try {
-      // TODO: can use the getPeers to get the online friends and sort online friends first
       const [friends, total] = await Promise.all([
-        db.getFriends(loggedUserAddress, { pagination }),
-        db.getFriendsCount(loggedUserAddress)
+        db.getFriends(loggedUserAddress, { pagination, onlyActive: true }),
+        db.getFriendsCount(loggedUserAddress, { onlyActive: true })
       ])
 
       const profiles = await catalystClient.getProfiles(friends.map((friend) => friend.address))

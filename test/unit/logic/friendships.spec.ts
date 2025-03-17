@@ -493,7 +493,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           from: '0xA',
           to: '0xB'
         },
-        mockProfile,
+        mockProfile
       )
     ).toEqual({
       update: {
@@ -518,7 +518,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           from: '0xA',
           to: '0xB'
         },
-        mockProfile,
+        mockProfile
       )
     ).toEqual({
       update: {
@@ -543,7 +543,7 @@ describe('parseEmittedUpdateToFriendshipUpdate()', () => {
           from: '0xA',
           to: '0xB'
         },
-        mockProfile,
+        mockProfile
       )
     ).toBe(null)
   })
@@ -579,6 +579,18 @@ describe('getFriendshipRequestStatus()', () => {
   test('when the last action is request and the acting user is not the logged user it should return request received', () => {
     const requestMadeByAnotherUser = { ...friendshipAction, acting_user: '0x456', action: Action.REQUEST }
     expect(getFriendshipRequestStatus(requestMadeByAnotherUser, '0x123')).toBe(FriendshipRequestStatus.REQUEST_RECEIVED)
+  })
+
+  test('when the last action is block and the acting user is the logged user it should return blocked', () => {
+    expect(getFriendshipRequestStatus({ ...friendshipAction, action: Action.BLOCK }, '0x123')).toBe(
+      FriendshipRequestStatus.BLOCKED
+    )
+  })
+
+  test('when the last action is block and the acting user is not the logged user it should return blocked by', () => {
+    expect(getFriendshipRequestStatus({ ...friendshipAction, action: Action.BLOCK }, '0x456')).toBe(
+      FriendshipRequestStatus.BLOCKED_BY
+    )
   })
 })
 
