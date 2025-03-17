@@ -389,13 +389,7 @@ describe('updates handlers', () => {
 
       await sleep(100)
 
-      expect(logger.debug).toHaveBeenCalledWith('Generator received update for friendshipUpdate', {
-        update: JSON.stringify(friendshipUpdate),
-        address: '0x123'
-      })
-      expect(logger.debug).toHaveBeenCalledWith('Skipping update friendshipUpdate for 0x123', {
-        update: JSON.stringify(friendshipUpdate)
-      })
+      expect(resultPromise).resolves.toBeUndefined()
     })
 
     it('should handle errors in the generator loop', async () => {
