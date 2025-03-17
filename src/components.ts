@@ -22,7 +22,7 @@ import { createWorldsStatsComponent } from './adapters/worlds-stats'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
-  const config = await createDotEnvConfigComponent({ path: ['.env.test', '.env.default', '.env'] })
+  const config = await createDotEnvConfigComponent({ path: ['.env.default', '.env'] })
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ metrics, config })
 

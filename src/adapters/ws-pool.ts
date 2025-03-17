@@ -63,15 +63,22 @@ export async function createWSPoolComponent({
   }
 
   async function releaseConnection(id: string) {
-    logger.debug('[DEBUGGING CONNECTION] Releasing connection', {
-      connectionId: id,
-      timestamp: new Date().toISOString()
-    })
+    try {
+      logger.debug('[DEBUGGING CONNECTION] Releasing connection', {
+        connectionId: id,
+        timestamp: new Date().toISOString()
+      })
 
-    const key = `ws:conn:${id}`
-    await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
-    const totalConnections = await redis.client.zCard('ws:active_connections')
-    metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
+      const key = `ws:conn:${id}`
+      await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
+      const totalConnections = await redis.client.zCard('ws:active_connections')
+      metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
+    } catch (error: any) {
+      logger.error('[DEBUGGING CONNECTION] Error releasing connection', {
+        connectionId: id,
+        error: error.message
+      })
+    }
   }
 
   async function updateActivity(id: string) {

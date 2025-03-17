@@ -21,6 +21,7 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { IRpcClient } from '../test/integration/utils/rpc-client'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -56,6 +57,7 @@ export type AppComponents = BaseComponents
 export type TestComponents = BaseComponents & {
   // A fetch component that only hits the test server
   localFetch: IFetchComponent
+  rpcClient: IRpcClient
 }
 
 export type IRPCServerComponent = IBaseComponent & {

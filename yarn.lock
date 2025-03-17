@@ -716,7 +716,7 @@
   resolved "https://registry.yarnpkg.com/@dcl/catalyst-contracts/-/catalyst-contracts-4.4.2.tgz#e7a329d7aee25c90d7ee07dbe82200a048f17ff9"
   integrity sha512-gJZo3IB8U+jhBJWR0DgoLS+zaUDIb/u79e7Rp+MEM78uH3bvC19S3Dd8lxWEbPXNKlCB0saUptfK/Buw0c1y2Q==
 
-"@dcl/crypto@^3.4.0", "@dcl/crypto@^3.4.3":
+"@dcl/crypto@^3.3.1", "@dcl/crypto@^3.4.0", "@dcl/crypto@^3.4.3":
   version "3.4.5"
   resolved "https://registry.yarnpkg.com/@dcl/crypto/-/crypto-3.4.5.tgz#95ca2beab46fa3494b4d38f009bf0d49c87ba235"
   integrity sha512-uneyjOAOx7pi5kabZsLmPm9kSLkCk4Cok8FUsvT+6k8RquqkjKqocvkGVOMaoWsfU6S3mkLOyaeqEKmOy4ErxA==
@@ -2480,6 +2480,11 @@ cookie@^0.5.0:
   resolved "https://registry.yarnpkg.com/cookie/-/cookie-0.5.0.tgz#d1f5d71adec6558c58f389987c366aa47e994f8b"
   integrity sha512-YZ3GUyn/o8gfKJlnlX7g7xq4gyO6OSuhGPKaaGssGB2qgDUS0gPgtTvoyZLTt9Ab6dC4hfc9dV5arkvc/OCmrw==
 
+core-js-pure@^3.19.1:
+  version "3.41.0"
+  resolved "https://registry.yarnpkg.com/core-js-pure/-/core-js-pure-3.41.0.tgz#349fecad168d60807a31e83c99d73d786fe80811"
+  integrity sha512-71Gzp96T9YPk63aUvE5Q5qP+DryB4ZloUZPSOebGM88VNw8VNfvdA7z6kGA8iGOTEzAomsRidp4jXSmUIJsL+Q==
+
 create-jest@^29.7.0:
   version "29.7.0"
   resolved "https://registry.npmjs.org/create-jest/-/create-jest-29.7.0.tgz"
@@ -2551,6 +2556,14 @@ decamelize@^5.0.0:
   version "5.0.1"
   resolved "https://registry.npmjs.org/decamelize/-/decamelize-5.0.1.tgz"
   integrity sha512-VfxadyCECXgQlkoEAjeghAr5gY3Hf+IKjKb+X8tGVDtveCjN+USwprd2q3QXBR9T1+x2DG0XZF5/w+7HAtSaXA==
+
+decentraland-crypto-fetch@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/decentraland-crypto-fetch/-/decentraland-crypto-fetch-2.0.1.tgz#02875f30b8a33c6b41284612fb61c632dea7f924"
+  integrity sha512-2IKu6Y4k/fle8bmU0b4zy7V1i1R0oCXtqlJumBXc4jwHUHKAcHDLD2YtgJFdd7JjsWQwf+t0DsKpzBCjQDKANg==
+  dependencies:
+    "@dcl/crypto" "^3.3.1"
+    core-js-pure "^3.19.1"
 
 dedent@^1.0.0:
   version "1.5.1"
@@ -3259,6 +3272,11 @@ isexe@^2.0.0:
   version "2.0.0"
   resolved "https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz"
   integrity sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==
+
+isomorphic-ws@^5.0.0:
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/isomorphic-ws/-/isomorphic-ws-5.0.0.tgz#e5529148912ecb9b451b46ed44d53dae1ce04bbf"
+  integrity sha512-muId7Zzn9ywDsyXgTIafTry2sV3nySZeUDe6YedVd1Hvuuep5AsIlqK+XefWpYTyJG5e503F2xIuT2lcU6rCSw==
 
 istanbul-lib-coverage@^3.0.0, istanbul-lib-coverage@^3.2.0:
   version "3.2.2"

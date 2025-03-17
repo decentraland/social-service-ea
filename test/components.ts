@@ -26,6 +26,7 @@ import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-sta
 import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
 import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { metricDeclarations } from '../src/metrics'
+import { createRpcClientComponent } from './integration/utils/rpc-client'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -97,6 +98,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const localFetch = await createLocalFetchCompoment(config)
 
+  const rpcClient = await createRpcClientComponent({ config, logs })
+
   return {
     archipelagoStats,
     catalystClient,
@@ -112,6 +115,7 @@ async function initComponents(): Promise<TestComponents> {
     pg,
     pubsub,
     redis,
+    rpcClient,
     rpcServer,
     server,
     sns,
