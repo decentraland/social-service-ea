@@ -11,6 +11,7 @@ jest.mock('redis', () => {
     del: jest.fn(),
     quit: jest.fn(),
     subscribe: jest.fn(),
+    unsubscribe: jest.fn(),
     publish: jest.fn(),
     zCard: jest.fn(),
     exists: jest.fn(),

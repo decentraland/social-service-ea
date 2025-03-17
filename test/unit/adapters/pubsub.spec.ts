@@ -126,15 +126,17 @@ describe('PubSubComponent', () => {
       Object.defineProperty(mockPubClient, 'isReady', { value: true, writable: true })
 
       await pubsub.stop()
+      expect(mockSubClient.unsubscribe).toHaveBeenCalled()
       expect(mockSubClient.disconnect).toHaveBeenCalled()
       expect(mockPubClient.disconnect).toHaveBeenCalled()
     })
 
-    it('should disconnect on stop if redis is ready', async () => {
+    it('should not disconnect if redis is not ready', async () => {
       Object.defineProperty(mockSubClient, 'isReady', { value: false, writable: true })
       Object.defineProperty(mockPubClient, 'isReady', { value: false, writable: true })
 
       await pubsub.stop()
+      expect(mockSubClient.unsubscribe).not.toHaveBeenCalled()
       expect(mockSubClient.disconnect).not.toHaveBeenCalled()
       expect(mockPubClient.disconnect).not.toHaveBeenCalled()
     })

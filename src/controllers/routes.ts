@@ -63,7 +63,7 @@ export async function setupRoutes(components: AppComponents | TestComponents): P
     res.writeStatus('200 OK')
     res.writeHeader('Access-Control-Allow-Origin', '*')
     res.end('alive')
-    onRequestEnd(metrics, labels, 404, end)
+    onRequestEnd(metrics, labels, 200, end)
   })
 
   server.app.any('/*', (res, req) => {

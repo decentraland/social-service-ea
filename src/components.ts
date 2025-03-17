@@ -24,7 +24,7 @@ import { createWorldsStatsComponent } from './adapters/worlds-stats'
 export async function initComponents(): Promise<AppComponents> {
   const config = await createDotEnvConfigComponent({ path: ['.env.test', '.env.default', '.env'] })
   const metrics = await createMetricsComponent(metricDeclarations, { config })
-  const logs = await createLogComponent({ metrics })
+  const logs = await createLogComponent({ metrics, config })
 
   const server = await createUWsComponent({ config, logs })
 
