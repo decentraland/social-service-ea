@@ -1,16 +1,6 @@
-import nock from 'nock'
 import { test } from '../components'
-import { ARCHIPELAGO_STATS_URL } from '../mocks/components'
 
-test('status handler', function ({ components, beforeStart }) {
-  beforeStart(async () => {
-    nock(ARCHIPELAGO_STATS_URL)
-      .get('/peers')
-      .reply(200, {
-        peers: [{ id: 'peer1' }, { id: 'peer2' }]
-      })
-  })
-
+test('status handler', function ({ components }) {
   it('GET /status returns 200', async () => {
     const { localFetch } = components
 

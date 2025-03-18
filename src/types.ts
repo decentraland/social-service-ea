@@ -150,7 +150,9 @@ export type IWorldsStatsComponent = IStatsComponent & {
   onPeerDisconnect(address: string): Promise<void>
 }
 
-export type IPeersSynchronizer = IBaseComponent
+export type IPeersSynchronizer = IBaseComponent & {
+  syncPeers(): Promise<void>
+}
 
 export type IPeerTrackingComponent = IBaseComponent & {
   getSubscriptions(): Map<string, Subscription>

@@ -11,8 +11,17 @@ export async function createFriendshipRequest(
   return id
 }
 
-export async function createActiveFriendship(db: IDatabaseComponent, users: [string, string]) {
-  const { id } = await db.createFriendship(users, true)
+export async function createOrUpsertActiveFriendship(db: IDatabaseComponent, users: [string, string]) {
+  let id: string | undefined
+  const existingFriendship = await db.getFriendship(users)
+
+  if (existingFriendship) {
+    id = existingFriendship.id
+  } else {
+    const friendship = await db.createFriendship(users, true)
+    id = friendship.id
+  }
+
   await db.recordFriendshipAction(id, users[0], Action.REQUEST, null)
   await db.recordFriendshipAction(id, users[1], Action.ACCEPT, null)
 

@@ -4,43 +4,44 @@ import type { Transport, TransportEvents } from '@dcl/rpc'
 
 export function createWebSocketTransport(url: string): Transport {
   let socket: WebSocket | undefined
+  let isClosing = false
+  let isConnected = false
   const events = mitt<TransportEvents>()
   
   const connect = () => {
+    if (socket || isClosing) {
+      return // Don't create multiple connections or during cleanup
+    }
+
     socket = new WebSocket(url)
     socket.binaryType = 'arraybuffer'
     
-    // Emit 'connect' when socket is open
-    socket.addEventListener('open', () => events.emit('connect', {}), { once: true })
+    socket.addEventListener('open', () => {
+      isConnected = true
+      if (!isClosing) {
+        events.emit('connect', {})
+      }
+    }, { once: true })
     
-    // Emit 'close' on socket close
-    socket.addEventListener(
-      'close',
-      (event) => {
+    socket.addEventListener('close', (event) => {
+      isConnected = false
+      if (!isClosing) {
         events.emit('close', {})
-      },
-      { once: true }
-    )
+      }
+      socket = undefined
+    }, { once: true })
     
-    // Handle errors and emit 'error' event
-    socket.addEventListener('error', (err) => {
-      const error = err instanceof Error ? err : new Error('WebSocket error')
-      console.error('WebSocket error:', error)
-      events.emit('error', error)
+    socket.addEventListener('error', (err: any) => {
+      if (!isClosing) {
+        events.emit('error', err)
+      }
     })
     
-    // Handle incoming messages and emit 'message'
     socket.addEventListener('message', (message: MessageEvent) => {
-      if (message.data instanceof ArrayBuffer) {
+      if (!isClosing && message.data instanceof ArrayBuffer) {
         events.emit('message', new Uint8Array(message.data))
       }
     })
-  }
-  
-  const send = (message: Uint8Array) => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(message)
-    }
   }
   
   connect()
@@ -49,17 +50,25 @@ export function createWebSocketTransport(url: string): Transport {
     ...events,
     
     get isConnected(): boolean {
-      return socket?.readyState === WebSocket.OPEN || false
+      return isConnected && socket?.readyState === WebSocket.OPEN
     },
     
     sendMessage(message: Uint8Array): void {
-      send(message)
+      if (!this.isConnected) {
+        throw new Error('WebSocket is not connected')
+      }
+      socket!.send(message)
     },
     
     close(): void {
+      isClosing = true
       if (socket) {
         socket.close()
+        socket = undefined
       }
+      events.all.clear()
+      isConnected = false
+      isClosing = false
     }
   }
 }

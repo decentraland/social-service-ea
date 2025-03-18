@@ -1,3 +1,4 @@
+import WebSocket from 'isomorphic-ws'
 import { createRpcClient } from '@dcl/rpc'
 import { loadService } from '@dcl/rpc/dist/codegen'
 import { 
@@ -8,12 +9,12 @@ import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-t
 import { type TestComponents } from '../../../src/types'
 import { createWebSocketTransport } from './transport'
 import type { Transport } from '@dcl/rpc'
+import { IBaseComponent } from '@well-known-components/interfaces'
 
-export interface IRpcClient {
+export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
   authAddress: string
-  start: () => Promise<void>
-  stop: () => void
+  connect: () => Promise<void>
 }
 
 export async function createRpcClientComponent({
@@ -30,101 +31,149 @@ export async function createRpcClientComponent({
   const serverUrl = `ws://127.0.0.1:${port}`
 
   async function connectWithRetry(retries = 3, delay = 1000): Promise<void> {
+    if (isShuttingDown) {
+      throw new Error('Client is shutting down')
+    }
+
     for (let i = 0; i < retries; i++) {
       try {
-        // Ensure previous transport is cleaned up
-        if (transport) {
-          transport.close()
-          transport = undefined as any
-          // Wait for cleanup
-          await new Promise(resolve => setTimeout(resolve, 500))
-        }
+        await cleanupTransport()
+
+        // Create identity and headers before establishing connection
+        const identity = await createTestIdentity()
+        const headers = createAuthHeaders('get', '/', {}, identity)
+        authAddress = identity.realAccount.address
+        const authMessage = new TextEncoder().encode(JSON.stringify(headers))
 
         transport = createWebSocketTransport(serverUrl)
-
+        
         await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Connection timeout'))
-          }, 5000)
+          let timeoutId: NodeJS.Timeout
+          let isResolved = false
 
-          transport.on('connect', async () => {
+          const cleanup = () => {
+            clearTimeout(timeoutId)
+          }
+
+          const handleMessage = async (message: Uint8Array) => {
+            // Handle any server messages during auth
+            logger.debug('Received message during auth')
+          }
+
+          const handleConnect = async () => {
+            if (isResolved) return
             try {
-              clearTimeout(timeout)
-              logger.debug('Connected to RPC server')
+              logger.debug('Connected to RPC server, sending auth...')
               
-              const identity = await createTestIdentity()
-              const headers = createAuthHeaders('get', '/', {}, identity)
-              authAddress = identity.realAccount.address
-              
-              const authMessage = new TextEncoder().encode(JSON.stringify(headers))
+              // Send auth immediately after connection
               transport.sendMessage(authMessage)
               logger.debug('Auth headers sent')
 
-              // Wait a bit for auth to process
-              await new Promise(resolve => setTimeout(resolve, 500))
+              // Add message handler to track auth progress
+              transport.on('message', handleMessage)
+
+              // Wait for auth to be processed
+              await new Promise(resolve => setTimeout(resolve, 1000))
 
               const client = await createRpcClient(transport)
               const rpcPort = await client.createPort('test-rpc-client')
               socialServiceClient = loadService(rpcPort, SocialServiceDefinition)
               logger.debug('RPC client successfully initialized')
-
+              
+              isResolved = true
+              cleanup()
               resolve()
             } catch (error) {
-              clearTimeout(timeout)
+              if (!isResolved) {
+                isResolved = true
+                cleanup()
+                reject(error)
+              }
+            }
+          }
+
+          const handleError = (error: Error) => {
+            logger.error('Transport error:', { error: error.message })
+            if (!isResolved) {
+              isResolved = true
+              cleanup()
               reject(error)
             }
-          })
+          }
 
-          transport.on('error', (error) => {
-            clearTimeout(timeout)
-            reject(error)
-          })
-
-          transport.on('close', () => {
-            clearTimeout(timeout)
-            if (!socialServiceClient && !isShuttingDown) {
-              reject(new Error('Connection closed before initialization'))
+          const handleClose = () => {
+            logger.debug('Transport closed')
+            if (!isResolved) {
+              isResolved = true
+              cleanup()
+              if (!isShuttingDown) {
+                reject(new Error('Connection closed unexpectedly'))
+              } else {
+                resolve()
+              }
             }
-          })
+          }
+
+          timeoutId = setTimeout(() => {
+            if (!isResolved) {
+              isResolved = true
+              cleanup()
+              reject(new Error('Connection timeout'))
+            }
+          }, 10000)
+
+          transport.on('connect', handleConnect)
+          transport.on('error', handleError)
+          transport.on('close', handleClose)
         })
 
-        // If we get here, connection was successful
-        return
-      } catch (error) {
-        logger.warn(`Connection attempt ${i + 1} failed:`, error)
+        return // Connection successful
+      } catch (error: any) {
+        logger.error(`Connection attempt ${i + 1} failed:`, {
+          error: error.message,
+          stack: error.stack
+        })
+        
         if (i === retries - 1) throw error
         
-        // Clean up before retry
-        if (transport) {
-          transport.close()
-          transport = undefined as any
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, delay))
+        await cleanupTransport()
+        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)))
       }
+    }
+  }
+
+  async function cleanupTransport() {
+    if (transport) {
+      const oldTransport = transport
+      transport = undefined as any
+      socialServiceClient = undefined as any
+      oldTransport.close()
+      await new Promise(resolve => setTimeout(resolve, 1000))
     }
   }
 
   return {
     get client() {
-      return socialServiceClient!
+      if (!socialServiceClient) {
+        throw new Error('RPC client not initialized')
+      }
+      return socialServiceClient
     },
     get authAddress() {
+      if (!authAddress) {
+        throw new Error('Auth address not initialized')
+      }
       return authAddress
     },
-    start: async () => {
+    connect: async () => {
       isShuttingDown = false
       await connectWithRetry()
     },
     stop: async () => {
       isShuttingDown = true
-      logger.debug('closing connection')
-      if (transport) {
-        transport.close()
-        transport = undefined as any
-        // Wait for cleanup
-        await new Promise(resolve => setTimeout(resolve, 500))
-      }
+      logger.debug('Stopping RPC client')
+      await cleanupTransport()
+      logger.debug('RPC client stopped')
     }
   }
 }
