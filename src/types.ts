@@ -17,11 +17,14 @@ import { Transport } from '@dcl/rpc'
 import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { INatsComponent, Subscription } from '@well-known-components/nats-component/dist/types'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  ConnectivityStatus,
+  SocialServiceDefinition
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { IRpcClient } from '../test/integration/utils/rpc-client'
+import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -58,6 +61,12 @@ export type TestComponents = BaseComponents & {
   // A fetch component that only hits the test server
   localFetch: IFetchComponent
   rpcClient: IRpcClient
+}
+
+export interface IRpcClient extends IBaseComponent {
+  client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
+  authAddress: string
+  connect: () => Promise<void>
 }
 
 export type IRPCServerComponent = IBaseComponent & {

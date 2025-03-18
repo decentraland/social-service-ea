@@ -1,4 +1,3 @@
-import WebSocket from 'isomorphic-ws'
 import { createRpcClient } from '@dcl/rpc'
 import { loadService } from '@dcl/rpc/dist/codegen'
 import { 
@@ -6,16 +5,9 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createTestIdentity, createAuthHeaders } from './auth'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
-import { type TestComponents } from '../../../src/types'
+import { IRpcClient, type TestComponents } from '../../../src/types'
 import { createWebSocketTransport } from './transport'
 import type { Transport } from '@dcl/rpc'
-import { IBaseComponent } from '@well-known-components/interfaces'
-
-export interface IRpcClient extends IBaseComponent {
-  client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
-  authAddress: string
-  connect: () => Promise<void>
-}
 
 export async function createRpcClientComponent({
   config,
@@ -71,9 +63,6 @@ export async function createRpcClientComponent({
 
               // Add message handler to track auth progress
               transport.on('message', handleMessage)
-
-              // Wait for auth to be processed
-              await new Promise(resolve => setTimeout(resolve, 1000))
 
               const client = await createRpcClient(transport)
               const rpcPort = await client.createPort('test-rpc-client')
@@ -137,7 +126,6 @@ export async function createRpcClientComponent({
         if (i === retries - 1) throw error
         
         await cleanupTransport()
-        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)))
       }
     }
   }
@@ -148,7 +136,6 @@ export async function createRpcClientComponent({
       transport = undefined as any
       socialServiceClient = undefined as any
       oldTransport.close()
-      await new Promise(resolve => setTimeout(resolve, 1000))
     }
   }
 
