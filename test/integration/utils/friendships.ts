@@ -17,6 +17,7 @@ export async function createOrUpsertActiveFriendship(db: IDatabaseComponent, use
 
   if (existingFriendship) {
     id = existingFriendship.id
+    await db.updateFriendshipStatus(id, true)
   } else {
     const friendship = await db.createFriendship(users, true)
     id = friendship.id

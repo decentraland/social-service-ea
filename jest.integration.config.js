@@ -11,5 +11,4 @@ module.exports = {
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/test/integration/setupTests.ts'],
   resetMocks: true,
-  runInBand: true
 }

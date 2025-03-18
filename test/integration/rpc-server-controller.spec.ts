@@ -41,15 +41,15 @@ test('RPC Server Controller', function ({ components }) {
   })
   
   describe('GetMutualFriends handler', function () {
-    it.skip('returns mutual friends successfully', async () => {
+    it('returns mutual friends successfully', async () => {
       const { rpcClient, db } = components
       const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
       const mutualFriendAddress = '0x77c4c17331436d3b8798596e3d7c0d8e1b786aa4'
-      
+
       const id1 = await createOrUpsertActiveFriendship(db, [rpcClient.authAddress, friendAddress])
       const id2 = await createOrUpsertActiveFriendship(db, [rpcClient.authAddress, mutualFriendAddress])
       const id3 = await createOrUpsertActiveFriendship(db, [friendAddress, mutualFriendAddress])
-      
+
       const response = await rpcClient.client.getMutualFriends({
         user: {
           address: friendAddress
@@ -60,6 +60,7 @@ test('RPC Server Controller', function ({ components }) {
         }
       })
       
+      
       expect(response.friends).toHaveLength(1)
       expect(response.friends[0].address).toEqual(mutualFriendAddress)
       
@@ -68,7 +69,7 @@ test('RPC Server Controller', function ({ components }) {
       await removeFriendship(db, id3, friendAddress)
     })
     
-    it.skip('returns empty list when no mutual friends exist', async () => {
+    it('returns empty list when no mutual friends exist', async () => {
       const { rpcClient, db } = components
       const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
       
