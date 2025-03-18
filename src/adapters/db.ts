@@ -168,7 +168,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async getSocialSettings(userAddresses: string[]): Promise<SocialSettings[]> {
       const query = SQL`
-        SELECT * FROM social_settings WHERE user_address = IN ${userAddresses}
+        SELECT * FROM social_settings WHERE address = ANY(${userAddresses})
       `
       const results = await pg.query<{ private_messages_privacy: string }>(query)
       return results.rows as SocialSettings[]
@@ -178,18 +178,26 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       settings: Partial<Omit<SocialSettings, 'address'>>
     ): Promise<SocialSettings> {
       const keys = Object.keys(settings)
-      const values = Object.values(settings)
-      const update = Object.entries(settings).reduce(
-        (acc, [key, value], index) =>
-          acc.append(`${key} = `).append(SQL`${value}${index === values.length - 1 ? '' : ', '}`),
+      const values = [userAddress, ...Object.values(settings)].reduce(
+        (acc, value, index, array) => {
+          return acc.append(SQL`${value}`).append(index === array.length - 1 ? '' : ', ')
+        },
         SQL``
       )
-      const query = SQL`INSERT INTO social_settings (user_address, `
-        .append(keys.join(', '))
-        .append(SQL`) VALUES (${userAddress}, ${values.join(', ')})`)
-        .append(`ON CONFLICT (user_address) DO UPDATE SET `)
+      const update = Object.entries(settings).reduce(
+        (acc, [key, value], index, array) =>
+          acc
+            .append(`${key} = `)
+            .append(SQL`${value}`)
+            .append(index === array.length - 1 ? '' : ', '),
+        SQL``
+      )
+      const query = SQL`INSERT INTO social_settings (address, `
+        .append(`${keys.join(', ')}) VALUES (`)
+        .append(values)
+        .append(`) ON CONFLICT (address) DO UPDATE SET `)
         .append(update)
-        .append(` RETURNING *`)
+        .append(SQL` WHERE social_settings.address = ${userAddress} RETURNING *`)
       const results = await pg.query<SocialSettings>(query)
       return results.rows[0]
     },
