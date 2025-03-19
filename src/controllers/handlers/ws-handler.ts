@@ -22,6 +22,9 @@ export async function registerWsHandler(
     Object.assign(data, { ...data, ...newData })
   }
 
+  // Connection tracking with timestamps
+  const connectionStartTimes = new Map<string, number>()
+
   server.app.ws<WsUserData>('/', {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS, // In seconds
     sendPingsAutomatically: true,
@@ -80,6 +83,11 @@ export async function registerWsHandler(
 
         changeStage(data, { isConnected: true })
         logger.debug('WebSocket opened', { wsConnectionId: data.wsConnectionId })
+
+        // Store the connection start time using the connection ID
+        if (data.wsConnectionId) {
+          connectionStartTimes.set(data.wsConnectionId, Date.now())
+        }
       } catch (error: any) {
         logger.debug('[DEBUGGING CONNECTION] Failed to acquire connection', {
           wsConnectionId: data.wsConnectionId,
@@ -233,6 +241,20 @@ export async function registerWsHandler(
         wsConnectionId,
         ...(data.auth && { address: data.address })
       })
+
+      // Calculate and record connection duration
+      if (data.wsConnectionId && connectionStartTimes.has(data.wsConnectionId)) {
+        const startTime = connectionStartTimes.get(data.wsConnectionId)!
+        const duration = (Date.now() - startTime) / 1000 // Convert to seconds
+
+        metrics.observe('ws_connection_duration_seconds', {}, duration)
+        connectionStartTimes.delete(data.wsConnectionId)
+
+        logger.debug('WebSocket connection closed, duration tracked', {
+          wsConnectionId: data.wsConnectionId,
+          durationSeconds: duration
+        })
+      }
     },
     ping: (ws) => {
       const data = ws.getUserData()

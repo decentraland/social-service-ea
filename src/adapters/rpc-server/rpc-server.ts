@@ -25,6 +25,7 @@ import { getBlockedUsersService } from './services/get-blocked-users'
 import { unblockUserService } from './services/unblock-user'
 import { getBlockingStatusService } from './services/get-blocking-status'
 import { subscribeToBlockUpdatesService } from './services/subscribe-to-block-updates'
+import { createRpcServerMetrics } from './metrics'
 
 export async function createRpcServerComponent({
   logs,
@@ -36,7 +37,8 @@ export async function createRpcServerComponent({
   catalystClient,
   sns,
   subscribersContext,
-  worldsStats
+  worldsStats,
+  metrics
 }: Pick<
   AppComponents,
   | 'logs'
@@ -49,6 +51,7 @@ export async function createRpcServerComponent({
   | 'sns'
   | 'subscribersContext'
   | 'worldsStats'
+  | 'metrics'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -56,34 +59,74 @@ export async function createRpcServerComponent({
     logger: logs.getLogger('rpc-server')
   })
 
+  const { measureRpcCall: withPromiseMetrics, measureRpcStream: withStreamMetrics } = createRpcServerMetrics({
+    components: { metrics, logs }
+  })
+
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
 
-  const getFriends = getFriendsService({ components: { logs, db, catalystClient } })
-  const getMutualFriends = getMutualFriendsService({ components: { logs, db, catalystClient } })
-  const getPendingFriendshipRequests = getPendingFriendshipRequestsService({
-    components: { logs, db, catalystClient }
-  })
-  const getSentFriendshipRequests = getSentFriendshipRequestsService({
-    components: { logs, db, catalystClient }
-  })
-  const upsertFriendship = upsertFriendshipService({
-    components: { logs, db, pubsub, catalystClient, sns }
-  })
-  const getFriendshipStatus = getFriendshipStatusService({ components: { logs, db } })
-  const subscribeToFriendshipUpdates = subscribeToFriendshipUpdatesService({
-    components: { logs, catalystClient }
-  })
-  const subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
-    components: { logs, db, archipelagoStats, catalystClient, worldsStats }
-  })
-  const subscribeToBlockUpdates = subscribeToBlockUpdatesService({
-    components: { logs, catalystClient }
-  })
+  const getFriends = withPromiseMetrics('getFriends', getFriendsService({ components: { logs, db, catalystClient } }))
+  const getMutualFriends = withPromiseMetrics(
+    'getMutualFriends',
+    getMutualFriendsService({ components: { logs, db, catalystClient } })
+  )
+  const getPendingFriendshipRequests = withPromiseMetrics(
+    'getPendingFriendshipRequests',
+    getPendingFriendshipRequestsService({
+      components: { logs, db, catalystClient }
+    })
+  )
+  const getSentFriendshipRequests = withPromiseMetrics(
+    'getSentFriendshipRequests',
+    getSentFriendshipRequestsService({
+      components: { logs, db, catalystClient }
+    })
+  )
+  const upsertFriendship = withPromiseMetrics(
+    'upsertFriendship',
+    upsertFriendshipService({
+      components: { logs, db, pubsub, catalystClient, sns }
+    })
+  )
+  const getFriendshipStatus = withPromiseMetrics(
+    'getFriendshipStatus',
+    getFriendshipStatusService({ components: { logs, db } })
+  )
+  const subscribeToFriendshipUpdates = withStreamMetrics(
+    'subscribeToFriendshipUpdates',
+    subscribeToFriendshipUpdatesService({
+      components: { logs, catalystClient }
+    })
+  )
+  const subscribeToFriendConnectivityUpdates = withStreamMetrics(
+    'subscribeToFriendConnectivityUpdates',
+    subscribeToFriendConnectivityUpdatesService({
+      components: { logs, db, archipelagoStats, catalystClient, worldsStats }
+    })
+  )
+  const subscribeToBlockUpdates = withStreamMetrics(
+    'subscribeToBlockUpdates',
+    subscribeToBlockUpdatesService({
+      components: { logs, catalystClient }
+    })
+  )
 
-  const blockUser = blockUserService({ components: { logs, db, catalystClient, pubsub } })
-  const unblockUser = unblockUserService({ components: { logs, db, catalystClient, pubsub } })
-  const getBlockedUsers = getBlockedUsersService({ components: { logs, db, catalystClient } })
-  const getBlockingStatus = getBlockingStatusService({ components: { logs, db } })
+  const blockUser = withPromiseMetrics(
+    'blockUser',
+    blockUserService({ components: { logs, db, catalystClient, pubsub } })
+  )
+  const unblockUser = withPromiseMetrics(
+    'unblockUser',
+    unblockUserService({ components: { logs, db, catalystClient, pubsub } })
+  )
+  const getBlockedUsers = withPromiseMetrics(
+    'getBlockedUsers',
+    getBlockedUsersService({ components: { logs, db, catalystClient } })
+  )
+  const getBlockingStatus = withPromiseMetrics(
+    'getBlockingStatus',
+    getBlockingStatusService({ components: { logs, db } })
+  )
 
   const getPrivateMessagesSettings = getPrivateMessagesSettingsService({ components: { logs, db } })
   const upsertSocialSettings = upsertSocialSettingsService({ components: { logs, db } })
