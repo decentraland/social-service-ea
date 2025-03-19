@@ -10,5 +10,5 @@ module.exports = {
   testMatch: ['**/test/integration/**/*.spec.(ts)'],
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/test/integration/setupTests.ts'],
-  resetMocks: true
+  resetMocks: true,
 }

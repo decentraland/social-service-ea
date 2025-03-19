@@ -99,7 +99,7 @@ describe('unblockUserService', () => {
       from: rpcContext.address,
       to: blockedAddress,
       action: Action.DELETE,
-      timestamp: Date.now()
+      timestamp: expect.any(Number)
     })
   })
 

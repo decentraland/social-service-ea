@@ -41,7 +41,7 @@ services:
       PG_COMPONENT_PSQL_CONNECTION_STRING: 'postgresql://postgres:postgres@postgres:5432/social_service_ea'
       REDIS_HOST: 'redis'
       NATS_URL: 'nats://nats:4222'
-      ARCHIPELAGO_STATS_URL: 'http://archipelago-ea-stats.decentraland.zone'
+      ARCHIPELAGO_STATS_URL: 'https://archipelago-ea-stats.decentraland.zone'
       CATALYST_URL: 'https://peer.decentraland.zone'
       PEER_SYNC_INTERVAL_MS: '45000'
       PEERS_SYNC_CACHE_TTL_MS: '90000'

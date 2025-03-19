@@ -28,7 +28,7 @@ export async function createPeersSynchronizerComponent({
   }
 
   return {
-    async start() {
+    async syncPeers() {
       await syncPeers()
       intervalId = setInterval(syncPeers, syncIntervalMs)
     },

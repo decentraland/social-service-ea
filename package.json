@@ -49,11 +49,12 @@
     "@well-known-components/pg-component": "^0.2.2",
     "@well-known-components/uws-http-server": "^0.0.2",
     "dcl-catalyst-client": "^21.7.0",
+    "decentraland-crypto-fetch": "^2.0.1",
     "fp-future": "^1.0.1",
     "lru-cache": "^10.4.3",
     "mitt": "^3.0.1",
     "nock": "^14.0.1",
-    "redis": "^4.6.13",
+    "redis": "^4.7.0",
     "sql-template-strings": "^2.2.2",
     "ws": "^8.16.0"
   }

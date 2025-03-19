@@ -10,5 +10,8 @@ export async function main(program: Lifecycle.EntryPointParameters<AppComponents
 
   await startComponents()
 
-  await components.peerTracking.subscribeToPeerStatusUpdates()
+  const { peerTracking, peersSynchronizer } = components
+
+  await peerTracking.subscribeToPeerStatusUpdates()
+  await peersSynchronizer.syncPeers()
 }

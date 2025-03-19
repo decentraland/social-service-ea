@@ -26,6 +26,8 @@ import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-sta
 import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
 import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { metricDeclarations } from '../src/metrics'
+import { createRpcClientComponent } from './integration/utils/rpc-client'
+import { mockPeersSynchronizer } from './mocks/components'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -40,8 +42,6 @@ export const test = createRunner<TestComponents>({
 })
 
 async function initComponents(): Promise<TestComponents> {
-  // const components = await originalInitComponents()
-
   const config = await createDotEnvConfigComponent(
     {
       path: ['.env.test']
@@ -92,10 +92,11 @@ async function initComponents(): Promise<TestComponents> {
     worldsStats
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
-  const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   const localFetch = await createLocalFetchCompoment(config)
+
+  const rpcClient = await createRpcClientComponent({ config, logs })
 
   return {
     archipelagoStats,
@@ -108,10 +109,11 @@ async function initComponents(): Promise<TestComponents> {
     metrics,
     nats,
     peerTracking,
-    peersSynchronizer,
+    peersSynchronizer: mockPeersSynchronizer,
     pg,
     pubsub,
     redis,
+    rpcClient,
     rpcServer,
     server,
     sns,
