@@ -9,6 +9,7 @@ import {
   IDatabaseComponent,
   User,
   Pagination,
+  SocialSettings,
   BlockUserWithDate
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
@@ -164,6 +165,41 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
 
       const results = await pg.query<User>(query)
       return results.rows
+    },
+    async getSocialSettings(userAddresses: string[]): Promise<SocialSettings[]> {
+      const query = SQL`
+        SELECT * FROM social_settings WHERE address = ANY(${userAddresses})
+      `
+      const results = await pg.query<{ private_messages_privacy: string }>(query)
+      return results.rows as SocialSettings[]
+    },
+    async upsertSocialSettings(
+      userAddress: string,
+      settings: Partial<Omit<SocialSettings, 'address'>>
+    ): Promise<SocialSettings> {
+      const keys = Object.keys(settings)
+      const values = [userAddress, ...Object.values(settings)].reduce(
+        (acc, value, index, array) => {
+          return acc.append(SQL`${value}`).append(index === array.length - 1 ? '' : ', ')
+        },
+        SQL``
+      )
+      const update = Object.entries(settings).reduce(
+        (acc, [key, value], index, array) =>
+          acc
+            .append(`${key} = `)
+            .append(SQL`${value}`)
+            .append(index === array.length - 1 ? '' : ', '),
+        SQL``
+      )
+      const query = SQL`INSERT INTO social_settings (address, `
+        .append(`${keys.join(', ')}) VALUES (`)
+        .append(values)
+        .append(`) ON CONFLICT (address) DO UPDATE SET `)
+        .append(update)
+        .append(SQL` WHERE social_settings.address = ${userAddress} RETURNING *`)
+      const results = await pg.query<SocialSettings>(query)
+      return results.rows[0]
     },
     async blockUser(blockerAddress, blockedAddress, txClient) {
       const query = SQL`

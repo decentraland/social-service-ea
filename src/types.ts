@@ -108,6 +108,9 @@ export interface IDatabaseComponent {
   getSentFriendshipRequests(userAddress: string, pagination?: Pagination): Promise<FriendshipRequest[]>
   getSentFriendshipRequestsCount(userAddress: string): Promise<number>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<User[]>
+  getSocialSettings(userAddresses: string[]): Promise<SocialSettings[]>
+  upsertSocialSettings(userAddress: string, settings: Partial<Omit<SocialSettings, 'address'>>): Promise<SocialSettings>
+  getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<User[]>
   blockUser(
     blockerAddress: string,
     blockedAddress: string,
@@ -276,6 +279,22 @@ export type Friendship = {
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+export type SocialSettings = {
+  address: string
+  private_messages_privacy: PrivateMessagesPrivacy
+  blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting
+}
+
+export enum PrivateMessagesPrivacy {
+  ONLY_FRIENDS = 'only_friends',
+  ALL = 'all'
+}
+
+export enum BlockedUsersMessagesVisibilitySetting {
+  SHOW_MESSAGES = 'show_messages',
+  DO_NOT_SHOW_MESSAGES = 'do_not_show_messages'
 }
 
 export type User = {

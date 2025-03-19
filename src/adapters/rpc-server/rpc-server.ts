@@ -17,6 +17,9 @@ import {
   friendshipAcceptedUpdateHandler,
   blockUpdateHandler
 } from '../../logic/updates'
+import { getPrivateMessagesSettingsService } from './services/get-private-messages-settings'
+import { upsertSocialSettingsService } from './services/upsert-social-settings'
+import { getSocialSettingsService } from './services/get-social-settings'
 import { blockUserService } from './services/block-user'
 import { getBlockedUsersService } from './services/get-blocked-users'
 import { unblockUserService } from './services/unblock-user'
@@ -82,6 +85,10 @@ export async function createRpcServerComponent({
   const getBlockedUsers = getBlockedUsersService({ components: { logs, db, catalystClient } })
   const getBlockingStatus = getBlockingStatusService({ components: { logs, db } })
 
+  const getPrivateMessagesSettings = getPrivateMessagesSettingsService({ components: { logs, db } })
+  const upsertSocialSettings = upsertSocialSettingsService({ components: { logs, db } })
+  const getSocialSettings = getSocialSettingsService({ components: { logs, db } })
+
   rpcServer.setHandler(async function handler(port) {
     registerService(port, SocialServiceDefinition, async () => ({
       getFriends,
@@ -96,6 +103,9 @@ export async function createRpcServerComponent({
       getBlockingStatus,
       subscribeToFriendshipUpdates,
       subscribeToFriendConnectivityUpdates,
+      getPrivateMessagesSettings,
+      upsertSocialSettings,
+      getSocialSettings,
       subscribeToBlockUpdates
     }))
   })

@@ -54,5 +54,6 @@ services:
       - postgres
       - redis
       - nats
+      - localstack
 volumes:
   postgres-data:
