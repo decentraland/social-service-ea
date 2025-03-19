@@ -39,7 +39,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropTable('social_settings')
   pgm.dropConstraint('social_settings', 'valid_private_messages_privacy')
   pgm.dropConstraint('social_settings', 'valid_blocked_users_messages_visibility')
+  pgm.dropTable('social_settings')
 }

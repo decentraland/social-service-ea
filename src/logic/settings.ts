@@ -1,9 +1,49 @@
 import {
-  PrivateMessagePrivacySetting as PrivateMessagePrivacySettingResponse,
-  SocialSettings as SocialSettingsResponse,
-  BlockedUsersMessagesVisibilitySetting as BlockedUsersMessagesVisibilitySettingResponse
+  PrivateMessagePrivacySetting as RPCPrivateMessagePrivacySetting,
+  SocialSettings as RPCSocialSettings,
+  BlockedUsersMessagesVisibilitySetting as RPCBlockedUsersMessagesVisibilitySetting
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { BlockedUsersMessagesVisibilitySetting, PrivateMessagesPrivacy, SocialSettings } from '../types'
+import {
+  BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
+  PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
+  SocialSettings as DBSocialSettings
+} from '../types'
+
+const RPC_PRIVATE_MESSAGE_PRIVACY_TO_DB_PRIVATE_MESSAGE_PRIVACY: Record<
+  RPCPrivateMessagePrivacySetting,
+  DBPrivateMessagesPrivacy | undefined
+> = {
+  [RPCPrivateMessagePrivacySetting.ONLY_FRIENDS]: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
+  [RPCPrivateMessagePrivacySetting.ALL]: DBPrivateMessagesPrivacy.ALL,
+  [RPCPrivateMessagePrivacySetting.UNRECOGNIZED]: undefined
+}
+
+const RPC_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_DB_BLOCKED_USERS_MESSAGES_VISIBILITY: Record<
+  RPCBlockedUsersMessagesVisibilitySetting,
+  DBBlockedUsersMessagesVisibilitySetting | undefined
+> = {
+  [RPCBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES]: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+  [RPCBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES]:
+    DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+  [RPCBlockedUsersMessagesVisibilitySetting.UNRECOGNIZED]: undefined
+}
+
+const DB_PRIVATE_MESSAGE_PRIVACY_TO_RPC_PRIVATE_MESSAGE_PRIVACY: Record<
+  DBPrivateMessagesPrivacy,
+  RPCPrivateMessagePrivacySetting
+> = {
+  [DBPrivateMessagesPrivacy.ONLY_FRIENDS]: RPCPrivateMessagePrivacySetting.ONLY_FRIENDS,
+  [DBPrivateMessagesPrivacy.ALL]: RPCPrivateMessagePrivacySetting.ALL
+}
+
+const DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBILITY: Record<
+  DBBlockedUsersMessagesVisibilitySetting,
+  RPCBlockedUsersMessagesVisibilitySetting
+> = {
+  [DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES]: RPCBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+  [DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES]:
+    RPCBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+}
 
 export class InvalidSocialSettingsError extends Error {
   constructor(message: string) {
@@ -11,19 +51,21 @@ export class InvalidSocialSettingsError extends Error {
   }
 }
 
-export function convertDBSettingsToRPCSettings(settings: SocialSettings): SocialSettingsResponse {
+export function convertDBSettingsToRPCSettings(settings: DBSocialSettings): RPCSocialSettings {
   return {
-    privateMessagesPrivacy: convertDbPrivateMessagesPrivacyIntoRPCSetting(settings.private_messages_privacy),
-    blockedUsersMessagesVisibility: convertDbBlockedUsersMessagesVisibilityIntoRPCSetting(
-      settings.blocked_users_messages_visibility
-    )
+    privateMessagesPrivacy:
+      DB_PRIVATE_MESSAGE_PRIVACY_TO_RPC_PRIVATE_MESSAGE_PRIVACY[settings.private_messages_privacy],
+    blockedUsersMessagesVisibility:
+      DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBILITY[
+        settings.blocked_users_messages_visibility
+      ]
   }
 }
 
 export function convertRPCSettingsIntoDBSettings(
-  settings: Partial<SocialSettingsResponse>
-): Partial<Omit<SocialSettings, 'address'>> {
-  const dbSettings: Partial<Omit<SocialSettings, 'address'>> = {}
+  settings: Partial<RPCSocialSettings>
+): Partial<Omit<DBSocialSettings, 'address'>> {
+  const dbSettings: Partial<Omit<DBSocialSettings, 'address'>> = {}
 
   if (settings.privateMessagesPrivacy !== undefined) {
     dbSettings.private_messages_privacy = convertRPCPrivateMessagesPrivacyIntoDBSetting(settings.privateMessagesPrivacy)
@@ -38,57 +80,30 @@ export function convertRPCSettingsIntoDBSettings(
   return dbSettings
 }
 
-function convertDbPrivateMessagesPrivacyIntoRPCSetting(
-  privacy: PrivateMessagesPrivacy
-): PrivateMessagePrivacySettingResponse {
-  switch (privacy) {
-    case PrivateMessagesPrivacy.ONLY_FRIENDS:
-      return PrivateMessagePrivacySettingResponse.ONLY_FRIENDS
-    case PrivateMessagesPrivacy.ALL:
-      return PrivateMessagePrivacySettingResponse.ALL
-  }
-}
-
 function convertRPCPrivateMessagesPrivacyIntoDBSetting(
-  privacy: PrivateMessagePrivacySettingResponse
-): PrivateMessagesPrivacy {
-  switch (privacy) {
-    case PrivateMessagePrivacySettingResponse.ONLY_FRIENDS:
-      return PrivateMessagesPrivacy.ONLY_FRIENDS
-    case PrivateMessagePrivacySettingResponse.ALL:
-      return PrivateMessagesPrivacy.ALL
-    default:
-      throw new InvalidSocialSettingsError('Unknown private messages privacy setting')
+  privacy: RPCPrivateMessagePrivacySetting
+): DBPrivateMessagesPrivacy {
+  const dbPrivacy = RPC_PRIVATE_MESSAGE_PRIVACY_TO_DB_PRIVATE_MESSAGE_PRIVACY[privacy]
+  if (dbPrivacy === undefined) {
+    throw new InvalidSocialSettingsError('Unknown private messages privacy setting')
   }
-}
-
-function convertDbBlockedUsersMessagesVisibilityIntoRPCSetting(
-  visibility: BlockedUsersMessagesVisibilitySetting
-): BlockedUsersMessagesVisibilitySettingResponse {
-  switch (visibility) {
-    case BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES:
-      return BlockedUsersMessagesVisibilitySettingResponse.SHOW_MESSAGES
-    case BlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES:
-      return BlockedUsersMessagesVisibilitySettingResponse.DO_NOT_SHOW_MESSAGES
-  }
+  return dbPrivacy
 }
 
 function convertRPCBlockedUsersMessagesVisibilityIntoDBSetting(
-  visibility: BlockedUsersMessagesVisibilitySettingResponse
-): BlockedUsersMessagesVisibilitySetting {
-  switch (visibility) {
-    case BlockedUsersMessagesVisibilitySettingResponse.SHOW_MESSAGES:
-      return BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
-    case BlockedUsersMessagesVisibilitySettingResponse.DO_NOT_SHOW_MESSAGES:
-      return BlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
-    default:
-      throw new InvalidSocialSettingsError('Unknown blocked users messages visibility setting')
+  visibility: RPCBlockedUsersMessagesVisibilitySetting
+): DBBlockedUsersMessagesVisibilitySetting {
+  const dbVisibility = RPC_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_DB_BLOCKED_USERS_MESSAGES_VISIBILITY[visibility]
+  if (dbVisibility === undefined) {
+    throw new InvalidSocialSettingsError('Unknown blocked users messages visibility setting')
   }
+  return dbVisibility
 }
-export function getDefaultSettings(address: string): SocialSettings {
+
+export function getDefaultSettings(address: string): DBSocialSettings {
   return {
     address,
-    private_messages_privacy: PrivateMessagesPrivacy.ONLY_FRIENDS,
-    blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+    private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
+    blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
   }
 }
