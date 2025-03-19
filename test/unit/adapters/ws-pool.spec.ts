@@ -168,7 +168,7 @@ describe('ws-pool-component', () => {
 
       const multiSetCall = mockRedisClient.multi().set.mock.calls[0]
       expect(multiSetCall[0]).toBe('ws:conn:test-1')
-      expect(multiSetCall[1]).toBe(JSON.stringify({ lastActivity: now }))
+      expect(multiSetCall[1]).toBe(JSON.stringify({ lastActivity: now, startTime: now }))
       expect(multiSetCall[2]).toEqual({
         NX: true,
         EX: Math.ceil(300000 / 1000)

@@ -7,6 +7,7 @@ import {
   mockConfig,
   mockDb,
   mockLogs,
+  mockMetrics,
   mockPubSub,
   mockUWs,
   mockWorldsStats
@@ -55,7 +56,8 @@ describe('createRpcServerComponent', () => {
       catalystClient: mockCatalystClient,
       sns: mockSns,
       subscribersContext,
-      worldsStats: mockWorldsStats
+      worldsStats: mockWorldsStats,
+      metrics: mockMetrics
     })
   })
 

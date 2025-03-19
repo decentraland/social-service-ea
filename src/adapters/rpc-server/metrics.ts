@@ -1,14 +1,30 @@
-import { RpcServerContext, RPCServiceContext } from '../../types'
+import { BaseComponents, RpcServerContext, RPCServiceContext } from '../../types'
+
+export type ServiceCreator<T, C extends keyof BaseComponents = keyof BaseComponents> = (
+  context: RPCServiceContext<C>
+) => T
+
+export enum ServiceType {
+  CALL = 'call',
+  STREAM = 'stream'
+}
+
+type RpcCallMethod<TParams, TResult, TContext> = (params: TParams, context: TContext) => Promise<TResult>
+
+type RpcStreamMethod<TParams, TResult, TContext> = (
+  params: TParams,
+  context: TContext
+) => AsyncGenerator<TResult, void, unknown>
+
+type ServiceMethodDefinition = {
+  creator: RpcCallMethod<any, any, RpcServerContext> | RpcStreamMethod<any, any, RpcServerContext>
+  type: ServiceType
+}
 
 type RpcServerMetrics = {
-  measureRpcCall: <TParams extends Record<string, unknown> | void, TResult, TContext extends RpcServerContext>(
-    procedureName: string,
-    serviceFunction: (params: TParams, context: TContext) => Promise<TResult>
-  ) => (params: TParams, context: TContext) => Promise<TResult>
-  measureRpcStream: <TParams extends Record<string, unknown> | void, TResult, TContext extends RpcServerContext>(
-    procedureName: string,
-    serviceFunction: (params: TParams, context: TContext) => AsyncGenerator<TResult, void, unknown>
-  ) => (params: TParams, context: TContext) => AsyncGenerator<TResult, void, unknown>
+  withMetrics: <T extends Record<string, ServiceMethodDefinition>>(
+    serviceCreators: T
+  ) => { [K in keyof T]: T[K]['creator'] }
 }
 
 enum RpcErrorCode {
@@ -17,7 +33,7 @@ enum RpcErrorCode {
   STREAM_ERROR = 'STREAM_ERROR'
 }
 
-export function createRpcServerMetrics({
+export function createRpcServerMetricsWrapper({
   components: { metrics, logs }
 }: RPCServiceContext<'metrics' | 'logs'>): RpcServerMetrics {
   const logger = logs.getLogger('rpc-server-metrics')
@@ -49,11 +65,11 @@ export function createRpcServerMetrics({
     metrics.observe('rpc_procedure_call_duration_seconds', { code, procedure: procedureName }, duration)
   }
 
-  function measureRpcCall<TParams extends Record<string, unknown> | void, TResult, TContext extends RpcServerContext>(
+  function measureRpcCall<TParams extends Record<string, unknown> | void, TResult>(
     procedureName: string,
-    serviceFunction: (params: TParams, context: TContext) => Promise<TResult>
-  ): (params: TParams, context: TContext) => Promise<TResult> {
-    return async (params: TParams, context: TContext) => {
+    serviceFunction: RpcCallMethod<TParams, TResult, RpcServerContext>
+  ): RpcCallMethod<TParams, TResult, RpcServerContext> {
+    return async (params: TParams, context: RpcServerContext) => {
       const startTime = Date.now()
 
       try {
@@ -71,11 +87,11 @@ export function createRpcServerMetrics({
     }
   }
 
-  function measureRpcStream<TParams extends Record<string, unknown> | void, TResult, TContext extends RpcServerContext>(
+  function measureRpcStream<TParams extends Record<string, unknown> | void, TResult>(
     procedureName: string,
-    serviceFunction: (params: TParams, context: TContext) => AsyncGenerator<TResult, void, unknown>
-  ): (params: TParams, context: TContext) => AsyncGenerator<TResult, void, unknown> {
-    return async function* (params: TParams, context: TContext) {
+    serviceFunction: RpcStreamMethod<TParams, TResult, RpcServerContext>
+  ): RpcStreamMethod<TParams, TResult, RpcServerContext> {
+    return async function* (params: TParams, context: RpcServerContext) {
       const startTime = Date.now()
 
       recordRequestSize(procedureName, params)
@@ -96,8 +112,27 @@ export function createRpcServerMetrics({
     }
   }
 
+  function withMetrics<T extends Record<string, ServiceMethodDefinition>>(
+    serviceCreators: T
+  ): { [K in keyof T]: T[K]['creator'] } {
+    const result = {} as { [K in keyof T]: T[K]['creator'] }
+
+    for (const key in serviceCreators) {
+      if (Object.prototype.hasOwnProperty.call(serviceCreators, key)) {
+        const { creator, type } = serviceCreators[key]
+
+        if (type === ServiceType.CALL) {
+          result[key] = measureRpcCall(String(key), creator as any)
+        } else {
+          result[key] = measureRpcStream(String(key), creator as any)
+        }
+      }
+    }
+
+    return result
+  }
+
   return {
-    measureRpcCall,
-    measureRpcStream
+    withMetrics
   }
 }

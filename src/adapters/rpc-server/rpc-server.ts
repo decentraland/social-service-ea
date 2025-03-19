@@ -25,7 +25,7 @@ import { getBlockedUsersService } from './services/get-blocked-users'
 import { unblockUserService } from './services/unblock-user'
 import { getBlockingStatusService } from './services/get-blocking-status'
 import { subscribeToBlockUpdatesService } from './services/subscribe-to-block-updates'
-import { createRpcServerMetrics } from './metrics'
+import { createRpcServerMetricsWrapper, ServiceType } from './metrics'
 
 export async function createRpcServerComponent({
   logs,
@@ -59,98 +59,85 @@ export async function createRpcServerComponent({
     logger: logs.getLogger('rpc-server')
   })
 
-  const { measureRpcCall: withPromiseMetrics, measureRpcStream: withStreamMetrics } = createRpcServerMetrics({
+  const { withMetrics } = createRpcServerMetricsWrapper({
     components: { metrics, logs }
   })
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
 
-  const getFriends = withPromiseMetrics('getFriends', getFriendsService({ components: { logs, db, catalystClient } }))
-  const getMutualFriends = withPromiseMetrics(
-    'getMutualFriends',
-    getMutualFriendsService({ components: { logs, db, catalystClient } })
-  )
-  const getPendingFriendshipRequests = withPromiseMetrics(
-    'getPendingFriendshipRequests',
-    getPendingFriendshipRequestsService({
-      components: { logs, db, catalystClient }
-    })
-  )
-  const getSentFriendshipRequests = withPromiseMetrics(
-    'getSentFriendshipRequests',
-    getSentFriendshipRequestsService({
-      components: { logs, db, catalystClient }
-    })
-  )
-  const upsertFriendship = withPromiseMetrics(
-    'upsertFriendship',
-    upsertFriendshipService({
-      components: { logs, db, pubsub, catalystClient, sns }
-    })
-  )
-  const getFriendshipStatus = withPromiseMetrics(
-    'getFriendshipStatus',
-    getFriendshipStatusService({ components: { logs, db } })
-  )
-  const subscribeToFriendshipUpdates = withStreamMetrics(
-    'subscribeToFriendshipUpdates',
-    subscribeToFriendshipUpdatesService({
-      components: { logs, catalystClient }
-    })
-  )
-  const subscribeToFriendConnectivityUpdates = withStreamMetrics(
-    'subscribeToFriendConnectivityUpdates',
-    subscribeToFriendConnectivityUpdatesService({
-      components: { logs, db, archipelagoStats, catalystClient, worldsStats }
-    })
-  )
-  const subscribeToBlockUpdates = withStreamMetrics(
-    'subscribeToBlockUpdates',
-    subscribeToBlockUpdatesService({
-      components: { logs, catalystClient }
-    })
-  )
+  const serviceCreators = {
+    getFriends: {
+      creator: getFriendsService({ components: { logs, db, catalystClient } }),
+      type: ServiceType.CALL
+    },
+    getMutualFriends: {
+      creator: getMutualFriendsService({ components: { logs, db, catalystClient } }),
+      type: ServiceType.CALL
+    },
+    getPendingFriendshipRequests: {
+      creator: getPendingFriendshipRequestsService({ components: { logs, db, catalystClient } }),
+      type: ServiceType.CALL
+    },
+    getSentFriendshipRequests: {
+      creator: getSentFriendshipRequestsService({ components: { logs, db, catalystClient } }),
+      type: ServiceType.CALL
+    },
+    upsertFriendship: {
+      creator: upsertFriendshipService({ components: { logs, db, pubsub, catalystClient, sns } }),
+      type: ServiceType.CALL
+    },
+    getFriendshipStatus: {
+      creator: getFriendshipStatusService({ components: { logs, db } }),
+      type: ServiceType.CALL
+    },
+    subscribeToFriendshipUpdates: {
+      creator: subscribeToFriendshipUpdatesService({ components: { logs, catalystClient } }),
+      type: ServiceType.STREAM
+    },
+    subscribeToFriendConnectivityUpdates: {
+      creator: subscribeToFriendConnectivityUpdatesService({
+        components: { logs, db, archipelagoStats, catalystClient, worldsStats }
+      }),
+      type: ServiceType.STREAM
+    },
+    subscribeToBlockUpdates: {
+      creator: subscribeToBlockUpdatesService({ components: { logs, catalystClient } }),
+      type: ServiceType.STREAM
+    },
+    blockUser: {
+      creator: blockUserService({ components: { logs, db, catalystClient, pubsub } }),
+      type: ServiceType.CALL
+    },
+    unblockUser: {
+      creator: unblockUserService({ components: { logs, db, catalystClient, pubsub } }),
+      type: ServiceType.CALL
+    },
+    getBlockedUsers: {
+      creator: getBlockedUsersService({ components: { logs, db, catalystClient } }),
+      type: ServiceType.CALL
+    },
+    getBlockingStatus: {
+      creator: getBlockingStatusService({ components: { logs, db } }),
+      type: ServiceType.CALL
+    },
+    getPrivateMessagesSettings: {
+      creator: getPrivateMessagesSettingsService({ components: { logs, db } }),
+      type: ServiceType.CALL
+    },
+    upsertSocialSettings: {
+      creator: upsertSocialSettingsService({ components: { logs, db } }),
+      type: ServiceType.CALL
+    },
+    getSocialSettings: {
+      creator: getSocialSettingsService({ components: { logs, db } }),
+      type: ServiceType.CALL
+    }
+  }
 
-  const blockUser = withPromiseMetrics(
-    'blockUser',
-    blockUserService({ components: { logs, db, catalystClient, pubsub } })
-  )
-  const unblockUser = withPromiseMetrics(
-    'unblockUser',
-    unblockUserService({ components: { logs, db, catalystClient, pubsub } })
-  )
-  const getBlockedUsers = withPromiseMetrics(
-    'getBlockedUsers',
-    getBlockedUsersService({ components: { logs, db, catalystClient } })
-  )
-  const getBlockingStatus = withPromiseMetrics(
-    'getBlockingStatus',
-    getBlockingStatusService({ components: { logs, db } })
-  )
-
-  const getPrivateMessagesSettings = getPrivateMessagesSettingsService({ components: { logs, db } })
-  const upsertSocialSettings = upsertSocialSettingsService({ components: { logs, db } })
-  const getSocialSettings = getSocialSettingsService({ components: { logs, db } })
+  const servicesWithMetrics = withMetrics(serviceCreators)
 
   rpcServer.setHandler(async function handler(port) {
-    registerService(port, SocialServiceDefinition, async () => ({
-      getFriends,
-      getMutualFriends,
-      getPendingFriendshipRequests,
-      getSentFriendshipRequests,
-      getFriendshipStatus,
-      upsertFriendship,
-      blockUser,
-      unblockUser,
-      getBlockedUsers,
-      getBlockingStatus,
-      subscribeToFriendshipUpdates,
-      subscribeToFriendConnectivityUpdates,
-      getPrivateMessagesSettings,
-      upsertSocialSettings,
-      getSocialSettings,
-      subscribeToBlockUpdates
-    }))
+    registerService(port, SocialServiceDefinition, async () => servicesWithMetrics)
   })
 
   return {
