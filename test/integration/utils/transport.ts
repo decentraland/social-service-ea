@@ -1,4 +1,4 @@
-import WebSocket, { MessageEvent } from 'isomorphic-ws'
+import WebSocket, { MessageEvent } from 'ws'
 import mitt from 'mitt'
 import type { Transport, TransportEvents } from '@dcl/rpc'
 
