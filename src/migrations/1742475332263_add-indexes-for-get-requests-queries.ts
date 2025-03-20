@@ -6,17 +6,18 @@ export const shorthands: ColumnDefinitions | undefined = undefined
 const indexes = {
   friendship_actions: [
     ['friendship_id', 'timestamp DESC'],
-    ['LOWER(acting_user)', 'action'],
     ['timestamp DESC'],
-    ['LOWER(acting_user)']
+    ['acting_user'],
+    ['action', 'acting_user', 'timestamp DESC'],
+    ['action', 'acting_user']
   ],
-  friendships: [['is_active', 'LOWER(address_requester)', 'LOWER(address_requested)']]
+  friendships: [['is_active']]
 }
 
 export async function up(pgm: MigrationBuilder): Promise<void> {
   Object.entries(indexes).forEach(([table, columnsIndexes]) => {
     columnsIndexes.forEach((columns) => {
-      pgm.createIndex(table, columns)
+      pgm.createIndex(table, columns, { ifNotExists: true })
     })
   })
 }
@@ -24,7 +25,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 export async function down(pgm: MigrationBuilder): Promise<void> {
   Object.entries(indexes).forEach(([table, columnsIndexes]) => {
     columnsIndexes.forEach((columns) => {
-      pgm.dropIndex(table, columns)
+      pgm.dropIndex(table, columns, { ifExists: true })
     })
   })
 }

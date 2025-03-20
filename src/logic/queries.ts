@@ -89,47 +89,49 @@ export function getFriendshipRequestsBaseQuery(
   const { limit, offset } = pagination || {}
   const normalizedUserAddress = normalizeAddress(userAddress)
 
-  const columnMapping = {
-    sent: SQL`
-        CASE
-          WHEN LOWER(f.address_requester) = lr.acting_user THEN LOWER(f.address_requested)
-          ELSE LOWER(f.address_requester)
-        END`,
-    received: SQL` LOWER(lr.acting_user)`
-  }
-
-  const filterMapping = {
-    sent: SQL` LOWER(lr.acting_user) = ${normalizedUserAddress}`,
-    received: SQL` LOWER(lr.acting_user) <> ${normalizedUserAddress} AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})`
-  }
-
   const baseQuery = SQL`SELECT`
 
   if (onlyCount) {
-    baseQuery.append(SQL` DISTINCT COUNT(1) as count`)
+    baseQuery.append(SQL` COUNT(1) as count`)
   } else {
-    baseQuery.append(SQL` lr.id,`)
-    baseQuery.append(columnMapping[type])
-    baseQuery.append(SQL` as address, lr.timestamp, lr.metadata`)
+    baseQuery.append(SQL` fa.id,`)
+
+    if (type === 'sent') {
+      baseQuery.append(SQL` 
+        CASE
+          WHEN LOWER(f.address_requester) = LOWER(fa.acting_user) THEN LOWER(f.address_requested)
+          ELSE LOWER(f.address_requester)
+        END as address,`)
+    } else {
+      baseQuery.append(SQL` LOWER(fa.acting_user) as address,`)
+    }
+
+    baseQuery.append(SQL` fa.timestamp, fa.metadata`)
   }
 
-  baseQuery.append(SQL` FROM friendships f`)
-  baseQuery.append(SQL` INNER JOIN LATERAL (
-        SELECT *
-        FROM friendship_actions fa
-        WHERE fa.friendship_id = f.id
-        ORDER BY fa.timestamp DESC
-        LIMIT 1
-      ) lr ON true`)
-  baseQuery.append(SQL` WHERE`)
-  baseQuery.append(filterMapping[type])
-  baseQuery.append(SQL` AND action = ${Action.REQUEST}`)
+  baseQuery.append(SQL` FROM friendship_actions fa`)
+  baseQuery.append(SQL` JOIN friendships f ON f.id = fa.friendship_id AND f.is_active IS FALSE`)
+  baseQuery.append(SQL` WHERE fa.action = ${Action.REQUEST}`)
 
-  baseQuery.append(SQL` AND f.is_active IS FALSE`)
+  if (type === 'sent') {
+    baseQuery.append(SQL` AND LOWER(fa.acting_user) = ${normalizedUserAddress}`)
+  } else {
+    baseQuery.append(SQL` AND LOWER(fa.acting_user) <> ${normalizedUserAddress}`)
+    baseQuery.append(
+      SQL` AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})`
+    )
+  }
+
+  baseQuery.append(SQL` AND NOT EXISTS (
+    SELECT 1 FROM friendship_actions newer
+    WHERE newer.friendship_id = fa.friendship_id
+    AND newer.timestamp > fa.timestamp
+  )`)
+
   baseQuery.append(SQL` AND `).append(getBlockingCondition(userAddress))
 
   if (!onlyCount) {
-    baseQuery.append(SQL` ORDER BY lr.timestamp DESC`)
+    baseQuery.append(SQL` ORDER BY fa.timestamp DESC`)
 
     if (limit) {
       baseQuery.append(SQL` LIMIT ${limit}`)
