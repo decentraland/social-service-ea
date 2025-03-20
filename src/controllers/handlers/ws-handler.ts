@@ -9,8 +9,8 @@ import { randomUUID } from 'crypto'
 
 const textDecoder = new TextDecoder()
 
-const FIVE_MINUTES_IN_SECONDS = 300
-const THREE_MINUTES_IN_MS = 180000
+export const FIVE_MINUTES_IN_SECONDS = 300
+export const THREE_MINUTES_IN_MS = 180000
 
 const getAddress = (data: WsUserData) => {
   return isAuthenticated(data) ? data.address : 'Not authenticated'

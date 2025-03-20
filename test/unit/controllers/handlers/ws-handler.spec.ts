@@ -1,6 +1,6 @@
 import mitt from 'mitt'
 import { verify } from '@dcl/platform-crypto-middleware'
-import { registerWsHandler } from '../../../../src/controllers/handlers/ws-handler'
+import { registerWsHandler, THREE_MINUTES_IN_MS } from '../../../../src/controllers/handlers/ws-handler'
 import {
   mockLogs,
   mockMetrics,
@@ -87,12 +87,25 @@ describe('ws-handler', () => {
       await wsHandlers.open(mockWs)
       expect(mockWsPool.acquireConnection).toHaveBeenCalledWith('test-client-id')
       expect(mockData.isConnected).toBe(true)
+      expect(mockData.connectionStartTime).toBeDefined()
     })
 
     it('should handle connection acquisition failure', async () => {
       mockWsPool.acquireConnection.mockRejectedValueOnce(new Error('Connection limit reached'))
       await wsHandlers.open(mockWs)
       expect(mockWs.end).toHaveBeenCalledWith(1013, 'Unable to acquire connection')
+    })
+
+    it('should set a timeout for non-authenticated connections', async () => {
+      jest.useFakeTimers()
+
+      await wsHandlers.open(mockWs)
+
+      expect(mockWs.getUserData().timeout).toBeDefined()
+
+      jest.advanceTimersByTime(THREE_MINUTES_IN_MS)
+      expect(mockWs.end).toHaveBeenCalled()
+      jest.useRealTimers()
     })
   })
 
@@ -145,6 +158,16 @@ describe('ws-handler', () => {
           })
         )
       })
+
+      it('should ignore messages when connection is marked as disconnected', async () => {
+        authData.isConnected = false;
+        const testMessage = Buffer.from('test message');
+        
+        await wsHandlers.message(mockWs, testMessage);
+        
+        expect(authData.eventEmitter.emit).not.toHaveBeenCalled();
+        expect(mockWsPool.updateActivity).not.toHaveBeenCalled();
+      })
     })
 
     describe('for non-authenticated users', () => {
@@ -179,6 +202,20 @@ describe('ws-handler', () => {
 
         expect(mockWs.close).toHaveBeenCalled()
       })
+
+      it('should clear timeout when user authenticates', async () => {
+        const mockTimeout = setTimeout(() => {}, 1000);
+        const userData = mockWs.getUserData();
+        userData.timeout = mockTimeout;
+        
+        (verify as jest.Mock).mockResolvedValue({ auth: '0x123' });
+        
+        await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })));
+
+        expect(mockWs.getUserData().timeout).toBeUndefined()
+
+        clearTimeout(mockTimeout);
+      })
     })
   })
 
@@ -200,6 +237,8 @@ describe('ws-handler', () => {
       expect(authData.transport.close).toHaveBeenCalled()
       expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123')
       expect(mockWsPool.releaseConnection).toHaveBeenCalledWith('test-client-id')
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_connection_duration_seconds', {}, expect.any(Number))
+      expect(authData.connectionStartTime).toBeDefined()
       expect(authData.isConnected).toBe(false)
       expect(authData.auth).toBe(false)
     })
@@ -233,6 +272,17 @@ describe('ws-handler', () => {
       expect(mockWsPool.releaseConnection).toHaveBeenCalledWith('test-client-id')
       expect(authData.isConnected).toBe(false)
       expect(authData.auth).toBe(false)
+    })
+
+    it('should clear timeout for non-authenticated connections', async () => {
+      const mockTimeout = setTimeout(() => {}, 1000)
+      const userData = mockWs.getUserData()
+      userData.timeout = mockTimeout
+
+      await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
+
+      expect(mockWs.getUserData().timeout).toBeUndefined()
+      clearTimeout(mockTimeout)
     })
   })
 
