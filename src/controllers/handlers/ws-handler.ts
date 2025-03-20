@@ -27,7 +27,7 @@ export async function registerWsHandler(
   }
 
   server.app.ws<WsUserData>('/', {
-    idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS, // In seconds
+    idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS,
     sendPingsAutomatically: true,
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
@@ -238,13 +238,14 @@ export async function registerWsHandler(
         ...(isAuthenticated(data) && { address: data.address })
       })
 
-      // Calculate and record connection duration
-      const duration = (Date.now() - data.connectionStartTime) / 1000 // Convert to seconds
-      metrics.observe('ws_connection_duration_seconds', {}, duration)
+      const duration = (Date.now() - data.connectionStartTime) / 1000
+      if (!isNaN(duration) && isFinite(duration)) {
+        metrics.observe('ws_connection_duration_seconds', {}, duration)
+      }
 
       logger.debug('WebSocket connection closed, duration tracked', {
         wsConnectionId: data.wsConnectionId,
-        durationSeconds: duration
+        durationSeconds: duration || 'N/A'
       })
     },
     ping: (ws) => {
