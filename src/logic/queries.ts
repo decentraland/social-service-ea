@@ -99,11 +99,11 @@ export function getFriendshipRequestsBaseQuery(
     if (type === 'sent') {
       baseQuery.append(SQL` 
         CASE
-          WHEN LOWER(f.address_requester) = LOWER(fa.acting_user) THEN LOWER(f.address_requested)
-          ELSE LOWER(f.address_requester)
+          WHEN f.address_requester = fa.acting_user THEN f.address_requested
+          ELSE f.address_requester
         END as address,`)
     } else {
-      baseQuery.append(SQL` LOWER(fa.acting_user) as address,`)
+      baseQuery.append(SQL` fa.acting_user as address,`)
     }
 
     baseQuery.append(SQL` fa.timestamp, fa.metadata`)
@@ -114,11 +114,11 @@ export function getFriendshipRequestsBaseQuery(
   baseQuery.append(SQL` WHERE fa.action = ${Action.REQUEST}`)
 
   if (type === 'sent') {
-    baseQuery.append(SQL` AND LOWER(fa.acting_user) = ${normalizedUserAddress}`)
+    baseQuery.append(SQL` AND fa.acting_user = ${normalizedUserAddress}`)
   } else {
-    baseQuery.append(SQL` AND LOWER(fa.acting_user) <> ${normalizedUserAddress}`)
+    baseQuery.append(SQL` AND fa.acting_user <> ${normalizedUserAddress}`)
     baseQuery.append(
-      SQL` AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})`
+      SQL` AND (f.address_requester = ${normalizedUserAddress} OR f.address_requested = ${normalizedUserAddress})`
     )
   }
 

@@ -382,7 +382,7 @@ describe('db', () => {
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
-            'SELECT fa.id, LOWER(fa.acting_user) as address, fa.timestamp, fa.metadata FROM friendship_actions fa'
+            'SELECT fa.id, fa.acting_user as address, fa.timestamp, fa.metadata FROM friendship_actions fa'
           )
         })
       )
@@ -409,21 +409,21 @@ describe('db', () => {
       const normalizedUserAddress = normalizeAddress('0x456')
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('LOWER(fa.acting_user) <>'),
+          text: expect.stringContaining('fa.acting_user <>'),
           values: expect.arrayContaining([normalizedUserAddress])
         })
       )
       
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('LOWER(f.address_requester) ='),
+          text: expect.stringContaining('f.address_requester ='),
           values: expect.arrayContaining([normalizedUserAddress])
         })
       )
       
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('LOWER(f.address_requested) ='),
+          text: expect.stringContaining('f.address_requested ='),
           values: expect.arrayContaining([normalizedUserAddress])
         })
       )
@@ -467,13 +467,13 @@ describe('db', () => {
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
-            `WHEN LOWER(f.address_requester) = LOWER(fa.acting_user) THEN LOWER(f.address_requested)`
+            `WHEN f.address_requester = fa.acting_user THEN f.address_requested`
           )
         })
       )
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining(`ELSE LOWER(f.address_requester)`)
+          text: expect.stringContaining(`ELSE f.address_requester`)
         })
       )
       expect(mockPg.query).toHaveBeenCalledWith(
@@ -483,7 +483,7 @@ describe('db', () => {
       )
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('LOWER(fa.acting_user) ='),
+          text: expect.stringContaining('fa.acting_user ='),
           values: expect.arrayContaining(['0x123'])
         })
       )
