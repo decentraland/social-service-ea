@@ -15,9 +15,16 @@ export async function createWSPoolComponent({
     const pattern = 'ws:conn:*'
 
     for await (const key of redis.client.scanIterator({ MATCH: pattern })) {
-      const data = await redis.get<{ lastActivity: number }>(key)
+      const data = await redis.get<{ lastActivity: number; startTime?: number }>(key)
       if (data && now - data.lastActivity > idleTimeoutInMs) {
         const id = key.replace('ws:conn:', '')
+
+        if (data.startTime) {
+          const duration = (now - data.startTime) / 1000
+          metrics.observe('ws_connection_duration_seconds', {}, duration)
+          logger.debug('Idle connection duration recorded', { id, durationSeconds: duration })
+        }
+
         await releaseConnection(id)
         metrics.increment('ws_idle_timeouts')
       }
@@ -36,16 +43,17 @@ export async function createWSPoolComponent({
       throw new Error('Connection already exists')
     }
 
+    const startTime = Date.now()
     const multi = redis.client.multi()
 
     try {
       const result = await multi
         .zCard('ws:active_connections')
-        .set(key, JSON.stringify({ lastActivity: Date.now() }), {
+        .set(key, JSON.stringify({ lastActivity: startTime, startTime }), {
           NX: true,
           EX: Math.ceil(idleTimeoutInMs / 1000)
         })
-        .zAdd('ws:active_connections', { score: Date.now(), value: id })
+        .zAdd('ws:active_connections', { score: startTime, value: id })
         .exec()
 
       if (!result) {
@@ -70,9 +78,17 @@ export async function createWSPoolComponent({
       })
 
       const key = `ws:conn:${id}`
+      const connectionData = await redis.get<{ lastActivity: number; startTime?: number }>(key)
       await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
       const totalConnections = await redis.client.zCard('ws:active_connections')
+
       metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
+
+      if (connectionData?.startTime) {
+        const duration = (Date.now() - connectionData.startTime) / 1000
+        metrics.observe('ws_connection_duration_seconds', {}, duration)
+        logger.debug('Connection duration recorded', { id, durationSeconds: duration })
+      }
     } catch (error: any) {
       logger.error('[DEBUGGING CONNECTION] Error releasing connection', {
         connectionId: id,

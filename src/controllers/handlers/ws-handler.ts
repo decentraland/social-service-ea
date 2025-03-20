@@ -4,13 +4,17 @@ import { verify } from '@dcl/platform-crypto-middleware'
 import { AppComponents, WsUserData } from '../../types'
 import { normalizeAddress } from '../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../utils/UWebSocketTransport'
-import { isNotAuthenticated } from '../../utils/wsUserData'
+import { isAuthenticated, isNotAuthenticated } from '../../utils/wsUserData'
 import { randomUUID } from 'crypto'
 
 const textDecoder = new TextDecoder()
 
-const FIVE_MINUTES_IN_SECONDS = 300
-const THREE_MINUTES_IN_MS = 180000
+export const FIVE_MINUTES_IN_SECONDS = 300
+export const THREE_MINUTES_IN_MS = 180000
+
+const getAddress = (data: WsUserData) => {
+  return isAuthenticated(data) ? data.address : 'Not authenticated'
+}
 
 export async function registerWsHandler(
   components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool'>
@@ -57,14 +61,14 @@ export async function registerWsHandler(
         wsConnectionId: data.wsConnectionId,
         isConnected: String(data.isConnected),
         auth: String(data.auth),
-        address: data.auth ? data.address : 'Not authenticated'
+        address: getAddress(data)
       })
 
       try {
         await wsPool.acquireConnection(data.wsConnectionId)
         logger.debug('[DEBUGGING CONNECTION] Connection acquired', {
           wsConnectionId: data.wsConnectionId,
-          address: data.auth ? data.address : 'Not authenticated'
+          address: getAddress(data)
         })
 
         if (isNotAuthenticated(data)) {
@@ -78,7 +82,7 @@ export async function registerWsHandler(
           }, THREE_MINUTES_IN_MS)
         }
 
-        changeStage(data, { isConnected: true })
+        changeStage(data, { isConnected: true, connectionStartTime: Date.now() })
         logger.debug('WebSocket opened', { wsConnectionId: data.wsConnectionId })
       } catch (error: any) {
         logger.debug('[DEBUGGING CONNECTION] Failed to acquire connection', {
@@ -95,7 +99,7 @@ export async function registerWsHandler(
         isConnected: String(data.isConnected),
         auth: String(data.auth),
         messageSize: message.byteLength,
-        address: data.auth ? data.address : 'Not authenticated'
+        address: getAddress(data)
       })
       metrics.increment('ws_messages_received')
 
@@ -150,12 +154,12 @@ export async function registerWsHandler(
         try {
           logger.info('Received message', {
             wsConnectionId: data.wsConnectionId,
-            address: data.auth ? data.address : 'Not authenticated'
+            address: getAddress(data)
           })
 
           if (!data.isConnected) {
             logger.warn('Received message but connection is marked as disconnected', {
-              address: data.address,
+              address: getAddress(data),
               wsConnectionId: data.wsConnectionId
             })
             return
@@ -170,7 +174,7 @@ export async function registerWsHandler(
         } catch (error: any) {
           logger.error('Error emitting message', {
             error,
-            address: data.address,
+            address: getAddress(data),
             wsConnectionId: data.wsConnectionId,
             isConnected: String(data.isConnected),
             hasEventEmitter: String(!!data.eventEmitter)
@@ -193,7 +197,7 @@ export async function registerWsHandler(
         auth: String(data.auth)
       })
 
-      if (data.auth && data.address) {
+      if (isAuthenticated(data)) {
         try {
           data.transport.close()
           rpcServer.detachUser(data.address)
@@ -202,7 +206,7 @@ export async function registerWsHandler(
         } catch (error: any) {
           logger.error('Error during connection cleanup', {
             error: error.message,
-            address: data.address,
+            address: getAddress(data),
             wsConnectionId
           })
         }
@@ -231,7 +235,16 @@ export async function registerWsHandler(
         code,
         reason: messageText,
         wsConnectionId,
-        ...(data.auth && { address: data.address })
+        ...(isAuthenticated(data) && { address: data.address })
+      })
+
+      // Calculate and record connection duration
+      const duration = (Date.now() - data.connectionStartTime) / 1000 // Convert to seconds
+      metrics.observe('ws_connection_duration_seconds', {}, duration)
+
+      logger.debug('WebSocket connection closed, duration tracked', {
+        wsConnectionId: data.wsConnectionId,
+        durationSeconds: duration
       })
     },
     ping: (ws) => {
@@ -239,7 +252,7 @@ export async function registerWsHandler(
       logger.debug('[DEBUGGING CONNECTION] Ping received', {
         wsConnectionId: data.wsConnectionId,
         isConnected: String(data.isConnected),
-        address: data.auth ? data.address : 'Not authenticated'
+        address: getAddress(data)
       })
       if (data.wsConnectionId) {
         wsPool.updateActivity(data.wsConnectionId)

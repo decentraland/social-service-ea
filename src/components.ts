@@ -73,7 +73,8 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     sns,
     subscribersContext,
-    worldsStats
+    worldsStats,
+    metrics
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })

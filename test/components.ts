@@ -89,7 +89,8 @@ async function initComponents(): Promise<TestComponents> {
     catalystClient,
     sns,
     subscribersContext,
-    worldsStats
+    worldsStats,
+    metrics
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
