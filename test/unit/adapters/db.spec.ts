@@ -382,7 +382,7 @@ describe('db', () => {
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
-            'SELECT lr.id, LOWER(lr.acting_user) as address, lr.timestamp, lr.metadata FROM friendships f INNER JOIN latest_requests lr ON f.id = lr.friendship_id'
+            'SELECT lr.id, LOWER(lr.acting_user) as address, lr.timestamp, lr.metadata FROM friendships f'
           )
         })
       )
@@ -417,9 +417,9 @@ describe('db', () => {
       const result = await dbComponent.getReceivedFriendshipRequestsCount('0x456')
 
       expect(result).toBe(mockCount)
-      expect(mockPg.query).not.toHaveBeenCalledWith(
+      expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('ORDER BY fa.timestamp DESC')
+          text: expect.stringContaining('DISTINCT COUNT(1) as count')
         })
       )
     })
@@ -476,9 +476,9 @@ describe('db', () => {
       const result = await dbComponent.getSentFriendshipRequestsCount('0x123')
 
       expect(result).toBe(mockCount)
-      expect(mockPg.query).not.toHaveBeenCalledWith(
+      expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('ORDER BY fa.timestamp DESC')
+          text: expect.stringContaining('DISTINCT COUNT(1) as count')
         })
       )
     })

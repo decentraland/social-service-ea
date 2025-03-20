@@ -103,11 +103,7 @@ export function getFriendshipRequestsBaseQuery(
     received: SQL` LOWER(lr.acting_user) <> ${normalizedUserAddress} AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})`
   }
 
-  const baseQuery = SQL`WITH latest_requests AS (
-        SELECT DISTINCT ON (friendship_id) *
-        FROM friendship_actions
-        ORDER BY friendship_id, timestamp DESC
-      ) SELECT`
+  const baseQuery = SQL`SELECT`
 
   if (onlyCount) {
     baseQuery.append(SQL` DISTINCT COUNT(1) as count`)
@@ -118,7 +114,13 @@ export function getFriendshipRequestsBaseQuery(
   }
 
   baseQuery.append(SQL` FROM friendships f`)
-  baseQuery.append(SQL` INNER JOIN latest_requests lr ON f.id = lr.friendship_id`)
+  baseQuery.append(SQL` INNER JOIN LATERAL (
+        SELECT *
+        FROM friendship_actions fa
+        WHERE fa.friendship_id = f.id
+        ORDER BY fa.timestamp DESC
+        LIMIT 1
+      ) lr ON true`)
   baseQuery.append(SQL` WHERE`)
   baseQuery.append(filterMapping[type])
   baseQuery.append(SQL` AND action = ${Action.REQUEST}`)
