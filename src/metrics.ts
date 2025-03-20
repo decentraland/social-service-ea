@@ -62,6 +62,11 @@ export const metricDeclarations = {
     help: 'Size of outgoing RPC procedure call payloads in bytes',
     labelNames: ['code', 'procedure'],
     buckets: [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
+  },
+  rpc_updates_sent_on_subscription: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of updates sent on RPC subscription streams',
+    labelNames: ['event']
   }
 }
 

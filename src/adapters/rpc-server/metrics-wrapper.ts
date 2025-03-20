@@ -16,13 +16,28 @@ type RpcStreamMethod<TParams, TResult, TContext> = (
   context: TContext
 ) => AsyncGenerator<TResult, void, unknown>
 
-type ServiceMethodDefinition = {
-  creator: RpcCallMethod<any, any, RpcServerContext> | RpcStreamMethod<any, any, RpcServerContext>
-  type: ServiceType
-}
+export type ServiceMethodDefinition =
+  | {
+      creator: RpcCallMethod<any, any, RpcServerContext>
+      type: ServiceType.CALL
+    }
+  | {
+      creator: RpcStreamMethod<any, any, RpcServerContext>
+      type: ServiceType.STREAM
+      event: string
+    }
 
 type RpcServerMetrics = {
-  withMetrics: <T extends Record<string, ServiceMethodDefinition>>(
+  withMetrics: <
+    T extends Record<
+      string,
+      {
+        creator: any
+        type: ServiceType
+        event?: string
+      }
+    >
+  >(
     serviceCreators: T
   ) => { [K in keyof T]: T[K]['creator'] }
 }
@@ -89,7 +104,8 @@ export function createRpcServerMetricsWrapper({
 
   function measureRpcStream<TParams extends Record<string, unknown> | void, TResult>(
     procedureName: string,
-    serviceFunction: RpcStreamMethod<TParams, TResult, RpcServerContext>
+    serviceFunction: RpcStreamMethod<TParams, TResult, RpcServerContext>,
+    event: string
   ): RpcStreamMethod<TParams, TResult, RpcServerContext> {
     return async function* (params: TParams, context: RpcServerContext) {
       const startTime = Date.now()
@@ -100,31 +116,41 @@ export function createRpcServerMetricsWrapper({
         const generator = serviceFunction(params, context)
 
         for await (const item of generator) {
+          metrics.increment('rpc_updates_sent_on_subscription', { event })
           yield item
         }
 
         recordCallMetrics(procedureName, RpcErrorCode.OK, startTime)
       } catch (error) {
         recordCallMetrics(procedureName, RpcErrorCode.STREAM_ERROR, startTime)
-
         throw error
       }
     }
   }
 
-  function withMetrics<T extends Record<string, ServiceMethodDefinition>>(
-    serviceCreators: T
-  ): { [K in keyof T]: T[K]['creator'] } {
+  function withMetrics<
+    T extends Record<
+      string,
+      {
+        creator: any
+        type: ServiceType
+        event?: string
+      }
+    >
+  >(serviceCreators: T): { [K in keyof T]: T[K]['creator'] } {
     const result = {} as { [K in keyof T]: T[K]['creator'] }
 
     for (const key in serviceCreators) {
       if (Object.prototype.hasOwnProperty.call(serviceCreators, key)) {
-        const { creator, type } = serviceCreators[key]
+        const definition = serviceCreators[key]
 
-        if (type === ServiceType.CALL) {
-          result[key] = measureRpcCall(String(key), creator as any)
+        if (definition.type === ServiceType.CALL) {
+          result[key] = measureRpcCall(String(key), definition.creator)
         } else {
-          result[key] = measureRpcStream(String(key), creator as any)
+          if (!definition.event) {
+            throw new Error(`Stream service "${String(key)}" must have an event property`)
+          }
+          result[key] = measureRpcStream(String(key), definition.creator, definition.event)
         }
       }
     }
