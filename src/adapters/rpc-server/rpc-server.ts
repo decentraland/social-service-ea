@@ -92,17 +92,20 @@ export async function createRpcServerComponent({
     },
     subscribeToFriendshipUpdates: {
       creator: subscribeToFriendshipUpdatesService({ components: { logs, catalystClient } }),
-      type: ServiceType.STREAM
+      type: ServiceType.STREAM,
+      event: 'friendship_updates'
     },
     subscribeToFriendConnectivityUpdates: {
       creator: subscribeToFriendConnectivityUpdatesService({
         components: { logs, db, archipelagoStats, catalystClient, worldsStats }
       }),
-      type: ServiceType.STREAM
+      type: ServiceType.STREAM,
+      event: 'friend_connectivity_updates'
     },
     subscribeToBlockUpdates: {
       creator: subscribeToBlockUpdatesService({ components: { logs, catalystClient } }),
-      type: ServiceType.STREAM
+      type: ServiceType.STREAM,
+      event: 'block_updates'
     },
     blockUser: {
       creator: blockUserService({ components: { logs, db, catalystClient, pubsub } }),

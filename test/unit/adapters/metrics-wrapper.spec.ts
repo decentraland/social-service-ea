@@ -228,7 +228,8 @@ describe('RPC Server Metrics Component', () => {
       const wrappedService = wrapper.withMetrics({
         testStream: {
           creator: streamService,
-          type: ServiceType.STREAM
+          type: ServiceType.STREAM,
+          event: 'testStream'
         }
       })
       
@@ -242,6 +243,10 @@ describe('RPC Server Metrics Component', () => {
       expect(streamService).toHaveBeenCalledWith(params, mockContext)
       
       expect(results).toEqual([1, 2, 3])
+
+      expect(mockMetrics.increment).toHaveBeenCalledWith('rpc_updates_sent_on_subscription', {
+        event: 'testStream'
+      })
       
       expect(mockMetrics.observe).toHaveBeenCalledWith(
         'rpc_in_procedure_call_size_bytes',
@@ -268,12 +273,13 @@ describe('RPC Server Metrics Component', () => {
         yield 1
         throw testError
       }
-      
+
       const streamService = jest.fn().mockImplementation(errorGenerator)
       const wrappedService = wrapper.withMetrics({
         errorStream: {
           creator: streamService,
-          type: ServiceType.STREAM
+          type: ServiceType.STREAM,
+          event: 'errorStream'
         }
       })
       
@@ -293,6 +299,16 @@ describe('RPC Server Metrics Component', () => {
         expect.any(Number)
       )
     })
+
+    it('should throw an error if a stream method does not have an event property', () => {
+      const { wrapper } = createTestContext()
+      
+      const streamFn = jest.fn()
+
+      expect(() => wrapper.withMetrics({
+        method1: { creator: streamFn, type: ServiceType.STREAM }
+      })).toThrow('Stream service "method1" must have an event property')
+    })
   })
   
   describe('withMetrics', () => {
@@ -304,7 +320,7 @@ describe('RPC Server Metrics Component', () => {
       
       const wrappedServices = wrapper.withMetrics({
         method1: { creator: callFn, type: ServiceType.CALL },
-        method2: { creator: streamFn, type: ServiceType.STREAM }
+        method2: { creator: streamFn, type: ServiceType.STREAM, event: 'testStream' }
       })
       
       expect(wrappedServices).toHaveProperty('method1')
