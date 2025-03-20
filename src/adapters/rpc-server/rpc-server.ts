@@ -25,7 +25,7 @@ import { getBlockedUsersService } from './services/get-blocked-users'
 import { unblockUserService } from './services/unblock-user'
 import { getBlockingStatusService } from './services/get-blocking-status'
 import { subscribeToBlockUpdatesService } from './services/subscribe-to-block-updates'
-import { createRpcServerMetricsWrapper, ServiceType } from './metrics'
+import { createRpcServerMetricsWrapper, ServiceType } from './metrics-wrapper'
 
 export async function createRpcServerComponent({
   logs,
