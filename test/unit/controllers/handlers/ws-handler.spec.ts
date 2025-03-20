@@ -107,7 +107,8 @@ describe('ws-handler', () => {
           address: '0x123',
           wsConnectionId: 'test-client-id',
           eventEmitter: mitt(),
-          transport: { close: jest.fn() } as any
+          transport: { close: jest.fn() } as any,
+          connectionStartTime: Date.now()
         }
         jest.spyOn(authData.eventEmitter, 'emit')
         mockWs.getUserData.mockReturnValue(authData)
@@ -189,7 +190,8 @@ describe('ws-handler', () => {
         address: '0x123',
         eventEmitter: mitt(),
         wsConnectionId: 'test-client-id',
-        transport: { close: jest.fn() } as any
+        transport: { close: jest.fn() } as any,
+        connectionStartTime: Date.now()
       }
       mockWs.getUserData.mockReturnValue(authData)
 
@@ -221,7 +223,8 @@ describe('ws-handler', () => {
           close: jest.fn().mockImplementationOnce(() => {
             throw new Error('Cleanup failed')
           })
-        } as any
+        } as any,
+        connectionStartTime: Date.now()
       }
       mockWs.getUserData.mockReturnValue(authData)
 

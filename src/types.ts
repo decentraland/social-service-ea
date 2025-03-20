@@ -232,20 +232,21 @@ export type IHandler = {
   f: (res: HttpResponse, req: HttpRequest) => Promise<IHandlerResult>
 }
 
-export type WsAuthenticatedUserData = {
+type WsBaseUserData = {
   isConnected: boolean
-  eventEmitter: Emitter<IUWebSocketEventMap>
-  auth: true
-  address: string
+  auth: boolean
   wsConnectionId: string
+  connectionStartTime: number
+}
+
+export type WsAuthenticatedUserData = WsBaseUserData & {
+  eventEmitter: Emitter<IUWebSocketEventMap>
+  address: string
   transport: Transport
 }
 
-export type WsNotAuthenticatedUserData = {
-  isConnected: boolean
-  auth: false
+export type WsNotAuthenticatedUserData = WsBaseUserData & {
   timeout?: NodeJS.Timeout
-  wsConnectionId: string
 }
 
 export type WsUserData = WsAuthenticatedUserData | WsNotAuthenticatedUserData

@@ -14,7 +14,8 @@ describe('wsUserData', () => {
         eventEmitter: { emit: jest.fn() } as unknown as Emitter<IUWebSocketEventMap>,
         address: '0x123',
         wsConnectionId,
-        transport: null
+        transport: null,
+        connectionStartTime: Date.now()
       }
 
       expect(isNotAuthenticated(data)).toBe(false)
@@ -24,7 +25,8 @@ describe('wsUserData', () => {
       const data: WsUserData = {
         auth: false,
         isConnected: false,
-        wsConnectionId
+        wsConnectionId,
+        connectionStartTime: Date.now()
       }
 
       expect(isNotAuthenticated(data)).toBe(true)
