@@ -15,14 +15,16 @@ export async function createWSPoolComponent({
     const pattern = 'ws:conn:*'
 
     for await (const key of redis.client.scanIterator({ MATCH: pattern })) {
-      const data = await redis.get<{ lastActivity: number; startTime?: number }>(key)
+      const data = await redis.get<{ lastActivity: number; startTime: number }>(key)
       if (data && now - data.lastActivity > idleTimeoutInMs) {
         const id = key.replace('ws:conn:', '')
 
         if (data.startTime) {
           const duration = (now - data.startTime) / 1000
-          metrics.observe('ws_connection_duration_seconds', {}, duration)
-          logger.debug('Idle connection duration recorded', { id, durationSeconds: duration })
+          if (!isNaN(duration) && isFinite(duration)) {
+            metrics.observe('ws_connection_duration_seconds', {}, duration)
+          }
+          logger.debug('Idle connection duration recorded', { id, durationSeconds: duration || 'N/A' })
         }
 
         await releaseConnection(id)
@@ -78,7 +80,7 @@ export async function createWSPoolComponent({
       })
 
       const key = `ws:conn:${id}`
-      const connectionData = await redis.get<{ lastActivity: number; startTime?: number }>(key)
+      const connectionData = await redis.get<{ lastActivity: number; startTime: number }>(key)
       await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
       const totalConnections = await redis.client.zCard('ws:active_connections')
 
