@@ -29,6 +29,12 @@ export async function createOrUpsertActiveFriendship(db: IDatabaseComponent, use
   return id
 }
 
+export async function createPendingFriendshipRequest(db: IDatabaseComponent, users: [string, string]) {
+  const { id } = await db.createFriendship(users, false)
+  await db.recordFriendshipAction(id, users[0], Action.REQUEST, null)
+  return id
+}
+
 export async function removeFriendship(db: IDatabaseComponent, id: string, actingUser: string) {
   await db.updateFriendshipStatus(id, false)
   await db.recordFriendshipAction(id, actingUser, Action.DELETE, null)
