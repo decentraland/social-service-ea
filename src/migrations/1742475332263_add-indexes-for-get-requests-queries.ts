@@ -8,7 +8,6 @@ const indexes = {
     ['friendship_id', 'timestamp DESC'],
     ['timestamp DESC'],
     ['acting_user'],
-    ['action', 'acting_user', 'timestamp DESC'],
     ['action', 'acting_user']
   ],
   friendships: [['is_active']]
