@@ -1,6 +1,7 @@
+import { FriendshipRequests, PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { test } from '../components'
 import { createMockProfile } from '../mocks/profile'
-import { createOrUpsertActiveFriendship, removeFriendship } from './utils/friendships'
+import { createOrUpsertActiveFriendship, createPendingFriendshipRequest, removeFriendship } from './utils/friendships'
 
 test('RPC Server Controller', function ({ components, stubComponents }) {
   beforeAll(async () => {
@@ -9,7 +10,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
   })
   
   describe('GetFriends handler', function () {
-    it('returns friends list successfully', async () => {
+    it('should return friends list successfully', async () => {
       const { rpcClient, db } = components
       const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
       const mockFriendProfile = createMockProfile(friendAddress)
@@ -30,7 +31,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       await removeFriendship(db, id, rpcClient.authAddress)
     })
     
-    it('returns empty list when user has no friends', async () => {
+    it('should return empty list when user has no friends', async () => {
       const { rpcClient } = components
       stubComponents.catalystClient.getProfiles.resolves([])
       
@@ -46,7 +47,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
   })
   
   describe('GetMutualFriends handler', function () {
-    it('returns mutual friends successfully', async () => {
+    it('should return mutual friends successfully', async () => {
       const { rpcClient, db } = components
       const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
       const mutualFriendAddress = '0x77c4c17331436d3b8798596e3d7c0d8e1b786aa4'
@@ -77,7 +78,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       await removeFriendship(db, id3, friendAddress)
     })
     
-    it('returns empty list when no mutual friends exist', async () => {
+    it('should return empty list when no mutual friends exist', async () => {
       const { rpcClient, db } = components
       const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
       const id = await createOrUpsertActiveFriendship(db, [rpcClient.authAddress, friendAddress])
@@ -99,4 +100,203 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       await removeFriendship(db, id, rpcClient.authAddress)
     })
   })
+
+  describe('getPendingFriendshipRequests', function() {
+    it('should return pending friendship requests successfully', async () => {
+      const { rpcClient, db } = components
+      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+      const mockFriendProfile = createMockProfile(friendAddress)
+
+      const id = await createPendingFriendshipRequest(db, [friendAddress, rpcClient.authAddress])
+
+      stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
+
+      const result = await rpcClient.client.getPendingFriendshipRequests({
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      assertFriendshipRequests(result, (requests) => {
+        expect(requests.length).toEqual(1)
+        expect(requests[0].friend.address).toEqual(friendAddress)
+      })
+
+      await removeFriendship(db, id, friendAddress)
+    })
+
+    it('should return empty list when user has no pending friendship requests', async () => {
+      const { rpcClient } = components
+      stubComponents.catalystClient.getProfiles.resolves([])
+      const result = await rpcClient.client.getPendingFriendshipRequests({
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      assertFriendshipRequests(result, (requests) => {
+        expect(requests.length).toEqual(0)
+      })
+    })
+
+    it('should return pending requests paginated with most recent first', async () => {
+      const { rpcClient, db } = components
+      const friendAddresses = [
+        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd1',
+        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd2',
+        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd3'
+      ]
+
+      const mockProfiles = friendAddresses.map(addr => createMockProfile(addr))
+      
+      const requestIds = []
+      for (const addr of friendAddresses) {
+        const id = await createPendingFriendshipRequest(db, [addr, rpcClient.authAddress])
+        requestIds.push(id)
+      }
+      
+      stubComponents.catalystClient.getProfiles.resolves(mockProfiles)
+
+      const firstPage = await rpcClient.client.getPendingFriendshipRequests({
+        pagination: {
+          limit: 2,
+          offset: 0
+        }
+      })
+
+      assertFriendshipRequests(firstPage, (requests) => {
+        expect(requests.length).toEqual(2)
+        expect(requests[0].friend.address).toEqual(friendAddresses[2])
+        expect(requests[1].friend.address).toEqual(friendAddresses[1])
+      })
+
+      const secondPage = await rpcClient.client.getPendingFriendshipRequests({
+        pagination: {
+          limit: 2,
+          offset: 2
+        }
+      })
+
+      assertFriendshipRequests(secondPage, (requests) => {
+        expect(requests.length).toEqual(1)
+        expect(requests[0].friend.address).toEqual(friendAddresses[0])
+      })
+
+      await Promise.all(
+        requestIds.map((id, index) => 
+          removeFriendship(db, id, friendAddresses[index])
+        )
+      )
+    })
+  })
+
+  describe('getSentFriendshipRequests', function() {
+    it('should return sent friendship requests successfully', async () => {
+      const { rpcClient, db } = components
+      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
+      const mockFriendProfile = createMockProfile(friendAddress)
+
+      const id = await createPendingFriendshipRequest(db, [rpcClient.authAddress, friendAddress])
+
+      stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
+
+      const result = await rpcClient.client.getSentFriendshipRequests({
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      assertFriendshipRequests(result, (requests) => {
+        expect(requests.length).toEqual(1)
+        expect(requests[0].friend.address).toEqual(friendAddress)
+      })
+
+      await removeFriendship(db, id, rpcClient.authAddress)
+    })
+
+    it('should return empty list when user has no sent friendship requests', async () => {
+      const { rpcClient } = components
+      stubComponents.catalystClient.getProfiles.resolves([])
+      const result = await rpcClient.client.getSentFriendshipRequests({
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      assertFriendshipRequests(result, (requests) => {
+        expect(requests.length).toEqual(0)
+      })
+    })
+
+    it('should return sent requests paginated with most recent first', async () => {
+      const { rpcClient, db } = components
+      const friendAddresses = [
+        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd1',
+        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd2',
+        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd3'
+      ]
+
+      const mockProfiles = friendAddresses.map(addr => createMockProfile(addr))
+      
+      const requestIds = []
+      for (const addr of friendAddresses) {
+        const id = await createPendingFriendshipRequest(db, [rpcClient.authAddress, addr])
+        requestIds.push(id)
+      }
+
+      stubComponents.catalystClient.getProfiles.resolves(mockProfiles)
+
+      const firstPage = await rpcClient.client.getSentFriendshipRequests({
+        pagination: {
+          limit: 2,
+          offset: 0
+        }
+      })
+
+      assertFriendshipRequests(firstPage, (requests) => {
+        expect(requests.length).toEqual(2)
+        expect(requests[0].friend.address).toEqual(friendAddresses[2])
+        expect(requests[1].friend.address).toEqual(friendAddresses[1])
+      })
+
+      const secondPage = await rpcClient.client.getSentFriendshipRequests({
+        pagination: {
+          limit: 2,
+          offset: 2
+        }
+      })
+
+      assertFriendshipRequests(secondPage, (requests) => {
+        expect(requests.length).toEqual(1)
+        expect(requests[0].friend.address).toEqual(friendAddresses[0])
+      })
+
+      await Promise.all(
+        requestIds.map((id, index) => 
+          removeFriendship(db, id, friendAddresses[index])
+        )
+      )
+    })
+  })
+
+  // Helper functions
+  function assertFriendshipRequests(
+    result: PaginatedFriendshipRequestsResponse,
+    assertions: (requests: FriendshipRequests['requests']) => void
+  ) {
+    const { response } = result
+
+    expect(response.$case).toEqual('requests')
+
+    if (response.$case === 'requests') {
+      const {
+        requests: { requests }
+      } = response
+      assertions(requests)
+    }
+  }
 })
