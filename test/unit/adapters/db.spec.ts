@@ -382,25 +382,48 @@ describe('db', () => {
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
-            'SELECT lr.id, LOWER(lr.acting_user) as address, lr.timestamp, lr.metadata FROM friendships f INNER JOIN latest_requests lr ON f.id = lr.friendship_id'
+            'SELECT fa.id, fa.acting_user as address, fa.timestamp, fa.metadata FROM friendship_actions fa'
           )
         })
       )
 
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('action = '),
+          text: expect.stringContaining('JOIN friendships f ON f.id = fa.friendship_id AND f.is_active IS FALSE')
+        })
+      )
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('fa.action = '),
           values: expect.arrayContaining([Action.REQUEST])
+        })
+      )
+
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(`NOT EXISTS`)
         })
       )
 
       const normalizedUserAddress = normalizeAddress('0x456')
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining(
-            SQL`LOWER(lr.acting_user) <> ${normalizedUserAddress} AND (LOWER(f.address_requester) = ${normalizedUserAddress} OR LOWER(f.address_requested) = ${normalizedUserAddress})`
-              .text
-          ),
+          text: expect.stringContaining('fa.acting_user <>'),
+          values: expect.arrayContaining([normalizedUserAddress])
+        })
+      )
+      
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('f.address_requester ='),
+          values: expect.arrayContaining([normalizedUserAddress])
+        })
+      )
+      
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('f.address_requested ='),
           values: expect.arrayContaining([normalizedUserAddress])
         })
       )
@@ -417,9 +440,9 @@ describe('db', () => {
       const result = await dbComponent.getReceivedFriendshipRequestsCount('0x456')
 
       expect(result).toBe(mockCount)
-      expect(mockPg.query).not.toHaveBeenCalledWith(
+      expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('ORDER BY fa.timestamp DESC')
+          text: expect.stringContaining('COUNT(1) as count')
         })
       )
     })
@@ -440,27 +463,27 @@ describe('db', () => {
       const result = await dbComponent.getSentFriendshipRequests('0x123', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
+      
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
-            `WHEN LOWER(f.address_requester) = lr.acting_user THEN LOWER(f.address_requested)`
+            `WHEN f.address_requester = fa.acting_user THEN f.address_requested`
           )
         })
       )
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining(`ELSE LOWER(f.address_requester)`)
+          text: expect.stringContaining(`ELSE f.address_requester`)
         })
       )
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('action = '),
-          values: expect.arrayContaining([Action.REQUEST])
+          text: expect.stringContaining('JOIN friendships f ON f.id = fa.friendship_id AND f.is_active IS FALSE')
         })
       )
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('LOWER(lr.acting_user) ='),
+          text: expect.stringContaining('fa.acting_user ='),
           values: expect.arrayContaining(['0x123'])
         })
       )
@@ -476,9 +499,9 @@ describe('db', () => {
       const result = await dbComponent.getSentFriendshipRequestsCount('0x123')
 
       expect(result).toBe(mockCount)
-      expect(mockPg.query).not.toHaveBeenCalledWith(
+      expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('ORDER BY fa.timestamp DESC')
+          text: expect.stringContaining('COUNT(1) as count')
         })
       )
     })
@@ -762,3 +785,4 @@ describe('db', () => {
     }
   }
 })
+
