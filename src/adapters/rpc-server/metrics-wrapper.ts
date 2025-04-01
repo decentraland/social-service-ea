@@ -1,4 +1,5 @@
 import { BaseComponents, RpcServerContext, RPCServiceContext } from '../../types'
+import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export type ServiceCreator<T, C extends keyof BaseComponents = keyof BaseComponents> = (
   context: RPCServiceContext<C>
@@ -42,11 +43,57 @@ type RpcServerMetrics = {
   ) => { [K in keyof T]: T[K]['creator'] }
 }
 
-enum RpcErrorCode {
+enum RpcResponseCode {
   OK = 'OK',
   ERROR = 'ERROR',
-  STREAM_ERROR = 'STREAM_ERROR'
+  STREAM_ERROR = 'STREAM_ERROR',
+  INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
+  INVALID_REQUEST = 'INVALID_REQUEST',
+  PROFILE_NOT_FOUND = 'PROFILE_NOT_FOUND',
+  INVALID_FRIENDSHIP_ACTION = 'INVALID_FRIENDSHIP_ACTION',
+  UNKNOWN = 'UNKNOWN'
 }
+
+// Map response cases to standardized response codes
+const responseCaseToCodeMap: Record<string, RpcResponseCode> = {
+  ok: RpcResponseCode.OK,
+  accepted: RpcResponseCode.OK,
+  requests: RpcResponseCode.OK,
+  internalServerError: RpcResponseCode.INTERNAL_SERVER_ERROR,
+  invalidRequest: RpcResponseCode.INVALID_REQUEST,
+  profileNotFound: RpcResponseCode.PROFILE_NOT_FOUND,
+  invalidFriendshipAction: RpcResponseCode.INVALID_FRIENDSHIP_ACTION,
+  unknown: RpcResponseCode.UNKNOWN
+}
+
+// Define response patterns we want to detect
+type ResponsePattern = {
+  check: (result: Record<string, any>) => boolean
+  getCode: (result: Record<string, any>) => RpcResponseCode
+}
+
+// Build a registry of response patterns based on protocol definitions
+const responsePatterns: ResponsePattern[] = [
+  // Pattern 1: Objects with nested response.$case
+  {
+    check: (result) => 'response' in result && result.response && '$case' in result.response,
+    getCode: (result) => {
+      const caseValue = result.response.$case
+      return responseCaseToCodeMap[caseValue] || RpcResponseCode.UNKNOWN
+    }
+  },
+  // Pattern 2: Paginated responses
+  {
+    check: (result) => ('friends' in result || 'profiles' in result) && 'paginationData' in result,
+    getCode: () => RpcResponseCode.OK
+  },
+  // Pattern 3: Blocking status responses
+  {
+    check: (result) => 'blockedUsers' in result && 'blockedByUsers' in result,
+    getCode: () => RpcResponseCode.OK
+  }
+  // Add more patterns as needed, without tying them to specific procedures
+]
 
 export function createRpcServerMetricsWrapper({
   components: { metrics, logs }
@@ -80,6 +127,45 @@ export function createRpcServerMetricsWrapper({
     metrics.observe('rpc_procedure_call_duration_seconds', { code, procedure: procedureName }, duration)
   }
 
+  /**
+   * Extracts the response code based on the result structure
+   * Analyzes different response patterns in the protocol
+   */
+  function getResponseCode(procedureName: string, result: unknown): RpcResponseCode {
+    // Return OK for null/undefined results
+    if (result === null || result === undefined) {
+      return RpcResponseCode.OK
+    }
+
+    // Only process objects
+    if (typeof result !== 'object') {
+      return RpcResponseCode.OK
+    }
+
+    const resultObj = result as Record<string, any>
+
+    // Look up expected response type from SocialServiceDefinition
+    const methodKey = procedureName.charAt(0).toLowerCase() + procedureName.slice(1)
+    const methodInfo = SocialServiceDefinition.methods[methodKey as keyof typeof SocialServiceDefinition.methods]
+
+    if (methodInfo) {
+      // Log the response type name for debugging (can be removed in production)
+      // logger.debug(`Procedure ${procedureName} expected response type: ${methodInfo.responseType.name}`);
+      // We can use methodInfo to customize behavior based on expected response type
+      // This gives us extensibility without hardcoding each procedure
+    }
+
+    // Try each pattern in order
+    for (const pattern of responsePatterns) {
+      if (pattern.check(resultObj)) {
+        return pattern.getCode(resultObj)
+      }
+    }
+
+    // Default to OK if no patterns match
+    return RpcResponseCode.OK
+  }
+
   function measureRpcCall<TParams extends Record<string, unknown> | void, TResult>(
     procedureName: string,
     serviceFunction: RpcCallMethod<TParams, TResult, RpcServerContext>
@@ -91,12 +177,15 @@ export function createRpcServerMetricsWrapper({
         recordRequestSize(procedureName, params)
         const result = await serviceFunction(params, context)
 
-        recordResponseSize(procedureName, RpcErrorCode.OK, result)
-        recordCallMetrics(procedureName, RpcErrorCode.OK, startTime)
+        // Determine the response code from the result structure
+        const responseCode = getResponseCode(procedureName, result)
+
+        recordResponseSize(procedureName, responseCode, result)
+        recordCallMetrics(procedureName, responseCode, startTime)
 
         return result
       } catch (error) {
-        recordCallMetrics(procedureName, RpcErrorCode.ERROR, startTime)
+        recordCallMetrics(procedureName, RpcResponseCode.ERROR, startTime)
         throw error
       }
     }
@@ -120,9 +209,9 @@ export function createRpcServerMetricsWrapper({
           yield item
         }
 
-        recordCallMetrics(procedureName, RpcErrorCode.OK, startTime)
+        recordCallMetrics(procedureName, RpcResponseCode.OK, startTime)
       } catch (error) {
-        recordCallMetrics(procedureName, RpcErrorCode.STREAM_ERROR, startTime)
+        recordCallMetrics(procedureName, RpcResponseCode.STREAM_ERROR, startTime)
         throw error
       }
     }
