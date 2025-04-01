@@ -231,6 +231,56 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         expect(requests.length).toEqual(0)
       })
     })
+
+    it('should return sent requests paginated with most recent first', async () => {
+      const { rpcClient, db } = components
+      const friendAddresses = [
+        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd1',
+        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd2',
+        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd3'
+      ]
+
+      const mockProfiles = friendAddresses.map(addr => createMockProfile(addr))
+      
+      const requestIds = []
+      for (const addr of friendAddresses) {
+        const id = await createPendingFriendshipRequest(db, [rpcClient.authAddress, addr])
+        requestIds.push(id)
+      }
+
+      stubComponents.catalystClient.getProfiles.resolves(mockProfiles)
+
+      const firstPage = await rpcClient.client.getSentFriendshipRequests({
+        pagination: {
+          limit: 2,
+          offset: 0
+        }
+      })
+
+      assertFriendshipRequests(firstPage, (requests) => {
+        expect(requests.length).toEqual(2)
+        expect(requests[0].friend.address).toEqual(friendAddresses[2])
+        expect(requests[1].friend.address).toEqual(friendAddresses[1])
+      })
+
+      const secondPage = await rpcClient.client.getSentFriendshipRequests({
+        pagination: {
+          limit: 2,
+          offset: 2
+        }
+      })
+
+      assertFriendshipRequests(secondPage, (requests) => {
+        expect(requests.length).toEqual(1)
+        expect(requests[0].friend.address).toEqual(friendAddresses[0])
+      })
+
+      await Promise.all(
+        requestIds.map((id, index) => 
+          removeFriendship(db, id, friendAddresses[index])
+        )
+      )
+    })
   })
 
   // Helper functions
