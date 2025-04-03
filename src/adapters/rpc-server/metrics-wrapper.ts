@@ -1,5 +1,15 @@
 import { BaseComponents, RpcServerContext, RPCServiceContext } from '../../types'
-import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  BlockUserResponse,
+  GetBlockedUsersResponse,
+  GetBlockingStatusResponse,
+  GetFriendshipStatusResponse,
+  GetPrivateMessagesSettingsResponse,
+  GetSocialSettingsResponse,
+  PaginatedFriendsProfilesResponse,
+  SocialServiceDefinition,
+  UpsertFriendshipResponse
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export type ServiceCreator<T, C extends keyof BaseComponents = keyof BaseComponents> = (
   context: RPCServiceContext<C>
@@ -10,7 +20,10 @@ export enum ServiceType {
   STREAM = 'stream'
 }
 
-type RpcCallMethod<TParams, TResult, TContext> = (params: TParams, context: TContext) => Promise<TResult>
+type RpcCallMethod<TParams, TResult extends SocialServiceResponse, TContext> = (
+  params: TParams,
+  context: TContext
+) => Promise<TResult>
 
 type RpcStreamMethod<TParams, TResult, TContext> = (
   params: TParams,
@@ -54,7 +67,6 @@ enum RpcResponseCode {
   UNKNOWN = 'UNKNOWN'
 }
 
-// Map response cases to standardized response codes
 const responseCaseToCodeMap: Record<string, RpcResponseCode> = {
   ok: RpcResponseCode.OK,
   accepted: RpcResponseCode.OK,
@@ -66,33 +78,41 @@ const responseCaseToCodeMap: Record<string, RpcResponseCode> = {
   unknown: RpcResponseCode.UNKNOWN
 }
 
-// Define response patterns we want to detect
-type ResponsePattern = {
-  check: (result: Record<string, any>) => boolean
-  getCode: (result: Record<string, any>) => RpcResponseCode
-}
+type SocialServiceMethod = (typeof SocialServiceDefinition.methods)[keyof typeof SocialServiceDefinition.methods]
+type SocialServiceResponse = ReturnType<SocialServiceMethod['responseType']['fromPartial']>
 
-// Build a registry of response patterns based on protocol definitions
-const responsePatterns: ResponsePattern[] = [
-  // Pattern 1: Objects with nested response.$case
+type ResponseWithCase =
+  | UpsertFriendshipResponse
+  | GetSocialSettingsResponse
+  | BlockUserResponse
+  | GetPrivateMessagesSettingsResponse
+  | GetFriendshipStatusResponse
+
+type ResponseWithPaginationData = PaginatedFriendsProfilesResponse | GetBlockedUsersResponse
+
+type ResponsePatterns = Array<{
+  check: (result: SocialServiceResponse) => boolean
+  getCode: (result: SocialServiceResponse) => RpcResponseCode
+}>
+
+const responsePatterns: ResponsePatterns = [
   {
-    check: (result) => 'response' in result && result.response && '$case' in result.response,
-    getCode: (result) => {
-      const caseValue = result.response.$case
-      return responseCaseToCodeMap[caseValue] || RpcResponseCode.UNKNOWN
+    check: (result: SocialServiceResponse): result is ResponseWithCase =>
+      'response' in result && result.response !== undefined && '$case' in result.response,
+    getCode: (result: SocialServiceResponse) => {
+      const response = (result as ResponseWithCase).response
+      return responseCaseToCodeMap[response?.$case || 'unknown'] || RpcResponseCode.UNKNOWN
     }
   },
-  // Pattern 2: Paginated responses
   {
-    check: (result) => ('friends' in result || 'profiles' in result) && 'paginationData' in result,
+    check: (result: SocialServiceResponse): result is ResponseWithPaginationData => 'paginationData' in result,
     getCode: () => RpcResponseCode.OK
   },
-  // Pattern 3: Blocking status responses
   {
-    check: (result) => 'blockedUsers' in result && 'blockedByUsers' in result,
+    check: (result: SocialServiceResponse): result is GetBlockingStatusResponse =>
+      'blockedUsers' in result && 'blockedByUsers' in result,
     getCode: () => RpcResponseCode.OK
   }
-  // Add more patterns as needed, without tying them to specific procedures
 ]
 
 export function createRpcServerMetricsWrapper({
@@ -131,42 +151,21 @@ export function createRpcServerMetricsWrapper({
    * Extracts the response code based on the result structure
    * Analyzes different response patterns in the protocol
    */
-  function getResponseCode(procedureName: string, result: unknown): RpcResponseCode {
-    // Return OK for null/undefined results
-    if (result === null || result === undefined) {
-      return RpcResponseCode.OK
+  function getResponseCode<T extends SocialServiceResponse>(procedureName: string, result: T): RpcResponseCode {
+    if (result === null || result === undefined || typeof result !== 'object') {
+      return RpcResponseCode.UNKNOWN
     }
 
-    // Only process objects
-    if (typeof result !== 'object') {
-      return RpcResponseCode.OK
-    }
-
-    const resultObj = result as Record<string, any>
-
-    // Look up expected response type from SocialServiceDefinition
-    const methodKey = procedureName.charAt(0).toLowerCase() + procedureName.slice(1)
-    const methodInfo = SocialServiceDefinition.methods[methodKey as keyof typeof SocialServiceDefinition.methods]
-
-    if (methodInfo) {
-      // Log the response type name for debugging (can be removed in production)
-      // logger.debug(`Procedure ${procedureName} expected response type: ${methodInfo.responseType.name}`);
-      // We can use methodInfo to customize behavior based on expected response type
-      // This gives us extensibility without hardcoding each procedure
-    }
-
-    // Try each pattern in order
     for (const pattern of responsePatterns) {
-      if (pattern.check(resultObj)) {
-        return pattern.getCode(resultObj)
+      if (pattern.check(result)) {
+        return pattern.getCode(result)
       }
     }
 
-    // Default to OK if no patterns match
-    return RpcResponseCode.OK
+    return RpcResponseCode.UNKNOWN
   }
 
-  function measureRpcCall<TParams extends Record<string, unknown> | void, TResult>(
+  function measureRpcCall<TParams extends Record<string, unknown> | void, TResult extends SocialServiceResponse>(
     procedureName: string,
     serviceFunction: RpcCallMethod<TParams, TResult, RpcServerContext>
   ): RpcCallMethod<TParams, TResult, RpcServerContext> {
