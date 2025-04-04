@@ -1,4 +1,15 @@
 import { BaseComponents, RpcServerContext, RPCServiceContext } from '../../types'
+import {
+  BlockUserResponse,
+  GetBlockedUsersResponse,
+  GetBlockingStatusResponse,
+  GetFriendshipStatusResponse,
+  GetPrivateMessagesSettingsResponse,
+  GetSocialSettingsResponse,
+  PaginatedFriendsProfilesResponse,
+  SocialServiceDefinition,
+  UpsertFriendshipResponse
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export type ServiceCreator<T, C extends keyof BaseComponents = keyof BaseComponents> = (
   context: RPCServiceContext<C>
@@ -9,7 +20,10 @@ export enum ServiceType {
   STREAM = 'stream'
 }
 
-type RpcCallMethod<TParams, TResult, TContext> = (params: TParams, context: TContext) => Promise<TResult>
+type RpcCallMethod<TParams, TResult extends SocialServiceResponse, TContext> = (
+  params: TParams,
+  context: TContext
+) => Promise<TResult>
 
 type RpcStreamMethod<TParams, TResult, TContext> = (
   params: TParams,
@@ -42,11 +56,64 @@ type RpcServerMetrics = {
   ) => { [K in keyof T]: T[K]['creator'] }
 }
 
-enum RpcErrorCode {
+export enum RpcResponseCode {
   OK = 'OK',
   ERROR = 'ERROR',
-  STREAM_ERROR = 'STREAM_ERROR'
+  STREAM_ERROR = 'STREAM_ERROR',
+  INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
+  INVALID_REQUEST = 'INVALID_REQUEST',
+  PROFILE_NOT_FOUND = 'PROFILE_NOT_FOUND',
+  INVALID_FRIENDSHIP_ACTION = 'INVALID_FRIENDSHIP_ACTION',
+  UNKNOWN = 'UNKNOWN'
 }
+
+const responseCaseToCodeMap: Record<string, RpcResponseCode> = {
+  ok: RpcResponseCode.OK,
+  accepted: RpcResponseCode.OK,
+  requests: RpcResponseCode.OK,
+  internalServerError: RpcResponseCode.INTERNAL_SERVER_ERROR,
+  invalidRequest: RpcResponseCode.INVALID_REQUEST,
+  profileNotFound: RpcResponseCode.PROFILE_NOT_FOUND,
+  invalidFriendshipAction: RpcResponseCode.INVALID_FRIENDSHIP_ACTION,
+  unknown: RpcResponseCode.UNKNOWN
+}
+
+type SocialServiceMethod = (typeof SocialServiceDefinition.methods)[keyof typeof SocialServiceDefinition.methods]
+type SocialServiceResponse = ReturnType<SocialServiceMethod['responseType']['fromPartial']>
+
+type ResponseWithCase =
+  | UpsertFriendshipResponse
+  | GetSocialSettingsResponse
+  | BlockUserResponse
+  | GetPrivateMessagesSettingsResponse
+  | GetFriendshipStatusResponse
+
+type ResponseWithPaginationData = PaginatedFriendsProfilesResponse | GetBlockedUsersResponse
+
+type ResponsePatterns = Array<{
+  check: (result: SocialServiceResponse) => boolean
+  getCode: (result: SocialServiceResponse) => RpcResponseCode
+}>
+
+const responsePatterns: ResponsePatterns = [
+  {
+    check: (result: SocialServiceResponse): result is ResponseWithCase =>
+      'response' in result && result.response !== undefined && '$case' in result.response,
+    getCode: (result: SocialServiceResponse) => {
+      const response = (result as ResponseWithCase).response
+      return responseCaseToCodeMap[response?.$case || 'unknown'] || RpcResponseCode.UNKNOWN
+    }
+  },
+  {
+    check: (result: SocialServiceResponse): result is ResponseWithPaginationData => 'paginationData' in result,
+    getCode: () => RpcResponseCode.OK
+  },
+  {
+    check: (result: SocialServiceResponse): result is GetBlockingStatusResponse =>
+      'blockedUsers' in result && 'blockedByUsers' in result,
+    getCode: () => RpcResponseCode.OK
+  }
+]
 
 export function createRpcServerMetricsWrapper({
   components: { metrics, logs }
@@ -80,7 +147,25 @@ export function createRpcServerMetricsWrapper({
     metrics.observe('rpc_procedure_call_duration_seconds', { code, procedure: procedureName }, duration)
   }
 
-  function measureRpcCall<TParams extends Record<string, unknown> | void, TResult>(
+  /**
+   * Extracts the response code based on the result structure
+   * Analyzes different response patterns in the protocol
+   */
+  function getResponseCode<T extends SocialServiceResponse>(procedureName: string, result: T): RpcResponseCode {
+    if (result === null || result === undefined || typeof result !== 'object') {
+      return RpcResponseCode.UNKNOWN
+    }
+
+    for (const pattern of responsePatterns) {
+      if (pattern.check(result)) {
+        return pattern.getCode(result)
+      }
+    }
+
+    return RpcResponseCode.UNKNOWN
+  }
+
+  function measureRpcCall<TParams extends Record<string, unknown> | void, TResult extends SocialServiceResponse>(
     procedureName: string,
     serviceFunction: RpcCallMethod<TParams, TResult, RpcServerContext>
   ): RpcCallMethod<TParams, TResult, RpcServerContext> {
@@ -91,12 +176,15 @@ export function createRpcServerMetricsWrapper({
         recordRequestSize(procedureName, params)
         const result = await serviceFunction(params, context)
 
-        recordResponseSize(procedureName, RpcErrorCode.OK, result)
-        recordCallMetrics(procedureName, RpcErrorCode.OK, startTime)
+        // Determine the response code from the result structure
+        const responseCode = getResponseCode(procedureName, result)
+
+        recordResponseSize(procedureName, responseCode, result)
+        recordCallMetrics(procedureName, responseCode, startTime)
 
         return result
       } catch (error) {
-        recordCallMetrics(procedureName, RpcErrorCode.ERROR, startTime)
+        recordCallMetrics(procedureName, RpcResponseCode.ERROR, startTime)
         throw error
       }
     }
@@ -120,9 +208,9 @@ export function createRpcServerMetricsWrapper({
           yield item
         }
 
-        recordCallMetrics(procedureName, RpcErrorCode.OK, startTime)
+        recordCallMetrics(procedureName, RpcResponseCode.OK, startTime)
       } catch (error) {
-        recordCallMetrics(procedureName, RpcErrorCode.STREAM_ERROR, startTime)
+        recordCallMetrics(procedureName, RpcResponseCode.STREAM_ERROR, startTime)
         throw error
       }
     }
