@@ -96,8 +96,7 @@ export async function registerWsHandler(
         address,
         eventEmitter,
         isConnected: true,
-        transport,
-        authenticating: false
+        transport
       })
 
       if (data.timeout) {
@@ -122,9 +121,10 @@ export async function registerWsHandler(
       logger.error(`Error verifying auth chain: ${error.message}`, {
         wsConnectionId: data.wsConnectionId
       })
-      changeStage(data, { authenticating: false })
       metrics.increment('ws_auth_errors')
       ws.close()
+    } finally {
+      changeStage(data, { authenticating: false })
     }
   }
 
