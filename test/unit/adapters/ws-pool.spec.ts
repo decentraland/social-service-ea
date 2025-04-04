@@ -1,6 +1,7 @@
 import { createWSPoolComponent } from '../../../src/adapters/ws-pool'
 import { mockConfig, mockMetrics, mockRedis, mockLogs } from '../../mocks/components'
 import { IWSPoolComponent } from '../../../src/types'
+import { exec } from 'child_process'
 
 describe('ws-pool-component', () => {
   let wsPool: IWSPoolComponent
@@ -10,32 +11,31 @@ describe('ws-pool-component', () => {
   let mockClearInterval: jest.Mock
 
   beforeEach(async () => {
-    // Mock setInterval/clearInterval
     originalSetInterval = global.setInterval
+
     mockSetInterval = jest.fn()
     mockClearInterval = jest.fn()
+
     global.setInterval = mockSetInterval as any
     global.clearInterval = mockClearInterval
 
     mockRedisClient = mockRedis.client as jest.Mocked<any>
-    mockRedisClient.zCard.mockResolvedValue(0)
+    mockRedisClient.sCard.mockResolvedValue(0)
     mockRedisClient.exists.mockResolvedValue(0)
     mockRedisClient.set.mockResolvedValue('OK')
-    mockRedisClient.zAdd.mockResolvedValue(1)
-    mockRedisClient.multi.mockReturnValue({
-      set: jest.fn().mockReturnThis(),
-      zAdd: jest.fn().mockReturnThis(),
-      exec: jest.fn().mockResolvedValue(['OK', 1])
-    })
+    mockRedisClient.sAdd.mockResolvedValue(1)
 
-    // Mock redis.get and redis.put for the component
+    const mockMulti = {
+      set: jest.fn().mockReturnThis(),
+      sAdd: jest.fn().mockReturnThis(),
+      sRem: jest.fn().mockReturnThis(),
+      del: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue(['OK', 1])
+    }
+    mockRedisClient.multi.mockReturnValue(mockMulti)
+
     mockRedis.get.mockResolvedValue(null)
     mockRedis.put.mockResolvedValue(undefined)
-
-    mockConfig.getNumber.mockImplementation(async (key) => {
-      if (key === 'IDLE_TIMEOUT_IN_MS') return 300000
-      return 0
-    })
 
     wsPool = await createWSPoolComponent({ metrics: mockMetrics, config: mockConfig, redis: mockRedis, logs: mockLogs })
   })
@@ -56,19 +56,7 @@ describe('ws-pool-component', () => {
       expect(pool).toBeDefined()
     })
 
-    it('should use configured idle timeout', async () => {
-      const customTimeout = 60000
-      mockConfig.getNumber.mockImplementation(async (key) => (key === 'IDLE_TIMEOUT_IN_MS' ? customTimeout : 0))
-      const pool = await createWSPoolComponent({
-        metrics: mockMetrics,
-        config: mockConfig,
-        redis: mockRedis,
-        logs: mockLogs
-      })
-      expect(pool).toBeDefined()
-    })
-
-    it('should set up cleanup interval', async () => {
+    it('should set up cleanup interval of one minute', async () => {
       expect(mockSetInterval).toHaveBeenCalledWith(expect.any(Function), 60000)
     })
 
@@ -78,17 +66,17 @@ describe('ws-pool-component', () => {
       mockRedisClient.scanIterator.mockReturnValue(mockIterator)
 
       mockRedis.get
-        .mockResolvedValueOnce({ lastActivity: Date.now() - 400000 }) // Expired
-        .mockResolvedValueOnce({ lastActivity: Date.now() - 100000 }) // Not expired
+        .mockResolvedValueOnce({ lastActivity: Date.now() - 400000 })
+        .mockResolvedValueOnce({ lastActivity: Date.now() - 100000 })
 
       await cleanupFn()
 
-      expect(mockRedisClient.del).toHaveBeenCalledWith('ws:conn:test-1')
-      expect(mockRedisClient.zRem).toHaveBeenCalledWith('ws:active_connections', 'test-1')
+      expect(mockRedisClient.multi().del).toHaveBeenCalledWith('ws:conn:test-1')
+      expect(mockRedisClient.multi().sRem).toHaveBeenCalledWith('ws:conn_ids', 'test-1')
       expect(mockMetrics.increment).toHaveBeenCalledWith('ws_idle_timeouts')
 
-      expect(mockRedisClient.del).not.toHaveBeenCalledWith('ws:conn:test-2')
-      expect(mockRedisClient.zRem).not.toHaveBeenCalledWith('ws:active_connections', 'test-2')
+      expect(mockRedisClient.multi().del).not.toHaveBeenCalledWith('ws:conn:test-2')
+      expect(mockRedisClient.multi().sRem).not.toHaveBeenCalledWith('ws:conn_ids', 'test-2')
     })
 
     it('should handle null data in cleanup', async () => {
@@ -100,8 +88,8 @@ describe('ws-pool-component', () => {
 
       await cleanupFn()
 
-      expect(mockRedisClient.del).not.toHaveBeenCalled()
-      expect(mockRedisClient.zRem).not.toHaveBeenCalled()
+      expect(mockRedisClient.multi().del).not.toHaveBeenCalled()
+      expect(mockRedisClient.multi().sRem).not.toHaveBeenCalled()
       expect(mockMetrics.increment).not.toHaveBeenCalled()
     })
 
@@ -114,81 +102,68 @@ describe('ws-pool-component', () => {
 
       await cleanupFn()
 
-      expect(mockRedisClient.del).not.toHaveBeenCalled()
-      expect(mockRedisClient.zRem).not.toHaveBeenCalled()
+      expect(mockRedisClient.multi().del).not.toHaveBeenCalled()
+      expect(mockRedisClient.multi().sRem).not.toHaveBeenCalled()
       expect(mockMetrics.increment).not.toHaveBeenCalled()
     })
   })
 
   describe('acquireConnection', () => {
-    it('should acquire connection and update metrics', async () => {
-      mockRedisClient.zCard.mockResolvedValue(1)
+    const testId = 'test-connection-1'
+    const expectedKey = `ws:conn:${testId}`
+    const now = Date.now()
+    const expectedData = { lastActivity: now, startTime: now }
 
-      mockRedisClient.multi.mockReturnValueOnce({
-        zCard: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        zAdd: jest.fn().mockReturnThis(),
-        exec: jest.fn().mockResolvedValue(['OK', 1])
-      })
+    jest.spyOn(Date, 'now').mockReturnValue(now)
 
-      await wsPool.acquireConnection('test-1')
+    it('should acquire new connection with correct Redis operations', async () => {
+      await wsPool.acquireConnection(testId)
 
       expect(mockRedisClient.multi).toHaveBeenCalled()
-      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, 1)
-    })
+      const multiChain = mockRedisClient.multi()
 
-    it('should fail if connection already exists', async () => {
-      mockRedisClient.exists.mockResolvedValue(1)
-      await expect(wsPool.acquireConnection('test-1')).rejects.toThrow('Connection already exists')
-    })
-
-    it('should handle Redis transaction failure', async () => {
-      mockRedisClient.multi.mockReturnValue({
-        zCard: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        zAdd: jest.fn().mockReturnThis(),
-        exec: jest.fn().mockResolvedValue(null)
-      })
-
-      await expect(wsPool.acquireConnection('test-1')).rejects.toThrow('Transaction failed')
-    })
-
-    it('should set connection data in Redis with correct parameters', async () => {
-      const now = Date.now()
-      jest.spyOn(Date, 'now').mockReturnValue(now)
-
-      mockRedisClient.multi.mockReturnValue({
-        zCard: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        zAdd: jest.fn().mockReturnThis(),
-        exec: jest.fn().mockResolvedValue(['OK', 1])
-      })
-
-      await wsPool.acquireConnection('test-1')
-
-      const multiSetCall = mockRedisClient.multi().set.mock.calls[0]
-      expect(multiSetCall[0]).toBe('ws:conn:test-1')
-      expect(multiSetCall[1]).toBe(JSON.stringify({ lastActivity: now, startTime: now }))
-      expect(multiSetCall[2]).toEqual({
+      expect(multiChain.set).toHaveBeenCalledWith(expectedKey, JSON.stringify(expectedData), {
         NX: true,
         EX: Math.ceil(300000 / 1000)
       })
+      expect(multiChain.sAdd).toHaveBeenCalledWith('ws:conn_ids', testId)
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, expect.any(Number))
+    })
 
-      jest.restoreAllMocks()
+    it('should handle transaction failure', async () => {
+      const mockFailedMulti = {
+        set: jest.fn().mockReturnThis(),
+        sAdd: jest.fn().mockReturnThis(),
+        del: jest.fn().mockReturnThis(),
+        sRem: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue(null)
+      }
+
+      mockRedisClient.multi.mockReturnValueOnce(mockFailedMulti)
+
+      await expect(wsPool.acquireConnection(testId)).rejects.toThrow('Connection already exists')
+
+      expect(mockRedisClient.multi().del).toHaveBeenCalledWith(expectedKey)
+      expect(mockRedisClient.multi().sRem).toHaveBeenCalledWith('ws:conn_ids', testId)
     })
   })
 
   describe('releaseConnection', () => {
     it('should release existing connection', async () => {
       await wsPool.releaseConnection('test-1')
-      expect(mockRedisClient.del).toHaveBeenCalledWith('ws:conn:test-1')
-      expect(mockRedisClient.zRem).toHaveBeenCalledWith('ws:active_connections', 'test-1')
+      expect(mockRedisClient.multi().del).toHaveBeenCalledWith('ws:conn:test-1')
+      expect(mockRedisClient.multi().sRem).toHaveBeenCalledWith('ws:conn_ids', 'test-1')
     })
 
-    it('should update metrics after release', async () => {
-      mockRedisClient.zCard.mockResolvedValue(0)
+    it('should update total connections and duration metrics after release', async () => {
+      const now = Date.now()
+      mockRedis.get.mockResolvedValueOnce({ startTime: now - 10000, lastActivity: now - 5000 })
+      mockRedisClient.sCard.mockResolvedValue(0)
+
       await wsPool.releaseConnection('test-1')
+
       expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, 0)
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_connection_duration_seconds', {}, expect.any(Number))
     })
   })
 
@@ -220,7 +195,7 @@ describe('ws-pool-component', () => {
 
   describe('getActiveConnections', () => {
     it('should return number of active connections', async () => {
-      mockRedisClient.zCard.mockResolvedValue(5)
+      mockRedisClient.sCard.mockResolvedValue(5)
       expect(await wsPool.getActiveConnections()).toBe(5)
     })
   })
@@ -232,8 +207,8 @@ describe('ws-pool-component', () => {
 
       await wsPool.cleanup()
 
-      expect(mockRedisClient.del).toHaveBeenCalledTimes(2)
-      expect(mockRedisClient.zRem).toHaveBeenCalledTimes(2)
+      expect(mockRedisClient.multi().del).toHaveBeenCalledTimes(2)
+      expect(mockRedisClient.multi().sRem).toHaveBeenCalledTimes(2)
       expect(mockClearInterval).toHaveBeenCalled()
     })
   })
