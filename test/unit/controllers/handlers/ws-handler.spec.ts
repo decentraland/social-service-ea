@@ -110,6 +110,18 @@ describe('ws-handler', () => {
   })
 
   describe('message handler', () => {
+    it('should reject messages when authentication is in progress', async () => {
+      const userData = mockWs.getUserData()
+      userData.authenticating = true
+
+      await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+      expect(mockWs.send).toHaveBeenCalledWith(
+        JSON.stringify({ error: 'Authentication already in progress, please try again later' })
+      )
+      expect(verify).not.toHaveBeenCalled()
+    })
+
     describe('for authenticated users', () => {
       let authData: WsAuthenticatedUserData
 
@@ -121,7 +133,8 @@ describe('ws-handler', () => {
           wsConnectionId: 'test-client-id',
           eventEmitter: mitt(),
           transport: { close: jest.fn() } as any,
-          connectionStartTime: Date.now()
+          connectionStartTime: Date.now(),
+          authenticating: false
         }
         jest.spyOn(authData.eventEmitter, 'emit')
         mockWs.getUserData.mockReturnValue(authData)
@@ -160,13 +173,13 @@ describe('ws-handler', () => {
       })
 
       it('should ignore messages when connection is marked as disconnected', async () => {
-        authData.isConnected = false;
-        const testMessage = Buffer.from('test message');
-        
-        await wsHandlers.message(mockWs, testMessage);
-        
-        expect(authData.eventEmitter.emit).not.toHaveBeenCalled();
-        expect(mockWsPool.updateActivity).not.toHaveBeenCalled();
+        authData.isConnected = false
+        const testMessage = Buffer.from('test message')
+
+        await wsHandlers.message(mockWs, testMessage)
+
+        expect(authData.eventEmitter.emit).not.toHaveBeenCalled()
+        expect(mockWsPool.updateActivity).not.toHaveBeenCalled()
       })
     })
 
@@ -188,6 +201,7 @@ describe('ws-handler', () => {
         expect(updatedData.auth).toBe(true)
         expect(updatedData.address).toBe('0x123')
         expect(updatedData.transport).toBeDefined()
+        expect(updatedData.authenticating).toBe(false)
         expect(mockRpcServer.attachUser).toHaveBeenCalledWith({
           transport: expect.any(Object),
           address: '0x123'
@@ -200,21 +214,23 @@ describe('ws-handler', () => {
 
         await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
 
+        const updatedData = mockWs.getUserData()
+        expect(updatedData.authenticating).toBe(false)
+        expect(updatedData.auth).toBe(false)
         expect(mockWs.close).toHaveBeenCalled()
       })
 
       it('should clear timeout when user authenticates', async () => {
-        const mockTimeout = setTimeout(() => {}, 1000);
-        const userData = mockWs.getUserData();
-        userData.timeout = mockTimeout;
-        
-        (verify as jest.Mock).mockResolvedValue({ auth: '0x123' });
-        
-        await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })));
+        const mockTimeout = setTimeout(() => {}, 1000)
+        const userData = mockWs.getUserData()
+        userData.timeout = mockTimeout
+        ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+
+        await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
 
         expect(mockWs.getUserData().timeout).toBeUndefined()
 
-        clearTimeout(mockTimeout);
+        clearTimeout(mockTimeout)
       })
     })
   })
@@ -228,7 +244,8 @@ describe('ws-handler', () => {
         eventEmitter: mitt(),
         wsConnectionId: 'test-client-id',
         transport: { close: jest.fn() } as any,
-        connectionStartTime: Date.now()
+        connectionStartTime: Date.now(),
+        authenticating: false
       }
       mockWs.getUserData.mockReturnValue(authData)
 
@@ -241,6 +258,7 @@ describe('ws-handler', () => {
       expect(authData.connectionStartTime).toBeDefined()
       expect(authData.isConnected).toBe(false)
       expect(authData.auth).toBe(false)
+      expect(authData.authenticating).toBe(false)
     })
 
     it('should cleanup non-authenticated connection', async () => {
@@ -249,6 +267,7 @@ describe('ws-handler', () => {
       expect(mockWsPool.releaseConnection).toHaveBeenCalledWith('test-client-id')
       expect(mockData.isConnected).toBe(false)
       expect(mockData.auth).toBe(false)
+      expect(mockData.authenticating).toBe(false)
     })
 
     it('should handle cleanup errors gracefully', async () => {
@@ -263,7 +282,8 @@ describe('ws-handler', () => {
             throw new Error('Cleanup failed')
           })
         } as any,
-        connectionStartTime: Date.now()
+        connectionStartTime: Date.now(),
+        authenticating: false
       }
       mockWs.getUserData.mockReturnValue(authData)
 
@@ -272,6 +292,7 @@ describe('ws-handler', () => {
       expect(mockWsPool.releaseConnection).toHaveBeenCalledWith('test-client-id')
       expect(authData.isConnected).toBe(false)
       expect(authData.auth).toBe(false)
+      expect(authData.authenticating).toBe(false)
     })
 
     it('should clear timeout for non-authenticated connections', async () => {
