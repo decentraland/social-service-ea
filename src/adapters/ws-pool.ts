@@ -7,7 +7,6 @@ export async function createWSPoolComponent({
   logs
 }: Pick<AppComponents, 'metrics' | 'config' | 'redis' | 'logs'>): Promise<IWSPoolComponent> {
   const logger = logs.getLogger('ws-pool')
-
   const idleTimeoutInMs = (await config.getNumber('IDLE_TIMEOUT_IN_MS')) || 300000 // 5 minutes default
 
   const cleanupInterval = setInterval(async () => {
@@ -18,15 +17,6 @@ export async function createWSPoolComponent({
       const data = await redis.get<{ lastActivity: number; startTime: number }>(key)
       if (data && now - data.lastActivity > idleTimeoutInMs) {
         const id = key.replace('ws:conn:', '')
-
-        if (data.startTime) {
-          const duration = (now - data.startTime) / 1000
-          if (!isNaN(duration) && isFinite(duration)) {
-            metrics.observe('ws_connection_duration_seconds', {}, duration)
-          }
-          logger.debug('Idle connection duration recorded', { id, durationSeconds: duration || 'N/A' })
-        }
-
         await releaseConnection(id)
         metrics.increment('ws_idle_timeouts')
       }
@@ -34,65 +24,49 @@ export async function createWSPoolComponent({
   }, 60000)
 
   async function acquireConnection(id: string) {
-    logger.debug('[DEBUGGING CONNECTION] Attempting to acquire connection', {
-      connectionId: id,
-      timestamp: new Date().toISOString()
-    })
-
     const key = `ws:conn:${id}`
-
-    if (await redis.client.exists(key)) {
-      throw new Error('Connection already exists')
-    }
-
     const startTime = Date.now()
-    const multi = redis.client.multi()
 
     try {
-      const result = await multi
-        .zCard('ws:active_connections')
+      const result = await redis.client
+        .multi()
         .set(key, JSON.stringify({ lastActivity: startTime, startTime }), {
           NX: true,
           EX: Math.ceil(idleTimeoutInMs / 1000)
         })
-        .zAdd('ws:active_connections', { score: startTime, value: id })
+        .sAdd('ws:conn_ids', id)
         .exec()
 
       if (!result) {
-        throw new Error('Transaction failed')
+        throw new Error('Connection already exists')
       }
 
       const totalConnections = await getActiveConnections()
-
-      logger.debug(`[DEBUGGING CONNECTION] Active connections ${totalConnections}`)
       metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
     } catch (error) {
-      await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
+      await Promise.all([redis.client.del(key), redis.client.sRem('ws:conn_ids', id)])
       throw error
     }
   }
 
   async function releaseConnection(id: string) {
     try {
-      logger.debug('[DEBUGGING CONNECTION] Releasing connection', {
-        connectionId: id,
-        timestamp: new Date().toISOString()
-      })
-
       const key = `ws:conn:${id}`
+      const endTime = Date.now()
       const connectionData = await redis.get<{ lastActivity: number; startTime: number }>(key)
-      await Promise.all([redis.client.del(key), redis.client.zRem('ws:active_connections', id)])
-      const totalConnections = await redis.client.zCard('ws:active_connections')
 
+      await redis.client.multi().del(key).sRem('ws:conn_ids', id).exec()
+
+      const totalConnections = await getActiveConnections()
       metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
 
       if (connectionData?.startTime) {
-        const duration = (Date.now() - connectionData.startTime) / 1000
+        const duration = (endTime - connectionData.startTime) / 1000
+        console.log('duration', duration)
         metrics.observe('ws_connection_duration_seconds', {}, duration)
-        logger.debug('Connection duration recorded', { id, durationSeconds: duration })
       }
     } catch (error: any) {
-      logger.error('[DEBUGGING CONNECTION] Error releasing connection', {
+      logger.error('Error releasing connection', {
         connectionId: id,
         error: error.message
       })
@@ -100,18 +74,13 @@ export async function createWSPoolComponent({
   }
 
   async function updateActivity(id: string) {
-    logger.debug('[DEBUGGING CONNECTION] Updating connection activity', {
-      connectionId: id,
-      timestamp: new Date().toISOString()
-    })
-
     const key = `ws:conn:${id}`
     await redis.put(
       key,
       { lastActivity: Date.now() },
       {
-        XX: true, // Only update if exists
-        EX: Math.ceil(idleTimeoutInMs / 1000) // Reset TTL
+        XX: true,
+        EX: Math.ceil(idleTimeoutInMs / 1000)
       }
     )
   }
@@ -120,8 +89,8 @@ export async function createWSPoolComponent({
     return (await redis.client.exists(`ws:conn:${id}`)) === 1
   }
 
-  async function getActiveConnections() {
-    return await redis.client.zCard('ws:active_connections')
+  async function getActiveConnections(): Promise<number> {
+    return await redis.client.sCard('ws:conn_ids')
   }
 
   async function cleanup() {
