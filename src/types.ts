@@ -235,6 +235,7 @@ export type IHandler = {
 type WsBaseUserData = {
   isConnected: boolean
   auth: boolean
+  authenticating: boolean
   wsConnectionId: string
   connectionStartTime: number
 }

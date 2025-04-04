@@ -7,7 +7,7 @@ describe('wsUserData', () => {
   const wsConnectionId = 'random-uuid'
 
   describe('isAuthenticated', () => {
-    it('should return true if the user is authenticated', () => {
+    it('should return true if the user is authenticated and not authenticating', () => {
       const data: WsUserData = {
         auth: true,
         isConnected: false,
@@ -15,7 +15,8 @@ describe('wsUserData', () => {
         address: '0x123',
         wsConnectionId,
         transport: null,
-        connectionStartTime: Date.now()
+        connectionStartTime: Date.now(),
+        authenticating: false
       }
 
       expect(isAuthenticated(data)).toBe(true)
@@ -27,6 +28,19 @@ describe('wsUserData', () => {
         isConnected: false,
         eventEmitter: { emit: jest.fn() } as unknown as Emitter<IUWebSocketEventMap>,
         wsConnectionId,
+        connectionStartTime: Date.now(),
+        authenticating: false
+      }
+
+      expect(isAuthenticated(data)).toBe(false)
+    })
+
+    it('should return false if the user is authenticating', () => {
+      const data: WsUserData = {
+        auth: true,
+        isConnected: false,
+        authenticating: true,
+        wsConnectionId,
         connectionStartTime: Date.now()
       }
 
@@ -35,7 +49,7 @@ describe('wsUserData', () => {
   })
 
   describe('isNotAuthenticated', () => {
-    it('should return false if the user is authenticated', () => {
+    it('should return false if the user is authenticated and not authenticating', () => {
       const data: WsUserData = {
         auth: true,
         isConnected: false,
@@ -43,7 +57,8 @@ describe('wsUserData', () => {
         address: '0x123',
         wsConnectionId,
         transport: null,
-        connectionStartTime: Date.now()
+        connectionStartTime: Date.now(),
+        authenticating: false
       }
 
       expect(isNotAuthenticated(data)).toBe(false)
@@ -53,6 +68,19 @@ describe('wsUserData', () => {
       const data: WsUserData = {
         auth: false,
         isConnected: false,
+        wsConnectionId,
+        connectionStartTime: Date.now(),
+        authenticating: false
+      }
+
+      expect(isNotAuthenticated(data)).toBe(true)
+    })
+
+    it('should return true if the user is authenticating', () => {
+      const data: WsUserData = {
+        auth: false,
+        isConnected: false,
+        authenticating: true,
         wsConnectionId,
         connectionStartTime: Date.now()
       }
