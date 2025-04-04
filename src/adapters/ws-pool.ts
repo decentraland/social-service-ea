@@ -44,7 +44,7 @@ export async function createWSPoolComponent({
       const totalConnections = await getActiveConnections()
       metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
     } catch (error) {
-      await Promise.all([redis.client.del(key), redis.client.sRem('ws:conn_ids', id)])
+      await redis.client.multi().del(key).sRem('ws:conn_ids', id).exec()
       throw error
     }
   }
@@ -62,7 +62,6 @@ export async function createWSPoolComponent({
 
       if (connectionData?.startTime) {
         const duration = (endTime - connectionData.startTime) / 1000
-        console.log('duration', duration)
         metrics.observe('ws_connection_duration_seconds', {}, duration)
       }
     } catch (error: any) {

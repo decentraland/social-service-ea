@@ -1,6 +1,7 @@
 import { createWSPoolComponent } from '../../../src/adapters/ws-pool'
 import { mockConfig, mockMetrics, mockRedis, mockLogs } from '../../mocks/components'
 import { IWSPoolComponent } from '../../../src/types'
+import { exec } from 'child_process'
 
 describe('ws-pool-component', () => {
   let wsPool: IWSPoolComponent
@@ -133,14 +134,17 @@ describe('ws-pool-component', () => {
       const mockFailedMulti = {
         set: jest.fn().mockReturnThis(),
         sAdd: jest.fn().mockReturnThis(),
+        del: jest.fn().mockReturnThis(),
+        sRem: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(null)
       }
-      mockRedisClient.multi.mockReturnValue(mockFailedMulti)
+
+      mockRedisClient.multi.mockReturnValueOnce(mockFailedMulti)
 
       await expect(wsPool.acquireConnection(testId)).rejects.toThrow('Connection already exists')
 
-      expect(mockRedisClient.del).toHaveBeenCalledWith(expectedKey)
-      expect(mockRedisClient.sRem).toHaveBeenCalledWith('ws:conn_ids', testId)
+      expect(mockRedisClient.multi().del).toHaveBeenCalledWith(expectedKey)
+      expect(mockRedisClient.multi().sRem).toHaveBeenCalledWith('ws:conn_ids', testId)
     })
   })
 
