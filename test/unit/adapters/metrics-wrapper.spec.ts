@@ -367,6 +367,30 @@ describe('RPC Server Metrics Component', () => {
       )
     })
 
+    it('should map error response to correct error code', async () => {
+      const { wrapper, mockContext } = createTestContext()
+
+      const errorResponse = {
+        response: { $case: 'internalServerError' }
+      }
+
+      const callService = jest.fn().mockResolvedValue(errorResponse)
+      const wrappedService = wrapper.withMetrics({
+        testMethod: {
+          creator: callService,
+          type: ServiceType.CALL
+        }
+      })
+
+      await wrappedService.testMethod({}, mockContext)
+
+      expect(mockMetrics.observe).toHaveBeenCalledWith(
+        'rpc_out_procedure_call_size_bytes',
+        { code: 'INTERNAL_SERVER_ERROR', procedure: 'testMethod' },
+        expect.any(Number)
+      )
+    })
+
     it('should map paginated response to OK code', async () => {
       const { wrapper, mockContext } = createTestContext()
 
