@@ -56,7 +56,7 @@ type RpcServerMetrics = {
   ) => { [K in keyof T]: T[K]['creator'] }
 }
 
-enum RpcResponseCode {
+export enum RpcResponseCode {
   OK = 'OK',
   ERROR = 'ERROR',
   STREAM_ERROR = 'STREAM_ERROR',

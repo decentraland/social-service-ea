@@ -1,4 +1,8 @@
-import { createRpcServerMetricsWrapper, ServiceType } from '../../../src/adapters/rpc-server/metrics-wrapper'
+import {
+  createRpcServerMetricsWrapper,
+  RpcResponseCode,
+  ServiceType
+} from '../../../src/adapters/rpc-server/metrics-wrapper'
 import { RpcServerContext } from '../../../src/types'
 import { mockLogs } from '../../mocks/components/logs'
 import { mockMetrics } from '../../mocks/components'
@@ -343,35 +347,17 @@ describe('RPC Server Metrics Component', () => {
   })
 
   describe('response code mapping', () => {
-    it('should map response with case to correct code', async () => {
-      const { wrapper, mockContext } = createTestContext()
-
-      const responseWithCase = {
-        response: { $case: 'ok' }
-      }
-
-      const callService = jest.fn().mockResolvedValue(responseWithCase)
-      const wrappedService = wrapper.withMetrics({
-        testMethod: {
-          creator: callService,
-          type: ServiceType.CALL
-        }
-      })
-
-      await wrappedService.testMethod({}, mockContext)
-
-      expect(mockMetrics.observe).toHaveBeenCalledWith(
-        'rpc_out_procedure_call_size_bytes',
-        { code: 'OK', procedure: 'testMethod' },
-        expect.any(Number)
-      )
-    })
-
-    it('should map error response to correct error code', async () => {
+    it.each([
+      { $case: 'ok', code: RpcResponseCode.OK },
+      { $case: 'internalServerError', code: RpcResponseCode.INTERNAL_SERVER_ERROR },
+      { $case: 'invalidRequest', code: RpcResponseCode.INVALID_REQUEST },
+      { $case: 'profileNotFound', code: RpcResponseCode.PROFILE_NOT_FOUND },
+      { $case: 'invalidFriendshipAction', code: RpcResponseCode.INVALID_FRIENDSHIP_ACTION }
+    ])('should map response with case $case to $code', async ({ $case, code }) => {
       const { wrapper, mockContext } = createTestContext()
 
       const errorResponse = {
-        response: { $case: 'internalServerError' }
+        response: { $case }
       }
 
       const callService = jest.fn().mockResolvedValue(errorResponse)
@@ -386,7 +372,7 @@ describe('RPC Server Metrics Component', () => {
 
       expect(mockMetrics.observe).toHaveBeenCalledWith(
         'rpc_out_procedure_call_size_bytes',
-        { code: 'INTERNAL_SERVER_ERROR', procedure: 'testMethod' },
+        { code, procedure: 'testMethod' },
         expect.any(Number)
       )
     })
