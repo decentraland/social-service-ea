@@ -11,6 +11,7 @@ import {
   mockWsPool
 } from '../../../mocks/components'
 import { WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../../src/types'
+import { mockTracing } from '../../../mocks/components/tracing'
 
 jest.mock('@dcl/platform-crypto-middleware')
 
@@ -57,7 +58,8 @@ describe('ws-handler', () => {
       fetcher: mockFetcher,
       rpcServer: mockRpcServer,
       config: mockConfig,
-      wsPool: mockWsPool
+      wsPool: mockWsPool,
+      tracing: mockTracing
     })
 
     wsHandlers = (mockUWs.app.ws as jest.Mock).mock.calls[0][1]

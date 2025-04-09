@@ -19,12 +19,14 @@ import { createCatalystClient } from './adapters/catalyst-client'
 import { createSnsComponent } from './adapters/sns'
 import { createWSPoolComponent } from './adapters/ws-pool'
 import { createWorldsStatsComponent } from './adapters/worlds-stats'
+import { createTracingComponent } from './adapters/tracing'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
   const config = await createDotEnvConfigComponent({ path: ['.env.default', '.env'] })
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ metrics, config })
+  const tracing = await createTracingComponent({ config, logs })
 
   const server = await createUWsComponent({ config, logs })
 
@@ -98,6 +100,7 @@ export async function initComponents(): Promise<AppComponents> {
     server,
     sns,
     subscribersContext,
+    tracing,
     worldsStats,
     wsPool
   }

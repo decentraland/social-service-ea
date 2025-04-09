@@ -18,9 +18,12 @@ const getAddress = (data: WsUserData) => {
 }
 
 export async function registerWsHandler(
-  components: Pick<AppComponents, 'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool'>
+  components: Pick<
+    AppComponents,
+    'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool' | 'tracing'
+  >
 ) {
-  const { logs, server, metrics, fetcher, rpcServer, config, wsPool } = components
+  const { logs, server, metrics, fetcher, rpcServer, config, wsPool, tracing } = components
   const logger = logs.getLogger('ws-handler')
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
@@ -37,6 +40,10 @@ export async function registerWsHandler(
         data.eventEmitter.emit('close', { code, reason: messageText })
         data.eventEmitter.all.clear()
       } catch (error: any) {
+        tracing.captureException(error as Error, {
+          address: getAddress(data),
+          wsConnectionId
+        })
         logger.error('Error during connection cleanup', {
           error: error.message,
           address: getAddress(data),
@@ -122,6 +129,10 @@ export async function registerWsHandler(
         wsConnectionId: data.wsConnectionId
       })
       metrics.increment('ws_auth_errors')
+      tracing.captureException(error as Error, {
+        address: getAddress(data),
+        wsConnectionId: data.wsConnectionId
+      })
       ws.close()
     } finally {
       changeStage(data, { authenticating: false })
@@ -159,6 +170,10 @@ export async function registerWsHandler(
       })
       metrics.increment('ws_errors')
       ws.send(JSON.stringify({ error: 'Error processing message', message: error.message }))
+      tracing.captureException(error as Error, {
+        address: getAddress(data),
+        wsConnectionId: data.wsConnectionId
+      })
     }
   }
 
@@ -219,6 +234,10 @@ export async function registerWsHandler(
         logger.debug('Failed to acquire connection', {
           wsConnectionId: data.wsConnectionId,
           error: error.message
+        })
+        tracing.captureException(error as Error, {
+          address: getAddress(data),
+          wsConnectionId: data.wsConnectionId
         })
         ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
       }
