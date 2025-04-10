@@ -1,7 +1,7 @@
+import { EthAddress } from '@dcl/schemas'
 import { HttpRequest, HttpResponse } from '@well-known-components/uws-http-server'
 import { AppComponents, PrivateMessagesPrivacy } from '../../types'
 import { isErrorWithMessage } from '../../utils/errors'
-import { isValidAddress } from '../../utils/address'
 
 export async function createPrivacyHandler(components: Pick<AppComponents, 'db' | 'logs'>) {
   const { db, logs } = components
@@ -13,7 +13,7 @@ export async function createPrivacyHandler(components: Pick<AppComponents, 'db' 
       const address = req.getParameter(0)?.toLowerCase()
       logger.info(`Getting privacy settings for address: ${address}`)
 
-      if (!isValidAddress(address)) {
+      if (!EthAddress.validate(address)) {
         return {
           status: 400,
           body: { error: 'Invalid address' }
