@@ -1,6 +1,5 @@
 import { Authenticator, AuthIdentity, IdentityType } from '@dcl/crypto'
 import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
-import { AUTH_CHAIN_HEADER_PREFIX, AUTH_METADATA_HEADER, AUTH_TIMESTAMP_HEADER } from '@dcl/platform-crypto-middleware'
 import { signedHeaderFactory } from 'decentraland-crypto-fetch'
 
 export type Identity = {

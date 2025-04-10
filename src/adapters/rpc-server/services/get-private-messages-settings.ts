@@ -20,7 +20,7 @@ export function getPrivateMessagesSettingsService({ components: { logs, db } }: 
       // Create base message privacy settings map
       const privacySettings = userAddresses.reduce(
         (acc, address) => {
-          acc[address] = PrivateMessagePrivacySetting.ONLY_FRIENDS
+          acc[address] = PrivateMessagePrivacySetting.ALL
           return acc
         },
         {} as Record<string, PrivateMessagePrivacySetting>

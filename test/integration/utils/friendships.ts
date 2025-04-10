@@ -1,4 +1,4 @@
-import { IDatabaseComponent } from '../../../src/types'
+import { IDatabaseComponent, PrivateMessagesPrivacy } from '../../../src/types'
 import { Action } from '../../../src/types'
 
 export async function createFriendshipRequest(
@@ -38,4 +38,14 @@ export async function createPendingFriendshipRequest(db: IDatabaseComponent, use
 export async function removeFriendship(db: IDatabaseComponent, id: string, actingUser: string) {
   await db.updateFriendshipStatus(id, false)
   await db.recordFriendshipAction(id, actingUser, Action.DELETE, null)
+}
+
+export async function createOrUpdateSocialSettings(
+  db: IDatabaseComponent,
+  address: string,
+  privacySettings: PrivateMessagesPrivacy
+) {
+  await db.upsertSocialSettings(address, {
+    private_messages_privacy: privacySettings
+  })
 }

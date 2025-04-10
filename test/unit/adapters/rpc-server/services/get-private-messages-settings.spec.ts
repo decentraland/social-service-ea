@@ -85,7 +85,7 @@ describe('getPrivateMessagesSettingsService', () => {
     const mockSettings: DBSocialSettings[] = [
       {
         address: testAddress1,
-        private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
+        private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
         blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
       }
     ]
@@ -103,12 +103,12 @@ describe('getPrivateMessagesSettingsService', () => {
       expect(result.response.ok.settings).toHaveLength(2)
       expect(result.response.ok.settings).toContainEqual({
         user: { address: testAddress1 },
-        privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL
+        privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS
       })
       // The second user has no saved settings, check that the default setting is returned
       expect(result.response.ok.settings).toContainEqual({
         user: { address: testAddress2 },
-        privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS
+        privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL
       })
     }
   })
