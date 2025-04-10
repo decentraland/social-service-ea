@@ -51,6 +51,7 @@ export type BaseComponents = {
   sns: IPublisherComponent
   wsPool: IWSPoolComponent
   subscribersContext: ISubscribersContext
+  tracing: ITracingComponent
 }
 
 // components used in runtime
@@ -201,6 +202,10 @@ export type ISubscribersContext = {
   getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
   addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => void
   removeSubscriber: (address: string) => void
+}
+
+export type ITracingComponent = IBaseComponent & {
+  captureException(error: Error, context?: Record<string, any>): void
 }
 
 // this type simplifies the typings of http handlers

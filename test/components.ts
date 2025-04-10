@@ -28,6 +28,7 @@ import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
 import { mockPeersSynchronizer } from './mocks/components'
+import { mockTracing } from './mocks/components/tracing'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -119,6 +120,7 @@ async function initComponents(): Promise<TestComponents> {
     server,
     sns,
     subscribersContext,
+    tracing: mockTracing,
     worldsStats,
     wsPool
   }
