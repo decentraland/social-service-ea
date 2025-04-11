@@ -8,7 +8,7 @@ export const createCommsGatekeeperComponent = async ({
 }: Pick<AppComponents, 'logs' | 'config' | 'fetcher'>): Promise<ICommsGatekeeperComponent> => {
   const { fetch } = fetcher
   const logger = logs.getLogger('comms-gatekeeper-component')
-  const commsUrl = await config.requireString('COMMS_URL')
+  const commsUrl = await config.requireString('COMMS_GATEKEEPER_URL')
   const commsGateKeeperToken = await config.requireString('COMMS_GATEKEEPER_AUTH_TOKEN')
 
   /**
