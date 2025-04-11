@@ -20,6 +20,7 @@ import { createSnsComponent } from './adapters/sns'
 import { createWSPoolComponent } from './adapters/ws-pool'
 import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
+import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -62,11 +63,13 @@ export async function initComponents(): Promise<AppComponents> {
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
+  const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const sns = await createSnsComponent({ config })
   const subscribersContext = createSubscribersContext()
   const rpcServer = await createRpcServerComponent({
     logs,
+    commsGatekeeper,
     db,
     pubsub,
     server,
@@ -83,6 +86,7 @@ export async function initComponents(): Promise<AppComponents> {
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   return {
+    commsGatekeeper,
     archipelagoStats,
     catalystClient,
     config,

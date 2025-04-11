@@ -20,7 +20,7 @@ import { createCatalystClient } from '../src/adapters/catalyst-client'
 import { createSnsComponent } from '../src/adapters/sns'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
 import { createWSPoolComponent } from '../src/adapters/ws-pool'
-import { createPeersSynchronizerComponent } from '../src/adapters/peers-synchronizer'
+import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
 import { createPeerTrackingComponent } from '../src/adapters/peer-tracking'
 import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-stats'
 import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
@@ -80,8 +80,10 @@ async function initComponents(): Promise<TestComponents> {
   const subscribersContext = createSubscribersContext()
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
+  const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const rpcServer = await createRpcServerComponent({
     logs,
+    commsGatekeeper,
     db,
     pubsub,
     server,
@@ -101,6 +103,7 @@ async function initComponents(): Promise<TestComponents> {
   const rpcClient = await createRpcClientComponent({ config, logs })
 
   return {
+    commsGatekeeper,
     archipelagoStats,
     catalystClient,
     config,
