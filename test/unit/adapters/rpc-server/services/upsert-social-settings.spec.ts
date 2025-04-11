@@ -11,7 +11,8 @@ import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   SocialSettings as DBSocialSettings,
-  RpcServerContext
+  RpcServerContext,
+  ICommsGatekeeperComponent
 } from '../../../../../src/types'
 
 describe('upsertSocialSettingsService', () => {
@@ -19,12 +20,17 @@ describe('upsertSocialSettingsService', () => {
   let context: RpcServerContext
   let upsertSocialSettingsMock: jest.MockedFunction<IDatabaseComponent['upsertSocialSettings']>
   let upsertSocialSettings: ReturnType<typeof upsertSocialSettingsService>
+  let commsGatekeeperMock: jest.MockedFunction<ICommsGatekeeperComponent['updateUserPrivateMessagePrivacyMetadata']>
 
   beforeEach(() => {
     upsertSocialSettingsMock = jest.fn()
+    commsGatekeeperMock = jest.fn()
     const db = {
       upsertSocialSettings: upsertSocialSettingsMock
     } as unknown as IDatabaseComponent
+    const commsGatekeeper: ICommsGatekeeperComponent = {
+      updateUserPrivateMessagePrivacyMetadata: commsGatekeeperMock
+    }
     const logs: ILoggerComponent = {
       getLogger: () => ({
         info: () => {},
@@ -41,7 +47,8 @@ describe('upsertSocialSettingsService', () => {
     upsertSocialSettings = upsertSocialSettingsService({
       components: {
         logs,
-        db
+        db,
+        commsGatekeeper
       }
     })
   })
@@ -56,6 +63,7 @@ describe('upsertSocialSettingsService', () => {
       blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
     }
 
+    commsGatekeeperMock.mockResolvedValueOnce()
     upsertSocialSettingsMock.mockResolvedValueOnce(resultDBSettings)
 
     const result = await upsertSocialSettings(payload, context)
@@ -84,6 +92,7 @@ describe('upsertSocialSettingsService', () => {
       blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
     }
 
+    commsGatekeeperMock.mockResolvedValueOnce()
     upsertSocialSettingsMock.mockResolvedValueOnce(resultDBSettings)
 
     const result = await upsertSocialSettings(payload, context)
@@ -113,6 +122,7 @@ describe('upsertSocialSettingsService', () => {
       blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
     }
 
+    commsGatekeeperMock.mockResolvedValueOnce()
     upsertSocialSettingsMock.mockResolvedValueOnce(expectedDBSettings)
 
     const result = await upsertSocialSettings(payload, context)
@@ -129,6 +139,59 @@ describe('upsertSocialSettingsService', () => {
       const expectedSettings = convertDBSettingsToRPCSettings(expectedDBSettings)
       expect(result.response.ok).toEqual(expectedSettings)
     }
+  })
+
+  it('should update the private message privacy metadata in the comms gatekeeper', async () => {
+    const payload: UpsertSocialSettingsPayload = {
+      privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS
+    }
+    const expectedDBSettings: DBSocialSettings = {
+      address: testAddress,
+      private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+    }
+
+    commsGatekeeperMock.mockResolvedValueOnce()
+    upsertSocialSettingsMock.mockResolvedValueOnce(expectedDBSettings)
+
+    const result = await upsertSocialSettings(payload, context)
+    expect(commsGatekeeperMock).toHaveBeenCalledWith(testAddress, DBPrivateMessagesPrivacy.ONLY_FRIENDS)
+    expect(result.response.$case).toEqual('ok')
+  })
+
+  it('should not update the private message privacy metadata in the comms gatekeeper when the private message privacy setting is not provided', async () => {
+    const payload: UpsertSocialSettingsPayload = {
+      blockedUsersMessagesVisibility: BlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+    }
+    const expectedDBSettings: DBSocialSettings = {
+      address: testAddress,
+      private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+    }
+
+    commsGatekeeperMock.mockResolvedValueOnce()
+    upsertSocialSettingsMock.mockResolvedValueOnce(expectedDBSettings)
+
+    const result = await upsertSocialSettings(payload, context)
+    expect(commsGatekeeperMock).not.toHaveBeenCalled()
+    expect(result.response.$case).toEqual('ok')
+  })
+
+  it('should not reject when the comms gatekeeper throws an error', async () => {
+    const payload: UpsertSocialSettingsPayload = {
+      privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS
+    }
+    const expectedDBSettings: DBSocialSettings = {
+      address: testAddress,
+      private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+    }
+
+    upsertSocialSettingsMock.mockResolvedValueOnce(expectedDBSettings)
+    commsGatekeeperMock.mockRejectedValueOnce(new Error('Comms gatekeeper error'))
+
+    const result = await upsertSocialSettings(payload, context)
+    expect(result.response.$case).toEqual('ok')
   })
 
   it('should return invalid request when no settings are provided', async () => {
@@ -149,6 +212,7 @@ describe('upsertSocialSettingsService', () => {
     }
 
     const error = new Error('Database error')
+    commsGatekeeperMock.mockResolvedValueOnce()
     upsertSocialSettingsMock.mockRejectedValueOnce(error)
 
     const result = await upsertSocialSettings(payload, context)

@@ -1,5 +1,10 @@
 import { createRpcServerComponent, createSubscribersContext } from '../../../src/adapters/rpc-server'
-import { IRPCServerComponent, ISubscribersContext, RpcServerContext } from '../../../src/types'
+import {
+  ICommsGatekeeperComponent,
+  IRPCServerComponent,
+  ISubscribersContext,
+  RpcServerContext
+} from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import {
   mockArchipelagoStats,
@@ -12,7 +17,11 @@ import {
   mockUWs,
   mockWorldsStats
 } from '../../mocks/components'
-import { BLOCK_UPDATES_CHANNEL, FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import {
+  BLOCK_UPDATES_CHANNEL,
+  FRIEND_STATUS_UPDATES_CHANNEL,
+  FRIENDSHIP_UPDATES_CHANNEL
+} from '../../../src/adapters/pubsub'
 import { mockSns } from '../../mocks/components/sns'
 import * as updates from '../../../src/logic/updates'
 
@@ -40,6 +49,10 @@ describe('createRpcServerComponent', () => {
     setHandlerMock = rpcServerMock.setHandler as jest.Mock
     attachTransportMock = rpcServerMock.attachTransport as jest.Mock
 
+    const mockCommsGatekeeper: ICommsGatekeeperComponent = {
+      updateUserPrivateMessagePrivacyMetadata: jest.fn()
+    }
+
     mockTransport = {
       on: jest.fn(),
       send: jest.fn(),
@@ -47,6 +60,7 @@ describe('createRpcServerComponent', () => {
     } as unknown as Transport
 
     rpcServer = await createRpcServerComponent({
+      commsGatekeeper: mockCommsGatekeeper,
       logs: mockLogs,
       db: mockDb,
       pubsub: mockPubSub,

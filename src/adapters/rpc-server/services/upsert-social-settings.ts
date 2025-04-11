@@ -10,7 +10,9 @@ import {
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 
-export function upsertSocialSettingsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
+export function upsertSocialSettingsService({
+  components: { logs, db, commsGatekeeper }
+}: RPCServiceContext<'logs' | 'db' | 'commsGatekeeper'>) {
   const logger = logs.getLogger('upsert-social-settings-service')
 
   return async function (
@@ -29,7 +31,18 @@ export function upsertSocialSettingsService({ components: { logs, db } }: RPCSer
         }
       }
 
-      const settings = await db.upsertSocialSettings(context.address, convertRPCSettingsIntoDBSettings(request))
+      const dbSettings = convertRPCSettingsIntoDBSettings(request)
+
+      // Update the private message privacy metadata in the comms gatekeeper and the database
+      const [_, settings] = await Promise.all([
+        dbSettings.private_messages_privacy !== undefined
+          ? await commsGatekeeper
+              .updateUserPrivateMessagePrivacyMetadata(context.address, dbSettings.private_messages_privacy)
+              // Ignore errors
+              .catch((_) => undefined)
+          : Promise.resolve(),
+        db.upsertSocialSettings(context.address, dbSettings)
+      ])
 
       return {
         response: {

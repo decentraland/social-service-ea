@@ -52,6 +52,7 @@ export type BaseComponents = {
   wsPool: IWSPoolComponent
   subscribersContext: ISubscribersContext
   tracing: ITracingComponent
+  commsGatekeeper: ICommsGatekeeperComponent
 }
 
 // components used in runtime
@@ -206,6 +207,13 @@ export type ISubscribersContext = {
 
 export type ITracingComponent = IBaseComponent & {
   captureException(error: Error, context?: Record<string, any>): void
+}
+
+export type ICommsGatekeeperComponent = {
+  updateUserPrivateMessagePrivacyMetadata: (
+    user: string,
+    privateMessagesPrivacy: PrivateMessagesPrivacy
+  ) => Promise<void>
 }
 
 // this type simplifies the typings of http handlers
