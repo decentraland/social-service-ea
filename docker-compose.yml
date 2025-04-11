@@ -33,7 +33,6 @@ services:
       - ./localstack:/etc/localstack/init/ready.d
 
   app:
-    image: social-service-ea:local
     build:
       context: .
       dockerfile: Dockerfile
@@ -45,6 +44,8 @@ services:
       CATALYST_URL: 'https://peer.decentraland.zone'
       PEER_SYNC_INTERVAL_MS: '45000'
       PEERS_SYNC_CACHE_TTL_MS: '90000'
+      COMMS_GATEKEEPER_URL: 'https://comms-gatekeeper.decentraland.zone'
+      COMMS_GATEKEEPER_AUTH_TOKEN: 'aToken'
       AWS_SNS_ARN: 'arn:aws:sns:us-east-1:000000000000:events'
       AWS_SNS_ENDPOINT: 'http://localstack:4566'
     ports:

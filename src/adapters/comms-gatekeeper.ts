@@ -28,7 +28,7 @@ export const createCommsGatekeeperComponent = async ({
           Authorization: `Bearer ${commsGateKeeperToken}`
         },
         body: JSON.stringify({
-          privateMessagesPrivacy
+          private_messages_privacy: privateMessagesPrivacy
         })
       })
 
