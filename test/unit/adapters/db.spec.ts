@@ -413,14 +413,14 @@ describe('db', () => {
           values: expect.arrayContaining([normalizedUserAddress])
         })
       )
-      
+
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('f.address_requester ='),
           values: expect.arrayContaining([normalizedUserAddress])
         })
       )
-      
+
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('f.address_requested ='),
@@ -463,12 +463,10 @@ describe('db', () => {
       const result = await dbComponent.getSentFriendshipRequests('0x123', { limit: 10, offset: 5 })
 
       expect(result).toEqual(mockRequests)
-      
+
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining(
-            `WHEN f.address_requester = fa.acting_user THEN f.address_requested`
-          )
+          text: expect.stringContaining(`WHEN f.address_requester = fa.acting_user THEN f.address_requested`)
         })
       )
       expect(mockPg.query).toHaveBeenCalledWith(
@@ -603,7 +601,15 @@ describe('db', () => {
 
       expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('ON CONFLICT DO NOTHING')
+          text: expect.stringContaining(
+            'ON CONFLICT (blocker_address, blocked_address) DO UPDATE SET id = blocks.id, blocked_at = blocks.blocked_at'
+          )
+        })
+      )
+
+      expect(queryToAssert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('RETURNING id, blocked_at')
         })
       )
     })
@@ -669,7 +675,10 @@ describe('db', () => {
 
   describe('getBlockedUsers', () => {
     it('should retrieve blocked users', async () => {
-      const mockBlockedUsers = [{ address: '0x456', blocked_at: new Date() }, { address: '0x789', blocked_at: new Date() }]
+      const mockBlockedUsers = [
+        { address: '0x456', blocked_at: new Date() },
+        { address: '0x789', blocked_at: new Date() }
+      ]
       mockPg.query.mockResolvedValueOnce({ rows: mockBlockedUsers, rowCount: mockBlockedUsers.length })
 
       const result = await dbComponent.getBlockedUsers('0x123')
@@ -685,14 +694,19 @@ describe('db', () => {
 
   describe('getBlockedByUsers', () => {
     it('should retrieve blocked by users', async () => {
-      const mockBlockedByUsers = [{ address: '0x456', blocked_at: new Date() }, { address: '0x789', blocked_at: new Date() }]
+      const mockBlockedByUsers = [
+        { address: '0x456', blocked_at: new Date() },
+        { address: '0x789', blocked_at: new Date() }
+      ]
       mockPg.query.mockResolvedValueOnce({ rows: mockBlockedByUsers, rowCount: mockBlockedByUsers.length })
 
       const result = await dbComponent.getBlockedByUsers('0x123')
       expect(result).toEqual(mockBlockedByUsers)
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('SELECT blocker_address as address, blocked_at FROM blocks WHERE LOWER(blocked_address) ='),
+          text: expect.stringContaining(
+            'SELECT blocker_address as address, blocked_at FROM blocks WHERE LOWER(blocked_address) ='
+          ),
           values: expect.arrayContaining([normalizeAddress('0x123')])
         })
       )
@@ -785,4 +799,3 @@ describe('db', () => {
     }
   }
 })
-
