@@ -205,7 +205,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query = SQL`
         INSERT INTO blocks (id, blocker_address, blocked_address)
         VALUES (${randomUUID()}, ${normalizeAddress(blockerAddress)}, ${normalizeAddress(blockedAddress)})
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (blocker_address, blocked_address) DO UPDATE SET id = blocks.id, blocked_at = blocks.blocked_at
         RETURNING id, blocked_at`
 
       const {
