@@ -37,7 +37,7 @@
   "dependencies": {
     "@aws-sdk/client-sns": "^3.734.0",
     "@dcl/platform-crypto-middleware": "^1.1.0",
-    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-13991670175.commit-a567d41.tgz",
+    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-14523877809.commit-39c10e9.tgz",
     "@dcl/rpc": "^1.1.2",
     "@dcl/schemas": "^16.0.0",
     "@sentry/node": "^9.12.0",

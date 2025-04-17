@@ -99,6 +99,7 @@ export interface IDatabaseComponent {
       onlyActive?: boolean
     }
   ): Promise<User[]>
+  getFriendsFromList(userAddress: string, otherUserAddresses: string[]): Promise<User[]>
   getFriendsCount(
     userAddress: string,
     options?: {
@@ -123,6 +124,7 @@ export interface IDatabaseComponent {
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<User[]>
   getSocialSettings(userAddresses: string[]): Promise<SocialSettings[]>
   upsertSocialSettings(userAddress: string, settings: Partial<Omit<SocialSettings, 'address'>>): Promise<SocialSettings>
+  deleteSocialSettings(userAddress: string): Promise<void>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<User[]>
   blockUser(
     blockerAddress: string,
