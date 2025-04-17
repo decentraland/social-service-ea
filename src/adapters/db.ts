@@ -14,7 +14,12 @@ import {
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
-import { getFriendsBaseQuery, getFriendshipRequestsBaseQuery, getMutualFriendsBaseQuery } from '../logic/queries'
+import {
+  getFriendsBaseQuery,
+  getFriendsFromListBaseQuery,
+  getFriendshipRequestsBaseQuery,
+  getMutualFriendsBaseQuery
+} from '../logic/queries'
 
 type FriendshipRequestType = 'sent' | 'received'
 
@@ -46,6 +51,11 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
   return {
     async getFriends(userAddress, { onlyActive, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 } } = {}) {
       const query: SQLStatement = getFriendsBaseQuery(userAddress, { onlyActive, pagination })
+      const result = await pg.query<User>(query)
+      return result.rows
+    },
+    async getFriendsFromList(userAddress: string, otherUserAddresses: string[]): Promise<User[]> {
+      const query = getFriendsFromListBaseQuery(userAddress, otherUserAddresses)
       const result = await pg.query<User>(query)
       return result.rows
     },
@@ -172,6 +182,10 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       `
       const results = await pg.query<{ private_messages_privacy: string }>(query)
       return results.rows as SocialSettings[]
+    },
+    async deleteSocialSettings(userAddress: string): Promise<void> {
+      const query = SQL`DELETE FROM social_settings WHERE address = ${userAddress}`
+      await pg.query(query)
     },
     async upsertSocialSettings(
       userAddress: string,
