@@ -67,33 +67,35 @@ export function useCTEs(CTEs: { query: SQLStatement | string; name: string }[]) 
  * @returns A CTE for the user's friends
  */
 function getUserFriendsCTE(userAddress: string) {
+  const normalizedUserAddress = normalizeAddress(userAddress)
   return {
     query: SQL`SELECT DISTINCT
     CASE
-      WHEN LOWER(f.address_requester) = ${userAddress} 
+      WHEN LOWER(f.address_requester) = ${normalizedUserAddress} 
       THEN f.address_requested
       ELSE f.address_requester
     END as address, created_at
   FROM friendships f
   WHERE f.is_active = true
     AND (
-      LOWER(f.address_requester) = ${userAddress}
-      OR LOWER(f.address_requested) = ${userAddress}
+      LOWER(f.address_requester) = ${normalizedUserAddress}
+      OR LOWER(f.address_requested) = ${normalizedUserAddress}
     )`,
     name: 'user_friends'
   }
 }
 
 function getBlockedForUserCTE(userAddress: string) {
+  const normalizedUserAddress = normalizeAddress(userAddress)
   return {
     query: SQL`SELECT DISTINCT 
-      CASE WHEN LOWER(b.blocker_address) = ${userAddress}
+      CASE WHEN LOWER(b.blocker_address) = ${normalizedUserAddress}
       THEN b.blocked_address
       ELSE b.blocker_address
     END as address
     FROM blocks b
-    WHERE LOWER(b.blocker_address) = ${userAddress}
-      OR LOWER(b.blocked_address) = ${userAddress}`,
+    WHERE LOWER(b.blocker_address) = ${normalizedUserAddress}
+      OR LOWER(b.blocked_address) = ${normalizedUserAddress}`,
     name: 'blocked_for_user'
   }
 }
@@ -101,11 +103,12 @@ function getBlockedForUserCTE(userAddress: string) {
 export function getFriendsFromListBaseQuery(userAddress: string, otherUserAddresses: string[]): SQLStatement {
   const userFriendsCTE = getUserFriendsCTE(userAddress)
   const blockedForUserCTE = getBlockedForUserCTE(userAddress)
+  const normalizedOtherUserAddresses = otherUserAddresses.map(normalizeAddress)
   return useCTEs([userFriendsCTE, blockedForUserCTE])
     .append(`SELECT uf.address FROM ${userFriendsCTE.name} uf `)
-    .append(SQL`WHERE uf.address = ANY(${otherUserAddresses}) AND NOT EXISTS (`)
+    .append(SQL`WHERE uf.address = ANY(${normalizedOtherUserAddresses}) AND NOT EXISTS (`)
     .append(`SELECT 1 FROM ${blockedForUserCTE.name} b `)
-    .append(SQL`WHERE b.address = ANY(${otherUserAddresses}))`)
+    .append(SQL`WHERE b.address = ANY(${normalizedOtherUserAddresses}))`)
 }
 
 export function getFriendsBaseQuery(
