@@ -64,7 +64,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async getFriendship(users, txClient) {
       const [userAddress1, userAddress2] = users.map(normalizeAddress)
-      const query = SQL`SELECT * FROM friendships WHERE (LOWER(address_requester), LOWER(address_requested)) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))`
+      const query = SQL`SELECT * FROM friendships WHERE (address_requester, address_requested) IN ((${userAddress1}, ${userAddress2}), (${userAddress2}, ${userAddress1}))`
 
       const results = txClient ? await txClient.query<Friendship>(query) : await pg.query<Friendship>(query)
       return results.rows[0]
@@ -77,7 +77,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
         SELECT fa.*
         FROM friendships f
         INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-        WHERE (LOWER(f.address_requester), LOWER(f.address_requested)) IN ((${normalizedLoggedUser}, ${normalizedFriendUser}), (${normalizedFriendUser}, ${normalizedLoggedUser}))
+        WHERE (f.address_requester, f.address_requested) IN ((${normalizedLoggedUser}, ${normalizedFriendUser}), (${normalizedFriendUser}, ${normalizedLoggedUser}))
         ORDER BY fa.timestamp DESC LIMIT 1
       `
 
@@ -146,20 +146,19 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query: SQLStatement = SQL`
         SELECT DISTINCT
           CASE
-            WHEN LOWER(address_requester) = ${normalizedUserAddress} THEN LOWER(address_requested)
-            ELSE LOWER(address_requester)
+            WHEN address_requester = ${normalizedUserAddress} THEN address_requested
+            ELSE address_requester
           END as address
         FROM friendships
         WHERE (
-          (LOWER(address_requester) = ${normalizedUserAddress} AND LOWER(address_requested) = ANY(${normalizedOnlinePotentialFriends}))
+          (address_requester = ${normalizedUserAddress} AND address_requested = ANY(${normalizedOnlinePotentialFriends}))
           OR
-          (LOWER(address_requested) = ${normalizedUserAddress} AND LOWER(address_requester) = ANY(${normalizedOnlinePotentialFriends}))
+          (address_requested = ${normalizedUserAddress} AND address_requester = ANY(${normalizedOnlinePotentialFriends}))
         )
         AND NOT EXISTS (
           SELECT 1 FROM blocks
-          WHERE (LOWER(blocker_address) = ${normalizedUserAddress} AND LOWER(blocked_address) = ANY(${normalizedOnlinePotentialFriends}))
-          OR
-          (LOWER(blocker_address) = ANY(${normalizedOnlinePotentialFriends}) AND LOWER(blocked_address) = ${normalizedUserAddress})
+          WHERE (blocker_address = ${normalizedUserAddress} AND blocked_address = ANY(${normalizedOnlinePotentialFriends}))
+          OR (blocker_address = ANY(${normalizedOnlinePotentialFriends}) AND blocked_address = ${normalizedUserAddress})
         )
         AND is_active = true`
 
@@ -178,7 +177,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       settings: Partial<Omit<SocialSettings, 'address'>>
     ): Promise<SocialSettings> {
       const keys = Object.keys(settings)
-      const values = [userAddress, ...Object.values(settings)].reduce(
+      const values = [normalizeAddress(userAddress), ...Object.values(settings)].reduce(
         (acc, value, index, array) => {
           return acc.append(SQL`${value}`).append(index === array.length - 1 ? '' : ', ')
         },
@@ -222,8 +221,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async unblockUser(blockerAddress, blockedAddress, txClient) {
       const query = SQL`
         DELETE FROM blocks
-        WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
-          AND LOWER(blocked_address) = ${normalizeAddress(blockedAddress)}
+        WHERE blocker_address = ${normalizeAddress(blockerAddress)}
+          AND blocked_address = ${normalizeAddress(blockedAddress)}
       `
       if (txClient) {
         await txClient.query(query)
@@ -247,21 +246,21 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     async unblockUsers(blockerAddress, blockedAddresses) {
       const query = SQL`
         DELETE FROM blocks
-        WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
-          AND LOWER(blocked_address) = ANY(${blockedAddresses.map(normalizeAddress)})
+        WHERE blocker_address = ${normalizeAddress(blockerAddress)}
+          AND blocked_address = ANY(${blockedAddresses.map(normalizeAddress)})
       `
       await pg.query(query)
     },
     async getBlockedUsers(blockerAddress) {
       const query = SQL`
-        SELECT blocked_address as address, blocked_at FROM blocks WHERE LOWER(blocker_address) = ${normalizeAddress(blockerAddress)}
+        SELECT blocked_address as address, blocked_at FROM blocks WHERE blocker_address = ${normalizeAddress(blockerAddress)}
       `
       const result = await pg.query<BlockUserWithDate>(query)
       return result.rows
     },
     async getBlockedByUsers(blockedAddress) {
       const query = SQL`
-        SELECT blocker_address as address, blocked_at FROM blocks WHERE LOWER(blocked_address) = ${normalizeAddress(blockedAddress)}
+        SELECT blocker_address as address, blocked_at FROM blocks WHERE blocked_address = ${normalizeAddress(blockedAddress)}
       `
       const result = await pg.query<BlockUserWithDate>(query)
       return result.rows
@@ -273,7 +272,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const query = SQL`
         SELECT EXISTS (
           SELECT 1 FROM blocks
-          WHERE (LOWER(blocker_address), LOWER(blocked_address)) IN ((${normalizedLoggedUserAddress}, ${normalizedAnotherUserAddress}), (${normalizedAnotherUserAddress}, ${normalizedLoggedUserAddress}))
+          WHERE (blocker_address, blocked_address) IN ((${normalizedLoggedUserAddress}, ${normalizedAnotherUserAddress}), (${normalizedAnotherUserAddress}, ${normalizedLoggedUserAddress}))
         )
       `
       const results = await pg.query<{ exists: boolean }>(query)

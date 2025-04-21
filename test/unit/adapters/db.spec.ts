@@ -1,9 +1,8 @@
+import SQL from 'sql-template-strings'
 import { createDBComponent } from '../../../src/adapters/db'
 import { Action } from '../../../src/types'
-import SQL from 'sql-template-strings'
 import { mockLogs, mockPg } from '../../mocks/components'
 import { normalizeAddress } from '../../../src/utils/address'
-import { PoolClient } from 'pg'
 
 jest.mock('node:crypto', () => ({
   randomUUID: jest.fn().mockReturnValue('mock-uuid')
@@ -29,11 +28,11 @@ describe('db', () => {
 
       const expectedFragmentsOfTheQuery = [
         {
-          text: 'WHEN LOWER(f.address_requester) =',
+          text: 'WHEN f.address_requester =',
           values: ['0x123']
         },
         {
-          text: 'WHERE (LOWER(f.address_requester) =',
+          text: 'WHERE (f.address_requester =',
           values: ['0x123']
         },
         {
@@ -45,7 +44,7 @@ describe('db', () => {
           values: []
         },
         {
-          text: 'WHEN LOWER(f.address_requester) =',
+          text: 'WHEN f.address_requester =',
           values: ['0x123']
         },
         {
@@ -99,7 +98,7 @@ describe('db', () => {
           values: []
         },
         {
-          text: 'WHERE (LOWER(f.address_requester) =',
+          text: 'WHERE (f.address_requester =',
           values: ['0x123']
         },
         {
@@ -131,7 +130,7 @@ describe('db', () => {
           values: []
         },
         {
-          text: 'WHERE (LOWER(f.address_requester) =',
+          text: 'WHERE (f.address_requester =',
           values: ['0x123']
         },
         {
@@ -163,7 +162,7 @@ describe('db', () => {
 
       const expectedQueryFragments = [
         {
-          text: 'WHEN LOWER(f_a.address_requester) =',
+          text: 'WHEN f_a.address_requester =',
           values: ['0x123']
         },
         {
@@ -226,7 +225,7 @@ describe('db', () => {
           values: []
         },
         {
-          text: 'WHEN LOWER(f_a.address_requester) =',
+          text: 'WHEN f_a.address_requester =',
           values: ['0x123']
         },
         {
@@ -283,7 +282,7 @@ describe('db', () => {
       expect(result).toEqual(mockAction)
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('WHERE (LOWER(f.address_requester), LOWER(f.address_requested)) IN'),
+          text: expect.stringContaining('WHERE (f.address_requester, f.address_requested) IN'),
           values: expect.arrayContaining(['0x123', '0x456', '0x456', '0x123'])
         })
       )
@@ -354,9 +353,7 @@ describe('db', () => {
 
       expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining(
-            'SELECT * FROM friendships WHERE (LOWER(address_requester), LOWER(address_requested)) IN'
-          ),
+          text: expect.stringContaining('SELECT * FROM friendships WHERE (address_requester, address_requested) IN'),
           values: expect.arrayContaining(['0x123', '0x456', '0x456', '0x123'])
         })
       )
@@ -560,15 +557,15 @@ describe('db', () => {
       await dbComponent.getOnlineFriends('0x123', normalizedPotentialFriends)
 
       const queryExpectations = [
-        SQL`WHEN LOWER(address_requester) = ${userAddress} THEN LOWER(address_requested)`,
-        SQL`ELSE LOWER(address_requester)`,
-        SQL`(LOWER(address_requester) = ${userAddress} AND LOWER(address_requested) = ANY(${normalizedPotentialFriends}))`,
-        SQL`(LOWER(address_requested) = ${userAddress} AND LOWER(address_requester) = ANY(${normalizedPotentialFriends}))`,
+        SQL`WHEN address_requester = ${userAddress} THEN address_requested`,
+        SQL`ELSE address_requester`,
+        SQL`(address_requester = ${userAddress} AND address_requested = ANY(${normalizedPotentialFriends}))`,
+        SQL`(address_requested = ${userAddress} AND address_requester = ANY(${normalizedPotentialFriends}))`,
         SQL`AND NOT EXISTS (
           SELECT 1 FROM blocks
-          WHERE (LOWER(blocker_address) = ${userAddress} AND LOWER(blocked_address) = ANY(${normalizedPotentialFriends}))
+          WHERE (blocker_address = ${userAddress} AND blocked_address = ANY(${normalizedPotentialFriends}))
           OR
-          (LOWER(blocker_address) = ANY(${normalizedPotentialFriends}) AND LOWER(blocked_address) = ${userAddress})
+          (blocker_address = ANY(${normalizedPotentialFriends}) AND blocked_address = ${userAddress})
         )`
       ]
 
@@ -625,8 +622,8 @@ describe('db', () => {
       await dbComponent.unblockUser('0x123', '0x456', mockClient)
       const expectedQuery = SQL`
         DELETE FROM blocks
-        WHERE LOWER(blocker_address) = ${normalizeAddress('0x123')}
-          AND LOWER(blocked_address) = ${normalizeAddress('0x456')}`
+        WHERE blocker_address = ${normalizeAddress('0x123')}
+          AND blocked_address = ${normalizeAddress('0x456')}`
 
       expect(queryToAssert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -661,8 +658,8 @@ describe('db', () => {
       await dbComponent.unblockUsers('0x123', ['0x456', '0x789'])
       const expectedQuery = SQL`
         DELETE FROM blocks
-        WHERE LOWER(blocker_address) = ${normalizeAddress('0x123')}
-          AND LOWER(blocked_address) = ANY(${['0x456', '0x789'].map(normalizeAddress)})`
+        WHERE blocker_address = ${normalizeAddress('0x123')}
+          AND blocked_address = ANY(${['0x456', '0x789'].map(normalizeAddress)})`
 
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -685,7 +682,7 @@ describe('db', () => {
       expect(result).toEqual(mockBlockedUsers)
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('LOWER(blocker_address) ='),
+          text: expect.stringContaining('blocker_address ='),
           values: expect.arrayContaining([normalizeAddress('0x123')])
         })
       )
@@ -705,7 +702,7 @@ describe('db', () => {
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining(
-            'SELECT blocker_address as address, blocked_at FROM blocks WHERE LOWER(blocked_address) ='
+            'SELECT blocker_address as address, blocked_at FROM blocks WHERE blocked_address ='
           ),
           values: expect.arrayContaining([normalizeAddress('0x123')])
         })
@@ -721,7 +718,7 @@ describe('db', () => {
       const expectedQuery = SQL`
         SELECT EXISTS (
           SELECT 1 FROM blocks
-          WHERE (LOWER(blocker_address), LOWER(blocked_address)) IN ((${'0x123'}, ${'0x456'}), (${'0x456'}, ${'0x123'}))
+          WHERE (blocker_address, blocked_address) IN ((${'0x123'}, ${'0x456'}), (${'0x456'}, ${'0x123'}))
         )
       `
 

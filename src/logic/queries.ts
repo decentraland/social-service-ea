@@ -9,9 +9,9 @@ function withAlias(tableAlias?: string): string {
 export function getFriendAddressCase(userAddress: string, tableAlias?: string): SQLStatement {
   const normalizedUserAddress = normalizeAddress(userAddress)
   return SQL`CASE
-    WHEN LOWER(`
+    WHEN `
     .append(withAlias(tableAlias))
-    .append(SQL`address_requester) = ${normalizedUserAddress} THEN `)
+    .append(SQL`address_requester = ${normalizedUserAddress} THEN `)
     .append(withAlias(tableAlias))
     .append(
       SQL`address_requested
@@ -23,11 +23,11 @@ export function getFriendAddressCase(userAddress: string, tableAlias?: string): 
 
 export function getFriendshipCondition(userAddress: string, tableAlias: string): SQLStatement {
   const normalizedUserAddress = normalizeAddress(userAddress)
-  return SQL`(LOWER(`
+  return SQL`(`
     .append(tableAlias)
-    .append(SQL`.address_requester) = ${normalizedUserAddress} OR LOWER(`)
+    .append(SQL`.address_requester = ${normalizedUserAddress} OR `)
     .append(tableAlias)
-    .append(SQL`.address_requested) = ${normalizedUserAddress})`)
+    .append(SQL`.address_requested = ${normalizedUserAddress})`)
 }
 
 export function getBlockingCondition(
