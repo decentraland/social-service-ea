@@ -50,6 +50,6 @@ export async function createOrUpdateSocialSettings(
   })
 }
 
-export async function removeSocialSettings(db: IDatabaseComponent, address: string) {
-  await db.deleteSocialSettings(address)
+export function removeSocialSettings(db: IDatabaseComponent, address: string): Promise<void> {
+  return db.deleteSocialSettings(address)
 }
