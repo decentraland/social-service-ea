@@ -22,13 +22,11 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     }
   })
 
-  pgm.createIndex('blocks', ['blocker_address'])
   pgm.createIndex('blocks', ['blocked_address'])
   pgm.createIndex('blocks', ['blocker_address', 'blocked_address'], { unique: true })
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropIndex('blocks', ['blocker_address'])
   pgm.dropIndex('blocks', ['blocked_address'])
   pgm.dropIndex('blocks', ['blocker_address', 'blocked_address'])
   pgm.dropTable('blocks')
