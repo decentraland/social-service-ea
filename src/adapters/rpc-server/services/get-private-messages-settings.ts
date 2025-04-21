@@ -20,6 +20,7 @@ export function getPrivateMessagesSettingsService({ components: { logs, db } }: 
       const userAddresses = request.user.map((user) => user.address.toLowerCase())
 
       if (userAddresses.length > MAX_USER_ADDRESSES) {
+        logger.warn(`Too many user private messages settings requested: ${userAddresses.length}`)
         return {
           response: {
             $case: 'invalidRequest',

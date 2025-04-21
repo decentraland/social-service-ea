@@ -349,7 +349,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('when getting the private message settings', function () {
+  describe('when getting the private message settings', () => {
     let requestedUsers: User[]
 
     beforeEach(() => {
@@ -359,7 +359,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       ]
     })
 
-    describe("and some of the requested users don't have social settings", function () {
+    describe("and some of the requested users don't have social settings", () => {
       beforeEach(async () => {
         const { db } = components
         await createOrUpdateSocialSettings(db, requestedUsers[0].address, PrivateMessagesPrivacy.ONLY_FRIENDS)
@@ -397,7 +397,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       })
     })
 
-    describe('and all the requested users have social settings', function () {
+    describe('and all the requested users have social settings', () => {
       beforeEach(async () => {
         const { db } = components
         await createOrUpdateSocialSettings(db, requestedUsers[0].address, PrivateMessagesPrivacy.ONLY_FRIENDS)
@@ -437,7 +437,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       })
     })
 
-    describe('and some of the requested users are friends', function () {
+    describe('and some of the requested users are friends', () => {
       let id: string
 
       beforeEach(async () => {
@@ -453,7 +453,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
       afterEach(async () => {
         const { db, rpcClient } = components
-        // await removeFriendship(db, id, rpcClient.authAddress.toLowerCase())
+        await removeFriendship(db, id, rpcClient.authAddress.toLowerCase())
         await removeSocialSettings(db, requestedUsers[0].address.toLowerCase())
       })
 
@@ -483,12 +483,34 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         })
       })
     })
+
+    describe('and the user requested the private message settings for an amount of users greater than the limit', () => {
+      it('should return an invalid request case with a message indicating that the amount of users is greater than the limit', async () => {
+        const { rpcClient } = components
+
+        const result = await rpcClient.client.getPrivateMessagesSettings({
+          user: Array.from({ length: 51 }, (_, index) => ({
+            address: `0x06b7c9e6aef7f6b6c259831953309f63c59bcfd${index}`
+          }))
+        })
+
+        assertInvalidRequestCase(result, 'Too many user addresses: 51')
+      })
+    })
   })
 
   // Assert ok case
   function assertOkCase<T>(result: { response?: { $case: string; ok?: T } | undefined }, expectedResult: T) {
     expect(result?.response?.$case).toEqual('ok')
     expect(result?.response?.ok).toEqual(expectedResult)
+  }
+
+  function assertInvalidRequestCase(
+    result: { response?: { $case: string; invalidRequest?: { message?: string } } | undefined },
+    expectedMessage: string
+  ) {
+    expect(result?.response?.$case).toEqual('invalidRequest')
+    expect(result.response?.invalidRequest?.message).toEqual(expectedMessage)
   }
 
   // Helper functions
