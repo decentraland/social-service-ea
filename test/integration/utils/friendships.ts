@@ -49,3 +49,7 @@ export async function createOrUpdateSocialSettings(
     private_messages_privacy: privacySettings
   })
 }
+
+export function removeSocialSettings(db: IDatabaseComponent, address: string): Promise<void> {
+  return db.deleteSocialSettings(address)
+}

@@ -80,13 +80,13 @@ describe('redis', () => {
   describe('stop()', () => {
     it('should stop the redis client', async () => {
       await redis.stop()
-      expect(mockClient.disconnect).toHaveBeenCalled()
+      expect(mockClient.quit).toHaveBeenCalled()
     })
 
     it('when disconnect fails, should throw an error', async () => {
       mockClient.disconnect = jest.fn().mockRejectedValueOnce(new Error('Disconnection failed'))
       await redis.stop()
-      expect(mockClient.disconnect).toHaveBeenCalled()
+      expect(mockClient.quit).toHaveBeenCalled()
     })
   })
 })

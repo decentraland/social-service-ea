@@ -151,7 +151,7 @@ export function createRpcServerMetricsWrapper({
    * Extracts the response code based on the result structure
    * Analyzes different response patterns in the protocol
    */
-  function getResponseCode<T extends SocialServiceResponse>(procedureName: string, result: T): RpcResponseCode {
+  function getResponseCode<T extends SocialServiceResponse>(result: T): RpcResponseCode {
     if (result === null || result === undefined || typeof result !== 'object') {
       return RpcResponseCode.UNKNOWN
     }
@@ -177,7 +177,7 @@ export function createRpcServerMetricsWrapper({
         const result = await serviceFunction(params, context)
 
         // Determine the response code from the result structure
-        const responseCode = getResponseCode(procedureName, result)
+        const responseCode = getResponseCode(result)
 
         recordResponseSize(procedureName, responseCode, result)
         recordCallMetrics(procedureName, responseCode, startTime)
