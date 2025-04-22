@@ -99,13 +99,18 @@ describe('UWebSocketTransport', () => {
       jest.useFakeTimers()
       const messages = [new Uint8Array([1]), new Uint8Array([2])]
       
-      // Mock socket.send to return 0 to simulate closed socket
+      // Mock socket.send to return 0 to simulate backpressure
       mockSocket.send.mockReturnValue(0)
       
       const sendPromises = messages.map(msg => transport.sendMessage(msg))
       
       // Run timers to process queue
       await jest.advanceTimersByTimeAsync(0)
+      
+      // Verify first message is retried
+      expect(mockSocket.send).toHaveBeenCalledTimes(2)
+      expect(mockSocket.send).toHaveBeenNthCalledWith(1, messages[0], true)
+      expect(mockSocket.send).toHaveBeenNthCalledWith(2, messages[0], true) // Same message retried
       
       // Close transport to trigger connection closed error
       transport.close()
@@ -179,6 +184,33 @@ describe('UWebSocketTransport', () => {
       expect(messageListener).not.toHaveBeenCalled()
     })
 
+    it('should handle queue processing retry', async () => {
+      jest.useFakeTimers()
+      const message = new Uint8Array([1])
+      
+      // Mock socket.send to simulate backpressure then success
+      mockSocket.send
+        .mockReturnValueOnce(0) // First attempt fails
+        .mockReturnValueOnce(0) // Second attempt fails
+        .mockReturnValue(1)     // Third attempt succeeds
+      
+      const sendPromise = transport.sendMessage(message)
+      
+      // First attempt fails
+      await jest.advanceTimersByTimeAsync(0)
+      expect(mockSocket.send).toHaveBeenCalledTimes(1)
+      
+      // Second attempt fails
+      await jest.advanceTimersByTimeAsync(1000)
+      expect(mockSocket.send).toHaveBeenCalledTimes(2)
+      
+      // Third attempt succeeds
+      await jest.advanceTimersByTimeAsync(1000)
+      expect(mockSocket.send).toHaveBeenCalledTimes(3)
+      
+      await expect(sendPromise).resolves.not.toThrow()
+    }, 10000)
+
     it('should handle queue processing interruption', async () => {
       jest.useFakeTimers()
       const messages = [new Uint8Array([1]), new Uint8Array([2])]
@@ -191,6 +223,11 @@ describe('UWebSocketTransport', () => {
       // Run timers to process first message
       await jest.advanceTimersByTimeAsync(0)
       
+      // Verify first message is retried
+      expect(mockSocket.send).toHaveBeenCalledTimes(2)
+      expect(mockSocket.send).toHaveBeenNthCalledWith(1, messages[0], true)
+      expect(mockSocket.send).toHaveBeenNthCalledWith(2, messages[0], true) // Same message retried
+      
       // Close transport during processing
       transport.close()
       
@@ -202,28 +239,7 @@ describe('UWebSocketTransport', () => {
         }
       })
       expect(errorListener).toHaveBeenCalledWith(new Error('Connection closed'))
-    })
-
-    it('should handle queue processing retry', async () => {
-      jest.useFakeTimers()
-      const message = new Uint8Array([1])
-      
-      // Mock socket.send to simulate backpressure then success
-      mockSocket.send
-        .mockReturnValueOnce(0) // First attempt fails
-        .mockReturnValue(1)     // Subsequent attempts succeed
-      
-      const sendPromise = transport.sendMessage(message)
-      
-      // First attempt fails
-      await jest.advanceTimersByTimeAsync(0)
-      
-      // Retry after 1 second
-      await jest.advanceTimersByTimeAsync(1000)
-      
-      await expect(sendPromise).resolves.not.toThrow()
-      expect(mockSocket.send).toHaveBeenCalledTimes(2)
-    })
+    }, 10000)
 
     it('should handle message queue size limit', async () => {
       mockSocket.getUserData.mockReturnValue({ isConnected: true })

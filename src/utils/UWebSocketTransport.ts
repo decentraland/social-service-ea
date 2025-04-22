@@ -52,6 +52,10 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   let isProcessing = false
   let queueProcessingTimeout: NodeJS.Timeout | null = null
 
+  // Process messages in batches of 100
+  const BATCH_SIZE = 100
+  let processedInBatch = 0
+
   async function processQueue() {
     if (isProcessing || !isTransportActive || !isInitialized) {
       logger.debug('[DEBUGGING CONNECTION] Queue processing skipped', {
@@ -82,21 +86,18 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         try {
           const result = socket.send(item.message, true)
           if (result === 0) {
-            // Send failed, socket might be closed or backpressured
-            if (!isTransportActive || !socket.getUserData().isConnected) {
-              // If transport is not active or socket is closed, reject with connection closed
-              const error = new Error('Connection closed')
-              item.future.reject(error)
-              messageQueue.shift()
-              events.emit('error', error)
-              return
-            } else {
-              // If transport is active but send failed, retry later
-              break
-            }
+            break
           }
+
           item.future.resolve()
           messageQueue.shift()
+
+          // Yield to event loop after processing BATCH_SIZE messages
+          processedInBatch++
+          if (processedInBatch >= BATCH_SIZE) {
+            processedInBatch = 0
+            await new Promise((resolve) => setImmediate(resolve))
+          }
         } catch (error: any) {
           const errorMessage = `Failed to send message: ${error.message}`
           item.future.reject(new Error(errorMessage))
@@ -104,7 +105,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
           events.emit('error', new Error(errorMessage))
           return
         }
-        await new Promise((resolve) => setTimeout(resolve, 0))
       }
     } finally {
       isProcessing = false
