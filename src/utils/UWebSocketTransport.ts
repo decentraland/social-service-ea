@@ -113,6 +113,10 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         queueProcessingTimeout = setTimeout(() => {
           void processQueue()
         }, 1000)
+      } else if (messageQueue.length === 0 && queueDrainTimeout) {
+        // Clear queue drain timeout if queue is empty
+        clearTimeout(queueDrainTimeout)
+        queueDrainTimeout = null
       }
     }
   }
@@ -150,6 +154,10 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
     // Set queue drain timeout if this is the first message
     if (messageQueue.length === 1) {
+      if (queueDrainTimeout) {
+        clearTimeout(queueDrainTimeout)
+      }
+
       queueDrainTimeout = setTimeout(() => {
         if (messageQueue.length > 0) {
           const error = new Error('Queue drain timeout')
