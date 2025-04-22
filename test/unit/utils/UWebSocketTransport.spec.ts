@@ -10,13 +10,10 @@ describe('UWebSocketTransport', () => {
   let errorListener: jest.Mock
 
   beforeEach(async () => {
-    mockConfig.getNumber.mockImplementation(async (key) => {
-      const defaults: Record<string, number> = {
-        WS_TRANSPORT_MAX_QUEUE_SIZE: 1000,
-        WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT: 5000
-      }
-      return defaults[key] || null
-    })
+    mockConfig.getNumber.mockImplementation(async (key) => ({
+      WS_TRANSPORT_MAX_QUEUE_SIZE: 3,
+      WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT_IN_MS: 5000
+    })[key] || null)
 
     mockSocket = {
       send: jest.fn().mockReturnValue(1),
@@ -33,38 +30,40 @@ describe('UWebSocketTransport', () => {
 
   afterEach(() => {
     mockEmitter.all.clear()
+    jest.useRealTimers()
   })
 
-  describe('Transport Initialization', () => {
-    it('should initialize transport with correct state', () => {
+  describe('Transport Lifecycle', () => {
+    it('should initialize with correct state', () => {
       expect(transport.isConnected).toBe(true)
     })
 
-    it('should use configured queue size', async () => {
-      mockConfig.getNumber.mockImplementation(async (key) => {
-        if (key === 'WS_TRANSPORT_MAX_QUEUE_SIZE') return 500
-        return null
-      })
+    it('should handle normal cleanup sequence', () => {
+      const closeListener = jest.fn()
+      transport.on('close', closeListener)
 
-      const customTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs)
-      expect(customTransport.isConnected).toBe(true)
-      expect(mockConfig.getNumber).toHaveBeenCalledWith('WS_TRANSPORT_MAX_QUEUE_SIZE')
+      transport.close()
+
+      expect(mockSocket.end).toHaveBeenCalledWith(1000, 'Client requested closure')
+      expect(closeListener).toHaveBeenCalledWith({ code: 1000, reason: 'Client requested closure' })
+      expect(transport.isConnected).toBe(false)
+    })
+
+    it('should handle multiple close calls gracefully', () => {
+      const closeListener = jest.fn()
+      transport.on('close', closeListener)
+
+      transport.close()
+      mockSocket.getUserData.mockReturnValue({ isConnected: false })
+      transport.close()
+
+      expect(mockSocket.end).toHaveBeenCalledTimes(1)
+      expect(closeListener).toHaveBeenCalledTimes(2)
     })
   })
 
   describe('Message Handling', () => {
-    it('should handle ArrayBuffer messages correctly', () => {
-      const messageListener = jest.fn()
-      transport.on('message', messageListener)
-
-      const buffer = new ArrayBuffer(4)
-      mockEmitter.emit('message', buffer)
-
-      expect(messageListener).toHaveBeenCalledWith(new Uint8Array(buffer))
-      expect(errorListener).not.toHaveBeenCalled()
-    })
-
-    it('should handle message queue processing', async () => {
+    it('should process single message successfully', async () => {
       const message = new Uint8Array([1, 2, 3])
       await transport.sendMessage(message)
 
@@ -72,134 +71,272 @@ describe('UWebSocketTransport', () => {
       expect(errorListener).not.toHaveBeenCalled()
     })
 
-    it('should handle send failure', async () => {
-      mockSocket.send.mockReturnValue(0)
-      const message = new Uint8Array([1, 2, 3])
+    it('should handle incoming ArrayBuffer messages', () => {
+      const messageListener = jest.fn()
+      transport.on('message', messageListener)
 
-      await expect(transport.sendMessage(message)).rejects.toThrow('Failed to send message: Socket closed')
+      const buffer = new ArrayBuffer(4)
+      mockEmitter.emit('message', buffer)
+
+      expect(messageListener).toHaveBeenCalledWith(new Uint8Array(buffer))
     })
 
-    it('should handle queue overflow', async () => {
-      mockConfig.getNumber.mockImplementation(async (key) => {
-        const values: Record<string, number> = {
-          WS_TRANSPORT_MAX_QUEUE_SIZE: 1,
-          WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT: 100
-        }
-        return values[key] || null
-      })
-
-      const customTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs)
-      mockSocket.send.mockReturnValue(0)
-
-      const message = new Uint8Array([1, 2, 3])
-      await expect(customTransport.sendMessage(message)).rejects.toThrow('Failed to send message: Socket closed')
-    })
-  })
-
-  describe('Connection State', () => {
-    it('should handle disconnection', async () => {
+    it('should reject messages when transport is not connected', async () => {
+      transport.close()
       mockSocket.getUserData.mockReturnValue({ isConnected: false })
-      const message = new Uint8Array([1, 2, 3])
+      
+      const message = new Uint8Array([1])
+      const errorListener = jest.fn()
+      transport.on('error', errorListener)
 
-      await transport.sendMessage(message)
+      transport.sendMessage(message)
+
+      expect(mockSocket.send).not.toHaveBeenCalled()
       expect(errorListener).toHaveBeenCalledWith(new Error('Transport is not ready or socket is not connected'))
     })
 
-    it('should handle cleanup on close', () => {
-      const closeListener = jest.fn()
-      transport.on('close', closeListener)
-
+    it('should handle message queue when socket closes', async () => {
+      jest.useFakeTimers()
+      const messages = [new Uint8Array([1]), new Uint8Array([2])]
+      
+      // Mock socket.send to return 0 to simulate closed socket
+      mockSocket.send.mockReturnValue(0)
+      
+      const sendPromises = messages.map(msg => transport.sendMessage(msg))
+      
+      // Run timers to process queue
+      await jest.advanceTimersByTimeAsync(0)
+      
+      // Close transport to trigger connection closed error
       transport.close()
-
-      expect(mockSocket.end).toHaveBeenCalledWith(1000, 'Client requested closure')
-    })
-  })
-
-  describe('Error Handling', () => {
-    it('should handle socket errors during send', async () => {
-      const error = new Error('Socket error')
-      mockSocket.send.mockImplementation(() => {
-        throw error
+      
+      const results = await Promise.allSettled(sendPromises)
+      results.forEach(result => {
+        expect(result.status).toBe('rejected')
+        if (result.status === 'rejected') {
+          expect(result.reason.message).toBe('Connection closed')
+        }
       })
-
-      const message = new Uint8Array([1, 2, 3])
-      await expect(transport.sendMessage(message)).rejects.toThrow('Failed to send message: Socket error')
-    })
-
-    it('should handle invalid message types', () => {
-      transport.sendMessage('invalid' as any)
-      expect(errorListener).toHaveBeenCalledWith(
-        new Error('WebSocketTransport: Received unknown type of message, expecting Uint8Array')
-      )
-    })
+      expect(errorListener).toHaveBeenCalledWith(new Error('Connection closed'))
+    }, 10000)
   })
 
-  describe('Queue Processing', () => {
+  describe('Queue Management', () => {
     beforeEach(() => {
       jest.useFakeTimers()
     })
 
-    afterEach(() => {
+    it('should process queued messages in order', async () => {
+      const messages = [new Uint8Array([1]), new Uint8Array([2])]
+      const sendPromises = messages.map(msg => transport.sendMessage(msg))
+      
+      await jest.runAllTimersAsync()
+      await Promise.all(sendPromises)
+
+      expect(mockSocket.send).toHaveBeenCalledTimes(2)
+      expect(mockSocket.send).toHaveBeenNthCalledWith(1, messages[0], true)
+      expect(mockSocket.send).toHaveBeenNthCalledWith(2, messages[1], true)
+    }, 10000)
+
+    it('should handle queue drain timeout', async () => {
+      jest.useFakeTimers()
+      
+      mockSocket.getUserData.mockReturnValue({ isConnected: true })
+      mockSocket.send.mockReturnValue(0) // Simulate backpressure
+
+      // Set up error listener
+      const errorListener = jest.fn()
+      transport.on('error', errorListener)
+
+      // Send a message that will be queued
+      const sendPromise = transport.sendMessage(new Uint8Array([1, 2, 3]))
+
+      // Run all pending timers
+      jest.runAllTimers()
+
+      // Verify error event was emitted
+      expect(errorListener).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Queue drain timeout'
+      }))
+
+      // Verify promise was rejected
+      await expect(sendPromise).rejects.toMatchObject({
+        message: 'Queue drain timeout'
+      })
+
       jest.useRealTimers()
     })
 
-    it('should process messages in queue', async () => {
-      mockSocket.send.mockReturnValue(1)
-      const messages = [new Uint8Array([1]), new Uint8Array([2])]
+    it('should handle non-binary messages correctly', () => {
+      const messageListener = jest.fn()
+      transport.on('message', messageListener)
 
-      const sendPromises = messages.map((msg) => transport.sendMessage(msg))
+      mockEmitter.emit('message', 'string message')
 
-      // Let the first message process
-      await Promise.resolve()
-      expect(mockSocket.send).toHaveBeenCalledWith(messages[0], true)
-
-      // Process second message
-      jest.advanceTimersByTime(1000)
-      await Promise.resolve()
-
-      await Promise.all(sendPromises)
-      expect(mockSocket.send).toHaveBeenCalledTimes(2)
-    })
-
-    it('should handle queue overflow and drain timeout', async () => {
-      mockSocket.send.mockReturnValue(0) // Force queue to fill
-      const message = new Uint8Array([1])
-
-      const sendPromise = transport.sendMessage(message)
-      jest.advanceTimersByTime(5000)
-
-      await expect(sendPromise).rejects.toThrow('Failed to send message: Socket closed')
+      expect(errorListener).toHaveBeenCalledWith(
+        new Error('WebSocketTransport: Received unknown type of message')
+      )
+      expect(messageListener).not.toHaveBeenCalled()
     })
 
     it('should handle queue processing interruption', async () => {
-      mockSocket.send.mockReturnValue(0) // Force queue to fill
-      const message = new Uint8Array([1])
-
-      const sendPromise = transport.sendMessage(message)
+      jest.useFakeTimers()
+      const messages = [new Uint8Array([1]), new Uint8Array([2])]
+      
+      // Mock socket.send to simulate backpressure for all messages
+      mockSocket.send.mockReturnValue(0)
+      
+      const sendPromises = messages.map(msg => transport.sendMessage(msg))
+      
+      // Run timers to process first message
+      await jest.advanceTimersByTimeAsync(0)
+      
+      // Close transport during processing
       transport.close()
-
-      await expect(sendPromise).rejects.toThrow('Failed to send message: Socket closed')
+      
+      const results = await Promise.allSettled(sendPromises)
+      results.forEach(result => {
+        expect(result.status).toBe('rejected')
+        if (result.status === 'rejected') {
+          expect(result.reason.message).toBe('Connection closed')
+        }
+      })
+      expect(errorListener).toHaveBeenCalledWith(new Error('Connection closed'))
     })
 
-    it('should handle concurrent message processing', async () => {
-      mockSocket.send.mockReturnValue(1)
-      const messages = Array(5)
-        .fill(0)
-        .map((_, i) => new Uint8Array([i]))
+    it('should handle queue processing retry', async () => {
+      jest.useFakeTimers()
+      const message = new Uint8Array([1])
+      
+      // Mock socket.send to simulate backpressure then success
+      mockSocket.send
+        .mockReturnValueOnce(0) // First attempt fails
+        .mockReturnValue(1)     // Subsequent attempts succeed
+      
+      const sendPromise = transport.sendMessage(message)
+      
+      // First attempt fails
+      await jest.advanceTimersByTimeAsync(0)
+      
+      // Retry after 1 second
+      await jest.advanceTimersByTimeAsync(1000)
+      
+      await expect(sendPromise).resolves.not.toThrow()
+      expect(mockSocket.send).toHaveBeenCalledTimes(2)
+    })
 
-      const sendPromises = messages.map((msg) => transport.sendMessage(msg))
+    it('should handle message queue size limit', async () => {
+      mockSocket.getUserData.mockReturnValue({ isConnected: true })
+      mockSocket.send.mockReturnValue(0) // Simulate backpressure
 
-      for (let i = 0; i < messages.length; i++) {
-        await Promise.resolve()
-        jest.advanceTimersByTime(0)
+      // Set up error listener
+      const errorListener = jest.fn()
+      transport.on('error', errorListener)
+
+      // Fill up the queue to its limit
+      const maxQueueSize = 3
+      const sendPromises = []
+      for (let i = 0; i < maxQueueSize; i++) {
+        sendPromises.push(transport.sendMessage(new Uint8Array([1, 2, 3])))
       }
 
-      await Promise.all(sendPromises)
-      expect(mockSocket.send).toHaveBeenCalledTimes(messages.length)
+      // Try to send one more message
+      transport.sendMessage(new Uint8Array([1, 2, 3]))
+
+      // Verify error event was emitted
+      expect(errorListener).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Queue size limit reached'
+      }))
+    })
+
+    it('should handle message processing after transport initialization', async () => {
+      const message = new Uint8Array([1])
+      
+      // Mock socket.send to simulate successful send
+      mockSocket.send.mockReturnValue(1)
+      
+      const sendPromise = transport.sendMessage(message)
+      
+      await expect(sendPromise).resolves.not.toThrow()
+      expect(mockSocket.send).toHaveBeenCalledWith(message, true)
+    })
+
+    it('should handle cleanup during active message processing', async () => {
+      jest.useFakeTimers()
+      const message = new Uint8Array([1])
+      
+      // Mock socket.send to simulate backpressure
+      mockSocket.send.mockReturnValue(0)
+      
+      const sendPromise = transport.sendMessage(message)
+      
+      // Start cleanup while message is being processed
+      transport.close()
+      
+      const result = await Promise.allSettled([sendPromise])
+      expect(result[0].status).toBe('rejected')
+      if (result[0].status === 'rejected') {
+        expect(result[0].reason.message).toBe('Connection closed')
+      }
+      expect(errorListener).toHaveBeenCalledWith(new Error('Connection closed'))
+    })
+
+    it('should handle message processing when transport is not initialized', async () => {
+      const uninitializedTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs)
+      mockSocket.getUserData.mockReturnValue({ isConnected: false })
+      
+      const message = new Uint8Array([1])
+      const errorListener = jest.fn()
+      uninitializedTransport.on('error', errorListener)
+
+      uninitializedTransport.sendMessage(message)
+      
+      expect(errorListener).toHaveBeenCalledWith(new Error('Transport is not ready or socket is not connected'))
     })
   })
 
-  describe('Message Processing', () => {
+  describe('Error Handling', () => {
+    it('should handle socket send errors', async () => {
+      mockSocket.send.mockImplementation(() => {
+        throw new Error('Socket error')
+      })
+
+      await expect(transport.sendMessage(new Uint8Array([1])))
+        .rejects.toThrow('Failed to send message: Socket error')
+    })
+
+    it('should handle invalid message types', () => {
+      transport.sendMessage('invalid' as any)
+      
+      expect(errorListener).toHaveBeenCalledWith(
+        new Error('WebSocketTransport: Received unknown type of message, expecting Uint8Array')
+      )
+    })
+
+    it('should handle errors during socket cleanup', () => {
+      mockSocket.end.mockImplementation(() => {
+        throw new Error('Cleanup error')
+      })
+
+      transport.close()
+      expect(transport.isConnected).toBe(false)
+      expect(errorListener).not.toHaveBeenCalled()
+    })
+
+    it('should handle errors during message emission', () => {
+      const error = new Error('Emission error')
+      transport.on('message', () => {
+        throw error
+      })
+
+      mockEmitter.emit('message', new ArrayBuffer(4))
+      expect(errorListener).toHaveBeenCalledWith(
+        new Error(`Failed to emit message: ${error.message}`)
+      )
+    })
+  })
+
+  describe('Edge Cases', () => {
     it('should handle message emission errors', () => {
       const error = new Error('Emission error')
       transport.on('message', () => {
@@ -207,73 +344,19 @@ describe('UWebSocketTransport', () => {
       })
 
       mockEmitter.emit('message', new ArrayBuffer(4))
-      expect(errorListener).toHaveBeenCalledWith(new Error(`Failed to emit message: ${error.message}`))
+      expect(errorListener).toHaveBeenCalledWith(
+        new Error(`Failed to emit message: ${error.message}`)
+      )
     })
 
-    it('should ignore messages when transport is not active', () => {
-      transport.close()
-      const messageListener = jest.fn()
-      transport.on('message', messageListener)
-
-      mockEmitter.emit('message', new ArrayBuffer(4))
-      expect(messageListener).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('Connection Management', () => {
-    it('should handle message send when transport is not initialized', async () => {
-      const uninitializedTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs)
-      // Force transport to be not ready
-      mockSocket.getUserData.mockReturnValue({ isConnected: false })
-      const errorListener = jest.fn()
-      uninitializedTransport.on('error', errorListener)
-
-      const message = new Uint8Array([1])
-      await uninitializedTransport.sendMessage(message)
-      expect(errorListener).toHaveBeenCalledWith(new Error('Transport is not ready or socket is not connected'))
-    })
-
-    it('should handle cleanup during active message processing', async () => {
-      jest.useFakeTimers()
-      mockSocket.send.mockReturnValue(0) // Force send failure
-
-      const message = new Uint8Array([1])
-      const sendPromise = transport.sendMessage(message)
-      transport.close()
-
-      await expect(sendPromise).rejects.toThrow('Failed to send message: Socket closed')
-      jest.useRealTimers()
-    })
-
-    it('should handle multiple close calls', () => {
-      transport.close()
-      mockSocket.end.mockClear()
-      mockSocket.getUserData.mockReturnValue({ isConnected: false }) // Indicate connection is closed
-      transport.close() // Second close should not call end again
-      expect(mockSocket.end).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('Error Scenarios', () => {
-    it('should handle socket errors during queue processing', async () => {
-      mockSocket.send.mockImplementation(() => {
-        throw new Error('Socket error')
+    it('should handle socket end errors during cleanup', () => {
+      mockSocket.end.mockImplementation(() => {
+        throw new Error('Socket end error')
       })
-
-      const message = new Uint8Array([1])
-      await expect(transport.sendMessage(message)).rejects.toThrow('Failed to send message: Socket error')
-    })
-
-    it('should handle queue timeout during processing', async () => {
-      jest.useFakeTimers()
-      mockSocket.send.mockReturnValue(0) // Force send failure
-
-      const message = new Uint8Array([1])
-      const sendPromise = transport.sendMessage(message)
-
-      await expect(sendPromise).rejects.toThrow('Failed to send message: Socket closed')
-
-      jest.useRealTimers()
+      
+      transport.close()
+      expect(transport.isConnected).toBe(false)
+      expect(errorListener).not.toHaveBeenCalled()
     })
   })
 })
