@@ -3,6 +3,7 @@ import mitt, { Emitter } from 'mitt'
 import { future, IFuture } from 'fp-future'
 import { IConfigComponent, ILoggerComponent } from '@well-known-components/interfaces'
 import { randomUUID } from 'crypto'
+import { isErrorWithMessage } from './errors'
 
 export type RecognizedString =
   | string
@@ -44,6 +45,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   const queueDrainTimeoutInMs = (await config.getNumber('WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT_IN_MS')) || 5000
 
   const messageQueue: Array<{ message: Uint8Array; future: IFuture<void> }> = []
+  let queueDrainTimeout: NodeJS.Timeout | null = null
 
   let isTransportActive = true
   let isInitialized = false
@@ -80,18 +82,26 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         try {
           const result = socket.send(item.message, true)
           if (result === 0) {
-            // Send failed, socket might be closed
-            item.future.reject(new Error('Failed to send message: Socket closed'))
-            messageQueue.shift()
-            cleanup()
-            return
+            // Send failed, socket might be closed or backpressured
+            if (!isTransportActive || !socket.getUserData().isConnected) {
+              // If transport is not active or socket is closed, reject with connection closed
+              const error = new Error('Connection closed')
+              item.future.reject(error)
+              messageQueue.shift()
+              events.emit('error', error)
+              return
+            } else {
+              // If transport is active but send failed, retry later
+              break
+            }
           }
           item.future.resolve()
           messageQueue.shift()
         } catch (error: any) {
-          item.future.reject(new Error(`Failed to send message: ${error.message}`))
+          const errorMessage = `Failed to send message: ${error.message}`
+          item.future.reject(new Error(errorMessage))
           messageQueue.shift()
-          cleanup()
+          events.emit('error', new Error(errorMessage))
           return
         }
         await new Promise((resolve) => setTimeout(resolve, 0))
@@ -99,7 +109,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     } finally {
       isProcessing = false
 
-      if (messageQueue.length > 0) {
+      if (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
         queueProcessingTimeout = setTimeout(() => {
           void processQueue()
         }, 1000)
@@ -117,33 +127,41 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       isConnected: String(socket.getUserData().isConnected)
     })
 
-    // TODO: we could retry a couple of times before returning an error
     if (!isTransportActive || !isInitialized || !socket.getUserData().isConnected) {
+      const error = new Error('Transport is not ready or socket is not connected')
       logger.error('[DEBUGGING CONNECTION] Transport is not ready or socket is not connected', {
         transportId,
         isTransportActive: String(isTransportActive),
         isInitialized: String(isInitialized),
         isConnected: String(socket.getUserData().isConnected)
       })
-      events.emit('error', new Error('Transport is not ready or socket is not connected'))
+      events.emit('error', error)
       return
     }
 
     if (messageQueue.length >= maxQueueSize) {
-      const drainFuture = future<void>()
-      const timeout = setTimeout(() => {
-        drainFuture.reject(new Error('Queue drain timeout'))
-      }, queueDrainTimeoutInMs)
-
-      try {
-        await drainFuture
-      } finally {
-        clearTimeout(timeout)
-      }
+      const error = new Error('Queue size limit reached')
+      events.emit('error', error)
+      return
     }
 
     const messageFuture = future<void>()
     messageQueue.push({ message: msg, future: messageFuture })
+
+    // Set queue drain timeout if this is the first message
+    if (messageQueue.length === 1) {
+      queueDrainTimeout = setTimeout(() => {
+        if (messageQueue.length > 0) {
+          const error = new Error('Queue drain timeout')
+          while (messageQueue.length > 0) {
+            const item = messageQueue.shift()
+            item?.future.reject(error)
+          }
+          events.emit('error', error)
+        }
+      }, queueDrainTimeoutInMs)
+    }
+
     void processQueue()
     return messageFuture
   }
@@ -184,13 +202,22 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       queueProcessingTimeout = null
     }
 
-    while (messageQueue.length > 0) {
-      const item = messageQueue.shift()
-      item?.future.reject(new Error('Connection closed'))
+    if (queueDrainTimeout) {
+      clearTimeout(queueDrainTimeout)
+      queueDrainTimeout = null
     }
 
     isTransportActive = false
     isInitialized = false
+
+    // Reject all queued messages
+    while (messageQueue.length > 0) {
+      const item = messageQueue.shift()
+      const error = new Error('Connection closed')
+      item?.future.reject(error)
+      events.emit('error', error)
+    }
+
     uServerEmitter.off('message', handleMessage)
     uServerEmitter.off('close', handleClose)
 
@@ -199,7 +226,10 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         socket.end(code, reason)
       }
     } catch (error) {
-      // Ignore error socket already closed
+      logger.debug('[DEBUGGING CONNECTION] Error during socket end', {
+        transportId,
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
     }
   }
 
