@@ -11,8 +11,5 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.createIndex('friendships', 'LOWER(address_requester) text_pattern_ops', {
-    name: 'friendships_address_requester_lower',
-    method: 'btree'
-  })
+  pgm.dropIndex('friendships', 'friendships_address_requester_lower')
 }
