@@ -205,6 +205,9 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       isInitialized: String(isInitialized)
     })
 
+    isTransportActive = false
+    isInitialized = false
+
     if (queueProcessingTimeout) {
       clearTimeout(queueProcessingTimeout)
       queueProcessingTimeout = null
@@ -214,9 +217,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       clearTimeout(queueDrainTimeout)
       queueDrainTimeout = null
     }
-
-    isTransportActive = false
-    isInitialized = false
 
     // Reject all queued messages
     while (messageQueue.length > 0) {
@@ -253,6 +253,11 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
   uServerEmitter.on('close', handleClose)
   uServerEmitter.on('message', handleMessage)
+
+  events.on('error', () => {
+    uServerEmitter.off('message', handleMessage)
+    uServerEmitter.off('close', handleClose)
+  })
 
   const api: Transport = {
     ...events,
