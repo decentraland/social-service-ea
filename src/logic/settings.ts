@@ -6,8 +6,12 @@ import {
 import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
-  SocialSettings as DBSocialSettings
+  SocialSettings as DBSocialSettings,
+  User
 } from '../types'
+
+const DEFAULT_DB_PRIVATE_MESSAGES_PRIVACY = DBPrivateMessagesPrivacy.ALL
+const DEFAULT_RPC_PRIVATE_MESSAGE_PRIVACY = RPCPrivateMessagePrivacySetting.ALL
 
 const RPC_PRIVATE_MESSAGE_PRIVACY_TO_DB_PRIVATE_MESSAGE_PRIVACY: Record<
   RPCPrivateMessagePrivacySetting,
@@ -103,7 +107,32 @@ function convertRPCBlockedUsersMessagesVisibilityIntoDBSetting(
 export function getDefaultSettings(address: string): DBSocialSettings {
   return {
     address,
-    private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
+    private_messages_privacy: DEFAULT_DB_PRIVATE_MESSAGES_PRIVACY,
     blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
   }
+}
+
+export function buildPrivateMessagesRPCSettingsForAddresses(
+  addresses: string[],
+  settings: DBSocialSettings[],
+  friends: User[]
+): Record<string, { privacy: RPCPrivateMessagePrivacySetting; isFriend: boolean }> {
+  // Create base message privacy information map
+  const privacyInformation = addresses.reduce(
+    (acc, address) => {
+      acc[address] = { privacy: DEFAULT_RPC_PRIVATE_MESSAGE_PRIVACY, isFriend: false }
+      return acc
+    },
+    {} as Record<string, { privacy: RPCPrivateMessagePrivacySetting; isFriend: boolean }>
+  )
+
+  settings.forEach((setting) => {
+    privacyInformation[setting.address].privacy = convertDBSettingsToRPCSettings(setting).privateMessagesPrivacy
+  })
+
+  friends.forEach((friend) => {
+    privacyInformation[friend.address].isFriend = true
+  })
+
+  return privacyInformation
 }

@@ -1,7 +1,8 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import {
   GetPrivateMessagesSettingsPayload,
-  PrivateMessagePrivacySetting
+  PrivateMessagePrivacySetting,
+  User
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getPrivateMessagesSettingsService } from '../../../../../src/adapters/rpc-server/services/get-private-messages-settings'
 import {
@@ -17,12 +18,15 @@ describe('getPrivateMessagesSettingsService', () => {
   const testAddress2 = '0xabcdef1234567890'
   let context: RpcServerContext
   let getSocialSettingsMock: jest.MockedFunction<IDatabaseComponent['getSocialSettings']>
+  let getFriendsFromListMock: jest.MockedFunction<IDatabaseComponent['getFriendsFromList']>
   let getPrivateMessagesSettings: ReturnType<typeof getPrivateMessagesSettingsService>
 
   beforeEach(() => {
     getSocialSettingsMock = jest.fn()
+    getFriendsFromListMock = jest.fn()
     const db = {
-      getSocialSettings: getSocialSettingsMock
+      getSocialSettings: getSocialSettingsMock,
+      getFriendsFromList: getFriendsFromListMock
     } as unknown as IDatabaseComponent
     const logs: ILoggerComponent = {
       getLogger: () => ({
@@ -45,102 +49,148 @@ describe('getPrivateMessagesSettingsService', () => {
     })
   })
 
-  it('should return the only the messages privacy settings for multiple users when they exist', async () => {
-    const mockSettings: DBSocialSettings[] = [
-      {
-        address: testAddress1,
-        private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-        blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
-      },
-      {
-        address: testAddress2,
-        private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
-        blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+  describe('when the settings and friends status for multiple users exist', () => {
+    beforeEach(() => {
+      const mockSettings: DBSocialSettings[] = [
+        {
+          address: testAddress1,
+          private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
+          blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+        },
+        {
+          address: testAddress2,
+          private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
+          blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+        }
+      ]
+
+      getSocialSettingsMock.mockResolvedValueOnce(mockSettings)
+      getFriendsFromListMock.mockResolvedValueOnce([{ address: testAddress1 }, { address: testAddress2 }])
+    })
+
+    it('should return the privacy messages settings and the friendship status for all of them', async () => {
+      const payload: GetPrivateMessagesSettingsPayload = {
+        user: [{ address: testAddress1 }, { address: testAddress2 }]
       }
-    ]
 
-    getSocialSettingsMock.mockResolvedValueOnce(mockSettings)
+      const result = await getPrivateMessagesSettings(payload, context)
 
-    const payload: GetPrivateMessagesSettingsPayload = {
-      user: [{ address: testAddress1 }, { address: testAddress2 }]
-    }
-
-    const result = await getPrivateMessagesSettings(payload, context)
-
-    expect(result.response.$case).toEqual('ok')
-    if (result.response.$case === 'ok') {
-      expect(result.response.ok.settings).toHaveLength(2)
-      expect(result.response.ok.settings).toContainEqual({
-        user: { address: testAddress1 },
-        privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS
-      })
-      expect(result.response.ok.settings).toContainEqual({
-        user: { address: testAddress2 },
-        privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL
-      })
-    }
-  })
-
-  it('should return default messages privacy settings when a requested user has no saved settings', async () => {
-    const mockSettings: DBSocialSettings[] = [
-      {
-        address: testAddress1,
-        private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-        blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+      expect(result.response.$case).toEqual('ok')
+      if (result.response.$case === 'ok') {
+        expect(result.response.ok.settings).toHaveLength(2)
+        expect(result.response.ok.settings).toContainEqual({
+          user: { address: testAddress1 },
+          privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS,
+          isFriend: true
+        })
+        expect(result.response.ok.settings).toContainEqual({
+          user: { address: testAddress2 },
+          privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL,
+          isFriend: true
+        })
       }
-    ]
-
-    getSocialSettingsMock.mockResolvedValueOnce(mockSettings)
-
-    const payload: GetPrivateMessagesSettingsPayload = {
-      user: [{ address: testAddress1 }, { address: testAddress2 }]
-    }
-
-    const result = await getPrivateMessagesSettings(payload, context)
-
-    expect(result.response.$case).toEqual('ok')
-    if (result.response.$case === 'ok') {
-      expect(result.response.ok.settings).toHaveLength(2)
-      expect(result.response.ok.settings).toContainEqual({
-        user: { address: testAddress1 },
-        privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS
-      })
-      // The second user has no saved settings, check that the default setting is returned
-      expect(result.response.ok.settings).toContainEqual({
-        user: { address: testAddress2 },
-        privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL
-      })
-    }
+    })
   })
 
-  it('should return an empty list when the user list is empty', async () => {
-    const payload: GetPrivateMessagesSettingsPayload = {
-      user: []
-    }
+  describe('when a requested user has no saved settings nor friends', () => {
+    beforeEach(() => {
+      const mockFriends: User[] = [{ address: testAddress1 }]
+      const mockSettings: DBSocialSettings[] = [
+        {
+          address: testAddress1,
+          private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
+          blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+        }
+      ]
 
-    getSocialSettingsMock.mockResolvedValueOnce([])
+      getSocialSettingsMock.mockResolvedValueOnce(mockSettings)
+      getFriendsFromListMock.mockResolvedValueOnce(mockFriends)
+    })
 
-    const result = await getPrivateMessagesSettings(payload, context)
+    it('should return default messages privacy settings and the friendship as false', async () => {
+      const payload: GetPrivateMessagesSettingsPayload = {
+        user: [{ address: testAddress1 }, { address: testAddress2 }]
+      }
 
-    expect(result.response.$case).toEqual('ok')
-    if (result.response.$case === 'ok') {
-      expect(result.response.ok.settings).toHaveLength(0)
-    }
+      const result = await getPrivateMessagesSettings(payload, context)
+
+      expect(result.response.$case).toEqual('ok')
+      if (result.response.$case === 'ok') {
+        expect(result.response.ok.settings).toHaveLength(2)
+        expect(result.response.ok.settings).toContainEqual({
+          user: { address: testAddress1 },
+          privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS,
+          isFriend: true
+        })
+        // The second user has no saved settings, check that the default setting is returned
+        expect(result.response.ok.settings).toContainEqual({
+          user: { address: testAddress2 },
+          privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL,
+          isFriend: false
+        })
+      }
+    })
   })
 
-  it('should return internal server error when the database throws an error', async () => {
-    const error = new Error('Database error')
-    getSocialSettingsMock.mockRejectedValueOnce(error)
+  describe('when the requested user list is empty', () => {
+    it('should return an empty list', async () => {
+      const payload: GetPrivateMessagesSettingsPayload = {
+        user: []
+      }
 
-    const payload: GetPrivateMessagesSettingsPayload = {
-      user: [{ address: testAddress1 }]
-    }
+      const result = await getPrivateMessagesSettings(payload, context)
 
-    const result = await getPrivateMessagesSettings(payload, context)
+      expect(result.response.$case).toEqual('ok')
+      if (result.response.$case === 'ok') {
+        expect(result.response.ok.settings).toHaveLength(0)
+      }
+    })
+  })
 
-    expect(result.response.$case).toEqual('internalServerError')
-    if (result.response.$case === 'internalServerError') {
-      expect(result.response.internalServerError.message).toEqual(error.message)
-    }
+  describe('when getting friends from list throws an error', () => {
+    beforeEach(() => {
+      getSocialSettingsMock.mockResolvedValueOnce([])
+      getFriendsFromListMock.mockRejectedValueOnce(new Error('Database error'))
+    })
+
+    it('should return an internal server error', async () => {
+      const error = new Error('Database error')
+      getSocialSettingsMock.mockResolvedValueOnce([])
+      getFriendsFromListMock.mockRejectedValueOnce(error)
+
+      const payload: GetPrivateMessagesSettingsPayload = {
+        user: [{ address: testAddress1 }]
+      }
+
+      const result = await getPrivateMessagesSettings(payload, context)
+
+      expect(result.response.$case).toEqual('internalServerError')
+      if (result.response.$case === 'internalServerError') {
+        expect(result.response.internalServerError.message).toEqual(error.message)
+      }
+    })
+  })
+
+  describe('when getting social settings throws an error', () => {
+    let error: Error
+
+    beforeEach(() => {
+      error = new Error('Database error')
+      getSocialSettingsMock.mockRejectedValueOnce(new Error('Database error'))
+      getFriendsFromListMock.mockResolvedValueOnce([])
+    })
+
+    it('should return an internal server error', async () => {
+      const payload: GetPrivateMessagesSettingsPayload = {
+        user: [{ address: testAddress1 }]
+      }
+
+      const result = await getPrivateMessagesSettings(payload, context)
+
+      expect(result.response.$case).toEqual('internalServerError')
+      if (result.response.$case === 'internalServerError') {
+        expect(result.response.internalServerError.message).toEqual(error.message)
+      }
+    })
   })
 })

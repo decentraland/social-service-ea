@@ -31,7 +31,7 @@ export async function createRedisComponent(
 
   async function stop() {
     try {
-      await client.disconnect()
+      await client.quit()
     } catch (err: any) {
       logger.error('Error disconnecting from Redis', err)
     }
