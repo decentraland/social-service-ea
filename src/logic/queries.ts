@@ -9,9 +9,9 @@ function withAlias(tableAlias?: string): string {
 export function getFriendAddressCase(userAddress: string, tableAlias?: string): SQLStatement {
   const normalizedUserAddress = normalizeAddress(userAddress)
   return SQL`CASE
-    WHEN LOWER(`
+    WHEN `
     .append(withAlias(tableAlias))
-    .append(SQL`address_requester) = ${normalizedUserAddress} THEN `)
+    .append(SQL`address_requester = ${normalizedUserAddress} THEN `)
     .append(withAlias(tableAlias))
     .append(
       SQL`address_requested
@@ -23,11 +23,11 @@ export function getFriendAddressCase(userAddress: string, tableAlias?: string): 
 
 export function getFriendshipCondition(userAddress: string, tableAlias: string): SQLStatement {
   const normalizedUserAddress = normalizeAddress(userAddress)
-  return SQL`(LOWER(`
+  return SQL`(`
     .append(tableAlias)
-    .append(SQL`.address_requester) = ${normalizedUserAddress} OR LOWER(`)
+    .append(SQL`.address_requester = ${normalizedUserAddress} OR `)
     .append(tableAlias)
-    .append(SQL`.address_requested) = ${normalizedUserAddress})`)
+    .append(SQL`.address_requested = ${normalizedUserAddress})`)
 }
 
 export function getBlockingCondition(
@@ -71,15 +71,15 @@ function getUserFriendsCTE(userAddress: string) {
   return {
     query: SQL`SELECT DISTINCT
     CASE
-      WHEN LOWER(f.address_requester) = ${normalizedUserAddress} 
+      WHEN f.address_requester = ${normalizedUserAddress} 
       THEN f.address_requested
       ELSE f.address_requester
     END as address, created_at
   FROM friendships f
   WHERE f.is_active = true
     AND (
-      LOWER(f.address_requester) = ${normalizedUserAddress}
-      OR LOWER(f.address_requested) = ${normalizedUserAddress}
+      f.address_requester = ${normalizedUserAddress}
+      OR f.address_requested = ${normalizedUserAddress}
     )`,
     name: 'user_friends'
   }
@@ -89,13 +89,13 @@ function getBlockedForUserCTE(userAddress: string) {
   const normalizedUserAddress = normalizeAddress(userAddress)
   return {
     query: SQL`SELECT DISTINCT 
-      CASE WHEN LOWER(b.blocker_address) = ${normalizedUserAddress}
+      CASE WHEN b.blocker_address = ${normalizedUserAddress}
       THEN b.blocked_address
       ELSE b.blocker_address
     END as address
     FROM blocks b
-    WHERE LOWER(b.blocker_address) = ${normalizedUserAddress}
-      OR LOWER(b.blocked_address) = ${normalizedUserAddress}`,
+    WHERE b.blocker_address = ${normalizedUserAddress}
+      OR b.blocked_address = ${normalizedUserAddress}`,
     name: 'blocked_for_user'
   }
 }

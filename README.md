@@ -264,3 +264,4 @@ The project uses GitHub Actions for:
 
 - **Development**: Automatic deployments on main branch
 - **Production**: Manual deployments via GitHub releases
+
