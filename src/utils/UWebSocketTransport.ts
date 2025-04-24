@@ -1,9 +1,10 @@
 import { Transport, TransportEvents } from '@dcl/rpc'
 import mitt, { Emitter } from 'mitt'
 import { future, IFuture } from 'fp-future'
-import { IConfigComponent, ILoggerComponent } from '@well-known-components/interfaces'
+import { IConfigComponent, ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
 import { randomUUID } from 'crypto'
 import { isErrorWithMessage } from './errors'
+import { MetricsDeclaration } from '../types'
 
 export type RecognizedString =
   | string
@@ -22,6 +23,12 @@ export type IUWebSocketEventMap = {
   message: RecognizedString
 }
 
+enum UWebSocketSendResult {
+  BACKPRESSURE = 0,
+  SUCCESS = 1,
+  DROPPED = 2
+}
+
 export interface IUWebSocket<T extends { isConnected: boolean; auth?: boolean }> {
   end(code?: number, shortMessage?: RecognizedString): void
 
@@ -36,93 +43,106 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   socket: IUWebSocket<T>,
   uServerEmitter: Emitter<IUWebSocketEventMap>,
   config: IConfigComponent,
-  logs: ILoggerComponent
+  logs: ILoggerComponent,
+  metrics: IMetricsComponent<MetricsDeclaration>
 ): Promise<Transport> {
   const logger = logs.getLogger('ws-transport')
   const transportId = randomUUID()
 
   const maxQueueSize = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')) || 1000
-  const queueDrainTimeoutInMs = (await config.getNumber('WS_TRANSPORT_QUEUE_DRAIN_TIMEOUT_IN_MS')) || 5000
-
-  const messageQueue: Array<{ message: Uint8Array; future: IFuture<void> }> = []
-  let queueDrainTimeout: NodeJS.Timeout | null = null
+  const retryDelayMs = (await config.getNumber('WS_TRANSPORT_RETRY_DELAY_MS')) || 1000
 
   let isTransportActive = true
   let isInitialized = false
-  let isProcessing = false
-  let queueProcessingTimeout: NodeJS.Timeout | null = null
 
-  // Process messages in batches of 100
-  const BATCH_SIZE = 100
-  let processedInBatch = 0
+  // Simple queue for messages that couldn't be sent immediately
+  const messageQueue: Array<{
+    message: Uint8Array
+    future: IFuture<void>
+    attempts: number
+  }> = []
+
+  let isProcessing = false
+  let processingTimeout: NodeJS.Timeout | null = null
+
+  type QueuedMessage = {
+    message: Uint8Array
+    future: IFuture<void>
+    attempts: number
+  }
 
   async function processQueue() {
     if (isProcessing || !isTransportActive || !isInitialized) {
-      logger.debug('[DEBUGGING CONNECTION] Queue processing skipped', {
-        transportId,
-        isProcessing: String(isProcessing),
-        isTransportActive: String(isTransportActive),
-        isInitialized: String(isInitialized),
-        queueLength: messageQueue.length
-      })
       return
     }
 
-    logger.debug('[DEBUGGING CONNECTION] Processing queue', {
-      transportId,
-      queueLength: messageQueue.length
-    })
-
     isProcessing = true
-
-    if (queueProcessingTimeout) {
-      clearTimeout(queueProcessingTimeout)
-      queueProcessingTimeout = null
+    if (processingTimeout) {
+      clearTimeout(processingTimeout)
+      processingTimeout = null
     }
 
     try {
       while (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
-        const item = messageQueue[0]
-        try {
-          const result = socket.send(item.message, true)
-          if (result === 0) {
-            break
-          }
+        const result = processNextMessage(messageQueue[0])
 
-          item.future.resolve()
+        if (result === UWebSocketSendResult.SUCCESS) {
           messageQueue.shift()
-
-          // Yield to event loop after processing BATCH_SIZE messages
-          processedInBatch++
-          if (processedInBatch >= BATCH_SIZE) {
-            processedInBatch = 0
-            await new Promise((resolve) => setImmediate(resolve))
-          }
-        } catch (error: any) {
-          const errorMessage = `Failed to send message: ${error.message}`
-          item.future.reject(new Error(errorMessage))
-          messageQueue.shift()
-          events.emit('error', new Error(errorMessage))
-          return
+          continue
         }
+
+        // Schedule retry for backpressure or dropped messages
+        processingTimeout = setTimeout(() => void processQueue(), retryDelayMs)
+        return
       }
     } finally {
       isProcessing = false
-
-      if (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
-        queueProcessingTimeout = setTimeout(() => {
-          void processQueue()
-        }, 1000)
-      } else if (messageQueue.length === 0 && queueDrainTimeout) {
-        // Clear queue drain timeout if queue is empty
-        clearTimeout(queueDrainTimeout)
-        queueDrainTimeout = null
-      }
     }
   }
 
+  function processNextMessage(item: QueuedMessage): UWebSocketSendResult {
+    const result = socket.send(item.message, true)
+
+    metrics.observe(
+      'ws_message_size_bytes',
+      { result: UWebSocketSendResult[result].toLowerCase() },
+      item.message.byteLength
+    )
+
+    logger.debug('[DEBUGGING CONNECTION] Processing queued message', {
+      transportId,
+      result,
+      queueLength: messageQueue.length,
+      messageAttempts: item.attempts,
+      messageSize: item.message.byteLength
+    })
+
+    switch (result) {
+      case UWebSocketSendResult.SUCCESS:
+        item.future.resolve()
+        break
+
+      case UWebSocketSendResult.BACKPRESSURE:
+        metrics.increment('ws_backpressure_events', { result: 'backpressure' })
+        break
+
+      case UWebSocketSendResult.DROPPED:
+        metrics.increment('ws_backpressure_events', { result: 'dropped' })
+        item.attempts++
+        break
+
+      default:
+        logger.error('[DEBUGGING CONNECTION] Unexpected send result', {
+          transportId,
+          result
+        })
+        break
+    }
+    return result
+  }
+
   async function send(msg: Uint8Array) {
-    logger.debug('[DEBUGGING CONNECTION] Attempting to send message', {
+    logger.debug('[DEBUGGING CONNECTION] Queueing message', {
       transportId,
       messageSize: msg.byteLength,
       queueLength: messageQueue.length,
@@ -144,33 +164,28 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
 
     if (messageQueue.length >= maxQueueSize) {
-      const error = new Error('Queue size limit reached')
+      const error = new Error('Message queue size limit reached')
+      logger.error('[DEBUGGING CONNECTION] Queue size limit reached', {
+        transportId,
+        queueSize: messageQueue.length,
+        maxQueueSize
+      })
       events.emit('error', error)
       return
     }
 
     const messageFuture = future<void>()
-    messageQueue.push({ message: msg, future: messageFuture })
 
-    // Set queue drain timeout if this is the first message
-    if (messageQueue.length === 1) {
-      if (queueDrainTimeout) {
-        clearTimeout(queueDrainTimeout)
-      }
+    messageQueue.push({
+      message: msg,
+      future: messageFuture,
+      attempts: 0
+    })
 
-      queueDrainTimeout = setTimeout(() => {
-        if (messageQueue.length > 0) {
-          const error = new Error('Queue drain timeout')
-          while (messageQueue.length > 0) {
-            const item = messageQueue.shift()
-            item?.future.reject(error)
-          }
-          events.emit('error', error)
-        }
-      }, queueDrainTimeoutInMs)
+    if (!isProcessing) {
+      void processQueue()
     }
 
-    void processQueue()
     return messageFuture
   }
 
@@ -208,22 +223,17 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     isTransportActive = false
     isInitialized = false
 
-    if (queueProcessingTimeout) {
-      clearTimeout(queueProcessingTimeout)
-      queueProcessingTimeout = null
-    }
-
-    if (queueDrainTimeout) {
-      clearTimeout(queueDrainTimeout)
-      queueDrainTimeout = null
+    if (processingTimeout) {
+      clearTimeout(processingTimeout)
+      processingTimeout = null
     }
 
     // Reject all queued messages
     while (messageQueue.length > 0) {
       const item = messageQueue.shift()
-      const error = new Error('Connection closed')
-      item?.future.reject(error)
-      events.emit('error', error)
+      if (item) {
+        item.future.reject(new Error('Connection closed'))
+      }
     }
 
     uServerEmitter.off('message', handleMessage)

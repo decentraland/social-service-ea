@@ -67,6 +67,17 @@ export const metricDeclarations = {
     type: IMetricsComponent.CounterType,
     help: 'Number of updates sent on RPC subscription streams',
     labelNames: ['event']
+  },
+  ws_backpressure_events: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of WebSocket messages that encountered backpressure or were dropped',
+    labelNames: ['result'] // 'backpressure' or 'dropped'
+  },
+  ws_message_size_bytes: {
+    type: IMetricsComponent.HistogramType,
+    help: 'Size of WebSocket messages in bytes',
+    labelNames: ['result'], // 'success', 'backpressure', or 'dropped'
+    buckets: [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
   }
 }
 
