@@ -96,7 +96,7 @@ export async function registerWsHandler(
       logger.debug('Authenticated User', { address, wsConnectionId: data.wsConnectionId })
 
       const eventEmitter = mitt<IUWebSocketEventMap>()
-      const transport = await createUWebSocketTransport(ws, eventEmitter, config, logs)
+      const transport = await createUWebSocketTransport(ws, eventEmitter, config, logs, metrics)
 
       changeStage(data, {
         auth: true,
@@ -180,6 +180,7 @@ export async function registerWsHandler(
   uwsServer.app.ws<WsUserData>('/', {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS,
     sendPingsAutomatically: true,
+    maxBackpressure: (await config.getNumber('WS_MAX_BACKPRESSURE')) ?? 128 * 1024, // should be adjusted based on metrics
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
       const wsConnectionId = randomUUID()
