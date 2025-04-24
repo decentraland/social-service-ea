@@ -23,7 +23,8 @@ export type IUWebSocketEventMap = {
   message: RecognizedString
 }
 
-enum UWebSocketSendResult {
+export enum UWebSocketSendResult {
+  ERROR = -1,
   BACKPRESSURE = 0,
   SUCCESS = 1,
   DROPPED = 2
@@ -65,6 +66,9 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   let isProcessing = false
   let processingTimeout: NodeJS.Timeout | null = null
 
+  const MAX_RETRY_ATTEMPTS = 5
+  const MAX_BACKOFF_DELAY_MS = 30000 // 30 seconds maximum delay
+
   type QueuedMessage = {
     message: Uint8Array
     future: IFuture<void>
@@ -84,15 +88,36 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
     try {
       while (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
-        const result = processNextMessage(messageQueue[0])
+        const currentMessage = messageQueue[0]
 
-        if (result === UWebSocketSendResult.SUCCESS) {
+        // Check max retries
+        if (currentMessage.attempts >= MAX_RETRY_ATTEMPTS) {
+          logger.warn('[DEBUGGING CONNECTION] Message dropped after max retries', {
+            transportId,
+            attempts: currentMessage.attempts,
+            messageSize: currentMessage.message.byteLength
+          })
+          currentMessage.future.reject(new Error('Message dropped after max retries'))
           messageQueue.shift()
           continue
         }
 
-        // Schedule retry for backpressure or dropped messages
-        processingTimeout = setTimeout(() => void processQueue(), retryDelayMs)
+        const result = processNextMessage(currentMessage)
+
+        if (result === UWebSocketSendResult.SUCCESS || result === UWebSocketSendResult.ERROR) {
+          continue
+        }
+
+        // Calculate exponential backoff delay
+        const backoffDelay = Math.min(retryDelayMs * Math.pow(2, currentMessage.attempts), MAX_BACKOFF_DELAY_MS)
+
+        // Schedule retry with exponential backoff
+        processingTimeout = setTimeout(() => {
+          processingTimeout = null
+          void processQueue()
+        }, backoffDelay)
+
+        // Exit the loop after scheduling retry
         return
       }
     } finally {
@@ -101,44 +126,64 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   function processNextMessage(item: QueuedMessage): UWebSocketSendResult {
-    const result = socket.send(item.message, true)
+    try {
+      const result = socket.send(item.message, true)
 
-    metrics.observe(
-      'ws_message_size_bytes',
-      { result: UWebSocketSendResult[result].toLowerCase() },
-      item.message.byteLength
-    )
+      // Only record metrics for known results
+      if (
+        result === UWebSocketSendResult.SUCCESS ||
+        result === UWebSocketSendResult.BACKPRESSURE ||
+        result === UWebSocketSendResult.DROPPED
+      ) {
+        metrics.observe(
+          'ws_message_size_bytes',
+          { result: UWebSocketSendResult[result].toLowerCase() },
+          item.message.byteLength
+        )
+      }
 
-    logger.debug('[DEBUGGING CONNECTION] Processing queued message', {
-      transportId,
-      result,
-      queueLength: messageQueue.length,
-      messageAttempts: item.attempts,
-      messageSize: item.message.byteLength
-    })
+      logger.debug('[DEBUGGING CONNECTION] Processing queued message', {
+        transportId,
+        result,
+        queueLength: messageQueue.length,
+        messageAttempts: item.attempts,
+        messageSize: item.message.byteLength
+      })
 
-    switch (result) {
-      case UWebSocketSendResult.SUCCESS:
-        item.future.resolve()
-        break
+      switch (result) {
+        case UWebSocketSendResult.SUCCESS:
+          item.future.resolve()
+          messageQueue.shift()
+          break
 
-      case UWebSocketSendResult.BACKPRESSURE:
-        metrics.increment('ws_backpressure_events', { result: 'backpressure' })
-        break
+        case UWebSocketSendResult.BACKPRESSURE:
+          metrics.increment('ws_backpressure_events', { result: 'backpressure' })
+          break
 
-      case UWebSocketSendResult.DROPPED:
-        metrics.increment('ws_backpressure_events', { result: 'dropped' })
-        item.attempts++
-        break
+        case UWebSocketSendResult.DROPPED:
+          metrics.increment('ws_backpressure_events', { result: 'dropped' })
+          item.attempts++
+          break
 
-      default:
-        logger.error('[DEBUGGING CONNECTION] Unexpected send result', {
-          transportId,
-          result
-        })
-        break
+        default:
+          logger.error('[DEBUGGING CONNECTION] Unexpected send result', {
+            transportId,
+            result
+          })
+          break
+      }
+      return result
+    } catch (error: any) {
+      const errorMessage = `Failed to send message: ${error.message}`
+      logger.error('[DEBUGGING CONNECTION] Error sending message', {
+        transportId,
+        error: errorMessage
+      })
+      item.future.reject(new Error(errorMessage))
+      events.emit('error', new Error(errorMessage))
+      messageQueue.shift()
+      return UWebSocketSendResult.ERROR
     }
-    return result
   }
 
   async function send(msg: Uint8Array) {
