@@ -34,7 +34,8 @@ describe('ws-handler', () => {
       getUserData: jest.fn().mockReturnValue(mockData),
       send: jest.fn(),
       end: jest.fn(),
-      close: jest.fn()
+      close: jest.fn(),
+      getBufferedAmount: jest.fn()
     }
 
     mockRes = { upgrade: jest.fn() }
@@ -313,6 +314,13 @@ describe('ws-handler', () => {
     it('should update connection activity', async () => {
       await wsHandlers.ping(mockWs)
       expect(mockWsPool.updateActivity).toHaveBeenCalledWith('test-client-id')
+    })
+  })
+
+  describe('drain handler', () => {
+    it('should increment drain event', () => {
+      wsHandlers.drain(mockWs)
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_drain_events')
     })
   })
 })
