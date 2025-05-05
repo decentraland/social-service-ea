@@ -3,7 +3,6 @@ import mitt, { Emitter } from 'mitt'
 import { future, IFuture } from 'fp-future'
 import { IConfigComponent, ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
 import { randomUUID } from 'crypto'
-import { isErrorWithMessage } from './errors'
 import { MetricsDeclaration } from '../types'
 
 export type RecognizedString =
@@ -92,7 +91,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
         // Check max retries
         if (currentMessage.attempts >= MAX_RETRY_ATTEMPTS) {
-          logger.warn('[DEBUGGING CONNECTION] Message dropped after max retries', {
+          logger.warn('Message dropped after max retries', {
             transportId,
             attempts: currentMessage.attempts,
             messageSize: currentMessage.message.byteLength
@@ -142,7 +141,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         )
       }
 
-      logger.debug('[DEBUGGING CONNECTION] Processing queued message', {
+      logger.debug('Processing queued message', {
         transportId,
         result,
         queueLength: messageQueue.length,
@@ -158,15 +157,25 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
         case UWebSocketSendResult.BACKPRESSURE:
           metrics.increment('ws_backpressure_events', { result: 'backpressure' })
+          item.attempts++ // Increment attempts to enable exponential backoff
           break
 
         case UWebSocketSendResult.DROPPED:
+          // Message was dropped by the underlying library due to maxBackpressure limit.
+          // Do not retry this specific message, reject its future and remove from queue.
+          logger.warn('Message dropped due to backpressure limit', {
+            transportId,
+            messageSize: item.message.byteLength
+          })
           metrics.increment('ws_backpressure_events', { result: 'dropped' })
-          item.attempts++
+          item.future.reject(new Error('Message dropped due to backpressure limit'))
+          messageQueue.shift() // Remove dropped message from queue
+          // NOTE: No attempt increment here, and we don't schedule a retry for this item.
+          // We continue processing the next item in the queue immediately if available.
           break
 
         default:
-          logger.error('[DEBUGGING CONNECTION] Unexpected send result', {
+          logger.error('Unexpected send result', {
             transportId,
             result
           })
@@ -175,7 +184,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       return result
     } catch (error: any) {
       const errorMessage = `Failed to send message: ${error.message}`
-      logger.error('[DEBUGGING CONNECTION] Error sending message', {
+      logger.error('Error sending message', {
         transportId,
         error: errorMessage
       })
@@ -187,7 +196,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   async function send(msg: Uint8Array) {
-    logger.debug('[DEBUGGING CONNECTION] Queueing message', {
+    logger.debug('Queueing message', {
       transportId,
       messageSize: msg.byteLength,
       queueLength: messageQueue.length,
@@ -198,7 +207,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
     if (!isTransportActive || !isInitialized || !socket.getUserData().isConnected) {
       const error = new Error('Transport is not ready or socket is not connected')
-      logger.error('[DEBUGGING CONNECTION] Transport is not ready or socket is not connected', {
+      logger.error('Transport is not ready or socket is not connected', {
         transportId,
         isTransportActive: String(isTransportActive),
         isInitialized: String(isInitialized),
@@ -210,7 +219,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
     if (messageQueue.length >= maxQueueSize) {
       const error = new Error('Message queue size limit reached')
-      logger.error('[DEBUGGING CONNECTION] Queue size limit reached', {
+      logger.error('Queue size limit reached', {
         transportId,
         queueSize: messageQueue.length,
         maxQueueSize
@@ -235,7 +244,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   function handleMessage(message: RecognizedString) {
-    logger.debug('[DEBUGGING CONNECTION] Handling incoming message', {
+    logger.debug('Handling incoming message', {
       transportId,
       messageType: message.constructor.name,
       isTransportActive: String(isTransportActive),
@@ -256,7 +265,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   function cleanup(code: number = 1000, reason: string = 'Normal closure') {
-    logger.debug('[DEBUGGING CONNECTION] Cleaning up transport', {
+    logger.debug('Cleaning up transport', {
       transportId,
       code,
       reason,
@@ -283,17 +292,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
     uServerEmitter.off('message', handleMessage)
     uServerEmitter.off('close', handleClose)
-
-    try {
-      if (socket.getUserData().isConnected) {
-        socket.end(code, reason)
-      }
-    } catch (error) {
-      logger.debug('[DEBUGGING CONNECTION] Error during socket end', {
-        transportId,
-        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-      })
-    }
   }
 
   function handleClose(code: number = 1000, reason: string = '') {
