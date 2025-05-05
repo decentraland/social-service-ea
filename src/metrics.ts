@@ -73,6 +73,10 @@ export const metricDeclarations = {
     help: 'Number of WebSocket messages that encountered backpressure or were dropped',
     labelNames: ['result'] // 'backpressure' or 'dropped'
   },
+  ws_drain_events: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of WebSocket drain events'
+  },
   ws_message_size_bytes: {
     type: IMetricsComponent.HistogramType,
     help: 'Size of WebSocket messages in bytes',

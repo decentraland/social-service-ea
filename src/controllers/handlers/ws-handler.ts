@@ -181,6 +181,19 @@ export async function registerWsHandler(
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS,
     sendPingsAutomatically: true,
     maxBackpressure: (await config.getNumber('WS_MAX_BACKPRESSURE')) ?? 128 * 1024, // should be adjusted based on metrics
+    drain: (ws) => {
+      const data = ws.getUserData()
+      const address = getAddress(data)
+      const bufferedAmount = ws.getBufferedAmount()
+
+      logger.debug('WebSocket drain event', {
+        wsConnectionId: data.wsConnectionId,
+        bufferedAmount,
+        address
+      })
+
+      metrics.increment('ws_drain_events')
+    },
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
       const wsConnectionId = randomUUID()
