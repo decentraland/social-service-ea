@@ -20,7 +20,9 @@ describe('UWebSocketTransport', () => {
       async (key) =>
         ({
           WS_TRANSPORT_MAX_QUEUE_SIZE: 3,
-          WS_TRANSPORT_RETRY_DELAY_MS: 1000
+          WS_TRANSPORT_RETRY_DELAY_MS: 1000,
+          WS_TRANSPORT_MAX_RETRY_ATTEMPTS: 5,
+          WS_TRANSPORT_MAX_BACKOFF_DELAY_MS: 30000
         })[key] || null
     )
 
