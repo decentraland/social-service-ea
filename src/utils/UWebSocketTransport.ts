@@ -51,6 +51,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
   const maxQueueSize = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')) || 1000
   const retryDelayMs = (await config.getNumber('WS_TRANSPORT_RETRY_DELAY_MS')) || 1000
+  const maxRetryAttempts = (await config.getNumber('WS_TRANSPORT_MAX_RETRY_ATTEMPTS')) || 5
+  const maxBackoffDelayMs = (await config.getNumber('WS_TRANSPORT_MAX_BACKOFF_DELAY_MS')) || 30000 // 30 seconds maximum delay
 
   let isTransportActive = true
   let isInitialized = false
@@ -64,9 +66,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
   let isProcessing = false
   let processingTimeout: NodeJS.Timeout | null = null
-
-  const MAX_RETRY_ATTEMPTS = 5
-  const MAX_BACKOFF_DELAY_MS = 30000 // 30 seconds maximum delay
 
   type QueuedMessage = {
     message: Uint8Array
@@ -90,7 +89,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         const currentMessage = messageQueue[0]
 
         // Check max retries
-        if (currentMessage.attempts >= MAX_RETRY_ATTEMPTS) {
+        if (currentMessage.attempts >= maxRetryAttempts) {
           logger.warn('Message dropped after max retries', {
             transportId,
             attempts: currentMessage.attempts,
@@ -108,7 +107,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         }
 
         // Calculate exponential backoff delay
-        const backoffDelay = Math.min(retryDelayMs * Math.pow(2, currentMessage.attempts), MAX_BACKOFF_DELAY_MS)
+        const backoffDelay = Math.min(retryDelayMs * Math.pow(2, currentMessage.attempts), maxBackoffDelayMs)
 
         // Schedule retry with exponential backoff
         processingTimeout = setTimeout(() => {

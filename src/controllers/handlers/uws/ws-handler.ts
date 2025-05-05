@@ -26,6 +26,8 @@ export async function registerWsHandler(
   const { logs, uwsServer, metrics, fetcher, rpcServer, config, wsPool, tracing } = components
   const logger = logs.getLogger('ws-handler')
 
+  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_SECONDS')) ?? 180000 // 3 minutes in ms
+
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
   }
@@ -239,7 +241,7 @@ export async function registerWsHandler(
               })
               ws.end()
             } catch (err) {}
-          }, THREE_MINUTES_IN_MS)
+          }, authTimeoutInMs)
         }
 
         changeStage(data, { isConnected: true, connectionStartTime: Date.now() })
