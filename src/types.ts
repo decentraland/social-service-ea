@@ -30,12 +30,14 @@ export type GlobalContext = {
   components: BaseComponents
 }
 
+export type MetricsDeclaration = keyof typeof metricDeclarations
+
 // components used in every environment
 export type BaseComponents = {
   config: IConfigComponent
   logs: ILoggerComponent
   server: IUWsComponent
-  metrics: IMetricsComponent<keyof typeof metricDeclarations>
+  metrics: IMetricsComponent<MetricsDeclaration>
   pg: IPgComponent
   db: IDatabaseComponent
   rpcServer: IRPCServerComponent
