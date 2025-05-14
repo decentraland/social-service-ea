@@ -10,16 +10,22 @@ export async function createWSPoolComponent({
   const idleTimeoutInMs = (await config.getNumber('IDLE_TIMEOUT_IN_MS')) || 300000 // 5 minutes default
 
   const cleanupInterval = setInterval(async () => {
-    const now = Date.now()
-    const pattern = 'ws:conn:*'
+    try {
+      const now = Date.now()
+      const pattern = 'ws:conn:*'
 
-    for await (const key of redis.client.scanIterator({ MATCH: pattern })) {
-      const data = await redis.get<{ lastActivity: number; startTime: number }>(key)
-      if (data && now - data.lastActivity > idleTimeoutInMs) {
-        const id = key.replace('ws:conn:', '')
-        await releaseConnection(id)
-        metrics.increment('ws_idle_timeouts')
+      for await (const key of redis.client.scanIterator({ MATCH: pattern })) {
+        const data = await redis.get<{ lastActivity: number; startTime: number }>(key)
+        if (data && now - data.lastActivity > idleTimeoutInMs) {
+          const id = key.replace('ws:conn:', '')
+          await releaseConnection(id)
+          metrics.increment('ws_idle_timeouts')
+        }
       }
+    } catch (error: any) {
+      logger.error('Error cleaning up idle connections', {
+        error: error.message
+      })
     }
   }, 60000)
 
@@ -43,7 +49,11 @@ export async function createWSPoolComponent({
 
       const totalConnections = await getActiveConnections()
       metrics.observe('ws_active_connections', { type: 'total' }, totalConnections)
-    } catch (error) {
+    } catch (error: any) {
+      logger.error('Error acquiring connection', {
+        connectionId: id,
+        error: error.message
+      })
       await redis.client.multi().del(key).sRem('ws:conn_ids', id).exec()
       throw error
     }
@@ -73,15 +83,23 @@ export async function createWSPoolComponent({
   }
 
   async function updateActivity(id: string) {
-    const key = `ws:conn:${id}`
-    await redis.put(
-      key,
-      { lastActivity: Date.now() },
-      {
-        XX: true,
-        EX: Math.ceil(idleTimeoutInMs / 1000)
-      }
-    )
+    try {
+      const key = `ws:conn:${id}`
+      await redis.put(
+        key,
+        { lastActivity: Date.now() },
+        {
+          XX: true,
+          EX: Math.ceil(idleTimeoutInMs / 1000)
+        }
+      )
+    } catch (error: any) {
+      logger.error('Error updating activity', {
+        connectionId: id,
+        error: error.message
+      })
+      throw error
+    }
   }
 
   async function isConnectionAvailable(id: string) {
