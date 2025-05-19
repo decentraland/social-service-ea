@@ -156,21 +156,21 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
         case UWebSocketSendResult.BACKPRESSURE:
           metrics.increment('ws_backpressure_events', { result: 'backpressure' })
-          item.attempts++ // Increment attempts to enable exponential backoff
+          // Message is already queued by the underlying library, no need to retry
+          item.future.resolve()
+          messageQueue.shift()
           break
 
         case UWebSocketSendResult.DROPPED:
           // Message was dropped by the underlying library due to maxBackpressure limit.
-          // Do not retry this specific message, reject its future and remove from queue.
-          logger.warn('Message dropped due to backpressure limit', {
+          // We should retry this message with exponential backoff
+          logger.warn('Message dropped due to backpressure limit, will retry', {
             transportId,
-            messageSize: item.message.byteLength
+            messageSize: item.message.byteLength,
+            attempts: item.attempts
           })
           metrics.increment('ws_backpressure_events', { result: 'dropped' })
-          item.future.reject(new Error('Message dropped due to backpressure limit'))
-          messageQueue.shift() // Remove dropped message from queue
-          // NOTE: No attempt increment here, and we don't schedule a retry for this item.
-          // We continue processing the next item in the queue immediately if available.
+          item.attempts++ // Increment attempts to enable exponential backoff
           break
 
         default:

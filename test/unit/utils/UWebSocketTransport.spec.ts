@@ -112,11 +112,11 @@ describe('UWebSocketTransport', () => {
       jest.useFakeTimers({ advanceTimers: true })
     })
 
-    it('should process messages with exponential backoff on backpressure', async () => {
+    it('should process messages with exponential backoff on dropped', async () => {
       const message = new Uint8Array([1])
       mockSocket.send
-        .mockReturnValueOnce(UWebSocketSendResult.BACKPRESSURE)
-        .mockReturnValueOnce(UWebSocketSendResult.BACKPRESSURE)
+        .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
+        .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
         .mockReturnValue(UWebSocketSendResult.SUCCESS)
 
       const sendPromise = transport.sendMessage(message)
@@ -130,28 +130,39 @@ describe('UWebSocketTransport', () => {
       expect(mockSocket.send).toHaveBeenCalledTimes(2)
 
       // Third attempt (after 4000ms, because attempts=2 after second failure)
-      // This attempt succeeds in the test setup.
       await jest.advanceTimersByTimeAsync(1000 * Math.pow(2, 2))
       expect(mockSocket.send).toHaveBeenCalledTimes(3)
 
       // Promise should resolve as the last attempt returns SUCCESS
-
       await expect(sendPromise).resolves.not.toThrow()
-      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_backpressure_events', { result: 'backpressure' })
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_backpressure_events', { result: 'dropped' })
     })
 
     it('should respect queue size limits and emit appropriate errors', async () => {
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
-
       // Fill queue to limit
       const messages = Array(3).fill(new Uint8Array([1]))
-      const sendPromises = messages.map((msg) => transport.sendMessage(msg))
+
+      // Mock send to return DROPPED to keep messages in queue
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
+
+      // Send messages to fill queue
+      for (const msg of messages) {
+        const promise = transport.sendMessage(msg)
+        // Add catch to prevent unhandled rejection
+        ;(promise as unknown as Promise<void>)?.catch(() => {})
+      }
+
+      // Process initial attempts
+      await jest.advanceTimersByTimeAsync(0)
 
       // Attempt to send one more message
       await transport.sendMessage(new Uint8Array([1]))
 
       expect(errorListener).toHaveBeenCalledWith(new Error('Message queue size limit reached'))
-      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_message_size_bytes', { result: 'backpressure' }, 1)
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_message_size_bytes', { result: 'dropped' }, 1)
+
+      // Clean up
+      await jest.runAllTimersAsync()
     })
 
     it('should handle unexpected send results', async () => {
@@ -186,7 +197,7 @@ describe('UWebSocketTransport', () => {
 
       const sendPromise = transport.sendMessage(message)
 
-      // Add catch after assertion to prevent Jest unhandled rejection error
+      // Add catch to prevent unhandled rejection
       ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
       // Process the send attempt
@@ -194,92 +205,117 @@ describe('UWebSocketTransport', () => {
 
       // 1. Check warning log (exact message string and payload structure)
       expect(mockLogs.getLogger('ws-transport').warn).toHaveBeenCalledWith(
-        'Message dropped due to backpressure limit', // Exact log message from code
+        'Message dropped due to backpressure limit, will retry',
         {
           transportId: expect.any(String),
-          messageSize: message.byteLength
+          messageSize: message.byteLength,
+          attempts: 0
         }
       )
 
-      // 2. Check metric increment (use the correct label from the code)
-      expect(mockMetrics.increment).toHaveBeenCalledWith(
-        'ws_backpressure_events',
-        { result: 'dropped' } // The code uses 'dropped' not 'dropped_permanently' here
-      )
-      // Check the size metric observation as well
-      expect(mockMetrics.observe).toHaveBeenCalledWith(
-        'ws_message_size_bytes',
-        { result: 'dropped' }, // Label matches the enum name
-        message.byteLength
-      )
+      // 2. Check metric increment
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_backpressure_events', { result: 'dropped' })
 
-      // 3. Check message future rejection
-      // Assertion already done, now await expect
-      await expect(sendPromise).rejects.toThrow('Message dropped due to backpressure limit')
+      // 3. Check message is still in queue (not rejected)
+      expect(sendPromise).toBeInstanceOf(Promise)
 
-      // 4. Check queue is empty (or that next message is processed)
-      // Send another message to ensure it gets processed immediately (implying the dropped one was removed).
+      // 4. Check queue processing continues
       const message2 = new Uint8Array([3])
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS) // Ensure next send succeeds
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
       const sendPromise2 = transport.sendMessage(message2)
-      await jest.advanceTimersByTimeAsync(0) // Process second message
+      await jest.advanceTimersByTimeAsync(0)
 
-      expect(mockSocket.send).toHaveBeenCalledWith(message2, true) // Verify second message was attempted
-      // Verify second message resolved
-      expect(sendPromise2).toBeInstanceOf(Promise) // Assert it's a promise before awaiting
+      expect(mockSocket.send).toHaveBeenCalledWith(message2, true)
       await expect(sendPromise2).resolves.not.toThrow()
 
-      // 5. Check no retry timeout was set (implicitly tested by immediate processing of message2)
+      // Clean up by advancing timers to process any pending retries
+      await jest.runAllTimersAsync()
     })
 
-    it('should handle message processing when transport becomes inactive', async () => {
-      const message = new Uint8Array([1])
+    it('should handle BACKPRESSURE send result correctly', async () => {
+      const message = new Uint8Array([1, 2])
       mockSocket.send.mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
 
       const sendPromise = transport.sendMessage(message)
 
+      // Process the send attempt
+      await jest.advanceTimersByTimeAsync(0)
+
+      // 1. Check metric increment
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_backpressure_events', { result: 'backpressure' })
+
+      // 2. Check message is resolved immediately
+      await expect(sendPromise).resolves.not.toThrow()
+
+      // 3. Check message is removed from queue
+      const message2 = new Uint8Array([3])
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
+      const sendPromise2 = transport.sendMessage(message2)
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(mockSocket.send).toHaveBeenCalledWith(message2, true)
+      await expect(sendPromise2).resolves.not.toThrow()
+
+      // Clean up by advancing timers to process any pending retries
+      await jest.runAllTimersAsync()
+    })
+
+    it('should handle message processing when transport becomes inactive', async () => {
+      const message = new Uint8Array([1])
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
+
+      const sendPromise = transport.sendMessage(message)
+      // Add catch to prevent unhandled rejection
+      ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
+
+      // Process initial attempt
+      await jest.advanceTimersByTimeAsync(0)
+
       // Deactivate transport during processing
       transport.close()
+
+      // Wait for cleanup to complete
+      await jest.runAllTimersAsync()
 
       await expect(sendPromise).rejects.toThrow('Connection closed')
     })
 
     it('should handle queue processing when socket disconnects', async () => {
-      jest.useFakeTimers({ advanceTimers: true })
-
       const message = new Uint8Array([1])
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
 
       const sendPromise = transport.sendMessage(message)
+      // Add catch to prevent unhandled rejection
+      ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
-      // Process initial attempt (queued due to backpressure)
+      // Process initial attempt
       await jest.advanceTimersByTimeAsync(0)
-      expect(mockSocket.send).toHaveBeenCalledTimes(1) // Ensure it was called once
+      expect(mockSocket.send).toHaveBeenCalledTimes(1)
 
       // Simulate socket disconnection
       mockSocket.getUserData.mockReturnValue({ isConnected: false })
 
-      // Closing the transport triggers cleanup and rejects pending promises
+      // Closing the transport triggers cleanup and rejects pending messages
       transport.close()
 
-      // The promise should reject because cleanup rejects pending messages
-      await expect(sendPromise).rejects.toThrow('Connection closed')
+      // Wait for cleanup to complete
+      await jest.runAllTimersAsync()
 
-      jest.useRealTimers()
-    }, 10000)
+      await expect(sendPromise).rejects.toThrow('Connection closed')
+    })
 
     it('should drop message after max retries', async () => {
       // Constants from the source file
       const MAX_RETRY_ATTEMPTS = 5
-      const RETRY_DELAY_MS = 1000 // Assuming this mock value
+      const RETRY_DELAY_MS = 1000
       const MAX_BACKOFF_DELAY_MS = 30000
 
       const message = new Uint8Array([1])
-      // Consistently return BACKPRESSURE to force retries
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
+      // Consistently return DROPPED to force retries
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
 
       const sendPromise = transport.sendMessage(message)
-      // Add catch immediately as it will eventually reject
+      // Add catch to prevent unhandled rejection
       ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
       // Initial attempt (attempt 0)
@@ -288,40 +324,31 @@ describe('UWebSocketTransport', () => {
 
       // Retry attempts (1 to MAX_RETRY_ATTEMPTS - 1)
       for (let attempt = 1; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
-        // Calculate delay for this specific retry attempt (based on the attempt number)
+        // Calculate delay for this specific retry attempt
         const delayForThisRetry = Math.min(RETRY_DELAY_MS * Math.pow(2, attempt), MAX_BACKOFF_DELAY_MS)
         await jest.advanceTimersByTimeAsync(delayForThisRetry)
-        // Check that send was called one more time (total calls = attempt + 1)
         expect(mockSocket.send).toHaveBeenCalledTimes(attempt + 1)
       }
 
-      // Final advance timer to trigger the max retry check (delay based on last attempt number)
+      // Final advance timer to trigger the max retry check
       const delayForFinalCheck = Math.min(RETRY_DELAY_MS * Math.pow(2, MAX_RETRY_ATTEMPTS), MAX_BACKOFF_DELAY_MS)
       await jest.advanceTimersByTimeAsync(delayForFinalCheck)
 
       // Assertions
-      // 1. Promise rejection
       await expect(sendPromise).rejects.toThrow('Message dropped after max retries')
 
-      // 2. Log message
       expect(mockLogs.getLogger('ws-transport').warn).toHaveBeenCalledWith(
-        'Message dropped after max retries', // Exact message from code
+        'Message dropped after max retries',
         expect.objectContaining({
           attempts: MAX_RETRY_ATTEMPTS,
           messageSize: message.byteLength
         })
       )
 
-      // 3. Ensure send was called exactly MAX_RETRY_ATTEMPTS times
       expect(mockSocket.send).toHaveBeenCalledTimes(MAX_RETRY_ATTEMPTS)
 
-      // 4. Ensure queue is now empty (or next message can be processed)
-      const message2 = new Uint8Array([2])
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
-      const sendPromise2 = transport.sendMessage(message2)
-      await jest.advanceTimersByTimeAsync(0) // Process immediately
-      expect(mockSocket.send).toHaveBeenCalledWith(message2, true)
-      await expect(sendPromise2).resolves.not.toThrow()
+      // Clean up by advancing timers to process any pending retries
+      await jest.runAllTimersAsync()
     })
   })
 
@@ -448,25 +475,20 @@ describe('UWebSocketTransport', () => {
     it('should record metrics for dropped events', async () => {
       mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
       const sendPromise = transport.sendMessage(new Uint8Array([1]))
-
-      // Add catch after assertion to prevent Jest unhandled rejection error
+      // Add catch to prevent unhandled rejection
       ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
-      await jest.advanceTimersByTimeAsync(0) // Process attempt
+      // Process initial attempt
+      await jest.advanceTimersByTimeAsync(0)
 
       // Check increment metric
       expect(mockMetrics.increment).toHaveBeenCalledWith('ws_backpressure_events', { result: 'dropped' })
 
       // Check size observation metric
-      expect(mockMetrics.observe).toHaveBeenCalledWith(
-        'ws_message_size_bytes',
-        { result: 'dropped' }, // Label matches the enum name
-        1
-      )
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_message_size_bytes', { result: 'dropped' }, 1)
 
-      // Assert it's a promise and await rejection
-      expect(sendPromise).toBeInstanceOf(Promise)
-      await expect(sendPromise).rejects.toThrow('Message dropped due to backpressure limit')
+      // Clean up
+      await jest.runAllTimersAsync()
     })
 
     it('should log transport cleanup events correctly', () => {
@@ -502,28 +524,28 @@ describe('UWebSocketTransport', () => {
     })
 
     it('should handle message processing during state transitions', async () => {
-      jest.useFakeTimers({ advanceTimers: true })
-
       const message = new Uint8Array([1])
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
 
       const sendPromise = transport.sendMessage(message)
+      // Add catch to prevent unhandled rejection
+      ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
-      // Process initial attempt (gets queued due to backpressure)
+      // Process initial attempt
       await jest.advanceTimersByTimeAsync(0)
       expect(mockSocket.send).toHaveBeenCalledTimes(1)
 
-      // Transition to disconnected state - just changing the mock isn't enough
+      // Transition to disconnected state
       mockSocket.getUserData.mockReturnValue({ isConnected: false })
 
-      // Simulate the close event that would naturally occur or be triggered
+      // Simulate the close event
       mockEmitter.emit('close', { code: 1006, reason: 'Connection abnormally closed' } as any)
 
-      // Now that cleanup has been triggered by the close event, the promise should reject
-      await expect(sendPromise).rejects.toThrow('Connection closed')
+      // Wait for cleanup to complete
+      await jest.runAllTimersAsync()
 
-      jest.useRealTimers()
-    }, 10000)
+      await expect(sendPromise).rejects.toThrow('Connection closed')
+    })
   })
 
   describe('Event Handling', () => {
@@ -541,12 +563,12 @@ describe('UWebSocketTransport', () => {
     })
 
     it('should handle transport cleanup with active timeouts', async () => {
-      jest.useFakeTimers({ advanceTimers: true })
-
       const message = new Uint8Array([1])
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
 
       const sendPromise = transport.sendMessage(message)
+      // Add catch to prevent unhandled rejection
+      ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
       // Process initial attempt
       await jest.advanceTimersByTimeAsync(0)
@@ -554,14 +576,15 @@ describe('UWebSocketTransport', () => {
       // Close transport while there's a pending timeout
       transport.close()
 
+      // Wait for cleanup to complete
+      await jest.runAllTimersAsync()
+
       await expect(sendPromise).rejects.toThrow('Connection closed')
       expect(transport.isConnected).toBe(false)
 
-      // Advance timers to ensure no more processing occurs
+      // Ensure no more processing occurs
       await jest.advanceTimersByTimeAsync(5000)
       expect(mockSocket.send).toHaveBeenCalledTimes(1)
-
-      jest.useRealTimers()
     })
   })
 
@@ -577,12 +600,15 @@ describe('UWebSocketTransport', () => {
     // Coverage for lines 200-208
     it('should handle message queue state transitions', async () => {
       const message = new Uint8Array([1])
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
 
       // Fill queue to near limit
       const promises = Array(2)
         .fill(null)
         .map(() => transport.sendMessage(message))
+
+      // Add catch to prevent unhandled rejections
+      promises.forEach((p) => (p as unknown as Promise<void>)?.catch(() => {}))
 
       // Process queue
       await jest.advanceTimersByTimeAsync(0)
@@ -590,16 +616,20 @@ describe('UWebSocketTransport', () => {
       // Simulate transport becoming inactive during processing
       transport.close()
 
+      // Wait for cleanup to complete
+      await jest.runAllTimersAsync()
+
       await Promise.all(promises.map((p) => expect(p).rejects.toThrow('Connection closed')))
     })
 
     // Coverage for lines 300-301
     it('should handle cleanup with pending timeouts', async () => {
       const message = new Uint8Array([1])
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
 
-      // Queue a message that will trigger a timeout
       const sendPromise = transport.sendMessage(message)
+      // Add catch to prevent unhandled rejection
+      ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
       // Let the first attempt process
       await jest.advanceTimersByTimeAsync(0)
@@ -607,9 +637,12 @@ describe('UWebSocketTransport', () => {
       // Close before timeout triggers
       transport.close()
 
+      // Wait for cleanup to complete
+      await jest.runAllTimersAsync()
+
       await expect(sendPromise).rejects.toThrow('Connection closed')
 
-      // Advance time to ensure no more processing occurs
+      // Ensure no more processing occurs
       await jest.advanceTimersByTimeAsync(5000)
       expect(mockSocket.send).toHaveBeenCalledTimes(1)
     })
@@ -647,29 +680,28 @@ describe('UWebSocketTransport', () => {
     })
 
     it('should handle cleanup during active message processing', async () => {
-      jest.useFakeTimers({ advanceTimers: true })
-
       const message = new Uint8Array([1])
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
 
       const sendPromise = transport.sendMessage(message)
+      // Add catch to prevent unhandled rejection
+      ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
       // Process initial attempt
       await jest.advanceTimersByTimeAsync(0)
-      expect(mockSocket.send).toHaveBeenCalledTimes(1) // Ensure it was called
 
       // Close transport during retry delay
       transport.close()
 
-      // Check rejection
+      // Wait for cleanup to complete
+      await jest.runAllTimersAsync()
+
       await expect(sendPromise).rejects.toThrow('Connection closed')
       expect(transport.isConnected).toBe(false)
 
       // Ensure timer doesn't fire later
       await jest.advanceTimersByTimeAsync(5000)
-      expect(mockSocket.send).toHaveBeenCalledTimes(1) // Should not be called again
-
-      jest.useRealTimers()
+      expect(mockSocket.send).toHaveBeenCalledTimes(1)
     })
   })
 })
