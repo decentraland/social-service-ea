@@ -8,8 +8,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     id: {
       type: PgType.UUID,
       primaryKey: true,
-      notNull: true,
-      default: pgm.func('uuid_generate_v4()')
+      notNull: true
     },
     community_id: {
       type: PgType.UUID,
