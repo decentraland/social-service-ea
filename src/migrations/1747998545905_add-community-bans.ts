@@ -20,12 +20,6 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       type: PgType.VARCHAR,
       notNull: true
     },
-    banned_member_id: {
-      type: PgType.UUID,
-      notNull: false,
-      references: 'community_members',
-      onDelete: 'SET NULL'
-    },
     banned_by: {
       type: PgType.VARCHAR,
       notNull: true
