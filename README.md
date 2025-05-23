@@ -99,6 +99,7 @@ erDiagram
     varchar owner_address
     varchar thumbnail_url
     varchar[] places
+    boolean private
     timestamp created_at
     timestamp updated_at
   }
