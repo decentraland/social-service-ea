@@ -49,7 +49,7 @@ This service follows the Well Known Components pattern, where each component is 
 
 #### Friends
 
-```
+```mermaid
 erDiagram
   FRIENDSHIPS {
     uuid id PK
@@ -88,7 +88,7 @@ The database schema supports:
 
 #### Communities
 
-```
+```mermaid
 erDiagram
   COMMUNITIES {
     uuid id PK
