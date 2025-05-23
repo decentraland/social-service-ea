@@ -47,6 +47,8 @@ This service follows the Well Known Components pattern, where each component is 
 
 ### Database Design
 
+#### Friends
+
 ```
 erDiagram
   FRIENDSHIPS {
@@ -83,6 +85,52 @@ The database schema supports:
 - User blocking system
 - Metadata for requests
 - Optimized queries with proper indexes
+
+#### Communities
+
+```
+erDiagram
+  COMMUNITIES {
+    uuid id PK
+    varchar name
+    text description
+    varchar owner_address
+    varchar thumbnail_url
+    varchar[] places
+    timestamp created_at
+    timestamp updated_at
+  }
+  COMMUNITY_ROLES {
+    uuid id PK
+    varchar name
+    jsonb permissions
+    timestamp created_at
+    timestamp updated_at
+  }
+  COMMUNITY_MEMBERS {
+    uuid id PK
+    uuid community_id FK
+    varchar member_address
+    uuid role_id FK
+    timestamp joined_at
+    varchar kicked_by
+    timestamp kicked_at
+    text kick_reason
+  }
+  COMMUNITY_BANS {
+    uuid id PK
+    uuid community_id FK
+    varchar banned_address
+    varchar banned_by
+    timestamp banned_at
+    text reason
+    boolean active
+  }
+
+  COMMUNITIES ||--o{ COMMUNITY_MEMBERS : "has"
+  COMMUNITIES ||--o{ COMMUNITY_BANS : "has"
+  COMMUNITY_ROLES ||--o{ COMMUNITY_MEMBERS : "assigned to"
+```
 
 See migrations for details: [migrations](./src/migrations)
 
@@ -264,4 +312,3 @@ The project uses GitHub Actions for:
 
 - **Development**: Automatic deployments on main branch
 - **Production**: Manual deployments via GitHub releases
-
