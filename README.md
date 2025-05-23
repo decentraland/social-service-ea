@@ -98,15 +98,7 @@ erDiagram
     text description
     varchar owner_address
     varchar thumbnail_url
-    varchar[] places
     boolean private
-    timestamp created_at
-    timestamp updated_at
-  }
-  COMMUNITY_ROLES {
-    int id PK
-    varchar name
-    jsonb permissions
     timestamp created_at
     timestamp updated_at
   }
@@ -114,11 +106,8 @@ erDiagram
     uuid id PK
     uuid community_id FK
     varchar member_address
-    uuid role_id FK
+    varchar role
     timestamp joined_at
-    varchar kicked_by
-    timestamp kicked_at
-    text kick_reason
   }
   COMMUNITY_BANS {
     uuid id PK
@@ -129,10 +118,18 @@ erDiagram
     text reason
     boolean active
   }
+  COMMUNITY_PLACES {
+    uuid id PK
+    uuid community_id FK
+    jsonb position
+    varchar world_name
+    varchar added_by
+    timestamp added_at
+  }
 
   COMMUNITIES ||--o{ COMMUNITY_MEMBERS : "has"
   COMMUNITIES ||--o{ COMMUNITY_BANS : "has"
-  COMMUNITY_ROLES ||--o{ COMMUNITY_MEMBERS : "assigned to"
+  COMMUNITIES ||--o{ COMMUNITY_PLACES : "has"
 ```
 
 See migrations for details: [migrations](./src/migrations)

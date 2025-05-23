@@ -4,11 +4,12 @@ import { MigrationBuilder, ColumnDefinitions, PgType } from 'node-pg-migrate'
 export const shorthands: ColumnDefinitions | undefined = undefined
 
 export async function up(pgm: MigrationBuilder): Promise<void> {
-  pgm.createTable('community_bans', {
+  pgm.createTable('community_places', {
     id: {
       type: PgType.UUID,
       primaryKey: true,
-      notNull: true
+      notNull: true,
+      default: pgm.func('uuid_generate_v4()')
     },
     community_id: {
       type: PgType.UUID,
@@ -16,31 +17,30 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       references: 'communities',
       onDelete: 'CASCADE'
     },
-    banned_address: {
+    place_type: {
       type: PgType.VARCHAR,
       notNull: true
     },
-    banned_by: {
+    position: {
+      type: PgType.JSONB,
+      notNull: true
+    },
+    world_name: {
       type: PgType.VARCHAR,
       notNull: true
     },
-    banned_at: {
+    added_by: {
+      type: PgType.VARCHAR,
+      notNull: true
+    },
+    added_at: {
       type: PgType.TIMESTAMP,
       notNull: true,
       default: pgm.func('now()')
-    },
-    reason: {
-      type: PgType.TEXT,
-      notNull: false
-    },
-    active: {
-      type: PgType.BOOLEAN,
-      notNull: true,
-      default: true
     }
   })
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropTable('community_bans')
+  pgm.dropTable('community_places')
 }

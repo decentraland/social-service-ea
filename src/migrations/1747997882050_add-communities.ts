@@ -26,11 +26,6 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       type: PgType.VARCHAR,
       notNull: false
     },
-    places: {
-      type: 'varchar[]',
-      notNull: true,
-      default: '{}'
-    },
     private: {
       type: PgType.BOOLEAN,
       notNull: true,
@@ -47,11 +42,8 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       default: pgm.func('now()')
     }
   })
-
-  pgm.createIndex('communities', 'owner_address')
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropIndex('communities', 'owner_address')
   pgm.dropTable('communities')
 }
