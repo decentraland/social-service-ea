@@ -10,6 +10,8 @@ A microservice that handles social interactions (friendships) for Decentraland, 
 - [🏗 Architecture](#-architecture)
   - [Component-Based Architecture](#component-based-architecture)
   - [Database Design](#database-design)
+    - [Friends](#friends)
+    - [Communities](#communities)
   - [Friendship Flow Diagrams](#friendship-flow-diagrams)
   - [Block System Flow](#block-system-flow)
 - [🚀 Getting Started](#-getting-started)
