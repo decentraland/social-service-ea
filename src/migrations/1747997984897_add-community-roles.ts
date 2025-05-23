@@ -6,7 +6,7 @@ export const shorthands: ColumnDefinitions | undefined = undefined
 export async function up(pgm: MigrationBuilder): Promise<void> {
   pgm.createTable('community_roles', {
     id: {
-      type: PgType.UUID,
+      type: PgType.INT,
       primaryKey: true,
       notNull: true
     },
@@ -34,10 +34,10 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 
   // Insert default roles
   pgm.sql(`
-    INSERT INTO community_roles (name, permissions) VALUES
-    ('owner', '["edit_info", "add_remove_places", "accept_reject_requests", "ban_players", "send_invitations", "edit_settings", "delete_community", "assign_roles"]'),
-    ('moderator', '["edit_info", "add_remove_places", "accept_reject_requests", "ban_players", "send_invitations"]'),
-    ('member', '[]')
+    INSERT INTO community_roles (id, name, permissions) VALUES
+    (1, 'owner', '["edit_info", "add_remove_places", "accept_reject_requests", "ban_players", "send_invitations", "edit_settings", "delete_community", "assign_roles"]'),
+    (2, 'moderator', '["edit_info", "add_remove_places", "accept_reject_requests", "ban_players", "send_invitations"]'),
+    (3, 'member', '[]')
   `)
 }
 

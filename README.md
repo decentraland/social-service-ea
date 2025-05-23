@@ -104,7 +104,7 @@ erDiagram
     timestamp updated_at
   }
   COMMUNITY_ROLES {
-    uuid id PK
+    int id PK
     varchar name
     jsonb permissions
     timestamp created_at

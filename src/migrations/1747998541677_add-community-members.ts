@@ -21,7 +21,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       notNull: true
     },
     role_id: {
-      type: PgType.UUID,
+      type: PgType.INT,
       notNull: true,
       references: 'community_roles',
       onDelete: 'RESTRICT'
