@@ -97,8 +97,8 @@ erDiagram
     varchar name
     text description
     varchar owner_address
-    varchar thumbnail_url
     boolean private
+    boolean active
     timestamp created_at
     timestamp updated_at
   }

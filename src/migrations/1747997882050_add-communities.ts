@@ -22,14 +22,15 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       type: PgType.VARCHAR,
       notNull: true
     },
-    thumbnail_url: {
-      type: PgType.VARCHAR,
-      notNull: false
-    },
     private: {
       type: PgType.BOOLEAN,
       notNull: true,
       default: false
+    },
+    active: {
+      type: PgType.BOOLEAN,
+      notNull: true,
+      default: true
     },
     created_at: {
       type: PgType.TIMESTAMP,
