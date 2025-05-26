@@ -46,9 +46,3 @@ export function hasPermission(role: CommunityRole, permission: CommunityPermissi
 export function getRolePermissions(role: CommunityRole): CommunityPermission[] {
   return COMMUNITY_ROLES[role].permissions
 }
-
-export function getAllPermissions(): CommunityPermission[] {
-  return Object.values(COMMUNITY_ROLES)
-    .flatMap((role) => role.permissions)
-    .filter((permission, index, self) => self.indexOf(permission) === index) // Remove duplicates
-}
