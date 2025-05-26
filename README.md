@@ -10,6 +10,8 @@ A microservice that handles social interactions (friendships) for Decentraland, 
 - [🏗 Architecture](#-architecture)
   - [Component-Based Architecture](#component-based-architecture)
   - [Database Design](#database-design)
+    - [Friends](#friends)
+    - [Communities](#communities)
   - [Friendship Flow Diagrams](#friendship-flow-diagrams)
   - [Block System Flow](#block-system-flow)
 - [🚀 Getting Started](#-getting-started)
@@ -47,7 +49,9 @@ This service follows the Well Known Components pattern, where each component is 
 
 ### Database Design
 
-```
+#### Friends
+
+```mermaid
 erDiagram
   FRIENDSHIPS {
     uuid id PK
@@ -83,6 +87,50 @@ The database schema supports:
 - User blocking system
 - Metadata for requests
 - Optimized queries with proper indexes
+
+#### Communities
+
+```mermaid
+erDiagram
+  COMMUNITIES {
+    uuid id PK
+    varchar name
+    text description
+    varchar owner_address
+    boolean private
+    boolean active
+    timestamp created_at
+    timestamp updated_at
+  }
+  COMMUNITY_MEMBERS {
+    uuid id PK
+    uuid community_id FK
+    varchar member_address
+    varchar role
+    timestamp joined_at
+  }
+  COMMUNITY_BANS {
+    uuid id PK
+    uuid community_id FK
+    varchar banned_address
+    varchar banned_by
+    timestamp banned_at
+    text reason
+    boolean active
+  }
+  COMMUNITY_PLACES {
+    uuid id PK
+    uuid community_id FK
+    jsonb position
+    varchar world_name
+    varchar added_by
+    timestamp added_at
+  }
+
+  COMMUNITIES ||--o{ COMMUNITY_MEMBERS : "has"
+  COMMUNITIES ||--o{ COMMUNITY_BANS : "has"
+  COMMUNITIES ||--o{ COMMUNITY_PLACES : "has"
+```
 
 See migrations for details: [migrations](./src/migrations)
 
@@ -264,4 +312,3 @@ The project uses GitHub Actions for:
 
 - **Development**: Automatic deployments on main branch
 - **Production**: Manual deployments via GitHub releases
-
