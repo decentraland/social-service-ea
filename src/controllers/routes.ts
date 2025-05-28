@@ -11,7 +11,7 @@ import { registerWsHandler } from './handlers/ws-handler'
 import { createPrivacyHandler } from './handlers/privacy-handler'
 
 export async function setupRoutes(components: AppComponents | TestComponents): Promise<void> {
-  const { metrics, server } = components
+  const { metrics, uwsServer } = components
 
   function wrap(h: IHandler) {
     return async (res: HttpResponse, req: HttpRequest) => {
@@ -61,18 +61,18 @@ export async function setupRoutes(components: AppComponents | TestComponents): P
 
   {
     const handler = await createStatusHandler(components)
-    server.app.get(handler.path, wrap(handler))
+    uwsServer.app.get(handler.path, wrap(handler))
   }
 
   {
     const { path, handler } = await createMetricsHandler(components, metrics.registry!)
-    server.app.get(path, handler)
+    uwsServer.app.get(path, handler)
   }
 
   const privacyHandler = await createPrivacyHandler(components)
-  server.app.get(privacyHandler.path, wrap(privacyHandler))
+  uwsServer.app.get(privacyHandler.path, wrap(privacyHandler))
 
-  server.app.any('/health/live', (res, req) => {
+  uwsServer.app.any('/health/live', (res, req) => {
     const { end, labels } = onRequestStart(metrics, req.getMethod(), '/health/live')
     res.writeStatus('200 OK')
     res.writeHeader('Access-Control-Allow-Origin', '*')
@@ -80,7 +80,7 @@ export async function setupRoutes(components: AppComponents | TestComponents): P
     onRequestEnd(metrics, labels, 200, end)
   })
 
-  server.app.any('/*', (res, req) => {
+  uwsServer.app.any('/*', (res, req) => {
     const { end, labels } = onRequestStart(metrics, req.getMethod(), '')
     res.writeStatus('404 Not Found')
     res.writeHeader('Access-Control-Allow-Origin', '*')

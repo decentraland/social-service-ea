@@ -3,7 +3,7 @@
 
 import { resolve } from 'path'
 import { createRunner, createLocalFetchCompoment } from '@well-known-components/test-helpers'
-import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
+import { createConfigComponent, createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createLogComponent } from '@well-known-components/logger'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
@@ -11,7 +11,7 @@ import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createPgComponent } from '@well-known-components/pg-component'
 
 import { main } from '../src/service'
-import { TestComponents } from '../src/types'
+import { GlobalContext, TestComponents } from '../src/types'
 import { createDBComponent } from '../src/adapters/db'
 import { createRedisComponent } from '../src/adapters/redis'
 import { createPubSubComponent } from '../src/adapters/pubsub'
@@ -29,6 +29,8 @@ import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
 import { mockPeersSynchronizer } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
+import { createServerComponent } from '@well-known-components/http-server'
+import { createStatusCheckComponent } from '@well-known-components/http-server'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -51,11 +53,26 @@ async function initComponents(): Promise<TestComponents> {
       ARCHIPELAGO_STATS_URL
     }
   )
+  const uwsHttpServerConfig = await createConfigComponent({
+    HTTP_SERVER_PORT: await config.requireString('UWS_HTTP_SERVER_PORT'),
+    HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
+  })
   const metrics = createTestMetricsComponent(metricDeclarations)
   const logs = await createLogComponent({ metrics, config })
 
-  const server = await createUWsComponent({ config, logs })
+  const uwsServer = await createUWsComponent({ config: uwsHttpServerConfig, logs })
+  const httpServer = await createServerComponent<GlobalContext>(
+    { config, logs },
+    {
+      cors: {
+        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT'],
+        maxAge: 86400
+      }
+    }
+  )
   const fetcher = createFetchComponent()
+
+  const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 
   let databaseUrl: string = await config.requireString('PG_COMPONENT_PSQL_CONNECTION_STRING')
   const pg = await createPgComponent(
@@ -86,7 +103,7 @@ async function initComponents(): Promise<TestComponents> {
     commsGatekeeper,
     db,
     pubsub,
-    server,
+    uwsServer,
     config,
     archipelagoStats,
     catalystClient,
@@ -98,11 +115,13 @@ async function initComponents(): Promise<TestComponents> {
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
-  const localFetch = await createLocalFetchCompoment(config)
+  const localFetch = await createLocalFetchCompoment(uwsHttpServerConfig)
 
   const rpcClient = await createRpcClientComponent({ config, logs })
 
   return {
+    statusChecks,
+    httpServer,
     commsGatekeeper,
     archipelagoStats,
     catalystClient,
@@ -120,7 +139,7 @@ async function initComponents(): Promise<TestComponents> {
     redis,
     rpcClient,
     rpcServer,
-    server,
+    uwsServer,
     sns,
     subscribersContext,
     tracing: mockTracing,

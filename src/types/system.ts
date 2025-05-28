@@ -2,7 +2,8 @@ import type {
   IConfigComponent,
   ILoggerComponent,
   IMetricsComponent,
-  IFetchComponent
+  IFetchComponent,
+  IHttpServerComponent
 } from '@well-known-components/interfaces'
 import { IPgComponent } from '@well-known-components/pg-component'
 import { metricDeclarations } from '../metrics'
@@ -24,7 +25,8 @@ import {
   ITracingComponent,
   ICommsGatekeeperComponent,
   IRpcClient,
-  ICacheComponent
+  ICacheComponent,
+  IStatusCheckComponent
 } from './components'
 
 export type GlobalContext = {
@@ -35,7 +37,8 @@ export type GlobalContext = {
 export type BaseComponents = {
   config: IConfigComponent
   logs: ILoggerComponent
-  server: IUWsComponent
+  uwsServer: IUWsComponent
+  httpServer: IHttpServerComponent<GlobalContext>
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   pg: IPgComponent
   db: IDatabaseComponent
@@ -54,6 +57,7 @@ export type BaseComponents = {
   subscribersContext: ISubscribersContext
   tracing: ITracingComponent
   commsGatekeeper: ICommsGatekeeperComponent
+  statusChecks: IStatusCheckComponent
 }
 
 // components used in runtime

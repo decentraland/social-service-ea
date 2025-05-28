@@ -179,3 +179,5 @@ export type ICommsGatekeeperComponent = {
 export type IWebSocketComponent = IBaseComponent & {
   ws: WebSocketServer
 }
+
+export type IStatusCheckComponent = IBaseComponent

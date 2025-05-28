@@ -32,7 +32,7 @@ export async function createRpcServerComponent({
   db,
   pubsub,
   config,
-  server,
+  uwsServer,
   archipelagoStats,
   catalystClient,
   sns,
@@ -46,7 +46,7 @@ export async function createRpcServerComponent({
   | 'db'
   | 'pubsub'
   | 'config'
-  | 'server'
+  | 'uwsServer'
   | 'archipelagoStats'
   | 'catalystClient'
   | 'sns'
@@ -147,7 +147,7 @@ export async function createRpcServerComponent({
 
   return {
     async start() {
-      server.app.listen(rpcServerPort, () => {
+      uwsServer.app.listen(rpcServerPort, () => {
         logger.info(`[RPC] RPC Server listening on port ${rpcServerPort}`)
       })
 
