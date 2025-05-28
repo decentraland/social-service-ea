@@ -1,6 +1,6 @@
 import { CommunityWithMembersCount, HandlerContextWithPath, HTTPResponse } from '../../types'
 import { messageErrorOrUnknown } from '../../utils/errors'
-import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../adapters/errors'
 import { toCommunityWithMembersCount } from '../../logic/community'
 
