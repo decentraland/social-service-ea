@@ -39,7 +39,8 @@ export async function createRpcServerComponent({
   subscribersContext,
   worldsStats,
   commsGatekeeper,
-  metrics
+  metrics,
+  settings
 }: Pick<
   AppComponents,
   | 'logs'
@@ -54,6 +55,7 @@ export async function createRpcServerComponent({
   | 'worldsStats'
   | 'commsGatekeeper'
   | 'metrics'
+  | 'settings'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -134,7 +136,7 @@ export async function createRpcServerComponent({
       type: ServiceType.CALL
     },
     getSocialSettings: {
-      creator: getSocialSettingsService({ components: { logs, db } }),
+      creator: getSocialSettingsService({ components: { logs, settings } }),
       type: ServiceType.CALL
     }
   }

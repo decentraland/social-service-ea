@@ -6,7 +6,7 @@ import {
   convertDBSettingsToRPCSettings,
   convertRPCSettingsIntoDBSettings,
   InvalidSocialSettingsError
-} from '../../../logic/settings'
+} from '../../../logic/settings/utils'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 

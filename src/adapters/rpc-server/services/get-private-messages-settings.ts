@@ -3,7 +3,7 @@ import {
   GetPrivateMessagesSettingsResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
-import { buildPrivateMessagesRPCSettingsForAddresses } from '../../../logic/settings'
+import { buildPrivateMessagesRPCSettingsForAddresses } from '../../../logic/settings/utils'
 import { isErrorWithMessage } from '../../../utils/errors'
 
 const MAX_USER_ADDRESSES = 50

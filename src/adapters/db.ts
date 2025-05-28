@@ -292,7 +292,26 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const results = await pg.query<{ exists: boolean }>(query)
       return results.rows[0].exists
     },
+    async areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean> {
+      const normalizedUserAddresses = userAddresses.map(normalizeAddress)
 
+      const query = SQL`
+        SELECT EXISTS (
+          SELECT 1 FROM calls WHERE caller_address IN (${normalizedUserAddresses}) OR callee_address IN (${normalizedUserAddresses})
+        )
+      `
+      const results = await pg.query<{ exists: boolean }>(query)
+      return results.rows[0].exists
+    },
+    async createCall(callerAddress: string, calleeAddress: string): Promise<string> {
+      const query = SQL`
+        INSERT INTO calls (id, caller_address, callee_address)
+        VALUES (${randomUUID()}, ${normalizeAddress(callerAddress)}, ${normalizeAddress(calleeAddress)})
+        RETURNING id
+      `
+      const results = await pg.query<{ id: string }>(query)
+      return results.rows[0].id
+    },
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
       const pool = pg.getPool()
       const client = await pool.connect()

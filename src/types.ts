@@ -25,6 +25,8 @@ import { FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
+import { IVoiceComponent } from './logic/voice'
+import { ISettingsComponent } from './logic/settings/types'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -53,6 +55,8 @@ export type BaseComponents = {
   subscribersContext: ISubscribersContext
   tracing: ITracingComponent
   commsGatekeeper: ICommsGatekeeperComponent
+  voice: IVoiceComponent
+  settings: ISettingsComponent
 }
 
 // components used in runtime
@@ -126,6 +130,7 @@ export interface IDatabaseComponent {
   upsertSocialSettings(userAddress: string, settings: Partial<Omit<SocialSettings, 'address'>>): Promise<SocialSettings>
   deleteSocialSettings(userAddress: string): Promise<void>
   getOnlineFriends(userAddress: string, potentialFriends: string[]): Promise<User[]>
+  areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
   blockUser(
     blockerAddress: string,
     blockedAddress: string,
@@ -137,6 +142,7 @@ export interface IDatabaseComponent {
   getBlockedUsers(blockerAddress: string): Promise<BlockUserWithDate[]>
   getBlockedByUsers(blockedAddress: string): Promise<BlockUserWithDate[]>
   isFriendshipBlocked(blockerAddress: string, blockedAddress: string): Promise<boolean>
+  createCall(callerAddress: string, calleeAddress: string): Promise<string>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
 export interface IRedisComponent extends IBaseComponent {
@@ -212,6 +218,7 @@ export type ITracingComponent = IBaseComponent & {
 }
 
 export type ICommsGatekeeperComponent = {
+  isUserInAVoiceChat: (address: string) => Promise<boolean>
   updateUserPrivateMessagePrivacyMetadata: (
     user: string,
     privateMessagesPrivacy: PrivateMessagesPrivacy

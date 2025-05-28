@@ -8,13 +8,13 @@ import {
   convertRPCSettingsIntoDBSettings,
   getDefaultSettings,
   buildPrivateMessagesRPCSettingsForAddresses
-} from '../../../src/logic/settings'
+} from '../../../../src/logic/settings'
 import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedVisibility,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   SocialSettings as DBSocialSettings,
   User
-} from '../../../src/types'
+} from '../../../../src/types'
 
 describe('convertDBSettingsToRPCSettings', () => {
   it.each([
