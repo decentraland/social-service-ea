@@ -1,4 +1,3 @@
-import { InvalidRequestError } from '@dcl/platform-server-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { messageErrorOrUnknown } from '../../utils/errors'
 import { CommunityNotFoundError } from '../../adapters/errors'
@@ -13,10 +12,6 @@ export async function deleteCommunityHandler(
   const logger = logs.getLogger('privacy-handler')
 
   logger.info(`Deleting community: ${id}`)
-
-  if (!id) {
-    throw new InvalidRequestError('Invalid id')
-  }
 
   try {
     await communitiesDb.deleteCommunity(id)

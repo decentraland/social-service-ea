@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 
-test('Delete Community Controller', function ({ components }) {
+test('Delete Community Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when deleting a community', () => {
@@ -54,6 +54,17 @@ test('Delete Community Controller', function ({ components }) {
           const getResponse = await makeRequest(identity, `/v1/communities/${communityId}`)
           expect(getResponse.status).toBe(404)
         })
+      })
+    })
+
+    describe('and the query fails', () => {
+      beforeEach(async () => {
+        spyComponents.communitiesDb.deleteCommunity.mockRejectedValue(new Error('Unable to delete community'))
+      })
+
+      it('should respond with a 500 status code', async () => {
+        const response = await makeRequest(identity, `/v1/communities/${communityId}`, 'DELETE')
+        expect(response.status).toBe(500)
       })
     })
   })

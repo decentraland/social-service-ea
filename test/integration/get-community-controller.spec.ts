@@ -3,7 +3,7 @@ import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 
-test('Get Community Controller', function ({ components }) {
+test('Get Community Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when getting a community', () => {
@@ -75,6 +75,17 @@ test('Get Community Controller', function ({ components }) {
             const response = await makeRequest(identity, `/v1/communities/${communityId}`)
             expect(response.status).toBe(404)
           })
+        })
+      })
+
+      describe('and the query fails', () => {
+        beforeEach(async () => {
+          spyComponents.communitiesDb.getCommunity.mockRejectedValue(new Error('Unable to get community'))
+        })
+
+        it('should respond with a 500 status code', async () => {
+          const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+          expect(response.status).toBe(500)
         })
       })
     })
