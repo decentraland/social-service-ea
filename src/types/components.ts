@@ -1,69 +1,27 @@
-import type {
-  IConfigComponent,
-  ILoggerComponent,
-  IHttpServerComponent,
-  IBaseComponent,
-  IMetricsComponent,
-  IFetchComponent,
-  ICacheComponent as IBaseCacheComponent
-} from '@well-known-components/interfaces'
-import { IPgComponent } from '@well-known-components/pg-component'
+import type { IBaseComponent, ICacheComponent as IBaseCacheComponent } from '@well-known-components/interfaces'
 import { WebSocketServer } from 'ws'
 import { Emitter } from 'mitt'
-import { metricDeclarations } from './metrics'
-import { HttpRequest, HttpResponse, IUWsComponent, WebSocket } from '@well-known-components/uws-http-server'
-import { IUWebSocketEventMap } from './utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
 import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
-import { INatsComponent, Subscription } from '@well-known-components/nats-component/dist/types'
-import {
-  ConnectivityStatus,
-  SocialServiceDefinition
-} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Subscription } from '@well-known-components/nats-component/dist/types'
+import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
-
-export type GlobalContext = {
-  components: BaseComponents
-}
-
-// components used in every environment
-export type BaseComponents = {
-  config: IConfigComponent
-  logs: ILoggerComponent
-  server: IUWsComponent
-  metrics: IMetricsComponent<keyof typeof metricDeclarations>
-  pg: IPgComponent
-  db: IDatabaseComponent
-  rpcServer: IRPCServerComponent
-  fetcher: IFetchComponent
-  redis: IRedisComponent & ICacheComponent
-  pubsub: IPubSubComponent
-  archipelagoStats: IArchipelagoStatsComponent
-  worldsStats: IWorldsStatsComponent
-  peersSynchronizer: IPeersSynchronizer
-  nats: INatsComponent
-  peerTracking: IPeerTrackingComponent
-  catalystClient: ICatalystClientComponent
-  sns: IPublisherComponent
-  wsPool: IWSPoolComponent
-  subscribersContext: ISubscribersContext
-  tracing: ITracingComponent
-  commsGatekeeper: ICommsGatekeeperComponent
-}
-
-// components used in runtime
-export type AppComponents = BaseComponents
-
-// components used in tests
-export type TestComponents = BaseComponents & {
-  // A fetch component that only hits the test server
-  localFetch: IFetchComponent
-  rpcClient: IRpcClient
-}
+import {
+  Action,
+  BlockUserWithDate,
+  Friendship,
+  FriendshipAction,
+  FriendshipRequest,
+  PrivateMessagesPrivacy,
+  SocialSettings,
+  User
+} from './entities'
+import { Pagination } from './entities'
+import { Subscribers, SubscriptionEventsEmitter } from './rpc'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -75,7 +33,7 @@ export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
   detachUser(address: string): void
 }
-export interface IDatabaseComponent {
+export interface IFriendsDatabaseComponent {
   createFriendship(
     users: [string, string],
     isActive: boolean,
@@ -139,6 +97,9 @@ export interface IDatabaseComponent {
   isFriendshipBlocked(blockerAddress: string, blockedAddress: string): Promise<boolean>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
+
+export interface ICommunitiesDatabaseComponent {}
+
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>
 }
@@ -218,155 +179,8 @@ export type ICommsGatekeeperComponent = {
   ) => Promise<void>
 }
 
-// this type simplifies the typings of http handlers
-export type HandlerContextWithPath<
-  ComponentNames extends keyof AppComponents,
-  Path extends string = any
-> = IHttpServerComponent.PathAwareContext<
-  IHttpServerComponent.DefaultContext<{
-    components: Pick<AppComponents, ComponentNames>
-  }>,
-  Path
->
-
 export type IWebSocketComponent = IBaseComponent & {
   ws: WebSocketServer
 }
 
-export type JsonBody = Record<string, any>
-export type ResponseBody = JsonBody | string
-
-export type IHandlerResult = {
-  status?: number
-  headers?: Record<string, string>
-  body?: ResponseBody
-}
-
-export type IHandler = {
-  path: string
-  f: (res: HttpResponse, req: HttpRequest) => Promise<IHandlerResult>
-}
-
-type WsBaseUserData = {
-  isConnected: boolean
-  auth: boolean
-  authenticating: boolean
-  wsConnectionId: string
-  connectionStartTime: number
-}
-
-export type WsAuthenticatedUserData = WsBaseUserData & {
-  eventEmitter: Emitter<IUWebSocketEventMap>
-  address: string
-  transport: Transport
-}
-
-export type WsNotAuthenticatedUserData = WsBaseUserData & {
-  timeout?: NodeJS.Timeout
-}
-
-export type WsUserData = WsAuthenticatedUserData | WsNotAuthenticatedUserData
-
-export type InternalWebSocket = WebSocket<WsUserData>
-
-export type RPCServiceContext<ComponentNames extends keyof AppComponents> = {
-  components: Pick<AppComponents, ComponentNames>
-}
-
-export type Context<Path extends string = any> = IHttpServerComponent.PathAwareContext<GlobalContext, Path>
-
-export type SubscriptionEventsEmitter = {
-  friendshipUpdate: {
-    id: string
-    to: string
-    from: string
-    action: Action
-    timestamp: number
-    metadata?: { message: string }
-  }
-  friendConnectivityUpdate: {
-    address: string
-    status: ConnectivityStatus
-  }
-  blockUpdate: {
-    blockerAddress: string
-    blockedAddress: string
-    isBlocked: boolean
-  }
-}
-
-export type Subscribers = Record<string, Emitter<SubscriptionEventsEmitter>>
-
-export type RpcServerContext = {
-  address: string
-  subscribersContext: ISubscribersContext
-}
-
-export type Friendship = {
-  id: string
-  address_requester: string
-  address_requested: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export type SocialSettings = {
-  address: string
-  private_messages_privacy: PrivateMessagesPrivacy
-  blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting
-}
-
-export enum PrivateMessagesPrivacy {
-  ONLY_FRIENDS = 'only_friends',
-  ALL = 'all'
-}
-
-export enum BlockedUsersMessagesVisibilitySetting {
-  SHOW_MESSAGES = 'show_messages',
-  DO_NOT_SHOW_MESSAGES = 'do_not_show_messages'
-}
-
-export type User = {
-  address: string
-}
-
-export type BlockUserWithDate = User & {
-  blocked_at: Date
-}
-
-export enum Action {
-  REQUEST = 'request', // request a friendship
-  CANCEL = 'cancel', // cancel a friendship request
-  ACCEPT = 'accept', // accept a friendship request
-  REJECT = 'reject', // reject a friendship request
-  DELETE = 'delete', // delete a friendship
-  BLOCK = 'block' // block a user
-}
-
-export type FriendshipAction = {
-  id: string
-  friendship_id: string
-  action: Action
-  acting_user: string
-  metadata?: Record<string, any>
-  timestamp: string
-}
-
-export enum FriendshipStatus {
-  Requested,
-  Friends,
-  NotFriends
-}
-
-export type FriendshipRequest = {
-  id: string
-  address: string
-  timestamp: string
-  metadata: Record<string, any> | null
-}
-
-export type Pagination = {
-  limit: number
-  offset: number
-}
+export type IStatusCheckComponent = IBaseComponent

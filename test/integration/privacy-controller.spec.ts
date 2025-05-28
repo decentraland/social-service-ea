@@ -9,7 +9,7 @@ test('Privacy Controller', function ({ components, spyComponents }) {
     describe('and there are privacy settings set for the address', () => {
       beforeEach(async () => {
         address = '0xa8b0cc8d68b3708df1a2ea3aef330d0e42681df8'
-        await createOrUpdateSocialSettings(components.db, address, PrivateMessagesPrivacy.ONLY_FRIENDS)
+        await createOrUpdateSocialSettings(components.friendsDb, address, PrivateMessagesPrivacy.ONLY_FRIENDS)
       })
 
       it('should respond with a 200 status code and the privacy settings', async () => {
@@ -55,7 +55,7 @@ test('Privacy Controller', function ({ components, spyComponents }) {
 
     describe('and getting the privacy settings from the DB fails', () => {
       beforeEach(() => {
-        spyComponents.db.getSocialSettings.mockRejectedValueOnce(new Error('Failed to get privacy settings'))
+        spyComponents.friendsDb.getSocialSettings.mockRejectedValueOnce(new Error('Failed to get privacy settings'))
         address = '0xa8b0cc8d68b3708df1a2ea3aef330d0e42681df8'
       })
 

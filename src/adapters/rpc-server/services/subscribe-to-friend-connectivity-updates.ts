@@ -9,8 +9,8 @@ import { parseProfilesToFriends } from '../../../logic/friends'
 import { handleSubscriptionUpdates } from '../../../logic/updates'
 
 export function subscribeToFriendConnectivityUpdatesService({
-  components: { logs, db, archipelagoStats, catalystClient, worldsStats }
-}: RPCServiceContext<'logs' | 'db' | 'archipelagoStats' | 'catalystClient' | 'worldsStats'>) {
+  components: { logs, friendsDb, archipelagoStats, catalystClient, worldsStats }
+}: RPCServiceContext<'logs' | 'friendsDb' | 'archipelagoStats' | 'catalystClient' | 'worldsStats'>) {
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
 
   async function getConnectedPeers() {
@@ -24,7 +24,7 @@ export function subscribeToFriendConnectivityUpdatesService({
 
     try {
       const onlinePeers = await getConnectedPeers()
-      const onlineFriends = await db.getOnlineFriends(context.address, onlinePeers)
+      const onlineFriends = await friendsDb.getOnlineFriends(context.address, onlinePeers)
 
       const profiles = await catalystClient.getProfiles(onlineFriends.map((friend) => friend.address))
       const parsedProfiles = parseProfilesToFriends(profiles).map((friend) => ({

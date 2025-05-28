@@ -9,8 +9,8 @@ import { getPage } from '../../../utils/pagination'
 import { parseProfilesToFriends } from '../../../logic/friends'
 
 export function getMutualFriendsService({
-  components: { logs, db, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'catalystClient'>) {
+  components: { logs, friendsDb, catalystClient }
+}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient'>) {
   const logger = logs.getLogger('get-mutual-friends-service')
 
   return async function (
@@ -23,8 +23,8 @@ export function getMutualFriendsService({
       const requested = normalizeAddress(user!.address)
 
       const [mutualFriends, total] = await Promise.all([
-        db.getMutualFriends(requester, requested, pagination),
-        db.getMutualFriendsCount(requester, requested)
+        friendsDb.getMutualFriends(requester, requested, pagination),
+        friendsDb.getMutualFriendsCount(requester, requested)
       ])
 
       const profiles = await catalystClient.getProfiles(mutualFriends.map((friend) => friend.address))

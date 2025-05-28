@@ -3,7 +3,7 @@ import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { getSocialSettingsService } from '../../../../../src/adapters/rpc-server/services/get-social-settings'
 import { getDefaultSettings, convertDBSettingsToRPCSettings } from '../../../../../src/logic/settings'
 import {
-  IDatabaseComponent,
+  IFriendsDatabaseComponent,
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   SocialSettings as DBSocialSettings,
@@ -13,14 +13,14 @@ import {
 describe('getSocialSettingsService', () => {
   const testAddress = '0x1234567890abcdef'
   let context: RpcServerContext
-  let getSocialSettingsMock: jest.MockedFunction<IDatabaseComponent['getSocialSettings']>
+  let getSocialSettingsMock: jest.MockedFunction<IFriendsDatabaseComponent['getSocialSettings']>
   let getSocialSettings: ReturnType<typeof getSocialSettingsService>
 
   beforeEach(() => {
     getSocialSettingsMock = jest.fn()
-    const db = {
+    const friendsDb = {
       getSocialSettings: getSocialSettingsMock
-    } as unknown as IDatabaseComponent
+    } as unknown as IFriendsDatabaseComponent
     const logs: ILoggerComponent = {
       getLogger: () => ({
         info: () => {},
@@ -37,7 +37,7 @@ describe('getSocialSettingsService', () => {
     getSocialSettings = getSocialSettingsService({
       components: {
         logs,
-        db
+        friendsDb
       }
     })
   })

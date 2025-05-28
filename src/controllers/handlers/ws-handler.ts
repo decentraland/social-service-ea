@@ -20,10 +20,10 @@ const getAddress = (data: WsUserData) => {
 export async function registerWsHandler(
   components: Pick<
     AppComponents,
-    'logs' | 'server' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool' | 'tracing'
+    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool' | 'tracing'
   >
 ) {
-  const { logs, server, metrics, fetcher, rpcServer, config, wsPool, tracing } = components
+  const { logs, uwsServer, metrics, fetcher, rpcServer, config, wsPool, tracing } = components
   const logger = logs.getLogger('ws-handler')
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
@@ -177,7 +177,7 @@ export async function registerWsHandler(
     }
   }
 
-  server.app.ws<WsUserData>('/', {
+  uwsServer.app.ws<WsUserData>('/', {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS,
     sendPingsAutomatically: true,
     upgrade: (res, req, context) => {

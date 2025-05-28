@@ -2,7 +2,7 @@ import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { GetBlockingStatusResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
-export function getBlockingStatusService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
+export function getBlockingStatusService({ components: { logs, friendsDb } }: RPCServiceContext<'logs' | 'friendsDb'>) {
   const logger = logs.getLogger('get-blocking-status-service')
 
   return async function (_request: Empty, context: RpcServerContext): Promise<GetBlockingStatusResponse> {
@@ -10,8 +10,8 @@ export function getBlockingStatusService({ components: { logs, db } }: RPCServic
 
     try {
       const [blockedUsers, blockedByUsers] = await Promise.all([
-        db.getBlockedUsers(address),
-        db.getBlockedByUsers(address)
+        friendsDb.getBlockedUsers(address),
+        friendsDb.getBlockedByUsers(address)
       ])
 
       const blockedAddresses = blockedUsers.map((user) => user.address)

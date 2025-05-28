@@ -53,7 +53,7 @@ describe('ws-handler', () => {
 
     await registerWsHandler({
       logs: mockLogs,
-      server: mockUWs,
+      uwsServer: mockUWs,
       metrics: mockMetrics,
       fetcher: mockFetcher,
       rpcServer: mockRpcServer,

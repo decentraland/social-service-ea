@@ -11,8 +11,8 @@ import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 
 export function upsertSocialSettingsService({
-  components: { logs, db, commsGatekeeper }
-}: RPCServiceContext<'logs' | 'db' | 'commsGatekeeper'>) {
+  components: { logs, friendsDb, commsGatekeeper }
+}: RPCServiceContext<'logs' | 'friendsDb' | 'commsGatekeeper'>) {
   const logger = logs.getLogger('upsert-social-settings-service')
 
   return async function (
@@ -41,7 +41,7 @@ export function upsertSocialSettingsService({
               // Ignore errors
               .catch((_) => undefined)
           : Promise.resolve(),
-        db.upsertSocialSettings(context.address, dbSettings)
+        friendsDb.upsertSocialSettings(context.address, dbSettings)
       ])
 
       return {

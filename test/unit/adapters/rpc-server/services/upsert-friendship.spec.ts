@@ -1,4 +1,4 @@
-import { mockCatalystClient, mockDb, mockLogs, mockPubSub } from '../../../../mocks/components'
+import { mockCatalystClient, mockFriendsDB, mockLogs, mockPubSub } from '../../../../mocks/components'
 import { upsertFriendshipService } from '../../../../../src/adapters/rpc-server/services/upsert-friendship'
 import { Action, FriendshipStatus, RpcServerContext } from '../../../../../src/types'
 import * as FriendshipsLogic from '../../../../../src/logic/friendships'
@@ -72,14 +72,14 @@ describe('upsertFriendshipService', () => {
   beforeEach(async () => {
     upsertFriendship = upsertFriendshipService({
       components: {
-        db: mockDb,
+        friendsDb: mockFriendsDB,
         logs: mockLogs,
         pubsub: mockPubSub,
         catalystClient: mockCatalystClient,
         sns: mockSns
       }
     })
-    mockDb.executeTx.mockImplementation(async (cb) => await cb({} as any))
+    mockFriendsDB.executeTx.mockImplementation(async (cb) => await cb({} as any))
   })
 
   it('should return an internalServerError for an invalid request', async () => {
@@ -123,7 +123,7 @@ describe('upsertFriendshipService', () => {
 
   it('should return invalidFriendshipAction for a blocked friendship', async () => {
     jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockParsedRequest)
-    mockDb.isFriendshipBlocked.mockResolvedValueOnce(true)
+    mockFriendsDB.isFriendshipBlocked.mockResolvedValueOnce(true)
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
@@ -154,8 +154,8 @@ describe('upsertFriendshipService', () => {
     jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
     jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
 
-    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
-    mockDb.updateFriendshipStatus.mockResolvedValueOnce({
+    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockFriendsDB.updateFriendshipStatus.mockResolvedValueOnce({
       id: existingFriendship.id,
       created_at: new Date(existingFriendship.created_at)
     })
@@ -163,8 +163,8 @@ describe('upsertFriendshipService', () => {
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
-    expect(mockDb.updateFriendshipStatus).toHaveBeenCalledWith(existingFriendship.id, true, expect.anything())
-    expect(mockDb.recordFriendshipAction).toHaveBeenCalledWith(
+    expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(existingFriendship.id, true, expect.anything())
+    expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
       existingFriendship.id,
       rpcContext.address,
       mockParsedRequest.action,
@@ -191,18 +191,22 @@ describe('upsertFriendshipService', () => {
     jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
     jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Requested)
 
-    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(null)
-    mockDb.getFriendship.mockResolvedValueOnce(null)
+    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(null)
+    mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
-    mockDb.createFriendship.mockResolvedValueOnce({
+    mockFriendsDB.createFriendship.mockResolvedValueOnce({
       id: 'new-friendship-id',
       created_at: new Date()
     })
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
-    expect(mockDb.createFriendship).toHaveBeenCalledWith([rpcContext.address, userAddress], false, expect.anything())
-    expect(mockDb.recordFriendshipAction).toHaveBeenCalledWith(
+    expect(mockFriendsDB.createFriendship).toHaveBeenCalledWith(
+      [rpcContext.address, userAddress],
+      false,
+      expect.anything()
+    )
+    expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
       'new-friendship-id',
       rpcContext.address,
       mockParsedRequest.action,
@@ -229,12 +233,12 @@ describe('upsertFriendshipService', () => {
     jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
     jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
 
-    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
-    mockDb.updateFriendshipStatus.mockResolvedValueOnce({
+    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockFriendsDB.updateFriendshipStatus.mockResolvedValueOnce({
       id: existingFriendship.id,
       created_at: new Date(existingFriendship.created_at)
     })
-    mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
+    mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
 
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
@@ -264,12 +268,12 @@ describe('upsertFriendshipService', () => {
       createMockProfile(userAddress)
     ]
 
-    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
-    mockDb.updateFriendshipStatus.mockResolvedValueOnce({
+    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockFriendsDB.updateFriendshipStatus.mockResolvedValueOnce({
       id: existingFriendship.id,
       created_at: new Date(existingFriendship.created_at)
     })
-    mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
+    mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockSenderProfile, mockReceiverProfile])
     jest.useFakeTimers()
     await upsertFriendship(requestPayload, rpcContext)
@@ -296,12 +300,12 @@ describe('upsertFriendshipService', () => {
     jest.spyOn(FriendshipsLogic, 'validateNewFriendshipAction').mockReturnValueOnce(true)
     jest.spyOn(FriendshipsLogic, 'getNewFriendshipStatus').mockReturnValueOnce(FriendshipStatus.Friends)
 
-    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
-    mockDb.updateFriendshipStatus.mockResolvedValueOnce({
+    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockFriendsDB.updateFriendshipStatus.mockResolvedValueOnce({
       id: existingFriendship.id,
       created_at: new Date(existingFriendship.created_at)
     })
-    mockDb.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
+    mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce(lastFriendshipAction.id)
     mockCatalystClient.getProfiles.mockResolvedValueOnce([null, null])
     const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
     expect(result).toEqual({
@@ -314,7 +318,7 @@ describe('upsertFriendshipService', () => {
 
   it('should handle errors gracefully', async () => {
     jest.spyOn(FriendshipsLogic, 'parseUpsertFriendshipRequest').mockReturnValueOnce(mockParsedRequest)
-    mockDb.getLastFriendshipActionByUsers.mockImplementationOnce(() => {
+    mockFriendsDB.getLastFriendshipActionByUsers.mockImplementationOnce(() => {
       throw new Error('Database error')
     })
 

@@ -3,8 +3,8 @@ import { HttpRequest, HttpResponse } from '@well-known-components/uws-http-serve
 import { AppComponents, PrivateMessagesPrivacy } from '../../types'
 import { isErrorWithMessage } from '../../utils/errors'
 
-export async function createPrivacyHandler(components: Pick<AppComponents, 'db' | 'logs'>) {
-  const { db, logs } = components
+export async function createPrivacyHandler(components: Pick<AppComponents, 'friendsDb' | 'logs'>) {
+  const { friendsDb, logs } = components
   const logger = logs.getLogger('privacy-handler')
 
   return {
@@ -21,7 +21,7 @@ export async function createPrivacyHandler(components: Pick<AppComponents, 'db' 
       }
 
       try {
-        const settings = await db.getSocialSettings([address])
+        const settings = await friendsDb.getSocialSettings([address])
 
         return {
           status: 200,

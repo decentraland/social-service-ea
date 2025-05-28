@@ -8,7 +8,9 @@ import { isErrorWithMessage } from '../../../utils/errors'
 
 const MAX_USER_ADDRESSES = 50
 
-export function getPrivateMessagesSettingsService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
+export function getPrivateMessagesSettingsService({
+  components: { logs, friendsDb }
+}: RPCServiceContext<'logs' | 'friendsDb'>) {
   const logger = logs.getLogger('get-private-messages-settings-service')
 
   return async function (
@@ -33,8 +35,8 @@ export function getPrivateMessagesSettingsService({ components: { logs, db } }: 
       const [settings, friendsOfConnectedAddress] =
         userAddresses.length > 0
           ? await Promise.all([
-              db.getSocialSettings(userAddresses),
-              db.getFriendsFromList(context.address, userAddresses)
+              friendsDb.getSocialSettings(userAddresses),
+              friendsDb.getFriendsFromList(context.address, userAddresses)
             ])
           : [[], []]
 

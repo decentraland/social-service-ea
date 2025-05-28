@@ -7,7 +7,7 @@ import {
   blockUpdateHandler
 } from '../../../src/logic/updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { mockCatalystClient, mockDb, mockLogs } from '../../mocks/components'
+import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../mocks/components'
 import mitt, { Emitter } from 'mitt'
 import { Action, ISubscribersContext, RpcServerContext, SubscriptionEventsEmitter } from '../../../src/types'
 import { sleep } from '../../../src/utils/timer'
@@ -144,14 +144,14 @@ describe('updates handlers', () => {
 
   describe('friendConnectivityUpdateHandler', () => {
     it('should emit status update to all online friends', async () => {
-      const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockDb)
+      const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockFriendsDB)
       const subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
       const subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
       const emitSpy456 = jest.spyOn(subscriber456, 'emit')
       const emitSpy789 = jest.spyOn(subscriber789, 'emit')
 
       const onlineFriends = [{ address: '0x456' }, { address: '0x789' }]
-      mockDb.getOnlineFriends.mockResolvedValueOnce(onlineFriends)
+      mockFriendsDB.getOnlineFriends.mockResolvedValueOnce(onlineFriends)
 
       const update = {
         address: '0x123',
@@ -160,14 +160,14 @@ describe('updates handlers', () => {
 
       await handler(JSON.stringify(update))
 
-      expect(mockDb.getOnlineFriends).toHaveBeenCalledWith('0x123', ['0x456', '0x789'])
+      expect(mockFriendsDB.getOnlineFriends).toHaveBeenCalledWith('0x123', ['0x456', '0x789'])
       expect(emitSpy456).toHaveBeenCalledWith('friendConnectivityUpdate', update)
       expect(emitSpy789).toHaveBeenCalledWith('friendConnectivityUpdate', update)
     })
 
     it('should handle empty online friends list', async () => {
-      const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockDb)
-      mockDb.getOnlineFriends.mockResolvedValueOnce([])
+      const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockFriendsDB)
+      mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
 
       const update = {
         address: '0x123',
@@ -176,11 +176,11 @@ describe('updates handlers', () => {
 
       await handler(JSON.stringify(update))
 
-      expect(mockDb.getOnlineFriends).toHaveBeenCalled()
+      expect(mockFriendsDB.getOnlineFriends).toHaveBeenCalled()
     })
 
     it('should log error on invalid JSON', async () => {
-      const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockDb)
+      const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockFriendsDB)
       const errorSpy = jest.spyOn(logger, 'error')
 
       await handler('invalid json')
@@ -192,11 +192,11 @@ describe('updates handlers', () => {
     })
 
     it('should handle database errors gracefully', async () => {
-      const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockDb)
+      const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockFriendsDB)
       const errorSpy = jest.spyOn(logger, 'error')
       const error = new Error('Database error')
 
-      mockDb.getOnlineFriends.mockRejectedValueOnce(error)
+      mockFriendsDB.getOnlineFriends.mockRejectedValueOnce(error)
 
       const update = {
         address: '0x123',
