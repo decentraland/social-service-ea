@@ -20,7 +20,7 @@ import {
   SocialSettings,
   User
 } from './entities'
-import { Pagination } from './http'
+import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
 
 export interface IRpcClient extends IBaseComponent {

@@ -61,3 +61,8 @@ export type FriendshipRequest = {
   timestamp: string
   metadata: Record<string, any> | null
 }
+
+export type Pagination = {
+  limit: number
+  offset: number
+}

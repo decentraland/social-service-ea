@@ -26,11 +26,6 @@ export type IHandler = {
   f: (res: HttpResponse, req: HttpRequest) => Promise<IHandlerResult>
 }
 
-export type Pagination = {
-  limit: number
-  offset: number
-}
-
 export type HTTPResponse<TBody> = {
   status: number
   body:
