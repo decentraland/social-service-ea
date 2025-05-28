@@ -4,7 +4,8 @@ import {
   ICommunitiesDatabaseComponent,
   Community,
   Pagination,
-  CommunityWithMembersCount
+  CommunityWithMembersCount,
+  CommunityRole
 } from '../types'
 import { normalizeAddress } from '../utils/address'
 import { CommunityNotFoundError } from './errors'
@@ -17,18 +18,19 @@ export function createCommunitiesDBComponent(
   const logger = logs.getLogger('communities-db-component')
 
   return {
-    async getCommunity(id: string) {
+    async getCommunity(id: string, userAddress: string) {
       const query = SQL`
         SELECT 
-          id,
-          name,
-          description,
-          owner_address as ownerAddress,
-          role,
-          CASE WHEN private THEN 'private' ELSE 'public' END as privacy,
-          active
-        FROM communities
-        WHERE id = ${id} AND active = true`
+          c.id,
+          c.name,
+          c.description,
+          c.owner_address as ownerAddress,
+          COALESCE(cm.role, ${CommunityRole.None}) as role,
+          CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
+          c.active
+        FROM communities c
+        LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizeAddress(userAddress)}
+        WHERE c.id = ${id} AND c.active = true`
 
       const result = await pg.query<Community>(query)
       return result.rows[0]

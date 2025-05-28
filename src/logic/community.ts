@@ -7,14 +7,12 @@ export type CommunityResult = {
   ownerAddress: string
   privacy: 'public' | 'private'
   active: boolean
-  places: string[]
   membersCount: number
 }
 
-export const fromDBCommunity = (community: Community, places: string[], membersCount: number): CommunityResult => {
+export const toCommunityWithMembersCount = (community: Community, membersCount: number): CommunityResult => {
   return {
     ...community,
-    places,
     membersCount
   }
 }

@@ -1,16 +1,20 @@
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
+import { CommunityWithMembersCount, HandlerContextWithPath, HTTPResponse } from '../../types'
 import { messageErrorOrUnknown } from '../../utils/errors'
-import { CommunityResult, fromDBCommunity } from '../../logic/community'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../adapters/errors'
 
 export async function getCommunityHandler(
-  context: Pick<HandlerContextWithPath<'logs' | 'communitiesDb', '/communities/:id'>, 'url' | 'components' | 'params'>
-): Promise<HTTPResponse<CommunityResult>> {
+  context: Pick<
+    HandlerContextWithPath<'logs' | 'communitiesDb', '/communities/:id'>,
+    'url' | 'components' | 'params' | 'verification'
+  >
+): Promise<HTTPResponse<CommunityWithMembersCount>> {
   const {
     components: { communitiesDb, logs },
-    params: { id }
+    params: { id },
+    verification
   } = context
+  const userAddress = verification?.auth.toLowerCase()
   const logger = logs.getLogger('privacy-handler')
 
   logger.info(`Getting community: ${id}`)
@@ -19,10 +23,13 @@ export async function getCommunityHandler(
     throw new InvalidRequestError('Invalid id')
   }
 
+  if (!userAddress) {
+    throw new NotAuthorizedError('Unauthorized')
+  }
+
   try {
-    const [community, places, membersCount] = await Promise.all([
-      communitiesDb.getCommunity(id),
-      communitiesDb.getCommunityPlaces(id),
+    const [community, membersCount] = await Promise.all([
+      communitiesDb.getCommunity(id, userAddress),
       communitiesDb.getCommunityMembersCount(id)
     ])
 
@@ -33,7 +40,10 @@ export async function getCommunityHandler(
     return {
       status: 200,
       body: {
-        data: fromDBCommunity(community, places, membersCount)
+        data: {
+          ...community,
+          membersCount
+        }
       }
     }
   } catch (error) {

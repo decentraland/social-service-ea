@@ -77,11 +77,11 @@ export type CommunityPermission =
   | 'delete_community'
   | 'assign_roles'
 
-export type CommunityRole = 'owner' | 'moderator' | 'member'
-
-export interface CommunityRolePermissions {
-  name: CommunityRole
-  permissions: CommunityPermission[]
+export enum CommunityRole {
+  Owner = 'owner',
+  Moderator = 'moderator',
+  Member = 'member',
+  None = 'none'
 }
 
 export type Community = {
