@@ -6,13 +6,14 @@ import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
+import { FriendshipAcceptedEvent, FriendshipRequestEvent, PaginatedParameters } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
 import {
   Action,
   BlockUserWithDate,
+  CommunityMember,
   Friendship,
   FriendshipAction,
   FriendshipRequest,
@@ -98,7 +99,11 @@ export interface IFriendsDatabaseComponent {
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
 
-export interface ICommunitiesDatabaseComponent {}
+export interface ICommunitiesDatabaseComponent {
+  communityExists(communityId: string): Promise<boolean>
+  getCommunityMembers(communityId: string, pagination?: Pagination): Promise<CommunityMember[]>
+  getCommunityMembersCount(communityId: string): Promise<number>
+}
 
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>
@@ -184,3 +189,10 @@ export type IWebSocketComponent = IBaseComponent & {
 }
 
 export type IStatusCheckComponent = IBaseComponent
+
+export interface ICommunityMembersComponent {
+  getCommunityMembers(
+    communityId: string,
+    pagination?: Required<PaginatedParameters>
+  ): Promise<{ totalMembers: number; members: CommunityMember[] } | undefined>
+}

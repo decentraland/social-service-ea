@@ -62,7 +62,16 @@ export type FriendshipRequest = {
   metadata: Record<string, any> | null
 }
 
-export type Pagination = {
-  limit: number
-  offset: number
+export type CommunityMember = {
+  id: string
+  communityId: string
+  memberAddress: string
+  role: CommunityMemberRole
+  joinedAt: string
+}
+
+export enum CommunityMemberRole {
+  ADMIN = 'admin',
+  MODERATOR = 'moderator',
+  MEMBER = 'member'
 }

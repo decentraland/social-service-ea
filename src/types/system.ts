@@ -27,7 +27,8 @@ import {
   IRpcClient,
   ICacheComponent,
   IStatusCheckComponent,
-  ICommunitiesDatabaseComponent
+  ICommunitiesDatabaseComponent,
+  ICommunityMembersComponent
 } from './components'
 
 export type GlobalContext = {
@@ -60,6 +61,7 @@ export type BaseComponents = {
   tracing: ITracingComponent
   commsGatekeeper: ICommsGatekeeperComponent
   statusChecks: IStatusCheckComponent
+  communityMembers: ICommunityMembersComponent
 }
 
 // components used in runtime

@@ -27,6 +27,7 @@ import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
+import { createCommunityMembersComponent } from './logic/community-members'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -109,6 +110,8 @@ export async function initComponents(): Promise<AppComponents> {
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
+  const communityMembers = createCommunityMembersComponent({ communitiesDb })
+
   return {
     archipelagoStats,
     catalystClient,
@@ -133,6 +136,7 @@ export async function initComponents(): Promise<AppComponents> {
     subscribersContext,
     tracing,
     worldsStats,
-    wsPool
+    wsPool,
+    communityMembers
   }
 }
