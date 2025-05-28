@@ -14,6 +14,7 @@ import {
   Action,
   BlockUserWithDate,
   Community,
+  CommunityDB,
   CommunityWithMembersCount,
   Friendship,
   FriendshipAction,
@@ -106,6 +107,7 @@ export interface ICommunitiesDatabaseComponent {
   getCommunityMembersCount(communityId: string): Promise<number>
   getCommunities(memberAddress: string, options?: { pagination?: Pagination }): Promise<CommunityWithMembersCount[]>
   getCommunitiesCount(memberAddress: string): Promise<number>
+  createCommunity(community: CommunityDB): Promise<{ id: string }>
   deleteCommunity(id: string): Promise<void>
 }
 

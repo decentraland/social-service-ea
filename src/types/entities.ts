@@ -84,6 +84,17 @@ export enum CommunityRole {
   None = 'none'
 }
 
+export type CommunityDB = {
+  id?: string
+  name: string
+  description: string
+  owner_address: string
+  private: boolean
+  active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
 export type Community = {
   id: string
   name: string

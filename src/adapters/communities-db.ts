@@ -5,10 +5,12 @@ import {
   Community,
   Pagination,
   CommunityWithMembersCount,
-  CommunityRole
+  CommunityRole,
+  CommunityDB
 } from '../types'
 import { normalizeAddress } from '../utils/address'
 import { CommunityNotFoundError } from './errors'
+import { randomUUID } from 'node:crypto'
 
 export function createCommunitiesDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs'>
@@ -24,7 +26,7 @@ export function createCommunitiesDBComponent(
           c.id,
           c.name,
           c.description,
-          c.owner_address as ownerAddress,
+          c.owner_address as "ownerAddress",
           COALESCE(cm.role, ${CommunityRole.None}) as role,
           CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
           c.active
@@ -109,7 +111,17 @@ export function createCommunitiesDBComponent(
           AND c.active = true
       `
       const result = await pg.query<{ count: number }>(query)
-      return result.rows[0].count
+      return Number(result.rows[0].count)
+    },
+
+    async createCommunity(community: CommunityDB) {
+      const id = randomUUID()
+      const query = SQL`
+        INSERT INTO communities (id, name, description, owner_address, private, active)
+        VALUES (${id}, ${community.name}, ${community.description}, ${normalizeAddress(community.owner_address)}, ${community.private || false}, ${community.active || true})
+        RETURNING id`
+      const result = await pg.query<{ id: string }>(query)
+      return result.rows[0]
     },
 
     async deleteCommunity(id) {

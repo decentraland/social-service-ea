@@ -2,6 +2,7 @@ import { CommunityWithMembersCount, HandlerContextWithPath, HTTPResponse } from 
 import { messageErrorOrUnknown } from '../../utils/errors'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../adapters/errors'
+import { toCommunityWithMembersCount } from '../../logic/community'
 
 export async function getCommunityHandler(
   context: Pick<
@@ -18,10 +19,6 @@ export async function getCommunityHandler(
   const logger = logs.getLogger('privacy-handler')
 
   logger.info(`Getting community: ${id}`)
-
-  if (!id) {
-    throw new InvalidRequestError('Invalid id')
-  }
 
   if (!userAddress) {
     throw new NotAuthorizedError('Unauthorized')
@@ -40,10 +37,7 @@ export async function getCommunityHandler(
     return {
       status: 200,
       body: {
-        data: {
-          ...community,
-          membersCount
-        }
+        data: toCommunityWithMembersCount(community, membersCount)
       }
     }
   } catch (error) {

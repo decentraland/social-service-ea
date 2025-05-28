@@ -1,18 +1,9 @@
-import { Community } from '../types'
+import { Community, CommunityWithMembersCount } from '../types'
 
-export type CommunityResult = {
-  id: string
-  name: string
-  description: string
-  ownerAddress: string
-  privacy: 'public' | 'private'
-  active: boolean
-  membersCount: number
-}
-
-export const toCommunityWithMembersCount = (community: Community, membersCount: number): CommunityResult => {
+export const toCommunityWithMembersCount = (community: Community, membersCount: number): CommunityWithMembersCount => {
   return {
     ...community,
-    membersCount
+    ownerAddress: community.ownerAddress,
+    membersCount: Number(membersCount)
   }
 }
