@@ -35,6 +35,11 @@ export function createCommunitiesDBComponent(
         WHERE c.id = ${id} AND c.active = true`
 
       const result = await pg.query<Community>(query)
+
+      if (result.rows.length === 0) {
+        throw new CommunityNotFoundError(`Community not found: ${id}`)
+      }
+
       return result.rows[0]
     },
 

@@ -30,10 +30,6 @@ export async function getCommunityHandler(
       communitiesDb.getCommunityMembersCount(id)
     ])
 
-    if (!community) {
-      throw new CommunityNotFoundError(id)
-    }
-
     return {
       status: 200,
       body: {

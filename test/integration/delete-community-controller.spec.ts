@@ -46,25 +46,58 @@ test('Delete Community Controller', function ({ components, spyComponents }) {
           communityId = id
         })
 
-        it('should respond with a 204 status code and delete the community', async () => {
-          const response = await makeRequest(identity, `/v1/communities/${communityId}`, 'DELETE')
-          expect(response.status).toBe(204)
+        describe('and the user is not the owner', () => {
+          const anotherAddress = '0x1234567890123456789012345678901234567890'
+          let anotherCommunityId: string
 
-          // Try to get the deleted community
-          const getResponse = await makeRequest(identity, `/v1/communities/${communityId}`)
-          expect(getResponse.status).toBe(404)
+          beforeEach(async () => {
+            const { id } = await components.communitiesDb.createCommunity({
+              name: 'Another Community',
+              description: 'Another Description',
+              owner_address: anotherAddress,
+              private: false,
+              active: true
+            })
+            anotherCommunityId = id
+          })
+
+          it('should respond with a 401 status code', async () => {
+            const response = await makeRequest(identity, `/v1/communities/${anotherCommunityId}`, 'DELETE')
+            expect(response.status).toBe(401)
+          })
+        })
+
+        describe('and the user is the owner', () => {
+          it('should respond with a 204 status code and delete the community', async () => {
+            const response = await makeRequest(identity, `/v1/communities/${communityId}`, 'DELETE')
+            expect(response.status).toBe(204)
+
+            // Try to get the deleted community
+            const getResponse = await makeRequest(identity, `/v1/communities/${communityId}`)
+            expect(getResponse.status).toBe(404)
+          })
         })
       })
-    })
 
-    describe('and the query fails', () => {
-      beforeEach(async () => {
-        spyComponents.communitiesDb.deleteCommunity.mockRejectedValue(new Error('Unable to delete community'))
-      })
+      describe('and the query fails', () => {
+        let failingCommunityId: string
 
-      it('should respond with a 500 status code', async () => {
-        const response = await makeRequest(identity, `/v1/communities/${communityId}`, 'DELETE')
-        expect(response.status).toBe(500)
+        beforeEach(async () => {
+          const { id } = await components.communitiesDb.createCommunity({
+            name: 'Failing Community',
+            description: 'Failing Description',
+            owner_address: address,
+            private: false,
+            active: true
+          })
+          failingCommunityId = id
+          spyComponents.communitiesDb.deleteCommunity.mockRejectedValue(new Error('Unable to delete community'))
+        })
+
+        it('should respond with a 500 status code', async () => {
+          const response = await makeRequest(identity, `/v1/communities/${failingCommunityId}`, 'DELETE')
+          expect(response.status).toBe(500)
+        })
       })
     })
   })
