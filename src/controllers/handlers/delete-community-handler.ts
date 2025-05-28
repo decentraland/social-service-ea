@@ -2,6 +2,7 @@ import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { messageErrorOrUnknown } from '../../utils/errors'
 import { CommunityNotFoundError } from '../../adapters/errors'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { isOwner } from '../../logic/community'
 
 export async function deleteCommunityHandler(
   context: Pick<
@@ -26,7 +27,7 @@ export async function deleteCommunityHandler(
   try {
     const community = await communitiesDb.getCommunity(id, userAddress)
 
-    if (community.ownerAddress.toLowerCase() !== userAddress) {
+    if (!isOwner(community, userAddress)) {
       throw new NotAuthorizedError("The user doesn't have permission to delete this community")
     }
 

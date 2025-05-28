@@ -1,23 +1,27 @@
 import { CommunityRole, CommunityPermission } from '../types/entities'
 
+export const OWNER_PERMISSIONS: CommunityPermission[] = [
+  'edit_info',
+  'add_remove_places',
+  'accept_reject_requests',
+  'ban_players',
+  'send_invitations',
+  'edit_settings',
+  'delete_community',
+  'assign_roles'
+]
+
+export const MODERATOR_PERMISSIONS: CommunityPermission[] = [
+  'edit_info',
+  'add_remove_places',
+  'accept_reject_requests',
+  'ban_players',
+  'send_invitations'
+]
+
 export const COMMUNITY_ROLES: Record<CommunityRole, CommunityPermission[]> = {
-  [CommunityRole.Owner]: [
-    'edit_info',
-    'add_remove_places',
-    'accept_reject_requests',
-    'ban_players',
-    'send_invitations',
-    'edit_settings',
-    'delete_community',
-    'assign_roles'
-  ],
-  [CommunityRole.Moderator]: [
-    'edit_info',
-    'add_remove_places',
-    'accept_reject_requests',
-    'ban_players',
-    'send_invitations'
-  ],
+  [CommunityRole.Owner]: OWNER_PERMISSIONS,
+  [CommunityRole.Moderator]: MODERATOR_PERMISSIONS,
   [CommunityRole.Member]: [],
   [CommunityRole.None]: []
 }
