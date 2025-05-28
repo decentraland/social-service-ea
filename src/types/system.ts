@@ -10,7 +10,7 @@ import { metricDeclarations } from '../metrics'
 import { IUWsComponent } from '@well-known-components/uws-http-server'
 import { INatsComponent } from '@well-known-components/nats-component/dist/types'
 import {
-  IDatabaseComponent,
+  IFriendsDatabaseComponent,
   IRPCServerComponent,
   IRedisComponent,
   IPubSubComponent,
@@ -41,7 +41,7 @@ export type BaseComponents = {
   httpServer: IHttpServerComponent<GlobalContext>
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   pg: IPgComponent
-  db: IDatabaseComponent
+  db: IFriendsDatabaseComponent
   rpcServer: IRPCServerComponent
   fetcher: IFetchComponent
   redis: IRedisComponent & ICacheComponent

@@ -12,7 +12,7 @@ import { createPgComponent } from '@well-known-components/pg-component'
 
 import { main } from '../src/service'
 import { GlobalContext, TestComponents } from '../src/types'
-import { createDBComponent } from '../src/adapters/db'
+import { createFriendsDBComponent } from '../src/adapters/db'
 import { createRedisComponent } from '../src/adapters/redis'
 import { createPubSubComponent } from '../src/adapters/pubsub'
 import { createNatsComponent } from '@well-known-components/nats-component'
@@ -87,7 +87,7 @@ async function initComponents(): Promise<TestComponents> {
       }
     }
   )
-  const db = createDBComponent({ pg, logs })
+  const db = createFriendsDBComponent({ pg, logs })
 
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })

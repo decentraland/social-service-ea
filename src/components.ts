@@ -11,7 +11,7 @@ import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createPgComponent } from '@well-known-components/pg-component'
 import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
-import { createDBComponent } from './adapters/db'
+import { createFriendsDBComponent } from './adapters/db'
 import { createSubscribersContext, createRpcServerComponent } from './adapters/rpc-server'
 import { createRedisComponent } from './adapters/redis'
 import { createPubSubComponent } from './adapters/pubsub'
@@ -78,7 +78,7 @@ export async function initComponents(): Promise<AppComponents> {
     }
   )
 
-  const db = createDBComponent({ pg, logs })
+  const db = createFriendsDBComponent({ pg, logs })
 
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })

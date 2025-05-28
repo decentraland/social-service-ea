@@ -6,7 +6,7 @@ import {
   Friendship,
   FriendshipAction,
   FriendshipRequest,
-  IDatabaseComponent,
+  IFriendsDatabaseComponent,
   User,
   Pagination,
   SocialSettings,
@@ -23,7 +23,7 @@ import {
 
 type FriendshipRequestType = 'sent' | 'received'
 
-export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>): IDatabaseComponent {
+export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>): IFriendsDatabaseComponent {
   const { pg, logs } = components
 
   const logger = logs.getLogger('db-component')

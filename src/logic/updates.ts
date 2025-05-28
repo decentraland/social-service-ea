@@ -2,7 +2,7 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 import {
   Action,
   ICatalystClientComponent,
-  IDatabaseComponent,
+  IFriendsDatabaseComponent,
   ISubscribersContext,
   RpcServerContext,
   SubscriptionEventsEmitter
@@ -82,7 +82,7 @@ export function friendshipAcceptedUpdateHandler(subscribersContext: ISubscribers
 export function friendConnectivityUpdateHandler(
   rpcContext: ISubscribersContext,
   logger: ILogger,
-  db: IDatabaseComponent
+  db: IFriendsDatabaseComponent
 ) {
   return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
     const onlineSubscribers = rpcContext.getSubscribersAddresses()

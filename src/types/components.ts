@@ -33,7 +33,7 @@ export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
   detachUser(address: string): void
 }
-export interface IDatabaseComponent {
+export interface IFriendsDatabaseComponent {
   createFriendship(
     users: [string, string],
     isActive: boolean,

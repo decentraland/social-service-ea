@@ -1,8 +1,8 @@
-import { IDatabaseComponent, PrivateMessagesPrivacy } from '../../../src/types'
+import { IFriendsDatabaseComponent, PrivateMessagesPrivacy } from '../../../src/types'
 import { Action } from '../../../src/types'
 
 export async function createFriendshipRequest(
-  db: IDatabaseComponent,
+  db: IFriendsDatabaseComponent,
   users: [string, string],
   metadata?: Record<string, string>
 ) {
@@ -11,7 +11,7 @@ export async function createFriendshipRequest(
   return id
 }
 
-export async function createOrUpsertActiveFriendship(db: IDatabaseComponent, users: [string, string]) {
+export async function createOrUpsertActiveFriendship(db: IFriendsDatabaseComponent, users: [string, string]) {
   let id: string | undefined
   const existingFriendship = await db.getFriendship(users)
 
@@ -29,19 +29,19 @@ export async function createOrUpsertActiveFriendship(db: IDatabaseComponent, use
   return id
 }
 
-export async function createPendingFriendshipRequest(db: IDatabaseComponent, users: [string, string]) {
+export async function createPendingFriendshipRequest(db: IFriendsDatabaseComponent, users: [string, string]) {
   const { id } = await db.createFriendship(users, false)
   await db.recordFriendshipAction(id, users[0], Action.REQUEST, null)
   return id
 }
 
-export async function removeFriendship(db: IDatabaseComponent, id: string, actingUser: string) {
+export async function removeFriendship(db: IFriendsDatabaseComponent, id: string, actingUser: string) {
   await db.updateFriendshipStatus(id, false)
   await db.recordFriendshipAction(id, actingUser, Action.DELETE, null)
 }
 
 export async function createOrUpdateSocialSettings(
-  db: IDatabaseComponent,
+  db: IFriendsDatabaseComponent,
   address: string,
   privacySettings: PrivateMessagesPrivacy
 ) {
@@ -50,6 +50,6 @@ export async function createOrUpdateSocialSettings(
   })
 }
 
-export function removeSocialSettings(db: IDatabaseComponent, address: string): Promise<void> {
+export function removeSocialSettings(db: IFriendsDatabaseComponent, address: string): Promise<void> {
   return db.deleteSocialSettings(address)
 }

@@ -1,5 +1,5 @@
 import SQL from 'sql-template-strings'
-import { createDBComponent } from '../../../src/adapters/db'
+import { createFriendsDBComponent } from '../../../src/adapters/db'
 import { Action } from '../../../src/types'
 import { mockLogs, mockPg } from '../../mocks/components'
 import { normalizeAddress } from '../../../src/utils/address'
@@ -9,10 +9,10 @@ jest.mock('node:crypto', () => ({
 }))
 
 describe('db', () => {
-  let dbComponent: ReturnType<typeof createDBComponent>
+  let dbComponent: ReturnType<typeof createFriendsDBComponent>
 
   beforeEach(() => {
-    dbComponent = createDBComponent({ pg: mockPg, logs: mockLogs })
+    dbComponent = createFriendsDBComponent({ pg: mockPg, logs: mockLogs })
   })
 
   describe('getFriends', () => {

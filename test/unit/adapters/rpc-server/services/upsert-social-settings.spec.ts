@@ -7,7 +7,7 @@ import {
 import { upsertSocialSettingsService } from '../../../../../src/adapters/rpc-server/services/upsert-social-settings'
 import { convertDBSettingsToRPCSettings } from '../../../../../src/logic/settings'
 import {
-  IDatabaseComponent,
+  IFriendsDatabaseComponent,
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   SocialSettings as DBSocialSettings,
@@ -18,7 +18,7 @@ import {
 describe('upsertSocialSettingsService', () => {
   const testAddress = '0x1234567890abcdef'
   let context: RpcServerContext
-  let upsertSocialSettingsMock: jest.MockedFunction<IDatabaseComponent['upsertSocialSettings']>
+  let upsertSocialSettingsMock: jest.MockedFunction<IFriendsDatabaseComponent['upsertSocialSettings']>
   let upsertSocialSettings: ReturnType<typeof upsertSocialSettingsService>
   let commsGatekeeperMock: jest.MockedFunction<ICommsGatekeeperComponent['updateUserPrivateMessagePrivacyMetadata']>
 
@@ -27,7 +27,7 @@ describe('upsertSocialSettingsService', () => {
     commsGatekeeperMock = jest.fn()
     const db = {
       upsertSocialSettings: upsertSocialSettingsMock
-    } as unknown as IDatabaseComponent
+    } as unknown as IFriendsDatabaseComponent
     const commsGatekeeper: ICommsGatekeeperComponent = {
       updateUserPrivateMessagePrivacyMetadata: commsGatekeeperMock
     }
