@@ -1,6 +1,7 @@
 import type { IHttpServerComponent } from '@well-known-components/interfaces'
 import { HttpRequest, HttpResponse } from '@well-known-components/uws-http-server'
 import { AppComponents } from './system'
+import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 
 export type HandlerContextWithPath<
   ComponentNames extends keyof AppComponents,
@@ -8,7 +9,8 @@ export type HandlerContextWithPath<
 > = IHttpServerComponent.PathAwareContext<
   IHttpServerComponent.DefaultContext<{
     components: Pick<AppComponents, ComponentNames>
-  }>,
+  }> &
+    DecentralandSignatureContext<any>,
   Path
 >
 
@@ -26,11 +28,14 @@ export type IHandler = {
   f: (res: HttpResponse, req: HttpRequest) => Promise<IHandlerResult>
 }
 
-export type HTTPResponse<TBody> = {
+export type HTTPResponse<T = undefined> = {
   status: number
-  body:
-    | TBody
+  body?:
     | {
-        error: string
+        message: string
+        data?: object
+      }
+    | {
+        data?: T
       }
 }

@@ -1,19 +1,4 @@
-export type CommunityPermission =
-  | 'edit_info'
-  | 'add_remove_places'
-  | 'accept_reject_requests'
-  | 'ban_players'
-  | 'send_invitations'
-  | 'edit_settings'
-  | 'delete_community'
-  | 'assign_roles'
-
-export type CommunityRole = 'owner' | 'moderator' | 'member'
-
-export interface CommunityRolePermissions {
-  name: CommunityRole
-  permissions: CommunityPermission[]
-}
+import { CommunityRole, CommunityRolePermissions, CommunityPermission } from '../types/entities'
 
 export const COMMUNITY_ROLES: Record<CommunityRole, CommunityRolePermissions> = {
   owner: {

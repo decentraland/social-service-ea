@@ -13,6 +13,8 @@ import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-t
 import {
   Action,
   BlockUserWithDate,
+  Community,
+  CommunityWithMembersCount,
   Friendship,
   FriendshipAction,
   FriendshipRequest,
@@ -98,7 +100,14 @@ export interface IFriendsDatabaseComponent {
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
 
-export interface ICommunitiesDatabaseComponent {}
+export interface ICommunitiesDatabaseComponent {
+  getCommunity(id: string): Promise<Community>
+  getCommunityPlaces(communityId: string): Promise<string[]>
+  getCommunityMembersCount(communityId: string): Promise<number>
+  getCommunities(memberAddress: string, options?: { pagination?: Pagination }): Promise<CommunityWithMembersCount[]>
+  getCommunitiesCount(memberAddress: string): Promise<number>
+  deleteCommunity(id: string): Promise<void>
+}
 
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>

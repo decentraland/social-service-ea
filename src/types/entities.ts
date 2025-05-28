@@ -66,3 +66,39 @@ export type Pagination = {
   limit: number
   offset: number
 }
+
+export type CommunityPermission =
+  | 'edit_info'
+  | 'add_remove_places'
+  | 'accept_reject_requests'
+  | 'ban_players'
+  | 'send_invitations'
+  | 'edit_settings'
+  | 'delete_community'
+  | 'assign_roles'
+
+export type CommunityRole = 'owner' | 'moderator' | 'member'
+
+export interface CommunityRolePermissions {
+  name: CommunityRole
+  permissions: CommunityPermission[]
+}
+
+export type Community = {
+  id: string
+  name: string
+  description: string
+  ownerAddress: string
+  role: CommunityRole
+  privacy: 'public' | 'private'
+  active: boolean
+}
+
+export type CommunityWithMembersCount = Community & {
+  membersCount: number
+}
+
+export type CommunityPlace = {
+  position: string
+  world_name: string
+}

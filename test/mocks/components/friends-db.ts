@@ -26,5 +26,11 @@ export const mockFriendsDB: jest.Mocked<IFriendsDatabaseComponent> = {
   upsertSocialSettings: jest.fn(),
   executeTx: jest.fn(),
   deleteSocialSettings: jest.fn(),
-  getFriendsFromList: jest.fn()
+  getFriendsFromList: jest.fn(),
+  getCommunity: jest.fn(),
+  getCommunityPlaces: jest.fn(),
+  getCommunityMembersCount: jest.fn(),
+  getCommunities: jest.fn(),
+  getCommunitiesCount: jest.fn(),
+  deleteCommunity: jest.fn()
 }
