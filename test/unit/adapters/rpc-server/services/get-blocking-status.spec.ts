@@ -12,7 +12,7 @@ describe('getBlockingStatusService', () => {
 
   beforeEach(() => {
     getBlockingStatus = getBlockingStatusService({
-      components: { db: mockFriendsDB, logs: mockLogs }
+      components: { friendsDb: mockFriendsDB, logs: mockLogs }
     })
   })
 

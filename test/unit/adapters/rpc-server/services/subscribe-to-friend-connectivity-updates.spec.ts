@@ -30,7 +30,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
       components: {
         logs: mockLogs,
-        db: mockFriendsDB,
+        friendsDb: mockFriendsDB,
         archipelagoStats: mockArchipelagoStats,
         catalystClient: mockCatalystClient,
         worldsStats: mockWorldsStats

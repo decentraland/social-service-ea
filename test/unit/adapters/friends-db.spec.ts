@@ -8,7 +8,7 @@ jest.mock('node:crypto', () => ({
   randomUUID: jest.fn().mockReturnValue('mock-uuid')
 }))
 
-describe('db', () => {
+describe('friendsDb', () => {
   let dbComponent: ReturnType<typeof createFriendsDBComponent>
 
   beforeEach(() => {

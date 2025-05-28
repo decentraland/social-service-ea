@@ -26,7 +26,7 @@ type FriendshipRequestType = 'sent' | 'received'
 export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>): IFriendsDatabaseComponent {
   const { pg, logs } = components
 
-  const logger = logs.getLogger('db-component')
+  const logger = logs.getLogger('friends-db-component')
 
   async function getCount(query: SQLStatement) {
     const result = await pg.query<{ count: number }>(query)

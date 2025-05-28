@@ -14,8 +14,8 @@ import { sendNotification, shouldNotify } from '../../../logic/notifications'
 import { getProfileUserId } from '../../../logic/profiles'
 
 export function upsertFriendshipService({
-  components: { logs, db, pubsub, catalystClient, sns }
-}: RPCServiceContext<'logs' | 'db' | 'pubsub' | 'catalystClient' | 'sns'>) {
+  components: { logs, friendsDb, pubsub, catalystClient, sns }
+}: RPCServiceContext<'logs' | 'friendsDb' | 'pubsub' | 'catalystClient' | 'sns'>) {
   const logger = logs.getLogger('upsert-friendship-service')
 
   return async function (
@@ -46,7 +46,7 @@ export function upsertFriendshipService({
     }
 
     try {
-      const isBlocked = await db.isFriendshipBlocked(context.address, parsedRequest.user!)
+      const isBlocked = await friendsDb.isFriendshipBlocked(context.address, parsedRequest.user!)
 
       if (isBlocked) {
         return {
@@ -57,7 +57,7 @@ export function upsertFriendshipService({
         }
       }
 
-      const lastAction = await db.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
+      const lastAction = await friendsDb.getLastFriendshipActionByUsers(context.address, parsedRequest.user!)
 
       if (!validateNewFriendshipAction(context.address, parsedRequest, lastAction)) {
         return {
@@ -74,15 +74,15 @@ export function upsertFriendshipService({
       const metadata =
         parsedRequest.action === Action.REQUEST && parsedRequest.metadata ? parsedRequest.metadata : undefined
 
-      const { id, actionId, createdAt } = await db.executeTx(async (tx) => {
+      const { id, actionId, createdAt } = await friendsDb.executeTx(async (tx) => {
         let id: string, createdAt: Date
 
         if (lastAction) {
-          const { created_at } = await db.updateFriendshipStatus(lastAction.friendship_id, isActive, tx)
+          const { created_at } = await friendsDb.updateFriendshipStatus(lastAction.friendship_id, isActive, tx)
           id = lastAction.friendship_id
           createdAt = created_at
         } else {
-          const { id: newFriendshipId, created_at } = await db.createFriendship(
+          const { id: newFriendshipId, created_at } = await friendsDb.createFriendship(
             [context.address, parsedRequest.user!],
             isActive,
             tx
@@ -91,7 +91,7 @@ export function upsertFriendshipService({
           createdAt = created_at
         }
 
-        const actionId = await db.recordFriendshipAction(
+        const actionId = await friendsDb.recordFriendshipAction(
           id,
           context.address,
           parsedRequest.action,

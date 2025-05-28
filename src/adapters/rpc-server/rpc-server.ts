@@ -29,7 +29,7 @@ import { createRpcServerMetricsWrapper, ServiceType } from './metrics-wrapper'
 
 export async function createRpcServerComponent({
   logs,
-  db,
+  friendsDb,
   pubsub,
   config,
   uwsServer,
@@ -43,7 +43,7 @@ export async function createRpcServerComponent({
 }: Pick<
   AppComponents,
   | 'logs'
-  | 'db'
+  | 'friendsDb'
   | 'pubsub'
   | 'config'
   | 'uwsServer'
@@ -69,27 +69,27 @@ export async function createRpcServerComponent({
 
   const serviceCreators = {
     getFriends: {
-      creator: getFriendsService({ components: { logs, db, catalystClient } }),
+      creator: getFriendsService({ components: { logs, friendsDb: friendsDb, catalystClient } }),
       type: ServiceType.CALL
     },
     getMutualFriends: {
-      creator: getMutualFriendsService({ components: { logs, db, catalystClient } }),
+      creator: getMutualFriendsService({ components: { logs, friendsDb: friendsDb, catalystClient } }),
       type: ServiceType.CALL
     },
     getPendingFriendshipRequests: {
-      creator: getPendingFriendshipRequestsService({ components: { logs, db, catalystClient } }),
+      creator: getPendingFriendshipRequestsService({ components: { logs, friendsDb: friendsDb, catalystClient } }),
       type: ServiceType.CALL
     },
     getSentFriendshipRequests: {
-      creator: getSentFriendshipRequestsService({ components: { logs, db, catalystClient } }),
+      creator: getSentFriendshipRequestsService({ components: { logs, friendsDb: friendsDb, catalystClient } }),
       type: ServiceType.CALL
     },
     upsertFriendship: {
-      creator: upsertFriendshipService({ components: { logs, db, pubsub, catalystClient, sns } }),
+      creator: upsertFriendshipService({ components: { logs, friendsDb: friendsDb, pubsub, catalystClient, sns } }),
       type: ServiceType.CALL
     },
     getFriendshipStatus: {
-      creator: getFriendshipStatusService({ components: { logs, db } }),
+      creator: getFriendshipStatusService({ components: { logs, friendsDb: friendsDb } }),
       type: ServiceType.CALL
     },
     subscribeToFriendshipUpdates: {
@@ -99,7 +99,7 @@ export async function createRpcServerComponent({
     },
     subscribeToFriendConnectivityUpdates: {
       creator: subscribeToFriendConnectivityUpdatesService({
-        components: { logs, db, archipelagoStats, catalystClient, worldsStats }
+        components: { logs, friendsDb: friendsDb, archipelagoStats, catalystClient, worldsStats }
       }),
       type: ServiceType.STREAM,
       event: 'friend_connectivity_updates'
@@ -110,31 +110,31 @@ export async function createRpcServerComponent({
       event: 'block_updates'
     },
     blockUser: {
-      creator: blockUserService({ components: { logs, db, catalystClient, pubsub } }),
+      creator: blockUserService({ components: { logs, friendsDb: friendsDb, catalystClient, pubsub } }),
       type: ServiceType.CALL
     },
     unblockUser: {
-      creator: unblockUserService({ components: { logs, db, catalystClient, pubsub } }),
+      creator: unblockUserService({ components: { logs, friendsDb: friendsDb, catalystClient, pubsub } }),
       type: ServiceType.CALL
     },
     getBlockedUsers: {
-      creator: getBlockedUsersService({ components: { logs, db, catalystClient } }),
+      creator: getBlockedUsersService({ components: { logs, friendsDb: friendsDb, catalystClient } }),
       type: ServiceType.CALL
     },
     getBlockingStatus: {
-      creator: getBlockingStatusService({ components: { logs, db } }),
+      creator: getBlockingStatusService({ components: { logs, friendsDb: friendsDb } }),
       type: ServiceType.CALL
     },
     getPrivateMessagesSettings: {
-      creator: getPrivateMessagesSettingsService({ components: { logs, db } }),
+      creator: getPrivateMessagesSettingsService({ components: { logs, friendsDb: friendsDb } }),
       type: ServiceType.CALL
     },
     upsertSocialSettings: {
-      creator: upsertSocialSettingsService({ components: { logs, db, commsGatekeeper } }),
+      creator: upsertSocialSettingsService({ components: { logs, friendsDb: friendsDb, commsGatekeeper } }),
       type: ServiceType.CALL
     },
     getSocialSettings: {
-      creator: getSocialSettingsService({ components: { logs, db } }),
+      creator: getSocialSettingsService({ components: { logs, friendsDb: friendsDb } }),
       type: ServiceType.CALL
     }
   }
@@ -158,7 +158,7 @@ export async function createRpcServerComponent({
       )
       await pubsub.subscribeToChannel(
         FRIEND_STATUS_UPDATES_CHANNEL,
-        friendConnectivityUpdateHandler(subscribersContext, logger, db)
+        friendConnectivityUpdateHandler(subscribersContext, logger, friendsDb)
       )
       await pubsub.subscribeToChannel(BLOCK_UPDATES_CHANNEL, blockUpdateHandler(subscribersContext, logger))
     },

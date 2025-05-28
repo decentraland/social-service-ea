@@ -82,11 +82,11 @@ export function friendshipAcceptedUpdateHandler(subscribersContext: ISubscribers
 export function friendConnectivityUpdateHandler(
   rpcContext: ISubscribersContext,
   logger: ILogger,
-  db: IFriendsDatabaseComponent
+  friendsDb: IFriendsDatabaseComponent
 ) {
   return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
     const onlineSubscribers = rpcContext.getSubscribersAddresses()
-    const friends = await db.getOnlineFriends(update.address, onlineSubscribers)
+    const friends = await friendsDb.getOnlineFriends(update.address, onlineSubscribers)
 
     friends.forEach(({ address: friendAddress }) => {
       const emitter = rpcContext.getOrAddSubscriber(friendAddress)

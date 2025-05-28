@@ -24,7 +24,7 @@ describe('getPrivateMessagesSettingsService', () => {
   beforeEach(() => {
     getSocialSettingsMock = jest.fn()
     getFriendsFromListMock = jest.fn()
-    const db = {
+    const friendsDb = {
       getSocialSettings: getSocialSettingsMock,
       getFriendsFromList: getFriendsFromListMock
     } as unknown as IFriendsDatabaseComponent
@@ -44,7 +44,7 @@ describe('getPrivateMessagesSettingsService', () => {
     getPrivateMessagesSettings = getPrivateMessagesSettingsService({
       components: {
         logs,
-        db
+        friendsDb
       }
     })
   })

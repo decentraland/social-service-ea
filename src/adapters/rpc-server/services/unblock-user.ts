@@ -7,8 +7,8 @@ import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
 import { parseProfileToBlockedUser } from '../../../logic/blocks'
 import { EthAddress } from '@dcl/schemas'
 export function unblockUserService({
-  components: { logs, db, catalystClient, pubsub }
-}: RPCServiceContext<'logs' | 'db' | 'catalystClient' | 'pubsub'>) {
+  components: { logs, friendsDb, catalystClient, pubsub }
+}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient' | 'pubsub'>) {
   const logger = logs.getLogger('unblock-user-service')
 
   return async function (request: UnblockUserPayload, context: RpcServerContext): Promise<UnblockUserResponse> {
@@ -45,13 +45,13 @@ export function unblockUserService({
         }
       }
 
-      const actionId = await db.executeTx(async (tx) => {
-        await db.unblockUser(blockerAddress, blockedAddress, tx)
+      const actionId = await friendsDb.executeTx(async (tx) => {
+        await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
 
-        const friendship = await db.getFriendship([blockerAddress, blockedAddress], tx)
+        const friendship = await friendsDb.getFriendship([blockerAddress, blockedAddress], tx)
         if (!friendship) return
 
-        const actionId = await db.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
+        const actionId = await friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
         return actionId
       })
 

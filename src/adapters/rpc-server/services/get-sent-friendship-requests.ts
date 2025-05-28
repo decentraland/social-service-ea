@@ -7,8 +7,8 @@ import {
 import { getPage } from '../../../utils/pagination'
 
 export function getSentFriendshipRequestsService({
-  components: { logs, db, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'catalystClient'>) {
+  components: { logs, friendsDb, catalystClient }
+}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient'>) {
   const logger = logs.getLogger('get-sent-friendship-requests-service')
 
   return async function (
@@ -18,8 +18,8 @@ export function getSentFriendshipRequestsService({
     try {
       const { limit, offset } = request.pagination || {}
       const [sentRequests, sentRequestsCount] = await Promise.all([
-        db.getSentFriendshipRequests(context.address, request.pagination),
-        db.getSentFriendshipRequestsCount(context.address)
+        friendsDb.getSentFriendshipRequests(context.address, request.pagination),
+        friendsDb.getSentFriendshipRequestsCount(context.address)
       ])
 
       const sentRequestsAddresses = sentRequests.map(({ address }) => address)

@@ -15,7 +15,7 @@ describe('getBlockedUsersService', () => {
 
   beforeEach(() => {
     getBlockedUsers = getBlockedUsersService({
-      components: { db: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
+      components: { friendsDb: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 

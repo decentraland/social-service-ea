@@ -22,7 +22,7 @@ describe('blockUserService', () => {
 
   beforeEach(async () => {
     blockUser = blockUserService({
-      components: { db: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient, pubsub: mockPubSub }
+      components: { friendsDb: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient, pubsub: mockPubSub }
     })
 
     mockClient = (await mockPg.getPool().connect()) as jest.Mocked<PoolClient>

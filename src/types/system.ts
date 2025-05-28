@@ -26,7 +26,8 @@ import {
   ICommsGatekeeperComponent,
   IRpcClient,
   ICacheComponent,
-  IStatusCheckComponent
+  IStatusCheckComponent,
+  ICommunitiesDatabaseComponent
 } from './components'
 
 export type GlobalContext = {
@@ -41,7 +42,8 @@ export type BaseComponents = {
   httpServer: IHttpServerComponent<GlobalContext>
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   pg: IPgComponent
-  db: IFriendsDatabaseComponent
+  friendsDb: IFriendsDatabaseComponent
+  communitiesDb: ICommunitiesDatabaseComponent
   rpcServer: IRPCServerComponent
   fetcher: IFetchComponent
   redis: IRedisComponent & ICacheComponent

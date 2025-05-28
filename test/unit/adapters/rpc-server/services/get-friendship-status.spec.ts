@@ -8,7 +8,7 @@ import {
 import { mockFriendsDB, mockLogs } from '../../../../mocks/components'
 
 describe('getFriendshipStatusService', () => {
-  let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
+  let components: jest.Mocked<Pick<AppComponents, 'friendsDb' | 'logs'>>
   let getFriendshipStatus: ReturnType<typeof getFriendshipStatusService>
 
   const rpcContext: RpcServerContext = {
@@ -23,7 +23,7 @@ describe('getFriendshipStatusService', () => {
   }
 
   beforeEach(() => {
-    components = { db: mockFriendsDB, logs: mockLogs }
+    components = { friendsDb: mockFriendsDB, logs: mockLogs }
     getFriendshipStatus = getFriendshipStatusService({ components })
   })
 

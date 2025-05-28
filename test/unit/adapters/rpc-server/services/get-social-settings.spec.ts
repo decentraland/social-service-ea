@@ -18,7 +18,7 @@ describe('getSocialSettingsService', () => {
 
   beforeEach(() => {
     getSocialSettingsMock = jest.fn()
-    const db = {
+    const friendsDb = {
       getSocialSettings: getSocialSettingsMock
     } as unknown as IFriendsDatabaseComponent
     const logs: ILoggerComponent = {
@@ -37,7 +37,7 @@ describe('getSocialSettingsService', () => {
     getSocialSettings = getSocialSettingsService({
       components: {
         logs,
-        db
+        friendsDb
       }
     })
   })

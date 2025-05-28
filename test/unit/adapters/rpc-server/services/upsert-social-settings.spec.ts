@@ -25,7 +25,7 @@ describe('upsertSocialSettingsService', () => {
   beforeEach(() => {
     upsertSocialSettingsMock = jest.fn()
     commsGatekeeperMock = jest.fn()
-    const db = {
+    const friendsDb = {
       upsertSocialSettings: upsertSocialSettingsMock
     } as unknown as IFriendsDatabaseComponent
     const commsGatekeeper: ICommsGatekeeperComponent = {
@@ -47,7 +47,7 @@ describe('upsertSocialSettingsService', () => {
     upsertSocialSettings = upsertSocialSettingsService({
       components: {
         logs,
-        db,
+        friendsDb,
         commsGatekeeper
       }
     })

@@ -97,6 +97,9 @@ export interface IFriendsDatabaseComponent {
   isFriendshipBlocked(blockerAddress: string, blockedAddress: string): Promise<boolean>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
+
+export interface ICommunitiesDatabaseComponent {}
+
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>
 }

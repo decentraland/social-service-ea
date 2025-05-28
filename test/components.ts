@@ -13,6 +13,7 @@ import { createPgComponent } from '@well-known-components/pg-component'
 import { main } from '../src/service'
 import { GlobalContext, TestComponents } from '../src/types'
 import { createFriendsDBComponent } from '../src/adapters/friends-db'
+import { createCommunitiesDBComponent } from '../src/adapters/communities-db'
 import { createRedisComponent } from '../src/adapters/redis'
 import { createPubSubComponent } from '../src/adapters/pubsub'
 import { createNatsComponent } from '@well-known-components/nats-component'
@@ -87,7 +88,8 @@ async function initComponents(): Promise<TestComponents> {
       }
     }
   )
-  const db = createFriendsDBComponent({ pg, logs })
+  const friendsDb = createFriendsDBComponent({ pg, logs })
+  const communitiesDb = createCommunitiesDBComponent({ pg, logs })
 
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
@@ -101,7 +103,7 @@ async function initComponents(): Promise<TestComponents> {
   const rpcServer = await createRpcServerComponent({
     logs,
     commsGatekeeper,
-    db,
+    friendsDb,
     pubsub,
     uwsServer,
     config,
@@ -126,7 +128,8 @@ async function initComponents(): Promise<TestComponents> {
     archipelagoStats,
     catalystClient,
     config,
-    db,
+    friendsDb,
+    communitiesDb,
     fetcher,
     localFetch,
     logs,

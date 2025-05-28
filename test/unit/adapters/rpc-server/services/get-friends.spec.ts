@@ -14,7 +14,7 @@ describe('getFriendsService', () => {
 
   beforeEach(() => {
     getFriends = getFriendsService({
-      components: { db: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
+      components: { friendsDb: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 

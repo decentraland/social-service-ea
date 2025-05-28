@@ -2,54 +2,54 @@ import { IFriendsDatabaseComponent, PrivateMessagesPrivacy } from '../../../src/
 import { Action } from '../../../src/types'
 
 export async function createFriendshipRequest(
-  db: IFriendsDatabaseComponent,
+  friendsDb: IFriendsDatabaseComponent,
   users: [string, string],
   metadata?: Record<string, string>
 ) {
-  const { id } = await db.createFriendship(users, false)
-  await db.recordFriendshipAction(id, users[0], Action.REQUEST, metadata || null)
+  const { id } = await friendsDb.createFriendship(users, false)
+  await friendsDb.recordFriendshipAction(id, users[0], Action.REQUEST, metadata || null)
   return id
 }
 
-export async function createOrUpsertActiveFriendship(db: IFriendsDatabaseComponent, users: [string, string]) {
+export async function createOrUpsertActiveFriendship(friendsDb: IFriendsDatabaseComponent, users: [string, string]) {
   let id: string | undefined
-  const existingFriendship = await db.getFriendship(users)
+  const existingFriendship = await friendsDb.getFriendship(users)
 
   if (existingFriendship) {
     id = existingFriendship.id
-    await db.updateFriendshipStatus(id, true)
+    await friendsDb.updateFriendshipStatus(id, true)
   } else {
-    const friendship = await db.createFriendship(users, true)
+    const friendship = await friendsDb.createFriendship(users, true)
     id = friendship.id
   }
 
-  await db.recordFriendshipAction(id, users[0], Action.REQUEST, null)
-  await db.recordFriendshipAction(id, users[1], Action.ACCEPT, null)
+  await friendsDb.recordFriendshipAction(id, users[0], Action.REQUEST, null)
+  await friendsDb.recordFriendshipAction(id, users[1], Action.ACCEPT, null)
 
   return id
 }
 
-export async function createPendingFriendshipRequest(db: IFriendsDatabaseComponent, users: [string, string]) {
-  const { id } = await db.createFriendship(users, false)
-  await db.recordFriendshipAction(id, users[0], Action.REQUEST, null)
+export async function createPendingFriendshipRequest(friendsDb: IFriendsDatabaseComponent, users: [string, string]) {
+  const { id } = await friendsDb.createFriendship(users, false)
+  await friendsDb.recordFriendshipAction(id, users[0], Action.REQUEST, null)
   return id
 }
 
-export async function removeFriendship(db: IFriendsDatabaseComponent, id: string, actingUser: string) {
-  await db.updateFriendshipStatus(id, false)
-  await db.recordFriendshipAction(id, actingUser, Action.DELETE, null)
+export async function removeFriendship(friendsDb: IFriendsDatabaseComponent, id: string, actingUser: string) {
+  await friendsDb.updateFriendshipStatus(id, false)
+  await friendsDb.recordFriendshipAction(id, actingUser, Action.DELETE, null)
 }
 
 export async function createOrUpdateSocialSettings(
-  db: IFriendsDatabaseComponent,
+  friendsDb: IFriendsDatabaseComponent,
   address: string,
   privacySettings: PrivateMessagesPrivacy
 ) {
-  await db.upsertSocialSettings(address, {
+  await friendsDb.upsertSocialSettings(address, {
     private_messages_privacy: privacySettings
   })
 }
 
-export function removeSocialSettings(db: IFriendsDatabaseComponent, address: string): Promise<void> {
-  return db.deleteSocialSettings(address)
+export function removeSocialSettings(friendsDb: IFriendsDatabaseComponent, address: string): Promise<void> {
+  return friendsDb.deleteSocialSettings(address)
 }

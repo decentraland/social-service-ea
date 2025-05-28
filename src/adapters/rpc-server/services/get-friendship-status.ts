@@ -5,7 +5,9 @@ import {
   GetFriendshipStatusResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
-export function getFriendshipStatusService({ components: { logs, db } }: RPCServiceContext<'logs' | 'db'>) {
+export function getFriendshipStatusService({
+  components: { logs, friendsDb }
+}: RPCServiceContext<'logs' | 'friendsDb'>) {
   const logger = logs.getLogger('get-sent-friendship-requests-service')
 
   return async function (
@@ -25,7 +27,7 @@ export function getFriendshipStatusService({ components: { logs, db } }: RPCServ
         }
       }
 
-      const lastFriendshipAction = await db.getLastFriendshipActionByUsers(loggedUserAddress, userAddress)
+      const lastFriendshipAction = await friendsDb.getLastFriendshipActionByUsers(loggedUserAddress, userAddress)
 
       return {
         response: {

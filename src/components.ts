@@ -26,6 +26,7 @@ import { createWSPoolComponent } from './adapters/ws-pool'
 import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
+import { createCommunitiesDBComponent } from './adapters/communities-db'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -78,7 +79,8 @@ export async function initComponents(): Promise<AppComponents> {
     }
   )
 
-  const db = createFriendsDBComponent({ pg, logs })
+  const friendsDb = createFriendsDBComponent({ pg, logs })
+  const communitiesDb = createCommunitiesDBComponent({ pg, logs })
 
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
@@ -92,7 +94,7 @@ export async function initComponents(): Promise<AppComponents> {
   const rpcServer = await createRpcServerComponent({
     logs,
     commsGatekeeper,
-    db,
+    friendsDb,
     pubsub,
     uwsServer,
     config,
@@ -112,7 +114,8 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     commsGatekeeper,
     config,
-    db,
+    friendsDb,
+    communitiesDb,
     fetcher,
     httpServer,
     logs,

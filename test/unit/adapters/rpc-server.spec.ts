@@ -62,7 +62,7 @@ describe('createRpcServerComponent', () => {
     rpcServer = await createRpcServerComponent({
       commsGatekeeper: mockCommsGatekeeper,
       logs: mockLogs,
-      db: mockFriendsDB,
+      friendsDb: mockFriendsDB,
       pubsub: mockPubSub,
       config: mockConfig,
       uwsServer: mockUWs,
