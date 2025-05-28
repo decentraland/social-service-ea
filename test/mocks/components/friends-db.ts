@@ -1,6 +1,6 @@
 import { IFriendsDatabaseComponent } from '../../../src/types'
 
-export const mockDb: jest.Mocked<IFriendsDatabaseComponent> = {
+export const mockFriendsDB: jest.Mocked<IFriendsDatabaseComponent> = {
   createFriendship: jest.fn(),
   updateFriendshipStatus: jest.fn(),
   getFriends: jest.fn(),

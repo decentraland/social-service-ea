@@ -1,4 +1,4 @@
-import { mockCatalystClient, mockConfig, mockDb, mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockConfig, mockFriendsDB, mockLogs } from '../../../../mocks/components'
 import { getPendingFriendshipRequestsService } from '../../../../../src/adapters/rpc-server/services/get-pending-friendship-requests'
 import { RpcServerContext } from '../../../../../src/types'
 import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -16,7 +16,7 @@ describe('getPendingFriendshipRequestsService', () => {
 
   beforeEach(async () => {
     getPendingRequests = getPendingFriendshipRequestsService({
-      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
+      components: { db: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 
@@ -27,8 +27,8 @@ describe('getPendingFriendshipRequestsService', () => {
     ]
     const mockProfiles = mockPendingRequests.map(({ address }) => createMockProfile(address))
 
-    mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
-    mockDb.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
+    mockFriendsDB.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
+    mockFriendsDB.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
     mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
     const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)
 
@@ -50,8 +50,8 @@ describe('getPendingFriendshipRequestsService', () => {
   })
 
   it.each([
-    ['getReceivedFriendshipRequests', mockDb.getReceivedFriendshipRequests],
-    ['getReceivedFriendshipRequestsCount', mockDb.getReceivedFriendshipRequestsCount]
+    ['getReceivedFriendshipRequests', mockFriendsDB.getReceivedFriendshipRequests],
+    ['getReceivedFriendshipRequestsCount', mockFriendsDB.getReceivedFriendshipRequestsCount]
   ])('should handle database errors in the %s method gracefully', async (_methodName, method) => {
     method.mockImplementationOnce(() => {
       throw new Error('Database error')
@@ -71,8 +71,8 @@ describe('getPendingFriendshipRequestsService', () => {
     const mockPendingRequests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
     const mockProfiles = mockPendingRequests.map(({ address }) => createMockProfile(address))
 
-    mockDb.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
-    mockDb.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
+    mockFriendsDB.getReceivedFriendshipRequests.mockResolvedValueOnce(mockPendingRequests)
+    mockFriendsDB.getReceivedFriendshipRequestsCount.mockResolvedValueOnce(mockPendingRequests.length)
     mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
 
     const result: PaginatedFriendshipRequestsResponse = await getPendingRequests(emptyRequest, rpcContext)

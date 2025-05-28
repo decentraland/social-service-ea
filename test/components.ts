@@ -12,7 +12,7 @@ import { createPgComponent } from '@well-known-components/pg-component'
 
 import { main } from '../src/service'
 import { GlobalContext, TestComponents } from '../src/types'
-import { createFriendsDBComponent } from '../src/adapters/db'
+import { createFriendsDBComponent } from '../src/adapters/friends-db'
 import { createRedisComponent } from '../src/adapters/redis'
 import { createPubSubComponent } from '../src/adapters/pubsub'
 import { createNatsComponent } from '@well-known-components/nats-component'

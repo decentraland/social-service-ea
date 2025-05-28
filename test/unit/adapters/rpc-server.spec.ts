@@ -10,7 +10,7 @@ import {
   mockArchipelagoStats,
   mockCatalystClient,
   mockConfig,
-  mockDb,
+  mockFriendsDB,
   mockLogs,
   mockMetrics,
   mockPubSub,
@@ -62,7 +62,7 @@ describe('createRpcServerComponent', () => {
     rpcServer = await createRpcServerComponent({
       commsGatekeeper: mockCommsGatekeeper,
       logs: mockLogs,
-      db: mockDb,
+      db: mockFriendsDB,
       pubsub: mockPubSub,
       config: mockConfig,
       uwsServer: mockUWs,
@@ -106,7 +106,11 @@ describe('createRpcServerComponent', () => {
 
       expect(updates.friendshipUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
       expect(updates.friendshipAcceptedUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
-      expect(updates.friendConnectivityUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger, mockDb)
+      expect(updates.friendConnectivityUpdateHandler).toHaveBeenCalledWith(
+        subscribersContext,
+        mockLogger,
+        mockFriendsDB
+      )
       expect(updates.blockUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
     })
   })

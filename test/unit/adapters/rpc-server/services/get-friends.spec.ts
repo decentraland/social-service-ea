@@ -1,4 +1,4 @@
-import { mockCatalystClient, mockDb, mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/adapters/rpc-server/services/get-friends'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
@@ -14,7 +14,7 @@ describe('getFriendsService', () => {
 
   beforeEach(() => {
     getFriends = getFriendsService({
-      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
+      components: { db: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 
@@ -24,8 +24,8 @@ describe('getFriendsService', () => {
     const mockProfiles = addresses.map(createMockProfile)
     const totalFriends = 2
 
-    mockDb.getFriends.mockResolvedValueOnce(mockFriends)
-    mockDb.getFriendsCount.mockResolvedValueOnce(totalFriends)
+    mockFriendsDB.getFriends.mockResolvedValueOnce(mockFriends)
+    mockFriendsDB.getFriendsCount.mockResolvedValueOnce(totalFriends)
     mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
 
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
@@ -40,8 +40,8 @@ describe('getFriendsService', () => {
   })
 
   it('should return an empty list if no friends are found', async () => {
-    mockDb.getFriends.mockResolvedValueOnce([])
-    mockDb.getFriendsCount.mockResolvedValueOnce(0)
+    mockFriendsDB.getFriends.mockResolvedValueOnce([])
+    mockFriendsDB.getFriendsCount.mockResolvedValueOnce(0)
 
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
@@ -55,7 +55,7 @@ describe('getFriendsService', () => {
   })
 
   it('should handle errors from the database gracefully', async () => {
-    mockDb.getFriends.mockImplementationOnce(() => {
+    mockFriendsDB.getFriends.mockImplementationOnce(() => {
       throw new Error('Database error')
     })
 

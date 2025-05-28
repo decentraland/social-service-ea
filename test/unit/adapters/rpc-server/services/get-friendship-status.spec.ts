@@ -5,7 +5,7 @@ import {
   GetFriendshipStatusPayload,
   GetFriendshipStatusResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { mockDb, mockLogs } from '../../../../mocks/components'
+import { mockFriendsDB, mockLogs } from '../../../../mocks/components'
 
 describe('getFriendshipStatusService', () => {
   let components: jest.Mocked<Pick<AppComponents, 'db' | 'logs'>>
@@ -23,7 +23,7 @@ describe('getFriendshipStatusService', () => {
   }
 
   beforeEach(() => {
-    components = { db: mockDb, logs: mockLogs }
+    components = { db: mockFriendsDB, logs: mockLogs }
     getFriendshipStatus = getFriendshipStatusService({ components })
   })
 
@@ -36,11 +36,11 @@ describe('getFriendshipStatusService', () => {
       timestamp: new Date().toISOString()
     }
 
-    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
 
     const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
 
-    expect(mockDb.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
+    expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
     expect(result).toEqual({
       response: {
         $case: 'accepted',
@@ -52,11 +52,11 @@ describe('getFriendshipStatusService', () => {
   })
 
   it('should return none if no friendship action is found', async () => {
-    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(null)
+    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(null)
 
     const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
 
-    expect(mockDb.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
+    expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
     expect(result).toEqual({
       response: {
         $case: 'accepted',
@@ -76,7 +76,7 @@ describe('getFriendshipStatusService', () => {
       timestamp: new Date().toISOString()
     }
 
-    mockDb.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
 
     const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
 
@@ -91,7 +91,7 @@ describe('getFriendshipStatusService', () => {
   })
 
   it('should return internalServerError if an error occurs', async () => {
-    mockDb.getLastFriendshipActionByUsers.mockImplementationOnce(() => {
+    mockFriendsDB.getLastFriendshipActionByUsers.mockImplementationOnce(() => {
       throw new Error('Database error')
     })
 

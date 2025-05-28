@@ -1,4 +1,4 @@
-import { mockCatalystClient, mockDb, mockLogs, mockPg, mockPubSub } from '../../../../mocks/components'
+import { mockCatalystClient, mockFriendsDB, mockLogs, mockPg, mockPubSub } from '../../../../mocks/components'
 import { blockUserService } from '../../../../../src/adapters/rpc-server/services/block-user'
 import { BlockUserPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
@@ -22,11 +22,11 @@ describe('blockUserService', () => {
 
   beforeEach(async () => {
     blockUser = blockUserService({
-      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient, pubsub: mockPubSub }
+      components: { db: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient, pubsub: mockPubSub }
     })
 
     mockClient = (await mockPg.getPool().connect()) as jest.Mocked<PoolClient>
-    mockDb.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
+    mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
 
     blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
     mockProfile = createMockProfile(blockedAddress)
@@ -39,8 +39,8 @@ describe('blockUserService', () => {
     }
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    mockDb.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+    mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
 
     const response = await blockUser(request, rpcContext)
 
@@ -52,10 +52,10 @@ describe('blockUserService', () => {
         }
       }
     })
-    expect(mockDb.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
-    expect(mockDb.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
-    expect(mockDb.updateFriendshipStatus).toHaveBeenCalledWith(expect.any(String), false, mockClient)
-    expect(mockDb.recordFriendshipAction).toHaveBeenCalledWith(
+    expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
+    expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
+    expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(expect.any(String), false, mockClient)
+    expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
       expect.any(String),
       rpcContext.address,
       Action.BLOCK,
@@ -70,8 +70,8 @@ describe('blockUserService', () => {
     }
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.getFriendship.mockResolvedValueOnce(null)
-    mockDb.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+    mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+    mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
 
     const response = await blockUser(request, rpcContext)
 
@@ -82,10 +82,10 @@ describe('blockUserService', () => {
       }
     })
 
-    expect(mockDb.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
-    expect(mockDb.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
-    expect(mockDb.updateFriendshipStatus).not.toHaveBeenCalled()
-    expect(mockDb.recordFriendshipAction).not.toHaveBeenCalled()
+    expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
+    expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
+    expect(mockFriendsDB.updateFriendshipStatus).not.toHaveBeenCalled()
+    expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
   })
 
   it('should publish a friendship update event after blocking a user if friendship exists', async () => {
@@ -94,9 +94,9 @@ describe('blockUserService', () => {
     }
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    mockDb.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
-    mockDb.recordFriendshipAction.mockResolvedValueOnce('action-id')
+    mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+    mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
 
     await blockUser(request, rpcContext)
 
@@ -115,8 +115,8 @@ describe('blockUserService', () => {
     }
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    mockDb.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+    mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
     await blockUser(request, rpcContext)
 
     expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
@@ -139,7 +139,7 @@ describe('blockUserService', () => {
         invalidRequest: { message: 'Cannot block yourself' }
       }
     })
-    expect(mockDb.blockUser).not.toHaveBeenCalled()
+    expect(mockFriendsDB.blockUser).not.toHaveBeenCalled()
   })
 
   it('should return invalidRequest when user address is missing', async () => {
@@ -155,7 +155,7 @@ describe('blockUserService', () => {
         invalidRequest: { message: 'Invalid user address in the request payload' }
       }
     })
-    expect(mockDb.blockUser).not.toHaveBeenCalled()
+    expect(mockFriendsDB.blockUser).not.toHaveBeenCalled()
   })
 
   it('should return invalidRequest when user address is invalid', async () => {
@@ -171,7 +171,7 @@ describe('blockUserService', () => {
         invalidRequest: { message: 'Invalid user address in the request payload' }
       }
     })
-    expect(mockDb.blockUser).not.toHaveBeenCalled()
+    expect(mockFriendsDB.blockUser).not.toHaveBeenCalled()
   })
 
   it('should return profileNotFound when profile is not found', async () => {
@@ -189,7 +189,7 @@ describe('blockUserService', () => {
         profileNotFound: { message: `Profile not found for address ${blockedAddress}` }
       }
     })
-    expect(mockDb.blockUser).not.toHaveBeenCalled()
+    expect(mockFriendsDB.blockUser).not.toHaveBeenCalled()
   })
 
   it('should handle database errors', async () => {
@@ -199,7 +199,7 @@ describe('blockUserService', () => {
     const error = new Error('Database error')
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.blockUser.mockRejectedValueOnce(error)
+    mockFriendsDB.blockUser.mockRejectedValueOnce(error)
 
     const response = await blockUser(request, rpcContext)
 

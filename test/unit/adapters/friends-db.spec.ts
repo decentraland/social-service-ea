@@ -1,5 +1,5 @@
 import SQL from 'sql-template-strings'
-import { createFriendsDBComponent } from '../../../src/adapters/db'
+import { createFriendsDBComponent } from '../../../src/adapters/friends-db'
 import { Action } from '../../../src/types'
 import { mockLogs, mockPg } from '../../mocks/components'
 import { normalizeAddress } from '../../../src/utils/address'

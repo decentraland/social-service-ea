@@ -1,4 +1,4 @@
-import { mockCatalystClient, mockDb, mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../../../mocks/components'
 import { getBlockedUsersService } from '../../../../../src/adapters/rpc-server/services/get-blocked-users'
 import { GetBlockedUsersPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
@@ -15,18 +15,21 @@ describe('getBlockedUsersService', () => {
 
   beforeEach(() => {
     getBlockedUsers = getBlockedUsersService({
-      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
+      components: { db: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 
   it('should return blocked users with profiles and pagination', async () => {
-    const blockedUsers = [{ address: '0x456', blocked_at: new Date() }, { address: '0x789', blocked_at: new Date() }]
+    const blockedUsers = [
+      { address: '0x456', blocked_at: new Date() },
+      { address: '0x789', blocked_at: new Date() }
+    ]
     const mockProfiles = blockedUsers.map((user) => createMockProfile(user.address))
     const request: GetBlockedUsersPayload = {
       pagination: { limit: 10, offset: 0 }
     }
 
-    mockDb.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
+    mockFriendsDB.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
     mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
 
     const response = await getBlockedUsers(request, rpcContext)
@@ -46,7 +49,7 @@ describe('getBlockedUsersService', () => {
     const mockProfiles = blockedUsers.map((user) => createMockProfile(user.address))
     const request: GetBlockedUsersPayload = {}
 
-    mockDb.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
+    mockFriendsDB.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
     mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
 
     const response = await getBlockedUsers(request, rpcContext)
@@ -59,7 +62,7 @@ describe('getBlockedUsersService', () => {
     const error = new Error('Database error')
     const request: GetBlockedUsersPayload = {}
 
-    mockDb.getBlockedUsers.mockRejectedValueOnce(error)
+    mockFriendsDB.getBlockedUsers.mockRejectedValueOnce(error)
 
     const response = await getBlockedUsers(request, rpcContext)
 

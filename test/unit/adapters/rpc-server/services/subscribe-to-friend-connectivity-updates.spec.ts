@@ -3,7 +3,7 @@ import { RpcServerContext } from '../../../../../src/types'
 import {
   mockLogs,
   mockArchipelagoStats,
-  mockDb,
+  mockFriendsDB,
   mockCatalystClient,
   mockWorldsStats
 } from '../../../../mocks/components'
@@ -30,7 +30,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
       components: {
         logs: mockLogs,
-        db: mockDb,
+        db: mockFriendsDB,
         archipelagoStats: mockArchipelagoStats,
         catalystClient: mockCatalystClient,
         worldsStats: mockWorldsStats
@@ -44,7 +44,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   })
 
   it('should get initial online friends from archipelago stats and then receive updates', async () => {
-    mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
+    mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
     mockArchipelagoStats.getPeers.mockResolvedValue(['0x456', '0x789'])
     mockWorldsStats.getPeers.mockResolvedValue(['0x654', '0x987'])
@@ -70,7 +70,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   })
 
   it('should handle empty online friends list and then receive updates', async () => {
-    mockDb.getOnlineFriends.mockResolvedValueOnce([])
+    mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
@@ -90,7 +90,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   })
 
   it('should handle errors from archipelago stats', async () => {
-    mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
+    mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
     mockArchipelagoStats.getPeers.mockRejectedValueOnce(new Error('Archipelago error'))
     mockWorldsStats.getPeers.mockResolvedValue(['0x456'])
@@ -112,7 +112,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   })
 
   it('should handle errors from worlds stats', async () => {
-    mockDb.getOnlineFriends.mockResolvedValueOnce([friend])
+    mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
     mockArchipelagoStats.getPeers.mockResolvedValueOnce(['0x456'])
     mockWorldsStats.getPeers.mockRejectedValueOnce(new Error('Worlds error'))
@@ -135,7 +135,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
 
   it('should handle errors during subscription', async () => {
     const testError = new Error('Test error')
-    mockDb.getOnlineFriends.mockRejectedValue(testError)
+    mockFriendsDB.getOnlineFriends.mockRejectedValue(testError)
 
     const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
 
@@ -156,7 +156,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   })
 
   it('should get the address from the update', async () => {
-    mockDb.getOnlineFriends.mockResolvedValueOnce([])
+    mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
@@ -174,7 +174,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   })
 
   it('should filter connectivity updates based on address conditions', async () => {
-    mockDb.getOnlineFriends.mockResolvedValueOnce([])
+    mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([])
     mockHandler.mockImplementationOnce(async function* () {
       yield {

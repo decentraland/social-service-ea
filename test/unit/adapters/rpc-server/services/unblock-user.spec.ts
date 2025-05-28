@@ -1,4 +1,4 @@
-import { mockCatalystClient, mockDb, mockLogs, mockPg, mockPubSub } from '../../../../mocks/components'
+import { mockCatalystClient, mockFriendsDB, mockLogs, mockPg, mockPubSub } from '../../../../mocks/components'
 import { unblockUserService } from '../../../../../src/adapters/rpc-server/services/unblock-user'
 import { UnblockUserPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
@@ -22,11 +22,11 @@ describe('unblockUserService', () => {
 
   beforeEach(async () => {
     unblockUser = unblockUserService({
-      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient, pubsub: mockPubSub }
+      components: { db: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient, pubsub: mockPubSub }
     })
 
     mockClient = (await mockPg.getPool().connect()) as jest.Mocked<PoolClient>
-    mockDb.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
+    mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
 
     blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
     mockProfile = createMockProfile(blockedAddress)
@@ -38,7 +38,7 @@ describe('unblockUserService', () => {
     }
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
 
     const response = await unblockUser(request, rpcContext)
 
@@ -50,9 +50,9 @@ describe('unblockUserService', () => {
         }
       }
     })
-    expect(mockDb.unblockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
-    expect(mockDb.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
-    expect(mockDb.recordFriendshipAction).toHaveBeenCalledWith(
+    expect(mockFriendsDB.unblockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
+    expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
+    expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
       expect.any(String),
       rpcContext.address,
       Action.DELETE,
@@ -67,7 +67,7 @@ describe('unblockUserService', () => {
     }
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.getFriendship.mockResolvedValueOnce(null)
+    mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
 
     const response = await unblockUser(request, rpcContext)
 
@@ -78,9 +78,9 @@ describe('unblockUserService', () => {
       }
     })
 
-    expect(mockDb.unblockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
-    expect(mockDb.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
-    expect(mockDb.recordFriendshipAction).not.toHaveBeenCalled()
+    expect(mockFriendsDB.unblockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
+    expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
+    expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
   })
 
   it('should publish a friendship update event after unblocking a user if friendship exists', async () => {
@@ -89,8 +89,8 @@ describe('unblockUserService', () => {
     }
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    mockDb.recordFriendshipAction.mockResolvedValueOnce('action-id')
+    mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
 
     await unblockUser(request, rpcContext)
 
@@ -109,7 +109,7 @@ describe('unblockUserService', () => {
     }
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
 
     await unblockUser(request, rpcContext)
 
@@ -133,7 +133,7 @@ describe('unblockUserService', () => {
         invalidRequest: { message: 'Cannot unblock yourself' }
       }
     })
-    expect(mockDb.unblockUser).not.toHaveBeenCalled()
+    expect(mockFriendsDB.unblockUser).not.toHaveBeenCalled()
   })
 
   it('should return invalidRequest when user address is missing', async () => {
@@ -149,7 +149,7 @@ describe('unblockUserService', () => {
         invalidRequest: { message: 'Invalid user address in the request payload' }
       }
     })
-    expect(mockDb.unblockUser).not.toHaveBeenCalled()
+    expect(mockFriendsDB.unblockUser).not.toHaveBeenCalled()
   })
 
   it('should return invalidRequest when user address is invalid', async () => {
@@ -165,7 +165,7 @@ describe('unblockUserService', () => {
         invalidRequest: { message: 'Invalid user address in the request payload' }
       }
     })
-    expect(mockDb.unblockUser).not.toHaveBeenCalled()
+    expect(mockFriendsDB.unblockUser).not.toHaveBeenCalled()
   })
 
   it('should return profileNotFound when profile is not found', async () => {
@@ -183,7 +183,7 @@ describe('unblockUserService', () => {
         profileNotFound: { message: `Profile not found for address ${blockedAddress}` }
       }
     })
-    expect(mockDb.unblockUser).not.toHaveBeenCalled()
+    expect(mockFriendsDB.unblockUser).not.toHaveBeenCalled()
   })
 
   it('should handle database errors', async () => {
@@ -193,7 +193,7 @@ describe('unblockUserService', () => {
     const error = new Error('Database error')
 
     mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockDb.unblockUser.mockRejectedValueOnce(error)
+    mockFriendsDB.unblockUser.mockRejectedValueOnce(error)
 
     const response = await unblockUser(request, rpcContext)
 
