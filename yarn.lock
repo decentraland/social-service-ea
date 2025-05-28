@@ -756,6 +756,15 @@
     "@well-known-components/fetch-component" "^2.0.2"
     "@well-known-components/interfaces" "^1.4.2"
 
+"@dcl/platform-server-commons@^0.0.5":
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/@dcl/platform-server-commons/-/platform-server-commons-0.0.5.tgz#2eaaef2125a699b08be93fe3402c2f4771ad3fe5"
+  integrity sha512-ATMZ57rEx6rAZzN5SSkgAHyqKPfuLN0tpnljERGTUegbUNjFxjrxaVzIz+r2UeW8lTIYaUl1sxhTt7udBDp+Qw==
+  dependencies:
+    "@well-known-components/http-server" "^2.1.0"
+    "@well-known-components/interfaces" "^1.4.3"
+    node-fetch "^2.7.0"
+
 "@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-14523877809.commit-39c10e9.tgz":
   version "1.0.0-14523877809.commit-39c10e9"
   resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-14523877809.commit-39c10e9.tgz#1b4c1def324bb1df32d67c31b5c4e37d0a93958e"
@@ -4480,7 +4489,7 @@ nock@^14.0.1:
     json-stringify-safe "^5.0.1"
     propagate "^2.0.0"
 
-node-fetch@^2.6.12, node-fetch@^2.6.9:
+node-fetch@^2.6.12, node-fetch@^2.6.9, node-fetch@^2.7.0:
   version "2.7.0"
   resolved "https://registry.npmjs.org/node-fetch/-/node-fetch-2.7.0.tgz"
   integrity sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==
