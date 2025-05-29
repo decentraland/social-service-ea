@@ -1,9 +1,10 @@
 import SQL from 'sql-template-strings'
-import { AppComponents, ICommunitiesDatabaseComponent, Pagination, CommunityRole } from '../types'
-import { Community, CommunityWithMembersCount, CommunityDB } from '../logic/community'
+import { AppComponents, ICommunitiesDatabaseComponent, CommunityRole } from '../types'
+import { Community, CommunityDB, GetCommunitiesOptions, CommunityWithMembersCountAndFriends } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
 import { randomUUID } from 'node:crypto'
+import { useCTEs, getUserFriendsCTE, searchCommunitiesQuery } from '../logic/queries'
 
 export function createCommunitiesDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs'>
@@ -62,45 +63,102 @@ export function createCommunitiesDBComponent(
       return result.rows.map((row) => row.place)
     },
 
-    async getCommunities(memberAddress: string, options?: { pagination?: Pagination }) {
-      const { pagination = { limit: 10, offset: 0 } } = options ?? {}
-      const query = SQL`
-        SELECT 
-          id,
-          name,
-          description,
-          owner_address as ownerAddress,
-          role,
-          CASE WHEN private THEN 'private' ELSE 'public' END as privacy,
-          active,
-          (SELECT COUNT(DISTINCT cm.member_address) 
-            FROM community_members cm
-            LEFT JOIN community_bans cb ON cm.member_address = cb.banned_address 
-                AND cb.community_id = cm.community_id
-                AND cb.active = true
-            WHERE cm.community_id = communities.id
-            AND cb.banned_address IS NULL) as membersCount
-        FROM communities WHERE active = true
-        LEFT JOIN community_members cm ON communities.id = cm.community_id AND cm.member_address = ${normalizeAddress(memberAddress)}
-        LEFT JOIN community_bans cb ON communities.id = cb.community_id AND cb.banned_address = ${normalizeAddress(memberAddress)}
+    async getCommunities(memberAddress: string, options?: GetCommunitiesOptions) {
+      const normalizedMemberAddress = normalizeAddress(memberAddress)
+      const { pagination, search } = options ?? {}
+      const { limit, offset } = pagination ?? {}
+
+      const communitiesWithMembersCountCTE = SQL`
+        SELECT c.id, COUNT(cm.member_address) as "membersCount"
+        FROM communities c
+        LEFT JOIN community_members cm ON c.id = cm.community_id
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
         WHERE cb.banned_address IS NULL
-        ORDER BY membersCount DESC
-        LIMIT ${pagination.limit}
-        OFFSET ${pagination.offset}
+          AND c.active = true
+        GROUP BY c.id
       `
-      const result = await pg.query<CommunityWithMembersCount>(query)
+
+      const communityFriendsCTE = SQL`
+        SELECT 
+          c.id as community_id,
+          (
+            SELECT array_agg(address ORDER BY address)
+            FROM (
+              SELECT DISTINCT uf.address
+              FROM user_friends uf
+              JOIN community_members cm ON cm.member_address = uf.address
+              WHERE cm.community_id = c.id
+              LIMIT 3
+            ) subq
+          ) as friends
+        FROM communities c
+        WHERE c.active = true
+      `
+
+      const query = useCTEs([
+        getUserFriendsCTE(normalizedMemberAddress),
+        {
+          query: communitiesWithMembersCountCTE,
+          name: 'communities_with_members_count'
+        },
+        {
+          query: communityFriendsCTE,
+          name: 'community_friends'
+        }
+      ]).append(
+        SQL`
+        SELECT 
+          c.id,
+          c.name,
+          c.description,
+          c.owner_address as "ownerAddress",
+          COALESCE(cm.role, ${CommunityRole.None}) as role,
+          CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
+          c.active,
+          cwmc."membersCount",
+          COALESCE(cf.friends, ARRAY[]::text[]) as friends
+        FROM communities c
+        LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
+        LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
+        LEFT JOIN community_friends cf ON c.id = cf.community_id
+        WHERE cb.banned_address IS NULL AND c.active = true`
+      )
+
+      if (search) {
+        query.append(searchCommunitiesQuery(search))
+      }
+
+      query.append(SQL` ORDER BY "membersCount" DESC`)
+
+      if (limit) {
+        query.append(SQL` LIMIT ${limit}`)
+      }
+
+      if (offset) {
+        query.append(SQL` OFFSET ${offset}`)
+      }
+
+      const result = await pg.query<CommunityWithMembersCountAndFriends>(query)
       return result.rows
     },
 
-    async getCommunitiesCount(memberAddress: string) {
+    async getCommunitiesCount(memberAddress: string, options?: Pick<GetCommunitiesOptions, 'search'>) {
+      const { search } = options ?? {}
+      const normalizedMemberAddress = normalizeAddress(memberAddress)
+
       const query = SQL`
         SELECT COUNT(*)
           FROM communities c
-          LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizeAddress(memberAddress)}
-          LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizeAddress(memberAddress)}
+          LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
         WHERE cb.banned_address IS NULL
           AND c.active = true
       `
+
+      if (search) {
+        query.append(searchCommunitiesQuery(search))
+      }
+
       const result = await pg.query<{ count: number }>(query)
       return Number(result.rows[0].count)
     },

@@ -30,7 +30,8 @@ export function createAuthHeaders(
   identity: Identity
 ): Record<string, string> {
   const signer = signedHeaderFactory()
-  const signedHeaders = signer(identity.authChain, method, path, metadata)
+  const basePath = path.split('?')[0]
+  const signedHeaders = signer(identity.authChain, method, basePath, metadata)
 
   return Object.fromEntries(signedHeaders.entries())
 }

@@ -109,7 +109,7 @@ export async function initComponents(): Promise<AppComponents> {
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
-  const community = createCommunityComponent({ communitiesDb })
+  const community = createCommunityComponent({ communitiesDb, catalystClient })
 
   return {
     archipelagoStats,

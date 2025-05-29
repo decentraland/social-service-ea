@@ -2,29 +2,27 @@ import {
   Community,
   CommunityWithMembersCount,
   isOwner,
-  toCommunityWithMembersCount
+  toCommunityWithMembersCount,
+  toCommunityResult,
+  toCommunityResults
 } from '../../../src/logic/community'
 import { CommunityRole } from '../../../src/types/entities'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { createCommunityComponent, CommunityNotFoundError, ICommunityComponent } from '../../../src/logic/community'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
+import { mockCatalystClient } from '../../mocks/components/catalyst-client'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { mockProfile, createMockProfile } from '../../mocks/profile'
+import { CommunityWithMembersCountAndFriends } from '../../../src/logic/community/types'
+import { parseExpectedFriends } from '../../mocks/friend'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
-  let mockCommunity: {
-    id: string
-    name: string
-    description: string
-    ownerAddress: string
-    privacy: 'public'
-    active: boolean
-    role: CommunityRole
-  }
+  let mockCommunity: Community
   let mockUserAddress: string
   let mockMembersCount: number
 
   beforeEach(() => {
-    jest.clearAllMocks()
     mockCommunity = {
       id: 'test-id',
       name: 'Test Community',
@@ -36,7 +34,92 @@ describe('when handling community operations', () => {
     }
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockMembersCount = 5
-    communityComponent = createCommunityComponent({ communitiesDb: mockCommunitiesDB })
+    communityComponent = createCommunityComponent({
+      communitiesDb: mockCommunitiesDB,
+      catalystClient: mockCatalystClient
+    })
+  })
+
+  describe('and getting communities', () => {
+    const mockCommunities = [
+      {
+        ...mockCommunity,
+        membersCount: 5,
+        friends: ['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222']
+      },
+      {
+        ...mockCommunity,
+        id: 'test-id-2',
+        membersCount: 3,
+        friends: ['0x3333333333333333333333333333333333333333']
+      }
+    ]
+
+    const mockProfiles: Profile[] = [
+      createMockProfile('0x1111111111111111111111111111111111111111'),
+      createMockProfile('0x2222222222222222222222222222222222222222')
+    ]
+
+    beforeEach(() => {
+      mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunities)
+      mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(2)
+      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+    })
+
+    it('should return communities with friends profiles', async () => {
+      const result = await communityComponent.getCommunities(mockUserAddress, { pagination: { limit: 10, offset: 0 } })
+
+      expect(result).toEqual({
+        communities: expect.arrayContaining([
+          expect.objectContaining({
+            ...mockCommunities[0],
+            friends: mockProfiles.map(parseExpectedFriends())
+          }),
+          expect.objectContaining({
+            ...mockCommunities[1],
+            friends: []
+          })
+        ]),
+        total: 2
+      })
+    })
+
+    it('should fetch communities from the database', async () => {
+      await communityComponent.getCommunities(mockUserAddress, { pagination: { limit: 10, offset: 0 } })
+
+      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(mockUserAddress, {
+        pagination: { limit: 10, offset: 0 }
+      })
+    })
+
+    it('should fetch the total count from the database', async () => {
+      await communityComponent.getCommunities(mockUserAddress, { pagination: { limit: 10, offset: 0 } })
+
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(mockUserAddress, {})
+    })
+
+    it('should fetch friend profiles from catalyst', async () => {
+      await communityComponent.getCommunities(mockUserAddress, { pagination: { limit: 10, offset: 0 } })
+
+      expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([
+        '0x1111111111111111111111111111111111111111',
+        '0x2222222222222222222222222222222222222222',
+        '0x3333333333333333333333333333333333333333'
+      ])
+    })
+
+    it('should handle search parameter', async () => {
+      await communityComponent.getCommunities(mockUserAddress, {
+        pagination: { limit: 10, offset: 0 },
+        search: 'test'
+      })
+
+      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(mockUserAddress, {
+        pagination: { limit: 10, offset: 0 },
+        search: 'test'
+      })
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(mockUserAddress, { search: 'test' })
+    })
   })
 
   describe('and getting a community', () => {
@@ -209,6 +292,95 @@ describe('Community Utils', () => {
       expect(result.active).toBe(mockCommunity.active)
       expect(result.role).toBe(mockCommunity.role)
       expect(result.membersCount).toBe(3)
+    })
+  })
+
+  describe('toCommunityResult', () => {
+    const mockCommunity: CommunityWithMembersCountAndFriends = {
+      id: 'test-id',
+      name: 'Test Community',
+      description: 'Test Description',
+      ownerAddress: '0x1234567890123456789012345678901234567890',
+      privacy: 'public',
+      active: true,
+      role: CommunityRole.None,
+      membersCount: 5,
+      friends: ['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222']
+    }
+
+    const mockProfiles: Profile[] = [
+      createMockProfile('0x1111111111111111111111111111111111111111'),
+      createMockProfile('0x2222222222222222222222222222222222222222')
+    ]
+
+    it('should convert community with friends to CommunityResult', () => {
+      const profilesMap = new Map(mockProfiles.map((profile) => [profile.avatars[0].userId, profile]))
+      const result = toCommunityResult(mockCommunity, profilesMap)
+
+      expect(result).toEqual({
+        ...mockCommunity,
+        friends: [parseExpectedFriends()(mockProfiles[0]), parseExpectedFriends()(mockProfiles[1])],
+        isLive: false
+      })
+    })
+
+    it('should handle missing friend profiles', () => {
+      const profilesMap = new Map([[mockProfiles[0].avatars[0].userId, mockProfiles[0]]])
+      const result = toCommunityResult(mockCommunity, profilesMap)
+
+      expect(result.friends).toHaveLength(1)
+      expect(result.friends[0].address).toBe('0x1111111111111111111111111111111111111111')
+    })
+  })
+
+  describe('toCommunityResults', () => {
+    const mockCommunities: CommunityWithMembersCountAndFriends[] = [
+      {
+        id: 'test-id-1',
+        name: 'Test Community 1',
+        description: 'Test Description 1',
+        ownerAddress: '0x1234567890123456789012345678901234567890',
+        privacy: 'public',
+        active: true,
+        role: CommunityRole.None,
+        membersCount: 5,
+        friends: ['0x1111111111111111111111111111111111111111']
+      },
+      {
+        id: 'test-id-2',
+        name: 'Test Community 2',
+        description: 'Test Description 2',
+        ownerAddress: '0x1234567890123456789012345678901234567890',
+        privacy: 'public',
+        active: true,
+        role: CommunityRole.None,
+        membersCount: 3,
+        friends: ['0x2222222222222222222222222222222222222222']
+      }
+    ]
+
+    const mockProfiles: Profile[] = [
+      createMockProfile('0x1111111111111111111111111111111111111111'),
+      createMockProfile('0x2222222222222222222222222222222222222222')
+    ]
+
+    it('should convert multiple communities with friends to CommunityResults', () => {
+      const results = toCommunityResults(mockCommunities, mockProfiles)
+
+      expect(results).toHaveLength(2)
+      expect(results[0].friends).toHaveLength(1)
+      expect(results[0].friends[0]).toEqual(parseExpectedFriends()(mockProfiles[0]))
+      expect(results[1].friends).toHaveLength(1)
+      expect(results[1].friends[0]).toEqual(parseExpectedFriends()(mockProfiles[1]))
+    })
+
+    it('should handle empty friends array', () => {
+      const communitiesWithNoFriends = mockCommunities.map((c) => ({ ...c, friends: [] }))
+      const results = toCommunityResults(communitiesWithNoFriends, mockProfiles)
+
+      expect(results).toHaveLength(2)
+      expect(results[0].friends).toHaveLength(0)
+      expect(results[1].friends).toHaveLength(0)
     })
   })
 })

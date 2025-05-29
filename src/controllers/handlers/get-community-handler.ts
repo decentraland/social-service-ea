@@ -1,10 +1,10 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
-import { messageErrorOrUnknown } from '../../utils/errors'
+import { errorMessageOrDefault } from '../../utils/errors'
 import { CommunityNotFoundError, CommunityWithMembersCount } from '../../logic/community'
 
 export async function getCommunityHandler(
   context: Pick<
-    HandlerContextWithPath<'logs' | 'community', '/communities/:id'>,
+    HandlerContextWithPath<'logs' | 'community', '/v1/communities/:id'>,
     'url' | 'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse<CommunityWithMembersCount>> {
@@ -27,7 +27,7 @@ export async function getCommunityHandler(
       }
     }
   } catch (error) {
-    const message = messageErrorOrUnknown(error)
+    const message = errorMessageOrDefault(error)
     logger.error(`Error getting community: ${id}, error: ${message}`)
 
     if (error instanceof CommunityNotFoundError) {
