@@ -194,5 +194,5 @@ export interface ICommunityMembersComponent {
   getCommunityMembers(
     communityId: string,
     pagination?: Required<PaginatedParameters>
-  ): Promise<{ totalMembers: number; members: CommunityMember[] } | undefined>
+  ): Promise<{ totalMembers: number; members: Omit<CommunityMember, 'communityId'>[] } | undefined>
 }

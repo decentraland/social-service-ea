@@ -63,9 +63,8 @@ export type FriendshipRequest = {
 }
 
 export type CommunityMember = {
-  id: string
   communityId: string
-  memberAddress: string
+  address: string
   role: CommunityMemberRole
   joinedAt: string
 }

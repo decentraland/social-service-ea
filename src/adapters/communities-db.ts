@@ -24,7 +24,7 @@ export function createCommunitiesDBComponent(
       SELECT 
         cm.id,
         cm.community_id AS "communityId",
-        cm.member_address AS "memberAddress",
+        cm.member_address AS "address",
         cm.role,
         cm.joined_at AS "joinedAt"
       FROM community_members cm
