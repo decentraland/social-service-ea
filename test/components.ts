@@ -2,7 +2,10 @@
 // Here we define the test components to be used in the testing environment
 
 import { resolve } from 'path'
-import { createRunner, createLocalFetchCompoment } from '@well-known-components/test-helpers'
+import {
+  createRunner,
+  createLocalFetchCompoment as createLocalFetchComponent
+} from '@well-known-components/test-helpers'
 import { createConfigComponent, createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createLogComponent } from '@well-known-components/logger'
@@ -117,7 +120,8 @@ async function initComponents(): Promise<TestComponents> {
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
-  const localFetch = await createLocalFetchCompoment(uwsHttpServerConfig)
+  const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
+  const localHttpFetch = await createLocalFetchComponent(config)
 
   const rpcClient = await createRpcClientComponent({ config, logs })
 
@@ -131,7 +135,8 @@ async function initComponents(): Promise<TestComponents> {
     friendsDb,
     communitiesDb,
     fetcher,
-    localFetch,
+    localUwsFetch,
+    localHttpFetch,
     logs,
     metrics,
     nats,

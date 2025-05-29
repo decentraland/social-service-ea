@@ -20,6 +20,7 @@ import {
   SocialSettings,
   User
 } from './entities'
+import { Community, CommunityDB, CommunityWithMembersCount } from '../logic/community/types'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
 
@@ -98,7 +99,15 @@ export interface IFriendsDatabaseComponent {
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
 
-export interface ICommunitiesDatabaseComponent {}
+export interface ICommunitiesDatabaseComponent {
+  getCommunity(id: string, userAddress: string): Promise<Community | null>
+  getCommunityPlaces(communityId: string): Promise<string[]>
+  getCommunityMembersCount(communityId: string): Promise<number>
+  getCommunities(memberAddress: string, options?: { pagination?: Pagination }): Promise<CommunityWithMembersCount[]>
+  getCommunitiesCount(memberAddress: string): Promise<number>
+  createCommunity(community: CommunityDB): Promise<{ id: string }>
+  deleteCommunity(id: string): Promise<void>
+}
 
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>

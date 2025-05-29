@@ -2,9 +2,9 @@ import { test } from '../components'
 
 test('status handler', function ({ components }) {
   it('GET /status returns 200', async () => {
-    const { localFetch } = components
+    const { localUwsFetch } = components
 
-    const response = await localFetch.fetch('/status')
+    const response = await localUwsFetch.fetch('/status')
 
     expect(response.status).toEqual(200)
     expect(await response.json()).toEqual({
