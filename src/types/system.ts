@@ -29,6 +29,7 @@ import {
   IStatusCheckComponent,
   ICommunitiesDatabaseComponent
 } from './components'
+import { ICommunityComponent } from '../logic/community'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -36,30 +37,31 @@ export type GlobalContext = {
 
 // components used in every environment
 export type BaseComponents = {
-  config: IConfigComponent
-  logs: ILoggerComponent
-  uwsServer: IUWsComponent
-  httpServer: IHttpServerComponent<GlobalContext>
-  metrics: IMetricsComponent<keyof typeof metricDeclarations>
-  pg: IPgComponent
-  friendsDb: IFriendsDatabaseComponent
-  communitiesDb: ICommunitiesDatabaseComponent
-  rpcServer: IRPCServerComponent
-  fetcher: IFetchComponent
-  redis: IRedisComponent & ICacheComponent
-  pubsub: IPubSubComponent
   archipelagoStats: IArchipelagoStatsComponent
-  worldsStats: IWorldsStatsComponent
-  peersSynchronizer: IPeersSynchronizer
+  catalystClient: ICatalystClientComponent
+  commsGatekeeper: ICommsGatekeeperComponent
+  community: ICommunityComponent
+  communitiesDb: ICommunitiesDatabaseComponent
+  config: IConfigComponent
+  fetcher: IFetchComponent
+  friendsDb: IFriendsDatabaseComponent
+  httpServer: IHttpServerComponent<GlobalContext>
+  logs: ILoggerComponent
+  metrics: IMetricsComponent<keyof typeof metricDeclarations>
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
-  catalystClient: ICatalystClientComponent
+  peersSynchronizer: IPeersSynchronizer
+  pg: IPgComponent
+  pubsub: IPubSubComponent
+  redis: IRedisComponent & ICacheComponent
+  rpcServer: IRPCServerComponent
   sns: IPublisherComponent
-  wsPool: IWSPoolComponent
+  statusChecks: IStatusCheckComponent
   subscribersContext: ISubscribersContext
   tracing: ITracingComponent
-  commsGatekeeper: ICommsGatekeeperComponent
-  statusChecks: IStatusCheckComponent
+  uwsServer: IUWsComponent
+  worldsStats: IWorldsStatsComponent
+  wsPool: IWSPoolComponent
 }
 
 // components used in runtime

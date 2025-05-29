@@ -1,13 +1,38 @@
-import { Community, CommunityWithMembersCount } from './types'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { AppComponents } from '../../types'
+import { CommunityNotFoundError } from './errors'
+import { ICommunityComponent } from './types'
+import { isOwner, toCommunityWithMembersCount } from './utils'
 
-export const isOwner = (community: Community, userAddress: string) => {
-  return community.ownerAddress.toLowerCase() === userAddress.toLowerCase()
-}
+export function createCommunityComponent(components: Pick<AppComponents, 'communitiesDb'>): ICommunityComponent {
+  const { communitiesDb } = components
 
-export const toCommunityWithMembersCount = (community: Community, membersCount: number): CommunityWithMembersCount => {
   return {
-    ...community,
-    ownerAddress: community.ownerAddress,
-    membersCount: Number(membersCount)
+    getCommunity: async (id: string, userAddress: string) => {
+      const [community, membersCount] = await Promise.all([
+        communitiesDb.getCommunity(id, userAddress),
+        communitiesDb.getCommunityMembersCount(id)
+      ])
+
+      if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      return toCommunityWithMembersCount(community, membersCount)
+    },
+
+    deleteCommunity: async (id: string, userAddress: string) => {
+      const community = await communitiesDb.getCommunity(id, userAddress)
+
+      if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      if (!isOwner(community, userAddress)) {
+        throw new NotAuthorizedError("The user doesn't have permission to delete this community")
+      }
+
+      await communitiesDb.deleteCommunity(id)
+    }
   }
 }

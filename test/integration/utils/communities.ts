@@ -1,4 +1,4 @@
-import { CommunityDB } from '../../../src/types'
+import { CommunityDB } from '../../../src/logic/community'
 import { ICommunitiesDatabaseComponent } from '../../../src/types'
 
 export async function createCommunity(communitiesDb: ICommunitiesDatabaseComponent, community: CommunityDB) {

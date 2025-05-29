@@ -1,15 +1,15 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { messageErrorOrUnknown } from '../../utils/errors'
-import { CommunityNotFoundError, CommunityWithMembersCount, toCommunityWithMembersCount } from '../../logic/community'
+import { CommunityNotFoundError, CommunityWithMembersCount } from '../../logic/community'
 
 export async function getCommunityHandler(
   context: Pick<
-    HandlerContextWithPath<'logs' | 'communitiesDb', '/communities/:id'>,
+    HandlerContextWithPath<'logs' | 'community', '/communities/:id'>,
     'url' | 'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse<CommunityWithMembersCount>> {
   const {
-    components: { communitiesDb, logs },
+    components: { community, logs },
     params: { id },
     verification
   } = context
@@ -19,19 +19,11 @@ export async function getCommunityHandler(
 
   try {
     const userAddress = verification!.auth.toLowerCase()
-    const [community, membersCount] = await Promise.all([
-      communitiesDb.getCommunity(id, userAddress),
-      communitiesDb.getCommunityMembersCount(id)
-    ])
-
-    if (!community) {
-      throw new CommunityNotFoundError(id)
-    }
 
     return {
       status: 200,
       body: {
-        data: toCommunityWithMembersCount(community, membersCount)
+        data: await community.getCommunity(id, userAddress)
       }
     }
   } catch (error) {
