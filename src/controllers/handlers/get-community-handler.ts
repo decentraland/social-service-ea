@@ -16,7 +16,7 @@ export async function getCommunityHandler(
     verification
   } = context
   const userAddress = verification?.auth.toLowerCase()
-  const logger = logs.getLogger('privacy-handler')
+  const logger = logs.getLogger('get-community-handler')
 
   logger.info(`Getting community: ${id}`)
 

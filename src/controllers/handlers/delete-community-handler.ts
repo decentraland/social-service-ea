@@ -15,7 +15,7 @@ export async function deleteCommunityHandler(
     params: { id },
     verification
   } = context
-  const logger = logs.getLogger('privacy-handler')
+  const logger = logs.getLogger('delete-community-handler')
   logger.info(`Deleting community: ${id}`)
 
   const userAddress = verification?.auth.toLowerCase()
