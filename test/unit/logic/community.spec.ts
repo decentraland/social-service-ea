@@ -1,5 +1,10 @@
-import { Community, CommunityRole, CommunityWithMembersCount } from '../../../src/types'
-import { isOwner, toCommunityWithMembersCount } from '../../../src/logic/community'
+import {
+  Community,
+  CommunityWithMembersCount,
+  isOwner,
+  toCommunityWithMembersCount
+} from '../../../src/logic/community'
+import { CommunityRole } from '../../../src/types/entities'
 
 describe('Community Utils', () => {
   describe('isOwner', () => {

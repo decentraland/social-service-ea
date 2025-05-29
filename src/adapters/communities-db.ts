@@ -1,13 +1,7 @@
 import SQL from 'sql-template-strings'
-import {
-  AppComponents,
-  ICommunitiesDatabaseComponent,
-  Community,
-  Pagination,
-  CommunityWithMembersCount,
-  CommunityRole,
-  CommunityDB
-} from '../types'
+import { AppComponents, ICommunitiesDatabaseComponent, Pagination, CommunityRole } from '../types'
+import { Community, CommunityWithMembersCount, CommunityDB } from '../logic/community'
+
 import { normalizeAddress } from '../utils/address'
 import { randomUUID } from 'node:crypto'
 

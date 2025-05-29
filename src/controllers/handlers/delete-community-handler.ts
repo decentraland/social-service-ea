@@ -1,6 +1,6 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { messageErrorOrUnknown } from '../../utils/errors'
-import { CommunityNotFoundError } from '../../adapters/errors'
+import { CommunityNotFoundError } from '../../logic/community/errors'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { isOwner } from '../../logic/community'
 

@@ -1,4 +1,4 @@
-import { Community, CommunityWithMembersCount } from '../types'
+import { Community, CommunityWithMembersCount } from './types'
 
 export const isOwner = (community: Community, userAddress: string) => {
   return community.ownerAddress.toLowerCase() === userAddress.toLowerCase()

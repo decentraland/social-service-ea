@@ -13,9 +13,6 @@ import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-t
 import {
   Action,
   BlockUserWithDate,
-  Community,
-  CommunityDB,
-  CommunityWithMembersCount,
   Friendship,
   FriendshipAction,
   FriendshipRequest,
@@ -23,6 +20,7 @@ import {
   SocialSettings,
   User
 } from './entities'
+import { Community, CommunityDB, CommunityWithMembersCount } from '../logic/community/types'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
 
