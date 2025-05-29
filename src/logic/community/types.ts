@@ -1,5 +1,10 @@
 import { CommunityRole } from '../../types/entities'
 
+export type ICommunityComponent = {
+  getCommunity: (id: string, userAddress: string) => Promise<CommunityWithMembersCount>
+  deleteCommunity: (id: string, userAddress: string) => Promise<void>
+}
+
 export type CommunityDB = {
   id?: string
   name: string

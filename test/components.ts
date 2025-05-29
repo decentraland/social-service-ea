@@ -35,6 +35,7 @@ import { mockPeersSynchronizer } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
+import { createCommunityComponent } from '../src/logic/community'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -119,6 +120,7 @@ async function initComponents(): Promise<TestComponents> {
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+  const community = createCommunityComponent({ communitiesDb })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
   const localHttpFetch = await createLocalFetchComponent(config)
@@ -126,17 +128,17 @@ async function initComponents(): Promise<TestComponents> {
   const rpcClient = await createRpcClientComponent({ config, logs })
 
   return {
-    statusChecks,
-    httpServer,
-    commsGatekeeper,
     archipelagoStats,
     catalystClient,
-    config,
-    friendsDb,
+    commsGatekeeper,
     communitiesDb,
+    community,
+    config,
     fetcher,
-    localUwsFetch,
+    friendsDb,
+    httpServer,
     localHttpFetch,
+    localUwsFetch,
     logs,
     metrics,
     nats,
@@ -147,10 +149,11 @@ async function initComponents(): Promise<TestComponents> {
     redis,
     rpcClient,
     rpcServer,
-    uwsServer,
     sns,
+    statusChecks,
     subscribersContext,
     tracing: mockTracing,
+    uwsServer,
     worldsStats,
     wsPool
   }
