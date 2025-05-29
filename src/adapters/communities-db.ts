@@ -9,15 +9,12 @@ import {
   CommunityDB
 } from '../types'
 import { normalizeAddress } from '../utils/address'
-import { CommunityNotFoundError } from './errors'
 import { randomUUID } from 'node:crypto'
 
 export function createCommunitiesDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs'>
 ): ICommunitiesDatabaseComponent {
-  const { pg, logs } = components
-
-  const logger = logs.getLogger('communities-db-component')
+  const { pg } = components
 
   return {
     async getCommunity(id: string, userAddress: string) {
@@ -35,17 +32,12 @@ export function createCommunitiesDBComponent(
         WHERE c.id = ${id} AND c.active = true`
 
       const result = await pg.query<Community>(query)
-
-      if (result.rows.length === 0) {
-        throw new CommunityNotFoundError(`Community not found: ${id}`)
-      }
-
       return result.rows[0]
     },
 
     async getCommunityMembersCount(communityId) {
       const query = SQL`
-        SELECT COUNT(DISTINCT cm.member_address) 
+        SELECT COUNT(cm.member_address) 
           FROM community_members cm
           LEFT JOIN community_bans cb ON cm.member_address = cb.banned_address 
               AND cb.community_id = cm.community_id
@@ -131,11 +123,7 @@ export function createCommunitiesDBComponent(
 
     async deleteCommunity(id) {
       const query = SQL`UPDATE communities SET active = false WHERE id = ${id}`
-      const result = await pg.query(query)
-
-      if (result.rowCount === 0) {
-        throw new CommunityNotFoundError(`Community not found: ${id}`)
-      }
+      await pg.query(query)
     }
   }
 }

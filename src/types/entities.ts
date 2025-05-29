@@ -69,8 +69,10 @@ export type Pagination = {
 
 export type CommunityPermission =
   | 'edit_info'
-  | 'add_remove_places'
-  | 'accept_reject_requests'
+  | 'add_places'
+  | 'remove_places'
+  | 'accept_requests'
+  | 'reject_requests'
   | 'ban_players'
   | 'send_invitations'
   | 'edit_settings'
@@ -107,9 +109,4 @@ export type Community = {
 
 export type CommunityWithMembersCount = Community & {
   membersCount: number
-}
-
-export type CommunityPlace = {
-  position: string
-  world_name: string
 }

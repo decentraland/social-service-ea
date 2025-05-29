@@ -2,8 +2,10 @@ import { CommunityRole, CommunityPermission } from '../types/entities'
 
 export const OWNER_PERMISSIONS: CommunityPermission[] = [
   'edit_info',
-  'add_remove_places',
-  'accept_reject_requests',
+  'add_places',
+  'remove_places',
+  'accept_requests',
+  'reject_requests',
   'ban_players',
   'send_invitations',
   'edit_settings',
@@ -13,8 +15,10 @@ export const OWNER_PERMISSIONS: CommunityPermission[] = [
 
 export const MODERATOR_PERMISSIONS: CommunityPermission[] = [
   'edit_info',
-  'add_remove_places',
-  'accept_reject_requests',
+  'add_places',
+  'remove_places',
+  'accept_requests',
+  'reject_requests',
   'ban_players',
   'send_invitations'
 ]

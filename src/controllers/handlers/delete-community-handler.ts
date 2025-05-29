@@ -16,16 +16,16 @@ export async function deleteCommunityHandler(
     verification
   } = context
   const logger = logs.getLogger('delete-community-handler')
+
   logger.info(`Deleting community: ${id}`)
 
-  const userAddress = verification?.auth.toLowerCase()
-
-  if (!userAddress) {
-    throw new NotAuthorizedError('Unauthorized')
-  }
-
   try {
+    const userAddress = verification!.auth.toLowerCase()
     const community = await communitiesDb.getCommunity(id, userAddress)
+
+    if (!community) {
+      throw new CommunityNotFoundError(id)
+    }
 
     if (!isOwner(community, userAddress)) {
       throw new NotAuthorizedError("The user doesn't have permission to delete this community")
@@ -37,20 +37,18 @@ export async function deleteCommunityHandler(
       status: 204
     }
   } catch (error) {
-    logger.error(`Error getting community: ${id}, error: ${messageErrorOrUnknown(error)}`)
+    const message = messageErrorOrUnknown(error)
 
-    if (error instanceof CommunityNotFoundError) {
-      throw error
-    }
+    logger.error(`Error deleting community: ${id}, error: ${message}`)
 
-    if (error instanceof NotAuthorizedError) {
+    if (error instanceof CommunityNotFoundError || error instanceof NotAuthorizedError) {
       throw error
     }
 
     return {
       status: 500,
       body: {
-        message: messageErrorOrUnknown(error)
+        message
       }
     }
   }

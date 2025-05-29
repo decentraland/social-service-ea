@@ -102,7 +102,7 @@ export interface IFriendsDatabaseComponent {
 }
 
 export interface ICommunitiesDatabaseComponent {
-  getCommunity(id: string, userAddress: string): Promise<Community>
+  getCommunity(id: string, userAddress: string): Promise<Community | null>
   getCommunityPlaces(communityId: string): Promise<string[]>
   getCommunityMembersCount(communityId: string): Promise<number>
   getCommunities(memberAddress: string, options?: { pagination?: Pagination }): Promise<CommunityWithMembersCount[]>
