@@ -1,11 +1,11 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
-import { messageErrorOrUnknown } from '../../utils/errors'
+import { errorMessageOrDefault } from '../../utils/errors'
 import { CommunityNotFoundError } from '../../logic/community/errors'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 
 export async function deleteCommunityHandler(
   context: Pick<
-    HandlerContextWithPath<'community' | 'logs', '/communities/:id'>,
+    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
@@ -27,7 +27,7 @@ export async function deleteCommunityHandler(
       status: 204
     }
   } catch (error) {
-    const message = messageErrorOrUnknown(error)
+    const message = errorMessageOrDefault(error)
 
     logger.error(`Error deleting community: ${id}, error: ${message}`)
 

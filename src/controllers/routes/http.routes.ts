@@ -2,6 +2,7 @@ import { Router } from '@well-known-components/http-server'
 import { GlobalContext } from '../../types'
 import { errorHandler } from '@dcl/platform-server-commons'
 import { getCommunityHandler } from '../handlers/get-community-handler'
+import { getCommunitiesHandler } from '../handlers/get-communities-handler'
 import { deleteCommunityHandler } from '../handlers/delete-community-handler'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 
@@ -25,6 +26,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.use(errorHandler)
 
   router.get('/v1/communities/:id', signedFetchMiddleware(false), getCommunityHandler)
+  router.get('/v1/communities', signedFetchMiddleware(true), getCommunitiesHandler)
   router.delete('/v1/communities/:id', signedFetchMiddleware(false), deleteCommunityHandler)
 
   return router

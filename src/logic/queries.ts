@@ -66,7 +66,7 @@ export function useCTEs(CTEs: { query: SQLStatement | string; name: string }[]) 
  * @param userAddress - The address of the user
  * @returns A CTE for the user's friends
  */
-function getUserFriendsCTE(userAddress: string) {
+export function getUserFriendsCTE(userAddress: string) {
   const normalizedUserAddress = normalizeAddress(userAddress)
   return {
     query: SQL`SELECT DISTINCT
@@ -262,4 +262,9 @@ export function getMutualFriendsBaseQuery(
   }
 
   return query
+}
+
+export function searchCommunitiesQuery(search: string) {
+  // TODO: enhance the search to include the description using the full text search or pg score
+  return SQL` AND (c.name ILIKE ${`%${search}%`} OR c.description ILIKE ${`%${search}%`})`
 }
