@@ -1,12 +1,12 @@
-import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { getPaginationParams } from '@dcl/platform-server-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
-import { CommunityResult } from '../../logic/community'
+import { CommunityResult, GetCommunitiesOptions, PublicCommunity } from '../../logic/community'
 
 export async function getCommunitiesHandler(
   context: Pick<HandlerContextWithPath<'community' | 'logs', '/v1/communities'>, 'components' | 'url' | 'verification'>
-): Promise<HTTPResponse<PaginatedResponse<CommunityResult>>> {
+): Promise<HTTPResponse<PaginatedResponse<CommunityResult | PublicCommunity>>> {
   const {
     components: { community, logs },
     verification,
@@ -15,21 +15,16 @@ export async function getCommunitiesHandler(
   const logger = logs.getLogger('get-communities-handler')
 
   logger.info(`Getting communities`)
+
   const userAddress = verification?.auth.toLowerCase()
   const pagination = getPaginationParams(url.searchParams)
   const search = url.searchParams.get('search')
 
-  if (!userAddress) {
-    // TODO: we should allow it for discovery reasons
-    throw new NotAuthorizedError('User address is required')
-  }
-
   try {
-    // TODO: based on the request verification we should get the communities for the user or the public communities
-    const { communities, total } = await community.getCommunities(userAddress, {
-      pagination,
-      search
-    })
+    const options: GetCommunitiesOptions = { pagination, search }
+    const { communities, total } = userAddress
+      ? await community.getCommunities(userAddress, options)
+      : await community.getPublicCommunities(options)
 
     return {
       status: 200,

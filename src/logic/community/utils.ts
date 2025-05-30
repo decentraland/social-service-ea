@@ -1,18 +1,38 @@
 import { parseProfilesToFriends } from '../friends'
 import { getProfileUserId } from '../profiles'
-import { Community, CommunityResult, CommunityWithMembersCount, CommunityWithMembersCountAndFriends } from './types'
+import {
+  Community,
+  CommunityResult,
+  CommunityWithMembersCount,
+  CommunityWithMembersCountAndFriends,
+  PublicCommunity
+} from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 export const isOwner = (community: Community, userAddress: string) => {
   return community.ownerAddress.toLowerCase() === userAddress.toLowerCase()
 }
 
-export const toCommunityWithMembersCount = (community: Community, membersCount: number): CommunityWithMembersCount => {
+const withMembersCount = <T extends { membersCount: number | string }>(community: T): T & { membersCount: number } => {
   return {
     ...community,
-    ownerAddress: community.ownerAddress,
-    membersCount: Number(membersCount)
+    membersCount: Number(community.membersCount)
   }
+}
+
+const toBaseCommunity = <T extends { membersCount: number | string }>(community: T): T & { isLive: boolean } => {
+  return {
+    ...withMembersCount(community),
+    isLive: false // TODO: calculate this in the future
+  }
+}
+
+export const toCommunityWithMembersCount = (community: Community, membersCount: number): CommunityWithMembersCount => {
+  return withMembersCount({
+    ...community,
+    ownerAddress: community.ownerAddress,
+    membersCount
+  })
 }
 
 export const toCommunityResult = (
@@ -23,10 +43,8 @@ export const toCommunityResult = (
   const friends = parseProfilesToFriends(friendsProfiles)
 
   return {
-    ...community,
-    membersCount: Number(community.membersCount),
-    friends,
-    isLive: false // TODO: calculate this in the future
+    ...toBaseCommunity(community),
+    friends
   }
 }
 
@@ -36,4 +54,8 @@ export const toCommunityResults = (
 ): CommunityResult[] => {
   const profilesMap = new Map(friendsProfiles.map((profile) => [getProfileUserId(profile), profile]))
   return communities.map((community) => toCommunityResult(community, profilesMap))
+}
+
+export const toPublicCommunity = (community: PublicCommunity): PublicCommunity => {
+  return toBaseCommunity(community)
 }
