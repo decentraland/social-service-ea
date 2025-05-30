@@ -10,7 +10,7 @@ export const mockPg: jest.Mocked<IPgComponent> = {
     connect: jest.fn().mockResolvedValue({ query: jest.fn(), release: jest.fn() })
   }),
   stop: jest.fn(),
-  getCountFromQuery: jest.fn().mockImplementation(async (query: SQLStatement) => {
+  getCount: jest.fn().mockImplementation(async (query: SQLStatement) => {
     const result = await mockPg.query(query)
     return result.rows[0].count
   }),

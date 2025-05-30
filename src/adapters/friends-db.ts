@@ -37,7 +37,7 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
   function getFriendshipRequestsCount(type: FriendshipRequestType) {
     return async (userAddress: string) => {
       const query = getFriendshipRequestsBaseQuery(userAddress, type, { onlyCount: true })
-      return pg.getCountFromQuery(query)
+      return pg.getCount(query)
     }
   }
 
@@ -54,7 +54,7 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
     },
     async getFriendsCount(userAddress, { onlyActive } = { onlyActive: true }) {
       const query: SQLStatement = getFriendsBaseQuery(userAddress, { onlyActive, onlyCount: true })
-      return pg.getCountFromQuery(query)
+      return pg.getCount(query)
     },
     async getMutualFriends(userAddress1, userAddress2, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }) {
       const query = getMutualFriendsBaseQuery(userAddress1, userAddress2, { pagination })
@@ -63,7 +63,7 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
     },
     async getMutualFriendsCount(userAddress1, userAddress2) {
       const query = getMutualFriendsBaseQuery(userAddress1, userAddress2, { onlyCount: true })
-      return pg.getCountFromQuery(query)
+      return pg.getCount(query)
     },
     async getFriendship(users, txClient) {
       const [userAddress1, userAddress2] = users.map(normalizeAddress)

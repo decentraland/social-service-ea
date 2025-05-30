@@ -205,7 +205,7 @@ export type IWebSocketComponent = IBaseComponent & {
 export type IStatusCheckComponent = IBaseComponent
 
 export interface IPgComponent extends IBasePgComponent {
-  getCountFromQuery(query: SQLStatement): Promise<number>
+  getCount(query: SQLStatement): Promise<number>
   withTransaction<T>(
     callback: (client: PoolClient) => Promise<T>,
     onError?: (error: unknown) => Promise<void>

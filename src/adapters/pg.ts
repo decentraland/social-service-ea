@@ -10,7 +10,7 @@ export async function createPgComponent(
 ): Promise<IPgComponent & IBaseComponent> {
   const pg = await createBasePgComponent(components, options)
 
-  async function getCountFromQuery(query: SQLStatement) {
+  async function getCount(query: SQLStatement) {
     const result = await pg.query<{ count: number }>(query)
     return result.rows[0].count
   }
@@ -38,5 +38,5 @@ export async function createPgComponent(
     }
   }
 
-  return { ...pg, getCountFromQuery, withTransaction }
+  return { ...pg, getCount, withTransaction }
 }

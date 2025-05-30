@@ -97,7 +97,7 @@ describe('when getting count from query', () => {
   })
 
   it('should return the count from the query result', async () => {
-    const count = await pg.getCountFromQuery(mockQuery)
+    const count = await pg.getCount(mockQuery)
     expect(count).toBe(mockCount)
     expect(mockPg.query).toHaveBeenCalledWith(mockQuery)
   })

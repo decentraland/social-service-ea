@@ -58,7 +58,7 @@ export function createCommunitiesDBComponent(
                   AND c.active = true
               )
       `
-      return pg.getCountFromQuery(query)
+      return pg.getCount(query)
     },
 
     async getCommunityPlaces(communityId: string) {
@@ -146,7 +146,7 @@ export function createCommunitiesDBComponent(
         query.append(searchCommunitiesQuery(search))
       }
 
-      return pg.getCountFromQuery(query)
+      return pg.getCount(query)
     },
 
     async getPublicCommunities(options: GetCommunitiesOptions) {
@@ -187,7 +187,7 @@ export function createCommunitiesDBComponent(
         query.append(searchCommunitiesQuery(search))
       }
 
-      return pg.getCountFromQuery(query)
+      return pg.getCount(query)
     },
 
     async createCommunity(community: CommunityDB) {
