@@ -2,11 +2,11 @@ import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import {
-  CommunityResult,
+  CommunityWithUserInformation,
   GetCommunitiesOptions,
-  GetCommunitiesResult,
+  GetCommunitiesWithTotal,
   ICommunityComponent,
-  PublicCommunity
+  CommunityPublicInformation
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 
@@ -32,7 +32,7 @@ export function createCommunityComponent(
     getCommunities: async (
       userAddress: string,
       { pagination, search }: GetCommunitiesOptions
-    ): Promise<GetCommunitiesResult<CommunityResult>> => {
+    ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>> => {
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunities(userAddress, { pagination, search }),
         communitiesDb.getCommunitiesCount(userAddress, { search })
@@ -45,10 +45,12 @@ export function createCommunityComponent(
       }
     },
 
-    getPublicCommunities: async (options: GetCommunitiesOptions): Promise<GetCommunitiesResult<PublicCommunity>> => {
+    getCommunitiesPublicInformation: async (
+      options: GetCommunitiesOptions
+    ): Promise<GetCommunitiesWithTotal<CommunityPublicInformation>> => {
       const { search } = options
       const [communities, total] = await Promise.all([
-        communitiesDb.getPublicCommunities(options),
+        communitiesDb.getCommunitiesPublicInformation(options),
         communitiesDb.getPublicCommunitiesCount({ search })
       ])
 

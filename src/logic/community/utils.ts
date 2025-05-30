@@ -2,10 +2,10 @@ import { parseProfilesToFriends } from '../friends'
 import { getProfileUserId } from '../profiles'
 import {
   Community,
-  CommunityResult,
+  CommunityWithUserInformation,
   CommunityWithMembersCount,
   CommunityWithMembersCountAndFriends,
-  PublicCommunity
+  CommunityPublicInformation
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
@@ -35,10 +35,10 @@ export const toCommunityWithMembersCount = (community: Community, membersCount: 
   })
 }
 
-export const toCommunityResult = (
+export const toCommunityWithUserInformation = (
   community: CommunityWithMembersCountAndFriends,
   profilesMap: Map<string, Profile>
-): CommunityResult => {
+): CommunityWithUserInformation => {
   const friendsProfiles = community.friends.map((friend) => profilesMap.get(friend)).filter(Boolean) as Profile[]
   const friends = parseProfilesToFriends(friendsProfiles)
 
@@ -51,11 +51,11 @@ export const toCommunityResult = (
 export const toCommunityResults = (
   communities: CommunityWithMembersCountAndFriends[],
   friendsProfiles: Profile[]
-): CommunityResult[] => {
+): CommunityWithUserInformation[] => {
   const profilesMap = new Map(friendsProfiles.map((profile) => [getProfileUserId(profile), profile]))
-  return communities.map((community) => toCommunityResult(community, profilesMap))
+  return communities.map((community) => toCommunityWithUserInformation(community, profilesMap))
 }
 
-export const toPublicCommunity = (community: PublicCommunity): PublicCommunity => {
+export const toPublicCommunity = (community: CommunityPublicInformation): CommunityPublicInformation => {
   return toBaseCommunity(community)
 }

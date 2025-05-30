@@ -66,11 +66,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
 
     afterEach(async () => {
       await components.pg.query(SQL`
-          DELETE FROM communities WHERE id IN (${communityId1}, ${communityId2})
-        `)
+        DELETE FROM community_members WHERE community_id IN (${communityId1}, ${communityId2})
+      `)
       await components.pg.query(SQL`
-          DELETE FROM community_members WHERE community_id IN (${communityId1}, ${communityId2})
-        `)
+        DELETE FROM communities WHERE id IN (${communityId1}, ${communityId2})
+      `)
       await removeFriendship(components.friendsDb, friendshipId1, address)
       await removeFriendship(components.friendsDb, friendshipId2, address)
     })

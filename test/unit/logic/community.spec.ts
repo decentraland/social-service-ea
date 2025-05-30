@@ -3,10 +3,10 @@ import {
   CommunityWithMembersCount,
   isOwner,
   toCommunityWithMembersCount,
-  toCommunityResult,
+  toCommunityWithUserInformation,
   toCommunityResults,
   toPublicCommunity,
-  PublicCommunity
+  CommunityPublicInformation
 } from '../../../src/logic/community'
 import { CommunityRole } from '../../../src/types/entities'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
@@ -125,7 +125,7 @@ describe('when handling community operations', () => {
   })
 
   describe('and getting public communities', () => {
-    const mockPublicCommunities: PublicCommunity[] = [
+    const mockPublicCommunities: CommunityPublicInformation[] = [
       {
         id: 'test-id',
         name: 'Test Community',
@@ -149,12 +149,12 @@ describe('when handling community operations', () => {
     ]
 
     beforeEach(() => {
-      mockCommunitiesDB.getPublicCommunities.mockResolvedValue(mockPublicCommunities)
+      mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockPublicCommunities)
       mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(2)
     })
 
     it('should return public communities', async () => {
-      const result = await communityComponent.getPublicCommunities({ pagination: { limit: 10, offset: 0 } })
+      const result = await communityComponent.getCommunitiesPublicInformation({ pagination: { limit: 10, offset: 0 } })
 
       expect(result).toEqual({
         communities: expect.arrayContaining([
@@ -174,26 +174,26 @@ describe('when handling community operations', () => {
     })
 
     it('should fetch public communities from the database', async () => {
-      await communityComponent.getPublicCommunities({ pagination: { limit: 10, offset: 0 } })
+      await communityComponent.getCommunitiesPublicInformation({ pagination: { limit: 10, offset: 0 } })
 
-      expect(mockCommunitiesDB.getPublicCommunities).toHaveBeenCalledWith({
+      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith({
         pagination: { limit: 10, offset: 0 }
       })
     })
 
     it('should fetch the total count from the database', async () => {
-      await communityComponent.getPublicCommunities({ pagination: { limit: 10, offset: 0 } })
+      await communityComponent.getCommunitiesPublicInformation({ pagination: { limit: 10, offset: 0 } })
 
       expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({})
     })
 
     it('should handle search parameter', async () => {
-      await communityComponent.getPublicCommunities({
+      await communityComponent.getCommunitiesPublicInformation({
         pagination: { limit: 10, offset: 0 },
         search: 'test'
       })
 
-      expect(mockCommunitiesDB.getPublicCommunities).toHaveBeenCalledWith({
+      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith({
         pagination: { limit: 10, offset: 0 },
         search: 'test'
       })
@@ -392,9 +392,9 @@ describe('Community Utils', () => {
       createMockProfile('0x2222222222222222222222222222222222222222')
     ]
 
-    it('should convert community with friends to CommunityResult', () => {
+    it('should convert community with friends to CommunityWithUserInformation', () => {
       const profilesMap = new Map(mockProfiles.map((profile) => [profile.avatars[0].userId, profile]))
-      const result = toCommunityResult(mockCommunity, profilesMap)
+      const result = toCommunityWithUserInformation(mockCommunity, profilesMap)
 
       expect(result).toEqual({
         ...mockCommunity,
@@ -405,7 +405,7 @@ describe('Community Utils', () => {
 
     it('should handle missing friend profiles', () => {
       const profilesMap = new Map([[mockProfiles[0].avatars[0].userId, mockProfiles[0]]])
-      const result = toCommunityResult(mockCommunity, profilesMap)
+      const result = toCommunityWithUserInformation(mockCommunity, profilesMap)
 
       expect(result.friends).toHaveLength(1)
       expect(result.friends[0].address).toBe('0x1111111111111111111111111111111111111111')
@@ -464,7 +464,7 @@ describe('Community Utils', () => {
   })
 
   describe('toPublicCommunity', () => {
-    const mockPublicCommunity: PublicCommunity = {
+    const mockPublicCommunity: CommunityPublicInformation = {
       id: 'test-id',
       name: 'Test Community',
       description: 'Test Description',

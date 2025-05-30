@@ -6,8 +6,10 @@ export type ICommunityComponent = {
   getCommunities: (
     userAddress: string,
     options: GetCommunitiesOptions
-  ) => Promise<GetCommunitiesResult<CommunityResult>>
-  getPublicCommunities: (options: GetCommunitiesOptions) => Promise<GetCommunitiesResult<PublicCommunity>>
+  ) => Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>>
+  getCommunitiesPublicInformation: (
+    options: GetCommunitiesOptions
+  ) => Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
   deleteCommunity: (id: string, userAddress: string) => Promise<void>
 }
 
@@ -48,16 +50,16 @@ export type GetCommunitiesOptions = {
   sortBy?: 'membersCount'
 }
 
-export type CommunityResult = CommunityWithMembersCount & {
+export type CommunityWithUserInformation = CommunityWithMembersCount & {
   friends: FriendProfile[]
   isLive: boolean
 }
 
-export type PublicCommunity = Omit<CommunityResult, 'role' | 'friends' | 'privacy'> & {
+export type CommunityPublicInformation = Omit<CommunityWithUserInformation, 'role' | 'friends' | 'privacy'> & {
   privacy: 'public'
 }
 
-export type GetCommunitiesResult<T> = {
+export type GetCommunitiesWithTotal<T> = {
   communities: T[]
   total: number
 }

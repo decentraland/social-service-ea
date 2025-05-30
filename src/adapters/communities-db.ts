@@ -5,7 +5,7 @@ import {
   CommunityDB,
   GetCommunitiesOptions,
   CommunityWithMembersCountAndFriends,
-  PublicCommunity
+  CommunityPublicInformation
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -149,7 +149,7 @@ export function createCommunitiesDBComponent(
       return pg.getCount(query)
     },
 
-    async getPublicCommunities(options: GetCommunitiesOptions) {
+    async getCommunitiesPublicInformation(options: GetCommunitiesOptions) {
       const baseQuery = useCTEs([getCommunitiesWithMembersCountCTE({ onlyPublic: true })]).append(
         SQL`
         SELECT 
@@ -170,7 +170,7 @@ export function createCommunitiesDBComponent(
         ...options
       })
 
-      const result = await pg.query<PublicCommunity>(query)
+      const result = await pg.query<CommunityPublicInformation>(query)
       return result.rows
     },
 
