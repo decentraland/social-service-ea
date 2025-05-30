@@ -217,3 +217,8 @@ export interface IPgComponent extends IBasePgComponent {
     onError?: (error: unknown) => Promise<void>
   ): Promise<T>
 }
+
+export interface ICommunitiesDbHelperComponent {
+  forceCommunityRemoval: (communityId: string) => Promise<void>
+  forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
+}

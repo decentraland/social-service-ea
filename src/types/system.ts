@@ -27,10 +27,10 @@ import {
   ICacheComponent,
   IStatusCheckComponent,
   ICommunitiesDatabaseComponent,
-  IPgComponent
+  IPgComponent,
+  ICommunitiesDbHelperComponent
 } from './components'
 import { ICommunityComponent } from '../logic/community'
-import { ICommunitiesDbHelperComponent } from '../../test/helpers/community-db-helper'
 
 export type GlobalContext = {
   components: BaseComponents
