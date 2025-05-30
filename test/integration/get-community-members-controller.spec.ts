@@ -111,6 +111,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 ethAddress: addressMakingRequest,
                 hasClaimedName: false,
                 name: '',
+                unclaimedName: 'Test User 4'
               }
             ]
           }
@@ -165,11 +166,11 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 memberAddress: addressMakingRequest,
                 hasClaimedName: false,
                 joinedAt: expect.any(String),
-                name: '',
+                name: 'Test User 4',
                 role: 'member',
               },
             ],
-            total: '4',
+            total: 4
           }
         })
       })
@@ -200,7 +201,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 role: 'member',
               },
             ],
-            total: '4',
+            total: 4,
           }
         })
       })
