@@ -12,6 +12,7 @@ import {
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { PaginatedParameters } from '@dcl/schemas'
+import { getProfileHasClaimedName, getProfileName } from '../profiles'
 
 export function createCommunityComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'catalystClient'>
@@ -99,26 +100,23 @@ export function createCommunityComponent(
 
       const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
 
-      const membersWithProfile: CommunityMemberProfile[] = communityMembers.map((communityMember) => {
-        const memberProfile = profiles.find(
-          (profile) => profile.avatars?.[0]?.ethAddress?.toLowerCase() === communityMember.memberAddress.toLowerCase()
-        )
+      const membersWithProfile: CommunityMemberProfile[] = communityMembers
+        .map((communityMember) => {
+          const memberProfile = profiles.find(
+            (profile) => profile.avatars?.[0]?.ethAddress?.toLowerCase() === communityMember.memberAddress.toLowerCase()
+          )
 
-        if (!memberProfile || !memberProfile.avatars?.[0]) {
+          if (!memberProfile) {
+            return undefined
+          }
+
           return {
             ...communityMember,
-            hasClaimedName: false,
-            name: ''
+            hasClaimedName: getProfileHasClaimedName(memberProfile),
+            name: getProfileName(memberProfile)
           }
-        }
-
-        const avatar = memberProfile.avatars[0]
-        return {
-          ...communityMember,
-          hasClaimedName: !!avatar.hasClaimedName,
-          name: avatar.name || avatar.unclaimedName || ''
-        }
-      })
+        })
+        .filter((member: CommunityMemberProfile | undefined): member is CommunityMemberProfile => member !== undefined)
 
       return { members: membersWithProfile, totalMembers }
     }

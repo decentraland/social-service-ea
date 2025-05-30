@@ -67,6 +67,7 @@ export function createCommunitiesDBComponent(
           AND cb.active = true
         WHERE cm.community_id = ${id}
           AND cb.banned_address IS NULL
+        ORDER BY cm.joined_at ASC
       `
 
       query.append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
