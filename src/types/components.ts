@@ -14,6 +14,7 @@ import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-t
 import {
   Action,
   BlockUserWithDate,
+  CommunityRole,
   Friendship,
   FriendshipAction,
   FriendshipRequest,
@@ -24,6 +25,7 @@ import {
 import {
   Community,
   CommunityDB,
+  CommunityMember,
   CommunityWithMembersCountAndFriends,
   GetCommunitiesOptions,
   CommunityPublicInformation
@@ -108,7 +110,10 @@ export interface IFriendsDatabaseComponent {
 }
 
 export interface ICommunitiesDatabaseComponent {
+  communityExists(communityId: string): Promise<boolean>
   getCommunity(id: string, userAddress: string): Promise<Community | null>
+  getCommunityMembers(id: string, pagination: Pagination): Promise<CommunityMember[]>
+  getCommunityMemberRole(id: string, userAddress: string): Promise<CommunityRole>
   getCommunityPlaces(communityId: string): Promise<string[]>
   getCommunityMembersCount(communityId: string): Promise<number>
   getCommunities(memberAddress: string, options: GetCommunitiesOptions): Promise<CommunityWithMembersCountAndFriends[]>
@@ -117,6 +122,7 @@ export interface ICommunitiesDatabaseComponent {
   getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
   createCommunity(community: CommunityDB): Promise<{ id: string }>
   deleteCommunity(id: string): Promise<void>
+  addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
 }
 
 export interface IRedisComponent extends IBaseComponent {

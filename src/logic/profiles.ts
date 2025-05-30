@@ -10,11 +10,11 @@ export function getProfileAvatarItem(profile: Pick<Profile, 'avatars'>): Profile
 }
 
 export function getProfileName(profile: Pick<Profile, 'avatars'>): string {
-  const { name } = getProfileAvatarItem(profile)
+  const { name, unclaimedName } = getProfileAvatarItem(profile)
 
-  if (!name) throw new Error('Missing profile avatar name')
+  if (!name && !unclaimedName) throw new Error('Missing profile avatar name')
 
-  return name
+  return name || unclaimedName!
 }
 
 export function getProfileUserId(profile: Pick<Profile, 'avatars'>): string {

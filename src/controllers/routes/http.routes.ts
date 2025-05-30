@@ -5,6 +5,7 @@ import { getCommunityHandler } from '../handlers/get-community-handler'
 import { getCommunitiesHandler } from '../handlers/get-communities-handler'
 import { deleteCommunityHandler } from '../handlers/delete-community-handler'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
+import { getCommunityMembersHandler } from '../handlers/get-community-members-handlers'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -13,7 +14,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   const router = new Router<GlobalContext>()
 
-  const signedFetchMiddleware = (optional: boolean = false) =>
+  const signedFetchMiddleware = ({ optional = false }: { optional?: boolean } = {}) =>
     wellKnownComponents({
       fetcher,
       optional,
@@ -25,9 +26,11 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.use(errorHandler)
 
-  router.get('/v1/communities/:id', signedFetchMiddleware(false), getCommunityHandler)
-  router.get('/v1/communities', signedFetchMiddleware(true), getCommunitiesHandler)
-  router.delete('/v1/communities/:id', signedFetchMiddleware(false), deleteCommunityHandler)
+  router.get('/v1/communities/:id', signedFetchMiddleware(), getCommunityHandler)
+  router.get('/v1/communities', signedFetchMiddleware({ optional: true }), getCommunitiesHandler)
+  router.delete('/v1/communities/:id', signedFetchMiddleware(), deleteCommunityHandler)
+
+  router.get('/v1/communities/:id/members', signedFetchMiddleware(), getCommunityMembersHandler)
 
   return router
 }

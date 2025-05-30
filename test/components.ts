@@ -36,6 +36,7 @@ import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
 import { createCommunityComponent } from '../src/logic/community'
+import { createDbHelper } from './helpers/community-db-helper'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -127,6 +128,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const rpcClient = await createRpcClientComponent({ config, logs })
 
+  const communitiesDbHelper = createDbHelper(pg)
+
   return {
     archipelagoStats,
     catalystClient,
@@ -155,6 +158,7 @@ async function initComponents(): Promise<TestComponents> {
     tracing: mockTracing,
     uwsServer,
     worldsStats,
-    wsPool
+    wsPool,
+    communitiesDbHelper
   }
 }

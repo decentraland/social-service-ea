@@ -62,6 +62,7 @@ export type FriendshipRequest = {
   metadata: Record<string, any> | null
 }
 
+// TODO: Use PaginatedParameters from @dcl/schemas
 export type Pagination = {
   limit: number
   offset: number

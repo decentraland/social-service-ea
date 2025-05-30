@@ -53,11 +53,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
       // Add members to the communities using SQL directly since there's no addMember method
       // TODO: Add a method to add members to the communities db
       await components.pg.query(SQL`
-          INSERT INTO community_members (id, community_id, member_address, role)
+          INSERT INTO community_members (community_id, member_address, role)
           VALUES 
-            (${randomUUID()}, ${communityId1}, ${friendAddress1}, ${CommunityRole.Member}),
-            (${randomUUID()}, ${communityId1}, ${friendAddress2}, ${CommunityRole.Member}),
-            (${randomUUID()}, ${communityId2}, ${friendAddress1}, ${CommunityRole.Member})
+            (${communityId1}, ${friendAddress1}, ${CommunityRole.Member}),
+            (${communityId1}, ${friendAddress2}, ${CommunityRole.Member}),
+            (${communityId2}, ${friendAddress1}, ${CommunityRole.Member})
         `)
 
       friendshipId1 = await createOrUpsertActiveFriendship(components.friendsDb, [address, friendAddress1])
