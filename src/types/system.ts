@@ -30,6 +30,7 @@ import {
   IPgComponent
 } from './components'
 import { ICommunityComponent } from '../logic/community'
+import { ICommunitiesDbHelperComponent } from '../../test/helpers/community-db-helper'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -73,4 +74,5 @@ export type TestComponents = BaseComponents & {
   localUwsFetch: IFetchComponent
   localHttpFetch: IFetchComponent
   rpcClient: IRpcClient
+  communitiesDbHelper: ICommunitiesDbHelperComponent
 }

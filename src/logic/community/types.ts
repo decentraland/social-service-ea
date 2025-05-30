@@ -1,5 +1,6 @@
 import { FriendProfile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { CommunityRole, Pagination } from '../../types/entities'
+import { PaginatedParameters } from '@dcl/schemas'
 
 export type ICommunityComponent = {
   getCommunity: (id: string, userAddress: string) => Promise<CommunityWithMembersCount>
@@ -11,6 +12,11 @@ export type ICommunityComponent = {
     options: GetCommunitiesOptions
   ) => Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
   deleteCommunity: (id: string, userAddress: string) => Promise<void>
+  getCommunityMembers: (
+    id: string,
+    userAddress: string,
+    pagination: Required<PaginatedParameters>
+  ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
 }
 
 export type CommunityDB = {
@@ -33,6 +39,18 @@ export type Community = {
   role: CommunityRole
   privacy: 'public' | 'private'
   active: boolean
+}
+
+export type CommunityMember = {
+  communityId: string
+  memberAddress: string
+  role: CommunityRole
+  joinedAt: string
+}
+
+export type CommunityMemberProfile = CommunityMember & {
+  hasClaimedName: boolean
+  name: string
 }
 
 export type CommunityWithMembersCount = Community & {
@@ -62,4 +80,12 @@ export type CommunityPublicInformation = Omit<CommunityWithUserInformation, 'rol
 export type GetCommunitiesWithTotal<T> = {
   communities: T[]
   total: number
+}
+
+export type GetCommunityMembersResult = {
+  results: CommunityMember[]
+  total: number
+  page: number
+  pages: number
+  limit: number
 }

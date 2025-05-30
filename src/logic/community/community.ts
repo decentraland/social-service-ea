@@ -1,14 +1,17 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
-import { AppComponents } from '../../types'
+import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import {
   CommunityWithUserInformation,
   GetCommunitiesOptions,
   GetCommunitiesWithTotal,
   ICommunityComponent,
-  CommunityPublicInformation
+  CommunityPublicInformation,
+  CommunityWithMembersCount,
+  CommunityMemberProfile
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
+import { PaginatedParameters } from '@dcl/schemas'
 
 export function createCommunityComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'catalystClient'>
@@ -16,7 +19,7 @@ export function createCommunityComponent(
   const { communitiesDb, catalystClient } = components
 
   return {
-    getCommunity: async (id: string, userAddress: string) => {
+    getCommunity: async (id: string, userAddress: string): Promise<CommunityWithMembersCount> => {
       const [community, membersCount] = await Promise.all([
         communitiesDb.getCommunity(id, userAddress),
         communitiesDb.getCommunityMembersCount(id)
@@ -60,7 +63,7 @@ export function createCommunityComponent(
       }
     },
 
-    deleteCommunity: async (id: string, userAddress: string) => {
+    deleteCommunity: async (id: string, userAddress: string): Promise<void> => {
       const community = await communitiesDb.getCommunity(id, userAddress)
 
       if (!community) {
@@ -72,6 +75,52 @@ export function createCommunityComponent(
       }
 
       await communitiesDb.deleteCommunity(id)
+    },
+
+    getCommunityMembers: async (
+      id: string,
+      userAddress: string,
+      pagination: Required<PaginatedParameters>
+    ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
+      const communityExists = await communitiesDb.communityExists(id)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      const memberRole = await communitiesDb.getCommunityMemberRole(id, userAddress)
+
+      if (memberRole === CommunityRole.None) {
+        throw new NotAuthorizedError("The user doesn't have permission to get community members")
+      }
+
+      const communityMembers = await communitiesDb.getCommunityMembers(id, pagination)
+      const totalMembers = await communitiesDb.getCommunityMembersCount(id)
+
+      const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
+
+      const membersWithProfile: CommunityMemberProfile[] = communityMembers.map((communityMember) => {
+        const memberProfile = profiles.find(
+          (profile) => profile.avatars?.[0]?.ethAddress?.toLowerCase() === communityMember.memberAddress.toLowerCase()
+        )
+
+        if (!memberProfile || !memberProfile.avatars?.[0]) {
+          return {
+            ...communityMember,
+            hasClaimedName: false,
+            name: ''
+          }
+        }
+
+        const avatar = memberProfile.avatars[0]
+        return {
+          ...communityMember,
+          hasClaimedName: !!avatar.hasClaimedName,
+          name: avatar.name || avatar.unclaimedName || ''
+        }
+      })
+
+      return { members: membersWithProfile, totalMembers }
     }
   }
 }
