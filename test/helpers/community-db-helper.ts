@@ -1,11 +1,7 @@
 import { IPgComponent } from '@well-known-components/pg-component'
 import SQL from 'sql-template-strings'
 import { normalizeAddress } from '../../src/utils/address'
-
-export type ICommunitiesDbHelperComponent = {
-    forceCommunityRemoval: (communityId: string) => Promise<void>
-    forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
-}
+import { ICommunitiesDbHelperComponent } from '../../src/types/components'
 
 export function createDbHelper(pg: IPgComponent): ICommunitiesDbHelperComponent {
   return {
