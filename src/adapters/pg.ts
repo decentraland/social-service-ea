@@ -12,7 +12,7 @@ export async function createPgComponent(
 
   async function getCount(query: SQLStatement) {
     const result = await pg.query<{ count: number }>(query)
-    return result.rows[0].count
+    return Number(result.rows[0].count)
   }
 
   async function withTransaction<T>(
