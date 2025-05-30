@@ -3,7 +3,13 @@ import { CommunityRole, Pagination } from '../../types/entities'
 
 export type ICommunityComponent = {
   getCommunity: (id: string, userAddress: string) => Promise<CommunityWithMembersCount>
-  getCommunities: (userAddress: string, options: GetCommunitiesOptions) => Promise<GetCommunitiesResult>
+  getCommunities: (
+    userAddress: string,
+    options: GetCommunitiesOptions
+  ) => Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>>
+  getCommunitiesPublicInformation: (
+    options: GetCommunitiesOptions
+  ) => Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
   deleteCommunity: (id: string, userAddress: string) => Promise<void>
 }
 
@@ -40,14 +46,20 @@ export type CommunityWithMembersCountAndFriends = CommunityWithMembersCount & {
 export type GetCommunitiesOptions = {
   pagination: Pagination
   search?: string | null
+  onlyPublic?: boolean
+  sortBy?: 'membersCount'
 }
 
-export type CommunityResult = CommunityWithMembersCount & {
+export type CommunityWithUserInformation = CommunityWithMembersCount & {
   friends: FriendProfile[]
   isLive: boolean
 }
 
-export type GetCommunitiesResult = {
-  communities: CommunityResult[]
+export type CommunityPublicInformation = Omit<CommunityWithUserInformation, 'role' | 'friends' | 'privacy'> & {
+  privacy: 'public'
+}
+
+export type GetCommunitiesWithTotal<T> = {
+  communities: T[]
   total: number
 }

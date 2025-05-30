@@ -1,10 +1,22 @@
 import SQL from 'sql-template-strings'
 import { AppComponents, ICommunitiesDatabaseComponent, CommunityRole } from '../types'
-import { Community, CommunityDB, GetCommunitiesOptions, CommunityWithMembersCountAndFriends } from '../logic/community'
+import {
+  Community,
+  CommunityDB,
+  GetCommunitiesOptions,
+  CommunityWithMembersCountAndFriends,
+  CommunityPublicInformation
+} from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
 import { randomUUID } from 'node:crypto'
-import { useCTEs, getUserFriendsCTE, searchCommunitiesQuery } from '../logic/queries'
+import {
+  useCTEs,
+  getUserFriendsCTE,
+  searchCommunitiesQuery,
+  getCommunitiesWithMembersCountCTE,
+  withSearchAndPagination
+} from '../logic/queries'
 
 export function createCommunitiesDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs'>
@@ -46,8 +58,7 @@ export function createCommunitiesDBComponent(
                   AND c.active = true
               )
       `
-      const result = await pg.query<{ count: number }>(query)
-      return result.rows[0].count
+      return pg.getCount(query)
     },
 
     async getCommunityPlaces(communityId: string) {
@@ -63,20 +74,8 @@ export function createCommunitiesDBComponent(
       return result.rows.map((row) => row.place)
     },
 
-    async getCommunities(memberAddress: string, options?: GetCommunitiesOptions) {
+    async getCommunities(memberAddress: string, options: GetCommunitiesOptions) {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
-      const { pagination, search } = options ?? {}
-      const { limit, offset } = pagination ?? {}
-
-      const communitiesWithMembersCountCTE = SQL`
-        SELECT c.id, COUNT(cm.member_address) as "membersCount"
-        FROM communities c
-        LEFT JOIN community_members cm ON c.id = cm.community_id
-        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
-        WHERE cb.banned_address IS NULL
-          AND c.active = true
-        GROUP BY c.id
-      `
 
       const communityFriendsCTE = SQL`
         SELECT 
@@ -95,12 +94,9 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true
       `
 
-      const query = useCTEs([
+      const baseQuery = useCTEs([
         getUserFriendsCTE(normalizedMemberAddress),
-        {
-          query: communitiesWithMembersCountCTE,
-          name: 'communities_with_members_count'
-        },
+        getCommunitiesWithMembersCountCTE(),
         {
           query: communityFriendsCTE,
           name: 'community_friends'
@@ -125,30 +121,21 @@ export function createCommunitiesDBComponent(
         WHERE cb.banned_address IS NULL AND c.active = true`
       )
 
-      if (search) {
-        query.append(searchCommunitiesQuery(search))
-      }
-
-      query.append(SQL` ORDER BY "membersCount" DESC`)
-
-      if (limit) {
-        query.append(SQL` LIMIT ${limit}`)
-      }
-
-      if (offset) {
-        query.append(SQL` OFFSET ${offset}`)
-      }
+      const query = withSearchAndPagination(baseQuery, {
+        onlyPublic: false,
+        ...options
+      })
 
       const result = await pg.query<CommunityWithMembersCountAndFriends>(query)
       return result.rows
     },
 
-    async getCommunitiesCount(memberAddress: string, options?: Pick<GetCommunitiesOptions, 'search'>) {
+    async getCommunitiesCount(memberAddress: string, options: Pick<GetCommunitiesOptions, 'search'>) {
       const { search } = options ?? {}
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const query = SQL`
-        SELECT COUNT(*)
+        SELECT COUNT(1) as count
           FROM communities c
           LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
         WHERE cb.banned_address IS NULL
@@ -159,8 +146,48 @@ export function createCommunitiesDBComponent(
         query.append(searchCommunitiesQuery(search))
       }
 
-      const result = await pg.query<{ count: number }>(query)
-      return Number(result.rows[0].count)
+      return pg.getCount(query)
+    },
+
+    async getCommunitiesPublicInformation(options: GetCommunitiesOptions) {
+      const baseQuery = useCTEs([getCommunitiesWithMembersCountCTE({ onlyPublic: true })]).append(
+        SQL`
+        SELECT 
+          c.id,
+          c.name,
+          c.description,
+          c.owner_address as "ownerAddress",
+          CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
+          c.active,
+          cwmc."membersCount"
+        FROM communities c
+        LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
+        WHERE c.active = true AND c.private = false`
+      )
+
+      const query = withSearchAndPagination(baseQuery, {
+        onlyPublic: true,
+        ...options
+      })
+
+      const result = await pg.query<CommunityPublicInformation>(query)
+      return result.rows
+    },
+
+    async getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>) {
+      const { search } = options ?? {}
+
+      const query = SQL`
+        SELECT COUNT(1) as count
+          FROM communities c
+        WHERE c.active = true AND c.private = false
+      `
+
+      if (search) {
+        query.append(searchCommunitiesQuery(search))
+      }
+
+      return pg.getCount(query)
     },
 
     async createCommunity(community: CommunityDB) {

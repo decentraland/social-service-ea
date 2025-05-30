@@ -3,8 +3,10 @@ import {
   CommunityWithMembersCount,
   isOwner,
   toCommunityWithMembersCount,
-  toCommunityResult,
-  toCommunityResults
+  toCommunityWithUserInformation,
+  toCommunityResults,
+  toPublicCommunity,
+  CommunityPublicInformation
 } from '../../../src/logic/community'
 import { CommunityRole } from '../../../src/types/entities'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
@@ -12,7 +14,7 @@ import { createCommunityComponent, CommunityNotFoundError, ICommunityComponent }
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockCatalystClient } from '../../mocks/components/catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { mockProfile, createMockProfile } from '../../mocks/profile'
+import { createMockProfile } from '../../mocks/profile'
 import { CommunityWithMembersCountAndFriends } from '../../../src/logic/community/types'
 import { parseExpectedFriends } from '../../mocks/friend'
 
@@ -119,6 +121,83 @@ describe('when handling community operations', () => {
         search: 'test'
       })
       expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(mockUserAddress, { search: 'test' })
+    })
+  })
+
+  describe('and getting public communities', () => {
+    const mockPublicCommunities: CommunityPublicInformation[] = [
+      {
+        id: 'test-id',
+        name: 'Test Community',
+        description: 'Test Description',
+        ownerAddress: '0x1234567890123456789012345678901234567890',
+        privacy: 'public',
+        active: true,
+        membersCount: 5,
+        isLive: false
+      },
+      {
+        id: 'test-id-2',
+        name: 'Test Community 2',
+        description: 'Test Description 2',
+        ownerAddress: '0x1234567890123456789012345678901234567890',
+        privacy: 'public',
+        active: true,
+        membersCount: 3,
+        isLive: false
+      }
+    ]
+
+    beforeEach(() => {
+      mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockPublicCommunities)
+      mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(2)
+    })
+
+    it('should return public communities', async () => {
+      const result = await communityComponent.getCommunitiesPublicInformation({ pagination: { limit: 10, offset: 0 } })
+
+      expect(result).toEqual({
+        communities: expect.arrayContaining([
+          expect.objectContaining({
+            ...mockPublicCommunities[0],
+            membersCount: 5,
+            isLive: false
+          }),
+          expect.objectContaining({
+            ...mockPublicCommunities[1],
+            membersCount: 3,
+            isLive: false
+          })
+        ]),
+        total: 2
+      })
+    })
+
+    it('should fetch public communities from the database', async () => {
+      await communityComponent.getCommunitiesPublicInformation({ pagination: { limit: 10, offset: 0 } })
+
+      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith({
+        pagination: { limit: 10, offset: 0 }
+      })
+    })
+
+    it('should fetch the total count from the database', async () => {
+      await communityComponent.getCommunitiesPublicInformation({ pagination: { limit: 10, offset: 0 } })
+
+      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({})
+    })
+
+    it('should handle search parameter', async () => {
+      await communityComponent.getCommunitiesPublicInformation({
+        pagination: { limit: 10, offset: 0 },
+        search: 'test'
+      })
+
+      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith({
+        pagination: { limit: 10, offset: 0 },
+        search: 'test'
+      })
+      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
     })
   })
 
@@ -313,9 +392,9 @@ describe('Community Utils', () => {
       createMockProfile('0x2222222222222222222222222222222222222222')
     ]
 
-    it('should convert community with friends to CommunityResult', () => {
+    it('should convert community with friends to CommunityWithUserInformation', () => {
       const profilesMap = new Map(mockProfiles.map((profile) => [profile.avatars[0].userId, profile]))
-      const result = toCommunityResult(mockCommunity, profilesMap)
+      const result = toCommunityWithUserInformation(mockCommunity, profilesMap)
 
       expect(result).toEqual({
         ...mockCommunity,
@@ -326,7 +405,7 @@ describe('Community Utils', () => {
 
     it('should handle missing friend profiles', () => {
       const profilesMap = new Map([[mockProfiles[0].avatars[0].userId, mockProfiles[0]]])
-      const result = toCommunityResult(mockCommunity, profilesMap)
+      const result = toCommunityWithUserInformation(mockCommunity, profilesMap)
 
       expect(result.friends).toHaveLength(1)
       expect(result.friends[0].address).toBe('0x1111111111111111111111111111111111111111')
@@ -381,6 +460,56 @@ describe('Community Utils', () => {
       expect(results).toHaveLength(2)
       expect(results[0].friends).toHaveLength(0)
       expect(results[1].friends).toHaveLength(0)
+    })
+  })
+
+  describe('toPublicCommunity', () => {
+    const mockPublicCommunity: CommunityPublicInformation = {
+      id: 'test-id',
+      name: 'Test Community',
+      description: 'Test Description',
+      ownerAddress: '0x1234567890123456789012345678901234567890',
+      privacy: 'public',
+      active: true,
+      membersCount: 5,
+      isLive: false
+    }
+
+    it('should convert community to PublicCommunity', () => {
+      const result = toPublicCommunity(mockPublicCommunity)
+
+      expect(result).toEqual({
+        ...mockPublicCommunity,
+        membersCount: 5,
+        isLive: false
+      })
+    })
+
+    it('should handle string membersCount by converting to number', () => {
+      const communityWithStringCount = {
+        ...mockPublicCommunity,
+        membersCount: 10
+      }
+      const result = toPublicCommunity(communityWithStringCount)
+
+      expect(result).toEqual({
+        ...mockPublicCommunity,
+        membersCount: 10,
+        isLive: false
+      })
+    })
+
+    it('should preserve all community properties', () => {
+      const result = toPublicCommunity(mockPublicCommunity)
+
+      expect(result.id).toBe(mockPublicCommunity.id)
+      expect(result.name).toBe(mockPublicCommunity.name)
+      expect(result.description).toBe(mockPublicCommunity.description)
+      expect(result.ownerAddress).toBe(mockPublicCommunity.ownerAddress)
+      expect(result.privacy).toBe(mockPublicCommunity.privacy)
+      expect(result.active).toBe(mockPublicCommunity.active)
+      expect(result.membersCount).toBe(5)
+      expect(result.isLive).toBe(false)
     })
   })
 })

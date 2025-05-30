@@ -31,35 +31,28 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         createMockProfile(friendAddress1),
         createMockProfile(friendAddress2)
       ])
-    })
 
-    describe('and the request is not signed', () => {
-      it.todo('should respond with a 200 status code and the public communities')
-    })
+      const result1 = await components.communitiesDb.createCommunity(
+        mockCommunity({
+          name: 'Test Community 1',
+          description: 'Test Description 1',
+          owner_address: address
+        })
+      )
+      communityId1 = result1.id
 
-    describe('and the request is signed', () => {
-      beforeEach(async () => {
-        const result1 = await components.communitiesDb.createCommunity(
-          mockCommunity({
-            name: 'Test Community 1',
-            description: 'Test Description 1',
-            owner_address: address
-          })
-        )
-        communityId1 = result1.id
+      const result2 = await components.communitiesDb.createCommunity(
+        mockCommunity({
+          name: 'Test Community 2',
+          description: 'Test Description 2',
+          owner_address: address
+        })
+      )
+      communityId2 = result2.id
 
-        const result2 = await components.communitiesDb.createCommunity(
-          mockCommunity({
-            name: 'Test Community 2',
-            description: 'Test Description 2',
-            owner_address: address
-          })
-        )
-        communityId2 = result2.id
-
-        // Add members to the communities using SQL directly since there's no addMember method
-        // TODO: Add a method to add members to the communities db
-        await components.pg.query(SQL`
+      // Add members to the communities using SQL directly since there's no addMember method
+      // TODO: Add a method to add members to the communities db
+      await components.pg.query(SQL`
           INSERT INTO community_members (id, community_id, member_address, role)
           VALUES 
             (${randomUUID()}, ${communityId1}, ${friendAddress1}, ${CommunityRole.Member}),
@@ -67,21 +60,62 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             (${randomUUID()}, ${communityId2}, ${friendAddress1}, ${CommunityRole.Member})
         `)
 
-        friendshipId1 = await createOrUpsertActiveFriendship(components.friendsDb, [address, friendAddress1])
-        friendshipId2 = await createOrUpsertActiveFriendship(components.friendsDb, [address, friendAddress2])
-      })
+      friendshipId1 = await createOrUpsertActiveFriendship(components.friendsDb, [address, friendAddress1])
+      friendshipId2 = await createOrUpsertActiveFriendship(components.friendsDb, [address, friendAddress2])
+    })
 
-      afterEach(async () => {
-        await components.pg.query(SQL`
-          DELETE FROM communities WHERE id IN (${communityId1}, ${communityId2})
-        `)
-        await components.pg.query(SQL`
-          DELETE FROM community_members WHERE community_id IN (${communityId1}, ${communityId2})
-        `)
-        await removeFriendship(components.friendsDb, friendshipId1, address)
-        await removeFriendship(components.friendsDb, friendshipId2, address)
-      })
+    afterEach(async () => {
+      await components.pg.query(SQL`
+        DELETE FROM community_members WHERE community_id IN (${communityId1}, ${communityId2})
+      `)
+      await components.pg.query(SQL`
+        DELETE FROM communities WHERE id IN (${communityId1}, ${communityId2})
+      `)
+      await removeFriendship(components.friendsDb, friendshipId1, address)
+      await removeFriendship(components.friendsDb, friendshipId2, address)
+    })
 
+    describe('and the request is not signed', () => {
+      it('should respond with a 200 status code and the public communities', async () => {
+        const { localHttpFetch } = components
+        const response = await localHttpFetch.fetch('/v1/communities?limit=10&offset=0&search=test')
+        const body = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(body).toEqual({
+          data: {
+            results: expect.arrayContaining([
+              expect.objectContaining({
+                id: communityId1,
+                name: 'Test Community 1',
+                description: 'Test Description 1',
+                ownerAddress: address,
+                privacy: 'public',
+                active: true,
+                membersCount: 2,
+                isLive: false
+              }),
+              expect.objectContaining({
+                id: communityId2,
+                name: 'Test Community 2',
+                description: 'Test Description 2',
+                ownerAddress: address,
+                privacy: 'public',
+                active: true,
+                membersCount: 1,
+                isLive: false
+              })
+            ]),
+            total: 2,
+            page: 1,
+            pages: 1,
+            limit: 10
+          }
+        })
+      })
+    })
+
+    describe('and the request is signed', () => {
       it('should respond with a 200 status code and the communities', async () => {
         const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&search=test')
         const body = await response.json()

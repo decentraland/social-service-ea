@@ -5,7 +5,6 @@ import type {
   IFetchComponent,
   IHttpServerComponent
 } from '@well-known-components/interfaces'
-import { IPgComponent } from '@well-known-components/pg-component'
 import { metricDeclarations } from '../metrics'
 import { IUWsComponent } from '@well-known-components/uws-http-server'
 import { INatsComponent } from '@well-known-components/nats-component/dist/types'
@@ -27,7 +26,8 @@ import {
   IRpcClient,
   ICacheComponent,
   IStatusCheckComponent,
-  ICommunitiesDatabaseComponent
+  ICommunitiesDatabaseComponent,
+  IPgComponent
 } from './components'
 import { ICommunityComponent } from '../logic/community'
 

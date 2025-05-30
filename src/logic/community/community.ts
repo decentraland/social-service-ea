@@ -1,8 +1,14 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents } from '../../types'
 import { CommunityNotFoundError } from './errors'
-import { GetCommunitiesOptions, GetCommunitiesResult, ICommunityComponent } from './types'
-import { isOwner, toCommunityWithMembersCount, toCommunityResults } from './utils'
+import {
+  CommunityWithUserInformation,
+  GetCommunitiesOptions,
+  GetCommunitiesWithTotal,
+  ICommunityComponent,
+  CommunityPublicInformation
+} from './types'
+import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 
 export function createCommunityComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'catalystClient'>
@@ -26,7 +32,7 @@ export function createCommunityComponent(
     getCommunities: async (
       userAddress: string,
       { pagination, search }: GetCommunitiesOptions
-    ): Promise<GetCommunitiesResult> => {
+    ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>> => {
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunities(userAddress, { pagination, search }),
         communitiesDb.getCommunitiesCount(userAddress, { search })
@@ -35,6 +41,21 @@ export function createCommunityComponent(
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
       return {
         communities: toCommunityResults(communities, friendsProfiles),
+        total
+      }
+    },
+
+    getCommunitiesPublicInformation: async (
+      options: GetCommunitiesOptions
+    ): Promise<GetCommunitiesWithTotal<CommunityPublicInformation>> => {
+      const { search } = options
+      const [communities, total] = await Promise.all([
+        communitiesDb.getCommunitiesPublicInformation(options),
+        communitiesDb.getPublicCommunitiesCount({ search })
+      ])
+
+      return {
+        communities: communities.map(toPublicCommunity),
         total
       }
     },

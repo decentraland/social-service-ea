@@ -1,4 +1,5 @@
 import type { IBaseComponent, ICacheComponent as IBaseCacheComponent } from '@well-known-components/interfaces'
+import { IPgComponent as IBasePgComponent } from '@well-known-components/pg-component'
 import { WebSocketServer } from 'ws'
 import { Emitter } from 'mitt'
 import { Transport } from '@dcl/rpc'
@@ -24,10 +25,12 @@ import {
   Community,
   CommunityDB,
   CommunityWithMembersCountAndFriends,
-  GetCommunitiesOptions
+  GetCommunitiesOptions,
+  CommunityPublicInformation
 } from '../logic/community/types'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
+import { SQLStatement } from 'sql-template-strings'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -108,8 +111,10 @@ export interface ICommunitiesDatabaseComponent {
   getCommunity(id: string, userAddress: string): Promise<Community | null>
   getCommunityPlaces(communityId: string): Promise<string[]>
   getCommunityMembersCount(communityId: string): Promise<number>
-  getCommunities(memberAddress: string, options?: GetCommunitiesOptions): Promise<CommunityWithMembersCountAndFriends[]>
-  getCommunitiesCount(memberAddress: string, options?: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
+  getCommunities(memberAddress: string, options: GetCommunitiesOptions): Promise<CommunityWithMembersCountAndFriends[]>
+  getCommunitiesCount(memberAddress: string, options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
+  getCommunitiesPublicInformation(options: GetCommunitiesOptions): Promise<CommunityPublicInformation[]>
+  getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
   createCommunity(community: CommunityDB): Promise<{ id: string }>
   deleteCommunity(id: string): Promise<void>
 }
@@ -198,3 +203,11 @@ export type IWebSocketComponent = IBaseComponent & {
 }
 
 export type IStatusCheckComponent = IBaseComponent
+
+export interface IPgComponent extends IBasePgComponent {
+  getCount(query: SQLStatement): Promise<number>
+  withTransaction<T>(
+    callback: (client: PoolClient) => Promise<T>,
+    onError?: (error: unknown) => Promise<void>
+  ): Promise<T>
+}

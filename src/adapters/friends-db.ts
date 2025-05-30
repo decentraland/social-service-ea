@@ -24,14 +24,7 @@ import {
 type FriendshipRequestType = 'sent' | 'received'
 
 export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>): IFriendsDatabaseComponent {
-  const { pg, logs } = components
-
-  const logger = logs.getLogger('friends-db-component')
-
-  async function getCount(query: SQLStatement) {
-    const result = await pg.query<{ count: number }>(query)
-    return result.rows[0].count
-  }
+  const { pg } = components
 
   function getFriendshipRequests(type: FriendshipRequestType) {
     return async (userAddress: string, pagination?: Pagination) => {
@@ -44,7 +37,7 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
   function getFriendshipRequestsCount(type: FriendshipRequestType) {
     return async (userAddress: string) => {
       const query = getFriendshipRequestsBaseQuery(userAddress, type, { onlyCount: true })
-      return getCount(query)
+      return pg.getCount(query)
     }
   }
 
@@ -61,7 +54,7 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
     },
     async getFriendsCount(userAddress, { onlyActive } = { onlyActive: true }) {
       const query: SQLStatement = getFriendsBaseQuery(userAddress, { onlyActive, onlyCount: true })
-      return getCount(query)
+      return pg.getCount(query)
     },
     async getMutualFriends(userAddress1, userAddress2, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }) {
       const query = getMutualFriendsBaseQuery(userAddress1, userAddress2, { pagination })
@@ -70,7 +63,7 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
     },
     async getMutualFriendsCount(userAddress1, userAddress2) {
       const query = getMutualFriendsBaseQuery(userAddress1, userAddress2, { onlyCount: true })
-      return getCount(query)
+      return pg.getCount(query)
     },
     async getFriendship(users, txClient) {
       const [userAddress1, userAddress2] = users.map(normalizeAddress)
@@ -294,21 +287,7 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
     },
 
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
-      const pool = pg.getPool()
-      const client = await pool.connect()
-      await client.query('BEGIN')
-
-      try {
-        const res = await cb(client)
-        await client.query('COMMIT')
-        return res
-      } catch (error: any) {
-        logger.error(`Error executing transaction: ${error.message}`)
-        await client.query('ROLLBACK')
-        throw error
-      } finally {
-        client.release()
-      }
+      return pg.withTransaction(cb)
     }
   }
 }

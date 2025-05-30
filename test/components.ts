@@ -11,7 +11,7 @@ import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createLogComponent } from '@well-known-components/logger'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
 import { createFetchComponent } from '@well-known-components/fetch-component'
-import { createPgComponent } from '@well-known-components/pg-component'
+import { createPgComponent } from '../src/adapters/pg'
 
 import { main } from '../src/service'
 import { GlobalContext, TestComponents } from '../src/types'
