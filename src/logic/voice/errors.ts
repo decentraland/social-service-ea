@@ -1,11 +1,17 @@
 export class VoiceCallNotAllowedError extends Error {
   constructor() {
-    super(`The callee or the caller are not accepting voice calls`)
+    super(`The callee or the caller are not accepting voice calls from users that are not friends`)
   }
 }
 
-export class UsersAlreadyInVoiceChatError extends Error {
+export class UserAlreadyInVoiceChatError extends Error {
+  constructor(address: string) {
+    super(`One of the users is already in a voice chat: ${address}`)
+  }
+}
+
+export class UsersAreCallingSomeoneElseError extends Error {
   constructor() {
-    super(`The callee or the caller are already in a voice chat`)
+    super('One of the users is busy calling someone else')
   }
 }

@@ -1,5 +1,5 @@
 import { AppComponents, PrivateMessagesPrivacy } from '../../types'
-import { UsersAlreadyInVoiceChatError, VoiceCallNotAllowedError } from './errors'
+import { UserAlreadyInVoiceChatError, UsersAreCallingSomeoneElseError, VoiceCallNotAllowedError } from './errors'
 import { IVoiceComponent } from './types'
 
 export async function createVoiceComponent({
@@ -34,7 +34,7 @@ export async function createVoiceComponent({
     // Check if the callee or the caller are calling someone else
     const areUsersCallingSomeoneElse = await voiceDb.areUsersBeingCalledOrCallingSomeone([callerAddress, calleeAddress])
     if (areUsersCallingSomeoneElse) {
-      throw new VoiceCallNotAllowedError()
+      throw new UsersAreCallingSomeoneElseError()
     }
 
     // Check if the callee or the caller are in a voice chat
@@ -43,8 +43,10 @@ export async function createVoiceComponent({
       commsGatekeeper.isUserInAVoiceChat(calleeAddress)
     ])
 
-    if (isCalleeInAVoiceChat || isCallerInAVoiceChat) {
-      throw new UsersAlreadyInVoiceChatError()
+    if (isCalleeInAVoiceChat) {
+      throw new UserAlreadyInVoiceChatError(calleeAddress)
+    } else if (isCallerInAVoiceChat) {
+      throw new UserAlreadyInVoiceChatError(callerAddress)
     }
 
     // Records the call intent in the database
