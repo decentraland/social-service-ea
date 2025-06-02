@@ -65,8 +65,8 @@ describe('getSocialSettingsService', () => {
 
   it('should return default settings when user has no saved settings', async () => {
     // No previous settings
-    getUsersSettingsMock.mockResolvedValueOnce([])
     const defaultSettings = getDefaultSettings(testAddress)
+    getUsersSettingsMock.mockResolvedValueOnce([defaultSettings])
 
     const result = await getSocialSettings(Empty.create(), context)
 

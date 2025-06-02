@@ -24,6 +24,8 @@ import {
 } from '../../../src/adapters/pubsub'
 import { mockSns } from '../../mocks/components/sns'
 import * as updates from '../../../src/logic/updates'
+import { createSettingsMockedComponent } from '../../mocks/components/settings'
+import { createVoiceMockedComponent } from '../../mocks/components/voice'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -50,8 +52,12 @@ describe('createRpcServerComponent', () => {
     attachTransportMock = rpcServerMock.attachTransport as jest.Mock
 
     const mockCommsGatekeeper: ICommsGatekeeperComponent = {
-      updateUserPrivateMessagePrivacyMetadata: jest.fn()
+      updateUserPrivateMessagePrivacyMetadata: jest.fn(),
+      isUserInAVoiceChat: jest.fn()
     }
+
+    const mockSettings = createSettingsMockedComponent({})
+    const mockVoice = createVoiceMockedComponent({})
 
     mockTransport = {
       on: jest.fn(),
@@ -71,7 +77,9 @@ describe('createRpcServerComponent', () => {
       sns: mockSns,
       subscribersContext,
       worldsStats: mockWorldsStats,
-      metrics: mockMetrics
+      metrics: mockMetrics,
+      settings: mockSettings,
+      voice: mockVoice
     })
   })
 

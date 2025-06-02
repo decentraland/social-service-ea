@@ -121,7 +121,7 @@ describe('Settings Component', () => {
 
       it('should return an empty array', async () => {
         const result = await settingsComponent.getUsersSettings(addresses)
-        expect(dbMock.getSocialSettings).toHaveBeenCalledWith(addresses)
+        expect(dbMock.getSocialSettings).not.toHaveBeenCalledWith(addresses)
         expect(result).toEqual([])
       })
     })
