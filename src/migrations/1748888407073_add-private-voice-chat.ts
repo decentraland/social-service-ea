@@ -33,14 +33,6 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     }
   })
 
-  // There can't be two private voice chats between the same two users at the same time.
-  pgm.createConstraint('private_voice_chats', 'private_voice_chats_caller_address_callee_address_unique', {
-    unique: ['caller_address', 'callee_address']
-  })
-  pgm.createConstraint('private_voice_chats', 'private_voice_chats_callee_address_caller_address_unique', {
-    unique: ['callee_address', 'caller_address']
-  })
-
   // The expiration time must be greater than the current time.
   pgm.createConstraint('private_voice_chats', 'private_voice_chats_expires_at_check', {
     check: 'expires_at > now()'
