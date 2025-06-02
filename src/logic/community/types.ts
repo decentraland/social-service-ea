@@ -1,5 +1,5 @@
 import { FriendProfile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { CommunityRole, Pagination } from '../../types/entities'
+import { CommunityRole, Pagination, CommunityPermission } from '../../types/entities'
 import { PaginatedParameters } from '@dcl/schemas'
 
 export type ICommunityComponent = {
@@ -21,6 +21,17 @@ export type ICommunityComponent = {
     memberAddress: string,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ) => Promise<GetCommunitiesWithTotal<MemberCommunity>>
+  kickMember: (communityId: string, kickerAddress: string, memberToKickAddress: string) => Promise<void>
+}
+
+export type ICommunityRolesComponent = {
+  hasPermission: (role: CommunityRole, permission: CommunityPermission) => boolean
+  getRolePermissions: (role: CommunityRole) => CommunityPermission[]
+  canKickMemberFromCommunity: (
+    communityId: string,
+    kickerAddress: string,
+    memberToKickAddress: string
+  ) => Promise<boolean>
 }
 
 export type CommunityDB = {

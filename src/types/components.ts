@@ -112,9 +112,11 @@ export interface IFriendsDatabaseComponent {
 
 export interface ICommunitiesDatabaseComponent {
   communityExists(communityId: string): Promise<boolean>
+  isMemberOfCommunity(communityId: string, userAddress: string): Promise<boolean>
   getCommunity(id: string, userAddress: string): Promise<Community | null>
   getCommunityMembers(id: string, pagination: Pagination): Promise<CommunityMember[]>
   getCommunityMemberRole(id: string, userAddress: string): Promise<CommunityRole>
+  getCommunityMemberRoles(id: string, userAddresses: string[]): Promise<Record<string, CommunityRole>>
   getCommunityPlaces(communityId: string): Promise<string[]>
   getCommunityMembersCount(communityId: string): Promise<number>
   getCommunities(memberAddress: string, options: GetCommunitiesOptions): Promise<CommunityWithMembersCountAndFriends[]>
@@ -131,6 +133,7 @@ export interface ICommunitiesDatabaseComponent {
   createCommunity(community: CommunityDB): Promise<{ id: string }>
   deleteCommunity(id: string): Promise<void>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
+  kickMemberFromCommunity(communityId: string, memberAddress: string): Promise<void>
 }
 
 export interface IRedisComponent extends IBaseComponent {

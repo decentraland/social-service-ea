@@ -16,9 +16,11 @@ import { PaginatedParameters } from '@dcl/schemas'
 import { getProfileHasClaimedName, getProfileName } from '../profiles'
 
 export function createCommunityComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient'>
+  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs'>
 ): ICommunityComponent {
-  const { communitiesDb, catalystClient } = components
+  const { communitiesDb, catalystClient, communityRoles, logs } = components
+
+  const logger = logs.getLogger('community-component')
 
   return {
     getCommunity: async (id: string, userAddress: string): Promise<CommunityWithMembersCount> => {
@@ -131,6 +133,31 @@ export function createCommunityComponent(
         communitiesDb.getCommunitiesCount(memberAddress, { onlyMemberOf: true })
       ])
       return { communities, total }
+    },
+
+    kickMember: async (communityId: string, kickerAddress: string, targetAddress: string): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const isTargetMember = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
+
+      if (!isTargetMember) {
+        logger.info(`Target ${targetAddress} is not a member of community ${communityId}, returning 204`)
+        return
+      }
+
+      const canKick = await communityRoles.canKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
+
+      if (!canKick) {
+        throw new NotAuthorizedError(
+          `The user ${kickerAddress} doesn't have permission to kick ${targetAddress} from community ${communityId}`
+        )
+      }
+
+      await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
     }
   }
 }
