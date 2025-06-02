@@ -111,7 +111,8 @@ export async function initComponents(): Promise<AppComponents> {
     subscribersContext,
     worldsStats,
     metrics,
-    settings
+    settings,
+    voice
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })

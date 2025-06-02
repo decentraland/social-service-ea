@@ -26,6 +26,7 @@ import { unblockUserService } from './services/unblock-user'
 import { getBlockingStatusService } from './services/get-blocking-status'
 import { subscribeToBlockUpdatesService } from './services/subscribe-to-block-updates'
 import { createRpcServerMetricsWrapper, ServiceType } from './metrics-wrapper'
+import { startPrivateVoiceChatService } from './services/start-private-voice-chat'
 
 export async function createRpcServerComponent({
   logs,
@@ -40,7 +41,8 @@ export async function createRpcServerComponent({
   worldsStats,
   commsGatekeeper,
   metrics,
-  settings
+  settings,
+  voice
 }: Pick<
   AppComponents,
   | 'logs'
@@ -56,6 +58,7 @@ export async function createRpcServerComponent({
   | 'commsGatekeeper'
   | 'metrics'
   | 'settings'
+  | 'voice'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -137,6 +140,10 @@ export async function createRpcServerComponent({
     },
     getSocialSettings: {
       creator: getSocialSettingsService({ components: { logs, settings } }),
+      type: ServiceType.CALL
+    },
+    startPrivateVoiceChat: {
+      creator: startPrivateVoiceChatService({ components: { logs, voice } }),
       type: ServiceType.CALL
     }
   }

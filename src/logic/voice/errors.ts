@@ -1,4 +1,4 @@
-export class VoiceCallNotAllowedError extends Error {
+export class VoiceChatNotAllowedError extends Error {
   constructor() {
     super(`The callee or the caller are not accepting voice calls from users that are not friends`)
   }

@@ -1,22 +1,20 @@
+import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, PrivateMessagesPrivacy } from '../../types'
-import { UserAlreadyInVoiceChatError, UsersAreCallingSomeoneElseError, VoiceCallNotAllowedError } from './errors'
-import { IVoiceComponent } from './types'
+import { UserAlreadyInVoiceChatError, UsersAreCallingSomeoneElseError, VoiceChatNotAllowedError } from './errors'
+import { IVoiceComponent, VoiceChatStatus } from './types'
 
-export async function createVoiceComponent({
+export function createVoiceComponent({
   logs,
   settings,
   commsGatekeeper,
   voiceDb,
   friendsDb,
   pubsub
-}: Pick<
-  AppComponents,
-  'logs' | 'settings' | 'commsGatekeeper' | 'voiceDb' | 'friendsDb' | 'pubsub'
->): Promise<IVoiceComponent> {
-  const logger = logs.getLogger('voice')
+}: Pick<AppComponents, 'logs' | 'settings' | 'commsGatekeeper' | 'voiceDb' | 'friendsDb' | 'pubsub'>): IVoiceComponent {
+  const logger = logs.getLogger('voice-logic')
 
   async function startVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
-    logger.info(`Starting voice chat for call ${callerAddress} -> ${calleeAddress}`)
+    logger.info(`Starting private voice chat from ${callerAddress} to ${calleeAddress}`)
 
     // Check privacy settings of the callee and the caller
     const [calleeSettings, callerSettings] = await settings.getUsersSettings([calleeAddress, callerAddress])
@@ -27,7 +25,7 @@ export async function createVoiceComponent({
       // If the callee or the caller are only accepting voice calls from friends, we need to check if they are friends
       const friendshipStatus = await friendsDb.getFriendship([callerAddress, calleeAddress])
       if (!friendshipStatus?.is_active) {
-        throw new VoiceCallNotAllowedError()
+        throw new VoiceChatNotAllowedError()
       }
     }
 
@@ -38,7 +36,7 @@ export async function createVoiceComponent({
     }
 
     // Check if the callee or the caller are in a voice chat
-    const [isCalleeInAVoiceChat, isCallerInAVoiceChat] = await Promise.all([
+    const [isCallerInAVoiceChat, isCalleeInAVoiceChat] = await Promise.all([
       commsGatekeeper.isUserInAVoiceChat(callerAddress),
       commsGatekeeper.isUserInAVoiceChat(calleeAddress)
     ])
@@ -53,11 +51,11 @@ export async function createVoiceComponent({
     const callId = await voiceDb.createCall(callerAddress, calleeAddress)
 
     // Send the call to the callee
-    await pubsub.publishInChannel('voice-call', {
+    await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
       callId,
       callerAddress,
       calleeAddress,
-      status: 'requested'
+      status: VoiceChatStatus.REQUESTED
     })
 
     return callId
