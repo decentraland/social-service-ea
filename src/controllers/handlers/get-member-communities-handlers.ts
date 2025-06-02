@@ -30,7 +30,7 @@ export async function getMemberCommunitiesHandler(
       throw new NotAuthorizedError('You are not authorized to get communities for this member')
     }
 
-    const { communities, total } = await community.getMemberCommunities(memberAddress, { pagination })
+    const { communities, total } = await community.getMemberCommunities(normalizedMemberAddress, { pagination })
 
     return {
       status: 200,

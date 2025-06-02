@@ -1,9 +1,7 @@
-import { randomUUID } from 'node:crypto'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { mockCommunity } from '../mocks/community'
-import SQL from 'sql-template-strings'
 
 test('Get Member Communities Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -47,23 +45,33 @@ test('Get Member Communities Controller', function ({ components, spyComponents 
       )
       communityId3 = result3.id
 
-      // Add the user as owner, moderator, and member to different communities
-      await components.pg.query(SQL`
-        INSERT INTO community_members (community_id, member_address, role)
-        VALUES 
-          (${communityId1}, ${address}, ${CommunityRole.Owner}),
-          (${communityId2}, ${address}, ${CommunityRole.Moderator}),
-          (${communityId3}, ${address}, ${CommunityRole.Member})
-      `)
+      await components.communitiesDb.addCommunityMember({
+        communityId: communityId1,
+        memberAddress: address,
+        role: CommunityRole.Owner
+      })
+
+      await components.communitiesDb.addCommunityMember({
+        communityId: communityId2,
+        memberAddress: address,
+        role: CommunityRole.Moderator
+      })
+
+      await components.communitiesDb.addCommunityMember({
+        communityId: communityId3,
+        memberAddress: address,
+        role: CommunityRole.Member
+      })
     })
 
     afterEach(async () => {
-      await components.pg.query(SQL`
-        DELETE FROM community_members WHERE community_id IN (${communityId1}, ${communityId2}, ${communityId3})
-      `)
-      await components.pg.query(SQL`
-        DELETE FROM communities WHERE id IN (${communityId1}, ${communityId2}, ${communityId3})
-      `)
+      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [address])
+      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId2, [address])
+      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId3, [address])
+
+      components.communitiesDbHelper.forceCommunityRemoval(communityId1)
+      components.communitiesDbHelper.forceCommunityRemoval(communityId2)
+      components.communitiesDbHelper.forceCommunityRemoval(communityId3)
     })
 
     describe('and the request is not signed', () => {
