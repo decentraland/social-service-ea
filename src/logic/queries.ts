@@ -1,6 +1,6 @@
 import SQL, { SQLStatement } from 'sql-template-strings'
 import { normalizeAddress } from '../utils/address'
-import { Action, Pagination } from '../types'
+import { Action, CommunityRole, Pagination } from '../types'
 import { GetCommunitiesOptions } from './community/types'
 
 type CTE = { query: SQLStatement | string; name: string }
@@ -298,7 +298,21 @@ export function withSearchAndPagination(query: SQLStatement, options?: GetCommun
     query.append(searchCommunitiesQuery(search))
   }
 
-  query.append(SQL` ORDER BY ${sortBy} DESC`)
+  switch (sortBy) {
+    case 'membersCount':
+      query.append(SQL` ORDER BY "membersCount" DESC`)
+      break
+    case 'role':
+      query.append(SQL` ORDER BY CASE cm.role
+            WHEN ${CommunityRole.Owner} THEN 1
+            WHEN ${CommunityRole.Moderator} THEN 2
+            ELSE 3
+          END,
+          c.name ASC`)
+      break
+    default:
+      query.append(SQL` ORDER BY c.name ASC`)
+  }
 
   if (limit) {
     query.append(SQL` LIMIT ${limit}`)

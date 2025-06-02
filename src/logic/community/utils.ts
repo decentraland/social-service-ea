@@ -5,7 +5,8 @@ import {
   CommunityWithUserInformation,
   CommunityWithMembersCount,
   CommunityWithMembersCountAndFriends,
-  CommunityPublicInformation
+  CommunityPublicInformation,
+  MemberCommunity
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 

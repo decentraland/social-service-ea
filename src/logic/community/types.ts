@@ -17,6 +17,10 @@ export type ICommunityComponent = {
     userAddress: string,
     pagination: Required<PaginatedParameters>
   ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
+  getMemberCommunities: (
+    memberAddress: string,
+    options: Pick<GetCommunitiesOptions, 'pagination'>
+  ) => Promise<GetCommunitiesWithTotal<MemberCommunity>>
 }
 
 export type CommunityDB = {
@@ -65,7 +69,8 @@ export type GetCommunitiesOptions = {
   pagination: Pagination
   search?: string | null
   onlyPublic?: boolean
-  sortBy?: 'membersCount'
+  sortBy?: 'membersCount' | 'role'
+  onlyMemberOf?: boolean
 }
 
 export type CommunityWithUserInformation = CommunityWithMembersCount & {
@@ -82,10 +87,4 @@ export type GetCommunitiesWithTotal<T> = {
   total: number
 }
 
-export type GetCommunityMembersResult = {
-  results: CommunityMember[]
-  total: number
-  page: number
-  pages: number
-  limit: number
-}
+export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress' | 'role'>

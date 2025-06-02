@@ -17,6 +17,7 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createMockProfile } from '../../mocks/profile'
 import { CommunityWithMembersCountAndFriends } from '../../../src/logic/community/types'
 import { parseExpectedFriends } from '../../mocks/friend'
+import { MemberCommunity } from '../../../src/logic/community/types'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
@@ -288,6 +289,75 @@ describe('when handling community operations', () => {
         await expect(communityComponent.deleteCommunity('non-existent-id', mockUserAddress)).rejects.toThrow(
           new CommunityNotFoundError('non-existent-id')
         )
+      })
+    })
+  })
+
+  describe('and getting member communities', () => {
+    const mockMemberCommunities: MemberCommunity[] = [
+      {
+        id: 'test-id-1',
+        name: 'Test Community 1',
+        ownerAddress: '0x1234567890123456789012345678901234567890',
+        role: CommunityRole.Owner
+      },
+      {
+        id: 'test-id-2',
+        name: 'Test Community 2',
+        ownerAddress: '0x1234567890123456789012345678901234567890',
+        role: CommunityRole.Moderator
+      },
+      {
+        id: 'test-id-3',
+        name: 'Test Community 3',
+        ownerAddress: '0x9876543210987654321098765432109876543210',
+        role: CommunityRole.Member
+      }
+    ]
+
+    beforeEach(() => {
+      mockCommunitiesDB.getMemberCommunities.mockResolvedValue(mockMemberCommunities)
+      mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(3)
+    })
+
+    it('should return member communities with total count', async () => {
+      const result = await communityComponent.getMemberCommunities(mockUserAddress, {
+        pagination: { limit: 10, offset: 0 }
+      })
+
+      expect(result).toEqual({
+        communities: mockMemberCommunities,
+        total: 3
+      })
+    })
+
+    it('should fetch member communities from the database', async () => {
+      await communityComponent.getMemberCommunities(mockUserAddress, {
+        pagination: { limit: 10, offset: 0 }
+      })
+
+      expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(mockUserAddress, {
+        pagination: { limit: 10, offset: 0 }
+      })
+    })
+
+    it('should fetch the total count from the database with onlyMemberOf flag', async () => {
+      await communityComponent.getMemberCommunities(mockUserAddress, {
+        pagination: { limit: 10, offset: 0 }
+      })
+
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(mockUserAddress, {
+        onlyMemberOf: true
+      })
+    })
+
+    it('should handle pagination correctly', async () => {
+      await communityComponent.getMemberCommunities(mockUserAddress, {
+        pagination: { limit: 2, offset: 1 }
+      })
+
+      expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(mockUserAddress, {
+        pagination: { limit: 2, offset: 1 }
       })
     })
   })
