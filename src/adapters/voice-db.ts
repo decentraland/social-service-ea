@@ -12,7 +12,7 @@ export function createVoiceDBComponent(components: Pick<AppComponents, 'pg'>): I
 
       const query = SQL`
         SELECT EXISTS (
-          SELECT 1 FROM calls WHERE caller_address IN (${normalizedUserAddresses}) OR callee_address IN (${normalizedUserAddresses})
+          SELECT 1 FROM private_voice_chats WHERE caller_address IN (${normalizedUserAddresses}) OR callee_address IN (${normalizedUserAddresses})
         )
       `
       const results = await pg.query<{ exists: boolean }>(query)
@@ -20,7 +20,7 @@ export function createVoiceDBComponent(components: Pick<AppComponents, 'pg'>): I
     },
     async createCall(callerAddress: string, calleeAddress: string): Promise<string> {
       const query = SQL`
-        INSERT INTO calls (id, caller_address, callee_address)
+        INSERT INTO private_voice_chats (id, caller_address, callee_address)
         VALUES (${randomUUID()}, ${normalizeAddress(callerAddress)}, ${normalizeAddress(calleeAddress)})
         RETURNING id
       `
