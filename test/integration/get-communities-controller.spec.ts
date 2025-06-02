@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
@@ -50,27 +49,33 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
       )
       communityId2 = result2.id
 
-      // Add members to the communities using SQL directly since there's no addMember method
-      // TODO: Add a method to add members to the communities db
-      await components.pg.query(SQL`
-          INSERT INTO community_members (community_id, member_address, role)
-          VALUES 
-            (${communityId1}, ${friendAddress1}, ${CommunityRole.Member}),
-            (${communityId1}, ${friendAddress2}, ${CommunityRole.Member}),
-            (${communityId2}, ${friendAddress1}, ${CommunityRole.Member})
-        `)
+      await Promise.all(
+        [friendAddress1, friendAddress2].map(async (memberAddress) =>
+          components.communitiesDb.addCommunityMember({
+            communityId: communityId1,
+            memberAddress,
+            role: CommunityRole.Member
+          })
+        )
+      )
+
+      await components.communitiesDb.addCommunityMember({
+        communityId: communityId2,
+        memberAddress: friendAddress1,
+        role: CommunityRole.Member
+      })
 
       friendshipId1 = await createOrUpsertActiveFriendship(components.friendsDb, [address, friendAddress1])
       friendshipId2 = await createOrUpsertActiveFriendship(components.friendsDb, [address, friendAddress2])
     })
 
     afterEach(async () => {
-      await components.pg.query(SQL`
-        DELETE FROM community_members WHERE community_id IN (${communityId1}, ${communityId2})
-      `)
-      await components.pg.query(SQL`
-        DELETE FROM communities WHERE id IN (${communityId1}, ${communityId2})
-      `)
+      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [friendAddress1, friendAddress2])
+      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId2, [friendAddress1])
+
+      components.communitiesDbHelper.forceCommunityRemoval(communityId1)
+      components.communitiesDbHelper.forceCommunityRemoval(communityId2)
+
       await removeFriendship(components.friendsDb, friendshipId1, address)
       await removeFriendship(components.friendsDb, friendshipId2, address)
     })
