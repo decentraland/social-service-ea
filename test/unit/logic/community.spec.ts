@@ -87,18 +87,24 @@ describe('when handling community operations', () => {
       })
     })
 
-    it('should fetch communities from the database', async () => {
-      await communityComponent.getCommunities(mockUserAddress, { pagination: { limit: 10, offset: 0 } })
+    it('should fetch communities and total count from the database', async () => {
+      await communityComponent.getCommunities(mockUserAddress, {
+        pagination: { limit: 10, offset: 0 },
+        onlyMemberOf: false,
+        search: 'test'
+      })
 
       expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(mockUserAddress, {
-        pagination: { limit: 10, offset: 0 }
+        pagination: { limit: 10, offset: 0 },
+        search: 'test',
+        onlyMemberOf: false
       })
-    })
 
-    it('should fetch the total count from the database', async () => {
-      await communityComponent.getCommunities(mockUserAddress, { pagination: { limit: 10, offset: 0 } })
-
-      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(mockUserAddress, {})
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(mockUserAddress, {
+        pagination: { limit: 10, offset: 0 },
+        search: 'test',
+        onlyMemberOf: false
+      })
     })
 
     it('should fetch friend profiles from catalyst', async () => {
@@ -109,19 +115,6 @@ describe('when handling community operations', () => {
         '0x2222222222222222222222222222222222222222',
         '0x3333333333333333333333333333333333333333'
       ])
-    })
-
-    it('should handle search parameter', async () => {
-      await communityComponent.getCommunities(mockUserAddress, {
-        pagination: { limit: 10, offset: 0 },
-        search: 'test'
-      })
-
-      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(mockUserAddress, {
-        pagination: { limit: 10, offset: 0 },
-        search: 'test'
-      })
-      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(mockUserAddress, { search: 'test' })
     })
   })
 
