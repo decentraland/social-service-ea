@@ -8,7 +8,8 @@ import {
   ICommunityComponent,
   CommunityPublicInformation,
   CommunityWithMembersCount,
-  CommunityMemberProfile
+  CommunityMemberProfile,
+  MemberCommunity
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { PaginatedParameters } from '@dcl/schemas'
@@ -35,11 +36,11 @@ export function createCommunityComponent(
 
     getCommunities: async (
       userAddress: string,
-      { pagination, search }: GetCommunitiesOptions
+      options: GetCommunitiesOptions
     ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>> => {
       const [communities, total] = await Promise.all([
-        communitiesDb.getCommunities(userAddress, { pagination, search }),
-        communitiesDb.getCommunitiesCount(userAddress, { search })
+        communitiesDb.getCommunities(userAddress, options),
+        communitiesDb.getCommunitiesCount(userAddress, options)
       ])
       const friendsAddresses = Array.from(new Set(communities.flatMap((community) => community.friends)))
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
@@ -119,6 +120,17 @@ export function createCommunityComponent(
         .filter((member: CommunityMemberProfile | undefined): member is CommunityMemberProfile => member !== undefined)
 
       return { members: membersWithProfile, totalMembers }
+    },
+
+    getMemberCommunities: async (
+      memberAddress: string,
+      options: Pick<GetCommunitiesOptions, 'pagination'>
+    ): Promise<GetCommunitiesWithTotal<MemberCommunity>> => {
+      const [communities, total] = await Promise.all([
+        communitiesDb.getMemberCommunities(memberAddress, options),
+        communitiesDb.getCommunitiesCount(memberAddress, { onlyMemberOf: true })
+      ])
+      return { communities, total }
     }
   }
 }

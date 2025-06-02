@@ -29,8 +29,9 @@ import {
   CommunityMember,
   CommunityWithMembersCountAndFriends,
   GetCommunitiesOptions,
-  CommunityPublicInformation
-} from '../logic/community/types'
+  CommunityPublicInformation,
+  MemberCommunity
+} from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
 
@@ -117,9 +118,16 @@ export interface ICommunitiesDatabaseComponent {
   getCommunityPlaces(communityId: string): Promise<string[]>
   getCommunityMembersCount(communityId: string): Promise<number>
   getCommunities(memberAddress: string, options: GetCommunitiesOptions): Promise<CommunityWithMembersCountAndFriends[]>
-  getCommunitiesCount(memberAddress: string, options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
+  getCommunitiesCount(
+    memberAddress: string,
+    options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf'>
+  ): Promise<number>
   getCommunitiesPublicInformation(options: GetCommunitiesOptions): Promise<CommunityPublicInformation[]>
   getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
+  getMemberCommunities(
+    memberAddress: string,
+    options: Pick<GetCommunitiesOptions, 'pagination'>
+  ): Promise<MemberCommunity[]>
   createCommunity(community: CommunityDB): Promise<{ id: string }>
   deleteCommunity(id: string): Promise<void>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
