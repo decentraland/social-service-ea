@@ -175,11 +175,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         })
 
         afterEach(async () => {
-          // Clean up the member role
-          await components.pg.query(SQL`
-            DELETE FROM community_members 
-            WHERE community_id = ${communityId1} AND member_address = ${address}
-          `)
+          components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [address])
         })
 
         it('should return only communities where the user is a member when onlyMemberOf is true', async () => {
