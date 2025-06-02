@@ -2,7 +2,6 @@ import type { IHttpServerComponent } from '@well-known-components/interfaces'
 import { HttpRequest, HttpResponse } from '@well-known-components/uws-http-server'
 import { AppComponents } from './system'
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
-import { PaginatedResponse } from '@dcl/schemas'
 
 export type HandlerContextWithPath<
   ComponentNames extends keyof AppComponents,

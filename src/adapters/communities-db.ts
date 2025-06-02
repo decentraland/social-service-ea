@@ -6,7 +6,8 @@ import {
   GetCommunitiesOptions,
   CommunityWithMembersCountAndFriends,
   CommunityPublicInformation,
-  CommunityMember
+  CommunityMember,
+  MemberCommunity
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -146,6 +147,10 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true
       `
 
+      const membersJoin = options.onlyMemberOf
+        ? SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
+        : SQL` LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
+
       const baseQuery = useCTEs([
         getUserFriendsCTE(normalizedMemberAddress),
         getCommunitiesWithMembersCountCTE(),
@@ -153,8 +158,9 @@ export function createCommunitiesDBComponent(
           query: communityFriendsCTE,
           name: 'community_friends'
         }
-      ]).append(
-        SQL`
+      ])
+        .append(
+          SQL`
         SELECT 
           c.id,
           c.name,
@@ -166,33 +172,36 @@ export function createCommunitiesDBComponent(
           cwmc."membersCount",
           COALESCE(cf.friends, ARRAY[]::text[]) as friends
         FROM communities c
+        `
+        )
+        .append(membersJoin).append(SQL`
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
-        LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}
         LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
         LEFT JOIN community_friends cf ON c.id = cf.community_id
-        WHERE cb.banned_address IS NULL AND c.active = true`
-      )
+        WHERE cb.banned_address IS NULL AND c.active = true`)
 
-      const query = withSearchAndPagination(baseQuery, {
-        onlyPublic: false,
-        ...options
-      })
+      const query = withSearchAndPagination(baseQuery, options)
 
       const result = await pg.query<CommunityWithMembersCountAndFriends>(query)
       return result.rows
     },
 
-    async getCommunitiesCount(memberAddress: string, options?: Pick<GetCommunitiesOptions, 'search'>): Promise<number> {
-      const { search } = options ?? {}
+    async getCommunitiesCount(
+      memberAddress: string,
+      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf'>
+    ): Promise<number> {
+      const { search, onlyMemberOf } = options ?? {}
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
-      const query = SQL`
-        SELECT COUNT(1) as count
-          FROM communities c
+      const membersJoin = onlyMemberOf
+        ? SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
+        : SQL``
+
+      const query = SQL`SELECT COUNT(1) as count FROM communities c`.append(membersJoin).append(SQL`
           LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
         WHERE cb.banned_address IS NULL
           AND c.active = true
-      `
+      `)
 
       if (search) {
         query.append(searchCommunitiesQuery(search))
@@ -217,10 +226,7 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true AND c.private = false`
       )
 
-      const query = withSearchAndPagination(baseQuery, {
-        onlyPublic: true,
-        ...options
-      })
+      const query = withSearchAndPagination(baseQuery, options)
 
       const result = await pg.query<CommunityPublicInformation>(query)
       return result.rows
@@ -240,6 +246,33 @@ export function createCommunitiesDBComponent(
       }
 
       return pg.getCount(query)
+    },
+
+    async getMemberCommunities(
+      memberAddress: string,
+      options: Pick<GetCommunitiesOptions, 'pagination'>
+    ): Promise<MemberCommunity[]> {
+      const normalizedMemberAddress = normalizeAddress(memberAddress)
+
+      const baseQuery = SQL`
+        SELECT 
+          c.id,
+          c.name,
+          c.owner_address as "ownerAddress",
+          COALESCE(cm.role, ${CommunityRole.None}) as role
+        FROM communities c
+        JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = cm.member_address
+        WHERE c.active = true AND cb.banned_address IS NULL
+      `
+
+      const query = withSearchAndPagination(baseQuery, {
+        sortBy: 'role',
+        ...options
+      })
+
+      const result = await pg.query<MemberCommunity>(query)
+      return result.rows
     },
 
     async createCommunity(community: CommunityDB): Promise<{ id: string }> {

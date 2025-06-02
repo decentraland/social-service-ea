@@ -32,13 +32,15 @@ test('Get Community Members Controller', function ({ components, spyComponents }
     const secondMemberAddress = '0x0000000000000000000000000000000000000003'
 
     beforeEach(async () => {
-      communityId = (await components.communitiesDb.createCommunity({
-        name: 'Test Community',
-        description: 'Test Description',
-        private: false,
-        active: true,
-        owner_address: '0x0000000000000000000000000000000000000000'
-      })).id
+      communityId = (
+        await components.communitiesDb.createCommunity({
+          name: 'Test Community',
+          description: 'Test Description',
+          private: false,
+          active: true,
+          owner_address: '0x0000000000000000000000000000000000000000'
+        })
+      ).id
 
       await components.communitiesDb.addCommunityMember({
         communityId,
@@ -61,7 +63,11 @@ test('Get Community Members Controller', function ({ components, spyComponents }
 
     afterEach(async () => {
       await components.communitiesDbHelper.forceCommunityRemoval(communityId)
-      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [firstMemberAddress, secondMemberAddress, ownerAddress])
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
+        firstMemberAddress,
+        secondMemberAddress,
+        ownerAddress
+      ])
     })
 
     describe('but the user is not a member of the community', () => {
@@ -70,7 +76,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
         expect(response.status).toBe(401)
         expect(await response.json()).toEqual({
           error: 'Not Authorized',
-          message: 'The user doesn\'t have permission to get community members'
+          message: "The user doesn't have permission to get community members"
         })
       })
     })
@@ -78,12 +84,12 @@ test('Get Community Members Controller', function ({ components, spyComponents }
     describe('and the request is made by a member of the community', () => {
       beforeEach(async () => {
         spyComponents.catalystClient.getProfiles.mockResolvedValue([
-            { 
+          {
             avatars: [
               {
                 ethAddress: firstMemberAddress,
                 hasClaimedName: true,
-                name: 'Test User',
+                name: 'Test User'
               }
             ]
           },
@@ -92,7 +98,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
               {
                 ethAddress: secondMemberAddress,
                 hasClaimedName: true,
-                name: 'Test User 2',
+                name: 'Test User 2'
               }
             ]
           },
@@ -101,7 +107,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
               {
                 ethAddress: ownerAddress,
                 hasClaimedName: true,
-                name: 'Test User 3',
+                name: 'Test User 3'
               }
             ]
           },
@@ -143,7 +149,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
                 name: 'Test User',
-                role: 'member',
+                role: 'member'
               },
               {
                 communityId,
@@ -151,7 +157,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
                 name: 'Test User 2',
-                role: 'member',
+                role: 'member'
               },
               {
                 communityId,
@@ -159,7 +165,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
                 name: 'Test User 3',
-                role: 'owner',
+                role: 'owner'
               },
               {
                 communityId,
@@ -167,8 +173,8 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 hasClaimedName: false,
                 joinedAt: expect.any(String),
                 name: 'Test User 4',
-                role: 'member',
-              },
+                role: 'member'
+              }
             ],
             total: 4
           }
@@ -190,7 +196,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
                 name: 'Test User',
-                role: 'member',
+                role: 'member'
               },
               {
                 communityId,
@@ -198,10 +204,10 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
                 name: 'Test User 2',
-                role: 'member',
-              },
+                role: 'member'
+              }
             ],
-            total: 4,
+            total: 4
           }
         })
       })
