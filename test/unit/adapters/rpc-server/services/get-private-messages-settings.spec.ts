@@ -6,7 +6,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getPrivateMessagesSettingsService } from '../../../../../src/adapters/rpc-server/services/get-private-messages-settings'
 import {
-  IDatabaseComponent,
+  IFriendsDatabaseComponent,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   SocialSettings as DBSocialSettings,
@@ -17,17 +17,17 @@ describe('getPrivateMessagesSettingsService', () => {
   const testAddress1 = '0x1234567890abcdef'
   const testAddress2 = '0xabcdef1234567890'
   let context: RpcServerContext
-  let getSocialSettingsMock: jest.MockedFunction<IDatabaseComponent['getSocialSettings']>
-  let getFriendsFromListMock: jest.MockedFunction<IDatabaseComponent['getFriendsFromList']>
+  let getSocialSettingsMock: jest.MockedFunction<IFriendsDatabaseComponent['getSocialSettings']>
+  let getFriendsFromListMock: jest.MockedFunction<IFriendsDatabaseComponent['getFriendsFromList']>
   let getPrivateMessagesSettings: ReturnType<typeof getPrivateMessagesSettingsService>
 
   beforeEach(() => {
     getSocialSettingsMock = jest.fn()
     getFriendsFromListMock = jest.fn()
-    const db = {
+    const friendsDb = {
       getSocialSettings: getSocialSettingsMock,
       getFriendsFromList: getFriendsFromListMock
-    } as unknown as IDatabaseComponent
+    } as unknown as IFriendsDatabaseComponent
     const logs: ILoggerComponent = {
       getLogger: () => ({
         info: () => {},
@@ -44,7 +44,7 @@ describe('getPrivateMessagesSettingsService', () => {
     getPrivateMessagesSettings = getPrivateMessagesSettingsService({
       components: {
         logs,
-        db
+        friendsDb
       }
     })
   })

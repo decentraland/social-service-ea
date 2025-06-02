@@ -6,7 +6,7 @@ import {
   Friendship,
   FriendshipAction,
   FriendshipRequest,
-  IDatabaseComponent,
+  IFriendsDatabaseComponent,
   User,
   Pagination,
   SocialSettings,
@@ -23,15 +23,8 @@ import {
 
 type FriendshipRequestType = 'sent' | 'received'
 
-export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>): IDatabaseComponent {
-  const { pg, logs } = components
-
-  const logger = logs.getLogger('db-component')
-
-  async function getCount(query: SQLStatement) {
-    const result = await pg.query<{ count: number }>(query)
-    return result.rows[0].count
-  }
+export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>): IFriendsDatabaseComponent {
+  const { pg } = components
 
   function getFriendshipRequests(type: FriendshipRequestType) {
     return async (userAddress: string, pagination?: Pagination) => {
@@ -44,7 +37,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
   function getFriendshipRequestsCount(type: FriendshipRequestType) {
     return async (userAddress: string) => {
       const query = getFriendshipRequestsBaseQuery(userAddress, type, { onlyCount: true })
-      return getCount(query)
+      return pg.getCount(query)
     }
   }
 
@@ -61,7 +54,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async getFriendsCount(userAddress, { onlyActive } = { onlyActive: true }) {
       const query: SQLStatement = getFriendsBaseQuery(userAddress, { onlyActive, onlyCount: true })
-      return getCount(query)
+      return pg.getCount(query)
     },
     async getMutualFriends(userAddress1, userAddress2, pagination = { limit: FRIENDSHIPS_PER_PAGE, offset: 0 }) {
       const query = getMutualFriendsBaseQuery(userAddress1, userAddress2, { pagination })
@@ -70,7 +63,7 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
     },
     async getMutualFriendsCount(userAddress1, userAddress2) {
       const query = getMutualFriendsBaseQuery(userAddress1, userAddress2, { onlyCount: true })
-      return getCount(query)
+      return pg.getCount(query)
     },
     async getFriendship(users, txClient) {
       const [userAddress1, userAddress2] = users.map(normalizeAddress)
@@ -292,42 +285,8 @@ export function createDBComponent(components: Pick<AppComponents, 'pg' | 'logs'>
       const results = await pg.query<{ exists: boolean }>(query)
       return results.rows[0].exists
     },
-    async areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean> {
-      const normalizedUserAddresses = userAddresses.map(normalizeAddress)
-
-      const query = SQL`
-        SELECT EXISTS (
-          SELECT 1 FROM calls WHERE caller_address IN (${normalizedUserAddresses}) OR callee_address IN (${normalizedUserAddresses})
-        )
-      `
-      const results = await pg.query<{ exists: boolean }>(query)
-      return results.rows[0].exists
-    },
-    async createCall(callerAddress: string, calleeAddress: string): Promise<string> {
-      const query = SQL`
-        INSERT INTO calls (id, caller_address, callee_address)
-        VALUES (${randomUUID()}, ${normalizeAddress(callerAddress)}, ${normalizeAddress(calleeAddress)})
-        RETURNING id
-      `
-      const results = await pg.query<{ id: string }>(query)
-      return results.rows[0].id
-    },
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
-      const pool = pg.getPool()
-      const client = await pool.connect()
-      await client.query('BEGIN')
-
-      try {
-        const res = await cb(client)
-        await client.query('COMMIT')
-        return res
-      } catch (error: any) {
-        logger.error(`Error executing transaction: ${error.message}`)
-        await client.query('ROLLBACK')
-        throw error
-      } finally {
-        client.release()
-      }
+      return pg.withTransaction(cb)
     }
   }
 }

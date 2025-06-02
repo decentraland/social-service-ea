@@ -7,4 +7,5 @@ nock.enableNetConnect('127.0.0.1|localhost|0.0.0.0')
 
 afterEach(() => {
   nock.cleanAll()
+  jest.clearAllMocks()
 })

@@ -2,17 +2,21 @@
 // Here we define the test components to be used in the testing environment
 
 import { resolve } from 'path'
-import { createRunner, createLocalFetchCompoment } from '@well-known-components/test-helpers'
-import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
+import {
+  createRunner,
+  createLocalFetchCompoment as createLocalFetchComponent
+} from '@well-known-components/test-helpers'
+import { createConfigComponent, createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createLogComponent } from '@well-known-components/logger'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
 import { createFetchComponent } from '@well-known-components/fetch-component'
-import { createPgComponent } from '@well-known-components/pg-component'
+import { createPgComponent } from '../src/adapters/pg'
 
 import { main } from '../src/service'
-import { TestComponents } from '../src/types'
-import { createDBComponent } from '../src/adapters/db'
+import { GlobalContext, TestComponents } from '../src/types'
+import { createFriendsDBComponent } from '../src/adapters/friends-db'
+import { createCommunitiesDBComponent } from '../src/adapters/communities-db'
 import { createRedisComponent } from '../src/adapters/redis'
 import { createPubSubComponent } from '../src/adapters/pubsub'
 import { createNatsComponent } from '@well-known-components/nats-component'
@@ -29,6 +33,10 @@ import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
 import { mockPeersSynchronizer } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
+import { createServerComponent } from '@well-known-components/http-server'
+import { createStatusCheckComponent } from '@well-known-components/http-server'
+import { createCommunityComponent } from '../src/logic/community'
+import { createDbHelper } from './helpers/community-db-helper'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -51,11 +59,26 @@ async function initComponents(): Promise<TestComponents> {
       ARCHIPELAGO_STATS_URL
     }
   )
+  const uwsHttpServerConfig = await createConfigComponent({
+    HTTP_SERVER_PORT: await config.requireString('UWS_HTTP_SERVER_PORT'),
+    HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
+  })
   const metrics = createTestMetricsComponent(metricDeclarations)
   const logs = await createLogComponent({ metrics, config })
 
-  const server = await createUWsComponent({ config, logs })
+  const uwsServer = await createUWsComponent({ config: uwsHttpServerConfig, logs })
+  const httpServer = await createServerComponent<GlobalContext>(
+    { config, logs },
+    {
+      cors: {
+        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT'],
+        maxAge: 86400
+      }
+    }
+  )
   const fetcher = createFetchComponent()
+
+  const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 
   let databaseUrl: string = await config.requireString('PG_COMPONENT_PSQL_CONNECTION_STRING')
   const pg = await createPgComponent(
@@ -70,7 +93,8 @@ async function initComponents(): Promise<TestComponents> {
       }
     }
   )
-  const db = createDBComponent({ pg, logs })
+  const friendsDb = createFriendsDBComponent({ pg, logs })
+  const communitiesDb = createCommunitiesDBComponent({ pg, logs })
 
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
@@ -84,9 +108,9 @@ async function initComponents(): Promise<TestComponents> {
   const rpcServer = await createRpcServerComponent({
     logs,
     commsGatekeeper,
-    db,
+    friendsDb,
     pubsub,
-    server,
+    uwsServer,
     config,
     archipelagoStats,
     catalystClient,
@@ -97,19 +121,27 @@ async function initComponents(): Promise<TestComponents> {
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+  const community = createCommunityComponent({ communitiesDb, catalystClient })
 
-  const localFetch = await createLocalFetchCompoment(config)
+  const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
+  const localHttpFetch = await createLocalFetchComponent(config)
 
   const rpcClient = await createRpcClientComponent({ config, logs })
 
+  const communitiesDbHelper = createDbHelper(pg)
+
   return {
-    commsGatekeeper,
     archipelagoStats,
     catalystClient,
+    commsGatekeeper,
+    communitiesDb,
+    community,
     config,
-    db,
     fetcher,
-    localFetch,
+    friendsDb,
+    httpServer,
+    localHttpFetch,
+    localUwsFetch,
     logs,
     metrics,
     nats,
@@ -120,11 +152,13 @@ async function initComponents(): Promise<TestComponents> {
     redis,
     rpcClient,
     rpcServer,
-    server,
     sns,
+    statusChecks,
     subscribersContext,
     tracing: mockTracing,
+    uwsServer,
     worldsStats,
-    wsPool
+    wsPool,
+    communitiesDbHelper
   }
 }

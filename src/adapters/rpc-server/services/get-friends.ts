@@ -8,8 +8,8 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export function getFriendsService({
-  components: { logs, db, catalystClient }
-}: RPCServiceContext<'logs' | 'db' | 'catalystClient'>) {
+  components: { logs, friendsDb, catalystClient }
+}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient'>) {
   const logger = logs.getLogger('get-friends-service')
 
   return async function (
@@ -21,8 +21,8 @@ export function getFriendsService({
 
     try {
       const [friends, total] = await Promise.all([
-        db.getFriends(loggedUserAddress, { pagination, onlyActive: true }),
-        db.getFriendsCount(loggedUserAddress, { onlyActive: true })
+        friendsDb.getFriends(loggedUserAddress, { pagination, onlyActive: true }),
+        friendsDb.getFriendsCount(loggedUserAddress, { onlyActive: true })
       ])
 
       const profiles = await catalystClient.getProfiles(friends.map((friend) => friend.address))

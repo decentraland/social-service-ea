@@ -1,4 +1,4 @@
-import { mockDb, mockLogs } from '../../../../mocks/components'
+import { mockFriendsDB, mockLogs } from '../../../../mocks/components'
 import { RpcServerContext } from '../../../../../src/types'
 import { getBlockingStatusService } from '../../../../../src/adapters/rpc-server/services/get-blocking-status'
 
@@ -12,16 +12,22 @@ describe('getBlockingStatusService', () => {
 
   beforeEach(() => {
     getBlockingStatus = getBlockingStatusService({
-      components: { db: mockDb, logs: mockLogs }
+      components: { friendsDb: mockFriendsDB, logs: mockLogs }
     })
   })
 
   it('should return blocked users and blocked by users addresses', async () => {
-    const blockedUsers = [{ address: '0x456', blocked_at: new Date() }, { address: '0x789', blocked_at: new Date() }]
-    const blockedByUsers = [{ address: '0x123', blocked_at: new Date() }, { address: '0x456', blocked_at: new Date() }]
+    const blockedUsers = [
+      { address: '0x456', blocked_at: new Date() },
+      { address: '0x789', blocked_at: new Date() }
+    ]
+    const blockedByUsers = [
+      { address: '0x123', blocked_at: new Date() },
+      { address: '0x456', blocked_at: new Date() }
+    ]
 
-    mockDb.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
-    mockDb.getBlockedByUsers.mockResolvedValueOnce(blockedByUsers)
+    mockFriendsDB.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
+    mockFriendsDB.getBlockedByUsers.mockResolvedValueOnce(blockedByUsers)
     const response = await getBlockingStatus({}, rpcContext)
 
     expect(response).toEqual({
@@ -33,7 +39,7 @@ describe('getBlockingStatusService', () => {
   it('should handle errors in the getBlockedUsers db call gracefully', async () => {
     const error = new Error('Database error')
 
-    mockDb.getBlockedUsers.mockRejectedValueOnce(error)
+    mockFriendsDB.getBlockedUsers.mockRejectedValueOnce(error)
 
     const response = await getBlockingStatus({}, rpcContext)
 
@@ -46,7 +52,7 @@ describe('getBlockingStatusService', () => {
   it('should handle errors in the getBlockedByUsers db call gracefully', async () => {
     const error = new Error('Database error')
 
-    mockDb.getBlockedByUsers.mockRejectedValueOnce(error)
+    mockFriendsDB.getBlockedByUsers.mockRejectedValueOnce(error)
 
     const response = await getBlockingStatus({}, rpcContext)
 

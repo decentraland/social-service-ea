@@ -2,20 +2,20 @@ import { createSettingsComponent } from '../../../../src/logic/settings/settings
 import { ISettingsComponent } from '../../../../src/logic/settings/types'
 import {
   SocialSettings,
-  IDatabaseComponent,
+  IFriendsDatabaseComponent,
   PrivateMessagesPrivacy,
   BlockedUsersMessagesVisibilitySetting
 } from '../../../../src/types'
 
 describe('Settings Component', () => {
   let settingsComponent: ISettingsComponent
-  let dbMock: jest.Mocked<IDatabaseComponent>
+  let dbMock: jest.Mocked<IFriendsDatabaseComponent>
 
   beforeEach(() => {
     dbMock = {
       getSocialSettings: jest.fn()
-    } as unknown as jest.Mocked<IDatabaseComponent>
-    settingsComponent = createSettingsComponent({ db: dbMock })
+    } as unknown as jest.Mocked<IFriendsDatabaseComponent>
+    settingsComponent = createSettingsComponent({ friendsDb: dbMock })
   })
 
   describe('getUsersSettings', () => {

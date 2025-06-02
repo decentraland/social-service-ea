@@ -1,4 +1,4 @@
-import { mockCatalystClient, mockDb, mockLogs } from '../../../../mocks/components'
+import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../../../mocks/components'
 import { getMutualFriendsService } from '../../../../../src/adapters/rpc-server/services/get-mutual-friends'
 import { GetMutualFriendsPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
@@ -20,7 +20,7 @@ describe('getMutualFriendsService', () => {
 
   beforeEach(async () => {
     getMutualFriends = getMutualFriendsService({
-      components: { db: mockDb, logs: mockLogs, catalystClient: mockCatalystClient }
+      components: { friendsDb: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
     })
   })
 
@@ -30,8 +30,8 @@ describe('getMutualFriendsService', () => {
     const mockMutualFriendsProfiles = addresses.map(createMockProfile)
     const totalMutualFriends = 2
 
-    mockDb.getMutualFriends.mockResolvedValueOnce(mockMutualFriends)
-    mockDb.getMutualFriendsCount.mockResolvedValueOnce(totalMutualFriends)
+    mockFriendsDB.getMutualFriends.mockResolvedValueOnce(mockMutualFriends)
+    mockFriendsDB.getMutualFriendsCount.mockResolvedValueOnce(totalMutualFriends)
     mockCatalystClient.getProfiles.mockResolvedValueOnce(mockMutualFriendsProfiles)
 
     const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
@@ -46,8 +46,8 @@ describe('getMutualFriendsService', () => {
   })
 
   it('should return an empty list if no mutual friends are found', async () => {
-    mockDb.getMutualFriends.mockResolvedValueOnce([])
-    mockDb.getMutualFriendsCount.mockResolvedValueOnce(0)
+    mockFriendsDB.getMutualFriends.mockResolvedValueOnce([])
+    mockFriendsDB.getMutualFriendsCount.mockResolvedValueOnce(0)
 
     const response = await getMutualFriends(
       { ...mutualFriendsRequest, pagination: { limit: 10, offset: 0 } },
@@ -64,7 +64,7 @@ describe('getMutualFriendsService', () => {
   })
 
   it('should handle errors from the database gracefully', async () => {
-    mockDb.getMutualFriends.mockImplementationOnce(() => {
+    mockFriendsDB.getMutualFriends.mockImplementationOnce(() => {
       throw new Error('Database error')
     })
 

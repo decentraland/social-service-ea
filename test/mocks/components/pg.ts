@@ -1,4 +1,6 @@
-import { IPgComponent } from '@well-known-components/pg-component'
+import { SQLStatement } from 'sql-template-strings'
+import { IPgComponent } from '../../../src/types'
+import { PoolClient } from 'pg'
 
 export const mockPg: jest.Mocked<IPgComponent> = {
   streamQuery: jest.fn(),
@@ -7,5 +9,23 @@ export const mockPg: jest.Mocked<IPgComponent> = {
   getPool: jest.fn().mockReturnValue({
     connect: jest.fn().mockResolvedValue({ query: jest.fn(), release: jest.fn() })
   }),
-  stop: jest.fn()
+  stop: jest.fn(),
+  getCount: jest.fn().mockImplementation(async (query: SQLStatement) => {
+    const result = await mockPg.query(query)
+    return result.rows[0].count
+  }),
+  withTransaction: jest.fn().mockImplementation(async (callback: (client: PoolClient) => Promise<any>) => {
+    const client = await mockPg.getPool().connect()
+    try {
+      await client.query('BEGIN')
+      const result = await callback(client)
+      await client.query('COMMIT')
+      return result
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      await client.release()
+    }
+  })
 }

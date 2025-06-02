@@ -1,6 +1,7 @@
 import { Authenticator, AuthIdentity, IdentityType } from '@dcl/crypto'
 import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
 import { signedHeaderFactory } from 'decentraland-crypto-fetch'
+import { TestComponents } from '../../../src/types'
 
 export type Identity = {
   authChain: AuthIdentity
@@ -29,7 +30,22 @@ export function createAuthHeaders(
   identity: Identity
 ): Record<string, string> {
   const signer = signedHeaderFactory()
-  const signedHeaders = signer(identity.authChain, method, path, metadata)
+  const basePath = path.split('?')[0]
+  const signedHeaders = signer(identity.authChain, method, basePath, metadata)
 
   return Object.fromEntries(signedHeaders.entries())
+}
+
+export function makeAuthenticatedRequest(components: Pick<TestComponents, 'localHttpFetch'>) {
+  return (identity: Identity, path: string, method: string = 'GET') => {
+    const { localHttpFetch } = components
+
+    return localHttpFetch.fetch(path, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...createAuthHeaders(method, path, {}, identity)
+      }
+    })
+  }
 }

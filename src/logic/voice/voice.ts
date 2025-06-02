@@ -6,9 +6,13 @@ export async function createVoiceComponent({
   logs,
   settings,
   commsGatekeeper,
-  db,
+  voiceDb,
+  friendsDb,
   pubsub
-}: Pick<AppComponents, 'logs' | 'settings' | 'commsGatekeeper' | 'db' | 'pubsub'>): Promise<IVoiceComponent> {
+}: Pick<
+  AppComponents,
+  'logs' | 'settings' | 'commsGatekeeper' | 'voiceDb' | 'friendsDb' | 'pubsub'
+>): Promise<IVoiceComponent> {
   const logger = logs.getLogger('voice')
 
   async function startVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
@@ -21,14 +25,14 @@ export async function createVoiceComponent({
       callerSettings.private_messages_privacy !== PrivateMessagesPrivacy.ALL
     ) {
       // If the callee or the caller are only accepting voice calls from friends, we need to check if they are friends
-      const friendshipStatus = await db.getFriendship([callerAddress, calleeAddress])
+      const friendshipStatus = await friendsDb.getFriendship([callerAddress, calleeAddress])
       if (!friendshipStatus?.is_active) {
         throw new VoiceCallNotAllowedError()
       }
     }
 
     // Check if the callee or the caller are calling someone else
-    const areUsersCallingSomeoneElse = await db.areUsersBeingCalledOrCallingSomeone([callerAddress, calleeAddress])
+    const areUsersCallingSomeoneElse = await voiceDb.areUsersBeingCalledOrCallingSomeone([callerAddress, calleeAddress])
     if (areUsersCallingSomeoneElse) {
       throw new VoiceCallNotAllowedError()
     }
@@ -44,7 +48,7 @@ export async function createVoiceComponent({
     }
 
     // Records the call intent in the database
-    const callId = await db.createCall(callerAddress, calleeAddress)
+    const callId = await voiceDb.createCall(callerAddress, calleeAddress)
 
     // Send the call to the callee
     await pubsub.publishInChannel('voice-call', {

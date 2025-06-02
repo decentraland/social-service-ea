@@ -1,6 +1,9 @@
 import SQL, { SQLStatement } from 'sql-template-strings'
 import { normalizeAddress } from '../utils/address'
 import { Action, Pagination } from '../types'
+import { GetCommunitiesOptions } from './community/types'
+
+type CTE = { query: SQLStatement | string; name: string }
 
 function withAlias(tableAlias?: string): string {
   return tableAlias ? `${tableAlias}.` : ``
@@ -45,7 +48,7 @@ export function getBlockingCondition(
   return query
 }
 
-export function useCTEs(CTEs: { query: SQLStatement | string; name: string }[]) {
+export function useCTEs(CTEs: CTE[]) {
   const CTEQuery = SQL`WITH `
   CTEs.forEach(({ query, name }, index) => {
     CTEQuery.append(name)
@@ -66,7 +69,7 @@ export function useCTEs(CTEs: { query: SQLStatement | string; name: string }[]) 
  * @param userAddress - The address of the user
  * @returns A CTE for the user's friends
  */
-function getUserFriendsCTE(userAddress: string) {
+export function getUserFriendsCTE(userAddress: string): CTE {
   const normalizedUserAddress = normalizeAddress(userAddress)
   return {
     query: SQL`SELECT DISTINCT
@@ -85,7 +88,7 @@ function getUserFriendsCTE(userAddress: string) {
   }
 }
 
-function getBlockedForUserCTE(userAddress: string) {
+function getBlockedForUserCTE(userAddress: string): CTE {
   const normalizedUserAddress = normalizeAddress(userAddress)
   return {
     query: SQL`SELECT DISTINCT 
@@ -262,4 +265,53 @@ export function getMutualFriendsBaseQuery(
   }
 
   return query
+}
+
+export function getCommunitiesWithMembersCountCTE(options?: { onlyPublic?: boolean }): CTE {
+  const { onlyPublic = false } = options ?? {}
+  const query = SQL`
+    SELECT c.id, COUNT(cm.member_address) as "membersCount"
+    FROM communities c
+    LEFT JOIN community_members cm ON c.id = cm.community_id
+    LEFT JOIN community_bans cb ON c.id = cb.community_id
+    WHERE cb.banned_address IS NULL
+      AND c.active = true
+  `
+
+  if (onlyPublic) {
+    query.append(SQL` AND c.private = false`)
+  }
+
+  query.append(SQL` GROUP BY c.id`)
+
+  return {
+    query,
+    name: 'communities_with_members_count'
+  }
+}
+
+export function withSearchAndPagination(query: SQLStatement, options?: GetCommunitiesOptions): SQLStatement {
+  const { search, pagination, sortBy = 'membersCount' } = options ?? {}
+  const { limit, offset } = pagination ?? {}
+
+  if (search) {
+    query.append(searchCommunitiesQuery(search))
+  }
+
+  query.append(SQL` ORDER BY ${sortBy} DESC`)
+
+  if (limit) {
+    query.append(SQL` LIMIT ${limit}`)
+  }
+
+  if (offset) {
+    query.append(SQL` OFFSET ${offset}`)
+  }
+
+  return query
+}
+
+export function searchCommunitiesQuery(search: string) {
+  // TODO: enhance the search to include the description using the full text search or pg score
+  return SQL` AND (c.name ILIKE ${`%${search}%`} OR c.description ILIKE ${`%${search}%`})`
 }
