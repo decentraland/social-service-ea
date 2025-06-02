@@ -51,6 +51,7 @@ export type CommunityMember = {
 export type CommunityMemberProfile = CommunityMember & {
   hasClaimedName: boolean
   name: string
+  profilePicture: string
 }
 
 export type CommunityWithMembersCount = Community & {

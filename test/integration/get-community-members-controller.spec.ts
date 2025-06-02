@@ -84,6 +84,11 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 ethAddress: firstMemberAddress,
                 hasClaimedName: true,
                 name: 'Test User',
+                avatar: {
+                  snapshots: {
+                    face256: 'https://test.com/test.png'
+                  }
+                }
               }
             ]
           },
@@ -93,6 +98,11 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 ethAddress: secondMemberAddress,
                 hasClaimedName: true,
                 name: 'Test User 2',
+                avatar: {
+                  snapshots: {
+                    face256: 'https://test.com/test.png'
+                  }
+                }
               }
             ]
           },
@@ -102,6 +112,11 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 ethAddress: ownerAddress,
                 hasClaimedName: true,
                 name: 'Test User 3',
+                avatar: {
+                  snapshots: {
+                    face256: 'https://test.com/test.png'
+                  }
+                }
               }
             ]
           },
@@ -111,7 +126,12 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 ethAddress: addressMakingRequest,
                 hasClaimedName: false,
                 name: '',
-                unclaimedName: 'Test User 4'
+                unclaimedName: 'Test User 4',
+                avatar: {
+                  snapshots: {
+                    face256: 'https://test.com/test.png'
+                  }
+                }
               }
             ]
           }
@@ -144,6 +164,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 joinedAt: expect.any(String),
                 name: 'Test User',
                 role: 'member',
+                profilePicture: 'https://test.com/test.png'
               },
               {
                 communityId,
@@ -152,6 +173,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 joinedAt: expect.any(String),
                 name: 'Test User 2',
                 role: 'member',
+                profilePicture: 'https://test.com/test.png'
               },
               {
                 communityId,
@@ -160,6 +182,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 joinedAt: expect.any(String),
                 name: 'Test User 3',
                 role: 'owner',
+                profilePicture: 'https://test.com/test.png'
               },
               {
                 communityId,
@@ -168,6 +191,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 joinedAt: expect.any(String),
                 name: 'Test User 4',
                 role: 'member',
+                profilePicture: 'https://test.com/test.png'
               },
             ],
             total: 4
@@ -191,6 +215,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 joinedAt: expect.any(String),
                 name: 'Test User',
                 role: 'member',
+                profilePicture: 'https://test.com/test.png'
               },
               {
                 communityId,
@@ -199,6 +224,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 joinedAt: expect.any(String),
                 name: 'Test User 2',
                 role: 'member',
+                profilePicture: 'https://test.com/test.png'
               },
             ],
             total: 4,

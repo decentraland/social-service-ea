@@ -12,7 +12,7 @@ import {
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { PaginatedParameters } from '@dcl/schemas'
-import { getProfileHasClaimedName, getProfileName } from '../profiles'
+import { getProfileHasClaimedName, getProfileName, getProfilePictureUrl } from '../profiles'
 
 export function createCommunityComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'catalystClient'>
@@ -113,7 +113,8 @@ export function createCommunityComponent(
           return {
             ...communityMember,
             hasClaimedName: getProfileHasClaimedName(memberProfile),
-            name: getProfileName(memberProfile)
+            name: getProfileName(memberProfile),
+            profilePicture: getProfilePictureUrl(memberProfile)
           }
         })
         .filter((member: CommunityMemberProfile | undefined): member is CommunityMemberProfile => member !== undefined)
