@@ -48,7 +48,7 @@ export function createVoiceComponent({
     }
 
     // Records the call intent in the database
-    const callId = await voiceDb.createCall(callerAddress, calleeAddress)
+    const callId = await voiceDb.createPrivateVoiceChat(callerAddress, calleeAddress)
 
     // Send the call to the callee
     await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {

@@ -22,7 +22,7 @@ export async function createVoiceDBComponent(
       const results = await pg.query<{ exists: boolean }>(query)
       return results.rows[0].exists
     },
-    async createCall(callerAddress: string, calleeAddress: string): Promise<string> {
+    async createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
       const query = SQL`
         INSERT INTO private_voice_chats (id, caller_address, callee_address, expires_at)
         VALUES (${randomUUID()}, ${normalizeAddress(callerAddress)}, ${normalizeAddress(calleeAddress)}, ${new Date(Date.now() + PRIVATE_VOICE_CHAT_EXPIRATION_TIME).toISOString()})

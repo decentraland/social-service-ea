@@ -135,7 +135,7 @@ export interface ICommunitiesDatabaseComponent {
 
 export interface IVoiceDatabaseComponent {
   areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
-  createCall(callerAddress: string, calleeAddress: string): Promise<string>
+  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
 }
 
 export interface IRedisComponent extends IBaseComponent {

@@ -25,7 +25,7 @@ let publishInChannelMock: jest.MockedFn<IPubSubComponent['publishInChannel']>
 let areUsersBeingCalledOrCallingSomeoneMock: jest.MockedFn<
   IVoiceDatabaseComponent['areUsersBeingCalledOrCallingSomeone']
 >
-let createCallMock: jest.MockedFn<IVoiceDatabaseComponent['createCall']>
+let createPrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['createPrivateVoiceChat']>
 let getUsersSettingsMock: jest.MockedFn<ISettingsComponent['getUsersSettings']>
 let getFriendshipMock: jest.MockedFn<IFriendsDatabaseComponent['getFriendship']>
 let isUserInAVoiceChatMock: jest.MockedFn<ICommsGatekeeperComponent['isUserInAVoiceChat']>
@@ -36,7 +36,7 @@ beforeEach(() => {
   isUserInAVoiceChatMock = jest.fn()
   publishInChannelMock = jest.fn()
   areUsersBeingCalledOrCallingSomeoneMock = jest.fn()
-  createCallMock = jest.fn()
+  createPrivateVoiceChatMock = jest.fn()
   const logs: ILoggerComponent = {
     getLogger: () => ({
       info: () => undefined,
@@ -49,7 +49,7 @@ beforeEach(() => {
   const pubsub = createMockedPubSubComponent({ publishInChannel: publishInChannelMock })
   const voiceDb = createVoiceDBMockedComponent({
     areUsersBeingCalledOrCallingSomeone: areUsersBeingCalledOrCallingSomeoneMock,
-    createCall: createCallMock
+    createPrivateVoiceChat: createPrivateVoiceChatMock
   })
   const settings = createSettingsMockedComponent({
     getUsersSettings: getUsersSettingsMock
@@ -130,7 +130,7 @@ describe('when starting a private voice chat', () => {
 
       it('should continue with the voice chat creation', async () => {
         await voice.startPrivateVoiceChat(callerAddress, calleeAddress)
-        expect(createCallMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
+        expect(createPrivateVoiceChatMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
       })
     })
   })
@@ -186,7 +186,7 @@ describe('when starting a private voice chat', () => {
 
       it('should continue with the voice chat creation', async () => {
         await voice.startPrivateVoiceChat(callerAddress, calleeAddress)
-        expect(createCallMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
+        expect(createPrivateVoiceChatMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
       })
     })
   })
@@ -246,14 +246,14 @@ describe('when starting a private voice chat', () => {
       beforeEach(() => {
         callId = '1'
         isUserInAVoiceChatMock.mockResolvedValueOnce(false).mockResolvedValueOnce(false)
-        createCallMock.mockResolvedValueOnce(callId)
+        createPrivateVoiceChatMock.mockResolvedValueOnce(callId)
         publishInChannelMock.mockResolvedValueOnce(undefined)
       })
 
       it('should create a voice chat, publish the intent in the pubsub and resolve with the call id', async () => {
         const callId = await voice.startPrivateVoiceChat(callerAddress, calleeAddress)
         expect(callId).toEqual(callId)
-        expect(createCallMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
+        expect(createPrivateVoiceChatMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
         expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
           callId,
           callerAddress,
