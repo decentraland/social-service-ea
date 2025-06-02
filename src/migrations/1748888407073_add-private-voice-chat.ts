@@ -43,7 +43,8 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 }
 
 export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropTable('calls')
-  pgm.dropIndex('calls', 'caller_address')
-  pgm.dropIndex('calls', 'callee_address')
+  pgm.dropIndex('private_voice_chats', 'caller_address')
+  pgm.dropIndex('private_voice_chats', 'callee_address')
+  pgm.dropConstraint('private_voice_chats', 'private_voice_chats_expires_at_check')
+  pgm.dropTable('private_voice_chats')
 }
