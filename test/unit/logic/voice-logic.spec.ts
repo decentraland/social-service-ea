@@ -18,6 +18,7 @@ import {
 import { createSettingsMockedComponent } from '../../mocks/components/settings'
 import { ISettingsComponent } from '../../../src/logic/settings'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
+import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 
 let voice: IVoiceComponent
 let publishInChannelMock: jest.MockedFn<IPubSubComponent['publishInChannel']>
@@ -253,7 +254,7 @@ describe('when starting a private voice chat', () => {
         const callId = await voice.startPrivateVoiceChat(callerAddress, calleeAddress)
         expect(callId).toEqual(callId)
         expect(createCallMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
-        expect(publishInChannelMock).toHaveBeenCalledWith('private-voice-chat', {
+        expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
           callId,
           callerAddress,
           calleeAddress,
