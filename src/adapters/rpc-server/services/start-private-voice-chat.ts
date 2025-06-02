@@ -18,7 +18,7 @@ export function startPrivateVoiceChatService({ components: { logs, voice } }: RP
     context: RpcServerContext
   ): Promise<StartPrivateVoiceChatResponse> {
     try {
-      const callId = await voice.startVoiceChat(context.address, request.calleeAddress)
+      const callId = await voice.startPrivateVoiceChat(context.address, request.calleeAddress)
 
       return {
         response: {

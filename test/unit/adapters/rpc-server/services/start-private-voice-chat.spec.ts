@@ -14,7 +14,7 @@ import {
 } from '../../../../../src/logic/voice/errors'
 
 describe('when starting a private voice chat', () => {
-  let startVoiceChatMock: jest.MockedFn<IVoiceComponent['startVoiceChat']>
+  let startPrivateVoiceChatMock: jest.MockedFn<IVoiceComponent['startPrivateVoiceChat']>
   let logs: jest.Mocked<ILoggerComponent>
   let voice: jest.Mocked<IVoiceComponent>
   let callerAddress: string
@@ -22,12 +22,12 @@ describe('when starting a private voice chat', () => {
   let service: ReturnType<typeof startPrivateVoiceChatService>
 
   beforeEach(async () => {
-    startVoiceChatMock = jest.fn()
+    startPrivateVoiceChatMock = jest.fn()
     callerAddress = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
     calleeAddress = '0xC001010101010101010101010101010101010101'
     logs = createLogsMockedComponent()
     voice = createVoiceMockedComponent({
-      startVoiceChat: startVoiceChatMock
+      startPrivateVoiceChat
     })
     service = startPrivateVoiceChatService({
       components: { voice, logs }
@@ -39,7 +39,7 @@ describe('when starting a private voice chat', () => {
 
     beforeEach(() => {
       callId = '1'
-      startVoiceChatMock.mockResolvedValue(callId)
+      startPrivateVoiceChatMock.mockResolvedValue(callId)
     })
 
     it('should resolve with an ok response and the call id', async () => {
@@ -62,7 +62,7 @@ describe('when starting a private voice chat', () => {
 
   describe('and starting a private voice chat fails with a voice chat not allowed error', () => {
     beforeEach(() => {
-      startVoiceChatMock.mockRejectedValue(new VoiceChatNotAllowedError())
+      startPrivateVoiceChatMock.mockRejectedValue(new VoiceChatNotAllowedError())
     })
 
     it('should resolve with a forbidden request response', async () => {
@@ -87,7 +87,7 @@ describe('when starting a private voice chat', () => {
 
   describe('and starting a private voice chat fails with a users are calling someone else error', () => {
     beforeEach(() => {
-      startVoiceChatMock.mockRejectedValue(new UsersAreCallingSomeoneElseError())
+      startPrivateVoiceChatMock.mockRejectedValue(new UsersAreCallingSomeoneElseError())
     })
 
     it('should resolve with an invalid request response', async () => {
@@ -110,7 +110,7 @@ describe('when starting a private voice chat', () => {
 
   describe('and starting a private voice chat fails with a user already in voice chat error', () => {
     beforeEach(() => {
-      startVoiceChatMock.mockRejectedValue(new UserAlreadyInVoiceChatError(calleeAddress))
+      startPrivateVoiceChatMock.mockRejectedValue(new UserAlreadyInVoiceChatError(calleeAddress))
     })
 
     it('should resolve with a conflicting request response', async () => {
@@ -138,7 +138,7 @@ describe('when starting a private voice chat', () => {
 
     beforeEach(() => {
       errorMessage = 'Internal server error'
-      startVoiceChatMock.mockRejectedValue(new Error(errorMessage))
+      startPrivateVoiceChatMock.mockRejectedValue(new Error(errorMessage))
     })
 
     it('should resolve with an internal server error response', async () => {

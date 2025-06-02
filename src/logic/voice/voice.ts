@@ -13,7 +13,7 @@ export function createVoiceComponent({
 }: Pick<AppComponents, 'logs' | 'settings' | 'commsGatekeeper' | 'voiceDb' | 'friendsDb' | 'pubsub'>): IVoiceComponent {
   const logger = logs.getLogger('voice-logic')
 
-  async function startVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
+  async function startPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
     logger.info(`Starting private voice chat from ${callerAddress} to ${calleeAddress}`)
 
     // Check privacy settings of the callee and the caller
@@ -62,6 +62,6 @@ export function createVoiceComponent({
   }
 
   return {
-    startVoiceChat
+    startPrivateVoiceChat
   }
 }

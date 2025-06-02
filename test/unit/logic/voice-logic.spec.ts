@@ -107,7 +107,9 @@ describe('when starting a private voice chat', () => {
         })
       })
       it('should reject with a voice chat not allowed error', () => {
-        return expect(voice.startVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(VoiceChatNotAllowedError)
+        return expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
+          VoiceChatNotAllowedError
+        )
       })
     })
 
@@ -126,7 +128,7 @@ describe('when starting a private voice chat', () => {
       })
 
       it('should continue with the voice chat creation', async () => {
-        await voice.startVoiceChat(callerAddress, calleeAddress)
+        await voice.startPrivateVoiceChat(callerAddress, calleeAddress)
         expect(createCallMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
       })
     })
@@ -161,7 +163,9 @@ describe('when starting a private voice chat', () => {
       })
 
       it('should reject with a voice chat not allowed error', () => {
-        return expect(voice.startVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(VoiceChatNotAllowedError)
+        return expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
+          VoiceChatNotAllowedError
+        )
       })
     })
 
@@ -180,7 +184,7 @@ describe('when starting a private voice chat', () => {
       })
 
       it('should continue with the voice chat creation', async () => {
-        await voice.startVoiceChat(callerAddress, calleeAddress)
+        await voice.startPrivateVoiceChat(callerAddress, calleeAddress)
         expect(createCallMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
       })
     })
@@ -207,7 +211,7 @@ describe('when starting a private voice chat', () => {
         areUsersBeingCalledOrCallingSomeoneMock.mockResolvedValueOnce(true)
       })
       it('should reject with a users are calling someone else error', () => {
-        return expect(voice.startVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
+        return expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
           UsersAreCallingSomeoneElseError
         )
       })
@@ -218,7 +222,7 @@ describe('when starting a private voice chat', () => {
         isUserInAVoiceChatMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
       })
       it('should reject with a user already in voice chat error', () => {
-        return expect(voice.startVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
+        return expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
           new UserAlreadyInVoiceChatError(calleeAddress)
         )
       })
@@ -229,7 +233,7 @@ describe('when starting a private voice chat', () => {
         isUserInAVoiceChatMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
       })
       it('should reject with a user already in voice chat error', () => {
-        return expect(voice.startVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
+        return expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(
           new UserAlreadyInVoiceChatError(callerAddress)
         )
       })
@@ -246,7 +250,7 @@ describe('when starting a private voice chat', () => {
       })
 
       it('should create a voice chat, publish the intent in the pubsub and resolve with the call id', async () => {
-        const callId = await voice.startVoiceChat(callerAddress, calleeAddress)
+        const callId = await voice.startPrivateVoiceChat(callerAddress, calleeAddress)
         expect(callId).toEqual(callId)
         expect(createCallMock).toHaveBeenCalledWith(callerAddress, calleeAddress)
         expect(publishInChannelMock).toHaveBeenCalledWith('private-voice-chat', {
