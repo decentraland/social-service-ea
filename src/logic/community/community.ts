@@ -36,11 +36,11 @@ export function createCommunityComponent(
 
     getCommunities: async (
       userAddress: string,
-      { pagination, search }: GetCommunitiesOptions
+      options: GetCommunitiesOptions
     ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>> => {
       const [communities, total] = await Promise.all([
-        communitiesDb.getCommunities(userAddress, { pagination, search }),
-        communitiesDb.getCommunitiesCount(userAddress, { search })
+        communitiesDb.getCommunities(userAddress, options),
+        communitiesDb.getCommunitiesCount(userAddress, options)
       ])
       const friendsAddresses = Array.from(new Set(communities.flatMap((community) => community.friends)))
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)

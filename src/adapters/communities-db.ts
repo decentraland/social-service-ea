@@ -147,6 +147,10 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true
       `
 
+      const membersJoin = options.onlyMemberOf
+        ? SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
+        : SQL` LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
+
       const baseQuery = useCTEs([
         getUserFriendsCTE(normalizedMemberAddress),
         getCommunitiesWithMembersCountCTE(),
@@ -154,8 +158,9 @@ export function createCommunitiesDBComponent(
           query: communityFriendsCTE,
           name: 'community_friends'
         }
-      ]).append(
-        SQL`
+      ])
+        .append(
+          SQL`
         SELECT 
           c.id,
           c.name,
@@ -167,12 +172,13 @@ export function createCommunitiesDBComponent(
           cwmc."membersCount",
           COALESCE(cf.friends, ARRAY[]::text[]) as friends
         FROM communities c
+        `
+        )
+        .append(membersJoin).append(SQL`
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
-        LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}
         LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
         LEFT JOIN community_friends cf ON c.id = cf.community_id
-        WHERE cb.banned_address IS NULL AND c.active = true`
-      )
+        WHERE cb.banned_address IS NULL AND c.active = true`)
 
       const query = withSearchAndPagination(baseQuery, options)
 

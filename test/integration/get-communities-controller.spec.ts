@@ -160,6 +160,58 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         })
       })
 
+      describe('and filtering by member role', () => {
+        beforeEach(async () => {
+          // Add the user as a member to one of the communities
+          await components.pg.query(SQL`
+            INSERT INTO community_members (community_id, member_address, role)
+            VALUES (${communityId1}, ${address}, ${CommunityRole.Member})
+          `)
+        })
+
+        afterEach(async () => {
+          // Clean up the member role
+          await components.pg.query(SQL`
+            DELETE FROM community_members 
+            WHERE community_id = ${communityId1} AND member_address = ${address}
+          `)
+        })
+
+        it('should return only communities where the user is a member when onlyMemberOf is true', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyMemberOf=true')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(1)
+          expect(body.data.results[0]).toEqual(
+            expect.objectContaining({
+              id: communityId1,
+              name: 'Test Community 1',
+              role: CommunityRole.Member
+            })
+          )
+          expect(body.data.total).toBe(1)
+        })
+
+        it('should return all communities when onlyMemberOf is false', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyMemberOf=false')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(2)
+          expect(body.data.total).toBe(2)
+        })
+
+        it('should return all communities when onlyMemberOf is not specified', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(2)
+          expect(body.data.total).toBe(2)
+        })
+      })
+
       describe('and the query fails', () => {
         beforeEach(() => {
           spyComponents.communitiesDb.getCommunities.mockRejectedValue(new Error('Unable to get communities'))

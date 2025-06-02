@@ -300,7 +300,7 @@ export function withSearchAndPagination(query: SQLStatement, options?: GetCommun
 
   switch (sortBy) {
     case 'membersCount':
-      query.append(SQL` ORDER BY "membersCount" DESC`)
+      query.append(SQL` ORDER BY "membersCount" DESC, c.name ASC`)
       break
     case 'role':
       query.append(SQL` ORDER BY CASE cm.role
