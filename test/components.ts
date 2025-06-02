@@ -98,7 +98,7 @@ async function initComponents(): Promise<TestComponents> {
   )
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
-  const voiceDb = createVoiceDBComponent({ pg })
+  const voiceDb = await createVoiceDBComponent({ pg, config })
 
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })

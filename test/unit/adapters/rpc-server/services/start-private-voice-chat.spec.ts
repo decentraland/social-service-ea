@@ -1,8 +1,5 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
-import {
-  StartPrivateVoiceChatPayload,
-  StartPrivateVoiceChatResponse
-} from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
+import { StartPrivateVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { startPrivateVoiceChatService } from '../../../../../src/adapters/rpc-server/services/start-private-voice-chat'
 import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
@@ -27,7 +24,7 @@ describe('when starting a private voice chat', () => {
     calleeAddress = '0xC001010101010101010101010101010101010101'
     logs = createLogsMockedComponent()
     voice = createVoiceMockedComponent({
-      startPrivateVoiceChat
+      startPrivateVoiceChat: startPrivateVoiceChatMock
     })
     service = startPrivateVoiceChatService({
       components: { voice, logs }

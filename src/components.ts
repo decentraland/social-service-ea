@@ -94,7 +94,7 @@ export async function initComponents(): Promise<AppComponents> {
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const settings = await createSettingsComponent({ friendsDb })
-  const voiceDb = createVoiceDBComponent({ pg })
+  const voiceDb = await createVoiceDBComponent({ pg, config })
   const voice = await createVoiceComponent({ logs, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
   const sns = await createSnsComponent({ config })
   const subscribersContext = createSubscribersContext()

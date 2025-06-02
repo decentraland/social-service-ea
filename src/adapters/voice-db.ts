@@ -3,8 +3,12 @@ import { randomUUID } from 'node:crypto'
 import { AppComponents, IVoiceDatabaseComponent } from '../types'
 import { normalizeAddress } from '../utils/address'
 
-export function createVoiceDBComponent(components: Pick<AppComponents, 'pg'>): IVoiceDatabaseComponent {
-  const { pg } = components
+export async function createVoiceDBComponent(
+  components: Pick<AppComponents, 'pg' | 'config'>
+): Promise<IVoiceDatabaseComponent> {
+  const { pg, config } = components
+  // Private voice chat expiration time in milliseconds
+  const PRIVATE_VOICE_CHAT_EXPIRATION_TIME = await config.requireNumber('PRIVATE_VOICE_CHAT_EXPIRATION_TIME')
 
   return {
     async areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean> {
@@ -20,8 +24,8 @@ export function createVoiceDBComponent(components: Pick<AppComponents, 'pg'>): I
     },
     async createCall(callerAddress: string, calleeAddress: string): Promise<string> {
       const query = SQL`
-        INSERT INTO private_voice_chats (id, caller_address, callee_address)
-        VALUES (${randomUUID()}, ${normalizeAddress(callerAddress)}, ${normalizeAddress(calleeAddress)})
+        INSERT INTO private_voice_chats (id, caller_address, callee_address, expires_at)
+        VALUES (${randomUUID()}, ${normalizeAddress(callerAddress)}, ${normalizeAddress(calleeAddress)}, ${new Date(Date.now() + PRIVATE_VOICE_CHAT_EXPIRATION_TIME).toISOString()})
         RETURNING id
       `
       const results = await pg.query<{ id: string }>(query)
