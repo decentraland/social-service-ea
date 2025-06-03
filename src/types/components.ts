@@ -220,11 +220,11 @@ export type ITracingComponent = IBaseComponent & {
 }
 
 export type ICommsGatekeeperComponent = {
-  getPrivateVoiceChatKeys: (
+  getPrivateVoiceChatCredentials: (
     roomId: string,
     calleeAddress: string,
     callerAddress: string
-  ) => Promise<Record<string, string>>
+  ) => Promise<Record<string, { url: string; token: string }>>
   isUserInAVoiceChat: (address: string) => Promise<boolean>
   updateUserPrivateMessagePrivacyMetadata: (
     user: string,
