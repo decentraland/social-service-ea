@@ -24,7 +24,7 @@ import { mockLogs } from '../../mocks/components'
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
   let mockCommunityRoles: ICommunityRolesComponent
-  let mockCommunity: Community
+  let mockCommunity: Community & { role: CommunityRole }
   let mockUserAddress: string
   let mockMembersCount: number
 
@@ -496,7 +496,7 @@ describe('when handling community operations', () => {
 
 describe('Community Utils', () => {
   describe('isOwner', () => {
-    const mockCommunity: Community = {
+    const mockCommunity: Community & { role: CommunityRole } = {
       id: 'test-id',
       name: 'Test Community',
       description: 'Test Description',
@@ -523,7 +523,7 @@ describe('Community Utils', () => {
   })
 
   describe('toCommunityWithMembersCount', () => {
-    const mockCommunity: Community = {
+    const mockCommunity: Community & { role: CommunityRole } = {
       id: 'test-id',
       name: 'Test Community',
       description: 'Test Description',

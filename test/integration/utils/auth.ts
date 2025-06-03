@@ -37,7 +37,7 @@ export function createAuthHeaders(
 }
 
 export function makeAuthenticatedRequest(components: Pick<TestComponents, 'localHttpFetch'>) {
-  return (identity: Identity, path: string, method: string = 'GET') => {
+  return (identity: Identity, path: string, method: string = 'GET', body?: any) => {
     const { localHttpFetch } = components
 
     return localHttpFetch.fetch(path, {
@@ -45,7 +45,8 @@ export function makeAuthenticatedRequest(components: Pick<TestComponents, 'local
       headers: {
         'Content-Type': 'application/json',
         ...createAuthHeaders(method, path, {}, identity)
-      }
+      },
+      body: body ? JSON.stringify(body) : undefined
     })
   }
 }
