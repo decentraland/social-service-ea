@@ -221,6 +221,98 @@ export function createCommunityComponent(
       }
 
       await communitiesDb.deleteCommunity(id)
+    },
+
+    banMember: async (communityId: string, bannerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const canBan = await communityRoles.canBanMemberFromCommunity(communityId, bannerAddress, targetAddress)
+
+      if (!canBan) {
+        throw new NotAuthorizedError(
+          `The user ${bannerAddress} doesn't have permission to ban ${targetAddress} from community ${communityId}`
+        )
+      }
+
+      const isTargetMember = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
+
+      if (isTargetMember) {
+        await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
+      }
+
+      await communitiesDb.banMemberFromCommunity(communityId, bannerAddress, targetAddress)
+    },
+
+    unbanMember: async (communityId: string, unbannerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const canUnban = await communityRoles.canUnbanMemberFromCommunity(communityId, unbannerAddress, targetAddress)
+
+      if (!canUnban) {
+        throw new NotAuthorizedError(
+          `The user ${unbannerAddress} doesn't have permission to unban ${targetAddress} from community ${communityId}`
+        )
+      }
+
+      const isBanned = await communitiesDb.isMemberBanned(communityId, targetAddress)
+
+      if (!isBanned) {
+        logger.info(`Target ${targetAddress} is not banned from community ${communityId}, returning 204`)
+        return
+      }
+
+      await communitiesDb.unbanMemberFromCommunity(communityId, unbannerAddress, targetAddress)
+    },
+
+    getBannedMembers: async (
+      id: string,
+      userAddress: EthAddress,
+      pagination: Required<PaginatedParameters>
+    ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
+      const communityExists = await communitiesDb.communityExists(id)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      const memberRole = await communitiesDb.getCommunityMemberRole(id, userAddress)
+
+      if (memberRole === CommunityRole.None) {
+        throw new NotAuthorizedError("The user doesn't have permission to get banned members")
+      }
+
+      const bannedMembers = await communitiesDb.getBannedMembers(id, pagination)
+      const totalBannedMembers = await communitiesDb.getBannedMembersCount(id)
+
+      const profiles = await catalystClient.getProfiles(bannedMembers.map((member) => member.memberAddress))
+
+      const membersWithProfile: CommunityMemberProfile[] = bannedMembers
+        .map((communityMember) => {
+          const memberProfile = profiles.find(
+            (profile) => profile.avatars?.[0]?.ethAddress?.toLowerCase() === communityMember.memberAddress.toLowerCase()
+          )
+
+          if (!memberProfile) {
+            return undefined
+          }
+
+          return {
+            ...communityMember,
+            hasClaimedName: getProfileHasClaimedName(memberProfile),
+            name: getProfileName(memberProfile)
+          }
+        })
+        .filter((member: CommunityMemberProfile | undefined): member is CommunityMemberProfile => member !== undefined)
+
+      return { members: membersWithProfile, totalMembers: totalBannedMembers }
     }
   }
 }

@@ -1,5 +1,4 @@
-import { IHttpServerComponent } from '@well-known-components/interfaces'
-import { HandlerContextWithPath } from '../../types'
+import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../logic/community'
 import { errorMessageOrDefault } from '../../utils/errors'
@@ -11,7 +10,7 @@ export async function removeMemberFromCommunityHandler(
     HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members/:memberAddress'>,
     'components' | 'params' | 'verification'
   >
-): Promise<IHttpServerComponent.IResponse> {
+): Promise<HTTPResponse> {
   const {
     components: { community, logs },
     params: { id: communityId, memberAddress: memberToRemoveAddress },

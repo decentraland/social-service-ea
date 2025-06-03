@@ -17,5 +17,10 @@ export const mockCommunitiesDB: jest.Mocked<ICommunitiesDatabaseComponent> = {
   isMemberOfCommunity: jest.fn(),
   communityExists: jest.fn(),
   getCommunityMemberRoles: jest.fn(),
-  kickMemberFromCommunity: jest.fn()
+  kickMemberFromCommunity: jest.fn(),
+  banMemberFromCommunity: jest.fn(),
+  unbanMemberFromCommunity: jest.fn(),
+  isMemberBanned: jest.fn(),
+  getBannedMembers: jest.fn(),
+  getBannedMembersCount: jest.fn()
 }
