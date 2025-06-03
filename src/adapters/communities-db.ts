@@ -201,7 +201,7 @@ export function createCommunitiesDBComponent(
         )
         .append(membersJoin).append(SQL`
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
-        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = cm.member_address
         LEFT JOIN community_friends cf ON c.id = cf.community_id
         WHERE cb.banned_address IS NULL AND c.active = true`)
 
