@@ -116,12 +116,8 @@ export function createVoiceComponent({
     logger.info(`Rejecting voice chat for call ${callId}`)
 
     const privateVoiceChat = await voiceDb.getPrivateVoiceChat(callId)
-    if (!privateVoiceChat) {
+    if (!privateVoiceChat || privateVoiceChat.callee_address !== calleeAddress) {
       throw new VoiceChatNotFoundError(callId)
-    }
-
-    if (privateVoiceChat.callee_address !== calleeAddress) {
-      throw new VoiceChatNotAllowedError()
     }
 
     if (privateVoiceChat.expires_at < new Date()) {

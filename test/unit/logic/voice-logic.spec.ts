@@ -428,8 +428,8 @@ describe('when rejecting a private voice chat', () => {
         privateVoiceChat.callee_address = '0x123'
       })
 
-      it('should reject with a voice chat not allowed error', () => {
-        return expect(voice.rejectPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotAllowedError)
+      it('should reject with a voice chat not found error', () => {
+        return expect(voice.rejectPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
       })
     })
 

@@ -36,15 +36,6 @@ export function rejectPrivateVoiceChatService({ components: { logs, voice } }: R
             }
           }
         }
-      } else if (error instanceof VoiceChatNotAllowedError) {
-        return {
-          response: {
-            $case: 'forbiddenError',
-            forbiddenError: {
-              message: errorMessage
-            }
-          }
-        }
       } else if (error instanceof VoiceChatExpiredError) {
         return {
           response: {

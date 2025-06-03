@@ -3,11 +3,7 @@ import { rejectPrivateVoiceChatService } from '../../../../../src/adapters/rpc-s
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
-import {
-  VoiceChatExpiredError,
-  VoiceChatNotAllowedError,
-  VoiceChatNotFoundError
-} from '../../../../../src/logic/voice/errors'
+import { VoiceChatExpiredError, VoiceChatNotFoundError } from '../../../../../src/logic/voice/errors'
 import { RejectPrivateVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('when rejecting a private voice chat', () => {
