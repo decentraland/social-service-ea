@@ -4,8 +4,9 @@ import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-co
 import { CommunityNotFoundError } from '../../logic/community'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { EthAddress } from '@dcl/schemas'
+import { normalizeAddress } from '../../utils/address'
 
-export async function kickMemberHandler(
+export async function removeMemberFromCommunityHandler(
   context: Pick<
     HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members/:memberAddress'>,
     'components' | 'params' | 'verification'
@@ -13,26 +14,25 @@ export async function kickMemberHandler(
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     components: { community, logs },
-    params: { id: communityId, memberAddress: memberToKickAddress },
+    params: { id: communityId, memberAddress: memberToRemoveAddress },
     verification
   } = context
 
   const logger = logs.getLogger('kick-member-handler')
-  const kickerAddress = verification!.auth.toLowerCase()
+  const removerAddress = normalizeAddress(verification!.auth)
+  const normalizedMemberToRemoveAddress = normalizeAddress(memberToRemoveAddress)
 
-  logger.info(`Removing member ${memberToKickAddress} from community ${communityId}`)
+  logger.info(`Removing member ${memberToRemoveAddress} from community ${communityId}`)
 
   try {
-    if (!EthAddress.validate(memberToKickAddress)) {
-      throw new InvalidRequestError(`Invalid address to remove ${memberToKickAddress}`)
+    if (!EthAddress.validate(normalizedMemberToRemoveAddress)) {
+      throw new InvalidRequestError(`Invalid address to remove ${normalizedMemberToRemoveAddress}`)
     }
 
-    // If the user is removing themselves, it's a leave operation
-    if (kickerAddress.toLowerCase() === memberToKickAddress.toLowerCase()) {
-      await community.leaveCommunity(communityId, kickerAddress)
+    if (removerAddress === normalizedMemberToRemoveAddress) {
+      await community.leaveCommunity(communityId, removerAddress)
     } else {
-      // Otherwise it's a kick operation
-      await community.kickMember(communityId, kickerAddress, memberToKickAddress)
+      await community.kickMember(communityId, removerAddress, normalizedMemberToRemoveAddress)
     }
 
     return {
@@ -40,7 +40,9 @@ export async function kickMemberHandler(
     }
   } catch (error) {
     const message = errorMessageOrDefault(error)
-    logger.error(`Error removing member: ${memberToKickAddress} from community: ${communityId}, error: ${message}`)
+    logger.error(
+      `Error removing member: ${normalizedMemberToRemoveAddress} from community: ${communityId}, error: ${message}`
+    )
 
     if (
       error instanceof CommunityNotFoundError ||

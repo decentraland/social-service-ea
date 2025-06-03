@@ -4,10 +4,10 @@ import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/
 import { mockCommunity } from '../mocks/community'
 import { randomUUID } from 'crypto'
 
-test('Kick Member Controller', function ({ components, spyComponents }) {
+test('Remove Member from Community Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
-  describe('when kicking a member', () => {
+  describe('when removing a member from a community', () => {
     let identity: Identity
     let kickerAddress: string
     let communityId: string

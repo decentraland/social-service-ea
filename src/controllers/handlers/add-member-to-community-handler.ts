@@ -5,7 +5,7 @@ import { CommunityNotFoundError } from '../../logic/community'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { EthAddress } from '@dcl/schemas'
 
-export async function joinCommunityHandler(
+export async function addMemberToCommunityHandler(
   context: Pick<
     HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members'>,
     'components' | 'params' | 'verification'

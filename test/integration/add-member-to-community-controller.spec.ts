@@ -4,10 +4,10 @@ import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/
 import { mockCommunity } from '../mocks/community'
 import { randomUUID } from 'crypto'
 
-test('Join Community Controller', function ({ components, spyComponents }) {
+test('Add Member to Community Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
-  describe('when joining a community', () => {
+  describe('when adding a member to a community', () => {
     let identity: Identity
     let memberAddress: string
     let communityId: string
