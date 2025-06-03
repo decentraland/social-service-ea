@@ -12,16 +12,18 @@ import {
   MemberCommunity
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
-import { PaginatedParameters } from '@dcl/schemas'
+import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 import { getProfileHasClaimedName, getProfileName } from '../profiles'
 
 export function createCommunityComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient'>
+  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs'>
 ): ICommunityComponent {
-  const { communitiesDb, catalystClient } = components
+  const { communitiesDb, catalystClient, communityRoles, logs } = components
+
+  const logger = logs.getLogger('community-component')
 
   return {
-    getCommunity: async (id: string, userAddress: string): Promise<CommunityWithMembersCount> => {
+    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount> => {
       const [community, membersCount] = await Promise.all([
         communitiesDb.getCommunity(id, userAddress),
         communitiesDb.getCommunityMembersCount(id)
@@ -65,7 +67,7 @@ export function createCommunityComponent(
       }
     },
 
-    deleteCommunity: async (id: string, userAddress: string): Promise<void> => {
+    deleteCommunity: async (id: string, userAddress: EthAddress): Promise<void> => {
       const community = await communitiesDb.getCommunity(id, userAddress)
 
       if (!community) {
@@ -81,7 +83,7 @@ export function createCommunityComponent(
 
     getCommunityMembers: async (
       id: string,
-      userAddress: string,
+      userAddress: EthAddress,
       pagination: Required<PaginatedParameters>
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
       const communityExists = await communitiesDb.communityExists(id)
@@ -131,6 +133,31 @@ export function createCommunityComponent(
         communitiesDb.getCommunitiesCount(memberAddress, { onlyMemberOf: true })
       ])
       return { communities, total }
+    },
+
+    kickMember: async (communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const isTargetMember = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
+
+      if (!isTargetMember) {
+        logger.info(`Target ${targetAddress} is not a member of community ${communityId}, returning 204`)
+        return
+      }
+
+      const canKick = await communityRoles.canKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
+
+      if (!canKick) {
+        throw new NotAuthorizedError(
+          `The user ${kickerAddress} doesn't have permission to kick ${targetAddress} from community ${communityId}`
+        )
+      }
+
+      await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
     }
   }
 }

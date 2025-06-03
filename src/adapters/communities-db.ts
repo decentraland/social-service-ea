@@ -19,6 +19,7 @@ import {
   getCommunitiesWithMembersCountCTE,
   withSearchAndPagination
 } from '../logic/queries'
+import { EthAddress } from '@dcl/schemas'
 
 export function createCommunitiesDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs'>
@@ -37,7 +38,18 @@ export function createCommunitiesDBComponent(
       return result.rows[0]?.exists ?? false
     },
 
-    async getCommunity(id: string, userAddress: string): Promise<Community> {
+    async isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean> {
+      const query = SQL`
+        SELECT EXISTS (
+          SELECT 1 FROM community_members cm
+          WHERE cm.community_id = ${communityId} AND cm.member_address = ${normalizeAddress(userAddress)}
+        ) AS "isMember"
+      `
+      const result = await pg.query<{ isMember: boolean }>(query)
+      return result.rows[0]?.isMember ?? false
+    },
+
+    async getCommunity(id: string, userAddress: EthAddress): Promise<Community> {
       const query = SQL`
         SELECT 
           c.id,
@@ -77,19 +89,32 @@ export function createCommunitiesDBComponent(
       return result.rows
     },
 
-    async getCommunityMemberRole(id: string, userAddress: string): Promise<CommunityRole> {
+    async getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole> {
+      const roles = await this.getCommunityMemberRoles(id, [userAddress])
+      return roles[userAddress] ?? CommunityRole.None
+    },
+
+    async getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>> {
+      const normalizedUserAddresses = userAddresses.map(normalizeAddress)
+
       const query = SQL`
-        SELECT cm.role
+        SELECT cm.member_address AS "memberAddress", cm.role AS "role"
         FROM community_members cm
         LEFT JOIN community_bans cb ON cm.member_address = cb.banned_address
           AND cb.community_id = cm.community_id
           AND cb.active = true
         WHERE cm.community_id = ${id}
-          AND cm.member_address = ${normalizeAddress(userAddress)}
+          AND cm.member_address = ANY(${normalizedUserAddresses})
           AND cb.banned_address IS NULL
       `
-      const result = await pg.query<{ role: CommunityRole }>(query)
-      return result.rows[0]?.role ?? CommunityRole.None
+      const result = await pg.query<{ memberAddress: string; role: CommunityRole }>(query)
+      return result.rows.reduce(
+        (acc, row) => {
+          acc[row.memberAddress] = row.role ?? CommunityRole.None
+          return acc
+        },
+        {} as Record<string, CommunityRole>
+      )
     },
 
     async getCommunityMembersCount(communityId: string): Promise<number> {
@@ -125,7 +150,7 @@ export function createCommunitiesDBComponent(
     },
 
     async getCommunities(
-      memberAddress: string,
+      memberAddress: EthAddress,
       options: GetCommunitiesOptions
     ): Promise<CommunityWithMembersCountAndFriends[]> {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
@@ -176,7 +201,7 @@ export function createCommunitiesDBComponent(
         )
         .append(membersJoin).append(SQL`
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
-        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = cm.member_address
         LEFT JOIN community_friends cf ON c.id = cf.community_id
         WHERE cb.banned_address IS NULL AND c.active = true`)
 
@@ -187,7 +212,7 @@ export function createCommunitiesDBComponent(
     },
 
     async getCommunitiesCount(
-      memberAddress: string,
+      memberAddress: EthAddress,
       options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf'>
     ): Promise<number> {
       const { search, onlyMemberOf } = options ?? {}
@@ -249,7 +274,7 @@ export function createCommunitiesDBComponent(
     },
 
     async getMemberCommunities(
-      memberAddress: string,
+      memberAddress: EthAddress,
       options: Pick<GetCommunitiesOptions, 'pagination'>
     ): Promise<MemberCommunity[]> {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
@@ -294,6 +319,13 @@ export function createCommunitiesDBComponent(
       const query = SQL`
         INSERT INTO community_members (community_id, member_address, role)
         VALUES (${member.communityId}, ${normalizeAddress(member.memberAddress)}, ${member.role})
+      `
+      await pg.query(query)
+    },
+
+    async kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void> {
+      const query = SQL`
+        DELETE FROM community_members WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
       `
       await pg.query(query)
     }

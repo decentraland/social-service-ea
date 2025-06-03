@@ -7,7 +7,7 @@ import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
+import { EthAddress, FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
@@ -112,25 +112,31 @@ export interface IFriendsDatabaseComponent {
 
 export interface ICommunitiesDatabaseComponent {
   communityExists(communityId: string): Promise<boolean>
-  getCommunity(id: string, userAddress: string): Promise<Community | null>
+  isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
+  getCommunity(id: string, userAddress: EthAddress): Promise<Community | null>
   getCommunityMembers(id: string, pagination: Pagination): Promise<CommunityMember[]>
-  getCommunityMemberRole(id: string, userAddress: string): Promise<CommunityRole>
+  getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
+  getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
   getCommunityPlaces(communityId: string): Promise<string[]>
   getCommunityMembersCount(communityId: string): Promise<number>
-  getCommunities(memberAddress: string, options: GetCommunitiesOptions): Promise<CommunityWithMembersCountAndFriends[]>
+  getCommunities(
+    memberAddress: EthAddress,
+    options: GetCommunitiesOptions
+  ): Promise<CommunityWithMembersCountAndFriends[]>
   getCommunitiesCount(
-    memberAddress: string,
+    memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf'>
   ): Promise<number>
   getCommunitiesPublicInformation(options: GetCommunitiesOptions): Promise<CommunityPublicInformation[]>
   getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
   getMemberCommunities(
-    memberAddress: string,
+    memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ): Promise<MemberCommunity[]>
   createCommunity(community: CommunityDB): Promise<{ id: string }>
   deleteCommunity(id: string): Promise<void>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
+  kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
 }
 
 export interface IRedisComponent extends IBaseComponent {
