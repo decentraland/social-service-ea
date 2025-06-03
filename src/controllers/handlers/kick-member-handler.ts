@@ -12,29 +12,35 @@ export async function kickMemberHandler(
   >
 ): Promise<IHttpServerComponent.IResponse> {
   const {
-    components: { community },
+    components: { community, logs },
     params: { id: communityId, memberAddress: memberToKickAddress },
     verification
   } = context
 
-  const logger = context.components.logs.getLogger('kick-member-handler')
+  const logger = logs.getLogger('kick-member-handler')
+  const kickerAddress = verification!.auth.toLowerCase()
 
-  logger.info(`Kicking member ${memberToKickAddress} from community ${communityId}`)
+  logger.info(`Removing member ${memberToKickAddress} from community ${communityId}`)
 
   try {
-    const kickerAddress = verification!.auth.toLowerCase()
-
     if (!EthAddress.validate(memberToKickAddress)) {
-      throw new InvalidRequestError(`Invalid address to kick ${memberToKickAddress}`)
+      throw new InvalidRequestError(`Invalid address to remove ${memberToKickAddress}`)
     }
 
-    await community.kickMember(communityId, kickerAddress, memberToKickAddress)
+    // If the user is removing themselves, it's a leave operation
+    if (kickerAddress.toLowerCase() === memberToKickAddress.toLowerCase()) {
+      await community.leaveCommunity(communityId, kickerAddress)
+    } else {
+      // Otherwise it's a kick operation
+      await community.kickMember(communityId, kickerAddress, memberToKickAddress)
+    }
+
     return {
       status: 204
     }
   } catch (error) {
     const message = errorMessageOrDefault(error)
-    logger.error(`Error kicking member: ${memberToKickAddress} from community: ${communityId}, error: ${message}`)
+    logger.error(`Error removing member: ${memberToKickAddress} from community: ${communityId}, error: ${message}`)
 
     if (
       error instanceof CommunityNotFoundError ||

@@ -23,6 +23,8 @@ export type ICommunityComponent = {
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ) => Promise<GetCommunitiesWithTotal<MemberCommunity>>
   kickMember: (communityId: string, kickerAddress: EthAddress, memberToKickAddress: EthAddress) => Promise<void>
+  joinCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
+  leaveCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
 }
 
 export type ICommunityRolesComponent = {
