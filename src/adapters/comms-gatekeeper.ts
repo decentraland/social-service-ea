@@ -89,8 +89,7 @@ export const createCommsGatekeeperComponent = async ({
         throw new Error(`Server responded with status ${response.status}`)
       }
 
-      const data = await response.json()
-      return data.keys
+      return await response.json()
     } catch (error) {
       logger.error(
         `Failed to get private voice chat keys for user ${calleeAddress} and ${callerAddress}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`

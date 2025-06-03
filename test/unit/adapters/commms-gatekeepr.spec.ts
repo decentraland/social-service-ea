@@ -167,9 +167,9 @@ describe('when getting the private voice chat credentials', () => {
       })
     })
 
-    it('should resolve with the keys', async () => {
-      const keys = await commsGatekeeper.getPrivateVoiceChatCredentials(roomId, calleeAddress, callerAddress)
-      expect(keys).toEqual(response)
+    it('should resolve with the credentials', async () => {
+      const credentials = await commsGatekeeper.getPrivateVoiceChatCredentials(roomId, calleeAddress, callerAddress)
+      expect(credentials).toEqual(response)
     })
   })
 

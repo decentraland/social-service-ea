@@ -26,6 +26,7 @@ import { mockSns } from '../../mocks/components/sns'
 import * as updates from '../../../src/logic/updates'
 import { createSettingsMockedComponent } from '../../mocks/components/settings'
 import { createVoiceMockedComponent } from '../../mocks/components/voice'
+import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -51,11 +52,7 @@ describe('createRpcServerComponent', () => {
     setHandlerMock = rpcServerMock.setHandler as jest.Mock
     attachTransportMock = rpcServerMock.attachTransport as jest.Mock
 
-    const mockCommsGatekeeper: ICommsGatekeeperComponent = {
-      updateUserPrivateMessagePrivacyMetadata: jest.fn(),
-      isUserInAVoiceChat: jest.fn()
-    }
-
+    const mockCommsGatekeeper: ICommsGatekeeperComponent = createCommsGatekeeperMockedComponent({})
     const mockSettings = createSettingsMockedComponent({})
     const mockVoice = createVoiceMockedComponent({})
 
