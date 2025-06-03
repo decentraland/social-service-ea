@@ -33,7 +33,83 @@ paths:
           description: Unauthorized - Signed Fetch required
       tags:
         - Communities
+    delete:
+      summary: Delete a community
+      description: |
+        Deletes a community. Requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+      responses:
+        '204':
+          description: Community deleted successfully
+        '401':
+          description: Unauthorized - Signed Fetch required
+      tags:
+        - Communities
   /v1/communities:
+    get:
+      summary: List communities
+      description: |
+        Returns a paginated list of communities. Signed Fetch is optional:
+        - If provided, returns user-specific fields (role, friends, isLive).
+        - If not provided, returns only public information.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Max number of results per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of results to skip.
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search term for filtering communities.
+        - name: onlyMemberOf
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, only return communities the user is a member of.
+      responses:
+        '200':
+          description: Paginated list of communities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          oneOf:
+                            - $ref: './communities-schemas.yaml#/components/schemas/CommunityWithUserInformation'
+                            - $ref: './communities-schemas.yaml#/components/schemas/CommunityPublicInformation'
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      pages:
+                        type: integer
+                      limit:
+                        type: integer
+      tags:
+        - Communities
     post:
       summary: Create a new community
       description: |
@@ -59,6 +135,133 @@ paths:
                     $ref: './communities-schemas.yaml#/components/schemas/Community'
         '400':
           description: Invalid request body
+        '401':
+          description: Unauthorized - Signed Fetch required
+      tags:
+        - Communities
+  /v1/communities/{id}/members:
+    get:
+      summary: Get community members
+      description: |
+        Returns a paginated list of members for a specific community. Requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Max number of results per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of results to skip.
+      responses:
+        '200':
+          description: Paginated list of community members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: './communities-schemas.yaml#/components/schemas/CommunityMemberProfile'
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      pages:
+                        type: integer
+                      limit:
+                        type: integer
+        '401':
+          description: Unauthorized - Signed Fetch required
+      tags:
+        - Communities
+  /v1/communities/{id}/members/{memberAddress}:
+    delete:
+      summary: Kick a member from a community
+      description: |
+        Removes a member from a community. Requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: memberAddress
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The address of the member to remove.
+      responses:
+        '204':
+          description: Member kicked successfully
+        '401':
+          description: Unauthorized - Signed Fetch required
+      tags:
+        - Communities
+  /v1/members/{address}/communities:
+    get:
+      summary: List communities for a member
+      description: |
+        Returns a paginated list of communities that the specified member belongs to. Requires Signed Fetch authentication. Only the user themselves can access this endpoint.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The address of the member.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Max number of results per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of results to skip.
+      responses:
+        '200':
+          description: Paginated list of member communities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: './communities-schemas.yaml#/components/schemas/MemberCommunity'
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      pages:
+                        type: integer
+                      limit:
+                        type: integer
         '401':
           description: Unauthorized - Signed Fetch required
       tags:

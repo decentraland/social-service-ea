@@ -60,3 +60,92 @@ components:
             membersCount:
               type: integer
               description: The number of members in the community.
+
+    CommunityWithUserInformation:
+      allOf:
+        - $ref: '#/components/schemas/CommunityWithMembersCount'
+        - type: object
+          required:
+            - friends
+            - isLive
+          properties:
+            friends:
+              type: array
+              items:
+                $ref: '#/components/schemas/FriendProfile'
+            isLive:
+              type: boolean
+
+    CommunityPublicInformation:
+      allOf:
+        - $ref: '#/components/schemas/Community'
+        - type: object
+          required:
+            - membersCount
+            - isLive
+            - privacy
+          properties:
+            membersCount:
+              type: integer
+            isLive:
+              type: boolean
+            privacy:
+              type: string
+              enum: [public]
+
+    CommunityMemberProfile:
+      type: object
+      required:
+        - communityId
+        - memberAddress
+        - role
+        - joinedAt
+        - hasClaimedName
+        - name
+      properties:
+        communityId:
+          type: string
+        memberAddress:
+          type: string
+        role:
+          type: string
+          enum: [Owner, Moderator, Member, None]
+        joinedAt:
+          type: string
+          format: date-time
+        hasClaimedName:
+          type: boolean
+        name:
+          type: string
+
+    MemberCommunity:
+      type: object
+      required:
+        - id
+        - name
+        - ownerAddress
+        - role
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ownerAddress:
+          type: string
+        role:
+          type: string
+          enum: [Owner, Moderator, Member, None]
+        thumbnails:
+          type: object
+          additionalProperties:
+            type: string
+          description: A map of thumbnail types to URLs.
+
+    FriendProfile:
+      type: object
+      description: Minimal friend profile structure (customize as needed)
+      properties:
+        address:
+          type: string
+        name:
+          type: string
