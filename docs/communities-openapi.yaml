@@ -1,0 +1,65 @@
+openapi: 3.0.0
+info:
+  title: Social Service API
+  version: 1.0.0
+  description: API documentation for the Social Service.
+# servers:
+#   - url: https://social-service-ea.decentraland.org
+
+paths:
+  /v1/communities/{id}:
+    get:
+      summary: Get a community by ID
+      description: |
+        Retrieves a specific community by its unique ID.
+        This endpoint requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+      responses:
+        '200':
+          description: Community found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/CommunityWithMembersCount'
+        '404':
+          description: Community not found
+        '401':
+          description: Unauthorized - Signed Fetch required
+      tags:
+        - Communities
+  /v1/communities:
+    post:
+      summary: Create a new community
+      description: |
+        Creates a new community with the provided details.
+        This endpoint requires Signed Fetch authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './communities-schemas.yaml#/components/schemas/CreateCommunityRequest'
+      responses:
+        '201':
+          description: Community created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: './communities-schemas.yaml#/components/schemas/Community'
+        '400':
+          description: Invalid request body
+        '401':
+          description: Unauthorized - Signed Fetch required
+      tags:
+        - Communities

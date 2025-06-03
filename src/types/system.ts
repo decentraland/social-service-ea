@@ -31,7 +31,7 @@ import {
   ICommunitiesDbHelperComponent,
   IVoiceDatabaseComponent
 } from './components'
-import { ICommunityComponent } from '../logic/community'
+import { ICommunityComponent, ICommunityRolesComponent } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
 
@@ -45,6 +45,7 @@ export type BaseComponents = {
   catalystClient: ICatalystClientComponent
   commsGatekeeper: ICommsGatekeeperComponent
   community: ICommunityComponent
+  communityRoles: ICommunityRolesComponent
   communitiesDb: ICommunitiesDatabaseComponent
   config: IConfigComponent
   fetcher: IFetchComponent

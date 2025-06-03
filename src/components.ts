@@ -29,8 +29,8 @@ import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
 import { createVoiceComponent } from './logic/voice'
 import { createSettingsComponent } from './logic/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
-import { createCommunityComponent } from './logic/community'
 import { createVoiceDBComponent } from './adapters/voice-db'
+import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -117,13 +117,15 @@ export async function initComponents(): Promise<AppComponents> {
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
-  const community = createCommunityComponent({ communitiesDb, catalystClient })
+  const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
+  const community = createCommunityComponent({ communitiesDb, catalystClient, communityRoles, logs })
 
   return {
     archipelagoStats,
     catalystClient,
     commsGatekeeper,
     community,
+    communityRoles,
     config,
     friendsDb,
     communitiesDb,

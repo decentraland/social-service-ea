@@ -59,7 +59,7 @@ export const createCommsGatekeeperComponent = async ({
       }
 
       const data = await response.json()
-      return data.is_in_a_voice_chat
+      return Boolean(data.is_user_in_voice_chat)
     } catch (error) {
       logger.error(
         `Failed to check if user ${address} is in a voice chat: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`

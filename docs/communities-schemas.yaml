@@ -1,0 +1,62 @@
+components:
+  schemas:
+    CreateCommunityRequest:
+      type: object
+      required:
+        - name
+        - description
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        thumbnails:
+          type: object
+          additionalProperties:
+            type: string
+          description: A map of thumbnail types to URLs.
+
+    Community:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - ownerAddress
+        - privacy
+        - active
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        ownerAddress:
+          type: string
+        privacy:
+          type: string
+          enum: [public, private]
+        active:
+          type: boolean
+        thumbnails:
+          type: object
+          additionalProperties:
+            type: string
+          description: A map of thumbnail types to URLs.
+
+    CommunityWithMembersCount:
+      allOf:
+        - $ref: '#/components/schemas/Community'
+        - type: object
+          required:
+            - role
+            - membersCount
+          properties:
+            role:
+              type: string
+              description: The role of the user in the community.
+              enum: [Owner, Moderator, Member, None]
+            membersCount:
+              type: integer
+              description: The number of members in the community.

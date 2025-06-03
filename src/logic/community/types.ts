@@ -1,26 +1,40 @@
 import { FriendProfile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { CommunityRole, Pagination } from '../../types/entities'
-import { PaginatedParameters } from '@dcl/schemas'
+import { CommunityRole, Pagination, CommunityPermission } from '../../types/entities'
+import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export type ICommunityComponent = {
-  getCommunity: (id: string, userAddress: string) => Promise<CommunityWithMembersCount>
+  getCommunity: (id: string, userAddress: EthAddress) => Promise<CommunityWithMembersCount>
   getCommunities: (
-    userAddress: string,
+    userAddress: EthAddress,
     options: GetCommunitiesOptions
   ) => Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>>
   getCommunitiesPublicInformation: (
     options: GetCommunitiesOptions
   ) => Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
-  deleteCommunity: (id: string, userAddress: string) => Promise<void>
+  deleteCommunity: (id: string, userAddress: EthAddress) => Promise<void>
+  createCommunity: (community: Omit<Community, 'id' | 'active' | 'privacy'>) => Promise<Community>
   getCommunityMembers: (
     id: string,
-    userAddress: string,
+    userAddress: EthAddress,
     pagination: Required<PaginatedParameters>
   ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
   getMemberCommunities: (
-    memberAddress: string,
+    memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ) => Promise<GetCommunitiesWithTotal<MemberCommunity>>
+  kickMember: (communityId: string, kickerAddress: EthAddress, memberToKickAddress: EthAddress) => Promise<void>
+  joinCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
+  leaveCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
+}
+
+export type ICommunityRolesComponent = {
+  hasPermission: (role: CommunityRole, permission: CommunityPermission) => boolean
+  getRolePermissions: (role: CommunityRole) => CommunityPermission[]
+  canKickMemberFromCommunity: (
+    communityId: string,
+    kickerAddress: string,
+    memberToKickAddress: string
+  ) => Promise<boolean>
 }
 
 export type CommunityDB = {
@@ -40,7 +54,6 @@ export type Community = {
   name: string
   description: string
   ownerAddress: string
-  role: CommunityRole
   privacy: 'public' | 'private'
   active: boolean
 }
@@ -58,6 +71,7 @@ export type CommunityMemberProfile = CommunityMember & {
 }
 
 export type CommunityWithMembersCount = Community & {
+  role: CommunityRole
   membersCount: number
 }
 
@@ -87,4 +101,4 @@ export type GetCommunitiesWithTotal<T> = {
   total: number
 }
 
-export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress' | 'role'>
+export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress'> & { role: CommunityRole }
