@@ -2,6 +2,7 @@ import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { HTTPResponse } from '../../types/http'
 import { HandlerContextWithPath } from '../../types/http'
 import { Community } from '../../logic/community'
+import { InvalidRequestError } from '@dcl/platform-server-commons'
 
 export async function createCommunityHandler(
   context: HandlerContextWithPath<'community' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
@@ -18,17 +19,13 @@ export async function createCommunityHandler(
 
   const body: Pick<Community, 'name' | 'description' | 'thumbnails'> = await request.json()
 
-  if (!body.name || !body.description || !body.thumbnails) {
+  // TODO: add thumbnails validation when implemented
+  if (!body.name || !body.description) {
     logger.error('Invalid request body while creating Community', {
       body: JSON.stringify(body)
     })
 
-    return {
-      status: 400,
-      body: {
-        message: 'Invalid request body'
-      }
-    }
+    throw new InvalidRequestError('Invalid request body')
   }
 
   logger.info('Creating community', {

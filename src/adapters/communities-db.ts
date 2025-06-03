@@ -49,7 +49,7 @@ export function createCommunitiesDBComponent(
       return result.rows[0]?.isMember ?? false
     },
 
-    async getCommunity(id: string, userAddress: string): Promise<Community & { role: CommunityRole }> {
+    async getCommunity(id: string, userAddress: EthAddress): Promise<Community & { role: CommunityRole }> {
       const query = SQL`
         SELECT 
           c.id,
