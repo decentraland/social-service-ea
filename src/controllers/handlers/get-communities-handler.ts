@@ -19,7 +19,7 @@ export async function getCommunitiesHandler(
   const userAddress = verification?.auth.toLowerCase()
   const pagination = getPaginationParams(url.searchParams)
   const search = url.searchParams.get('search')
-  const onlyMemberOf = url.searchParams.get('onlyMemberOf') === 'true'
+  const onlyMemberOf = url.searchParams.get('onlyMemberOf')?.toLowerCase() === 'true'
 
   try {
     const { communities, total } = userAddress
