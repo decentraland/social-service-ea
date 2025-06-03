@@ -18,24 +18,22 @@ export async function banMemberHandler(
   } = context
 
   const logger = logs.getLogger('ban-member-handler')
-  const banningUserAddress = normalizeAddress(verification!.auth)
-  const normalizedBannedMemberAddress = normalizeAddress(memberAddress)
+  const addressPerformingBan = normalizeAddress(verification!.auth)
+  const addressToBan = normalizeAddress(memberAddress)
 
   try {
-    if (!EthAddress.validate(normalizedBannedMemberAddress)) {
+    if (!EthAddress.validate(addressToBan)) {
       throw new InvalidRequestError('Invalid member address')
     }
 
-    logger.info(`Banning member ${normalizedBannedMemberAddress} from community ${communityId}`)
+    logger.info(`Banning member ${addressToBan} from community ${communityId}`)
 
-    await community.banMember(communityId, banningUserAddress, normalizedBannedMemberAddress)
+    await community.banMember(communityId, addressPerformingBan, addressToBan)
 
     return { status: 204 }
   } catch (error) {
     const message = errorMessageOrDefault(error)
-    logger.error(
-      `Error banning member: ${normalizedBannedMemberAddress} from community: ${communityId}, error: ${message}`
-    )
+    logger.error(`Error banning member: ${addressToBan} from community: ${communityId}, error: ${message}`)
 
     if (
       error instanceof InvalidRequestError ||

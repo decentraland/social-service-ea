@@ -19,24 +19,22 @@ export async function unbanMemberHandler(
 
   const logger = logs.getLogger('unban-member-handler')
 
-  const unbanningUserAddress = normalizeAddress(verification!.auth)
-  const normalizedUnbannedMemberAddress = normalizeAddress(memberAddress)
+  const addressPerformingUnban = normalizeAddress(verification!.auth)
+  const userAddressToUnban = normalizeAddress(memberAddress)
 
   try {
-    if (!EthAddress.validate(normalizedUnbannedMemberAddress)) {
+    if (!EthAddress.validate(userAddressToUnban)) {
       throw new InvalidRequestError('Invalid member address')
     }
 
-    logger.info(`Unbanning member ${normalizedUnbannedMemberAddress} from community ${communityId}`)
+    logger.info(`Unbanning member ${userAddressToUnban} from community ${communityId}`)
 
-    await community.unbanMember(communityId, unbanningUserAddress, normalizedUnbannedMemberAddress)
+    await community.unbanMember(communityId, addressPerformingUnban, userAddressToUnban)
 
     return { status: 204 }
   } catch (error) {
     const message = errorMessageOrDefault(error)
-    logger.error(
-      `Error unbanning member: ${normalizedUnbannedMemberAddress} from community: ${communityId}, error: ${message}`
-    )
+    logger.error(`Error unbanning member: ${userAddressToUnban} from community: ${communityId}, error: ${message}`)
 
     if (
       error instanceof InvalidRequestError ||

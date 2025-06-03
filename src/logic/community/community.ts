@@ -129,9 +129,9 @@ export function createCommunityComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
-      const isTargetMember = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
+      const doesTargetUserBelongsToCommunity = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
 
-      if (!isTargetMember) {
+      if (!doesTargetUserBelongsToCommunity) {
         logger.info(`Target ${targetAddress} is not a member of community ${communityId}, returning 204`)
         return
       }
@@ -238,9 +238,9 @@ export function createCommunityComponent(
         )
       }
 
-      const isTargetMember = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
+      const doesTargetUserBelongsToCommunity = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
 
-      if (isTargetMember) {
+      if (doesTargetUserBelongsToCommunity) {
         await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
       }
 
