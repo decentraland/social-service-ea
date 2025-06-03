@@ -86,6 +86,17 @@ test('Kick Member Controller', function ({ components, spyComponents }) {
         })
       })
 
+      describe('and the address is invalid', () => {
+        it('should respond with a 400 status code when trying to kick with an invalid address', async () => {
+          const response = await makeRequest(
+            identity,
+            `/v1/communities/${communityId}/members/invalid-address`,
+            'DELETE'
+          )
+          expect(response.status).toBe(400)
+        })
+      })
+
       describe('and the community exists', () => {
         describe('and the kicker is not a member of the community', () => {
           it('should respond with a 401 status code', async () => {

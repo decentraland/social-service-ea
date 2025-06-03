@@ -19,6 +19,7 @@ import {
   getCommunitiesWithMembersCountCTE,
   withSearchAndPagination
 } from '../logic/queries'
+import { EthAddress } from '@dcl/schemas'
 
 export function createCommunitiesDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs'>
@@ -37,7 +38,7 @@ export function createCommunitiesDBComponent(
       return result.rows[0]?.exists ?? false
     },
 
-    async isMemberOfCommunity(communityId: string, userAddress: string): Promise<boolean> {
+    async isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean> {
       const query = SQL`
         SELECT EXISTS (
           SELECT 1 FROM community_members cm
@@ -48,7 +49,7 @@ export function createCommunitiesDBComponent(
       return result.rows[0]?.isMember ?? false
     },
 
-    async getCommunity(id: string, userAddress: string): Promise<Community> {
+    async getCommunity(id: string, userAddress: EthAddress): Promise<Community> {
       const query = SQL`
         SELECT 
           c.id,
@@ -88,12 +89,12 @@ export function createCommunitiesDBComponent(
       return result.rows
     },
 
-    async getCommunityMemberRole(id: string, userAddress: string): Promise<CommunityRole> {
+    async getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole> {
       const roles = await this.getCommunityMemberRoles(id, [userAddress])
       return roles[userAddress] ?? CommunityRole.None
     },
 
-    async getCommunityMemberRoles(id: string, userAddresses: string[]): Promise<Record<string, CommunityRole>> {
+    async getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>> {
       const normalizedUserAddresses = userAddresses.map(normalizeAddress)
 
       const query = SQL`
@@ -149,7 +150,7 @@ export function createCommunitiesDBComponent(
     },
 
     async getCommunities(
-      memberAddress: string,
+      memberAddress: EthAddress,
       options: GetCommunitiesOptions
     ): Promise<CommunityWithMembersCountAndFriends[]> {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
@@ -211,7 +212,7 @@ export function createCommunitiesDBComponent(
     },
 
     async getCommunitiesCount(
-      memberAddress: string,
+      memberAddress: EthAddress,
       options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf'>
     ): Promise<number> {
       const { search, onlyMemberOf } = options ?? {}
@@ -273,7 +274,7 @@ export function createCommunitiesDBComponent(
     },
 
     async getMemberCommunities(
-      memberAddress: string,
+      memberAddress: EthAddress,
       options: Pick<GetCommunitiesOptions, 'pagination'>
     ): Promise<MemberCommunity[]> {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
@@ -322,7 +323,7 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
-    async kickMemberFromCommunity(communityId: string, memberAddress: string): Promise<void> {
+    async kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void> {
       const query = SQL`
         DELETE FROM community_members WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
       `

@@ -1,27 +1,27 @@
 import { FriendProfile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { CommunityRole, Pagination, CommunityPermission } from '../../types/entities'
-import { PaginatedParameters } from '@dcl/schemas'
+import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export type ICommunityComponent = {
-  getCommunity: (id: string, userAddress: string) => Promise<CommunityWithMembersCount>
+  getCommunity: (id: string, userAddress: EthAddress) => Promise<CommunityWithMembersCount>
   getCommunities: (
-    userAddress: string,
+    userAddress: EthAddress,
     options: GetCommunitiesOptions
   ) => Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>>
   getCommunitiesPublicInformation: (
     options: GetCommunitiesOptions
   ) => Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
-  deleteCommunity: (id: string, userAddress: string) => Promise<void>
+  deleteCommunity: (id: string, userAddress: EthAddress) => Promise<void>
   getCommunityMembers: (
     id: string,
-    userAddress: string,
+    userAddress: EthAddress,
     pagination: Required<PaginatedParameters>
   ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
   getMemberCommunities: (
-    memberAddress: string,
+    memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ) => Promise<GetCommunitiesWithTotal<MemberCommunity>>
-  kickMember: (communityId: string, kickerAddress: string, memberToKickAddress: string) => Promise<void>
+  kickMember: (communityId: string, kickerAddress: EthAddress, memberToKickAddress: EthAddress) => Promise<void>
 }
 
 export type ICommunityRolesComponent = {

@@ -1,8 +1,9 @@
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import { HandlerContextWithPath } from '../../types'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../logic/community'
 import { errorMessageOrDefault } from '../../utils/errors'
+import { EthAddress } from '@dcl/schemas'
 
 export async function kickMemberHandler(
   context: Pick<
@@ -23,6 +24,10 @@ export async function kickMemberHandler(
   try {
     const kickerAddress = verification!.auth.toLowerCase()
 
+    if (!EthAddress.validate(memberToKickAddress)) {
+      throw new InvalidRequestError(`Invalid address to kick ${memberToKickAddress}`)
+    }
+
     await community.kickMember(communityId, kickerAddress, memberToKickAddress)
     return {
       status: 204
@@ -31,7 +36,11 @@ export async function kickMemberHandler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error kicking member: ${memberToKickAddress} from community: ${communityId}, error: ${message}`)
 
-    if (error instanceof CommunityNotFoundError || error instanceof NotAuthorizedError) {
+    if (
+      error instanceof CommunityNotFoundError ||
+      error instanceof NotAuthorizedError ||
+      error instanceof InvalidRequestError
+    ) {
       throw error
     }
 
