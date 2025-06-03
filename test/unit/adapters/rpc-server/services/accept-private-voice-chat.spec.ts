@@ -7,6 +7,7 @@ import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import {
   UserAlreadyInVoiceChatError,
   UsersAreCallingSomeoneElseError,
+  VoiceChatExpiredError,
   VoiceChatNotAllowedError
 } from '../../../../../src/logic/voice/errors'
 import { AcceptPrivateVoiceChatPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -89,9 +90,9 @@ describe('when accepting a private voice chat', () => {
     })
   })
 
-  describe('and starting a private voice chat fails with a users are calling someone else error', () => {
+  describe('and accepting a private voice chat fails with voice chat not allowed error', () => {
     beforeEach(() => {
-      acceptPrivateVoiceChatMock.mockRejectedValue(new UsersAreCallingSomeoneElseError())
+      acceptPrivateVoiceChatMock.mockRejectedValue(new VoiceChatNotAllowedError())
     })
 
     it('should resolve with an invalid request response', async () => {
@@ -105,37 +106,37 @@ describe('when accepting a private voice chat', () => {
         }
       )
 
-      expect(result.response?.$case).toBe('invalidRequest')
-      if (result.response?.$case === 'invalidRequest') {
-        expect(result.response.invalidRequest.message).toBe('One of the users is busy calling someone else')
+      expect(result.response?.$case).toBe('forbiddenError')
+      if (result.response?.$case === 'forbiddenError') {
+        expect(result.response.forbiddenError.message).toBe(
+          'The callee or the caller are not accepting voice calls from users that are not friends'
+        )
       }
     })
   })
 
-  // describe('and starting a private voice chat fails with a user already in voice chat error', () => {
-  //   beforeEach(() => {
-  //     acceptPrivateVoiceChatMock.mockRejectedValue(new UserAlreadyInVoiceChatError(calleeAddress))
-  //   })
+  describe('and accepting a private voice chat fails with a voice chat expired error', () => {
+    beforeEach(() => {
+      acceptPrivateVoiceChatMock.mockRejectedValue(new VoiceChatExpiredError(calleeAddress))
+    })
 
-  //   it('should resolve with a conflicting request response', async () => {
-  //     const result = await service(
-  //       AcceptPrivateVoiceChatPayload.create({
-  //         callId
-  //       }),
-  //       {
-  //         address: callerAddress,
-  //         subscribersContext: undefined
-  //       }
-  //     )
+    it('should resolve with an invalid request response', async () => {
+      const result = await service(
+        AcceptPrivateVoiceChatPayload.create({
+          callId
+        }),
+        {
+          address: callerAddress,
+          subscribersContext: undefined
+        }
+      )
 
-  //     expect(result.response?.$case).toBe('conflictingError')
-  //     if (result.response?.$case === 'conflictingError') {
-  //       expect(result.response.conflictingError.message).toBe(
-  //         `One of the users is already in a voice chat: ${calleeAddress}`
-  //       )
-  //     }
-  //   })
-  // })
+      expect(result.response?.$case).toBe('invalidRequest')
+      if (result.response?.$case === 'invalidRequest') {
+        expect(result.response.invalidRequest.message).toBe(`The voice chat with id ${calleeAddress} has expired`)
+      }
+    })
+  })
 
   describe('and starting a private voice chat fails with an unknown error', () => {
     let errorMessage: string
