@@ -18,7 +18,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yml#/components/schemas/CommunityWithMembersCount'
+                $ref: './communities-schemas.yaml#/components/schemas/CommunityWithMembersCount'
         '404':
           description: Community not found
         '401':
@@ -36,7 +36,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: './communities-schemas.yml#/components/schemas/CreateCommunityRequest'
+              $ref: './communities-schemas.yaml#/components/schemas/CreateCommunityRequest'
       responses:
         '201':
           description: Community created successfully
@@ -48,7 +48,7 @@ paths:
                   message:
                     type: string
                   data:
-                    $ref: './communities-schemas.yml#/components/schemas/Community'
+                    $ref: './communities-schemas.yaml#/components/schemas/Community'
         '400':
           description: Invalid request body
         '401':
