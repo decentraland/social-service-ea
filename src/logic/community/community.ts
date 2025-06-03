@@ -10,11 +10,19 @@ import {
   CommunityWithMembersCount,
   CommunityMemberProfile,
   MemberCommunity,
-  Community
+  Community,
+  BannedMemberProfile,
+  BannedMember,
+  CommunityMember
 } from './types'
-import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
+import {
+  isOwner,
+  toCommunityWithMembersCount,
+  toCommunityResults,
+  toPublicCommunity,
+  mapMembersWithProfiles
+} from './utils'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
-import { getProfileHasClaimedName, getProfileName } from '../profiles'
 
 export function createCommunityComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs'>
@@ -90,23 +98,10 @@ export function createCommunityComponent(
 
       const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
 
-      const membersWithProfile: CommunityMemberProfile[] = communityMembers
-        .map((communityMember) => {
-          const memberProfile = profiles.find(
-            (profile) => profile.avatars?.[0]?.ethAddress?.toLowerCase() === communityMember.memberAddress.toLowerCase()
-          )
-
-          if (!memberProfile) {
-            return undefined
-          }
-
-          return {
-            ...communityMember,
-            hasClaimedName: getProfileHasClaimedName(memberProfile),
-            name: getProfileName(memberProfile)
-          }
-        })
-        .filter((member: CommunityMemberProfile | undefined): member is CommunityMemberProfile => member !== undefined)
+      const membersWithProfile: CommunityMemberProfile[] = mapMembersWithProfiles<
+        CommunityMember,
+        CommunityMemberProfile
+      >(communityMembers, profiles)
 
       return { members: membersWithProfile, totalMembers }
     },
@@ -276,7 +271,7 @@ export function createCommunityComponent(
       id: string,
       userAddress: EthAddress,
       pagination: Required<PaginatedParameters>
-    ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
+    ): Promise<{ members: BannedMemberProfile[]; totalMembers: number }> => {
       const communityExists = await communitiesDb.communityExists(id)
 
       if (!communityExists) {
@@ -285,7 +280,7 @@ export function createCommunityComponent(
 
       const memberRole = await communitiesDb.getCommunityMemberRole(id, userAddress)
 
-      if (memberRole === CommunityRole.None) {
+      if (!memberRole || !communityRoles.hasPermission(memberRole, 'ban_players')) {
         throw new NotAuthorizedError("The user doesn't have permission to get banned members")
       }
 
@@ -293,24 +288,10 @@ export function createCommunityComponent(
       const totalBannedMembers = await communitiesDb.getBannedMembersCount(id)
 
       const profiles = await catalystClient.getProfiles(bannedMembers.map((member) => member.memberAddress))
-
-      const membersWithProfile: CommunityMemberProfile[] = bannedMembers
-        .map((communityMember) => {
-          const memberProfile = profiles.find(
-            (profile) => profile.avatars?.[0]?.ethAddress?.toLowerCase() === communityMember.memberAddress.toLowerCase()
-          )
-
-          if (!memberProfile) {
-            return undefined
-          }
-
-          return {
-            ...communityMember,
-            hasClaimedName: getProfileHasClaimedName(memberProfile),
-            name: getProfileName(memberProfile)
-          }
-        })
-        .filter((member: CommunityMemberProfile | undefined): member is CommunityMemberProfile => member !== undefined)
+      const membersWithProfile: BannedMemberProfile[] = mapMembersWithProfiles<BannedMember, BannedMemberProfile>(
+        bannedMembers,
+        profiles
+      )
 
       return { members: membersWithProfile, totalMembers: totalBannedMembers }
     }

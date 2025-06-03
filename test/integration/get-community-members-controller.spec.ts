@@ -2,6 +2,7 @@ import { CommunityRole } from '../../src/types/entities'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { v4 as uuidv4 } from 'uuid'
+import { createMockProfile } from '../mocks/profile'
 
 test('Get Community Members Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -84,37 +85,14 @@ test('Get Community Members Controller', function ({ components, spyComponents }
     describe('and the request is made by a member of the community', () => {
       beforeEach(async () => {
         spyComponents.catalystClient.getProfiles.mockResolvedValue([
+          createMockProfile(firstMemberAddress),
+          createMockProfile(secondMemberAddress),
+          createMockProfile(ownerAddress),
           {
+            ...createMockProfile(addressMakingRequest),
             avatars: [
               {
-                ethAddress: firstMemberAddress,
-                hasClaimedName: true,
-                name: 'Test User'
-              }
-            ]
-          },
-          {
-            avatars: [
-              {
-                ethAddress: secondMemberAddress,
-                hasClaimedName: true,
-                name: 'Test User 2'
-              }
-            ]
-          },
-          {
-            avatars: [
-              {
-                ethAddress: ownerAddress,
-                hasClaimedName: true,
-                name: 'Test User 3'
-              }
-            ]
-          },
-          {
-            avatars: [
-              {
-                ethAddress: addressMakingRequest,
+                ...createMockProfile(addressMakingRequest).avatars[0],
                 hasClaimedName: false,
                 name: '',
                 unclaimedName: 'Test User 4'
@@ -148,24 +126,27 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 memberAddress: firstMemberAddress,
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
-                name: 'Test User',
-                role: 'member'
+                name: `Profile name ${firstMemberAddress}`,
+                role: 'member',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
               },
               {
                 communityId,
                 memberAddress: secondMemberAddress,
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
-                name: 'Test User 2',
-                role: 'member'
+                name: `Profile name ${secondMemberAddress}`,
+                role: 'member',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
               },
               {
                 communityId,
                 memberAddress: ownerAddress,
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
-                name: 'Test User 3',
-                role: 'owner'
+                name: `Profile name ${ownerAddress}`,
+                role: 'owner',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
               },
               {
                 communityId,
@@ -173,7 +154,8 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 hasClaimedName: false,
                 joinedAt: expect.any(String),
                 name: 'Test User 4',
-                role: 'member'
+                role: 'member',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
               }
             ],
             total: 4
@@ -195,16 +177,18 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                 memberAddress: firstMemberAddress,
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
-                name: 'Test User',
-                role: 'member'
+                name: `Profile name ${firstMemberAddress}`,
+                role: 'member',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
               },
               {
                 communityId,
                 memberAddress: secondMemberAddress,
                 hasClaimedName: true,
                 joinedAt: expect.any(String),
-                name: 'Test User 2',
-                role: 'member'
+                name: `Profile name ${secondMemberAddress}`,
+                role: 'member',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
               }
             ],
             total: 4

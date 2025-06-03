@@ -12,6 +12,7 @@ import { createCommunityHandler } from '../handlers/create-community-handler'
 import { addMemberToCommunityHandler } from '../handlers/add-member-to-community-handler'
 import { unbanMemberHandler } from '../handlers/unban-member-handler'
 import { banMemberHandler } from '../handlers/ban-member-handler'
+import { getBannedMembersHandler } from '../handlers/get-banned-members-handler'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -39,6 +40,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.post('/v1/communities/:id/members', signedFetchMiddleware(), addMemberToCommunityHandler)
   router.delete('/v1/communities/:id/members/:memberAddress', signedFetchMiddleware(), removeMemberFromCommunityHandler)
 
+  router.get('/v1/communities/:id/bans', signedFetchMiddleware(), getBannedMembersHandler)
   router.post('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), banMemberHandler)
   router.delete('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), unbanMemberHandler)
 
