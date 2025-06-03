@@ -9,43 +9,50 @@ import {
   UsersAreCallingSomeoneElseError,
   VoiceChatNotAllowedError
 } from '../../../../../src/logic/voice/errors'
+import { AcceptPrivateVoiceChatPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { acceptPrivateVoiceChatService } from '../../../../../src/adapters/rpc-server/services/accept-private-voice-chat'
 
-describe('when starting a private voice chat', () => {
-  let startPrivateVoiceChatMock: jest.MockedFn<IVoiceComponent['startPrivateVoiceChat']>
+describe('when accepting a private voice chat', () => {
+  let acceptPrivateVoiceChatMock: jest.MockedFn<IVoiceComponent['acceptPrivateVoiceChat']>
   let logs: jest.Mocked<ILoggerComponent>
   let voice: jest.Mocked<IVoiceComponent>
   let callerAddress: string
   let calleeAddress: string
-  let service: ReturnType<typeof startPrivateVoiceChatService>
+  let callId: string
+  let service: ReturnType<typeof acceptPrivateVoiceChatService>
 
   beforeEach(async () => {
-    startPrivateVoiceChatMock = jest.fn()
+    callId = '1'
+    acceptPrivateVoiceChatMock = jest.fn()
     callerAddress = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
     calleeAddress = '0xC001010101010101010101010101010101010101'
     logs = createLogsMockedComponent()
     voice = createVoiceMockedComponent({
-      startPrivateVoiceChat: startPrivateVoiceChatMock
+      acceptPrivateVoiceChat: acceptPrivateVoiceChatMock
     })
-    service = startPrivateVoiceChatService({
+    service = acceptPrivateVoiceChatService({
       components: { voice, logs }
     })
   })
 
-  describe('and starting a private voice chat is successful', () => {
-    let callId: string
+  describe('and accepting a private voice chat is successful', () => {
+    let token: string
+    let url: string
 
     beforeEach(() => {
-      callId = '1'
-      startPrivateVoiceChatMock.mockResolvedValue(callId)
+      acceptPrivateVoiceChatMock.mockResolvedValue({
+        token,
+        url
+      })
     })
 
     it('should resolve with an ok response and the call id', async () => {
       const result = await service(
-        StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
+        AcceptPrivateVoiceChatPayload.create({
+          callId
         }),
         {
-          address: callerAddress,
+          address: calleeAddress,
           subscribersContext: undefined
         }
       )
@@ -57,18 +64,18 @@ describe('when starting a private voice chat', () => {
     })
   })
 
-  describe('and starting a private voice chat fails with a voice chat not allowed error', () => {
+  describe('and accepting a private voice chat fails with a voice chat not allowed error', () => {
     beforeEach(() => {
-      startPrivateVoiceChatMock.mockRejectedValue(new VoiceChatNotAllowedError())
+      acceptPrivateVoiceChatMock.mockRejectedValue(new VoiceChatNotAllowedError())
     })
 
     it('should resolve with a forbidden request response', async () => {
       const result = await service(
-        StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
+        AcceptPrivateVoiceChatPayload.create({
+          callId
         }),
         {
-          address: callerAddress,
+          address: calleeAddress,
           subscribersContext: undefined
         }
       )
@@ -84,67 +91,67 @@ describe('when starting a private voice chat', () => {
 
   describe('and starting a private voice chat fails with a users are calling someone else error', () => {
     beforeEach(() => {
-      startPrivateVoiceChatMock.mockRejectedValue(new UsersAreCallingSomeoneElseError())
+      acceptPrivateVoiceChatMock.mockRejectedValue(new UsersAreCallingSomeoneElseError())
     })
 
     it('should resolve with an invalid request response', async () => {
       const result = await service(
-        StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
+        AcceptPrivateVoiceChatPayload.create({
+          callId
         }),
         {
-          address: callerAddress,
+          address: calleeAddress,
           subscribersContext: undefined
         }
       )
 
-      expect(result.response?.$case).toBe('conflictingError')
-      if (result.response?.$case === 'conflictingError') {
-        expect(result.response.conflictingError.message).toBe('One of the users is busy calling someone else')
+      expect(result.response?.$case).toBe('invalidRequest')
+      if (result.response?.$case === 'invalidRequest') {
+        expect(result.response.invalidRequest.message).toBe('One of the users is busy calling someone else')
       }
     })
   })
 
-  describe('and starting a private voice chat fails with a user already in voice chat error', () => {
-    beforeEach(() => {
-      startPrivateVoiceChatMock.mockRejectedValue(new UserAlreadyInVoiceChatError(calleeAddress))
-    })
+  // describe('and starting a private voice chat fails with a user already in voice chat error', () => {
+  //   beforeEach(() => {
+  //     acceptPrivateVoiceChatMock.mockRejectedValue(new UserAlreadyInVoiceChatError(calleeAddress))
+  //   })
 
-    it('should resolve with a conflicting request response', async () => {
-      const result = await service(
-        StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
-        }),
-        {
-          address: callerAddress,
-          subscribersContext: undefined
-        }
-      )
+  //   it('should resolve with a conflicting request response', async () => {
+  //     const result = await service(
+  //       AcceptPrivateVoiceChatPayload.create({
+  //         callId
+  //       }),
+  //       {
+  //         address: callerAddress,
+  //         subscribersContext: undefined
+  //       }
+  //     )
 
-      expect(result.response?.$case).toBe('conflictingError')
-      if (result.response?.$case === 'conflictingError') {
-        expect(result.response.conflictingError.message).toBe(
-          `One of the users is already in a voice chat: ${calleeAddress}`
-        )
-      }
-    })
-  })
+  //     expect(result.response?.$case).toBe('conflictingError')
+  //     if (result.response?.$case === 'conflictingError') {
+  //       expect(result.response.conflictingError.message).toBe(
+  //         `One of the users is already in a voice chat: ${calleeAddress}`
+  //       )
+  //     }
+  //   })
+  // })
 
   describe('and starting a private voice chat fails with an unknown error', () => {
     let errorMessage: string
 
     beforeEach(() => {
       errorMessage = 'Internal server error'
-      startPrivateVoiceChatMock.mockRejectedValue(new Error(errorMessage))
+      acceptPrivateVoiceChatMock.mockRejectedValue(new Error(errorMessage))
     })
 
     it('should resolve with an internal server error response', async () => {
       const result = await service(
-        StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
+        AcceptPrivateVoiceChatPayload.create({
+          callId
         }),
         {
-          address: callerAddress,
+          address: calleeAddress,
           subscribersContext: undefined
         }
       )

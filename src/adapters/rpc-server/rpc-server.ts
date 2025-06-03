@@ -27,6 +27,7 @@ import { getBlockingStatusService } from './services/get-blocking-status'
 import { subscribeToBlockUpdatesService } from './services/subscribe-to-block-updates'
 import { createRpcServerMetricsWrapper, ServiceType } from './metrics-wrapper'
 import { startPrivateVoiceChatService } from './services/start-private-voice-chat'
+import { acceptPrivateVoiceChatService } from './services/accept-private-voice-chat'
 
 export async function createRpcServerComponent({
   logs,
@@ -144,6 +145,10 @@ export async function createRpcServerComponent({
     },
     startPrivateVoiceChat: {
       creator: startPrivateVoiceChatService({ components: { logs, voice } }),
+      type: ServiceType.CALL
+    },
+    acceptPrivateVoiceChat: {
+      creator: acceptPrivateVoiceChatService({ components: { logs, voice } }),
       type: ServiceType.CALL
     }
   }

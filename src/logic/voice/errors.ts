@@ -15,3 +15,15 @@ export class UsersAreCallingSomeoneElseError extends Error {
     super('One of the users is busy calling someone else')
   }
 }
+
+export class VoiceChatExpiredError extends Error {
+  constructor(callId: string) {
+    super(`The voice chat with id ${callId} has expired`)
+  }
+}
+
+export class VoiceChatNotFoundError extends Error {
+  constructor(callId: string) {
+    super(`The voice chat with id ${callId} was not found`)
+  }
+}

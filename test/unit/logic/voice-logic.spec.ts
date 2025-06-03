@@ -3,7 +3,8 @@ import { createVoiceComponent, IVoiceComponent } from '../../../src/logic/voice'
 import {
   UserAlreadyInVoiceChatError,
   UsersAreCallingSomeoneElseError,
-  VoiceChatNotAllowedError
+  VoiceChatNotAllowedError,
+  VoiceChatNotFoundError
 } from '../../../src/logic/voice/errors'
 import { createFriendsDBMockedComponent, createMockedPubSubComponent } from '../../mocks/components'
 import { createVoiceDBMockedComponent } from '../../mocks/components/voice-db'
@@ -29,8 +30,10 @@ let createPrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['createPri
 let getUsersSettingsMock: jest.MockedFn<ISettingsComponent['getUsersSettings']>
 let getFriendshipMock: jest.MockedFn<IFriendsDatabaseComponent['getFriendship']>
 let isUserInAVoiceChatMock: jest.MockedFn<ICommsGatekeeperComponent['isUserInAVoiceChat']>
+let getPrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['getPrivateVoiceChat']>
 
 beforeEach(() => {
+  getPrivateVoiceChatMock = jest.fn()
   getUsersSettingsMock = jest.fn()
   getFriendshipMock = jest.fn()
   isUserInAVoiceChatMock = jest.fn()
@@ -263,4 +266,28 @@ describe('when starting a private voice chat', () => {
       })
     })
   })
+})
+
+describe('when accepting a private voice chat', () => {
+  let callId: string
+  let calleeAddress: string
+  let callerAddress: string
+
+  beforeEach(() => {
+    callId = '1'
+    calleeAddress = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
+    callerAddress = '0x2B72b8d597c553b3173bca922B9ad871da751dA5'
+  })
+
+  describe('and the voice chat is not found', () => {
+    beforeEach(() => {
+      getPrivateVoiceChatMock.mockResolvedValueOnce(null)
+    })
+
+    it('should reject with a voice chat not found error', () => {
+      return expect(voice.acceptPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
+    })
+  })
+
+  describe('and the voice chat is found', () => {})
 })
