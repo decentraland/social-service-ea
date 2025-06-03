@@ -12,6 +12,7 @@ export type ICommunityComponent = {
     options: GetCommunitiesOptions
   ) => Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
   deleteCommunity: (id: string, userAddress: EthAddress) => Promise<void>
+  createCommunity: (community: Omit<Community, 'id' | 'active' | 'privacy'>) => Promise<Community>
   getCommunityMembers: (
     id: string,
     userAddress: EthAddress,
@@ -51,7 +52,6 @@ export type Community = {
   name: string
   description: string
   ownerAddress: string
-  role: CommunityRole
   privacy: 'public' | 'private'
   active: boolean
 }
@@ -69,6 +69,7 @@ export type CommunityMemberProfile = CommunityMember & {
 }
 
 export type CommunityWithMembersCount = Community & {
+  role: CommunityRole
   membersCount: number
 }
 
@@ -98,4 +99,4 @@ export type GetCommunitiesWithTotal<T> = {
   total: number
 }
 
-export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress' | 'role'>
+export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress'> & { role: CommunityRole }

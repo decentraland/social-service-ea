@@ -49,7 +49,7 @@ export function createCommunitiesDBComponent(
       return result.rows[0]?.isMember ?? false
     },
 
-    async getCommunity(id: string, userAddress: EthAddress): Promise<Community> {
+    async getCommunity(id: string, userAddress: string): Promise<Community & { role: CommunityRole }> {
       const query = SQL`
         SELECT 
           c.id,
@@ -63,7 +63,7 @@ export function createCommunitiesDBComponent(
         LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizeAddress(userAddress)}
         WHERE c.id = ${id} AND c.active = true`
 
-      const result = await pg.query<Community>(query)
+      const result = await pg.query<Community & { role: CommunityRole }>(query)
       return result.rows[0]
     },
 
@@ -300,14 +300,23 @@ export function createCommunitiesDBComponent(
       return result.rows
     },
 
-    async createCommunity(community: CommunityDB): Promise<{ id: string }> {
+    async createCommunity(community: CommunityDB): Promise<Community> {
       const id = randomUUID()
       const query = SQL`
         INSERT INTO communities (id, name, description, owner_address, private, active)
         VALUES (${id}, ${community.name}, ${community.description}, ${normalizeAddress(community.owner_address)}, ${community.private || false}, ${community.active || true})
-        RETURNING id`
-      const result = await pg.query<{ id: string }>(query)
-      return result.rows[0]
+        RETURNING id, name, description, owner_address, private, active, created_at, updated_at
+        `
+      const result = await pg.query(query)
+      const row = result.rows[0]
+      return {
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        ownerAddress: row.owner_address,
+        privacy: row.private ? 'private' : 'public',
+        active: row.active
+      }
     },
 
     async deleteCommunity(id: string): Promise<void> {

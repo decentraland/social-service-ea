@@ -9,7 +9,8 @@ import {
   CommunityPublicInformation,
   CommunityWithMembersCount,
   CommunityMemberProfile,
-  MemberCommunity
+  MemberCommunity,
+  Community
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
@@ -65,20 +66,6 @@ export function createCommunityComponent(
         communities: communities.map(toPublicCommunity),
         total
       }
-    },
-
-    deleteCommunity: async (id: string, userAddress: EthAddress): Promise<void> => {
-      const community = await communitiesDb.getCommunity(id, userAddress)
-
-      if (!community) {
-        throw new CommunityNotFoundError(id)
-      }
-
-      if (!isOwner(community, userAddress)) {
-        throw new NotAuthorizedError("The user doesn't have permission to delete this community")
-      }
-
-      await communitiesDb.deleteCommunity(id)
     },
 
     getCommunityMembers: async (
@@ -158,6 +145,37 @@ export function createCommunityComponent(
       }
 
       await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
+    },
+
+    createCommunity: async (community: Omit<Community, 'id' | 'active' | 'privacy'>): Promise<Community> => {
+      const newCommunity = await communitiesDb.createCommunity({
+        ...community,
+        owner_address: community.ownerAddress,
+        private: false, // TODO: support private communities
+        active: true
+      })
+
+      await communitiesDb.addCommunityMember({
+        communityId: newCommunity.id,
+        memberAddress: community.ownerAddress,
+        role: CommunityRole.Owner
+      })
+
+      return newCommunity
+    },
+
+    deleteCommunity: async (id: string, userAddress: string): Promise<void> => {
+      const community = await communitiesDb.getCommunity(id, userAddress)
+
+      if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      if (!isOwner(community, userAddress)) {
+        throw new NotAuthorizedError("The user doesn't have permission to delete this community")
+      }
+
+      await communitiesDb.deleteCommunity(id)
     }
   }
 }

@@ -113,7 +113,7 @@ export interface IFriendsDatabaseComponent {
 export interface ICommunitiesDatabaseComponent {
   communityExists(communityId: string): Promise<boolean>
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
-  getCommunity(id: string, userAddress: EthAddress): Promise<Community | null>
+  getCommunity(id: string, userAddress: EthAddress): Promise<(Community & { role: CommunityRole }) | null>
   getCommunityMembers(id: string, pagination: Pagination): Promise<CommunityMember[]>
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
   getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
@@ -133,7 +133,7 @@ export interface ICommunitiesDatabaseComponent {
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ): Promise<MemberCommunity[]>
-  createCommunity(community: CommunityDB): Promise<{ id: string }>
+  createCommunity(community: CommunityDB): Promise<Community>
   deleteCommunity(id: string): Promise<void>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
   kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>

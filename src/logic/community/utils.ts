@@ -1,3 +1,4 @@
+import { CommunityRole } from '../../types/entities'
 import { parseProfilesToFriends } from '../friends'
 import { getProfileUserId } from '../profiles'
 import {
@@ -27,7 +28,10 @@ const toBaseCommunity = <T extends { membersCount: number | string }>(community:
   }
 }
 
-export const toCommunityWithMembersCount = (community: Community, membersCount: number): CommunityWithMembersCount => {
+export const toCommunityWithMembersCount = (
+  community: Community & { role: CommunityRole },
+  membersCount: number
+): CommunityWithMembersCount => {
   return withMembersCount({
     ...community,
     ownerAddress: community.ownerAddress,
