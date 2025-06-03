@@ -84,7 +84,7 @@ export function createVoiceComponent({
     }
 
     // Call the comms gate-keeper endpoint to get the keys of both users
-    const keys = await commsGatekeeper.getPrivateVoiceChatKeys(
+    const credentials = await commsGatekeeper.getPrivateVoiceChatCredentials(
       callId,
       privateVoiceChat.callee_address,
       privateVoiceChat.caller_address
@@ -98,8 +98,8 @@ export function createVoiceComponent({
       status: VoiceChatStatus.ACCEPTED,
       // Credentials for the caller
       credentials: {
-        token: keys[privateVoiceChat.caller_address],
-        url: keys[privateVoiceChat.caller_address]
+        token: credentials[privateVoiceChat.caller_address].token,
+        url: credentials[privateVoiceChat.caller_address].url
       }
     })
 
@@ -107,8 +107,8 @@ export function createVoiceComponent({
     await voiceDb.deletePrivateVoiceChat(callId)
 
     return {
-      token: keys[privateVoiceChat.callee_address],
-      url: keys[privateVoiceChat.callee_address]
+      token: credentials[privateVoiceChat.callee_address].token,
+      url: credentials[privateVoiceChat.callee_address].url
     }
   }
 
