@@ -15,13 +15,16 @@ import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockCatalystClient } from '../../mocks/components/catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createMockProfile } from '../../mocks/profile'
-import { CommunityWithMembersCountAndFriends } from '../../../src/logic/community/types'
+import { CommunityWithMembersCountAndFriends, ICommunityRolesComponent } from '../../../src/logic/community/types'
 import { parseExpectedFriends } from '../../mocks/friend'
 import { MemberCommunity } from '../../../src/logic/community/types'
+import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
+import { mockLogs } from '../../mocks/components'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
-  let mockCommunity: Community
+  let mockCommunityRoles: ICommunityRolesComponent
+  let mockCommunity: Community & { role: CommunityRole }
   let mockUserAddress: string
   let mockMembersCount: number
 
@@ -37,9 +40,12 @@ describe('when handling community operations', () => {
     }
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockMembersCount = 5
+    mockCommunityRoles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
     communityComponent = createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
-      catalystClient: mockCatalystClient
+      catalystClient: mockCatalystClient,
+      communityRoles: mockCommunityRoles,
+      logs: mockLogs
     })
   })
 
@@ -354,11 +360,143 @@ describe('when handling community operations', () => {
       })
     })
   })
+
+  describe('and kicking a member', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xowner'
+    const moderatorAddress = '0xmoderator'
+    const memberAddress = '0xmember'
+
+    describe('when the community exists', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(true)
+      })
+
+      describe('and the kicker is the owner', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+            [ownerAddress]: CommunityRole.Owner,
+            [memberAddress]: CommunityRole.Member
+          })
+        })
+
+        it('should allow owner to kick a member', async () => {
+          await communityComponent.kickMember(communityId, ownerAddress, memberAddress)
+          expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, memberAddress)
+        })
+
+        it('should allow owner to kick a moderator', async () => {
+          mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+            [ownerAddress]: CommunityRole.Owner,
+            [moderatorAddress]: CommunityRole.Moderator
+          })
+
+          await communityComponent.kickMember(communityId, ownerAddress, moderatorAddress)
+          expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, moderatorAddress)
+        })
+
+        it('should not allow owner to kick another owner', async () => {
+          mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+            [ownerAddress]: CommunityRole.Owner,
+            ['0xother-owner']: CommunityRole.Owner
+          })
+
+          await expect(communityComponent.kickMember(communityId, ownerAddress, '0xother-owner')).rejects.toThrow(
+            new NotAuthorizedError(
+              `The user ${ownerAddress} doesn't have permission to kick 0xother-owner from community ${communityId}`
+            )
+          )
+
+          expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the kicker is a moderator', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+            [moderatorAddress]: CommunityRole.Moderator,
+            [memberAddress]: CommunityRole.Member
+          })
+        })
+
+        it('should allow moderator to kick a member', async () => {
+          await communityComponent.kickMember(communityId, moderatorAddress, memberAddress)
+          expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, memberAddress)
+        })
+
+        it('should not allow moderator to kick another moderator', async () => {
+          mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+            [moderatorAddress]: CommunityRole.Moderator,
+            ['0xother-moderator']: CommunityRole.Moderator
+          })
+
+          await expect(
+            communityComponent.kickMember(communityId, moderatorAddress, '0xother-moderator')
+          ).rejects.toThrow(
+            new NotAuthorizedError(
+              `The user ${moderatorAddress} doesn't have permission to kick 0xother-moderator from community ${communityId}`
+            )
+          )
+
+          expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+        })
+
+        it('should not allow moderator to kick an owner', async () => {
+          mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+            [moderatorAddress]: CommunityRole.Moderator,
+            [ownerAddress]: CommunityRole.Owner
+          })
+
+          await expect(communityComponent.kickMember(communityId, moderatorAddress, ownerAddress)).rejects.toThrow(
+            new NotAuthorizedError(
+              `The user ${moderatorAddress} doesn't have permission to kick ${ownerAddress} from community ${communityId}`
+            )
+          )
+
+          expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the kicker is a member', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+            [memberAddress]: CommunityRole.Member,
+            ['0xother-member']: CommunityRole.Member
+          })
+        })
+
+        it('should not allow member to kick another member', async () => {
+          await expect(communityComponent.kickMember(communityId, memberAddress, '0xother-member')).rejects.toThrow(
+            new NotAuthorizedError(
+              `The user ${memberAddress} doesn't have permission to kick 0xother-member from community ${communityId}`
+            )
+          )
+
+          expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+        })
+      })
+    })
+
+    describe('when the community does not exist', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+      })
+
+      it('should throw a CommunityNotFoundError', async () => {
+        await expect(communityComponent.kickMember(communityId, ownerAddress, memberAddress)).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+      })
+    })
+  })
 })
 
 describe('Community Utils', () => {
   describe('isOwner', () => {
-    const mockCommunity: Community = {
+    const mockCommunity: Community & { role: CommunityRole } = {
       id: 'test-id',
       name: 'Test Community',
       description: 'Test Description',
@@ -385,7 +523,7 @@ describe('Community Utils', () => {
   })
 
   describe('toCommunityWithMembersCount', () => {
-    const mockCommunity: Community = {
+    const mockCommunity: Community & { role: CommunityRole } = {
       id: 'test-id',
       name: 'Test Community',
       description: 'Test Description',

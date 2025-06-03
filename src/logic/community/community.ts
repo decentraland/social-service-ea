@@ -9,19 +9,22 @@ import {
   CommunityPublicInformation,
   CommunityWithMembersCount,
   CommunityMemberProfile,
-  MemberCommunity
+  MemberCommunity,
+  Community
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
-import { PaginatedParameters } from '@dcl/schemas'
+import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 import { getProfileHasClaimedName, getProfileName } from '../profiles'
 
 export function createCommunityComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient'>
+  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs'>
 ): ICommunityComponent {
-  const { communitiesDb, catalystClient } = components
+  const { communitiesDb, catalystClient, communityRoles, logs } = components
+
+  const logger = logs.getLogger('community-component')
 
   return {
-    getCommunity: async (id: string, userAddress: string): Promise<CommunityWithMembersCount> => {
+    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount> => {
       const [community, membersCount] = await Promise.all([
         communitiesDb.getCommunity(id, userAddress),
         communitiesDb.getCommunityMembersCount(id)
@@ -65,23 +68,9 @@ export function createCommunityComponent(
       }
     },
 
-    deleteCommunity: async (id: string, userAddress: string): Promise<void> => {
-      const community = await communitiesDb.getCommunity(id, userAddress)
-
-      if (!community) {
-        throw new CommunityNotFoundError(id)
-      }
-
-      if (!isOwner(community, userAddress)) {
-        throw new NotAuthorizedError("The user doesn't have permission to delete this community")
-      }
-
-      await communitiesDb.deleteCommunity(id)
-    },
-
     getCommunityMembers: async (
       id: string,
-      userAddress: string,
+      userAddress: EthAddress,
       pagination: Required<PaginatedParameters>
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
       const communityExists = await communitiesDb.communityExists(id)
@@ -131,6 +120,107 @@ export function createCommunityComponent(
         communitiesDb.getCommunitiesCount(memberAddress, { onlyMemberOf: true })
       ])
       return { communities, total }
+    },
+
+    kickMember: async (communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const isTargetMember = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
+
+      if (!isTargetMember) {
+        logger.info(`Target ${targetAddress} is not a member of community ${communityId}, returning 204`)
+        return
+      }
+
+      const canKick = await communityRoles.canKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
+
+      if (!canKick) {
+        throw new NotAuthorizedError(
+          `The user ${kickerAddress} doesn't have permission to kick ${targetAddress} from community ${communityId}`
+        )
+      }
+
+      await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
+    },
+
+    joinCommunity: async (communityId: string, memberAddress: EthAddress): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const isAlreadyMember = await communitiesDb.isMemberOfCommunity(communityId, memberAddress)
+
+      if (isAlreadyMember) {
+        logger.info(`User ${memberAddress} is already a member of community ${communityId}, returning 204`)
+        return
+      }
+
+      await communitiesDb.addCommunityMember({
+        communityId,
+        memberAddress,
+        role: CommunityRole.Member
+      })
+    },
+
+    leaveCommunity: async (communityId: string, memberAddress: EthAddress): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const isMember = await communitiesDb.isMemberOfCommunity(communityId, memberAddress)
+
+      if (!isMember) {
+        logger.info(`User ${memberAddress} is not a member of community ${communityId}, returning 204`)
+        return
+      }
+
+      const memberRole = await communitiesDb.getCommunityMemberRole(communityId, memberAddress)
+
+      // Owners cannot leave their communities
+      if (memberRole === CommunityRole.Owner) {
+        throw new NotAuthorizedError(`The owner cannot leave the community ${communityId}`)
+      }
+
+      await communitiesDb.kickMemberFromCommunity(communityId, memberAddress)
+    },
+
+    createCommunity: async (community: Omit<Community, 'id' | 'active' | 'privacy'>): Promise<Community> => {
+      const newCommunity = await communitiesDb.createCommunity({
+        ...community,
+        owner_address: community.ownerAddress,
+        private: false, // TODO: support private communities
+        active: true
+      })
+
+      await communitiesDb.addCommunityMember({
+        communityId: newCommunity.id,
+        memberAddress: community.ownerAddress,
+        role: CommunityRole.Owner
+      })
+
+      return newCommunity
+    },
+
+    deleteCommunity: async (id: string, userAddress: string): Promise<void> => {
+      const community = await communitiesDb.getCommunity(id, userAddress)
+
+      if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      if (!isOwner(community, userAddress)) {
+        throw new NotAuthorizedError("The user doesn't have permission to delete this community")
+      }
+
+      await communitiesDb.deleteCommunity(id)
     }
   }
 }
