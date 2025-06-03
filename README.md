@@ -4,6 +4,10 @@
 
 A microservice that handles social interactions (friendships) for Decentraland, built using the Well Known Components architecture pattern.
 
+## API Documentation
+
+👉 [View Swagger API Docs](https://decentraland.github.io/social-service-ea/)
+
 ## Table of Contents
 
 - [🌟 Features](#-features)
