@@ -6,6 +6,7 @@ export interface AcceptPrivateVoiceChatResult {
 export interface IVoiceComponent {
   startPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
   acceptPrivateVoiceChat(callId: string, calleeAddress: string): Promise<AcceptPrivateVoiceChatResult>
+  rejectPrivateVoiceChat(callId: string, calleeAddress: string): Promise<void>
 }
 
 export enum VoiceChatStatus {

@@ -112,7 +112,34 @@ export function createVoiceComponent({
     }
   }
 
+  async function rejectPrivateVoiceChat(callId: string, calleeAddress: string): Promise<void> {
+    logger.info(`Rejecting voice chat for call ${callId}`)
+
+    const privateVoiceChat = await voiceDb.getPrivateVoiceChat(callId)
+    if (!privateVoiceChat) {
+      throw new VoiceChatNotFoundError(callId)
+    }
+
+    if (privateVoiceChat.callee_address !== calleeAddress) {
+      throw new VoiceChatNotAllowedError()
+    }
+
+    if (privateVoiceChat.expires_at < new Date()) {
+      throw new VoiceChatExpiredError(callId)
+    }
+
+    await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+      callId,
+      callerAddress: privateVoiceChat.caller_address,
+      calleeAddress: privateVoiceChat.callee_address,
+      status: VoiceChatStatus.REJECTED
+    })
+
+    await voiceDb.deletePrivateVoiceChat(callId)
+  }
+
   return {
+    rejectPrivateVoiceChat,
     startPrivateVoiceChat,
     acceptPrivateVoiceChat
   }
