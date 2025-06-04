@@ -31,7 +31,7 @@ export type ICommunityComponent = {
     id: string,
     userAddress: EthAddress,
     pagination: Required<PaginatedParameters>
-  ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
+  ) => Promise<{ members: BannedMemberProfile[]; totalMembers: number }>
 }
 
 export type ICommunityRolesComponent = {
@@ -75,6 +75,7 @@ export type Community = {
   active: boolean
 }
 
+// TODO: missing friendship status
 export type CommunityMember = {
   communityId: string
   memberAddress: string
@@ -82,7 +83,22 @@ export type CommunityMember = {
   joinedAt: string
 }
 
+// TODO: missing friendship status
+export type BannedMember = {
+  communityId: string
+  memberAddress: string
+  bannedAt: string
+  bannedBy: string
+}
+
 export type CommunityMemberProfile = CommunityMember & {
+  profilePictureUrl: string
+  hasClaimedName: boolean
+  name: string
+}
+
+export type BannedMemberProfile = BannedMember & {
+  profilePictureUrl: string
   hasClaimedName: boolean
   name: string
 }

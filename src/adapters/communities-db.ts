@@ -7,7 +7,8 @@ import {
   CommunityWithMembersCountAndFriends,
   CommunityPublicInformation,
   CommunityMember,
-  MemberCommunity
+  MemberCommunity,
+  BannedMember
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -378,25 +379,21 @@ export function createCommunitiesDBComponent(
       return pg.exists(query, 'isBanned')
     },
 
-    // TODO: review this query
-    async getBannedMembers(communityId: string, pagination: Pagination): Promise<CommunityMember[]> {
+    async getBannedMembers(communityId: string, pagination: Pagination): Promise<BannedMember[]> {
       const query = SQL`
         SELECT 
           cb.community_id AS "communityId",
           cb.banned_address AS "memberAddress",
-          cm.role AS "role",
-          cb.created_at AS "joinedAt"
+          cb.banned_at AS "bannedAt"
         FROM community_bans cb
-        LEFT JOIN community_members cm ON cb.banned_address = cm.member_address 
-          AND cb.community_id = cm.community_id
         WHERE cb.community_id = ${communityId}
           AND cb.active = true
-        ORDER BY cb.created_at ASC
+        ORDER BY cb.banned_at ASC
       `
 
       query.append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
 
-      const result = await pg.query<CommunityMember>(query)
+      const result = await pg.query<BannedMember>(query)
       return result.rows
     },
 

@@ -29,7 +29,8 @@ import {
   CommunityWithMembersCountAndFriends,
   GetCommunitiesOptions,
   CommunityPublicInformation,
-  MemberCommunity
+  MemberCommunity,
+  BannedMember
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -144,7 +145,7 @@ export interface ICommunitiesDatabaseComponent {
     unbannedMemberAddress: EthAddress
   ): Promise<void>
   isMemberBanned(communityId: string, bannedMemberAddress: EthAddress): Promise<boolean>
-  getBannedMembers(communityId: string, pagination: Pagination): Promise<CommunityMember[]>
+  getBannedMembers(communityId: string, pagination: Pagination): Promise<BannedMember[]>
   getBannedMembersCount(communityId: string): Promise<number>
 }
 

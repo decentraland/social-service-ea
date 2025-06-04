@@ -1,6 +1,6 @@
 import { CommunityRole } from '../../types/entities'
 import { parseProfilesToFriends } from '../friends'
-import { getProfileUserId } from '../profiles'
+import { getProfileUserId, getProfileInfo } from '../profiles'
 import {
   Community,
   CommunityWithUserInformation,
@@ -62,4 +62,32 @@ export const toCommunityResults = (
 
 export const toPublicCommunity = (community: CommunityPublicInformation): CommunityPublicInformation => {
   return toBaseCommunity(community)
+}
+
+export const mapMembersWithProfiles = <
+  T extends { memberAddress: string },
+  R extends { profilePictureUrl: string; hasClaimedName: boolean; name: string }
+>(
+  members: T[],
+  profiles: Profile[]
+): (T & R)[] => {
+  const profileMap = new Map(profiles.map((profile) => [getProfileUserId(profile), profile]))
+  return members
+    .map((member) => {
+      const memberProfile = profileMap.get(member.memberAddress)
+
+      if (!memberProfile) {
+        return undefined
+      }
+
+      const { profilePictureUrl, hasClaimedName, name } = getProfileInfo(memberProfile)
+
+      return {
+        ...member,
+        profilePictureUrl,
+        hasClaimedName,
+        name
+      }
+    })
+    .filter((member): member is T & R => member !== undefined)
 }

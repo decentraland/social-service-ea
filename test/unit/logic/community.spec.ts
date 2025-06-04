@@ -20,6 +20,7 @@ import { parseExpectedFriends } from '../../mocks/friend'
 import { MemberCommunity } from '../../../src/logic/community/types'
 import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
 import { mockLogs } from '../../mocks/components'
+import { mapMembersWithProfiles } from '../../../src/logic/community/utils'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
@@ -1027,6 +1028,71 @@ describe('Community Utils', () => {
       expect(result.active).toBe(mockPublicCommunity.active)
       expect(result.membersCount).toBe(5)
       expect(result.isLive).toBe(false)
+    })
+  })
+
+  describe('mapMembersWithProfiles', () => {
+    const mockMembers = [
+      { memberAddress: '0x1111111111111111111111111111111111111111', role: CommunityRole.Member },
+      { memberAddress: '0x2222222222222222222222222222222222222222', role: CommunityRole.Moderator },
+      { memberAddress: '0x3333333333333333333333333333333333333333', role: CommunityRole.Owner }
+    ]
+
+    const mockProfiles: Profile[] = [
+      createMockProfile('0x1111111111111111111111111111111111111111'),
+      createMockProfile('0x2222222222222222222222222222222222222222')
+    ]
+
+    it('should map members with their profiles', () => {
+      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
+
+      expect(result).toHaveLength(2)
+      expect(result[0]).toEqual({
+        ...mockMembers[0],
+        profilePictureUrl: expect.any(String),
+        hasClaimedName: expect.any(Boolean),
+        name: expect.any(String)
+      })
+      expect(result[1]).toEqual({
+        ...mockMembers[1],
+        profilePictureUrl: expect.any(String),
+        hasClaimedName: expect.any(Boolean),
+        name: expect.any(String)
+      })
+    })
+
+    it('should filter out members without profiles', () => {
+      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
+
+      expect(result).toHaveLength(2)
+      expect(result.find((m) => m.memberAddress === '0x3333333333333333333333333333333333333333')).toBeUndefined()
+    })
+
+    it('should use profile map for efficient lookups', () => {
+      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
+
+      expect(result).toHaveLength(2)
+      expect(result[0].memberAddress).toBe('0x1111111111111111111111111111111111111111')
+      expect(result[1].memberAddress).toBe('0x2222222222222222222222222222222222222222')
+    })
+
+    it('should include all required profile fields', () => {
+      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
+
+      result.forEach((member) => {
+        expect(member).toHaveProperty('profilePictureUrl')
+        expect(member).toHaveProperty('hasClaimedName')
+        expect(member).toHaveProperty('name')
+      })
+    })
+
+    it('should preserve original member properties', () => {
+      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
+
+      result.forEach((member, index) => {
+        expect(member.role).toBe(mockMembers[index].role)
+        expect(member.memberAddress).toBe(mockMembers[index].memberAddress)
+      })
     })
   })
 })
