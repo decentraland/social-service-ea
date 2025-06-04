@@ -31,7 +31,8 @@ import {
   CommunityWithMembersCountAndFriends,
   GetCommunitiesOptions,
   CommunityPublicInformation,
-  MemberCommunity
+  MemberCommunity,
+  BannedMember
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -113,13 +114,10 @@ export interface IFriendsDatabaseComponent {
 
 export interface ICommunitiesDatabaseComponent {
   communityExists(communityId: string): Promise<boolean>
-  isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
   getCommunity(id: string, userAddress: EthAddress): Promise<(Community & { role: CommunityRole }) | null>
-  getCommunityMembers(id: string, pagination: Pagination): Promise<CommunityMember[]>
-  getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
-  getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
   getCommunityPlaces(communityId: string): Promise<string[]>
-  getCommunityMembersCount(communityId: string): Promise<number>
+  createCommunity(community: CommunityDB): Promise<Community>
+  deleteCommunity(id: string): Promise<void>
   getCommunities(
     memberAddress: EthAddress,
     options: GetCommunitiesOptions
@@ -130,14 +128,31 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<number>
   getCommunitiesPublicInformation(options: GetCommunitiesOptions): Promise<CommunityPublicInformation[]>
   getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
+  isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
+  getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
+  getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
+  addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
+  kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
+  getCommunityMembers(id: string, pagination: Pagination): Promise<CommunityMember[]>
+  getCommunityMembersCount(communityId: string): Promise<number>
   getMemberCommunities(
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ): Promise<MemberCommunity[]>
-  createCommunity(community: CommunityDB): Promise<Community>
-  deleteCommunity(id: string): Promise<void>
-  addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
-  kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
+  banMemberFromCommunity(communityId: string, bannedBy: EthAddress, bannedMemberAddress: EthAddress): Promise<void>
+  unbanMemberFromCommunity(
+    communityId: string,
+    unbannedBy: EthAddress,
+    unbannedMemberAddress: EthAddress
+  ): Promise<void>
+  isMemberBanned(communityId: string, bannedMemberAddress: EthAddress): Promise<boolean>
+  getBannedMembers(communityId: string, pagination: Pagination): Promise<BannedMember[]>
+  getBannedMembersCount(communityId: string): Promise<number>
+}
+
+export interface IVoiceDatabaseComponent {
+  areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
+  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
 }
 
 export interface IVoiceDatabaseComponent {
@@ -240,6 +255,7 @@ export type IStatusCheckComponent = IBaseComponent
 
 export interface IPgComponent extends IBasePgComponent {
   getCount(query: SQLStatement): Promise<number>
+  exists<T extends Record<string, any>>(query: SQLStatement, existsProp: keyof T): Promise<boolean>
   withTransaction<T>(
     callback: (client: PoolClient) => Promise<T>,
     onError?: (error: unknown) => Promise<void>

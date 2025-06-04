@@ -66,18 +66,16 @@ test('Create Community Controller', async function ({ components, spyComponents 
           const body = await response.json()
           communityId = body.id
 
-          console.log(JSON.stringify(body, null, 2))
-
           expect(response.status).toBe(201)
           expect(body).toMatchObject({
             data: {
-                id: expect.any(String),
-                name: 'Test Community',
-                description: 'Test Description',
-                active: true,
-                ownerAddress: identity.realAccount.address.toLowerCase(),
-                privacy: 'public'
-              },
+              id: expect.any(String),
+              name: 'Test Community',
+              description: 'Test Description',
+              active: true,
+              ownerAddress: identity.realAccount.address.toLowerCase(),
+              privacy: 'public'
+            },
             message: 'Community created successfully'
           })
         })

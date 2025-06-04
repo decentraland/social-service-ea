@@ -1,62 +1,299 @@
 components:
   schemas:
-    CreateCommunityRequest:
+    ErrorResponse:
       type: object
       required:
-        - name
-        - description
+        - message
+        - error
       properties:
-        name:
+        message:
           type: string
-        description:
+          description: 'A message describing the error'
+        error:
           type: string
-        thumbnails:
-          type: object
-          additionalProperties:
-            type: string
-          description: A map of thumbnail types to URLs.
-
-    Community:
+          description: 'Error code (e.g. Not Found, Invalid Request, Unauthorized, etc.)'
+    GetCommunities200OkResponse:
       type: object
       required:
-        - id
-        - name
-        - description
-        - ownerAddress
-        - privacy
-        - active
+        - data
       properties:
-        id:
-          type: string
-        name:
-          type: string
-        description:
-          type: string
-        ownerAddress:
-          type: string
-        privacy:
-          type: string
-          enum: [public, private]
-        active:
-          type: boolean
-        thumbnails:
+        data:
           type: object
-          additionalProperties:
-            type: string
-          description: A map of thumbnail types to URLs.
-
-    CommunityWithMembersCount:
-      allOf:
-        - $ref: '#/components/schemas/Community'
-        - type: object
           required:
-            - role
-            - membersCount
+            - results
+            - total
+            - page
+            - pages
+            - limit
           properties:
+            results:
+              type: array
+              items:
+                type: object
+                required:
+                  - id
+                  - name
+                  - description
+                  - ownerAddress
+                  - privacy
+                  - active
+                  - membersCount
+                  # - thumbnails TODO
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  ownerAddress:
+                    type: string
+                  privacy:
+                    type: string
+                    enum: [public, private]
+                  active:
+                    type: boolean
+                  membersCount:
+                    type: integer
+                  # thumbnails TODO
+                  friends:
+                    type: array
+                    items:
+                      type: string
+                      description: |
+                        ETH Address of a friend of the community.
+                        This is only present when the user is signed in.
+                  role:
+                    type: string
+                    enum: [Owner, Moderator, Member, None]
+                    description: |
+                      The role of the user in the community.
+                      This is only present when the user is signed in.
+            total:
+              type: integer
+              description: 'Total number of communities'
+            page:
+              type: integer
+              description: 'Current page number'
+            pages:
+              type: integer
+              description: 'Total number of pages'
+            limit:
+              type: integer
+              description: 'Number of communities per page'
+    CreateCommunity201OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        message:
+          type: string
+          description: 'A message describing the result'
+        data:
+          type: object
+          required:
+            - id
+            - name
+            - description
+            - ownerAddress
+            - privacy
+            - active
+            # - thumbnails TODO
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
+            ownerAddress:
+              type: string
+            privacy:
+              type: string
+              enum: [public, private]
+            active:
+              type: boolean
+            # thumbnails TODO
+    GetCommunityById200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - name
+            - description
+            - ownerAddress
+            - privacy
+            - active
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
+            ownerAddress:
+              type: string
+              description: 'ETH Address of the community owner'
+            privacy:
+              type: string
+              enum: [public, private]
+            active:
+              type: boolean
+              description: 'Whether the community is active or it was logically deleted'
+            thumbnails:
+              type: object
+              additionalProperties:
+                type: string
+              description: 'A map of thumbnail types to URLs.'
+    GetCommunityMembers200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - results
+            - total
+            - page
+            - pages
+            - limit
+          properties:
+            results:
+              type: array
+              items:
+                type: object
+                required:
+                  - address
+                  - role
+                  - joinedAt
+                properties:
+                  address:
+                    type: string
+                  role:
+                    type: string
+                    enum: [Owner, Moderator, Member]
+                  joinedAt:
+                    type: string
+                    format: date-time
+            total:
+              type: integer
+            page:
+              type: integer
+            pages:
+              type: integer
+            limit:
+              type: integer
+    AddMemberToCommunity201OkResponse:
+      type: object
+      required:
+        - message
+        - data
+      properties:
+        message:
+          type: string
+        data:
+          type: object
+          required:
+            - address
+            - role
+            - joinedAt
+          properties:
+            address:
+              type: string
             role:
               type: string
-              description: The role of the user in the community.
-              enum: [Owner, Moderator, Member, None]
-            membersCount:
+              enum: [Owner, Moderator, Member]
+            joinedAt:
+              type: string
+              format: date-time
+    GetMemberCommunities200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - results
+            - total
+            - page
+            - pages
+            - limit
+          properties:
+            results:
+              type: array
+              items:
+                type: object
+                required:
+                  - id
+                  - name
+                  - description
+                  - ownerAddress
+                  - privacy
+                  - active
+                  - role
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  ownerAddress:
+                    type: string
+                  privacy:
+                    type: string
+                    enum: [public, private]
+                  active:
+                    type: boolean
+                  role:
+                    type: string
+                    enum: [Owner, Moderator, Member]
+            total:
               type: integer
-              description: The number of members in the community.
+            page:
+              type: integer
+            pages:
+              type: integer
+            limit:
+              type: integer
+    GetBannedMembers200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - results
+            - total
+            - page
+            - pages
+            - limit
+          properties:
+            results:
+              type: array
+              items:
+                type: object
+                required:
+                  - address
+                  - bannedAt
+                properties:
+                  address:
+                    type: string
+                  bannedAt:
+                    type: string
+                    format: date-time
+            total:
+              type: integer
+            page:
+              type: integer
+            pages:
+              type: integer
+            limit:
+              type: integer

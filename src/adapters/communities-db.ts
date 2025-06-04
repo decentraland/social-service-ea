@@ -7,7 +7,8 @@ import {
   CommunityWithMembersCountAndFriends,
   CommunityPublicInformation,
   CommunityMember,
-  MemberCommunity
+  MemberCommunity,
+  BannedMember
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -34,8 +35,7 @@ export function createCommunitiesDBComponent(
           WHERE id = ${communityId} AND active = true
         ) AS "exists"
       `
-      const result = await pg.query<{ exists: boolean }>(query)
-      return result.rows[0]?.exists ?? false
+      return pg.exists(query, 'exists')
     },
 
     async isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean> {
@@ -45,8 +45,7 @@ export function createCommunitiesDBComponent(
           WHERE cm.community_id = ${communityId} AND cm.member_address = ${normalizeAddress(userAddress)}
         ) AS "isMember"
       `
-      const result = await pg.query<{ isMember: boolean }>(query)
-      return result.rows[0]?.isMember ?? false
+      return pg.exists(query, 'isMember')
     },
 
     async getCommunity(id: string, userAddress: EthAddress): Promise<Community & { role: CommunityRole }> {
@@ -75,11 +74,7 @@ export function createCommunitiesDBComponent(
           cm.role AS "role",
           cm.joined_at AS "joinedAt"
         FROM community_members cm
-        LEFT JOIN community_bans cb ON cm.member_address = cb.banned_address 
-          AND cb.community_id = cm.community_id
-          AND cb.active = true
         WHERE cm.community_id = ${id}
-          AND cb.banned_address IS NULL
         ORDER BY cm.joined_at ASC
       `
 
@@ -100,12 +95,8 @@ export function createCommunitiesDBComponent(
       const query = SQL`
         SELECT cm.member_address AS "memberAddress", cm.role AS "role"
         FROM community_members cm
-        LEFT JOIN community_bans cb ON cm.member_address = cb.banned_address
-          AND cb.community_id = cm.community_id
-          AND cb.active = true
         WHERE cm.community_id = ${id}
           AND cm.member_address = ANY(${normalizedUserAddresses})
-          AND cb.banned_address IS NULL
       `
       const result = await pg.query<{ memberAddress: string; role: CommunityRole }>(query)
       return result.rows.reduce(
@@ -121,11 +112,7 @@ export function createCommunitiesDBComponent(
       const query = SQL`
         SELECT COUNT(cm.member_address) 
           FROM community_members cm
-          LEFT JOIN community_bans cb ON cm.member_address = cb.banned_address 
-              AND cb.community_id = cm.community_id
-              AND cb.active = true
           WHERE cm.community_id = ${communityId}
-              AND cb.banned_address IS NULL
               AND EXISTS (
                   SELECT 1 
                   FROM communities c 
@@ -201,11 +188,14 @@ export function createCommunitiesDBComponent(
         )
         .append(membersJoin).append(SQL`
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
-        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = cm.member_address
         LEFT JOIN community_friends cf ON c.id = cf.community_id
-        WHERE cb.banned_address IS NULL AND c.active = true`)
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
+        WHERE c.active = true AND cb.banned_address IS NULL`)
 
-      const query = withSearchAndPagination(baseQuery, options)
+      const query = withSearchAndPagination(baseQuery, {
+        ...options,
+        sortBy: options.onlyMemberOf ? 'role' : 'membersCount'
+      })
 
       const result = await pg.query<CommunityWithMembersCountAndFriends>(query)
       return result.rows
@@ -223,9 +213,8 @@ export function createCommunitiesDBComponent(
         : SQL``
 
       const query = SQL`SELECT COUNT(1) as count FROM communities c`.append(membersJoin).append(SQL`
-          LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
-        WHERE cb.banned_address IS NULL
-          AND c.active = true
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
+        WHERE c.active = true AND cb.banned_address IS NULL
       `)
 
       if (search) {
@@ -287,8 +276,7 @@ export function createCommunitiesDBComponent(
           COALESCE(cm.role, ${CommunityRole.None}) as role
         FROM communities c
         JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}
-        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = cm.member_address
-        WHERE c.active = true AND cb.banned_address IS NULL
+        WHERE c.active = true
       `
 
       const query = withSearchAndPagination(baseQuery, {
@@ -337,6 +325,75 @@ export function createCommunitiesDBComponent(
         DELETE FROM community_members WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
       `
       await pg.query(query)
+    },
+
+    async banMemberFromCommunity(
+      communityId: string,
+      bannedBy: EthAddress,
+      bannedMemberAddress: EthAddress
+    ): Promise<void> {
+      const query = SQL`
+        INSERT INTO community_bans (community_id, banned_address, banned_by, active)
+        VALUES (${communityId}, ${normalizeAddress(bannedMemberAddress)}, ${normalizeAddress(bannedBy)}, true)
+        ON CONFLICT (community_id, banned_address) 
+        DO UPDATE SET active = true
+      `
+      await pg.query(query)
+    },
+
+    async unbanMemberFromCommunity(
+      communityId: string,
+      unbannedBy: EthAddress,
+      unbannedMemberAddress: EthAddress
+    ): Promise<void> {
+      const query = SQL`
+        UPDATE community_bans 
+        SET active = false, unbanned_by = ${normalizeAddress(unbannedBy)}, unbanned_at = now()
+        WHERE community_id = ${communityId} 
+          AND banned_address = ${normalizeAddress(unbannedMemberAddress)}
+          AND active = true
+      `
+      await pg.query(query)
+    },
+
+    async isMemberBanned(communityId: string, memberAddress: EthAddress): Promise<boolean> {
+      const query = SQL`
+        SELECT EXISTS (
+          SELECT 1 FROM community_bans
+          WHERE community_id = ${communityId} 
+          AND banned_address = ${normalizeAddress(memberAddress)}
+          AND active = true
+        ) AS "isBanned"
+      `
+      return pg.exists(query, 'isBanned')
+    },
+
+    async getBannedMembers(communityId: string, pagination: Pagination): Promise<BannedMember[]> {
+      const query = SQL`
+        SELECT 
+          cb.community_id AS "communityId",
+          cb.banned_address AS "memberAddress",
+          cb.banned_at AS "bannedAt"
+        FROM community_bans cb
+        WHERE cb.community_id = ${communityId}
+          AND cb.active = true
+        ORDER BY cb.banned_at ASC
+      `
+
+      query.append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
+
+      const result = await pg.query<BannedMember>(query)
+      return result.rows
+    },
+
+    async getBannedMembersCount(communityId: string): Promise<number> {
+      const query = SQL`
+        SELECT COUNT(banned_address) 
+        FROM community_bans
+        WHERE community_id = ${communityId}
+          AND active = true
+      `
+      return pg.getCount(query)
     }
   }
 }

@@ -5,7 +5,6 @@ import { createMockProfile } from '../mocks/profile'
 import { parseExpectedFriends } from '../mocks/friend'
 import { mockCommunity } from '../mocks/community'
 import { createOrUpsertActiveFriendship, removeFriendship } from './utils/friendships'
-import SQL from 'sql-template-strings'
 
 test('Get Communities Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -70,11 +69,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
     })
 
     afterEach(async () => {
-      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [friendAddress1, friendAddress2])
-      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId2, [friendAddress1])
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [friendAddress1, friendAddress2])
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId2, [friendAddress1])
 
-      components.communitiesDbHelper.forceCommunityRemoval(communityId1)
-      components.communitiesDbHelper.forceCommunityRemoval(communityId2)
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId1)
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId2)
 
       await removeFriendship(components.friendsDb, friendshipId1, address)
       await removeFriendship(components.friendsDb, friendshipId2, address)
@@ -121,95 +120,115 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
     })
 
     describe('and the request is signed', () => {
-      it('should respond with a 200 status code and the communities', async () => {
-        const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&search=test')
-        const body = await response.json()
+      describe('when getting all communities', () => {
+        it('should return all communities with correct role and friends information', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&search=test')
+          const body = await response.json()
 
-        const friend1Profile = createMockProfile(friendAddress1)
-        const friend2Profile = createMockProfile(friendAddress2)
+          const friend1Profile = createMockProfile(friendAddress1)
+          const friend2Profile = createMockProfile(friendAddress2)
 
-        expect(response.status).toBe(200)
-        expect(body).toEqual({
-          data: {
-            results: expect.arrayContaining([
-              expect.objectContaining({
-                id: communityId1,
-                name: 'Test Community 1',
-                description: 'Test Description 1',
-                ownerAddress: address,
-                privacy: 'public',
-                active: true,
-                role: CommunityRole.None,
-                membersCount: 2,
-                friends: expect.arrayContaining([parseFriend(friend1Profile), parseFriend(friend2Profile)]),
-                isLive: false
-              }),
-              expect.objectContaining({
-                id: communityId2,
-                name: 'Test Community 2',
-                description: 'Test Description 2',
-                ownerAddress: address,
-                privacy: 'public',
-                active: true,
-                role: CommunityRole.None,
-                membersCount: 1,
-                friends: expect.arrayContaining([parseFriend(friend1Profile)]),
-                isLive: false
-              })
-            ]),
-            total: 2,
-            page: 1,
-            pages: 1,
-            limit: 10
-          }
+          expect(response.status).toBe(200)
+          expect(body).toEqual({
+            data: {
+              results: expect.arrayContaining([
+                expect.objectContaining({
+                  id: communityId1,
+                  name: 'Test Community 1',
+                  description: 'Test Description 1',
+                  ownerAddress: address,
+                  privacy: 'public',
+                  active: true,
+                  role: CommunityRole.None,
+                  membersCount: 2,
+                  friends: expect.arrayContaining([parseFriend(friend1Profile), parseFriend(friend2Profile)]),
+                  isLive: false
+                }),
+                expect.objectContaining({
+                  id: communityId2,
+                  name: 'Test Community 2',
+                  description: 'Test Description 2',
+                  ownerAddress: address,
+                  privacy: 'public',
+                  active: true,
+                  role: CommunityRole.None,
+                  membersCount: 1,
+                  friends: expect.arrayContaining([parseFriend(friend1Profile)]),
+                  isLive: false
+                })
+              ]),
+              total: 2,
+              page: 1,
+              pages: 1,
+              limit: 10
+            }
+          })
         })
       })
 
-      describe('and filtering by member role', () => {
+      describe('when filtering by membership', () => {
+        let communityId3: string
+
         beforeEach(async () => {
-          // Add the user as a member to one of the communities
-          await components.pg.query(SQL`
-            INSERT INTO community_members (community_id, member_address, role)
-            VALUES (${communityId1}, ${address}, ${CommunityRole.Member})
-          `)
+          const result3 = await components.communitiesDb.createCommunity(
+            mockCommunity({
+              name: 'Test Community 3',
+              description: 'Test Description 3',
+              owner_address: address
+            })
+          )
+          communityId3 = result3.id
+
+          await components.communitiesDb.addCommunityMember({
+            communityId: communityId1,
+            memberAddress: address,
+            role: CommunityRole.Member
+          })
+
+          await components.communitiesDb.addCommunityMember({
+            communityId: communityId3,
+            memberAddress: address,
+            role: CommunityRole.Moderator
+          })
         })
 
         afterEach(async () => {
-          components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [address])
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [address])
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId3, [address])
+
+          await components.communitiesDbHelper.forceCommunityRemoval(communityId3)
         })
 
-        it('should return only communities where the user is a member when onlyMemberOf is true', async () => {
+        it('should return only member communities sorted by role when onlyMemberOf=true', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyMemberOf=true')
           const body = await response.json()
 
           expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(1)
+          expect(body.data.results).toHaveLength(2)
           expect(body.data.results[0]).toEqual(
+            expect.objectContaining({
+              id: communityId3,
+              name: 'Test Community 3',
+              role: CommunityRole.Moderator
+            })
+          )
+          expect(body.data.results[1]).toEqual(
             expect.objectContaining({
               id: communityId1,
               name: 'Test Community 1',
               role: CommunityRole.Member
             })
           )
-          expect(body.data.total).toBe(1)
+          expect(body.data.total).toBe(2)
         })
 
-        it('should return all communities when onlyMemberOf is false', async () => {
+        it('should return all communities sorted by membersCount when onlyMemberOf=false', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyMemberOf=false')
           const body = await response.json()
 
           expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(2)
-          expect(body.data.total).toBe(2)
-        })
-
-        it('should return all communities when onlyMemberOf is not specified', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0')
-          const body = await response.json()
-
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(2)
-          expect(body.data.total).toBe(2)
+          expect(body.data.results).toHaveLength(3)
+          expect(body.data.total).toBe(3)
         })
       })
 
