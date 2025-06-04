@@ -162,6 +162,13 @@ export interface IVoiceDatabaseComponent {
   deletePrivateVoiceChat(callId: string): Promise<void>
 }
 
+export interface IVoiceDatabaseComponent {
+  areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
+  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
+  getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
+  deletePrivateVoiceChat(callId: string): Promise<void>
+}
+
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>
 }

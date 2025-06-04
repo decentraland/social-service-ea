@@ -386,3 +386,78 @@ describe('when accepting a private voice chat', () => {
     })
   })
 })
+
+describe('when rejecting a private voice chat', () => {
+  let callId: string
+  let calleeAddress: string
+  let callerAddress: string
+
+  beforeEach(() => {
+    callId = '1'
+    calleeAddress = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
+    callerAddress = '0x2B72b8d597c553b3173bca922B9ad871da751dA5'
+  })
+
+  describe('and the voice chat is not found', () => {
+    beforeEach(() => {
+      getPrivateVoiceChatMock.mockResolvedValueOnce(null)
+    })
+
+    it('should reject with a voice chat not found error', () => {
+      return expect(voice.rejectPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
+    })
+  })
+
+  describe('and the voice chat is found', () => {
+    let privateVoiceChat: PrivateVoiceChat
+
+    beforeEach(() => {
+      privateVoiceChat = {
+        id: callId,
+        caller_address: callerAddress,
+        callee_address: calleeAddress,
+        expires_at: new Date(Date.now() + 1000000000),
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+      getPrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
+    })
+
+    describe('and the rejecting callee is not the callee of the voice chat', () => {
+      beforeEach(() => {
+        privateVoiceChat.callee_address = '0x123'
+      })
+
+      it('should reject with a voice chat not found error', () => {
+        return expect(voice.rejectPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
+      })
+    })
+
+    describe('and the voice chat has expired', () => {
+      beforeEach(() => {
+        privateVoiceChat.expires_at = new Date(Date.now() - 1000000000)
+      })
+
+      it('should reject with a voice chat expired error', () => {
+        return expect(voice.rejectPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatExpiredError)
+      })
+    })
+
+    describe('and the voice chat is still valid', () => {
+      beforeEach(() => {
+        privateVoiceChat.expires_at = new Date(Date.now() + 1000000000)
+      })
+
+      it('should publish the voice chat rejected event in the channel and delete the voice chat from the database', async () => {
+        await voice.rejectPrivateVoiceChat(callId, calleeAddress)
+        expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId,
+          callerAddress,
+          calleeAddress,
+          status: 'rejected'
+        })
+        expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+      })
+    })
+  })
+})
