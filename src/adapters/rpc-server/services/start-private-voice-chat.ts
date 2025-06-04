@@ -18,7 +18,16 @@ export function startPrivateVoiceChatService({ components: { logs, voice } }: RP
     context: RpcServerContext
   ): Promise<StartPrivateVoiceChatResponse> {
     try {
-      const callId = await voice.startPrivateVoiceChat(context.address, request.calleeAddress)
+      if (!request.callee?.address) {
+        return {
+          response: {
+            $case: 'invalidRequest',
+            invalidRequest: { message: 'Callee address is missing in the request payload' }
+          }
+        }
+      }
+
+      const callId = await voice.startPrivateVoiceChat(context.address, request.callee.address)
 
       return {
         response: {

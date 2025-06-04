@@ -42,7 +42,7 @@ describe('when starting a private voice chat', () => {
     it('should resolve with an ok response and the call id', async () => {
       const result = await service(
         StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
+          callee: { address: calleeAddress }
         }),
         {
           address: callerAddress,
@@ -65,7 +65,7 @@ describe('when starting a private voice chat', () => {
     it('should resolve with a forbidden request response', async () => {
       const result = await service(
         StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
+          callee: { address: calleeAddress }
         }),
         {
           address: callerAddress,
@@ -90,7 +90,7 @@ describe('when starting a private voice chat', () => {
     it('should resolve with an invalid request response', async () => {
       const result = await service(
         StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
+          callee: { address: calleeAddress }
         }),
         {
           address: callerAddress,
@@ -113,7 +113,7 @@ describe('when starting a private voice chat', () => {
     it('should resolve with a conflicting request response', async () => {
       const result = await service(
         StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
+          callee: { address: calleeAddress }
         }),
         {
           address: callerAddress,
@@ -141,7 +141,7 @@ describe('when starting a private voice chat', () => {
     it('should resolve with an internal server error response', async () => {
       const result = await service(
         StartPrivateVoiceChatPayload.create({
-          calleeAddress: calleeAddress
+          callee: { address: calleeAddress }
         }),
         {
           address: callerAddress,
