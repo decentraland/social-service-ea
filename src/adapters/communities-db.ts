@@ -380,19 +380,35 @@ export function createCommunitiesDBComponent(
       return pg.exists(query, 'isBanned')
     },
 
-    async getBannedMembers(communityId: string, pagination: Pagination): Promise<BannedMember[]> {
-      const query = SQL`
+    async getBannedMembers(
+      communityId: string,
+      userAddress: EthAddress,
+      pagination: Pagination
+    ): Promise<BannedMember[]> {
+      const normalizedUserAddress = normalizeAddress(userAddress)
+
+      const query = useCTEs([
+        getMembersCTE(
+          SQL`SELECT banned_address as member_address FROM community_bans WHERE community_id = ${communityId}`
+        ),
+        getLatestFriendshipActionCTE(normalizedUserAddress)
+      ])
+        .append(
+          SQL`
         SELECT 
           cb.community_id AS "communityId",
           cb.banned_address AS "memberAddress",
-          cb.banned_at AS "bannedAt"
+          cb.banned_at AS "bannedAt",
+          lfa.action AS "lastFriendshipAction",
+          lfa.acting_user AS "actingUser"
         FROM community_bans cb
+        LEFT JOIN latest_friendship_actions lfa ON lfa.other_user = cb.banned_address
         WHERE cb.community_id = ${communityId}
           AND cb.active = true
         ORDER BY cb.banned_at ASC
       `
-
-      query.append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
+        )
+        .append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
 
       const result = await pg.query<BannedMember>(query)
       return result.rows

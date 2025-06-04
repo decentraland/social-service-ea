@@ -133,7 +133,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
         await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [addressMakingRequest])
       })
 
-      it('should respond with a 200 status code and the correct members including friendship status', async () => {
+      it('should respond with a 200 status code and the correct members', async () => {
         const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
         expect(response.status).toBe(200)
         const result = await response.json()
@@ -198,8 +198,6 @@ test('Get Community Members Controller', function ({ components, spyComponents }
         const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
         expect(response.status).toBe(200)
         const result = await response.json()
-
-        console.log(result.data.results)
 
         const owner = result.data.results.find((m) => m.memberAddress === ownerAddress)
         expect(owner.friendshipStatus).toBe(FriendshipStatus.NONE)

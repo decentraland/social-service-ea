@@ -145,7 +145,7 @@ export interface ICommunitiesDatabaseComponent {
     unbannedMemberAddress: EthAddress
   ): Promise<void>
   isMemberBanned(communityId: string, bannedMemberAddress: EthAddress): Promise<boolean>
-  getBannedMembers(communityId: string, pagination: Pagination): Promise<BannedMember[]>
+  getBannedMembers(communityId: string, userAddress: EthAddress, pagination: Pagination): Promise<BannedMember[]>
   getBannedMembersCount(communityId: string): Promise<number>
 }
 

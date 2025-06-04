@@ -284,7 +284,7 @@ export function createCommunityComponent(
         throw new NotAuthorizedError("The user doesn't have permission to get banned members")
       }
 
-      const bannedMembers = await communitiesDb.getBannedMembers(id, pagination)
+      const bannedMembers = await communitiesDb.getBannedMembers(id, userAddress, pagination)
       const totalBannedMembers = await communitiesDb.getBannedMembersCount(id)
 
       const profiles = await catalystClient.getProfiles(bannedMembers.map((member) => member.memberAddress))

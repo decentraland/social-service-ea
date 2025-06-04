@@ -941,6 +941,138 @@ describe('when handling community operations', () => {
       expect(result.members[0].memberAddress).toBe(mockMembers[0].memberAddress)
     })
   })
+
+  describe('and getting banned members', () => {
+    const communityId = 'test-community'
+    const mockBannedMembers = [
+      {
+        communityId: 'test-community',
+        memberAddress: '0x1111111111111111111111111111111111111111',
+        bannedAt: new Date().toISOString(),
+        bannedBy: '0x1234567890123456789012345678901234567890',
+        lastFriendshipAction: Action.REQUEST,
+        actingUser: '0x1111111111111111111111111111111111111111'
+      },
+      {
+        communityId: 'test-community',
+        memberAddress: '0x2222222222222222222222222222222222222222',
+        bannedAt: new Date().toISOString(),
+        bannedBy: '0x1234567890123456789012345678901234567890',
+        lastFriendshipAction: Action.ACCEPT,
+        actingUser: '0x2222222222222222222222222222222222222222'
+      }
+    ]
+
+    const mockProfiles: Profile[] = [
+      createMockProfile('0x1111111111111111111111111111111111111111'),
+      createMockProfile('0x2222222222222222222222222222222222222222')
+    ]
+
+    beforeEach(() => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(true)
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+      mockCommunitiesDB.getBannedMembers.mockResolvedValue(mockBannedMembers)
+      mockCommunitiesDB.getBannedMembersCount.mockResolvedValue(2)
+      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+    })
+
+    it('should return banned members with profiles and friendship status', async () => {
+      const result = await communityComponent.getBannedMembers(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(result).toEqual({
+        members: expect.arrayContaining([
+          expect.objectContaining({
+            ...mockBannedMembers[0],
+            profilePictureUrl: expect.any(String),
+            hasClaimedName: expect.any(Boolean),
+            name: expect.any(String),
+            friendshipStatus: expect.any(Number)
+          }),
+          expect.objectContaining({
+            ...mockBannedMembers[1],
+            profilePictureUrl: expect.any(String),
+            hasClaimedName: expect.any(Boolean),
+            name: expect.any(String),
+            friendshipStatus: expect.any(Number)
+          })
+        ]),
+        totalMembers: 2
+      })
+    })
+
+    it('should fetch banned members and total count from the database', async () => {
+      await communityComponent.getBannedMembers(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(mockCommunitiesDB.getBannedMembers).toHaveBeenCalledWith(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+      expect(mockCommunitiesDB.getBannedMembersCount).toHaveBeenCalledWith(communityId)
+    })
+
+    it('should fetch profiles from catalyst', async () => {
+      await communityComponent.getBannedMembers(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(
+        mockBannedMembers.map((member) => member.memberAddress)
+      )
+    })
+
+    it('should throw CommunityNotFoundError when community does not exist', async () => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(false)
+
+      await expect(
+        communityComponent.getBannedMembers(communityId, mockUserAddress, {
+          limit: 10,
+          offset: 0
+        })
+      ).rejects.toThrow(new CommunityNotFoundError(communityId))
+    })
+
+    it('should throw NotAuthorizedError when user is not authorized', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+
+      await expect(
+        communityComponent.getBannedMembers(communityId, mockUserAddress, {
+          limit: 10,
+          offset: 0
+        })
+      ).rejects.toThrow(new NotAuthorizedError("The user doesn't have permission to get banned members"))
+    })
+
+    it('should handle pagination correctly', async () => {
+      await communityComponent.getBannedMembers(communityId, mockUserAddress, {
+        limit: 1,
+        offset: 1
+      })
+
+      expect(mockCommunitiesDB.getBannedMembers).toHaveBeenCalledWith(communityId, mockUserAddress, {
+        limit: 1,
+        offset: 1
+      })
+    })
+
+    it('should filter out members without profiles', async () => {
+      mockCatalystClient.getProfiles.mockResolvedValue([mockProfiles[0]]) // Only return profile for first member
+
+      const result = await communityComponent.getBannedMembers(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(result.members).toHaveLength(1)
+      expect(result.members[0].memberAddress).toBe(mockBannedMembers[0].memberAddress)
+    })
+  })
 })
 
 describe('Community Utils', () => {
