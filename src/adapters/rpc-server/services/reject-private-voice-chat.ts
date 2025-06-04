@@ -1,9 +1,11 @@
-import { RejectPrivateVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  RejectPrivateVoiceChatPayload,
+  RejectPrivateVoiceChatResponse
+} from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { VoiceChatExpiredError } from '../../../logic/voice/errors'
-import { VoiceChatNotAllowedError, VoiceChatNotFoundError } from '../../../logic/voice/errors'
+import { VoiceChatNotFoundError } from '../../../logic/voice/errors'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
-import { RejectPrivateVoiceChatResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export function rejectPrivateVoiceChatService({ components: { logs, voice } }: RPCServiceContext<'logs' | 'voice'>) {
   const logger = logs.getLogger('start-call-service')
