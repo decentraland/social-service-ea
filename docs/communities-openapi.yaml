@@ -120,3 +120,177 @@ paths:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
+
+  /v1/communities/{id}/members:
+    get:
+      summary: List community members
+      description: |
+        Lists all members of a specific community.
+        This endpoint requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Page number for pagination.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of members per page.
+      responses:
+        '200':
+          description: Members found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityMembers200OkResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+    post:
+      summary: Add a member to a community
+      description: |
+        Adds a member to a community.
+        This endpoint requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - memberAddress
+              properties:
+                memberAddress:
+                  type: string
+                  description: ETH address of the member to add.
+      responses:
+        '201':
+          description: Member added successfully
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/AddMemberToCommunity201OkResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+  /v1/communities/{id}/members/{memberAddress}:
+    delete:
+      summary: Remove a member from a community
+      description: |
+        Removes a member from a community.
+        This endpoint requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: memberAddress
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the member to remove.
+      responses:
+        '204':
+          description: Member removed successfully
+        '404':
+          description: Community or member not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+  /v1/members/{address}/communities:
+    get:
+      summary: List communities for a member
+      description: |
+        Lists all communities a member belongs to.
+        This endpoint requires Signed Fetch authentication.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the member.
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Page number for pagination.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities per page.
+      responses:
+        '200':
+          description: Communities found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetMemberCommunities200OkResponse'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
