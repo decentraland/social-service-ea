@@ -5,7 +5,11 @@ import {
   UsersAreCallingSomeoneElseError,
   VoiceChatNotAllowedError
 } from '../../../src/logic/voice/errors'
-import { createFriendsDBMockedComponent, createMockedPubSubComponent } from '../../mocks/components'
+import {
+  createFriendsDBMockedComponent,
+  createLogsMockedComponent,
+  createMockedPubSubComponent
+} from '../../mocks/components'
 import { createVoiceDBMockedComponent } from '../../mocks/components/voice-db'
 import {
   BlockedUsersMessagesVisibilitySetting,
@@ -37,15 +41,7 @@ beforeEach(() => {
   publishInChannelMock = jest.fn()
   areUsersBeingCalledOrCallingSomeoneMock = jest.fn()
   createPrivateVoiceChatMock = jest.fn()
-  const logs: ILoggerComponent = {
-    getLogger: () => ({
-      info: () => undefined,
-      error: () => undefined,
-      debug: () => undefined,
-      warn: () => undefined,
-      log: () => undefined
-    })
-  }
+  const logs = createLogsMockedComponent()
   const pubsub = createMockedPubSubComponent({ publishInChannel: publishInChannelMock })
   const voiceDb = createVoiceDBMockedComponent({
     areUsersBeingCalledOrCallingSomeone: areUsersBeingCalledOrCallingSomeoneMock,
