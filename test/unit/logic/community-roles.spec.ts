@@ -166,4 +166,248 @@ describe('Community Roles Component', () => {
       })
     })
   })
+
+  describe('canBanMemberFromCommunity', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xowner'
+    const moderatorAddress = '0xmoderator'
+    const memberAddress = '0xmember'
+    const nonMemberAddress = '0xnonmember'
+
+    describe('when checking if owner can ban', () => {
+      it('should allow owner to ban a member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [memberAddress]: CommunityRole.Member
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, ownerAddress, memberAddress)
+        expect(result).toBe(true)
+      })
+
+      it('should allow owner to ban a moderator', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [moderatorAddress]: CommunityRole.Moderator
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, ownerAddress, moderatorAddress)
+        expect(result).toBe(true)
+      })
+
+      it('should not allow owner to ban another owner', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          ['0xother-owner']: CommunityRole.Owner
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, ownerAddress, '0xother-owner')
+        expect(result).toBe(false)
+      })
+
+      it('should allow owner to ban a non-member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [nonMemberAddress]: CommunityRole.None
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, ownerAddress, nonMemberAddress)
+        expect(result).toBe(true)
+      })
+    })
+
+    describe('when checking if moderator can ban', () => {
+      it('should allow moderator to ban a member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [moderatorAddress]: CommunityRole.Moderator,
+          [memberAddress]: CommunityRole.Member
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, moderatorAddress, memberAddress)
+        expect(result).toBe(true)
+      })
+
+      it('should not allow moderator to ban another moderator', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [moderatorAddress]: CommunityRole.Moderator,
+          ['0xother-moderator']: CommunityRole.Moderator
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, moderatorAddress, '0xother-moderator')
+        expect(result).toBe(false)
+      })
+
+      it('should not allow moderator to ban an owner', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [moderatorAddress]: CommunityRole.Moderator,
+          [ownerAddress]: CommunityRole.Owner
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, moderatorAddress, ownerAddress)
+        expect(result).toBe(false)
+      })
+
+      it('should allow moderator to ban a non-member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [moderatorAddress]: CommunityRole.Moderator,
+          [nonMemberAddress]: CommunityRole.None
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, moderatorAddress, nonMemberAddress)
+        expect(result).toBe(true)
+      })
+    })
+
+    describe('when checking if member can ban', () => {
+      it('should not allow member to ban another member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [memberAddress]: CommunityRole.Member,
+          ['0xother-member']: CommunityRole.Member
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, memberAddress, '0xother-member')
+        expect(result).toBe(false)
+      })
+
+      it('should not allow member to ban a moderator', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [memberAddress]: CommunityRole.Member,
+          [moderatorAddress]: CommunityRole.Moderator
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, memberAddress, moderatorAddress)
+        expect(result).toBe(false)
+      })
+
+      it('should not allow member to ban an owner', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [memberAddress]: CommunityRole.Member,
+          [ownerAddress]: CommunityRole.Owner
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, memberAddress, ownerAddress)
+        expect(result).toBe(false)
+      })
+
+      it('should not allow member to ban a non-member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [memberAddress]: CommunityRole.Member,
+          [nonMemberAddress]: CommunityRole.None
+        })
+        const result = await roles.canBanMemberFromCommunity(communityId, memberAddress, nonMemberAddress)
+        expect(result).toBe(false)
+      })
+    })
+  })
+
+  describe('canUnbanMemberFromCommunity', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xowner'
+    const moderatorAddress = '0xmoderator'
+    const memberAddress = '0xmember'
+    const nonMemberAddress = '0xnonmember'
+
+    describe('when checking if owner can unban', () => {
+      it('should allow owner to unban a member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [memberAddress]: CommunityRole.Member
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, ownerAddress, memberAddress)
+        expect(result).toBe(true)
+      })
+
+      it('should allow owner to unban a moderator', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [moderatorAddress]: CommunityRole.Moderator
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, ownerAddress, moderatorAddress)
+        expect(result).toBe(true)
+      })
+
+      it('should not allow owner to unban another owner', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          ['0xother-owner']: CommunityRole.Owner
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, ownerAddress, '0xother-owner')
+        expect(result).toBe(false)
+      })
+
+      it('should allow owner to unban a non-member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [nonMemberAddress]: CommunityRole.None
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, ownerAddress, nonMemberAddress)
+        expect(result).toBe(true)
+      })
+    })
+
+    describe('when checking if moderator can unban', () => {
+      it('should allow moderator to unban a member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [moderatorAddress]: CommunityRole.Moderator,
+          [memberAddress]: CommunityRole.Member
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, moderatorAddress, memberAddress)
+        expect(result).toBe(true)
+      })
+
+      it('should not allow moderator to unban another moderator', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [moderatorAddress]: CommunityRole.Moderator,
+          ['0xother-moderator']: CommunityRole.Moderator
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, moderatorAddress, '0xother-moderator')
+        expect(result).toBe(false)
+      })
+
+      it('should not allow moderator to unban an owner', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [moderatorAddress]: CommunityRole.Moderator,
+          [ownerAddress]: CommunityRole.Owner
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, moderatorAddress, ownerAddress)
+        expect(result).toBe(false)
+      })
+
+      it('should allow moderator to unban a non-member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [moderatorAddress]: CommunityRole.Moderator,
+          [nonMemberAddress]: CommunityRole.None
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, moderatorAddress, nonMemberAddress)
+        expect(result).toBe(true)
+      })
+    })
+
+    describe('when checking if member can unban', () => {
+      it('should not allow member to unban another member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [memberAddress]: CommunityRole.Member,
+          ['0xother-member']: CommunityRole.Member
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, memberAddress, '0xother-member')
+        expect(result).toBe(false)
+      })
+
+      it('should not allow member to unban a moderator', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [memberAddress]: CommunityRole.Member,
+          [moderatorAddress]: CommunityRole.Moderator
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, memberAddress, moderatorAddress)
+        expect(result).toBe(false)
+      })
+
+      it('should not allow member to unban an owner', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [memberAddress]: CommunityRole.Member,
+          [ownerAddress]: CommunityRole.Owner
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, memberAddress, ownerAddress)
+        expect(result).toBe(false)
+      })
+
+      it('should not allow member to unban a non-member', async () => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [memberAddress]: CommunityRole.Member,
+          [nonMemberAddress]: CommunityRole.None
+        })
+        const result = await roles.canUnbanMemberFromCommunity(communityId, memberAddress, nonMemberAddress)
+        expect(result).toBe(false)
+      })
+    })
+  })
 })

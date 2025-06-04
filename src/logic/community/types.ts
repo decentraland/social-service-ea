@@ -22,9 +22,16 @@ export type ICommunityComponent = {
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ) => Promise<GetCommunitiesWithTotal<MemberCommunity>>
-  kickMember: (communityId: string, kickerAddress: EthAddress, memberToKickAddress: EthAddress) => Promise<void>
+  kickMember: (communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
   joinCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
   leaveCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
+  banMember: (communityId: string, bannerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
+  unbanMember: (communityId: string, unbannerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
+  getBannedMembers: (
+    id: string,
+    userAddress: EthAddress,
+    pagination: Required<PaginatedParameters>
+  ) => Promise<{ members: BannedMemberProfile[]; totalMembers: number }>
 }
 
 export type ICommunityRolesComponent = {
@@ -34,6 +41,16 @@ export type ICommunityRolesComponent = {
     communityId: string,
     kickerAddress: string,
     memberToKickAddress: string
+  ) => Promise<boolean>
+  canBanMemberFromCommunity: (
+    communityId: string,
+    bannerAddress: string,
+    memberToBanAddress: string
+  ) => Promise<boolean>
+  canUnbanMemberFromCommunity: (
+    communityId: string,
+    unbannerAddress: string,
+    memberToUnbanAddress: string
   ) => Promise<boolean>
 }
 
@@ -58,6 +75,7 @@ export type Community = {
   active: boolean
 }
 
+// TODO: missing friendship status
 export type CommunityMember = {
   communityId: string
   memberAddress: string
@@ -65,7 +83,22 @@ export type CommunityMember = {
   joinedAt: string
 }
 
+// TODO: missing friendship status
+export type BannedMember = {
+  communityId: string
+  memberAddress: string
+  bannedAt: string
+  bannedBy: string
+}
+
 export type CommunityMemberProfile = CommunityMember & {
+  profilePictureUrl: string
+  hasClaimedName: boolean
+  name: string
+}
+
+export type BannedMemberProfile = BannedMember & {
+  profilePictureUrl: string
   hasClaimedName: boolean
   name: string
 }
