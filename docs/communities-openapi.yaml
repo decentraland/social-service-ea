@@ -58,7 +58,8 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
-
+      tags:
+        - Communities
   /v1/communities/{id}:
     get:
       summary: Get a community by ID
@@ -282,6 +283,124 @@ paths:
                 $ref: './communities-schemas.yaml#/components/schemas/GetMemberCommunities200OkResponse'
         '404':
           description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
+  /v1/communities/{id}/bans:
+    get:
+      summary: List banned members of a community
+      description: |
+        Lists all banned members of a specific community.
+        This endpoint requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Page number for pagination.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of banned members per page.
+      responses:
+        '200':
+          description: Banned members found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetBannedMembers200OkResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+  /v1/communities/{id}/members/{memberAddress}/bans:
+    post:
+      summary: Ban a member from a community
+      description: |
+        Bans a member from a community.
+        This endpoint requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: memberAddress
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the member to ban.
+      responses:
+        '204':
+          description: Member banned successfully
+        '404':
+          description: Community or member not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+    delete:
+      summary: Unban a member from a community
+      description: |
+        Unbans a member from a community.
+        This endpoint requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: memberAddress
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the member to unban.
+      responses:
+        '204':
+          description: Member unbanned successfully
+        '404':
+          description: Community or member not found
           content:
             application/json:
               schema:

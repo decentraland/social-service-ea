@@ -262,3 +262,38 @@ components:
               type: integer
             limit:
               type: integer
+    GetBannedMembers200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - results
+            - total
+            - page
+            - pages
+            - limit
+          properties:
+            results:
+              type: array
+              items:
+                type: object
+                required:
+                  - address
+                  - bannedAt
+                properties:
+                  address:
+                    type: string
+                  bannedAt:
+                    type: string
+                    format: date-time
+            total:
+              type: integer
+            page:
+              type: integer
+            pages:
+              type: integer
+            limit:
+              type: integer
