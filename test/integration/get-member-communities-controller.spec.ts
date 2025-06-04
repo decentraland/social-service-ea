@@ -65,13 +65,13 @@ test('Get Member Communities Controller', function ({ components, spyComponents 
     })
 
     afterEach(async () => {
-      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [address])
-      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId2, [address])
-      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId3, [address])
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [address])
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId2, [address])
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId3, [address])
 
-      components.communitiesDbHelper.forceCommunityRemoval(communityId1)
-      components.communitiesDbHelper.forceCommunityRemoval(communityId2)
-      components.communitiesDbHelper.forceCommunityRemoval(communityId3)
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId1)
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId2)
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId3)
     })
 
     describe('and the request is not signed', () => {

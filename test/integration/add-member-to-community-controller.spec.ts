@@ -35,8 +35,8 @@ test('Add Member to Community Controller', function ({ components, spyComponents
     })
 
     afterEach(async () => {
-      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [memberAddress, ownerAddress])
-      components.communitiesDbHelper.forceCommunityRemoval(communityId)
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [memberAddress, ownerAddress])
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId)
     })
 
     describe('and the request is not signed', () => {

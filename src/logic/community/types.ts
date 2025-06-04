@@ -1,5 +1,8 @@
-import { FriendProfile } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { CommunityRole, Pagination, CommunityPermission } from '../../types/entities'
+import {
+  FriendProfile,
+  FriendshipStatus
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { CommunityRole, Pagination, CommunityPermission, Action } from '../../types/entities'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export type ICommunityComponent = {
@@ -81,6 +84,8 @@ export type CommunityMember = {
   memberAddress: string
   role: CommunityRole
   joinedAt: string
+  lastFriendshipAction?: Action
+  actingUser?: string
 }
 
 // TODO: missing friendship status
@@ -89,18 +94,22 @@ export type BannedMember = {
   memberAddress: string
   bannedAt: string
   bannedBy: string
+  lastFriendshipAction?: Action
+  actingUser?: string
 }
 
-export type CommunityMemberProfile = CommunityMember & {
+export type CommunityMemberProfile = Omit<CommunityMember, 'friendshipAction' | 'friendshipActingUser'> & {
   profilePictureUrl: string
   hasClaimedName: boolean
   name: string
+  friendshipStatus: FriendshipStatus
 }
 
-export type BannedMemberProfile = BannedMember & {
+export type BannedMemberProfile = Omit<BannedMember, 'friendshipAction' | 'friendshipActingUser'> & {
   profilePictureUrl: string
   hasClaimedName: boolean
   name: string
+  friendshipStatus: FriendshipStatus
 }
 
 export type CommunityWithMembersCount = Community & {

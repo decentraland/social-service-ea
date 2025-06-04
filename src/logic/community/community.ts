@@ -93,7 +93,7 @@ export function createCommunityComponent(
         throw new NotAuthorizedError("The user doesn't have permission to get community members")
       }
 
-      const communityMembers = await communitiesDb.getCommunityMembers(id, pagination)
+      const communityMembers = await communitiesDb.getCommunityMembers(id, userAddress, pagination)
       const totalMembers = await communitiesDb.getCommunityMembersCount(id)
 
       const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
@@ -101,7 +101,7 @@ export function createCommunityComponent(
       const membersWithProfile: CommunityMemberProfile[] = mapMembersWithProfiles<
         CommunityMember,
         CommunityMemberProfile
-      >(communityMembers, profiles)
+      >(userAddress, communityMembers, profiles)
 
       return { members: membersWithProfile, totalMembers }
     },
@@ -289,6 +289,7 @@ export function createCommunityComponent(
 
       const profiles = await catalystClient.getProfiles(bannedMembers.map((member) => member.memberAddress))
       const membersWithProfile: BannedMemberProfile[] = mapMembersWithProfiles<BannedMember, BannedMemberProfile>(
+        userAddress,
         bannedMembers,
         profiles
       )

@@ -21,6 +21,8 @@ import { MemberCommunity } from '../../../src/logic/community/types'
 import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
 import { mockLogs } from '../../mocks/components'
 import { mapMembersWithProfiles } from '../../../src/logic/community/utils'
+import { Action } from '../../../src/types/entities'
+import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
@@ -809,6 +811,136 @@ describe('when handling community operations', () => {
       })
     })
   })
+
+  describe('and getting community members', () => {
+    const communityId = 'test-community'
+    const mockMembers = [
+      {
+        communityId: 'test-community',
+        memberAddress: '0x1111111111111111111111111111111111111111',
+        role: CommunityRole.Member,
+        joinedAt: new Date().toISOString(),
+        lastFriendshipAction: Action.REQUEST,
+        actingUser: '0x1111111111111111111111111111111111111111'
+      },
+      {
+        communityId: 'test-community',
+        memberAddress: '0x2222222222222222222222222222222222222222',
+        role: CommunityRole.Moderator,
+        joinedAt: new Date().toISOString(),
+        lastFriendshipAction: Action.ACCEPT,
+        actingUser: '0x2222222222222222222222222222222222222222'
+      }
+    ]
+
+    const mockProfiles: Profile[] = [
+      createMockProfile('0x1111111111111111111111111111111111111111'),
+      createMockProfile('0x2222222222222222222222222222222222222222')
+    ]
+
+    beforeEach(() => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(true)
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockMembers)
+      mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(2)
+      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+    })
+
+    it('should return members with profiles and friendship status', async () => {
+      const result = await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(result).toEqual({
+        members: expect.arrayContaining([
+          expect.objectContaining({
+            ...mockMembers[0],
+            profilePictureUrl: expect.any(String),
+            hasClaimedName: expect.any(Boolean),
+            name: expect.any(String),
+            friendshipStatus: expect.any(Number)
+          }),
+          expect.objectContaining({
+            ...mockMembers[1],
+            profilePictureUrl: expect.any(String),
+            hasClaimedName: expect.any(Boolean),
+            name: expect.any(String),
+            friendshipStatus: expect.any(Number)
+          })
+        ]),
+        totalMembers: 2
+      })
+    })
+
+    it('should fetch members and total count from the database', async () => {
+      await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
+    })
+
+    it('should fetch profiles from catalyst', async () => {
+      await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(mockMembers.map((member) => member.memberAddress))
+    })
+
+    it('should throw CommunityNotFoundError when community does not exist', async () => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(false)
+
+      await expect(
+        communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+          limit: 10,
+          offset: 0
+        })
+      ).rejects.toThrow(new CommunityNotFoundError(communityId))
+    })
+
+    it('should throw NotAuthorizedError when user is not a member', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+
+      await expect(
+        communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+          limit: 10,
+          offset: 0
+        })
+      ).rejects.toThrow(new NotAuthorizedError("The user doesn't have permission to get community members"))
+    })
+
+    it('should handle pagination correctly', async () => {
+      await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+        limit: 1,
+        offset: 1
+      })
+
+      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, mockUserAddress, {
+        limit: 1,
+        offset: 1
+      })
+    })
+
+    it('should filter out members without profiles', async () => {
+      mockCatalystClient.getProfiles.mockResolvedValue([mockProfiles[0]]) // Only return profile for first member
+
+      const result = await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(result.members).toHaveLength(1)
+      expect(result.members[0].memberAddress).toBe(mockMembers[0].memberAddress)
+    })
+  })
 })
 
 describe('Community Utils', () => {
@@ -1032,10 +1164,26 @@ describe('Community Utils', () => {
   })
 
   describe('mapMembersWithProfiles', () => {
+    const mockUserAddress = '0x1234567890123456789012345678901234567890'
     const mockMembers = [
-      { memberAddress: '0x1111111111111111111111111111111111111111', role: CommunityRole.Member },
-      { memberAddress: '0x2222222222222222222222222222222222222222', role: CommunityRole.Moderator },
-      { memberAddress: '0x3333333333333333333333333333333333333333', role: CommunityRole.Owner }
+      {
+        memberAddress: '0x1111111111111111111111111111111111111111',
+        role: CommunityRole.Member,
+        lastFriendshipAction: Action.REQUEST,
+        actingUser: '0x1111111111111111111111111111111111111111'
+      },
+      {
+        memberAddress: '0x2222222222222222222222222222222222222222',
+        role: CommunityRole.Moderator,
+        lastFriendshipAction: Action.ACCEPT,
+        actingUser: '0x2222222222222222222222222222222222222222'
+      },
+      {
+        memberAddress: '0x3333333333333333333333333333333333333333',
+        role: CommunityRole.Owner,
+        lastFriendshipAction: Action.REQUEST,
+        actingUser: mockUserAddress
+      }
     ]
 
     const mockProfiles: Profile[] = [
@@ -1043,56 +1191,63 @@ describe('Community Utils', () => {
       createMockProfile('0x2222222222222222222222222222222222222222')
     ]
 
-    it('should map members with their profiles', () => {
-      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
+    it('should map members with their profiles and include friendship status', () => {
+      const result = mapMembersWithProfiles(mockUserAddress, mockMembers, mockProfiles)
 
       expect(result).toHaveLength(2)
-      expect(result[0]).toEqual({
-        ...mockMembers[0],
-        profilePictureUrl: expect.any(String),
-        hasClaimedName: expect.any(Boolean),
-        name: expect.any(String)
-      })
-      expect(result[1]).toEqual({
-        ...mockMembers[1],
-        profilePictureUrl: expect.any(String),
-        hasClaimedName: expect.any(Boolean),
-        name: expect.any(String)
+      result.forEach((member) => {
+        expect(member).toHaveProperty('profilePictureUrl')
+        expect(member).toHaveProperty('hasClaimedName')
+        expect(member).toHaveProperty('name')
+        expect(member).toHaveProperty('friendshipStatus')
       })
     })
 
     it('should filter out members without profiles', () => {
-      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
+      const result = mapMembersWithProfiles(mockUserAddress, mockMembers, mockProfiles)
 
       expect(result).toHaveLength(2)
       expect(result.find((m) => m.memberAddress === '0x3333333333333333333333333333333333333333')).toBeUndefined()
     })
 
-    it('should use profile map for efficient lookups', () => {
-      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
-
-      expect(result).toHaveLength(2)
-      expect(result[0].memberAddress).toBe('0x1111111111111111111111111111111111111111')
-      expect(result[1].memberAddress).toBe('0x2222222222222222222222222222222222222222')
-    })
-
-    it('should include all required profile fields', () => {
-      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
-
-      result.forEach((member) => {
-        expect(member).toHaveProperty('profilePictureUrl')
-        expect(member).toHaveProperty('hasClaimedName')
-        expect(member).toHaveProperty('name')
-      })
-    })
-
-    it('should preserve original member properties', () => {
-      const result = mapMembersWithProfiles(mockMembers, mockProfiles)
+    it('should preserve all original member properties', () => {
+      const result = mapMembersWithProfiles(mockUserAddress, mockMembers, mockProfiles)
 
       result.forEach((member, index) => {
-        expect(member.role).toBe(mockMembers[index].role)
-        expect(member.memberAddress).toBe(mockMembers[index].memberAddress)
+        const originalMember = mockMembers[index]
+        expect(member.role).toBe(originalMember.role)
+        expect(member.memberAddress).toBe(originalMember.memberAddress)
+        expect(member.lastFriendshipAction).toBe(originalMember.lastFriendshipAction)
+        expect(member.actingUser).toBe(originalMember.actingUser)
       })
+    })
+
+    it('should set friendship status to NONE when no friendship action exists', () => {
+      const membersWithoutFriendship = mockMembers.map(({ lastFriendshipAction, actingUser, ...rest }) => rest)
+      const result = mapMembersWithProfiles(mockUserAddress, membersWithoutFriendship, mockProfiles)
+
+      result.forEach((member) => {
+        expect(member.friendshipStatus).toBe(FriendshipStatus.NONE)
+      })
+    })
+
+    it('should include friendship status when friendship action exists', () => {
+      const result = mapMembersWithProfiles(mockUserAddress, mockMembers, mockProfiles)
+
+      result.forEach((member) => {
+        expect(member.friendshipStatus).toBeDefined()
+        // We don't test the specific status value as that's getFriendshipRequestStatus's responsibility
+      })
+    })
+
+    it('should handle empty members array', () => {
+      const result = mapMembersWithProfiles(mockUserAddress, [], mockProfiles)
+      expect(result).toHaveLength(0)
+    })
+
+    it('should handle empty profiles array', () => {
+      const result = mapMembersWithProfiles(mockUserAddress, mockMembers, [])
+      expect(result).toHaveLength(0)
     })
   })
 })
