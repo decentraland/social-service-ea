@@ -22,9 +22,16 @@ export type ICommunityComponent = {
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ) => Promise<GetCommunitiesWithTotal<MemberCommunity>>
-  kickMember: (communityId: string, kickerAddress: EthAddress, memberToKickAddress: EthAddress) => Promise<void>
+  kickMember: (communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
   joinCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
   leaveCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
+  banMember: (communityId: string, bannerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
+  unbanMember: (communityId: string, unbannerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
+  getBannedMembers: (
+    id: string,
+    userAddress: EthAddress,
+    pagination: Required<PaginatedParameters>
+  ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
 }
 
 export type ICommunityRolesComponent = {
@@ -34,6 +41,16 @@ export type ICommunityRolesComponent = {
     communityId: string,
     kickerAddress: string,
     memberToKickAddress: string
+  ) => Promise<boolean>
+  canBanMemberFromCommunity: (
+    communityId: string,
+    bannerAddress: string,
+    memberToBanAddress: string
+  ) => Promise<boolean>
+  canUnbanMemberFromCommunity: (
+    communityId: string,
+    unbannerAddress: string,
+    memberToUnbanAddress: string
   ) => Promise<boolean>
 }
 

@@ -107,18 +107,18 @@ erDiagram
     timestamp updated_at
   }
   COMMUNITY_MEMBERS {
-    uuid id PK
-    uuid community_id FK
-    varchar member_address
+    uuid community_id PK,FK
+    varchar member_address PK
     varchar role
     timestamp joined_at
   }
   COMMUNITY_BANS {
-    uuid id PK
-    uuid community_id FK
-    varchar banned_address
+    uuid community_id PK,FK
+    varchar banned_address PK
     varchar banned_by
     timestamp banned_at
+    varchar unbanned_by NULL
+    timestamp unbanned_at NULL
     text reason
     boolean active
   }
