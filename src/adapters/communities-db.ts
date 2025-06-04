@@ -74,11 +74,7 @@ export function createCommunitiesDBComponent(
           cm.role AS "role",
           cm.joined_at AS "joinedAt"
         FROM community_members cm
-        LEFT JOIN community_bans cb ON cm.member_address = cb.banned_address 
-          AND cb.community_id = cm.community_id
-          AND cb.active = true
         WHERE cm.community_id = ${id}
-          AND cb.banned_address IS NULL
         ORDER BY cm.joined_at ASC
       `
 
@@ -99,12 +95,8 @@ export function createCommunitiesDBComponent(
       const query = SQL`
         SELECT cm.member_address AS "memberAddress", cm.role AS "role"
         FROM community_members cm
-        LEFT JOIN community_bans cb ON cm.member_address = cb.banned_address
-          AND cb.community_id = cm.community_id
-          AND cb.active = true
         WHERE cm.community_id = ${id}
           AND cm.member_address = ANY(${normalizedUserAddresses})
-          AND cb.banned_address IS NULL
       `
       const result = await pg.query<{ memberAddress: string; role: CommunityRole }>(query)
       return result.rows.reduce(
@@ -120,11 +112,7 @@ export function createCommunitiesDBComponent(
       const query = SQL`
         SELECT COUNT(cm.member_address) 
           FROM community_members cm
-          LEFT JOIN community_bans cb ON cm.member_address = cb.banned_address 
-              AND cb.community_id = cm.community_id
-              AND cb.active = true
           WHERE cm.community_id = ${communityId}
-              AND cb.banned_address IS NULL
               AND EXISTS (
                   SELECT 1 
                   FROM communities c 
@@ -200,9 +188,9 @@ export function createCommunitiesDBComponent(
         )
         .append(membersJoin).append(SQL`
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
-        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = cm.member_address
         LEFT JOIN community_friends cf ON c.id = cf.community_id
-        WHERE cb.banned_address IS NULL AND c.active = true`)
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
+        WHERE c.active = true AND cb.banned_address IS NULL`)
 
       const query = withSearchAndPagination(baseQuery, options)
 
@@ -222,9 +210,8 @@ export function createCommunitiesDBComponent(
         : SQL``
 
       const query = SQL`SELECT COUNT(1) as count FROM communities c`.append(membersJoin).append(SQL`
-          LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress}
-        WHERE cb.banned_address IS NULL
-          AND c.active = true
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
+        WHERE c.active = true AND cb.banned_address IS NULL
       `)
 
       if (search) {
@@ -286,8 +273,7 @@ export function createCommunitiesDBComponent(
           COALESCE(cm.role, ${CommunityRole.None}) as role
         FROM communities c
         JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}
-        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = cm.member_address
-        WHERE c.active = true AND cb.banned_address IS NULL
+        WHERE c.active = true
       `
 
       const query = withSearchAndPagination(baseQuery, {
