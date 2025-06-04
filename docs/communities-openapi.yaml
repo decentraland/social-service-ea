@@ -7,6 +7,58 @@ info:
 #   - url: https://social-service-ea.decentraland.org
 
 paths:
+  /v1/communities:
+    get:
+      summary: List communities
+      description: |
+        Lists all communities.
+        This endpoint has optional Signed Fetch authentication.
+        When signed, it includes properties related to the authenticated user in its response.
+      responses:
+        '200':
+          description: Communities found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetCommunities200OkResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+    post:
+      summary: Create a new community
+      description: |
+        Creates a new community with the provided details.
+        This endpoint requires Signed Fetch authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - description
+                # - thumbnail TODO
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                # thumbnail:
+                  # type: string
+      responses:
+        '201':
+          description: Community created successfully
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/CreateCommunity201OkResponse'
+
   /v1/communities/{id}:
     get:
       summary: Get a community by ID
@@ -26,40 +78,45 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/CommunityWithMembersCount'
+                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityById200OkResponse'
         '404':
           description: Community not found
-        '401':
-          description: Unauthorized - Signed Fetch required
-      tags:
-        - Communities
-  /v1/communities:
-    post:
-      summary: Create a new community
-      description: |
-        Creates a new community with the provided details.
-        This endpoint requires Signed Fetch authentication.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: './communities-schemas.yaml#/components/schemas/CreateCommunityRequest'
-      responses:
-        '201':
-          description: Community created successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  data:
-                    $ref: './communities-schemas.yaml#/components/schemas/Community'
-        '400':
-          description: Invalid request body
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+    delete:
+      summary: Delete a community
+      description: |
+        Deletes a community.
+        This endpoint requires Signed Fetch authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+      responses:
+        '204':
+          description: Community deleted successfully
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
