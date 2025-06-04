@@ -1,3 +1,4 @@
+import { PrivateVoiceChatNotFoundError } from '../../adapters/comms-gatekeeper'
 import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, PrivateMessagesPrivacy } from '../../types'
 import {
@@ -134,7 +135,36 @@ export function createVoiceComponent({
     await voiceDb.deletePrivateVoiceChat(callId)
   }
 
+  async function endPrivateVoiceChat(callId: string, address: string): Promise<void> {
+    logger.info(`Ending voice chat for call ${callId}`)
+
+    // If the voice chat is in the database, we can delete it
+    const privateVoiceChat = await voiceDb.getPrivateVoiceChat(callId)
+    if (privateVoiceChat) {
+      // If the caller or the callee are not the ones ending the call, we don't do anything
+      if (privateVoiceChat.callee_address !== address && privateVoiceChat.caller_address !== address) {
+        logger.info(`The caller or the callee are not the ones ending the call (${address}) with id ${callId}`)
+        return
+      }
+
+      // Delete the voice chat from the database
+      await voiceDb.deletePrivateVoiceChat(callId)
+
+      // Notify the other user that the call ended
+      await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        callId,
+        calleeAddress: address === privateVoiceChat.callee_address ? undefined : privateVoiceChat.callee_address,
+        callerAddress: address === privateVoiceChat.caller_address ? undefined : privateVoiceChat.caller_address,
+        status: VoiceChatStatus.ENDED
+      })
+    } else {
+      // If the voice chat is not in the database, we need to notify the comms gatekeeper that the call has ended
+      await commsGatekeeper.endPrivateVoiceChat(callId, address)
+    }
+  }
+
   return {
+    endPrivateVoiceChat,
     rejectPrivateVoiceChat,
     startPrivateVoiceChat,
     acceptPrivateVoiceChat

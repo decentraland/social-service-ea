@@ -1,6 +1,12 @@
 import { AppComponents, ICommsGatekeeperComponent, PrivateMessagesPrivacy } from '../types'
 import { isErrorWithMessage } from '../utils/errors'
 
+export class PrivateVoiceChatNotFoundError extends Error {
+  constructor(callId: string) {
+    super(`Voice chat for call ${callId} not found`)
+  }
+}
+
 export const createCommsGatekeeperComponent = async ({
   logs,
   config,
@@ -98,7 +104,36 @@ export const createCommsGatekeeperComponent = async ({
     }
   }
 
+  async function endPrivateVoiceChat(callId: string, address: string): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/private-voice-chat/${callId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        },
+        body: JSON.stringify({
+          address
+        })
+      })
+
+      if (response.status === 404) {
+        throw new PrivateVoiceChatNotFoundError(callId)
+      }
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to end private voice chat for call ${callId} and address ${address}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
   return {
+    endPrivateVoiceChat,
     updateUserPrivateMessagePrivacyMetadata,
     isUserInAVoiceChat,
     getPrivateVoiceChatCredentials

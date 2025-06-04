@@ -252,6 +252,7 @@ export type ICommsGatekeeperComponent = {
     user: string,
     privateMessagesPrivacy: PrivateMessagesPrivacy
   ) => Promise<void>
+  endPrivateVoiceChat: (callId: string, address: string) => Promise<void>
 }
 
 export type IWebSocketComponent = IBaseComponent & {
