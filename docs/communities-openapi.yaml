@@ -21,12 +21,6 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/GetCommunities200OkResponse'
-        '401':
-          description: Unauthorized - Signed Fetch required
-          content:
-            application/json:
-              schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     post:
@@ -58,6 +52,12 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/CreateCommunity201OkResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
 
   /v1/communities/{id}:
     get:
