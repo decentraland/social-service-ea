@@ -102,3 +102,21 @@ describe('when getting count from query', () => {
     expect(mockPg.query).toHaveBeenCalledWith(mockQuery)
   })
 })
+
+describe('when checking if a record exists in the database', () => {
+  const mockQuery = {} as SQLStatement
+  const mockExists = true
+
+  beforeEach(() => {
+    mockPg.query.mockResolvedValue({
+      rows: [{ exists: mockExists }],
+      rowCount: 1
+    })
+  })
+
+  it('should return true if the record exists', async () => {
+    const exists = await pg.exists(mockQuery, 'exists')
+    expect(exists).toBe(mockExists)
+    expect(mockPg.query).toHaveBeenCalledWith(mockQuery)
+  })
+})

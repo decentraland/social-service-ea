@@ -10,9 +10,14 @@ export async function createPgComponent(
 ): Promise<IPgComponent & IBaseComponent> {
   const pg = await createBasePgComponent(components, options)
 
-  async function getCount(query: SQLStatement) {
+  async function getCount(query: SQLStatement): Promise<number> {
     const result = await pg.query<{ count: number }>(query)
     return Number(result.rows[0].count)
+  }
+
+  async function exists<T extends Record<string, any>>(query: SQLStatement, existsProp: keyof T): Promise<boolean> {
+    const result = await pg.query<T>(query)
+    return result.rows[0]?.[existsProp] ?? false
   }
 
   async function withTransaction<T>(
@@ -38,5 +43,5 @@ export async function createPgComponent(
     }
   }
 
-  return { ...pg, getCount, withTransaction }
+  return { ...pg, getCount, exists, withTransaction }
 }

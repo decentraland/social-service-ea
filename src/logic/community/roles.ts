@@ -53,6 +53,14 @@ export function createCommunityRolesComponent(
     return getRolePermissions(role)?.includes(permission) ?? false
   }
 
+  const isMember = (role: CommunityRole): boolean => {
+    return !!role && role !== CommunityRole.None
+  }
+
+  const canActOnMember = (actorRole: CommunityRole, targetRole: CommunityRole): boolean => {
+    return ROLE_ACTION_TRANSITIONS[targetRole]?.includes(actorRole) ?? false
+  }
+
   return {
     hasPermission,
     getRolePermissions,
@@ -66,7 +74,36 @@ export function createCommunityRolesComponent(
       const kickerRole = roles[kickerAddress]
       const targetRole = roles[targetAddress]
 
-      return ROLE_ACTION_TRANSITIONS[targetRole]?.includes(kickerRole)
+      return canActOnMember(kickerRole, targetRole)
+    },
+
+    async canBanMemberFromCommunity(
+      communityId: string,
+      bannerAddress: string,
+      targetAddress: string
+    ): Promise<boolean> {
+      const roles = await communitiesDb.getCommunityMemberRoles(communityId, [bannerAddress, targetAddress])
+      const bannerRole = roles[bannerAddress]
+      const targetRole = roles[targetAddress]
+
+      return (
+        hasPermission(bannerRole, 'ban_players') && (canActOnMember(bannerRole, targetRole) || !isMember(targetRole))
+      )
+    },
+
+    async canUnbanMemberFromCommunity(
+      communityId: string,
+      unbannerAddress: string,
+      targetAddress: string
+    ): Promise<boolean> {
+      const roles = await communitiesDb.getCommunityMemberRoles(communityId, [unbannerAddress, targetAddress])
+      const unbannerRole = roles[unbannerAddress]
+      const targetRole = roles[targetAddress]
+
+      return (
+        hasPermission(unbannerRole, 'ban_players') &&
+        (canActOnMember(unbannerRole, targetRole) || !isMember(targetRole))
+      )
     }
   }
 }

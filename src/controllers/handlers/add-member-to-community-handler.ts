@@ -1,5 +1,4 @@
-import { IHttpServerComponent } from '@well-known-components/interfaces'
-import { HandlerContextWithPath } from '../../types'
+import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../logic/community'
 import { errorMessageOrDefault } from '../../utils/errors'
@@ -10,7 +9,7 @@ export async function addMemberToCommunityHandler(
     HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members'>,
     'components' | 'params' | 'verification'
   >
-): Promise<IHttpServerComponent.IResponse> {
+): Promise<HTTPResponse> {
   const {
     components: { community, logs },
     params: { id: communityId },

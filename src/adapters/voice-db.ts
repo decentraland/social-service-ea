@@ -19,8 +19,7 @@ export async function createVoiceDBComponent(
           SELECT 1 FROM private_voice_chats WHERE caller_address IN (${normalizedUserAddresses}) OR callee_address IN (${normalizedUserAddresses})
         )
       `
-      const results = await pg.query<{ exists: boolean }>(query)
-      return results.rows[0].exists
+      return pg.exists(query, 'exists')
     },
     async createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
       const query = SQL`
