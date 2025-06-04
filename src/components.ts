@@ -26,7 +26,10 @@ import { createWSPoolComponent } from './adapters/ws-pool'
 import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
+import { createVoiceComponent } from './logic/voice'
+import { createSettingsComponent } from './logic/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
+import { createVoiceDBComponent } from './adapters/voice-db'
 import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
 
 // Initialize all the components of the app
@@ -90,6 +93,9 @@ export async function initComponents(): Promise<AppComponents> {
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
+  const settings = await createSettingsComponent({ friendsDb })
+  const voiceDb = await createVoiceDBComponent({ pg, config })
+  const voice = await createVoiceComponent({ logs, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
   const sns = await createSnsComponent({ config })
   const subscribersContext = createSubscribersContext()
   const rpcServer = await createRpcServerComponent({
@@ -104,7 +110,9 @@ export async function initComponents(): Promise<AppComponents> {
     sns,
     subscribersContext,
     worldsStats,
-    metrics
+    metrics,
+    settings,
+    voice
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
@@ -138,6 +146,9 @@ export async function initComponents(): Promise<AppComponents> {
     subscribersContext,
     tracing,
     worldsStats,
-    wsPool
+    wsPool,
+    voice,
+    voiceDb,
+    settings
   }
 }

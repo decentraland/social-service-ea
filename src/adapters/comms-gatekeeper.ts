@@ -44,7 +44,32 @@ export const createCommsGatekeeperComponent = async ({
     }
   }
 
+  async function isUserInAVoiceChat(address: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${commsUrl}/users/${address}/voice-chat-status`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+
+      const data = await response.json()
+      return Boolean(data.is_user_in_voice_chat)
+    } catch (error) {
+      logger.error(
+        `Failed to check if user ${address} is in a voice chat: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
   return {
-    updateUserPrivateMessagePrivacyMetadata
+    updateUserPrivateMessagePrivacyMetadata,
+    isUserInAVoiceChat
   }
 }

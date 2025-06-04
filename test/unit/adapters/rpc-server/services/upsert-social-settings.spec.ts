@@ -29,6 +29,7 @@ describe('upsertSocialSettingsService', () => {
       upsertSocialSettings: upsertSocialSettingsMock
     } as unknown as IFriendsDatabaseComponent
     const commsGatekeeper: ICommsGatekeeperComponent = {
+      isUserInAVoiceChat: jest.fn(),
       updateUserPrivateMessagePrivacyMetadata: commsGatekeeperMock
     }
     const logs: ILoggerComponent = {

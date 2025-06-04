@@ -285,7 +285,6 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       const results = await pg.query<{ exists: boolean }>(query)
       return results.rows[0].exists
     },
-
     async executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T> {
       return pg.withTransaction(cb)
     }

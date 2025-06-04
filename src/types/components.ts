@@ -11,6 +11,7 @@ import { EthAddress, FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dc
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
+import { SQLStatement } from 'sql-template-strings'
 import {
   Action,
   BlockUserWithDate,
@@ -34,7 +35,6 @@ import {
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
-import { SQLStatement } from 'sql-template-strings'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -149,6 +149,11 @@ export interface ICommunitiesDatabaseComponent {
   getBannedMembersCount(communityId: string): Promise<number>
 }
 
+export interface IVoiceDatabaseComponent {
+  areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
+  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
+}
+
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>
 }
@@ -222,6 +227,7 @@ export type ITracingComponent = IBaseComponent & {
 }
 
 export type ICommsGatekeeperComponent = {
+  isUserInAVoiceChat: (address: string) => Promise<boolean>
   updateUserPrivateMessagePrivacyMetadata: (
     user: string,
     privateMessagesPrivacy: PrivateMessagesPrivacy

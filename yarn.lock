@@ -772,6 +772,12 @@
   dependencies:
     "@dcl/ts-proto" "1.154.0"
 
+"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15396936054.commit-6b3ce0a.tgz":
+  version "1.0.0-15396936054.commit-6b3ce0a"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15396936054.commit-6b3ce0a.tgz#11113504a103ce3a39b0815198664e0e79bfbb7a"
+  dependencies:
+    "@dcl/ts-proto" "1.154.0"
+
 "@dcl/rpc@^1.1.2":
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/@dcl/rpc/-/rpc-1.1.2.tgz#789f4f24c8d432a48df3e786b77d017883dda11a"

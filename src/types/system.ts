@@ -28,9 +28,12 @@ import {
   IStatusCheckComponent,
   ICommunitiesDatabaseComponent,
   IPgComponent,
-  ICommunitiesDbHelperComponent
+  ICommunitiesDbHelperComponent,
+  IVoiceDatabaseComponent
 } from './components'
 import { ICommunityComponent, ICommunityRolesComponent } from '../logic/community'
+import { ISettingsComponent } from '../logic/settings'
+import { IVoiceComponent } from '../logic/voice'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -64,6 +67,9 @@ export type BaseComponents = {
   uwsServer: IUWsComponent
   worldsStats: IWorldsStatsComponent
   wsPool: IWSPoolComponent
+  settings: ISettingsComponent
+  voice: IVoiceComponent
+  voiceDb: IVoiceDatabaseComponent
 }
 
 // components used in runtime

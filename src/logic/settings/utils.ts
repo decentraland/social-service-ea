@@ -8,7 +8,7 @@ import {
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   SocialSettings as DBSocialSettings,
   User
-} from '../types'
+} from '../../types'
 
 const DEFAULT_DB_PRIVATE_MESSAGES_PRIVACY = DBPrivateMessagesPrivacy.ALL
 const DEFAULT_RPC_PRIVATE_MESSAGE_PRIVACY = RPCPrivateMessagePrivacySetting.ALL

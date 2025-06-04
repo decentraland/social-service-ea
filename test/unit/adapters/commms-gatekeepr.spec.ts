@@ -77,3 +77,61 @@ describe('when updating the user privacy message metadata', () => {
     })
   })
 })
+
+describe('when checking if a user is in a voice chat', () => {
+  describe('and the user is in a voice chat', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ is_user_in_voice_chat: true })
+      })
+    })
+
+    it('should resolve as true', () => {
+      return expect(commsGatekeeper.isUserInAVoiceChat('0x123')).resolves.toBe(true)
+    })
+  })
+
+  describe('and the user is not in a voice chat', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ is_user_in_voice_chat: false })
+      })
+    })
+
+    it('should resolve as false', () => {
+      return expect(commsGatekeeper.isUserInAVoiceChat('0x123')).resolves.toBe(false)
+    })
+  })
+
+  describe('and the request resolves with a non 200 status code', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request'
+      })
+    })
+
+    it('should log the error and reject with it', async () => {
+      await expect(commsGatekeeper.isUserInAVoiceChat('0x123')).rejects.toThrow('Server responded with status 400')
+      expect(errorLogMock).toHaveBeenCalledWith(
+        'Failed to check if user 0x123 is in a voice chat: Server responded with status 400'
+      )
+    })
+  })
+
+  describe('and the request fails with a network error', () => {
+    beforeEach(() => {
+      fetchMock.mockRejectedValueOnce(new Error('Network error'))
+    })
+
+    it('should log the error and reject with it', async () => {
+      await expect(commsGatekeeper.isUserInAVoiceChat('0x123')).rejects.toThrow('Network error')
+      expect(errorLogMock).toHaveBeenCalledWith('Failed to check if user 0x123 is in a voice chat: Network error')
+    })
+  })
+})
