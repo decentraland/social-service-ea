@@ -192,7 +192,10 @@ export function createCommunitiesDBComponent(
         LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
         WHERE c.active = true AND cb.banned_address IS NULL`)
 
-      const query = withSearchAndPagination(baseQuery, options)
+      const query = withSearchAndPagination(baseQuery, {
+        ...options,
+        sortBy: options.onlyMemberOf ? 'role' : 'membersCount'
+      })
 
       const result = await pg.query<CommunityWithMembersCountAndFriends>(query)
       return result.rows
