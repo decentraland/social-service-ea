@@ -1,7 +1,13 @@
 import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, PrivateMessagesPrivacy } from '../../types'
-import { UserAlreadyInVoiceChatError, UsersAreCallingSomeoneElseError, VoiceChatNotAllowedError } from './errors'
-import { IVoiceComponent, VoiceChatStatus } from './types'
+import {
+  UserAlreadyInVoiceChatError,
+  UsersAreCallingSomeoneElseError,
+  VoiceChatExpiredError,
+  VoiceChatNotAllowedError,
+  VoiceChatNotFoundError
+} from './errors'
+import { AcceptPrivateVoiceChatResult, IVoiceComponent, VoiceChatStatus } from './types'
 
 export function createVoiceComponent({
   logs,
@@ -61,7 +67,53 @@ export function createVoiceComponent({
     return callId
   }
 
+  async function acceptPrivateVoiceChat(callId: string, calleeAddress: string): Promise<AcceptPrivateVoiceChatResult> {
+    logger.info(`Accepting voice chat for call ${callId}`)
+
+    const privateVoiceChat = await voiceDb.getPrivateVoiceChat(callId)
+    if (!privateVoiceChat) {
+      throw new VoiceChatNotFoundError(callId)
+    }
+
+    if (privateVoiceChat.callee_address !== calleeAddress) {
+      throw new VoiceChatNotAllowedError()
+    }
+
+    if (privateVoiceChat.expires_at < new Date()) {
+      throw new VoiceChatExpiredError(callId)
+    }
+
+    // Call the comms gate-keeper endpoint to get the keys of both users
+    const credentials = await commsGatekeeper.getPrivateVoiceChatCredentials(
+      callId,
+      privateVoiceChat.callee_address,
+      privateVoiceChat.caller_address
+    )
+
+    // Notify the other user about the voice call being accepted
+    await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+      callId,
+      callerAddress: privateVoiceChat.caller_address,
+      calleeAddress: privateVoiceChat.callee_address,
+      status: VoiceChatStatus.ACCEPTED,
+      // Credentials for the caller
+      credentials: {
+        token: credentials[privateVoiceChat.caller_address].token,
+        url: credentials[privateVoiceChat.caller_address].url
+      }
+    })
+
+    // The call has been accepted, we can delete it from the database
+    await voiceDb.deletePrivateVoiceChat(callId)
+
+    return {
+      token: credentials[privateVoiceChat.callee_address].token,
+      url: credentials[privateVoiceChat.callee_address].url
+    }
+  }
+
   return {
-    startPrivateVoiceChat
+    startPrivateVoiceChat,
+    acceptPrivateVoiceChat
   }
 }

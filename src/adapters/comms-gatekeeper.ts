@@ -68,8 +68,39 @@ export const createCommsGatekeeperComponent = async ({
     }
   }
 
+  async function getPrivateVoiceChatCredentials(
+    roomId: string,
+    calleeAddress: string,
+    callerAddress: string
+  ): Promise<Record<string, { url: string; token: string }>> {
+    try {
+      const response = await fetch(`${commsUrl}/private-voice-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          roomId,
+          userAddresses: [calleeAddress, callerAddress]
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      logger.error(
+        `Failed to get private voice chat keys for user ${calleeAddress} and ${callerAddress}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
   return {
     updateUserPrivateMessagePrivacyMetadata,
-    isUserInAVoiceChat
+    isUserInAVoiceChat,
+    getPrivateVoiceChatCredentials
   }
 }

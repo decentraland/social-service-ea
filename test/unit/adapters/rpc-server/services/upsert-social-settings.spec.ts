@@ -14,6 +14,7 @@ import {
   RpcServerContext,
   ICommsGatekeeperComponent
 } from '../../../../../src/types'
+import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 
 describe('upsertSocialSettingsService', () => {
   const testAddress = '0x1234567890abcdef'
@@ -28,10 +29,11 @@ describe('upsertSocialSettingsService', () => {
     const friendsDb = {
       upsertSocialSettings: upsertSocialSettingsMock
     } as unknown as IFriendsDatabaseComponent
-    const commsGatekeeper: ICommsGatekeeperComponent = {
+    const commsGatekeeper: ICommsGatekeeperComponent = createCommsGatekeeperMockedComponent({
       isUserInAVoiceChat: jest.fn(),
+      getPrivateVoiceChatCredentials: jest.fn(),
       updateUserPrivateMessagePrivacyMetadata: commsGatekeeperMock
-    }
+    })
     const logs: ILoggerComponent = {
       getLogger: () => ({
         info: () => {},

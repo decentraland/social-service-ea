@@ -135,3 +135,75 @@ describe('when checking if a user is in a voice chat', () => {
     })
   })
 })
+
+describe('when getting the private voice chat credentials', () => {
+  let roomId: string
+  let calleeAddress: string
+  let callerAddress: string
+
+  beforeEach(() => {
+    roomId = '1'
+    calleeAddress = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
+    callerAddress = '0x2B72b8d597c553b3173bca922B9ad871da751dA5'
+  })
+
+  describe('and the request resolves with a 200 status code', () => {
+    let response: {
+      [key: string]: {
+        url: string
+        token: string
+      }
+    }
+
+    beforeEach(() => {
+      response = {
+        [calleeAddress]: { url: 'https://url.com', token: 'token' },
+        [callerAddress]: { url: 'https://another-url.com', token: 'another-token' }
+      }
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(response)
+      })
+    })
+
+    it('should resolve with the credentials', async () => {
+      const credentials = await commsGatekeeper.getPrivateVoiceChatCredentials(roomId, calleeAddress, callerAddress)
+      expect(credentials).toEqual(response)
+    })
+  })
+
+  describe('and the request resolves with a non 200 status code', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request'
+      })
+    })
+
+    it('should log the error and reject with it', async () => {
+      await expect(
+        commsGatekeeper.getPrivateVoiceChatCredentials(roomId, calleeAddress, callerAddress)
+      ).rejects.toThrow('Server responded with status 400')
+      expect(errorLogMock).toHaveBeenCalledWith(
+        `Failed to get private voice chat keys for user ${calleeAddress} and ${callerAddress}: Server responded with status 400`
+      )
+    })
+  })
+
+  describe('and the request fails with a network error', () => {
+    beforeEach(() => {
+      fetchMock.mockRejectedValueOnce(new Error('Network error'))
+    })
+
+    it('should log the error and reject with it', async () => {
+      await expect(
+        commsGatekeeper.getPrivateVoiceChatCredentials(roomId, calleeAddress, callerAddress)
+      ).rejects.toThrow('Network error')
+      expect(errorLogMock).toHaveBeenCalledWith(
+        `Failed to get private voice chat keys for user ${calleeAddress} and ${callerAddress}: Network error`
+      )
+    })
+  })
+})

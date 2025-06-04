@@ -2,10 +2,14 @@ import { IVoiceDatabaseComponent } from '../../../src/types'
 
 export function createVoiceDBMockedComponent({
   areUsersBeingCalledOrCallingSomeone = jest.fn(),
-  createPrivateVoiceChat = jest.fn()
+  createPrivateVoiceChat = jest.fn(),
+  getPrivateVoiceChat = jest.fn(),
+  deletePrivateVoiceChat = jest.fn()
 }: Partial<jest.Mocked<IVoiceDatabaseComponent>>): jest.Mocked<IVoiceDatabaseComponent> {
   return {
     areUsersBeingCalledOrCallingSomeone,
-    createPrivateVoiceChat
+    createPrivateVoiceChat,
+    getPrivateVoiceChat,
+    deletePrivateVoiceChat
   }
 }

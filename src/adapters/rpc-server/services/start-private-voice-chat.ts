@@ -35,8 +35,8 @@ export function startPrivateVoiceChatService({ components: { logs, voice } }: RP
       if (error instanceof VoiceChatNotAllowedError) {
         return {
           response: {
-            $case: 'forbiddenRequest',
-            forbiddenRequest: {
+            $case: 'forbiddenError',
+            forbiddenError: {
               message: error.message
             }
           }
@@ -44,8 +44,8 @@ export function startPrivateVoiceChatService({ components: { logs, voice } }: RP
       } else if (error instanceof UsersAreCallingSomeoneElseError) {
         return {
           response: {
-            $case: 'invalidRequest',
-            invalidRequest: {
+            $case: 'conflictingError',
+            conflictingError: {
               message: error.message
             }
           }
@@ -53,8 +53,8 @@ export function startPrivateVoiceChatService({ components: { logs, voice } }: RP
       } else if (error instanceof UserAlreadyInVoiceChatError) {
         return {
           response: {
-            $case: 'conflictingRequest',
-            conflictingRequest: {
+            $case: 'conflictingError',
+            conflictingError: {
               message: error.message
             }
           }

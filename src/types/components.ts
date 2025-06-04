@@ -20,6 +20,7 @@ import {
   FriendshipAction,
   FriendshipRequest,
   PrivateMessagesPrivacy,
+  PrivateVoiceChat,
   SocialSettings,
   User
 } from './entities'
@@ -154,6 +155,13 @@ export interface IVoiceDatabaseComponent {
   createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
 }
 
+export interface IVoiceDatabaseComponent {
+  areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
+  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
+  getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
+  deletePrivateVoiceChat(callId: string): Promise<void>
+}
+
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>
 }
@@ -227,6 +235,11 @@ export type ITracingComponent = IBaseComponent & {
 }
 
 export type ICommsGatekeeperComponent = {
+  getPrivateVoiceChatCredentials: (
+    roomId: string,
+    calleeAddress: string,
+    callerAddress: string
+  ) => Promise<Record<string, { url: string; token: string }>>
   isUserInAVoiceChat: (address: string) => Promise<boolean>
   updateUserPrivateMessagePrivacyMetadata: (
     user: string,

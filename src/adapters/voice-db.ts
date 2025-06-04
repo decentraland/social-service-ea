@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings'
 import { randomUUID } from 'node:crypto'
-import { AppComponents, IVoiceDatabaseComponent } from '../types'
+import { AppComponents, IVoiceDatabaseComponent, PrivateVoiceChat } from '../types'
 import { normalizeAddress } from '../utils/address'
 
 export async function createVoiceDBComponent(
@@ -29,6 +29,19 @@ export async function createVoiceDBComponent(
       `
       const results = await pg.query<{ id: string }>(query)
       return results.rows[0].id
+    },
+    async getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null> {
+      const query = SQL`
+        SELECT * FROM private_voice_chats WHERE id = ${callId}
+      `
+      const results = await pg.query<PrivateVoiceChat>(query)
+      return results.rows[0] ?? null
+    },
+    async deletePrivateVoiceChat(callId: string): Promise<void> {
+      const query = SQL`
+        DELETE FROM private_voice_chats WHERE id = ${callId}
+      `
+      await pg.query(query)
     }
   }
 }
