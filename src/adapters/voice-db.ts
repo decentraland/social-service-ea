@@ -37,11 +37,12 @@ export async function createVoiceDBComponent(
       const results = await pg.query<PrivateVoiceChat>(query)
       return results.rows[0] ?? null
     },
-    async deletePrivateVoiceChat(callId: string): Promise<void> {
+    async deletePrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null> {
       const query = SQL`
-        DELETE FROM private_voice_chats WHERE id = ${callId}
+        DELETE FROM private_voice_chats WHERE id = ${callId} RETURNING *;
       `
-      await pg.query(query)
+      const results = await pg.query<PrivateVoiceChat>(query)
+      return results.rows[0] ?? null
     }
   }
 }

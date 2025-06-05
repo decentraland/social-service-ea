@@ -153,20 +153,8 @@ export interface ICommunitiesDatabaseComponent {
 export interface IVoiceDatabaseComponent {
   areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
   createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
-}
-
-export interface IVoiceDatabaseComponent {
-  areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
-  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
   getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
-  deletePrivateVoiceChat(callId: string): Promise<void>
-}
-
-export interface IVoiceDatabaseComponent {
-  areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
-  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
-  getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
-  deletePrivateVoiceChat(callId: string): Promise<void>
+  deletePrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
 }
 
 export interface IRedisComponent extends IBaseComponent {
@@ -252,6 +240,7 @@ export type ICommsGatekeeperComponent = {
     user: string,
     privateMessagesPrivacy: PrivateMessagesPrivacy
   ) => Promise<void>
+  endPrivateVoiceChat(callId: string, address: string): Promise<void>
 }
 
 export type IWebSocketComponent = IBaseComponent & {

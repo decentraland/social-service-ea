@@ -35,6 +35,7 @@ let isUserInAVoiceChatMock: jest.MockedFn<ICommsGatekeeperComponent['isUserInAVo
 let getPrivateVoiceChatCredentialsMock: jest.MockedFn<ICommsGatekeeperComponent['getPrivateVoiceChatCredentials']>
 let getPrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['getPrivateVoiceChat']>
 let deletePrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['deletePrivateVoiceChat']>
+let endPrivateVoiceChatMock: jest.MockedFn<ICommsGatekeeperComponent['endPrivateVoiceChat']>
 
 beforeEach(() => {
   deletePrivateVoiceChatMock = jest.fn()
@@ -46,6 +47,7 @@ beforeEach(() => {
   areUsersBeingCalledOrCallingSomeoneMock = jest.fn()
   createPrivateVoiceChatMock = jest.fn()
   getPrivateVoiceChatCredentialsMock = jest.fn()
+  endPrivateVoiceChatMock = jest.fn()
   const logs: ILoggerComponent = {
     getLogger: () => ({
       info: () => undefined,
@@ -70,7 +72,8 @@ beforeEach(() => {
   })
   const commsGatekeeper = createCommsGatekeeperMockedComponent({
     isUserInAVoiceChat: isUserInAVoiceChatMock,
-    getPrivateVoiceChatCredentials: getPrivateVoiceChatCredentialsMock
+    getPrivateVoiceChatCredentials: getPrivateVoiceChatCredentialsMock,
+    endPrivateVoiceChat: endPrivateVoiceChatMock
   })
 
   voice = createVoiceComponent({
@@ -364,22 +367,40 @@ describe('when accepting a private voice chat', () => {
           })
         })
 
-        it('should publish the voice chat accepted event in the channel, delete the voice chat from the database and resolve with the credentials', async () => {
-          const result = await voice.acceptPrivateVoiceChat(callId, calleeAddress)
-          expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-            callId,
-            callerAddress,
-            calleeAddress,
-            status: 'accepted',
-            credentials: {
-              token: callerCredentials.token,
-              url: callerCredentials.url
-            }
+        describe('and the voice chat is successfully deleted from the database', () => {
+          beforeEach(() => {
+            deletePrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
           })
-          expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
-          expect(result).toEqual({
-            token: calleeCredentials.token,
-            url: calleeCredentials.url
+
+          it('should publish the voice chat accepted event in the channel, delete the voice chat from the database and resolve with the credentials', async () => {
+            const result = await voice.acceptPrivateVoiceChat(callId, calleeAddress)
+            expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+              callId,
+              callerAddress,
+              calleeAddress,
+              status: 'accepted',
+              credentials: {
+                token: callerCredentials.token,
+                url: callerCredentials.url
+              }
+            })
+            expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+            expect(result).toEqual({
+              token: calleeCredentials.token,
+              url: calleeCredentials.url
+            })
+          })
+        })
+
+        describe('and the voice chat deletion fails due to race condition', () => {
+          beforeEach(() => {
+            deletePrivateVoiceChatMock.mockResolvedValueOnce(null)
+          })
+
+          it('should end the private voice chat and reject with a voice chat not found error', async () => {
+            await expect(voice.acceptPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
+            expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
+            expect(publishInChannelMock).not.toHaveBeenCalled()
           })
         })
       })
@@ -448,15 +469,33 @@ describe('when rejecting a private voice chat', () => {
         privateVoiceChat.expires_at = new Date(Date.now() + 1000000000)
       })
 
-      it('should publish the voice chat rejected event in the channel and delete the voice chat from the database', async () => {
-        await voice.rejectPrivateVoiceChat(callId, calleeAddress)
-        expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-          callId,
-          callerAddress,
-          calleeAddress,
-          status: 'rejected'
+      describe('and the voice chat is successfully deleted from the database', () => {
+        beforeEach(() => {
+          deletePrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
         })
-        expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+
+        it('should publish the voice chat rejected event in the channel and delete the voice chat from the database', async () => {
+          await voice.rejectPrivateVoiceChat(callId, calleeAddress)
+          expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+            callId,
+            callerAddress,
+            calleeAddress,
+            status: 'rejected'
+          })
+          expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+        })
+      })
+
+      describe('and the voice chat deletion fails due to race condition', () => {
+        beforeEach(() => {
+          deletePrivateVoiceChatMock.mockResolvedValueOnce(null)
+        })
+
+        it('should not publish the voice chat rejected event', async () => {
+          await voice.rejectPrivateVoiceChat(callId, calleeAddress)
+          expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+          expect(publishInChannelMock).not.toHaveBeenCalled()
+        })
       })
     })
   })
