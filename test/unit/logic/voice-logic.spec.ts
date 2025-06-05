@@ -491,8 +491,8 @@ describe('when rejecting a private voice chat', () => {
           deletePrivateVoiceChatMock.mockResolvedValueOnce(null)
         })
 
-        it('should not publish the voice chat rejected event', async () => {
-          await voice.rejectPrivateVoiceChat(callId, calleeAddress)
+        it('should not publish the voice chat rejected event and reject with a voice chat not found error', async () => {
+          await expect(voice.rejectPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
           expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
           expect(publishInChannelMock).not.toHaveBeenCalled()
         })

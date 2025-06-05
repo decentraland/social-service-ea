@@ -144,6 +144,10 @@ export function createVoiceComponent({
         calleeAddress: privateVoiceChat.callee_address,
         status: VoiceChatStatus.REJECTED
       })
+    } else {
+      // If the voice chat was not deleted from the database, it means that the operation was not successful
+      // We need to notify the user that rejected the call
+      throw new VoiceChatNotFoundError(callId)
     }
   }
 
