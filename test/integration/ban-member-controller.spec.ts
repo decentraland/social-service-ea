@@ -53,14 +53,14 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
     })
 
     afterEach(async () => {
-      components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
         bannerAddress,
         targetMemberAddress,
         targetModeratorAddress,
         targetOwnerAddress,
         nonMemberAddress
       ])
-      components.communitiesDbHelper.forceCommunityRemoval(communityId)
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId)
     })
 
     describe('and the request is not signed', () => {

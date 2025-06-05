@@ -1,4 +1,5 @@
-import { CommunityRole } from '../../types/entities'
+import { EthAddress } from '@dcl/schemas'
+import { Action, CommunityRole, FriendshipAction } from '../../types/entities'
 import { parseProfilesToFriends } from '../friends'
 import { getProfileUserId, getProfileInfo } from '../profiles'
 import {
@@ -9,6 +10,8 @@ import {
   CommunityPublicInformation
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { getFriendshipRequestStatus } from '../friendships'
+import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export const isOwner = (community: Community, userAddress: string) => {
   return community.ownerAddress.toLowerCase() === userAddress.toLowerCase()
@@ -65,9 +68,10 @@ export const toPublicCommunity = (community: CommunityPublicInformation): Commun
 }
 
 export const mapMembersWithProfiles = <
-  T extends { memberAddress: string },
-  R extends { profilePictureUrl: string; hasClaimedName: boolean; name: string }
+  T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress },
+  R extends { profilePictureUrl: string; hasClaimedName: boolean; name: string; friendshipStatus: FriendshipStatus }
 >(
+  userAddress: EthAddress,
   members: T[],
   profiles: Profile[]
 ): (T & R)[] => {
@@ -75,6 +79,16 @@ export const mapMembersWithProfiles = <
   return members
     .map((member) => {
       const memberProfile = profileMap.get(member.memberAddress)
+      const { lastFriendshipAction, actingUser } = member
+      let friendshipStatus: FriendshipStatus = FriendshipStatus.NONE
+
+      if (lastFriendshipAction && actingUser) {
+        const friendshipAction: Pick<FriendshipAction, 'action' | 'acting_user'> = {
+          action: lastFriendshipAction,
+          acting_user: actingUser
+        }
+        friendshipStatus = getFriendshipRequestStatus(friendshipAction, userAddress)
+      }
 
       if (!memberProfile) {
         return undefined
@@ -86,7 +100,8 @@ export const mapMembersWithProfiles = <
         ...member,
         profilePictureUrl,
         hasClaimedName,
-        name
+        name,
+        friendshipStatus
       }
     })
     .filter((member): member is T & R => member !== undefined)
