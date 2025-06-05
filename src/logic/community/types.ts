@@ -78,34 +78,34 @@ export type Community = {
   active: boolean
 }
 
+type FriendshipAction = {
+  lastFriendshipAction?: Action
+  actingUser?: string
+}
+
 // TODO: missing friendship status
 export type CommunityMember = {
   communityId: string
   memberAddress: string
   role: CommunityRole
   joinedAt: string
-  lastFriendshipAction?: Action
-  actingUser?: string
-}
+} & FriendshipAction
 
-// TODO: missing friendship status
 export type BannedMember = {
   communityId: string
   memberAddress: string
   bannedAt: string
   bannedBy: string
-  lastFriendshipAction?: Action
-  actingUser?: string
-}
+} & FriendshipAction
 
-export type CommunityMemberProfile = Omit<CommunityMember, 'friendshipAction' | 'friendshipActingUser'> & {
+export type CommunityMemberProfile = CommunityMember & {
   profilePictureUrl: string
   hasClaimedName: boolean
   name: string
   friendshipStatus: FriendshipStatus
 }
 
-export type BannedMemberProfile = Omit<BannedMember, 'friendshipAction' | 'friendshipActingUser'> & {
+export type BannedMemberProfile = BannedMember & {
   profilePictureUrl: string
   hasClaimedName: boolean
   name: string

@@ -273,9 +273,7 @@ export function getCommunitiesWithMembersCountCTE(options?: { onlyPublic?: boole
     SELECT c.id, COUNT(cm.member_address) as "membersCount"
     FROM communities c
     LEFT JOIN community_members cm ON c.id = cm.community_id
-    LEFT JOIN community_bans cb ON c.id = cb.community_id
-    WHERE cb.banned_address IS NULL
-      AND c.active = true
+    WHERE c.active = true
   `
 
   if (onlyPublic) {

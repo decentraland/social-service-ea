@@ -151,7 +151,7 @@ test('Get Banned Members Controller', function ({ components, spyComponents }) {
               bannedAt: expect.any(String),
               name: `Profile name ${firstBannedAddress}`,
               profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-              friendshipStatus: FriendshipStatus.REQUEST_SENT
+              friendshipStatus: FriendshipStatus.ACCEPTED
             }),
             expect.objectContaining({
               communityId,
