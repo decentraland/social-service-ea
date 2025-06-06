@@ -1,9 +1,10 @@
 import { createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
-import { AppComponents, ICatalystClientComponent, ICatalystClientRequestOptions } from '../types'
+import { AppComponents, ICatalystClientComponent, ICatalystClientRequestOptions, OwnedNames } from '../types'
 import { retry } from '../utils/retrier'
 import { shuffleArray } from '../utils/array'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { EthAddress } from '@dcl/schemas'
 
 const L1_MAINNET = 'mainnet'
 const L1_TESTNET = 'sepolia'
@@ -59,5 +60,24 @@ export async function createCatalystClient({
     return retry(executeClientRequest, retries, waitTime)
   }
 
-  return { getProfiles, getProfile }
+  async function getOwnedNames(
+    address: EthAddress,
+    options: ICatalystClientRequestOptions = {}
+  ): Promise<OwnedNames[]> {
+    const { retries = 3, waitTime = 300, lambdasServerUrl } = options
+    const executeClientRequest = rotateLambdasServerClient(
+      (lambdasClientToUse) => lambdasClientToUse.getNames(address),
+      lambdasServerUrl
+    )
+
+    const result = await retry(executeClientRequest, retries, waitTime)
+    return result.elements.map((name) => ({
+      id: name.tokenId,
+      name: name.name,
+      contractAddress: name.contractAddress,
+      tokenId: name.tokenId
+    }))
+  }
+
+  return { getProfiles, getProfile, getOwnedNames }
 }
