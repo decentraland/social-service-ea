@@ -96,7 +96,7 @@ export enum CommunityRole {
   None = 'none'
 }
 
-export type OwnedNames = {
+export type OwnedName = {
   id: string
   name: string
   contractAddress: string
