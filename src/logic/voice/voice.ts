@@ -167,9 +167,10 @@ export function createVoiceComponent({
       // Delete the voice chat from the database
       const deletedVoiceChat = await voiceDb.deletePrivateVoiceChat(callId)
 
+      // In order to avoid race conditions, we need to check if the voice chat was deleted from the database
       if (deletedVoiceChat) {
         // Notify the other user that the call ended
-        await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        return pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
           callId,
           // Set the callee or the caller address to undefined if they are the ones ending the call
           calleeAddress: address === privateVoiceChat.callee_address ? undefined : privateVoiceChat.callee_address,
@@ -178,8 +179,23 @@ export function createVoiceComponent({
         })
       }
     }
-    // Always notify the comms gatekeeper that the call has ended
-    await commsGatekeeper.endPrivateVoiceChat(callId, address)
+
+    // If the voice chat was not deleted or was not found, we need to try and end it in the comms gatekeeper
+    const usersInVoiceChat = await commsGatekeeper.endPrivateVoiceChat(callId, address)
+
+    // If the voice chat was not ended, it means that the call was never accepted
+    if (usersInVoiceChat.length === 0) {
+      throw new VoiceChatNotFoundError(callId)
+    }
+
+    // Notify the other user that the call ended
+    await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+      callId,
+      // Set the caller address to the other user in the voice chat
+      // We don't know if it's the callee or the caller, but the event handler will resolve it
+      callerAddress: usersInVoiceChat.find((user) => user !== address),
+      status: VoiceChatStatus.ENDED
+    })
   }
 
   async function getIncomingPrivateVoiceChat(address: string): Promise<PrivateVoiceChat> {
