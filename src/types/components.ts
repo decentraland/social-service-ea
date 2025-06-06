@@ -9,7 +9,7 @@ import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { EthAddress, FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
-import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
 import { SQLStatement } from 'sql-template-strings'
 import {
@@ -19,6 +19,7 @@ import {
   Friendship,
   FriendshipAction,
   FriendshipRequest,
+  OwnedName,
   PrivateMessagesPrivacy,
   PrivateVoiceChat,
   SocialSettings,
@@ -202,6 +203,11 @@ export type ICatalystClientRequestOptions = {
 export type ICatalystClientComponent = {
   getProfiles(ids: string[], options?: ICatalystClientRequestOptions): Promise<Profile[]>
   getProfile(id: string, options?: ICatalystClientRequestOptions): Promise<Profile>
+  getOwnedNames(
+    address: EthAddress,
+    params?: GetNamesParams,
+    options?: ICatalystClientRequestOptions
+  ): Promise<OwnedName[]>
 }
 
 export type IPublisherComponent = {
