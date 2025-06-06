@@ -98,7 +98,32 @@ export const createCommsGatekeeperComponent = async ({
     }
   }
 
+  async function endPrivateVoiceChat(callId: string, address: string): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/private-voice-chat/${callId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        },
+        body: JSON.stringify({
+          address
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to end private voice chat for call ${callId} and address ${address}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
   return {
+    endPrivateVoiceChat,
     updateUserPrivateMessagePrivacyMetadata,
     isUserInAVoiceChat,
     getPrivateVoiceChatCredentials
