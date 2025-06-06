@@ -234,11 +234,11 @@ describe('when ending a private voice chat', () => {
       })
     })
 
-    it('should resolve successfully', async () => {
+    it('should resolve to be undefined', async () => {
       await expect(commsGatekeeper.endPrivateVoiceChat(callId, address)).resolves.toBeUndefined()
     })
 
-    it('should make the correct API call', async () => {
+    it('should make the correct the API call to the configured URL in the config parameters using the configured auth token and the given address', async () => {
       await commsGatekeeper.endPrivateVoiceChat(callId, address)
       expect(fetchMock).toHaveBeenCalledWith('https://comms-gatekeeper.org/private-voice-chat/test-call-id-123', {
         method: 'DELETE',
