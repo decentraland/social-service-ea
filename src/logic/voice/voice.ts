@@ -90,25 +90,33 @@ export function createVoiceComponent({
       privateVoiceChat.caller_address
     )
 
-    // Notify the other user about the voice call being accepted
-    await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-      callId,
-      callerAddress: privateVoiceChat.caller_address,
-      calleeAddress: privateVoiceChat.callee_address,
-      status: VoiceChatStatus.ACCEPTED,
-      // Credentials for the caller
-      credentials: {
-        token: credentials[privateVoiceChat.caller_address].token,
-        url: credentials[privateVoiceChat.caller_address].url
-      }
-    })
-
     // The call has been accepted, we can delete it from the database
-    await voiceDb.deletePrivateVoiceChat(callId)
+    const deletedVoiceChat = await voiceDb.deletePrivateVoiceChat(callId)
 
-    return {
-      token: credentials[privateVoiceChat.callee_address].token,
-      url: credentials[privateVoiceChat.callee_address].url
+    // In order to avoid race conditions, we need to check if the voice chat was deleted from the database
+    if (deletedVoiceChat) {
+      // Notify the other user about the voice call being accepted
+      await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        callId,
+        callerAddress: privateVoiceChat.caller_address,
+        calleeAddress: privateVoiceChat.callee_address,
+        status: VoiceChatStatus.ACCEPTED,
+        // Credentials for the caller
+        credentials: {
+          token: credentials[privateVoiceChat.caller_address].token,
+          url: credentials[privateVoiceChat.caller_address].url
+        }
+      })
+
+      return {
+        token: credentials[privateVoiceChat.callee_address].token,
+        url: credentials[privateVoiceChat.callee_address].url
+      }
+    } else {
+      // If the voice chat was not deleted from the database, it means that the call was rejected by the callee
+      // We need to notify the comms gatekeeper that the call has ended (reverting the call intent)
+      await commsGatekeeper.endPrivateVoiceChat(callId, calleeAddress)
+      throw new VoiceChatNotFoundError(callId)
     }
   }
 
@@ -124,14 +132,23 @@ export function createVoiceComponent({
       throw new VoiceChatExpiredError(callId)
     }
 
-    await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-      callId,
-      callerAddress: privateVoiceChat.caller_address,
-      calleeAddress: privateVoiceChat.callee_address,
-      status: VoiceChatStatus.REJECTED
-    })
+    // Delete the voice chat from the database
+    const deletedVoiceChat = await voiceDb.deletePrivateVoiceChat(callId)
 
-    await voiceDb.deletePrivateVoiceChat(callId)
+    // In order to avoid race conditions, we need to check if the voice chat was deleted from the database
+    if (deletedVoiceChat) {
+      // Notify the other user that the call was rejected
+      await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        callId,
+        callerAddress: privateVoiceChat.caller_address,
+        calleeAddress: privateVoiceChat.callee_address,
+        status: VoiceChatStatus.REJECTED
+      })
+    } else {
+      // If the voice chat was not deleted from the database, it means that the operation was not successful
+      // We need to notify the user that rejected the call
+      throw new VoiceChatNotFoundError(callId)
+    }
   }
 
   async function endPrivateVoiceChat(callId: string, address: string): Promise<void> {

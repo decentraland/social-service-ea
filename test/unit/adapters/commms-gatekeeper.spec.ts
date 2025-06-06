@@ -1,7 +1,7 @@
-import { ILoggerComponent, IFetchComponent } from '@well-known-components/interfaces'
+import { ILoggerComponent, IFetchComponent, IConfigComponent } from '@well-known-components/interfaces'
 import { createCommsGatekeeperComponent } from '../../../src/adapters/comms-gatekeeper'
 import { ICommsGatekeeperComponent, PrivateMessagesPrivacy } from '../../../src/types'
-import { mockConfig } from '../../mocks/components'
+import { createLogsMockedComponent, createMockConfigComponent, mockConfig } from '../../mocks/components'
 
 let fetchMock: jest.Mock
 let errorLogMock: jest.Mock
@@ -17,15 +17,24 @@ beforeEach(async () => {
   const fetcher: IFetchComponent = {
     fetch: fetchMock
   }
-  const logs: ILoggerComponent = {
-    getLogger: jest.fn().mockReturnValue({
-      error: errorLogMock,
-      warn: warnLogMock,
-      info: infoLogMock
+  const logs: ILoggerComponent = createLogsMockedComponent({
+    error: errorLogMock,
+    warn: warnLogMock,
+    info: infoLogMock
+  })
+  const config: IConfigComponent = createMockConfigComponent({
+    requireString: jest.fn().mockImplementation((name) => {
+      if (name === 'COMMS_GATEKEEPER_URL') {
+        return 'https://comms-gatekeeper.org'
+      }
+      if (name === 'COMMS_GATEKEEPER_AUTH_TOKEN') {
+        return 'comms-gatekeeper-token'
+      }
+      throw new Error(`Unknown config key: ${name}`)
     })
-  }
+  })
 
-  commsGatekeeper = await createCommsGatekeeperComponent({ logs, config: mockConfig, fetcher })
+  commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
 })
 
 describe('when updating the user privacy message metadata', () => {
@@ -203,6 +212,75 @@ describe('when getting the private voice chat credentials', () => {
       ).rejects.toThrow('Network error')
       expect(errorLogMock).toHaveBeenCalledWith(
         `Failed to get private voice chat keys for user ${calleeAddress} and ${callerAddress}: Network error`
+      )
+    })
+  })
+})
+
+describe('when ending a private voice chat', () => {
+  let callId: string
+  let address: string
+
+  beforeEach(() => {
+    callId = 'test-call-id-123'
+    address = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
+  })
+
+  describe('and the request resolves with a 200 status code', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+    })
+
+    it('should resolve to be undefined', async () => {
+      await expect(commsGatekeeper.endPrivateVoiceChat(callId, address)).resolves.toBeUndefined()
+    })
+
+    it('should make the correct the API call to the configured URL in the config parameters using the configured auth token and the given address', async () => {
+      await commsGatekeeper.endPrivateVoiceChat(callId, address)
+      expect(fetchMock).toHaveBeenCalledWith('https://comms-gatekeeper.org/private-voice-chat/test-call-id-123', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer comms-gatekeeper-token'
+        },
+        body: JSON.stringify({
+          address: '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
+        })
+      })
+    })
+  })
+
+  describe('and the request resolves with a non 200 status code', () => {
+    beforeEach(() => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request'
+      })
+    })
+
+    it('should log the error and reject with it', async () => {
+      await expect(commsGatekeeper.endPrivateVoiceChat(callId, address)).rejects.toThrow(
+        'Server responded with status 400'
+      )
+      expect(errorLogMock).toHaveBeenCalledWith(
+        `Failed to end private voice chat for call ${callId} and address ${address}: Server responded with status 400`
+      )
+    })
+  })
+
+  describe('and the request fails with a network error', () => {
+    beforeEach(() => {
+      fetchMock.mockRejectedValueOnce(new Error('Network error'))
+    })
+
+    it('should log the error and reject with it', async () => {
+      await expect(commsGatekeeper.endPrivateVoiceChat(callId, address)).rejects.toThrow('Network error')
+      expect(errorLogMock).toHaveBeenCalledWith(
+        `Failed to end private voice chat for call ${callId} and address ${address}: Network error`
       )
     })
   })

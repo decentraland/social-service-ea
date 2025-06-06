@@ -117,10 +117,6 @@ export const createCommsGatekeeperComponent = async ({
         })
       })
 
-      if (response.status === 404) {
-        throw new PrivateVoiceChatNotFoundError(callId)
-      }
-
       if (!response.ok) {
         throw new Error(`Server responded with status ${response.status}`)
       }

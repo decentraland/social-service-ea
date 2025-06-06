@@ -9,7 +9,7 @@ import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { EthAddress, FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
-import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
 import { SQLStatement } from 'sql-template-strings'
 import {
@@ -19,6 +19,7 @@ import {
   Friendship,
   FriendshipAction,
   FriendshipRequest,
+  OwnedName,
   PrivateMessagesPrivacy,
   PrivateVoiceChat,
   SocialSettings,
@@ -133,7 +134,7 @@ export interface ICommunitiesDatabaseComponent {
   getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
   kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
-  getCommunityMembers(id: string, pagination: Pagination): Promise<CommunityMember[]>
+  getCommunityMembers(id: string, userAddress: EthAddress, pagination: Pagination): Promise<CommunityMember[]>
   getCommunityMembersCount(communityId: string): Promise<number>
   getMemberCommunities(
     memberAddress: EthAddress,
@@ -146,27 +147,15 @@ export interface ICommunitiesDatabaseComponent {
     unbannedMemberAddress: EthAddress
   ): Promise<void>
   isMemberBanned(communityId: string, bannedMemberAddress: EthAddress): Promise<boolean>
-  getBannedMembers(communityId: string, pagination: Pagination): Promise<BannedMember[]>
+  getBannedMembers(communityId: string, userAddress: EthAddress, pagination: Pagination): Promise<BannedMember[]>
   getBannedMembersCount(communityId: string): Promise<number>
 }
 
 export interface IVoiceDatabaseComponent {
   areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
   createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
-}
-
-export interface IVoiceDatabaseComponent {
-  areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
-  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
   getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
-  deletePrivateVoiceChat(callId: string): Promise<void>
-}
-
-export interface IVoiceDatabaseComponent {
-  areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
-  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
-  getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
-  deletePrivateVoiceChat(callId: string): Promise<void>
+  deletePrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
 }
 
 export interface IRedisComponent extends IBaseComponent {
@@ -214,6 +203,11 @@ export type ICatalystClientRequestOptions = {
 export type ICatalystClientComponent = {
   getProfiles(ids: string[], options?: ICatalystClientRequestOptions): Promise<Profile[]>
   getProfile(id: string, options?: ICatalystClientRequestOptions): Promise<Profile>
+  getOwnedNames(
+    address: EthAddress,
+    params?: GetNamesParams,
+    options?: ICatalystClientRequestOptions
+  ): Promise<OwnedName[]>
 }
 
 export type IPublisherComponent = {

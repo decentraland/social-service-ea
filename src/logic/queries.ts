@@ -273,9 +273,7 @@ export function getCommunitiesWithMembersCountCTE(options?: { onlyPublic?: boole
     SELECT c.id, COUNT(cm.member_address) as "membersCount"
     FROM communities c
     LEFT JOIN community_members cm ON c.id = cm.community_id
-    LEFT JOIN community_bans cb ON c.id = cb.community_id
-    WHERE cb.banned_address IS NULL
-      AND c.active = true
+    WHERE c.active = true
   `
 
   if (onlyPublic) {
@@ -328,4 +326,36 @@ export function withSearchAndPagination(query: SQLStatement, options?: GetCommun
 export function searchCommunitiesQuery(search: string) {
   // TODO: enhance the search to include the description using the full text search or pg score
   return SQL` AND (c.name ILIKE ${`%${search}%`} OR c.description ILIKE ${`%${search}%`})`
+}
+
+export function getMembersCTE(subquery: SQLStatement) {
+  return {
+    query: SQL`SELECT member_address FROM (`.append(subquery).append(SQL`) AS members`),
+    name: 'members'
+  }
+}
+
+export function getLatestFriendshipActionCTE(userAddress: string) {
+  const normalizedUserAddress = normalizeAddress(userAddress)
+
+  return {
+    query: SQL`SELECT DISTINCT ON (f.id) 
+            f.id as friendship_id,
+            fa.action,
+            fa.acting_user,
+            CASE 
+              WHEN f.address_requester = ${normalizedUserAddress} THEN f.address_requested
+              ELSE f.address_requester
+            END as other_user
+          FROM friendships f
+          INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
+          INNER JOIN members cm ON cm.member_address IN (f.address_requester, f.address_requested)
+          WHERE (f.address_requester, f.address_requested) IN (
+            (${normalizedUserAddress}, cm.member_address),
+            (cm.member_address, ${normalizedUserAddress})
+          )
+          ORDER BY f.id, fa.timestamp DESC
+        `,
+    name: 'latest_friendship_actions'
+  }
 }
