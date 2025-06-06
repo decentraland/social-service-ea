@@ -151,7 +151,54 @@ export function createVoiceComponent({
     }
   }
 
+  async function endPrivateVoiceChat(callId: string, address: string): Promise<void> {
+    logger.info(`Ending voice chat for call ${callId}`)
+
+    // If the voice chat is in the database, we can delete it
+    const privateVoiceChat = await voiceDb.getPrivateVoiceChat(callId)
+    if (privateVoiceChat) {
+      // If the caller or the callee are not the ones ending the call, we don't do anything
+      if (privateVoiceChat.callee_address !== address && privateVoiceChat.caller_address !== address) {
+        logger.info(`The caller or the callee are not the ones ending the call (${address}) with id ${callId}`)
+        throw new VoiceChatNotFoundError(callId)
+      }
+
+      // Delete the voice chat from the database
+      const deletedVoiceChat = await voiceDb.deletePrivateVoiceChat(callId)
+
+      // In order to avoid race conditions, we need to check if the voice chat was deleted from the database
+      if (deletedVoiceChat) {
+        // Notify the other user that the call ended
+        return pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId,
+          // Set the callee or the caller address to undefined if they are the ones ending the call
+          calleeAddress: address === privateVoiceChat.callee_address ? undefined : privateVoiceChat.callee_address,
+          callerAddress: address === privateVoiceChat.caller_address ? undefined : privateVoiceChat.caller_address,
+          status: VoiceChatStatus.ENDED
+        })
+      }
+    }
+
+    // If the voice chat was not deleted or was not found, we need to try and end it in the comms gatekeeper
+    const usersInVoiceChat = await commsGatekeeper.endPrivateVoiceChat(callId, address)
+
+    // If the voice chat was not ended, it means that the call was never accepted
+    if (usersInVoiceChat.length === 0) {
+      throw new VoiceChatNotFoundError(callId)
+    }
+
+    // Notify the other user that the call ended
+    await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+      callId,
+      // Set the caller address to the other user in the voice chat
+      // We don't know if it's the callee or the caller, but the event handler will resolve it
+      callerAddress: usersInVoiceChat.find((user) => user !== address),
+      status: VoiceChatStatus.ENDED
+    })
+  }
+
   return {
+    endPrivateVoiceChat,
     rejectPrivateVoiceChat,
     startPrivateVoiceChat,
     acceptPrivateVoiceChat
