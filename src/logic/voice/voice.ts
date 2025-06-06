@@ -1,4 +1,3 @@
-import { PrivateVoiceChatNotFoundError } from '../../adapters/comms-gatekeeper'
 import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, PrivateMessagesPrivacy } from '../../types'
 import {
