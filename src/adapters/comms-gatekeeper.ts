@@ -104,7 +104,14 @@ export const createCommsGatekeeperComponent = async ({
     }
   }
 
-  async function endPrivateVoiceChat(callId: string, address: string): Promise<void> {
+  /**
+   * Ends a private voice chat for a given call ID and address.
+   * @param callId - The ID of the voice chat to end
+   * @param address - The address of the user ending the voice chat
+   * @returns The addresses of the users in the ended voice chat.
+   */
+  async function endPrivateVoiceChat(callId: string, address: string): Promise<string[]> {
+    let usersInVoiceChat: string[] = []
     try {
       const response = await fetch(`${commsUrl}/private-voice-chat/${callId}`, {
         method: 'DELETE',
@@ -117,8 +124,9 @@ export const createCommsGatekeeperComponent = async ({
         })
       })
 
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
+      if (response.ok) {
+        const data = await response.json()
+        usersInVoiceChat = data.users_in_voice_chat
       }
     } catch (error) {
       logger.error(
@@ -126,6 +134,7 @@ export const createCommsGatekeeperComponent = async ({
       )
       throw error
     }
+    return usersInVoiceChat
   }
 
   return {

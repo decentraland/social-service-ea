@@ -518,11 +518,49 @@ describe('when ending a private voice chat', () => {
       getPrivateVoiceChatMock.mockResolvedValueOnce(null)
     })
 
-    it('should call comms gatekeeper to end the voice chat', async () => {
-      await voice.endPrivateVoiceChat(callId, calleeAddress)
-      expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
-      expect(publishInChannelMock).not.toHaveBeenCalled()
-      expect(deletePrivateVoiceChatMock).not.toHaveBeenCalled()
+    describe('and ending the voice chat through the comms gatekeeper succeeds', () => {
+      let otherUserAddress: string
+
+      beforeEach(() => {
+        otherUserAddress = '0x999'
+        endPrivateVoiceChatMock.mockResolvedValueOnce([calleeAddress, otherUserAddress])
+      })
+
+      it('should call comms gatekeeper to end the voice chat with the call id and the callee address and publish the ended event', async () => {
+        await voice.endPrivateVoiceChat(callId, calleeAddress)
+        expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
+        expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId,
+          callerAddress: otherUserAddress,
+          status: 'ended'
+        })
+        expect(deletePrivateVoiceChatMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and ending the voice chat through the comms gatekeeper fails by returning that no users were in the voice chat', () => {
+      beforeEach(() => {
+        endPrivateVoiceChatMock.mockResolvedValueOnce([])
+      })
+
+      it('should reject with a voice chat not found error', async () => {
+        await expect(voice.endPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
+        expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
+        expect(publishInChannelMock).not.toHaveBeenCalled()
+        expect(deletePrivateVoiceChatMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and ending the voice chat through the comms gatekeeper fails by throwing an error', () => {
+      beforeEach(() => {
+        endPrivateVoiceChatMock.mockRejectedValueOnce(new Error('Comms gatekeeper error'))
+      })
+
+      it('should reject with the propagated error', async () => {
+        await expect(voice.endPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow('Comms gatekeeper error')
+        expect(publishInChannelMock).not.toHaveBeenCalled()
+        expect(deletePrivateVoiceChatMock).not.toHaveBeenCalled()
+      })
     })
   })
 
@@ -562,16 +600,15 @@ describe('when ending a private voice chat', () => {
           deletePrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
         })
 
-        it('should delete the voice chat, publish the ended event with callee address undefined, and call the comms gatekeeper', async () => {
+        it('should delete the voice chat, publish the ended event with the caller address, and not call comms gatekeeper', async () => {
           await voice.endPrivateVoiceChat(callId, calleeAddress)
           expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
           expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
             callId,
             callerAddress,
-            calleeAddress: undefined,
             status: 'ended'
           })
-          expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
+          expect(endPrivateVoiceChatMock).not.toHaveBeenCalled()
         })
       })
 
@@ -580,11 +617,34 @@ describe('when ending a private voice chat', () => {
           deletePrivateVoiceChatMock.mockResolvedValueOnce(null)
         })
 
-        it('should not publish the ended event but still call the comms gatekeeper', async () => {
-          await voice.endPrivateVoiceChat(callId, calleeAddress)
-          expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
-          expect(publishInChannelMock).not.toHaveBeenCalled()
-          expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
+        describe('and comms gatekeeper successfully ends the voice chat', () => {
+          beforeEach(() => {
+            endPrivateVoiceChatMock.mockResolvedValueOnce([calleeAddress, callerAddress])
+          })
+
+          it('should publish the ended event with the callee address and resolve', async () => {
+            await voice.endPrivateVoiceChat(callId, calleeAddress)
+            expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+            expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
+            expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+              callId,
+              callerAddress,
+              status: 'ended'
+            })
+          })
+        })
+
+        describe('and comms gatekeeper returns no users', () => {
+          beforeEach(() => {
+            endPrivateVoiceChatMock.mockResolvedValueOnce([])
+          })
+
+          it('should reject with a voice chat not found error', async () => {
+            await expect(voice.endPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
+            expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+            expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
+            expect(publishInChannelMock).not.toHaveBeenCalled()
+          })
         })
       })
     })
@@ -595,7 +655,7 @@ describe('when ending a private voice chat', () => {
           deletePrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
         })
 
-        it('should delete the voice chat, publish the ended event with caller address undefined, and call the comms gatekeeper', async () => {
+        it('should delete the voice chat, publish the ended event with the callee address, and not call comms gatekeeper', async () => {
           await voice.endPrivateVoiceChat(callId, callerAddress)
           expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
           expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -604,7 +664,7 @@ describe('when ending a private voice chat', () => {
             calleeAddress,
             status: 'ended'
           })
-          expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, callerAddress)
+          expect(endPrivateVoiceChatMock).not.toHaveBeenCalled()
         })
       })
 
@@ -613,11 +673,34 @@ describe('when ending a private voice chat', () => {
           deletePrivateVoiceChatMock.mockResolvedValueOnce(null)
         })
 
-        it('should not publish the ended event but still call the comms gatekeeper', async () => {
-          await voice.endPrivateVoiceChat(callId, callerAddress)
-          expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
-          expect(publishInChannelMock).not.toHaveBeenCalled()
-          expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, callerAddress)
+        describe('and ending the voice chat through the comms gatekeeper succeeds', () => {
+          beforeEach(() => {
+            endPrivateVoiceChatMock.mockResolvedValueOnce([callerAddress, calleeAddress])
+          })
+
+          it('should publish the ended event with the callee address and resolve', async () => {
+            await voice.endPrivateVoiceChat(callId, callerAddress)
+            expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+            expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, callerAddress)
+            expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+              callId,
+              callerAddress: calleeAddress,
+              status: 'ended'
+            })
+          })
+        })
+
+        describe('and ending the voice chat through the comms gatekeeper fails by returning that no users were in the voice chat', () => {
+          beforeEach(() => {
+            endPrivateVoiceChatMock.mockResolvedValueOnce([])
+          })
+
+          it('should reject with a voice chat not found error', async () => {
+            await expect(voice.endPrivateVoiceChat(callId, callerAddress)).rejects.toThrow(VoiceChatNotFoundError)
+            expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+            expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, callerAddress)
+            expect(publishInChannelMock).not.toHaveBeenCalled()
+          })
         })
       })
     })

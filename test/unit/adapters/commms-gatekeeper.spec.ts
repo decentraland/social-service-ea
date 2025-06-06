@@ -227,15 +227,20 @@ describe('when ending a private voice chat', () => {
   })
 
   describe('and the request resolves with a 200 status code', () => {
+    let usersInVoiceChat: string[]
+
     beforeEach(() => {
+      usersInVoiceChat = ['0xUser1', '0xUser2']
       fetchMock.mockResolvedValueOnce({
         ok: true,
-        status: 200
+        status: 200,
+        json: () => Promise.resolve({ users_in_voice_chat: usersInVoiceChat })
       })
     })
 
-    it('should resolve to be undefined', async () => {
-      await expect(commsGatekeeper.endPrivateVoiceChat(callId, address)).resolves.toBeUndefined()
+    it('should resolve with the array of users that were in the voice chat', async () => {
+      const result = await commsGatekeeper.endPrivateVoiceChat(callId, address)
+      expect(result).toEqual(usersInVoiceChat)
     })
 
     it('should make the correct the API call to the configured URL in the config parameters using the configured auth token and the given address', async () => {
@@ -262,13 +267,9 @@ describe('when ending a private voice chat', () => {
       })
     })
 
-    it('should log the error and reject with it', async () => {
-      await expect(commsGatekeeper.endPrivateVoiceChat(callId, address)).rejects.toThrow(
-        'Server responded with status 400'
-      )
-      expect(errorLogMock).toHaveBeenCalledWith(
-        `Failed to end private voice chat for call ${callId} and address ${address}: Server responded with status 400`
-      )
+    it('should resolve with an empty array', async () => {
+      const result = await commsGatekeeper.endPrivateVoiceChat(callId, address)
+      expect(result).toEqual([])
     })
   })
 
