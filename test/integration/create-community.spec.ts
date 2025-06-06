@@ -2,7 +2,7 @@ import { test } from '../components'
 import { createTestIdentity, Identity } from './utils/auth'
 import { makeAuthenticatedRequest } from './utils/auth'
 
-test('Create Community Controller', async function ({ components, spyComponents }) {
+test('Create Community Controller', async function ({ components, stubComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when creating a community', () => {
@@ -57,26 +57,75 @@ test('Create Community Controller', async function ({ components, spyComponents 
           await components.communitiesDb.deleteCommunity(communityId)
         })
 
-        it('should respond with a 200 status code', async () => {
-          const response = await makeRequest(identity, '/v1/communities', 'POST', {
-            name: 'Test Community',
-            description: 'Test Description',
-            thumbnails: ['https://example.com/thumbnail.png']
+        describe('when the user owns a name', () => {
+          beforeEach(async () => {
+            stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([{
+              id: '1',
+              name: 'testOwnedName',
+              contractAddress: '0x0000000000000000000000000000000000000000',
+              tokenId: '1'
+            }])
           })
-          const body = await response.json()
-          communityId = body.id
 
-          expect(response.status).toBe(201)
-          expect(body).toMatchObject({
-            data: {
-              id: expect.any(String),
+          it('should respond with a 200 status code', async () => {
+            const response = await makeRequest(identity, '/v1/communities', 'POST', {
               name: 'Test Community',
               description: 'Test Description',
-              active: true,
-              ownerAddress: identity.realAccount.address.toLowerCase(),
-              privacy: 'public'
-            },
-            message: 'Community created successfully'
+              thumbnails: ['https://example.com/thumbnail.png']
+            })
+            const body = await response.json()
+            communityId = body.id
+  
+            expect(response.status).toBe(201)
+            expect(body).toMatchObject({
+              data: {
+                id: expect.any(String),
+                name: 'Test Community',
+                description: 'Test Description',
+                active: true,
+                ownerAddress: identity.realAccount.address.toLowerCase(),
+                privacy: 'public'
+              },
+              message: 'Community created successfully'
+            })
+          })
+
+          describe('but names cannot be fetched', () => {
+            beforeEach(async () => {
+              stubComponents.catalystClient.getOwnedNames.onFirstCall().rejects(new Error('Failed to fetch names'))
+            })
+            
+            it('should respond with a 500 status code', async () => {
+              const response = await makeRequest(identity, '/v1/communities', 'POST', {
+                name: 'Test Community',
+                description: 'Test Description',
+                thumbnails: ['https://example.com/thumbnail.png']
+              })
+
+              expect(response.status).toBe(500)
+              expect(await response.json()).toMatchObject({
+                message: 'Failed to fetch names'
+              })
+            })
+          })
+        })
+
+        describe('when the user does not own a name', () => {
+          beforeEach(async () => {
+            stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([])
+          })
+          
+          it('should respond with a 401 status code', async () => {
+            const response = await makeRequest(identity, '/v1/communities', 'POST', {
+              name: 'Test Community',
+              description: 'Test Description',
+              thumbnails: ['https://example.com/thumbnail.png']
+            })
+
+            expect(response.status).toBe(401)
+            expect(await response.json()).toMatchObject({
+              message: `The user ${identity.realAccount.address.toLowerCase()} doesn't have any names`
+            })
           })
         })
       })

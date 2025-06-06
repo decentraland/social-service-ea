@@ -188,6 +188,14 @@ export function createCommunityComponent(
     },
 
     createCommunity: async (community: Omit<Community, 'id' | 'active' | 'privacy'>): Promise<Community> => {
+      const ownedNames = await catalystClient.getOwnedNames(community.ownerAddress, {
+        pageSize: '1'
+      })
+
+      if (ownedNames.length === 0) {
+        throw new NotAuthorizedError(`The user ${community.ownerAddress} doesn't have any names`)
+      }
+
       const newCommunity = await communitiesDb.createCommunity({
         ...community,
         owner_address: community.ownerAddress,

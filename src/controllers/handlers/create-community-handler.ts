@@ -2,7 +2,8 @@ import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { HTTPResponse } from '../../types/http'
 import { HandlerContextWithPath } from '../../types/http'
 import { Community } from '../../logic/community'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { errorMessageOrDefault } from '../../utils/errors'
 
 export async function createCommunityHandler(
   context: HandlerContextWithPath<'community' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
@@ -14,45 +15,56 @@ export async function createCommunityHandler(
   } = context
 
   const logger = logs.getLogger('create-community-handler')
-
   const address = verification!.auth.toLowerCase()
 
-  const body: Pick<Community, 'name' | 'description' | 'thumbnails'> = await request.json()
+  try {
+    const body: Pick<Community, 'name' | 'description' | 'thumbnails'> = await request.json()
 
-  // TODO: add thumbnails validation when implemented
-  if (!body.name || !body.description) {
-    logger.error('Invalid request body while creating Community', {
-      body: JSON.stringify(body)
+    // TODO: add thumbnails validation when implemented
+    if (!body.name || !body.description) {
+      logger.error('Invalid request body while creating Community', {
+        body: JSON.stringify(body)
+      })
+
+      throw new InvalidRequestError('Invalid request body')
+    }
+
+    logger.info('Creating community', {
+      owner: address,
+      name: body.name,
+      thumbnails: JSON.stringify(body.thumbnails)
     })
 
-    throw new InvalidRequestError('Invalid request body')
-  }
+    // TODO: support thumbnails upload
+    const createdCommunity = await community.createCommunity({
+      name: body.name,
+      description: body.description,
+      ownerAddress: address,
+      thumbnails: body.thumbnails
+    })
 
-  logger.info('Creating community', {
-    owner: address,
-    name: body.name,
-    thumbnails: JSON.stringify(body.thumbnails)
-  })
+    logger.info('Community created', {
+      community: JSON.stringify(createdCommunity)
+    })
 
-  // TODO: support thumbnails upload
-  // TODO: add name integration
+    return {
+      status: 201,
+      body: {
+        message: 'Community created successfully',
+        data: createdCommunity
+      }
+    }
+  } catch (error) {
+    const message = errorMessageOrDefault(error)
+    logger.error(`Error creating community: ${message}`)
 
-  const createdCommunity = await community.createCommunity({
-    name: body.name,
-    description: body.description,
-    ownerAddress: address,
-    thumbnails: body.thumbnails
-  })
+    if (error instanceof NotAuthorizedError || error instanceof InvalidRequestError) {
+      throw error
+    }
 
-  logger.info('Community created', {
-    community: JSON.stringify(createdCommunity)
-  })
-
-  return {
-    status: 201,
-    body: {
-      message: 'Community created successfully',
-      data: createdCommunity
+    return {
+      status: 500,
+      body: { message }
     }
   }
 }

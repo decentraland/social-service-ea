@@ -95,3 +95,10 @@ export enum CommunityRole {
   Member = 'member',
   None = 'none'
 }
+
+export type OwnedName = {
+  id: string
+  name: string
+  contractAddress: string
+  tokenId: string
+}
