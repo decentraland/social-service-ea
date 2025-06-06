@@ -5,6 +5,7 @@ import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
 import { ILoggerComponent } from '@well-known-components/interfaces'
+import { VoiceChatNotFoundError } from '../../../../../src/logic/voice/errors'
 
 describe('endPrivateVoiceChatService', () => {
   let mockVoice: jest.Mocked<IVoiceComponent>
@@ -69,7 +70,30 @@ describe('endPrivateVoiceChatService', () => {
     })
   })
 
-  describe('when ending a private voice chat fails with an error with message', () => {
+  describe('when ending a private voice chat fails with a voice chat not found error', () => {
+    beforeEach(() => {
+      endPrivateVoiceChatMock.mockRejectedValueOnce(new VoiceChatNotFoundError(callId))
+    })
+
+    it('should resolve with a not found response and log the error message', async () => {
+      const result = await service(request, context)
+
+      expect(result).toEqual({
+        response: {
+          $case: 'notFound',
+          notFound: {
+            message: `The voice chat with id ${callId} was not found`
+          }
+        }
+      })
+
+      expect(errorLogMock).toHaveBeenCalledWith(
+        `Error ending private voice chat: The voice chat with id ${callId} was not found`
+      )
+    })
+  })
+
+  describe('when ending a private voice chat fails with an unknown error', () => {
     const errorMessage = 'Internal server error'
 
     beforeEach(() => {

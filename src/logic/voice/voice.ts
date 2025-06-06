@@ -160,7 +160,7 @@ export function createVoiceComponent({
       // If the caller or the callee are not the ones ending the call, we don't do anything
       if (privateVoiceChat.callee_address !== address && privateVoiceChat.caller_address !== address) {
         logger.info(`The caller or the callee are not the ones ending the call (${address}) with id ${callId}`)
-        return
+        throw new VoiceChatNotFoundError(callId)
       }
 
       // Delete the voice chat from the database
