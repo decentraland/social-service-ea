@@ -164,19 +164,21 @@ export function createVoiceComponent({
       }
 
       // Delete the voice chat from the database
-      await voiceDb.deletePrivateVoiceChat(callId)
+      const deletedVoiceChat = await voiceDb.deletePrivateVoiceChat(callId)
 
-      // Notify the other user that the call ended
-      await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-        callId,
-        calleeAddress: address === privateVoiceChat.callee_address ? undefined : privateVoiceChat.callee_address,
-        callerAddress: address === privateVoiceChat.caller_address ? undefined : privateVoiceChat.caller_address,
-        status: VoiceChatStatus.ENDED
-      })
-    } else {
-      // If the voice chat is not in the database, we need to notify the comms gatekeeper that the call has ended
-      await commsGatekeeper.endPrivateVoiceChat(callId, address)
+      if (deletedVoiceChat) {
+        // Notify the other user that the call ended
+        await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId,
+          // Set the callee or the caller address to undefined if they are the ones ending the call
+          calleeAddress: address === privateVoiceChat.callee_address ? undefined : privateVoiceChat.callee_address,
+          callerAddress: address === privateVoiceChat.caller_address ? undefined : privateVoiceChat.caller_address,
+          status: VoiceChatStatus.ENDED
+        })
+      }
     }
+    // Always notify the comms gatekeeper that the call has ended
+    await commsGatekeeper.endPrivateVoiceChat(callId, address)
   }
 
   return {
