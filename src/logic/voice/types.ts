@@ -1,3 +1,5 @@
+import { PrivateVoiceChat } from '../../types'
+
 export interface AcceptPrivateVoiceChatResult {
   token: string
   url: string
@@ -8,6 +10,7 @@ export interface IVoiceComponent {
   acceptPrivateVoiceChat(callId: string, calleeAddress: string): Promise<AcceptPrivateVoiceChatResult>
   rejectPrivateVoiceChat(callId: string, calleeAddress: string): Promise<void>
   endPrivateVoiceChat(callId: string, address: string): Promise<void>
+  getIncomingPrivateVoiceChat(address: string): Promise<PrivateVoiceChat>
 }
 
 export enum VoiceChatStatus {

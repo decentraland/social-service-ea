@@ -1,6 +1,7 @@
 import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
-import { AppComponents, PrivateMessagesPrivacy } from '../../types'
+import { AppComponents, PrivateMessagesPrivacy, PrivateVoiceChat } from '../../types'
 import {
+  IncomingVoiceChatNotFoundError,
   UserAlreadyInVoiceChatError,
   UsersAreCallingSomeoneElseError,
   VoiceChatExpiredError,
@@ -197,8 +198,19 @@ export function createVoiceComponent({
     })
   }
 
+  async function getIncomingPrivateVoiceChat(address: string): Promise<PrivateVoiceChat> {
+    logger.info(`Getting incoming private voice chats for ${address}`)
+
+    const privateVoiceChat = await voiceDb.getPrivateVoiceChatForCalleeAddress(address)
+    if (!privateVoiceChat) {
+      throw new IncomingVoiceChatNotFoundError(address)
+    }
+    return privateVoiceChat
+  }
+
   return {
     endPrivateVoiceChat,
+    getIncomingPrivateVoiceChat,
     rejectPrivateVoiceChat,
     startPrivateVoiceChat,
     acceptPrivateVoiceChat

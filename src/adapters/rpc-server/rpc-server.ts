@@ -30,6 +30,7 @@ import { startPrivateVoiceChatService } from './services/start-private-voice-cha
 import { acceptPrivateVoiceChatService } from './services/accept-private-voice-chat'
 import { rejectPrivateVoiceChatService } from './services/reject-private-voice-chat'
 import { endPrivateVoiceChatService } from './services/end-private-voice-chat'
+import { getIncomingPrivateVoiceChatRequestsService } from './services/get-incoming-private-voice-chat-requests'
 
 export async function createRpcServerComponent({
   logs,
@@ -159,6 +160,10 @@ export async function createRpcServerComponent({
     },
     endPrivateVoiceChat: {
       creator: endPrivateVoiceChatService({ components: { logs, voice } }),
+      type: ServiceType.CALL
+    },
+    getIncomingPrivateVoiceChatRequest: {
+      creator: getIncomingPrivateVoiceChatRequestsService({ components: { logs, voice } }),
       type: ServiceType.CALL
     }
   }
