@@ -31,6 +31,11 @@ import { createSettingsComponent } from './logic/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
 import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
+import { createReferralDBComponent } from './adapters/referral-db'
+import { createMessageProcessorComponent } from './logic/message-processor'
+import { createSqsAdapter } from './adapters/sqs'
+import { createMemoryQueueAdapter } from './adapters/memory-queue'
+import { createMessagesConsumerComponent } from './logic/message-consumer'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -85,7 +90,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
-
+  const referralDb = await createReferralDBComponent({ pg, logs })
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
@@ -120,35 +125,50 @@ export async function initComponents(): Promise<AppComponents> {
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const community = createCommunityComponent({ communitiesDb, catalystClient, communityRoles, logs })
 
+  const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
+  const queue = sqsEndpoint ? await createSqsAdapter(sqsEndpoint) : createMemoryQueueAdapter()
+
+  const messageProcessor = await createMessageProcessorComponent({ logs, referralDb })
+
+  const messageConsumer = createMessagesConsumerComponent({
+    logs,
+    queue,
+    messageProcessor
+  })
+
   return {
     archipelagoStats,
     catalystClient,
     commsGatekeeper,
     community,
     communityRoles,
-    config,
-    friendsDb,
     communitiesDb,
+    config,
     fetcher,
+    friendsDb,
     httpServer,
     logs,
+    messageConsumer,
+    messageProcessor,
     metrics,
     nats,
     peerTracking,
     peersSynchronizer,
     pg,
     pubsub,
+    queue,
     redis,
+    referralDb,
     rpcServer,
-    uwsServer,
+    settings,
     sns,
     statusChecks,
     subscribersContext,
     tracing,
-    worldsStats,
-    wsPool,
+    uwsServer,
     voice,
     voiceDb,
-    settings
+    worldsStats,
+    wsPool
   }
 }

@@ -2,7 +2,7 @@
 
 [![Coverage Status](https://coveralls.io/repos/github/decentraland/social-service-ea/badge.svg)](https://coveralls.io/github/decentraland/social-service-ea)
 
-A microservice that handles social interactions (friendships) for Decentraland, built using the Well Known Components architecture pattern.
+A microservice that handles social interactions (friendships) and referral system for Decentraland, built using the Well Known Components architecture pattern.
 
 ## API Documentation
 
@@ -16,25 +16,36 @@ A microservice that handles social interactions (friendships) for Decentraland, 
   - [Database Design](#database-design)
     - [Friends](#friends)
     - [Communities](#communities)
+    - [Referrals](#referrals)
   - [Friendship Flow Diagrams](#friendship-flow-diagrams)
   - [Block System Flow](#block-system-flow)
+  - [Referral System Flow](#referral-system-flow)
 - [🚀 Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
   - [Local Development](#local-development)
   - [Environment Variables](#environment-variables)
 - [🧪 Testing](#-testing)
   - [Test Coverage](#test-coverage)
-- [🔄 CI/CD](#-ci/cd)
+- [🔄 CI/CD](#-cicd)
   - [Deployment Environments](#deployment-environments)
 
 ## 🌟 Features
 
+### Social Features
 - Friendship management (requests, accepts, rejects, cancellations)
 - Real-time friend status updates
 - Mutual friends discovery
 - Online status tracking
 - Integration with Archipelago for peer synchronization
 - User blocking system
+
+### Referral Features
+- New referral progress validation
+- Referrer tier validation
+- Unlocked tiers calculation
+- Reward determination and distribution
+- Accepted referrals tracking system
+- ETH address validation and self-referrer prevention
 
 ## 🏗 Architecture
 
@@ -50,6 +61,12 @@ This service follows the Well Known Components pattern, where each component is 
 - **Peer Tracking**: Monitors online status of users through the NATS messaging system
 - **Catalyst Client**: Fetches profiles from the Catalyst Lambdas API
 - **Peers Synchronization**: Synchronizes peers with the Archipelago Stats service and store them in Redis
+
+#### Referral Components
+- **Database (PostgreSQL)**: Stores referral records and rewards
+- **Auth Chain Validator**: Validates authentication chains for referrals
+- **Reward Calculator**: Calculates and manages referral rewards
+- **Metrics Collector**: Collects metrics about the referral system
 
 ### Database Design
 
@@ -137,6 +154,31 @@ erDiagram
 ```
 
 See migrations for details: [migrations](./src/migrations)
+
+#### Referrals
+
+```mermaid
+erDiagram
+  REFERRAL_PROGRESS {
+    uuid id PK
+    text referrer
+    text invited_user
+    text status
+    bigint signed_up_at
+    boolean tier_granted
+    bigint tier_granted_at
+    bigint created_at
+    bigint updated_at
+  }
+  REFERRAL_PROGRESS_VIEWED {
+    text referrer PK
+    integer invites_accepted_viewed
+    bigint created_at
+    bigint updated_at
+  }
+
+  REFERRAL_PROGRESS ||--o{ REFERRAL_PROGRESS_VIEWED : "tracks"
+```
 
 ### Friendship Flow Diagrams
 
@@ -238,6 +280,38 @@ sequenceDiagram
         PubSub-->>RPC Server: Block Status Change
         RPC Server-->>Client: Stream Block Update
     end
+```
+
+### Referral System Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant HTTP Server
+    participant DB
+    participant Auth Chain
+
+    Note over Client,DB: Referral Creation Flow
+    Client->>HTTP Server: POST /v1/referral-progress
+    HTTP Server->>Auth Chain: Validate Auth Chain
+    Auth Chain-->>HTTP Server: Validation Result
+    HTTP Server->>DB: Create Referral Record
+    HTTP Server-->>Client: 204 No Content
+
+    Note over Client,DB: Referral Signup Flow
+    Client->>HTTP Server: PATCH /v1/referral-progress
+    HTTP Server->>Auth Chain: Validate Auth Chain
+    Auth Chain-->>HTTP Server: Validation Result
+    HTTP Server->>DB: Update Referral Status
+    HTTP Server->>DB: Calculate Rewards
+    HTTP Server-->>Client: 204 No Content
+
+    Note over Client,DB: Referral Status Check
+    Client->>HTTP Server: GET /v1/referral-progress
+    HTTP Server->>Auth Chain: Validate Auth Chain
+    Auth Chain-->>HTTP Server: Validation Result
+    HTTP Server->>DB: Get Referral Stats
+    HTTP Server-->>Client: Referral Progress Data
 ```
 
 ## 🚀 Getting Started
