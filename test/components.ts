@@ -78,7 +78,7 @@ async function initComponents(): Promise<TestComponents> {
     { config, logs },
     {
       cors: {
-        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT'],
+        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT', 'PATCH'],
         maxAge: 86400
       }
     }
