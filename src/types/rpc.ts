@@ -4,6 +4,7 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { AppComponents, GlobalContext } from './system'
 import { Action } from './entities'
 import { ISubscribersContext } from './components'
+import { VoiceChatStatus } from '../logic/voice/types'
 
 export type RPCServiceContext<ComponentNames extends keyof AppComponents> = {
   components: Pick<AppComponents, ComponentNames>
@@ -28,6 +29,12 @@ export type SubscriptionEventsEmitter = {
     blockerAddress: string
     blockedAddress: string
     isBlocked: boolean
+  }
+  privateVoiceChatUpdate: {
+    callId: string
+    status: VoiceChatStatus
+    callerAddress?: string
+    calleeAddress?: string
   }
 }
 

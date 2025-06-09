@@ -1,5 +1,5 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
-import { createVoiceComponent, IVoiceComponent } from '../../../src/logic/voice'
+import { createVoiceComponent, IVoiceComponent, VoiceChatStatus } from '../../../src/logic/voice'
 import {
   UserAlreadyInVoiceChatError,
   UsersAreCallingSomeoneElseError,
@@ -40,6 +40,7 @@ let endPrivateVoiceChatMock: jest.MockedFn<ICommsGatekeeperComponent['endPrivate
 let getPrivateVoiceChatForCalleeAddressMock: jest.MockedFn<
   IVoiceDatabaseComponent['getPrivateVoiceChatForCalleeAddress']
 >
+let getPrivateVoiceChatOfUserMock: jest.MockedFn<IVoiceDatabaseComponent['getPrivateVoiceChatOfUser']>
 
 beforeEach(() => {
   deletePrivateVoiceChatMock = jest.fn()
@@ -53,6 +54,7 @@ beforeEach(() => {
   getPrivateVoiceChatCredentialsMock = jest.fn()
   endPrivateVoiceChatMock = jest.fn()
   getPrivateVoiceChatForCalleeAddressMock = jest.fn()
+  getPrivateVoiceChatOfUserMock = jest.fn()
   const logs: ILoggerComponent = {
     getLogger: () => ({
       info: () => undefined,
@@ -68,7 +70,8 @@ beforeEach(() => {
     createPrivateVoiceChat: createPrivateVoiceChatMock,
     getPrivateVoiceChat: getPrivateVoiceChatMock,
     deletePrivateVoiceChat: deletePrivateVoiceChatMock,
-    getPrivateVoiceChatForCalleeAddress: getPrivateVoiceChatForCalleeAddressMock
+    getPrivateVoiceChatForCalleeAddress: getPrivateVoiceChatForCalleeAddressMock,
+    getPrivateVoiceChatOfUser: getPrivateVoiceChatOfUserMock
   })
   const settings = createSettingsMockedComponent({
     getUsersSettings: getUsersSettingsMock
@@ -751,6 +754,99 @@ describe('when getting the incoming private voice chat', () => {
       const result = await voice.getIncomingPrivateVoiceChat(calleeAddress)
       expect(result).toEqual(privateVoiceChat)
       expect(getPrivateVoiceChatForCalleeAddressMock).toHaveBeenCalledWith(calleeAddress)
+    })
+  })
+})
+
+describe('when ending incoming or outgoing private voice chat for a user', () => {
+  let userAddress: string
+
+  beforeEach(() => {
+    userAddress = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
+  })
+
+  describe('and no voice chat is found for the user', () => {
+    beforeEach(() => {
+      getPrivateVoiceChatOfUserMock.mockResolvedValueOnce(null)
+    })
+
+    it('should resolve without doing anything', async () => {
+      await voice.endIncomingOrOutgoingPrivateVoiceChatForUser(userAddress)
+      expect(getPrivateVoiceChatOfUserMock).toHaveBeenCalledWith(userAddress)
+    })
+  })
+
+  describe('and a voice chat is found for the user', () => {
+    let privateVoiceChat: PrivateVoiceChat
+
+    beforeEach(() => {
+      privateVoiceChat = {
+        id: 'voice-chat-123',
+        caller_address: '0x2B72b8d597c553b3173bca922B9ad871da751dA5',
+        callee_address: userAddress,
+        expires_at: new Date(Date.now() + 1000000000),
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+      getPrivateVoiceChatOfUserMock.mockResolvedValueOnce(privateVoiceChat)
+    })
+
+    describe('and the voice chat is successfully ended', () => {
+      beforeEach(() => {
+        // Mocks for the endPrivateVoiceChat method
+        getPrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
+        deletePrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
+        publishInChannelMock.mockResolvedValueOnce(undefined)
+      })
+
+      it('should end the private voice chat with the private voice chat id and the callee address and resolve', async () => {
+        await voice.endIncomingOrOutgoingPrivateVoiceChatForUser(userAddress)
+        expect(getPrivateVoiceChatOfUserMock).toHaveBeenCalledWith(userAddress)
+        expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(privateVoiceChat.id)
+        expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId: privateVoiceChat.id,
+          callerAddress: privateVoiceChat.caller_address,
+          status: VoiceChatStatus.ENDED
+        })
+      })
+    })
+
+    describe('and ending the voice chat throws an error', () => {
+      let privateVoiceChat: PrivateVoiceChat
+      let mockError: Error
+
+      beforeEach(() => {
+        privateVoiceChat = {
+          id: 'voice-chat-123',
+          caller_address: '0x2B72b8d597c553b3173bca922B9ad871da751dA5',
+          callee_address: userAddress,
+          expires_at: new Date(Date.now() + 1000000000),
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+        mockError = new VoiceChatNotFoundError('voice-chat-123')
+        getPrivateVoiceChatOfUserMock.mockResolvedValueOnce(privateVoiceChat)
+        getPrivateVoiceChatMock.mockRejectedValueOnce(mockError)
+      })
+
+      it('should not reject and handle the error gracefully', async () => {
+        await expect(voice.endIncomingOrOutgoingPrivateVoiceChatForUser(userAddress)).resolves.toBeUndefined()
+        expect(getPrivateVoiceChatOfUserMock).toHaveBeenCalledWith(userAddress)
+      })
+    })
+  })
+
+  describe('and getting the voice chat throws an error', () => {
+    let mockError: Error
+
+    beforeEach(() => {
+      mockError = new Error('Database error')
+      getPrivateVoiceChatOfUserMock.mockRejectedValueOnce(mockError)
+    })
+
+    it('should not reject', async () => {
+      await expect(voice.endIncomingOrOutgoingPrivateVoiceChatForUser(userAddress)).resolves.toBeUndefined()
+      expect(getPrivateVoiceChatOfUserMock).toHaveBeenCalledWith(userAddress)
     })
   })
 })
