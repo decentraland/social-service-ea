@@ -61,9 +61,6 @@ export async function createCommunityHandler(
     logger.error(`Error creating community: ${message}`)
     logger.debug('Error stack', { stack: error?.stack })
 
-    console.log('[DEBUG-ERROR-STACK]', error?.stack)
-    console.log('[DEBUG-ERROR-STACK]', JSON.stringify(error, null, 2))
-
     if (error instanceof NotAuthorizedError || error instanceof InvalidRequestError) {
       throw error
     }

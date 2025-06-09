@@ -60,8 +60,7 @@ async function initComponents(): Promise<TestComponents> {
       path: ['.env.default', '.env.test']
     },
     {
-      ARCHIPELAGO_STATS_URL,
-      LOG_LEVEL: 'ALL'
+      ARCHIPELAGO_STATS_URL
     }
   )
   const uwsHttpServerConfig = await createConfigComponent({

@@ -5,7 +5,7 @@ import { makeAuthenticatedMultipartRequest } from './utils/auth'
 test('Create Community Controller', async function ({ components, stubComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
 
-  describe.only('when creating a community', () => {
+  describe('when creating a community', () => {
     let identity: Identity
 
     beforeEach(async () => {
@@ -22,8 +22,8 @@ test('Create Community Controller', async function ({ components, stubComponents
       })
     })
 
-    describe.only('and the request is signed', () => {
-      describe.skip('but the body is invalid', () => {
+    describe('and the request is signed', () => {
+      describe('but the body is invalid', () => {
         it('should respond with a 400 status code when missing name', async () => {
           const response = await makeMultipartRequest(
             identity,
@@ -63,7 +63,7 @@ test('Create Community Controller', async function ({ components, stubComponents
         })
       })
 
-      describe.only('and the body is valid', () => {
+      describe('and the body is valid', () => {
         let communityId: string
         let validBody: { name: string; description: string; thumbnailPath: string } = {
           name: 'Test Community',
@@ -75,7 +75,7 @@ test('Create Community Controller', async function ({ components, stubComponents
           await components.communitiesDb.deleteCommunity(communityId)
         })
 
-        describe.only('when the user owns a name', () => {
+        describe('when the user owns a name', () => {
           beforeEach(async () => {
             stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([{
               id: '1',
@@ -85,7 +85,7 @@ test('Create Community Controller', async function ({ components, stubComponents
             }])
           })
 
-          it.only('should respond with a 201 status code', async () => {
+          it('should respond with a 201 status code', async () => {
             const response = await makeMultipartRequest(
               identity,
               '/v1/communities',
@@ -108,7 +108,7 @@ test('Create Community Controller', async function ({ components, stubComponents
             })
           })
 
-          describe.skip('but names cannot be fetched', () => {
+          describe('but names cannot be fetched', () => {
             beforeEach(async () => {
               stubComponents.catalystClient.getOwnedNames.onFirstCall().rejects(new Error('Failed to fetch names'))
             })
@@ -124,7 +124,7 @@ test('Create Community Controller', async function ({ components, stubComponents
           })
         })
 
-        describe.skip('when the user does not own a name', () => {
+        describe('when the user does not own a name', () => {
           beforeEach(async () => {
             stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([])
           })
