@@ -137,9 +137,9 @@ export interface ICommunitiesDatabaseComponent {
   kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
   getCommunityMembers(
     id: string,
-    options: { userAddress?: EthAddress; pagination: Pagination }
+    options: { userAddress?: EthAddress; pagination: Pagination; onlinePeers?: string[] }
   ): Promise<CommunityMember[]>
-  getCommunityMembersCount(communityId: string): Promise<number>
+  getCommunityMembersCount(communityId: string, options?: { onlinePeers?: string[] }): Promise<number>
   getMemberCommunities(
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>

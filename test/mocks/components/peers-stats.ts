@@ -1,7 +1,9 @@
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 
-export function createMockPeersStatsComponent(): jest.Mocked<IPeersStatsComponent> {
+export function createMockPeersStatsComponent({
+  getConnectedPeers = jest.fn().mockResolvedValue([])
+}: Partial<jest.Mocked<IPeersStatsComponent>> = {}): jest.Mocked<IPeersStatsComponent> {
   return {
-    getConnectedPeers: jest.fn().mockResolvedValue([])
+    getConnectedPeers
   }
 }
