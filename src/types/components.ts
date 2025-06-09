@@ -132,6 +132,7 @@ export interface ICommunitiesDatabaseComponent {
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
   getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
+  updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
   kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
   getCommunityMembers(

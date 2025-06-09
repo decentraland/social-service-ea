@@ -39,6 +39,12 @@ export type ICommunityComponent = {
     userAddress: EthAddress,
     pagination: Required<PaginatedParameters>
   ) => Promise<{ members: BannedMemberProfile[]; totalMembers: number }>
+  updateMemberRole: (
+    communityId: string,
+    updaterAddress: EthAddress,
+    targetAddress: EthAddress,
+    newRole: CommunityRole
+  ) => Promise<void>
 }
 
 export type ICommunityRolesComponent = {
@@ -58,6 +64,12 @@ export type ICommunityRolesComponent = {
     communityId: string,
     unbannerAddress: string,
     memberToUnbanAddress: string
+  ) => Promise<boolean>
+  canUpdateMemberRole: (
+    communityId: string,
+    updaterAddress: string,
+    targetAddress: string,
+    newRole: CommunityRole
   ) => Promise<boolean>
 }
 

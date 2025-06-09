@@ -1198,6 +1198,61 @@ describe('when handling community operations', () => {
       expect(result.members[0].memberAddress).toBe(mockMembers[0].memberAddress)
     })
   })
+
+  describe('updateMemberRole', () => {
+    describe('when community does not exist', () => {
+      it('should throw CommunityNotFoundError', async () => {
+        const communityId = 'non-existent'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+
+        await expect(
+          communityComponent.updateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).rejects.toThrow(CommunityNotFoundError)
+      })
+    })
+
+    describe('when user does not have permission to update role', () => {
+      it('should throw NotAuthorizedError', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Member,
+          [targetAddress]: CommunityRole.Member
+        })
+
+        await expect(
+          communityComponent.updateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).rejects.toThrow(NotAuthorizedError)
+      })
+    })
+
+    describe('when user has permission to update role', () => {
+      it('should update the member role', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Owner,
+          [targetAddress]: CommunityRole.Member
+        })
+
+        await communityComponent.updateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+        expect(mockCommunitiesDB.updateMemberRole).toHaveBeenCalledWith(communityId, targetAddress, newRole)
+      })
+    })
+  })
 })
 
 describe('Community Utils', () => {

@@ -321,6 +321,29 @@ export function createCommunityComponent(
       )
 
       return { members: membersWithProfile, totalMembers: totalBannedMembers }
+    },
+
+    updateMemberRole: async (
+      communityId: string,
+      updaterAddress: EthAddress,
+      targetAddress: EthAddress,
+      newRole: CommunityRole
+    ): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const canUpdate = await communityRoles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+      if (!canUpdate) {
+        throw new NotAuthorizedError(
+          `The user ${updaterAddress} doesn't have permission to update ${targetAddress}'s role in community ${communityId}`
+        )
+      }
+
+      await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
     }
   }
 }

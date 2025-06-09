@@ -434,6 +434,15 @@ export function createCommunitiesDBComponent(
           AND active = true
       `
       return pg.getCount(query)
+    },
+
+    async updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void> {
+      const query = SQL`
+        UPDATE community_members 
+        SET role = ${newRole}
+        WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
+      `
+      await pg.query(query)
     }
   }
 }
