@@ -16,10 +16,10 @@ export async function createCommunityHandler(
   const address = verification!.auth.toLowerCase()
 
   try {
-    const name: string = formData.fields.name.value
-    const description: string = formData.fields.description.value
+    const name: string = formData.fields.name?.value
+    const description: string = formData.fields.description?.value
 
-    const thumbnailFile = formData.files['thumbnail']
+    const thumbnailFile = formData?.files?.['thumbnail']
 
     if (!name || !description || !thumbnailFile) {
       logger.error('Invalid request body while creating Community', {
