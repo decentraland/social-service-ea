@@ -34,6 +34,7 @@ import {
 import { ICommunityComponent, ICommunityRolesComponent } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
+import { IPeersStatsComponent } from '../logic/peers-stats'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -55,6 +56,7 @@ export type BaseComponents = {
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
+  peersStats: IPeersStatsComponent
   peersSynchronizer: IPeersSynchronizer
   pg: IPgComponent
   pubsub: IPubSubComponent

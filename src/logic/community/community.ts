@@ -13,7 +13,8 @@ import {
   Community,
   BannedMemberProfile,
   BannedMember,
-  CommunityMember
+  CommunityMember,
+  GetCommunityMembersOptions
 } from './types'
 import {
   isOwner,
@@ -31,11 +32,8 @@ export function createCommunityComponent(
 
   const logger = logs.getLogger('community-component')
 
-  const getCommunityMembers = async (
-    id: string,
-    pagination: Required<PaginatedParameters>,
-    userAddress?: EthAddress
-  ) => {
+  const getCommunityMembers = async (id: string, options: GetCommunityMembersOptions, userAddress?: EthAddress) => {
+    const { pagination, onlyOnline } = options
     const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress })
 
     if (!communityExists) {
@@ -112,16 +110,16 @@ export function createCommunityComponent(
     getCommunityMembers: async (
       id: string,
       userAddress: EthAddress,
-      pagination: Required<PaginatedParameters>
+      options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      return getCommunityMembers(id, pagination, userAddress)
+      return getCommunityMembers(id, options, userAddress)
     },
 
     getMembersFromPublicCommunity: async (
       id: string,
-      pagination: Required<PaginatedParameters>
+      options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      return getCommunityMembers(id, pagination)
+      return getCommunityMembers(id, options)
     },
 
     getMemberCommunities: async (
