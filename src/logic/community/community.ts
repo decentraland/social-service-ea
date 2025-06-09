@@ -208,7 +208,7 @@ export function createCommunityComponent(
 
       logger.info('Community created', { communityId: newCommunity.id, name: newCommunity.name })
 
-      const thumbnailUrl = await storage.storeFiles(thumbnail, `communities/${newCommunity.id}/raw-thumbnail.png`)
+      const thumbnailUrl = await storage.storeFile(thumbnail, `communities/${newCommunity.id}/raw-thumbnail.png`)
 
       logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id })
 

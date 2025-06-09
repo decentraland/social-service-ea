@@ -11,7 +11,7 @@ export async function createS3Adapter({ config }: Pick<AppComponents, 'config'>)
 
   const s3 = new S3Client({ region, endpoint: bucketEndpoint })
 
-  async function storeFiles(file: Buffer, key: string): Promise<string> {
+  async function storeFile(file: Buffer, key: string): Promise<string> {
     const upload = new Upload({
       client: s3,
       params: {
@@ -25,5 +25,5 @@ export async function createS3Adapter({ config }: Pick<AppComponents, 'config'>)
     return await upload.done().then(() => `${bucketEndpoint}/${bucket}/${key}`)
   }
 
-  return { storeFiles }
+  return { storeFile }
 }

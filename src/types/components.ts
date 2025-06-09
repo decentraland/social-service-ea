@@ -270,5 +270,5 @@ export interface ICommunitiesDbHelperComponent {
 }
 
 export interface IStorageComponent {
-  storeFiles: (file: Buffer, key: string) => Promise<string>
+  storeFile: (file: Buffer, key: string) => Promise<string>
 }
