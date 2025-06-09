@@ -54,7 +54,7 @@
     "@well-known-components/nats-component": "^2.0.0",
     "@well-known-components/pg-component": "^0.2.2",
     "@well-known-components/uws-http-server": "^0.0.2",
-    "dcl-catalyst-client": "^21.7.0",
+    "dcl-catalyst-client": "^21.8.1",
     "decentraland-crypto-fetch": "^2.0.1",
     "dotenv": "^16.4.7",
     "fp-future": "^1.0.1",
