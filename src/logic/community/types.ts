@@ -21,6 +21,10 @@ export type ICommunityComponent = {
     userAddress: EthAddress,
     pagination: Required<PaginatedParameters>
   ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
+  getMembersFromPublicCommunity: (
+    id: string,
+    pagination: Required<PaginatedParameters>
+  ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
   getMemberCommunities: (
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>

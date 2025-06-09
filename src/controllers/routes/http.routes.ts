@@ -35,7 +35,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.get('/v1/communities/:id', signedFetchMiddleware(), getCommunityHandler)
   router.get('/v1/communities', signedFetchMiddleware({ optional: true }), getCommunitiesHandler)
-  router.get('/v1/communities/:id/members', signedFetchMiddleware(), getCommunityMembersHandler)
+  router.get('/v1/communities/:id/members', signedFetchMiddleware({ optional: true }), getCommunityMembersHandler)
 
   router.post('/v1/communities/:id/members', signedFetchMiddleware(), addMemberToCommunityHandler)
   router.delete('/v1/communities/:id/members/:memberAddress', signedFetchMiddleware(), removeMemberFromCommunityHandler)

@@ -3,7 +3,7 @@ import { normalizeAddress } from '../utils/address'
 import { Action, CommunityRole, Pagination } from '../types'
 import { GetCommunitiesOptions } from './community/types'
 
-type CTE = { query: SQLStatement | string; name: string }
+export type CTE = { query: SQLStatement | string; name: string }
 
 function withAlias(tableAlias?: string): string {
   return tableAlias ? `${tableAlias}.` : ``
@@ -335,7 +335,7 @@ export function getMembersCTE(subquery: SQLStatement) {
   }
 }
 
-export function getLatestFriendshipActionCTE(userAddress: string) {
+export function getLatestFriendshipActionCTE(userAddress: string): CTE {
   const normalizedUserAddress = normalizeAddress(userAddress)
 
   return {

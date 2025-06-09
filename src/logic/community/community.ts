@@ -31,6 +31,39 @@ export function createCommunityComponent(
 
   const logger = logs.getLogger('community-component')
 
+  const getCommunityMembers = async (
+    id: string,
+    pagination: Required<PaginatedParameters>,
+    userAddress?: EthAddress
+  ) => {
+    const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress })
+
+    if (!communityExists) {
+      throw new CommunityNotFoundError(id)
+    }
+
+    const memberRole = userAddress ? await communitiesDb.getCommunityMemberRole(id, userAddress) : CommunityRole.None
+
+    if (userAddress && memberRole === CommunityRole.None) {
+      throw new NotAuthorizedError("The user doesn't have permission to get community members")
+    }
+
+    const communityMembers = await communitiesDb.getCommunityMembers(id, {
+      userAddress,
+      pagination
+    })
+    const totalMembers = await communitiesDb.getCommunityMembersCount(id)
+
+    const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
+
+    const membersWithProfile: CommunityMemberProfile[] = mapMembersWithProfiles<
+      CommunityMember,
+      CommunityMemberProfile
+    >(userAddress, communityMembers, profiles)
+
+    return { members: membersWithProfile, totalMembers }
+  }
+
   return {
     getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount> => {
       const [community, membersCount] = await Promise.all([
@@ -81,29 +114,14 @@ export function createCommunityComponent(
       userAddress: EthAddress,
       pagination: Required<PaginatedParameters>
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      const communityExists = await communitiesDb.communityExists(id)
+      return getCommunityMembers(id, pagination, userAddress)
+    },
 
-      if (!communityExists) {
-        throw new CommunityNotFoundError(id)
-      }
-
-      const memberRole = await communitiesDb.getCommunityMemberRole(id, userAddress)
-
-      if (memberRole === CommunityRole.None) {
-        throw new NotAuthorizedError("The user doesn't have permission to get community members")
-      }
-
-      const communityMembers = await communitiesDb.getCommunityMembers(id, userAddress, pagination)
-      const totalMembers = await communitiesDb.getCommunityMembersCount(id)
-
-      const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
-
-      const membersWithProfile: CommunityMemberProfile[] = mapMembersWithProfiles<
-        CommunityMember,
-        CommunityMemberProfile
-      >(userAddress, communityMembers, profiles)
-
-      return { members: membersWithProfile, totalMembers }
+    getMembersFromPublicCommunity: async (
+      id: string,
+      pagination: Required<PaginatedParameters>
+    ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
+      return getCommunityMembers(id, pagination)
     },
 
     getMemberCommunities: async (

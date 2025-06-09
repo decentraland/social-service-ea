@@ -21,10 +21,12 @@ export async function getCommunityMembersHandler(
   logger.info(`Getting community members for community: ${communityId}`)
 
   try {
-    const userAddress = verification!.auth.toLowerCase()
+    const userAddress = verification?.auth?.toLowerCase()
     const paginationParams = getPaginationParams(context.url.searchParams)
 
-    const { members, totalMembers } = await community.getCommunityMembers(communityId, userAddress, paginationParams)
+    const { members, totalMembers } = userAddress
+      ? await community.getCommunityMembers(communityId, userAddress, paginationParams)
+      : await community.getMembersFromPublicCommunity(communityId, paginationParams)
 
     return {
       status: 200,

@@ -7,12 +7,13 @@ import { Action } from '../../src/types/entities'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createFriendshipRequest, createOrUpsertActiveFriendship } from './utils/friendships'
 import { removeFriendship } from './utils/friendships'
+import { Response } from '@well-known-components/interfaces'
 
 test('Get Community Members Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
   let identity: Identity
   let addressMakingRequest: string
-  let communityId
+  let communityId: string
 
   beforeEach(async () => {
     identity = await createTestIdentity()
@@ -20,18 +21,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
     communityId = uuidv4()
   })
 
-  describe('when community does not exists', () => {
-    it('should respond with a 404 status code', async () => {
-      const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
-      expect(response.status).toBe(404)
-      expect(await response.json()).toEqual({
-        error: 'Not Found',
-        message: `Community not found: ${communityId}`
-      })
-    })
-  })
-
-  describe('when community exists and has members', () => {
+  describe('when getting community members', () => {
     const ownerAddress = '0x0000000000000000000000000000000000000001'
     const firstMemberAddress = '0x0000000000000000000000000000000000000002'
     const secondMemberAddress = '0x0000000000000000000000000000000000000003'
@@ -77,6 +67,23 @@ test('Get Community Members Controller', function ({ components, spyComponents }
         secondMemberAddress,
         addressMakingRequest
       ])
+
+      spyComponents.catalystClient.getProfiles.mockResolvedValue([
+        createMockProfile(firstMemberAddress),
+        createMockProfile(secondMemberAddress),
+        createMockProfile(ownerAddress),
+        {
+          ...createMockProfile(addressMakingRequest),
+          avatars: [
+            {
+              ...createMockProfile(addressMakingRequest).avatars[0],
+              hasClaimedName: false,
+              name: '',
+              unclaimedName: 'Test User 4'
+            }
+          ]
+        }
+      ])
     })
 
     afterEach(async () => {
@@ -92,54 +99,174 @@ test('Get Community Members Controller', function ({ components, spyComponents }
       await removeFriendship(components.friendsDb, secondFriendshipId, addressMakingRequest)
     })
 
-    describe('but the user is not a member of the community', () => {
-      it('should respond with a 401 status code', async () => {
-        const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
-        expect(response.status).toBe(401)
-        expect(await response.json()).toEqual({
-          error: 'Not Authorized',
-          message: "The user doesn't have permission to get community members"
+    describe('and the request is not signed', () => {
+      describe('and the community exists but is not public', () => {
+        let privateCommunityId: string
+        beforeEach(async () => {
+          privateCommunityId = (
+            await components.communitiesDb.createCommunity({
+              name: 'Test Community',
+              description: 'Test Description',
+              private: true,
+              active: true,
+              owner_address: '0x0000000000000000000000000000000000000000'
+            })
+          ).id
+        })
+
+        afterEach(async () => {
+          await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
+        })
+
+        it('should respond with a 404 status code', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/communities/${privateCommunityId}/members`)
+          expect(response.status).toBe(404)
+          expect(await response.json()).toEqual({
+            error: 'Not Found',
+            message: `Community not found: ${privateCommunityId}`
+          })
+        })
+      })
+
+      describe('and the community exists and is public', () => {
+        let response: Response
+
+        beforeEach(async () => {
+          const { localHttpFetch } = components
+          response = await localHttpFetch.fetch(`/v1/communities/${communityId}/members`)
+        })
+
+        it('should respond with a 200 status code', async () => {
+          expect(response.status).toBe(200)
+        })
+
+        it('should respond with the community members paginated and without friendship status', async () => {
+          const result = await response.json()
+
+          expect(result.data.results).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                communityId,
+                memberAddress: firstMemberAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${firstMemberAddress}`,
+                role: 'member',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.NONE
+              }),
+              expect.objectContaining({
+                communityId,
+                memberAddress: secondMemberAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${secondMemberAddress}`,
+                role: 'member',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.NONE
+              }),
+              expect.objectContaining({
+                communityId,
+                memberAddress: ownerAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${ownerAddress}`,
+                role: 'owner',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.NONE
+              })
+            ])
+          )
         })
       })
     })
 
-    describe('and the request is made by a member of the community', () => {
-      beforeEach(async () => {
-        spyComponents.catalystClient.getProfiles.mockResolvedValue([
-          createMockProfile(firstMemberAddress),
-          createMockProfile(secondMemberAddress),
-          createMockProfile(ownerAddress),
-          {
-            ...createMockProfile(addressMakingRequest),
-            avatars: [
-              {
-                ...createMockProfile(addressMakingRequest).avatars[0],
-                hasClaimedName: false,
-                name: '',
-                unclaimedName: 'Test User 4'
-              }
-            ]
-          }
-        ])
-
-        await components.communitiesDb.addCommunityMember({
-          communityId,
-          memberAddress: addressMakingRequest,
-          role: CommunityRole.Member
+    describe('and the request is signed', () => {
+      describe('and the community does not exist', () => {
+        it('should respond with a 404 status code', async () => {
+          const nonExistentCommunityId = uuidv4()
+          const response = await makeRequest(identity, `/v1/communities/${nonExistentCommunityId}/members`)
+          expect(response.status).toBe(404)
+          expect(await response.json()).toEqual({
+            error: 'Not Found',
+            message: `Community not found: ${nonExistentCommunityId}`
+          })
         })
       })
 
-      afterEach(async () => {
-        await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [addressMakingRequest])
+      describe('and the user is not a member of the community', () => {
+        it('should respond with a 401 status code', async () => {
+          const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
+          expect(response.status).toBe(401)
+          expect(await response.json()).toEqual({
+            error: 'Not Authorized',
+            message: "The user doesn't have permission to get community members"
+          })
+        })
       })
 
-      it('should respond with a 200 status code and the correct members', async () => {
-        const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
-        expect(response.status).toBe(200)
-        const result = await response.json()
+      describe('and the user is a member of the community', () => {
+        beforeEach(async () => {
+          await components.communitiesDb.addCommunityMember({
+            communityId,
+            memberAddress: addressMakingRequest,
+            role: CommunityRole.Member
+          })
+        })
 
-        expect(result.data.results).toEqual(
-          expect.arrayContaining([
+        afterEach(async () => {
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [addressMakingRequest])
+        })
+
+        it('should respond with a 200 status code and the correct members with friendship status', async () => {
+          const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
+          expect(response.status).toBe(200)
+          const result = await response.json()
+
+          expect(result.data.results).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                communityId,
+                memberAddress: firstMemberAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${firstMemberAddress}`,
+                role: 'member',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.REQUEST_SENT
+              }),
+              expect.objectContaining({
+                communityId,
+                memberAddress: secondMemberAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${secondMemberAddress}`,
+                role: 'member',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.ACCEPTED
+              }),
+              expect.objectContaining({
+                communityId,
+                memberAddress: ownerAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${ownerAddress}`,
+                role: 'owner',
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.NONE
+              })
+            ])
+          )
+        })
+
+        it('should return with a 200 and the correct members with pagination', async () => {
+          const response = await makeRequest(identity, `/v1/communities/${communityId}/members?limit=2&page=1`)
+          expect(response.status).toBe(200)
+          const result = await response.json()
+
+          expect(result.data.results).toHaveLength(2)
+          expect(result.data.results[0]).toEqual(
             expect.objectContaining({
               communityId,
               memberAddress: firstMemberAddress,
@@ -149,58 +276,29 @@ test('Get Community Members Controller', function ({ components, spyComponents }
               role: 'member',
               profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
               friendshipStatus: FriendshipStatus.REQUEST_SENT
-            }),
-            expect.objectContaining({
-              communityId,
-              memberAddress: secondMemberAddress,
-              hasClaimedName: true,
-              joinedAt: expect.any(String),
-              name: `Profile name ${secondMemberAddress}`,
-              role: 'member',
-              profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-              friendshipStatus: FriendshipStatus.ACCEPTED
-            }),
-            expect.objectContaining({
-              communityId,
-              memberAddress: ownerAddress,
-              hasClaimedName: true,
-              joinedAt: expect.any(String),
-              name: `Profile name ${ownerAddress}`,
-              role: 'owner',
-              profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-              friendshipStatus: FriendshipStatus.NONE
             })
-          ])
-        )
+          )
+        })
+
+        it('should handle members with no friendship status correctly', async () => {
+          const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
+          expect(response.status).toBe(200)
+          const result = await response.json()
+
+          const owner = result.data.results.find((m) => m.memberAddress === ownerAddress)
+          expect(owner.friendshipStatus).toBe(FriendshipStatus.NONE)
+        })
       })
 
-      it('should return with a 200 and the correct members with friendship status when the request is made with pagination', async () => {
-        const response = await makeRequest(identity, `/v1/communities/${communityId}/members?limit=2&page=1`)
-        expect(response.status).toBe(200)
-        const result = await response.json()
+      describe('and the request fails', () => {
+        beforeEach(() => {
+          spyComponents.community.getCommunityMembers.mockRejectedValue(new Error('Unable to get community members'))
+        })
 
-        expect(result.data.results).toHaveLength(2)
-        expect(result.data.results[0]).toEqual(
-          expect.objectContaining({
-            communityId,
-            memberAddress: firstMemberAddress,
-            hasClaimedName: true,
-            joinedAt: expect.any(String),
-            name: `Profile name ${firstMemberAddress}`,
-            role: 'member',
-            profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-            friendshipStatus: FriendshipStatus.REQUEST_SENT
-          })
-        )
-      })
-
-      it('should handle members with no friendship status correctly', async () => {
-        const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
-        expect(response.status).toBe(200)
-        const result = await response.json()
-
-        const owner = result.data.results.find((m) => m.memberAddress === ownerAddress)
-        expect(owner.friendshipStatus).toBe(FriendshipStatus.NONE)
+        it('should respond with a 500 status code', async () => {
+          const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
+          expect(response.status).toBe(500)
+        })
       })
     })
   })
