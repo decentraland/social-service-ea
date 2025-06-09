@@ -4,7 +4,6 @@ import {
   BlockedUsersMessagesVisibilitySetting as RPCBlockedUsersMessagesVisibilitySetting
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
-  AppComponents,
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   SocialSettings as DBSocialSettings,
