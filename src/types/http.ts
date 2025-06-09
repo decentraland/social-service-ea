@@ -2,6 +2,7 @@ import type { IHttpServerComponent } from '@well-known-components/interfaces'
 import { HttpRequest, HttpResponse } from '@well-known-components/uws-http-server'
 import { AppComponents } from './system'
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
+import { FormDataContext } from '@well-known-components/multipart-wrapper'
 
 export type HandlerContextWithPath<
   ComponentNames extends keyof AppComponents,
@@ -39,3 +40,13 @@ export type HTTPResponse<T = undefined> = {
         data?: T
       }
 }
+
+export type FormHandlerContextWithPath<
+  ComponentNames extends keyof AppComponents,
+  Path extends string = any
+> = IHttpServerComponent.PathAwareContext<
+  FormDataContext<{
+    components: Pick<AppComponents, ComponentNames>
+  }>,
+  Path
+>

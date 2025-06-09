@@ -1,29 +1,31 @@
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
-import { HTTPResponse } from '../../types/http'
-import { HandlerContextWithPath } from '../../types/http'
-import { Community } from '../../logic/community'
+import { FormHandlerContextWithPath, HTTPResponse } from '../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../utils/errors'
 
 export async function createCommunityHandler(
-  context: HandlerContextWithPath<'community' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
+  context: FormHandlerContextWithPath<'community' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
 ): Promise<HTTPResponse> {
   const {
     components: { community, logs },
     verification,
-    request
+    formData
   } = context
 
   const logger = logs.getLogger('create-community-handler')
   const address = verification!.auth.toLowerCase()
 
   try {
-    const body: Pick<Community, 'name' | 'description' | 'thumbnails'> = await request.json()
+    const name: string = formData.fields.name.value
+    const description: string = formData.fields.description.value
 
-    // TODO: add thumbnails validation when implemented
-    if (!body.name || !body.description) {
+    const thumbnailFile = formData.files['thumbnail']
+
+    if (!name || !description || !thumbnailFile) {
       logger.error('Invalid request body while creating Community', {
-        body: JSON.stringify(body)
+        name,
+        description,
+        thumbnails: thumbnailFile ? 'present' : 'missing'
       })
 
       throw new InvalidRequestError('Invalid request body')
@@ -31,17 +33,17 @@ export async function createCommunityHandler(
 
     logger.info('Creating community', {
       owner: address,
-      name: body.name,
-      thumbnails: JSON.stringify(body.thumbnails)
+      name
     })
 
-    // TODO: support thumbnails upload
-    const createdCommunity = await community.createCommunity({
-      name: body.name,
-      description: body.description,
-      ownerAddress: address,
-      thumbnails: body.thumbnails
-    })
+    const createdCommunity = await community.createCommunity(
+      {
+        name,
+        description,
+        ownerAddress: address
+      },
+      thumbnailFile.value
+    )
 
     logger.info('Community created', {
       community: JSON.stringify(createdCommunity)

@@ -31,11 +31,12 @@ import { createSettingsComponent } from './logic/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
 import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
+import { createS3Adapter } from './adapters/s3'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
   const config = await createDotEnvConfigComponent({ path: ['.env.default', '.env'] })
-  const uwsHttpServerConfig = await createConfigComponent({
+  const uwsHttpServerConfig = createConfigComponent({
     HTTP_SERVER_PORT: await config.requireString('UWS_HTTP_SERVER_PORT'),
     HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
   })
@@ -120,6 +121,8 @@ export async function initComponents(): Promise<AppComponents> {
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const community = createCommunityComponent({ communitiesDb, catalystClient, communityRoles, logs })
 
+  const storage = await createS3Adapter({ config })
+
   return {
     archipelagoStats,
     catalystClient,
@@ -149,6 +152,7 @@ export async function initComponents(): Promise<AppComponents> {
     wsPool,
     voice,
     voiceDb,
-    settings
+    settings,
+    storage
   }
 }
