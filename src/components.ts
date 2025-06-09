@@ -31,6 +31,7 @@ import { createSettingsComponent } from './logic/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
 import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
+import { createPeersStatsComponent } from './logic/peers-stats'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -98,6 +99,7 @@ export async function initComponents(): Promise<AppComponents> {
   const voice = await createVoiceComponent({ logs, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
   const sns = await createSnsComponent({ config })
   const subscribersContext = createSubscribersContext()
+  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const rpcServer = await createRpcServerComponent({
     logs,
     commsGatekeeper,
@@ -105,14 +107,13 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     uwsServer,
     config,
-    archipelagoStats,
     catalystClient,
     sns,
     subscribersContext,
-    worldsStats,
     metrics,
     settings,
-    voice
+    voice,
+    peersStats
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
@@ -135,20 +136,21 @@ export async function initComponents(): Promise<AppComponents> {
     metrics,
     nats,
     peerTracking,
+    peersStats,
     peersSynchronizer,
     pg,
     pubsub,
     redis,
     rpcServer,
-    uwsServer,
+    settings,
     sns,
     statusChecks,
     subscribersContext,
     tracing,
-    worldsStats,
-    wsPool,
-    voice,
+    uwsServer,
     voiceDb,
-    settings
+    voice,
+    wsPool,
+    worldsStats
   }
 }

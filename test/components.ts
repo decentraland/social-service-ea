@@ -40,6 +40,7 @@ import { createCommunityComponent, createCommunityRolesComponent } from '../src/
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createSettingsComponent } from '../src/logic/settings'
+import { createPeersStatsComponent } from '../src/logic/peers-stats'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -111,6 +112,7 @@ async function initComponents(): Promise<TestComponents> {
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voice = await createVoiceComponent({ logs, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
+  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const rpcServer = await createRpcServerComponent({
     logs,
     commsGatekeeper,
@@ -118,14 +120,13 @@ async function initComponents(): Promise<TestComponents> {
     pubsub,
     uwsServer,
     config,
-    archipelagoStats,
     catalystClient,
     sns,
     subscribersContext,
-    worldsStats,
     metrics,
     settings,
-    voice
+    voice,
+    peersStats
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
@@ -157,6 +158,7 @@ async function initComponents(): Promise<TestComponents> {
     nats,
     peerTracking,
     peersSynchronizer: mockPeersSynchronizer,
+    peersStats,
     pg,
     pubsub,
     redis,
