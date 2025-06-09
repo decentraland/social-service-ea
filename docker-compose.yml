@@ -52,6 +52,7 @@ services:
       BUCKET_ENDPOINT: 'http://localstack:4566'
       AWS_REGION: 'us-east-1'
       BUCKET_PREFIX: 'social'
+      LOG_LEVEL: ALL
     ports:
       - '3000:3000'
       - '8085:8085'

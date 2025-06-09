@@ -27,7 +27,7 @@ import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
 import { createVoiceComponent } from './logic/voice'
-import { createSettingsComponent } from './logic/settings'
+import { createSettingsComponent } from './logic/settings/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
 import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
@@ -98,6 +98,7 @@ export async function initComponents(): Promise<AppComponents> {
   const voiceDb = await createVoiceDBComponent({ pg, config })
   const voice = await createVoiceComponent({ logs, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
   const sns = await createSnsComponent({ config })
+  const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const rpcServer = await createRpcServerComponent({
     logs,
@@ -119,9 +120,7 @@ export async function initComponents(): Promise<AppComponents> {
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const community = createCommunityComponent({ communitiesDb, catalystClient, communityRoles, logs })
-
-  const storage = await createS3Adapter({ config })
+  const community = createCommunityComponent({ communitiesDb, catalystClient, communityRoles, logs, storage })
 
   return {
     archipelagoStats,

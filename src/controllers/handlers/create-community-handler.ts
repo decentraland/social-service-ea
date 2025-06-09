@@ -56,9 +56,10 @@ export async function createCommunityHandler(
         data: createdCommunity
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     const message = errorMessageOrDefault(error)
     logger.error(`Error creating community: ${message}`)
+    logger.debug('Error stack', { stack: error?.stack })
 
     if (error instanceof NotAuthorizedError || error instanceof InvalidRequestError) {
       throw error
