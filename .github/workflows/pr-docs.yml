@@ -7,7 +7,7 @@ on:
       - '.github/workflows/**'
 
 jobs:
-  validate-docs:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,9 +30,33 @@ jobs:
       - name: Build documentation
         run: npx @redocly/cli build-docs docs/communities-openapi.yaml -o docs/index.html
 
-      - name: Upload documentation artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: api-docs
-          path: docs/index.html
-          retention-days: 1
+          path: ./docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Comment PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const previewUrl = steps.deployment.outputs.page_url
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `📚 API Documentation preview is available at: ${previewUrl}`
+            })
