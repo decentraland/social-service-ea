@@ -269,3 +269,7 @@ export interface ICommunitiesDbHelperComponent {
   forceCommunityRemoval: (communityId: string) => Promise<void>
   forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
 }
+
+export interface IStorageComponent {
+  storeFile: (file: Buffer, key: string) => Promise<string>
+}
