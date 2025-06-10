@@ -132,13 +132,14 @@ export interface ICommunitiesDatabaseComponent {
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
   getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
+  updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
   kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
   getCommunityMembers(
     id: string,
-    options: { userAddress?: EthAddress; pagination: Pagination }
+    options: { userAddress?: EthAddress; pagination: Pagination; filterByMembers?: string[] }
   ): Promise<CommunityMember[]>
-  getCommunityMembersCount(communityId: string): Promise<number>
+  getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number>
   getMemberCommunities(
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>

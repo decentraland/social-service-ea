@@ -76,9 +76,9 @@ export function createCommunitiesDBComponent(
 
     async getCommunityMembers(
       id: string,
-      options: { userAddress: EthAddress; pagination: Pagination }
+      options: { userAddress: EthAddress; pagination: Pagination; filterByMembers?: string[] }
     ): Promise<CommunityMember[]> {
-      const { userAddress, pagination } = options
+      const { userAddress, pagination, filterByMembers } = options
       const normalizedUserAddress = userAddress ? normalizeAddress(userAddress) : null
 
       const ctes = [
@@ -100,6 +100,7 @@ export function createCommunitiesDBComponent(
             : SQL``
         )
         .append(SQL` WHERE cm.community_id = ${id}`)
+        .append(filterByMembers ? SQL` AND cm.member_address = ANY(${filterByMembers.map(normalizeAddress)})` : SQL``)
         .append(SQL` ORDER BY cm.joined_at ASC`)
         .append(SQL` LIMIT ${pagination.limit}`)
         .append(SQL` OFFSET ${pagination.offset}`)
@@ -132,7 +133,7 @@ export function createCommunitiesDBComponent(
       )
     },
 
-    async getCommunityMembersCount(communityId: string): Promise<number> {
+    async getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number> {
       const query = SQL`
         SELECT COUNT(cm.member_address) 
           FROM community_members cm
@@ -144,6 +145,11 @@ export function createCommunitiesDBComponent(
                   AND c.active = true
               )
       `
+
+      if (options && options.filterByMembers) {
+        query.append(SQL` AND cm.member_address = ANY(${options.filterByMembers.map(normalizeAddress)})`)
+      }
+
       return pg.getCount(query)
     },
 
@@ -434,6 +440,15 @@ export function createCommunitiesDBComponent(
           AND active = true
       `
       return pg.getCount(query)
+    },
+
+    async updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void> {
+      const query = SQL`
+        UPDATE community_members 
+        SET role = ${newRole}
+        WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
+      `
+      await pg.query(query)
     }
   }
 }
