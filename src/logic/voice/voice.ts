@@ -1,5 +1,6 @@
 import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, PrivateMessagesPrivacy, PrivateVoiceChat } from '../../types'
+import { isErrorWithMessage } from '../../utils/errors'
 import {
   IncomingVoiceChatNotFoundError,
   UserAlreadyInVoiceChatError,
@@ -198,17 +199,42 @@ export function createVoiceComponent({
     })
   }
 
+  /**
+   * Gets the incoming private voice chat for a given address.
+   * @param address - The address of the user to get the incoming private voice chat for.
+   * @returns The incoming private voice chat.
+   */
   async function getIncomingPrivateVoiceChat(address: string): Promise<PrivateVoiceChat> {
     logger.info(`Getting incoming private voice chats for ${address}`)
 
     const privateVoiceChat = await voiceDb.getPrivateVoiceChatForCalleeAddress(address)
-    if (!privateVoiceChat) {
+    if (!privateVoiceChat || privateVoiceChat.expires_at < new Date()) {
       throw new IncomingVoiceChatNotFoundError(address)
     }
     return privateVoiceChat
   }
 
+  /**
+   * Ends all private voice chat for a given address.
+   * @param address - The address of the user to end the private voice chats for.
+   */
+  async function endIncomingOrOutgoingPrivateVoiceChatForUser(address: string): Promise<void> {
+    logger.info(`Ending all private voice chats for ${address}`)
+
+    try {
+      const privateVoiceChat = await voiceDb.getPrivateVoiceChatOfUser(address)
+      if (privateVoiceChat) {
+        await endPrivateVoiceChat(privateVoiceChat.id, privateVoiceChat.callee_address)
+      }
+    } catch (error) {
+      logger.error(
+        `Error ending private voice chats for ${address}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+    }
+  }
+
   return {
+    endIncomingOrOutgoingPrivateVoiceChatForUser,
     endPrivateVoiceChat,
     getIncomingPrivateVoiceChat,
     rejectPrivateVoiceChat,

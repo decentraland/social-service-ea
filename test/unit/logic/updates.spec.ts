@@ -4,7 +4,8 @@ import {
   handleSubscriptionUpdates,
   ILogger,
   friendshipAcceptedUpdateHandler,
-  blockUpdateHandler
+  blockUpdateHandler,
+  privateVoiceChatUpdateHandler
 } from '../../../src/logic/updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../mocks/components'
@@ -13,6 +14,7 @@ import { Action, ISubscribersContext, RpcServerContext, SubscriptionEventsEmitte
 import { sleep } from '../../../src/utils/timer'
 import { mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
+import { VoiceChatStatus } from '../../../src/logic/voice/types'
 
 describe('updates handlers', () => {
   const logger = mockLogs.getLogger('test')
@@ -255,6 +257,194 @@ describe('updates handlers', () => {
         expect.stringContaining('Error handling update:'),
         expect.objectContaining({ message: 'invalid json' })
       )
+    })
+  })
+
+  describe('when handling private voice chat updates', () => {
+    let handler: ReturnType<typeof privateVoiceChatUpdateHandler>
+    let callerAddress: string
+    let calleeAddress: string
+    let callId: string
+    let callerEmitSpy: jest.SpyInstance
+    let calleeEmitSpy: jest.SpyInstance
+    let update: any
+
+    beforeEach(() => {
+      handler = privateVoiceChatUpdateHandler(subscribersContext, logger)
+      callerAddress = '0x123'
+      calleeAddress = '0x456'
+      callId = 'voice-call-1'
+
+      const caller = subscribersContext.getOrAddSubscriber(callerAddress)
+      const callee = subscribersContext.getOrAddSubscriber(calleeAddress)
+      callerEmitSpy = jest.spyOn(caller, 'emit')
+      calleeEmitSpy = jest.spyOn(callee, 'emit')
+
+      // Reset update object for each test
+      update = {
+        id: callId,
+        callerAddress,
+        calleeAddress,
+        status: VoiceChatStatus.REQUESTED, // Default status, will be overridden in specific tests
+        timestamp: Date.now()
+      }
+    })
+
+    describe('and the voice chat status is REQUESTED', () => {
+      beforeEach(() => {
+        update.status = VoiceChatStatus.REQUESTED
+      })
+
+      describe('and the calleeAddress is present', () => {
+        it('should emit the update to the callee', () => {
+          handler(JSON.stringify(update))
+
+          expect(calleeEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
+        })
+      })
+
+      describe('and the calleeAddress is missing', () => {
+        beforeEach(() => {
+          update.calleeAddress = undefined
+        })
+
+        it('should not emit the update to any subscriber', () => {
+          handler(JSON.stringify(update))
+
+          expect(callerEmitSpy).not.toHaveBeenCalled()
+          expect(calleeEmitSpy).not.toHaveBeenCalled()
+        })
+      })
+    })
+
+    describe('and the voice chat status is ACCEPTED', () => {
+      beforeEach(() => {
+        update.status = VoiceChatStatus.ACCEPTED
+      })
+
+      describe('and the callerAddress is present', () => {
+        it('should emit the update to the caller', () => {
+          handler(JSON.stringify(update))
+
+          expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
+        })
+      })
+
+      describe('and the callerAddress is missing', () => {
+        beforeEach(() => {
+          update.callerAddress = undefined
+        })
+
+        it('should not emit the update to any subscriber', () => {
+          handler(JSON.stringify(update))
+
+          expect(callerEmitSpy).not.toHaveBeenCalled()
+          expect(calleeEmitSpy).not.toHaveBeenCalled()
+        })
+      })
+    })
+
+    describe('and the voice chat status is REJECTED', () => {
+      beforeEach(() => {
+        update.status = VoiceChatStatus.REJECTED
+      })
+
+      describe('and the callerAddress is present', () => {
+        it('should emit the update to the caller', () => {
+          handler(JSON.stringify(update))
+
+          expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
+        })
+      })
+
+      describe('and the callerAddress is missing', () => {
+        beforeEach(() => {
+          update.callerAddress = undefined
+        })
+
+        it('should not emit the update to any subscriber', () => {
+          handler(JSON.stringify(update))
+
+          expect(callerEmitSpy).not.toHaveBeenCalled()
+          expect(calleeEmitSpy).not.toHaveBeenCalled()
+        })
+      })
+    })
+
+    describe('and the voice chat status is ENDED', () => {
+      beforeEach(() => {
+        update.status = VoiceChatStatus.ENDED
+      })
+
+      describe('and both callerAddress and calleeAddress are present', () => {
+        it('should emit the update to both the caller and the callee', () => {
+          handler(JSON.stringify(update))
+
+          expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
+          expect(calleeEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
+        })
+      })
+
+      describe('and only callerAddress is present', () => {
+        beforeEach(() => {
+          update.calleeAddress = undefined
+        })
+
+        it('should emit the update only to the caller', () => {
+          handler(JSON.stringify(update))
+
+          expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
+        })
+      })
+
+      describe('and only calleeAddress is present', () => {
+        beforeEach(() => {
+          update.callerAddress = undefined
+        })
+
+        it('should emit the update only to the callee', () => {
+          handler(JSON.stringify(update))
+
+          expect(calleeEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
+        })
+      })
+    })
+
+    describe('and the voice chat status is EXPIRED', () => {
+      beforeEach(() => {
+        update.status = VoiceChatStatus.EXPIRED
+      })
+
+      it('should emit the update to both the caller and the callee', () => {
+        handler(JSON.stringify(update))
+
+        expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
+        expect(calleeEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
+      })
+    })
+
+    describe('and the voice chat status is unknown', () => {
+      beforeEach(() => {
+        update.status = 'unknown' as VoiceChatStatus
+      })
+
+      it('should not emit the update to any subscriber', () => {
+        handler(JSON.stringify(update))
+
+        expect(callerEmitSpy).not.toHaveBeenCalled()
+        expect(calleeEmitSpy).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the subscriber does not exist', () => {
+      beforeEach(() => {
+        update.callerAddress = '0xNONEXISTENT'
+        update.status = VoiceChatStatus.ACCEPTED
+      })
+
+      it('should resolve without emitting to any subscriber', () => {
+        expect(handler(JSON.stringify(update))).resolves.toBeUndefined()
+      })
     })
   })
 

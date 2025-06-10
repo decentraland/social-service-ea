@@ -10,6 +10,7 @@ export interface IVoiceComponent {
   acceptPrivateVoiceChat(callId: string, calleeAddress: string): Promise<AcceptPrivateVoiceChatResult>
   rejectPrivateVoiceChat(callId: string, calleeAddress: string): Promise<void>
   endPrivateVoiceChat(callId: string, address: string): Promise<void>
+  endIncomingOrOutgoingPrivateVoiceChatForUser(address: string): Promise<void>
   getIncomingPrivateVoiceChat(address: string): Promise<PrivateVoiceChat>
 }
 
@@ -17,5 +18,6 @@ export enum VoiceChatStatus {
   REQUESTED = 'requested',
   ACCEPTED = 'accepted',
   REJECTED = 'rejected',
-  ENDED = 'ended'
+  ENDED = 'ended',
+  EXPIRED = 'expired'
 }
