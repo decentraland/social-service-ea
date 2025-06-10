@@ -21,7 +21,7 @@ export async function createCommunityHandler(
 
     const thumbnailFile = formData?.files?.['thumbnail']
 
-    if (!name || !description || !thumbnailFile) {
+    if (!name || !description) {
       logger.error('Invalid request body while creating Community', {
         name,
         description,
@@ -42,7 +42,7 @@ export async function createCommunityHandler(
         description,
         ownerAddress: address
       },
-      thumbnailFile.value
+      thumbnailFile?.value
     )
 
     logger.info('Community created', {
