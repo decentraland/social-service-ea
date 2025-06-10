@@ -114,7 +114,7 @@ export interface IFriendsDatabaseComponent {
 }
 
 export interface ICommunitiesDatabaseComponent {
-  communityExists(communityId: string): Promise<boolean>
+  communityExists(communityId: string, options?: Pick<GetCommunitiesOptions, 'onlyPublic'>): Promise<boolean>
   getCommunity(id: string, userAddress: EthAddress): Promise<(Community & { role: CommunityRole }) | null>
   getCommunityPlaces(communityId: string): Promise<string[]>
   createCommunity(community: CommunityDB): Promise<Community>
@@ -132,10 +132,14 @@ export interface ICommunitiesDatabaseComponent {
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
   getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
+  updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
   kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
-  getCommunityMembers(id: string, userAddress: EthAddress, pagination: Pagination): Promise<CommunityMember[]>
-  getCommunityMembersCount(communityId: string): Promise<number>
+  getCommunityMembers(
+    id: string,
+    options: { userAddress?: EthAddress; pagination: Pagination; filterByMembers?: string[] }
+  ): Promise<CommunityMember[]>
+  getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number>
   getMemberCommunities(
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
