@@ -69,9 +69,14 @@ export const toPublicCommunity = (community: CommunityPublicInformation): Commun
 
 export const mapMembersWithProfiles = <
   T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress },
-  R extends { profilePictureUrl: string; hasClaimedName: boolean; name: string; friendshipStatus: FriendshipStatus }
+  R extends {
+    profilePictureUrl: string
+    hasClaimedName: boolean
+    name: string
+    friendshipStatus: FriendshipStatus
+  }
 >(
-  userAddress: EthAddress,
+  userAddress: EthAddress | undefined,
   members: T[],
   profiles: Profile[]
 ): (T & R)[] => {
@@ -82,7 +87,7 @@ export const mapMembersWithProfiles = <
       const { lastFriendshipAction, actingUser } = member
       let friendshipStatus: FriendshipStatus = FriendshipStatus.NONE
 
-      if (lastFriendshipAction && actingUser) {
+      if (lastFriendshipAction && actingUser && userAddress) {
         const friendshipAction: Pick<FriendshipAction, 'action' | 'acting_user'> = {
           action: lastFriendshipAction,
           acting_user: actingUser

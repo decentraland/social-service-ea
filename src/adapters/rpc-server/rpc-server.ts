@@ -38,15 +38,14 @@ export async function createRpcServerComponent({
   pubsub,
   config,
   uwsServer,
-  archipelagoStats,
   catalystClient,
   sns,
   subscribersContext,
-  worldsStats,
   commsGatekeeper,
   metrics,
   settings,
-  voice
+  voice,
+  peersStats
 }: Pick<
   AppComponents,
   | 'logs'
@@ -54,15 +53,14 @@ export async function createRpcServerComponent({
   | 'pubsub'
   | 'config'
   | 'uwsServer'
-  | 'archipelagoStats'
   | 'catalystClient'
   | 'sns'
   | 'subscribersContext'
-  | 'worldsStats'
   | 'commsGatekeeper'
   | 'metrics'
   | 'settings'
   | 'voice'
+  | 'peersStats'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -108,7 +106,7 @@ export async function createRpcServerComponent({
     },
     subscribeToFriendConnectivityUpdates: {
       creator: subscribeToFriendConnectivityUpdatesService({
-        components: { logs, friendsDb: friendsDb, archipelagoStats, catalystClient, worldsStats }
+        components: { logs, friendsDb: friendsDb, catalystClient, peersStats }
       }),
       type: ServiceType.STREAM,
       event: 'friend_connectivity_updates'

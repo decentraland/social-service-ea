@@ -7,7 +7,6 @@ import {
 } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import {
-  mockArchipelagoStats,
   mockCatalystClient,
   mockConfig,
   mockFriendsDB,
@@ -15,7 +14,7 @@ import {
   mockMetrics,
   mockPubSub,
   mockUWs,
-  mockWorldsStats
+  createMockPeersStatsComponent
 } from '../../mocks/components'
 import {
   BLOCK_UPDATES_CHANNEL,
@@ -27,6 +26,7 @@ import * as updates from '../../../src/logic/updates'
 import { createSettingsMockedComponent } from '../../mocks/components/settings'
 import { createVoiceMockedComponent } from '../../mocks/components/voice'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
+import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -41,6 +41,7 @@ describe('createRpcServerComponent', () => {
   let setHandlerMock: jest.Mock, attachTransportMock: jest.Mock
   let mockTransport: Transport
   let subscribersContext: ISubscribersContext
+  let mockPeersStats: jest.Mocked<IPeersStatsComponent>
 
   beforeEach(async () => {
     subscribersContext = createSubscribersContext()
@@ -56,6 +57,8 @@ describe('createRpcServerComponent', () => {
     const mockSettings = createSettingsMockedComponent({})
     const mockVoice = createVoiceMockedComponent({})
 
+    mockPeersStats = createMockPeersStatsComponent()
+
     mockTransport = {
       on: jest.fn(),
       send: jest.fn(),
@@ -69,14 +72,13 @@ describe('createRpcServerComponent', () => {
       pubsub: mockPubSub,
       config: mockConfig,
       uwsServer: mockUWs,
-      archipelagoStats: mockArchipelagoStats,
       catalystClient: mockCatalystClient,
       sns: mockSns,
       subscribersContext,
-      worldsStats: mockWorldsStats,
       metrics: mockMetrics,
       settings: mockSettings,
-      voice: mockVoice
+      voice: mockVoice,
+      peersStats: mockPeersStats
     })
   })
 
