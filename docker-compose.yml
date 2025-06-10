@@ -48,10 +48,10 @@ services:
       COMMS_GATEKEEPER_AUTH_TOKEN: 'aToken'
       AWS_SNS_ARN: 'arn:aws:sns:us-east-1:000000000000:events'
       AWS_SNS_ENDPOINT: 'http://localstack:4566'
-      BUCKET: 'social-service-ea'
-      BUCKET_ENDPOINT: 'http://localstack:4566'
+      AWS_S3_BUCKET: 'social-service-ea'
+      AWS_S3_BUCKET_ENDPOINT: 'http://localstack:4566'
       AWS_REGION: 'us-east-1'
-      BUCKET_PREFIX: 'social'
+      AWS_S3_BUCKET_PREFIX: 'social'
       LOG_LEVEL: ALL
     ports:
       - '3000:3000'
