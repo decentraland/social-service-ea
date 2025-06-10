@@ -13,7 +13,8 @@ import {
   Community,
   BannedMemberProfile,
   BannedMember,
-  CommunityMember
+  CommunityMember,
+  GetCommunityMembersOptions
 } from './types'
 import {
   isOwner,
@@ -25,17 +26,21 @@ import {
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export function createCommunityComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'storage'>
+  components: Pick<
+    AppComponents,
+    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats' | 'storage'
+  >
 ): ICommunityComponent {
-  const { communitiesDb, catalystClient, communityRoles, logs, storage } = components
+  const { communitiesDb, catalystClient, communityRoles, logs, peersStats, storage } = components
 
   const logger = logs.getLogger('community-component')
 
-  const getCommunityMembers = async (
+  const filterAndCountCommunityMembers = async (
     id: string,
-    pagination: Required<PaginatedParameters>,
+    options: GetCommunityMembersOptions,
     userAddress?: EthAddress
   ) => {
+    const { pagination, onlyOnline } = options
     const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress })
 
     if (!communityExists) {
@@ -48,11 +53,19 @@ export function createCommunityComponent(
       throw new NotAuthorizedError("The user doesn't have permission to get community members")
     }
 
+    let onlinePeers: string[] | undefined = undefined
+
+    if (onlyOnline) {
+      onlinePeers = await peersStats.getConnectedPeers()
+      logger.info(`Getting community members for community using the ${onlinePeers.length} connected peers`)
+    }
+
     const communityMembers = await communitiesDb.getCommunityMembers(id, {
       userAddress,
-      pagination
+      pagination,
+      filterByMembers: onlinePeers
     })
-    const totalMembers = await communitiesDb.getCommunityMembersCount(id)
+    const totalMembers = await communitiesDb.getCommunityMembersCount(id, { filterByMembers: onlinePeers })
 
     const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
 
@@ -112,16 +125,16 @@ export function createCommunityComponent(
     getCommunityMembers: async (
       id: string,
       userAddress: EthAddress,
-      pagination: Required<PaginatedParameters>
+      options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      return getCommunityMembers(id, pagination, userAddress)
+      return filterAndCountCommunityMembers(id, options, userAddress)
     },
 
     getMembersFromPublicCommunity: async (
       id: string,
-      pagination: Required<PaginatedParameters>
+      options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      return getCommunityMembers(id, pagination)
+      return filterAndCountCommunityMembers(id, options)
     },
 
     getMemberCommunities: async (

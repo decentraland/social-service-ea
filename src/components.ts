@@ -31,6 +31,7 @@ import { createSettingsComponent } from './logic/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
 import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
+import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
 
 // Initialize all the components of the app
@@ -100,6 +101,7 @@ export async function initComponents(): Promise<AppComponents> {
   const sns = await createSnsComponent({ config })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
+  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const rpcServer = await createRpcServerComponent({
     logs,
     commsGatekeeper,
@@ -107,20 +109,26 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     uwsServer,
     config,
-    archipelagoStats,
     catalystClient,
     sns,
     subscribersContext,
-    worldsStats,
     metrics,
     settings,
-    voice
+    voice,
+    peersStats
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const community = createCommunityComponent({ communitiesDb, catalystClient, communityRoles, logs, storage })
+  const community = createCommunityComponent({
+    communitiesDb,
+    catalystClient,
+    communityRoles,
+    logs,
+    peersStats,
+    storage
+  })
 
   return {
     archipelagoStats,
@@ -137,21 +145,22 @@ export async function initComponents(): Promise<AppComponents> {
     metrics,
     nats,
     peerTracking,
+    peersStats,
     peersSynchronizer,
     pg,
     pubsub,
     redis,
     rpcServer,
-    uwsServer,
+    settings,
     sns,
     statusChecks,
+    storage,
     subscribersContext,
     tracing,
-    worldsStats,
-    wsPool,
-    voice,
+    uwsServer,
     voiceDb,
-    settings,
-    storage
+    voice,
+    wsPool,
+    worldsStats
   }
 }

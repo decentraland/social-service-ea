@@ -2,7 +2,7 @@ import {
   FriendProfile,
   FriendshipStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { CommunityRole, Pagination, CommunityPermission, Action } from '../../types/entities'
+import { CommunityRole, CommunityPermission, Action } from '../../types/entities'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export type ICommunityComponent = {
@@ -22,11 +22,11 @@ export type ICommunityComponent = {
   getCommunityMembers: (
     id: string,
     userAddress: EthAddress,
-    pagination: Required<PaginatedParameters>
+    options: GetCommunityMembersOptions
   ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
   getMembersFromPublicCommunity: (
     id: string,
-    pagination: Required<PaginatedParameters>
+    options: GetCommunityMembersOptions
   ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
   getMemberCommunities: (
     memberAddress: EthAddress,
@@ -141,11 +141,16 @@ export type CommunityWithMembersCountAndFriends = CommunityWithMembersCount & {
 }
 
 export type GetCommunitiesOptions = {
-  pagination: Pagination
+  pagination: PaginatedParameters
   search?: string | null
   onlyPublic?: boolean
   sortBy?: 'membersCount' | 'role'
   onlyMemberOf?: boolean
+}
+
+export type GetCommunityMembersOptions = {
+  pagination: Required<PaginatedParameters>
+  onlyOnline?: boolean
 }
 
 export type CommunityWithUserInformation = CommunityWithMembersCount & {

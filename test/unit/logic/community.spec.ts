@@ -27,6 +27,8 @@ import { mockLogs } from '../../mocks/components'
 import { mapMembersWithProfiles } from '../../../src/logic/community/utils'
 import { Action } from '../../../src/types/entities'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { createMockPeersStatsComponent } from '../../mocks/components'
+import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { createS3ComponentMock } from '../../mocks/components/s3'
 
 describe('when handling community operations', () => {
@@ -35,6 +37,7 @@ describe('when handling community operations', () => {
   let mockCommunity: Community & { role: CommunityRole }
   let mockUserAddress: string
   let mockMembersCount: number
+  let mockPeersStats: jest.Mocked<IPeersStatsComponent>
 
   beforeEach(() => {
     mockCommunity = {
@@ -48,12 +51,16 @@ describe('when handling community operations', () => {
     }
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockMembersCount = 5
+    mockPeersStats = createMockPeersStatsComponent({
+      getConnectedPeers: jest.fn().mockResolvedValue([])
+    })
     mockCommunityRoles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
     communityComponent = createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
       logs: mockLogs,
+      peersStats: mockPeersStats,
       storage: createS3ComponentMock()
     })
   })
@@ -854,8 +861,10 @@ describe('when handling community operations', () => {
 
     it('should return members with profiles and friendship status', async () => {
       const result = await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(result).toEqual({
@@ -881,8 +890,10 @@ describe('when handling community operations', () => {
 
     it('should fetch members and total count from the database', async () => {
       await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
       expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
         userAddress: mockUserAddress,
@@ -891,13 +902,15 @@ describe('when handling community operations', () => {
           offset: 0
         }
       })
-      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
+      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {})
     })
 
     it('should fetch profiles from catalyst', async () => {
       await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(mockMembers.map((member) => member.memberAddress))
@@ -908,8 +921,10 @@ describe('when handling community operations', () => {
 
       await expect(
         communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-          limit: 10,
-          offset: 0
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
         })
       ).rejects.toThrow(new CommunityNotFoundError(communityId))
     })
@@ -919,16 +934,20 @@ describe('when handling community operations', () => {
 
       await expect(
         communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-          limit: 10,
-          offset: 0
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
         })
       ).rejects.toThrow(new NotAuthorizedError("The user doesn't have permission to get community members"))
     })
 
     it('should handle pagination correctly', async () => {
       await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 1,
-        offset: 1
+        pagination: {
+          limit: 1,
+          offset: 1
+        }
       })
 
       expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
@@ -944,12 +963,78 @@ describe('when handling community operations', () => {
       mockCatalystClient.getProfiles.mockResolvedValue([mockProfiles[0]]) // Only return profile for first member
 
       const result = await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(result.members).toHaveLength(1)
       expect(result.members[0].memberAddress).toBe(mockMembers[0].memberAddress)
+    })
+
+    describe('when filtering for online members', () => {
+      const onlinePeers = ['0x1111111111111111111111111111111111111111']
+
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+        mockCommunitiesDB.getCommunityMembers.mockResolvedValue(
+          mockMembers.filter((member) => onlinePeers.includes(member.memberAddress))
+        )
+        mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(onlinePeers.length)
+        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockPeersStats.getConnectedPeers.mockResolvedValueOnce(onlinePeers)
+      })
+
+      it('should return only online members when onlyOnline is true', async () => {
+        const result = await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+          pagination: {
+            limit: 10,
+            offset: 0
+          },
+          onlyOnline: true
+        })
+
+        expect(result.members).toHaveLength(1)
+        expect(result.members[0].memberAddress).toBe(onlinePeers[0])
+        expect(result.totalMembers).toBe(1)
+      })
+
+      it('should fetch online peers from peersStats component', async () => {
+        await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+          pagination: {
+            limit: 10,
+            offset: 0
+          },
+          onlyOnline: true
+        })
+
+        expect(mockPeersStats.getConnectedPeers).toHaveBeenCalled()
+      })
+
+      it('should pass online peers to database queries', async () => {
+        await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+          pagination: {
+            limit: 10,
+            offset: 0
+          },
+          onlyOnline: true
+        })
+
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+          userAddress: mockUserAddress,
+          pagination: {
+            limit: 10,
+            offset: 0
+          },
+          filterByMembers: onlinePeers
+        })
+
+        expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {
+          filterByMembers: onlinePeers
+        })
+      })
     })
   })
 
@@ -1120,8 +1205,10 @@ describe('when handling community operations', () => {
 
     it('should return members with profiles and friendship status', async () => {
       const result = await communityComponent.getMembersFromPublicCommunity(communityId, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(result).toEqual({
@@ -1145,21 +1232,25 @@ describe('when handling community operations', () => {
 
     it('should fetch members and total count from the database', async () => {
       await communityComponent.getMembersFromPublicCommunity(communityId, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
         userAddress: undefined,
         pagination: { limit: 10, offset: 0 }
       })
-      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
+      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {})
     })
 
     it('should fetch profiles from catalyst', async () => {
       await communityComponent.getMembersFromPublicCommunity(communityId, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(mockMembers.map((member) => member.memberAddress))
@@ -1170,16 +1261,20 @@ describe('when handling community operations', () => {
 
       await expect(
         communityComponent.getMembersFromPublicCommunity(communityId, {
-          limit: 10,
-          offset: 0
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
         })
       ).rejects.toThrow(new CommunityNotFoundError(communityId))
     })
 
     it('should handle pagination correctly', async () => {
       await communityComponent.getMembersFromPublicCommunity(communityId, {
-        limit: 1,
-        offset: 1
+        pagination: {
+          limit: 1,
+          offset: 1
+        }
       })
 
       expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
@@ -1192,8 +1287,10 @@ describe('when handling community operations', () => {
       mockCatalystClient.getProfiles.mockResolvedValue([mockProfiles[0]]) // Only return profile for first member
 
       const result = await communityComponent.getMembersFromPublicCommunity(communityId, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(result.members).toHaveLength(1)
