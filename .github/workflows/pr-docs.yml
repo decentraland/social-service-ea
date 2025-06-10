@@ -22,13 +22,13 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Install Redocly CLI
-        run: yarn global add @redocly/cli
+        run: yarn add -D @redocly/cli
 
       - name: Validate OpenAPI specification
-        run: npx @redocly/cli lint docs/communities-openapi.yaml
+        run: yarn redocly lint docs/communities-openapi.yaml
 
       - name: Build documentation
-        run: npx @redocly/cli build-docs docs/communities-openapi.yaml -o docs/index.html
+        run: yarn redocly build-docs docs/communities-openapi.yaml -o docs/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -50,15 +50,3 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           preview: true
-
-      - name: Comment PR
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const previewUrl = '${{ steps.deployment.outputs.page_url }}'
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `📚 API Documentation preview is available at: ${previewUrl}`
-            })
