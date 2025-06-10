@@ -15,7 +15,10 @@ export type ICommunityComponent = {
     options: GetCommunitiesOptions
   ) => Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
   deleteCommunity: (id: string, userAddress: EthAddress) => Promise<void>
-  createCommunity: (community: Omit<Community, 'id' | 'active' | 'privacy'>) => Promise<Community>
+  createCommunity: (
+    community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
+    thumbnail: Buffer
+  ) => Promise<Community>
   getCommunityMembers: (
     id: string,
     userAddress: EthAddress,

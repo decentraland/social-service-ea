@@ -23,6 +23,7 @@ import { mockLogs } from '../../mocks/components'
 import { mapMembersWithProfiles } from '../../../src/logic/community/utils'
 import { Action } from '../../../src/types/entities'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { createS3ComponentMock } from '../../mocks/components/s3'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
@@ -48,7 +49,8 @@ describe('when handling community operations', () => {
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
-      logs: mockLogs
+      logs: mockLogs,
+      storage: createS3ComponentMock()
     })
   })
 
