@@ -28,7 +28,7 @@ services:
     ports:
       - '4566:4566'
     environment:
-      - SERVICES=sns
+      - SERVICES=sns,s3
     volumes:
       - ./localstack:/etc/localstack/init/ready.d
 
@@ -48,6 +48,11 @@ services:
       COMMS_GATEKEEPER_AUTH_TOKEN: 'aToken'
       AWS_SNS_ARN: 'arn:aws:sns:us-east-1:000000000000:events'
       AWS_SNS_ENDPOINT: 'http://localstack:4566'
+      BUCKET: 'social-service-ea'
+      BUCKET_ENDPOINT: 'http://localstack:4566'
+      AWS_REGION: 'us-east-1'
+      BUCKET_PREFIX: 'social'
+      LOG_LEVEL: ALL
     ports:
       - '3000:3000'
       - '8085:8085'

@@ -14,6 +14,7 @@ import { unbanMemberHandler } from '../handlers/unban-member-handler'
 import { banMemberHandler } from '../handlers/ban-member-handler'
 import { getBannedMembersHandler } from '../handlers/get-banned-members-handler'
 import { updateMemberRoleHandler } from '../handlers/update-member-role-handler'
+import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -48,7 +49,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.get('/v1/members/:address/communities', signedFetchMiddleware(), getMemberCommunitiesHandler)
 
-  router.post('/v1/communities', signedFetchMiddleware(), createCommunityHandler)
+  router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
   router.delete('/v1/communities/:id', signedFetchMiddleware(), deleteCommunityHandler)
 
   return router

@@ -25,9 +25,9 @@ import {
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export function createCommunityComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs'>
+  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'storage'>
 ): ICommunityComponent {
-  const { communitiesDb, catalystClient, communityRoles, logs } = components
+  const { communitiesDb, catalystClient, communityRoles, logs, storage } = components
 
   const logger = logs.getLogger('community-component')
 
@@ -205,7 +205,10 @@ export function createCommunityComponent(
       await communitiesDb.kickMemberFromCommunity(communityId, memberAddress)
     },
 
-    createCommunity: async (community: Omit<Community, 'id' | 'active' | 'privacy'>): Promise<Community> => {
+    createCommunity: async (
+      community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
+      thumbnail: Buffer
+    ): Promise<Community> => {
       const ownedNames = await catalystClient.getOwnedNames(community.ownerAddress, {
         pageSize: '1'
       })
@@ -220,6 +223,12 @@ export function createCommunityComponent(
         private: false, // TODO: support private communities
         active: true
       })
+
+      logger.info('Community created', { communityId: newCommunity.id, name: newCommunity.name })
+
+      const thumbnailUrl = await storage.storeFile(thumbnail, `communities/${newCommunity.id}/raw-thumbnail.png`)
+
+      logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id })
 
       await communitiesDb.addCommunityMember({
         communityId: newCommunity.id,
