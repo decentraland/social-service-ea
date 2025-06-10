@@ -1,6 +1,6 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { errorMessageOrDefault } from '../../utils/errors'
-import { CommunityMemberProfile, CommunityNotFoundError } from '../../logic/community'
+import { CommunityMemberProfile, CommunityNotFoundError, GetCommunityMembersOptions } from '../../logic/community'
 import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { getPaginationResultProperties } from '../../utils/pagination'
 import { PaginatedResponse } from '@dcl/schemas'
@@ -14,17 +14,23 @@ export async function getCommunityMembersHandler(
   const {
     components: { community, logs },
     params: { id: communityId },
-    verification
+    verification,
+    url
   } = context
   const logger = logs.getLogger('get-community-members-handler')
 
   logger.info(`Getting community members for community: ${communityId}`)
 
   try {
-    const userAddress = verification!.auth.toLowerCase()
-    const paginationParams = getPaginationParams(context.url.searchParams)
+    const userAddress = verification?.auth?.toLowerCase()
+    const paginationParams = getPaginationParams(url.searchParams)
+    const onlyOnline = url.searchParams.get('onlyOnline')?.toLowerCase() === 'true'
 
-    const { members, totalMembers } = await community.getCommunityMembers(communityId, userAddress, paginationParams)
+    const options: GetCommunityMembersOptions = { pagination: paginationParams, onlyOnline }
+
+    const { members, totalMembers } = userAddress
+      ? await community.getCommunityMembers(communityId, userAddress, options)
+      : await community.getMembersFromPublicCommunity(communityId, options)
 
     return {
       status: 200,

@@ -23,6 +23,7 @@ import { createPubSubComponent } from '../src/adapters/pubsub'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createCatalystClient } from '../src/adapters/catalyst-client'
 import { createSnsComponent } from '../src/adapters/sns'
+import { createS3Adapter } from '../src/adapters/s3'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
 import { createWSPoolComponent } from '../src/adapters/ws-pool'
 import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
@@ -40,6 +41,7 @@ import { createCommunityComponent, createCommunityRolesComponent } from '../src/
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createSettingsComponent } from '../src/logic/settings'
+import { createPeersStatsComponent } from '../src/logic/peers-stats'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -56,7 +58,7 @@ export const test = createRunner<TestComponents>({
 async function initComponents(): Promise<TestComponents> {
   const config = await createDotEnvConfigComponent(
     {
-      path: ['.env.test']
+      path: ['.env.default', '.env.test']
     },
     {
       ARCHIPELAGO_STATS_URL
@@ -105,12 +107,14 @@ async function initComponents(): Promise<TestComponents> {
   const nats = await createNatsComponent({ logs, config })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const sns = await createSnsComponent({ config })
+  const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voice = await createVoiceComponent({ logs, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
+  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const rpcServer = await createRpcServerComponent({
     logs,
     commsGatekeeper,
@@ -118,19 +122,25 @@ async function initComponents(): Promise<TestComponents> {
     pubsub,
     uwsServer,
     config,
-    archipelagoStats,
     catalystClient,
     sns,
     subscribersContext,
-    worldsStats,
     metrics,
     settings,
-    voice
+    voice,
+    peersStats
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const community = createCommunityComponent({ communitiesDb, catalystClient, communityRoles, logs })
+  const community = createCommunityComponent({
+    communitiesDb,
+    catalystClient,
+    communityRoles,
+    logs,
+    peersStats,
+    storage
+  })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
   const localHttpFetch = await createLocalFetchComponent(config)
@@ -157,6 +167,7 @@ async function initComponents(): Promise<TestComponents> {
     nats,
     peerTracking,
     peersSynchronizer: mockPeersSynchronizer,
+    peersStats,
     pg,
     pubsub,
     redis,
@@ -164,6 +175,7 @@ async function initComponents(): Promise<TestComponents> {
     rpcServer,
     sns,
     statusChecks,
+    storage,
     subscribersContext,
     tracing: mockTracing,
     uwsServer,

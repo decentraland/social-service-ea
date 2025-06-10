@@ -2,7 +2,7 @@ import {
   FriendProfile,
   FriendshipStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { CommunityRole, Pagination, CommunityPermission, Action } from '../../types/entities'
+import { CommunityRole, CommunityPermission, Action } from '../../types/entities'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export type ICommunityComponent = {
@@ -15,11 +15,18 @@ export type ICommunityComponent = {
     options: GetCommunitiesOptions
   ) => Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
   deleteCommunity: (id: string, userAddress: EthAddress) => Promise<void>
-  createCommunity: (community: Omit<Community, 'id' | 'active' | 'privacy'>) => Promise<Community>
+  createCommunity: (
+    community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
+    thumbnail: Buffer
+  ) => Promise<Community>
   getCommunityMembers: (
     id: string,
     userAddress: EthAddress,
-    pagination: Required<PaginatedParameters>
+    options: GetCommunityMembersOptions
+  ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
+  getMembersFromPublicCommunity: (
+    id: string,
+    options: GetCommunityMembersOptions
   ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
   getMemberCommunities: (
     memberAddress: EthAddress,
@@ -35,6 +42,12 @@ export type ICommunityComponent = {
     userAddress: EthAddress,
     pagination: Required<PaginatedParameters>
   ) => Promise<{ members: BannedMemberProfile[]; totalMembers: number }>
+  updateMemberRole: (
+    communityId: string,
+    updaterAddress: EthAddress,
+    targetAddress: EthAddress,
+    newRole: CommunityRole
+  ) => Promise<void>
 }
 
 export type ICommunityRolesComponent = {
@@ -54,6 +67,12 @@ export type ICommunityRolesComponent = {
     communityId: string,
     unbannerAddress: string,
     memberToUnbanAddress: string
+  ) => Promise<boolean>
+  canUpdateMemberRole: (
+    communityId: string,
+    updaterAddress: string,
+    targetAddress: string,
+    newRole: CommunityRole
   ) => Promise<boolean>
 }
 
@@ -122,11 +141,16 @@ export type CommunityWithMembersCountAndFriends = CommunityWithMembersCount & {
 }
 
 export type GetCommunitiesOptions = {
-  pagination: Pagination
+  pagination: PaginatedParameters
   search?: string | null
   onlyPublic?: boolean
   sortBy?: 'membersCount' | 'role'
   onlyMemberOf?: boolean
+}
+
+export type GetCommunityMembersOptions = {
+  pagination: Required<PaginatedParameters>
+  onlyOnline?: boolean
 }
 
 export type CommunityWithUserInformation = CommunityWithMembersCount & {

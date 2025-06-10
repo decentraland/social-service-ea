@@ -410,4 +410,136 @@ describe('Community Roles Component', () => {
       })
     })
   })
+
+  describe('canUpdateMemberRole', () => {
+    describe('when trying to update own role', () => {
+      it('should return false', async () => {
+        const communityId = 'community-1'
+        const address = '0x123'
+        const newRole = CommunityRole.Moderator
+
+        const result = await roles.canUpdateMemberRole(communityId, address, address, newRole)
+
+        expect(result).toBe(false)
+      })
+    })
+
+    describe('when updater does not have assign_roles permission', () => {
+      it('should return false', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+
+        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+        expect(result).toBe(false)
+      })
+    })
+
+    describe('when trying to set role to Owner', () => {
+      it('should return false', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Owner
+
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Moderator,
+          [targetAddress]: CommunityRole.Moderator
+        })
+
+        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+        expect(result).toBe(false)
+      })
+    })
+
+    describe('when updater cannot act on target member', () => {
+      it('should return false', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Moderator,
+          [targetAddress]: CommunityRole.Owner
+        })
+
+        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+        expect(result).toBe(false)
+      })
+    })
+
+    describe('when owner updates member roles', () => {
+      it('should allow promoting a member to moderator', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Owner,
+          [targetAddress]: CommunityRole.Member
+        })
+
+        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+        expect(result).toBe(true)
+      })
+
+      it('should allow demoting a moderator to member', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Member
+
+        mockCommunitiesDB.getCommunityMemberRole
+          .mockResolvedValueOnce(CommunityRole.Owner) // updater role
+          .mockResolvedValueOnce(CommunityRole.Moderator) // target role
+
+        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+        expect(result).toBe(true)
+      })
+    })
+
+    describe('when moderator updates member roles', () => {
+      it('should not allow promoting a member to moderator', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Moderator,
+          [targetAddress]: CommunityRole.Member
+        })
+
+        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+        expect(result).toBe(false)
+      })
+
+      it('should not allow demoting another moderator to member', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Member
+
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Moderator,
+          [targetAddress]: CommunityRole.Moderator
+        })
+
+        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+        expect(result).toBe(false)
+      })
+    })
+  })
 })

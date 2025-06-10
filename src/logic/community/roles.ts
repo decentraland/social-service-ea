@@ -104,6 +104,27 @@ export function createCommunityRolesComponent(
         hasPermission(unbannerRole, 'ban_players') &&
         (canActOnMember(unbannerRole, targetRole) || !isMember(targetRole))
       )
+    },
+
+    async canUpdateMemberRole(
+      communityId: string,
+      updaterAddress: string,
+      targetAddress: string,
+      newRole: CommunityRole
+    ): Promise<boolean> {
+      if (updaterAddress.toLowerCase() === targetAddress.toLowerCase()) {
+        return false
+      }
+
+      const roles = await communitiesDb.getCommunityMemberRoles(communityId, [updaterAddress, targetAddress])
+      const updaterRole = roles[updaterAddress]
+      const targetRole = roles[targetAddress]
+
+      return (
+        hasPermission(updaterRole, 'assign_roles') &&
+        canActOnMember(updaterRole, targetRole) &&
+        newRole !== CommunityRole.Owner
+      )
     }
   }
 }

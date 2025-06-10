@@ -2,6 +2,8 @@ import { Authenticator, AuthIdentity, IdentityType } from '@dcl/crypto'
 import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
 import { signedHeaderFactory } from 'decentraland-crypto-fetch'
 import { TestComponents } from '../../../src/types'
+import FormData from 'form-data'
+import fs from 'fs'
 
 export type Identity = {
   authChain: AuthIdentity
@@ -47,6 +49,38 @@ export function makeAuthenticatedRequest(components: Pick<TestComponents, 'local
         ...createAuthHeaders(method, path, {}, identity)
       },
       body: body ? JSON.stringify(body) : undefined
+    })
+  }
+}
+
+export function makeAuthenticatedMultipartRequest(components: Pick<TestComponents, 'localHttpFetch'>) {
+  return (
+    identity: Identity,
+    path: string,
+    { name, description, thumbnailPath }: { name?: string; description?: string; thumbnailPath?: string }
+  ) => {
+    const { localHttpFetch } = components
+    const form = new FormData()
+    if (name) {
+      form.append('name', name)
+    }
+
+    if (description) {
+      form.append('description', description)
+    }
+
+    if (thumbnailPath) {
+      form.append('thumbnail', fs.createReadStream(thumbnailPath), 'thumbnail.png')
+    }
+
+    const headers = {
+      ...createAuthHeaders('POST', path, {}, identity)
+    }
+
+    return localHttpFetch.fetch(path, {
+      method: 'POST',
+      headers,
+      body: form as any
     })
   }
 }

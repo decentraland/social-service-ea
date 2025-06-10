@@ -18,5 +18,6 @@ module.exports = {
     ...(integrationConfig.collectCoverageFrom || [])
   ],
   // Run integration tests serially
-  maxWorkers: 1
+  maxWorkers: 1,
+  testTimeout: 10000
 }

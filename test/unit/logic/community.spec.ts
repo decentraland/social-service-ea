@@ -15,7 +15,11 @@ import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockCatalystClient } from '../../mocks/components/catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createMockProfile } from '../../mocks/profile'
-import { CommunityWithMembersCountAndFriends, ICommunityRolesComponent } from '../../../src/logic/community/types'
+import {
+  CommunityMemberProfile,
+  CommunityWithMembersCountAndFriends,
+  ICommunityRolesComponent
+} from '../../../src/logic/community/types'
 import { parseExpectedFriends } from '../../mocks/friend'
 import { MemberCommunity } from '../../../src/logic/community/types'
 import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
@@ -23,6 +27,9 @@ import { mockLogs } from '../../mocks/components'
 import { mapMembersWithProfiles } from '../../../src/logic/community/utils'
 import { Action } from '../../../src/types/entities'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { createMockPeersStatsComponent } from '../../mocks/components'
+import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
+import { createS3ComponentMock } from '../../mocks/components/s3'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
@@ -30,6 +37,7 @@ describe('when handling community operations', () => {
   let mockCommunity: Community & { role: CommunityRole }
   let mockUserAddress: string
   let mockMembersCount: number
+  let mockPeersStats: jest.Mocked<IPeersStatsComponent>
 
   beforeEach(() => {
     mockCommunity = {
@@ -43,12 +51,17 @@ describe('when handling community operations', () => {
     }
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockMembersCount = 5
+    mockPeersStats = createMockPeersStatsComponent({
+      getConnectedPeers: jest.fn().mockResolvedValue([])
+    })
     mockCommunityRoles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
     communityComponent = createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
-      logs: mockLogs
+      logs: mockLogs,
+      peersStats: mockPeersStats,
+      storage: createS3ComponentMock()
     })
   })
 
@@ -838,7 +851,7 @@ describe('when handling community operations', () => {
       createMockProfile('0x2222222222222222222222222222222222222222')
     ]
 
-    beforeEach(() => {
+    beforeEach(async () => {
       mockCommunitiesDB.communityExists.mockResolvedValue(true)
       mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
       mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockMembers)
@@ -848,8 +861,10 @@ describe('when handling community operations', () => {
 
     it('should return members with profiles and friendship status', async () => {
       const result = await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(result).toEqual({
@@ -875,21 +890,27 @@ describe('when handling community operations', () => {
 
     it('should fetch members and total count from the database', async () => {
       await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
-
-      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
+      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+        userAddress: mockUserAddress,
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
-      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
+      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {})
     })
 
     it('should fetch profiles from catalyst', async () => {
       await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(mockMembers.map((member) => member.memberAddress))
@@ -900,8 +921,10 @@ describe('when handling community operations', () => {
 
       await expect(
         communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-          limit: 10,
-          offset: 0
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
         })
       ).rejects.toThrow(new CommunityNotFoundError(communityId))
     })
@@ -911,21 +934,28 @@ describe('when handling community operations', () => {
 
       await expect(
         communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-          limit: 10,
-          offset: 0
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
         })
       ).rejects.toThrow(new NotAuthorizedError("The user doesn't have permission to get community members"))
     })
 
     it('should handle pagination correctly', async () => {
       await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 1,
-        offset: 1
+        pagination: {
+          limit: 1,
+          offset: 1
+        }
       })
 
-      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, mockUserAddress, {
-        limit: 1,
-        offset: 1
+      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+        userAddress: mockUserAddress,
+        pagination: {
+          limit: 1,
+          offset: 1
+        }
       })
     })
 
@@ -933,12 +963,78 @@ describe('when handling community operations', () => {
       mockCatalystClient.getProfiles.mockResolvedValue([mockProfiles[0]]) // Only return profile for first member
 
       const result = await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
       })
 
       expect(result.members).toHaveLength(1)
       expect(result.members[0].memberAddress).toBe(mockMembers[0].memberAddress)
+    })
+
+    describe('when filtering for online members', () => {
+      const onlinePeers = ['0x1111111111111111111111111111111111111111']
+
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+        mockCommunitiesDB.getCommunityMembers.mockResolvedValue(
+          mockMembers.filter((member) => onlinePeers.includes(member.memberAddress))
+        )
+        mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(onlinePeers.length)
+        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+        mockPeersStats.getConnectedPeers.mockResolvedValueOnce(onlinePeers)
+      })
+
+      it('should return only online members when onlyOnline is true', async () => {
+        const result = await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+          pagination: {
+            limit: 10,
+            offset: 0
+          },
+          onlyOnline: true
+        })
+
+        expect(result.members).toHaveLength(1)
+        expect(result.members[0].memberAddress).toBe(onlinePeers[0])
+        expect(result.totalMembers).toBe(1)
+      })
+
+      it('should fetch online peers from peersStats component', async () => {
+        await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+          pagination: {
+            limit: 10,
+            offset: 0
+          },
+          onlyOnline: true
+        })
+
+        expect(mockPeersStats.getConnectedPeers).toHaveBeenCalled()
+      })
+
+      it('should pass online peers to database queries', async () => {
+        await communityComponent.getCommunityMembers(communityId, mockUserAddress, {
+          pagination: {
+            limit: 10,
+            offset: 0
+          },
+          onlyOnline: true
+        })
+
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+          userAddress: mockUserAddress,
+          pagination: {
+            limit: 10,
+            offset: 0
+          },
+          filterByMembers: onlinePeers
+        })
+
+        expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {
+          filterByMembers: onlinePeers
+        })
+      })
     })
   })
 
@@ -1071,6 +1167,189 @@ describe('when handling community operations', () => {
 
       expect(result.members).toHaveLength(1)
       expect(result.members[0].memberAddress).toBe(mockBannedMembers[0].memberAddress)
+    })
+  })
+
+  describe('and getting members from public community', () => {
+    const communityId = 'test-community'
+    const mockMembers = [
+      {
+        communityId: 'test-community',
+        memberAddress: '0x1111111111111111111111111111111111111111',
+        role: CommunityRole.Member,
+        joinedAt: new Date().toISOString(),
+        lastFriendshipAction: Action.REQUEST,
+        actingUser: '0x1111111111111111111111111111111111111111'
+      },
+      {
+        communityId: 'test-community',
+        memberAddress: '0x2222222222222222222222222222222222222222',
+        role: CommunityRole.Moderator,
+        joinedAt: new Date().toISOString(),
+        lastFriendshipAction: Action.ACCEPT,
+        actingUser: '0x2222222222222222222222222222222222222222'
+      }
+    ]
+
+    const mockProfiles: Profile[] = [
+      createMockProfile('0x1111111111111111111111111111111111111111'),
+      createMockProfile('0x2222222222222222222222222222222222222222')
+    ]
+
+    beforeEach(() => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(true)
+      mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockMembers)
+      mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(2)
+      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+    })
+
+    it('should return members with profiles and friendship status', async () => {
+      const result = await communityComponent.getMembersFromPublicCommunity(communityId, {
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      expect(result).toEqual({
+        members: expect.arrayContaining([
+          expect.objectContaining({
+            ...mockMembers[0],
+            profilePictureUrl: expect.any(String),
+            hasClaimedName: expect.any(Boolean),
+            name: expect.any(String)
+          }),
+          expect.objectContaining({
+            ...mockMembers[1],
+            profilePictureUrl: expect.any(String),
+            hasClaimedName: expect.any(Boolean),
+            name: expect.any(String)
+          })
+        ]),
+        totalMembers: 2
+      })
+    })
+
+    it('should fetch members and total count from the database', async () => {
+      await communityComponent.getMembersFromPublicCommunity(communityId, {
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+        userAddress: undefined,
+        pagination: { limit: 10, offset: 0 }
+      })
+      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {})
+    })
+
+    it('should fetch profiles from catalyst', async () => {
+      await communityComponent.getMembersFromPublicCommunity(communityId, {
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(mockMembers.map((member) => member.memberAddress))
+    })
+
+    it('should throw CommunityNotFoundError when community does not exist', async () => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(false)
+
+      await expect(
+        communityComponent.getMembersFromPublicCommunity(communityId, {
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
+      ).rejects.toThrow(new CommunityNotFoundError(communityId))
+    })
+
+    it('should handle pagination correctly', async () => {
+      await communityComponent.getMembersFromPublicCommunity(communityId, {
+        pagination: {
+          limit: 1,
+          offset: 1
+        }
+      })
+
+      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+        userAddress: undefined,
+        pagination: { limit: 1, offset: 1 }
+      })
+    })
+
+    it('should filter out members without profiles', async () => {
+      mockCatalystClient.getProfiles.mockResolvedValue([mockProfiles[0]]) // Only return profile for first member
+
+      const result = await communityComponent.getMembersFromPublicCommunity(communityId, {
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      expect(result.members).toHaveLength(1)
+      expect(result.members[0].memberAddress).toBe(mockMembers[0].memberAddress)
+    })
+  })
+
+  describe('updateMemberRole', () => {
+    describe('when community does not exist', () => {
+      it('should throw CommunityNotFoundError', async () => {
+        const communityId = 'non-existent'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+
+        await expect(
+          communityComponent.updateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).rejects.toThrow(CommunityNotFoundError)
+      })
+    })
+
+    describe('when user does not have permission to update role', () => {
+      it('should throw NotAuthorizedError', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Member,
+          [targetAddress]: CommunityRole.Member
+        })
+
+        await expect(
+          communityComponent.updateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).rejects.toThrow(NotAuthorizedError)
+      })
+    })
+
+    describe('when user has permission to update role', () => {
+      it('should update the member role', async () => {
+        const communityId = 'community-1'
+        const updaterAddress = '0x123'
+        const targetAddress = '0x456'
+        const newRole = CommunityRole.Moderator
+
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Owner,
+          [targetAddress]: CommunityRole.Member
+        })
+
+        await communityComponent.updateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+        expect(mockCommunitiesDB.updateMemberRole).toHaveBeenCalledWith(communityId, targetAddress, newRole)
+      })
     })
   })
 })
