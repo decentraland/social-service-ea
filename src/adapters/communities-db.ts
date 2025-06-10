@@ -76,9 +76,9 @@ export function createCommunitiesDBComponent(
 
     async getCommunityMembers(
       id: string,
-      options: { userAddress: EthAddress; pagination: Pagination; onlinePeers?: string[] }
+      options: { userAddress: EthAddress; pagination: Pagination; filterByMembers?: string[] }
     ): Promise<CommunityMember[]> {
-      const { userAddress, pagination, onlinePeers } = options
+      const { userAddress, pagination, filterByMembers } = options
       const normalizedUserAddress = userAddress ? normalizeAddress(userAddress) : null
 
       const ctes = [
@@ -100,7 +100,7 @@ export function createCommunitiesDBComponent(
             : SQL``
         )
         .append(SQL` WHERE cm.community_id = ${id}`)
-        .append(onlinePeers ? SQL` AND cm.member_address = ANY(${onlinePeers.map(normalizeAddress)})` : SQL``)
+        .append(filterByMembers ? SQL` AND cm.member_address = ANY(${filterByMembers.map(normalizeAddress)})` : SQL``)
         .append(SQL` ORDER BY cm.joined_at ASC`)
         .append(SQL` LIMIT ${pagination.limit}`)
         .append(SQL` OFFSET ${pagination.offset}`)
@@ -133,7 +133,7 @@ export function createCommunitiesDBComponent(
       )
     },
 
-    async getCommunityMembersCount(communityId: string, options?: { onlinePeers?: string[] }): Promise<number> {
+    async getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number> {
       const query = SQL`
         SELECT COUNT(cm.member_address) 
           FROM community_members cm
@@ -146,8 +146,8 @@ export function createCommunitiesDBComponent(
               )
       `
 
-      if (options && options.onlinePeers) {
-        query.append(SQL` AND cm.member_address = ANY(${options.onlinePeers.map(normalizeAddress)})`)
+      if (options && options.filterByMembers) {
+        query.append(SQL` AND cm.member_address = ANY(${options.filterByMembers.map(normalizeAddress)})`)
       }
 
       return pg.getCount(query)

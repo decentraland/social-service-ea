@@ -35,7 +35,11 @@ export function createCommunityComponent(
 
   const logger = logs.getLogger('community-component')
 
-  const getCommunityMembers = async (id: string, options: GetCommunityMembersOptions, userAddress?: EthAddress) => {
+  const filterAndCountCommunityMembers = async (
+    id: string,
+    options: GetCommunityMembersOptions,
+    userAddress?: EthAddress
+  ) => {
     const { pagination, onlyOnline } = options
     const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress })
 
@@ -59,9 +63,9 @@ export function createCommunityComponent(
     const communityMembers = await communitiesDb.getCommunityMembers(id, {
       userAddress,
       pagination,
-      onlinePeers
+      filterByMembers: onlinePeers
     })
-    const totalMembers = await communitiesDb.getCommunityMembersCount(id, { onlinePeers })
+    const totalMembers = await communitiesDb.getCommunityMembersCount(id, { filterByMembers: onlinePeers })
 
     const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
 
@@ -123,14 +127,14 @@ export function createCommunityComponent(
       userAddress: EthAddress,
       options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      return getCommunityMembers(id, options, userAddress)
+      return filterAndCountCommunityMembers(id, options, userAddress)
     },
 
     getMembersFromPublicCommunity: async (
       id: string,
       options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      return getCommunityMembers(id, options)
+      return filterAndCountCommunityMembers(id, options)
     },
 
     getMemberCommunities: async (

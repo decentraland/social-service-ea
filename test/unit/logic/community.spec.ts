@@ -900,10 +900,9 @@ describe('when handling community operations', () => {
         pagination: {
           limit: 10,
           offset: 0
-        },
-        onlinePeers: []
+        }
       })
-      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, { onlinePeers: [] })
+      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {})
     })
 
     it('should fetch profiles from catalyst', async () => {
@@ -956,8 +955,7 @@ describe('when handling community operations', () => {
         pagination: {
           limit: 1,
           offset: 1
-        },
-        onlinePeers: []
+        }
       })
     })
 
@@ -1030,10 +1028,12 @@ describe('when handling community operations', () => {
             limit: 10,
             offset: 0
           },
-          onlinePeers
+          filterByMembers: onlinePeers
         })
 
-        expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, { onlinePeers })
+        expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {
+          filterByMembers: onlinePeers
+        })
       })
     })
   })
@@ -1240,10 +1240,9 @@ describe('when handling community operations', () => {
 
       expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
         userAddress: undefined,
-        pagination: { limit: 10, offset: 0 },
-        onlinePeers: []
+        pagination: { limit: 10, offset: 0 }
       })
-      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, { onlinePeers: [] })
+      expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {})
     })
 
     it('should fetch profiles from catalyst', async () => {
@@ -1280,8 +1279,7 @@ describe('when handling community operations', () => {
 
       expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
         userAddress: undefined,
-        pagination: { limit: 1, offset: 1 },
-        onlinePeers: []
+        pagination: { limit: 1, offset: 1 }
       })
     })
 
