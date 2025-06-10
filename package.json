@@ -41,7 +41,7 @@
     "@aws-sdk/lib-storage": "^3.826.0",
     "@dcl/platform-crypto-middleware": "^1.1.0",
     "@dcl/platform-server-commons": "^0.1.0",
-    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15495666361.commit-b6831f5.tgz",
+    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15538666462.commit-a5c3d1b.tgz",
     "@dcl/rpc": "^1.1.2",
     "@dcl/schemas": "^16.0.0",
     "@sentry/node": "^9.12.0",

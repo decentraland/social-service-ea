@@ -1302,6 +1302,13 @@
     "@dcl/ts-proto" "1.154.0"
     protobufjs "7.2.4"
 
+"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15538666462.commit-a5c3d1b.tgz":
+  version "1.0.0-15538666462.commit-a5c3d1b"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15538666462.commit-a5c3d1b.tgz#452ed6dc47896e24d70e232de3a329a168efffe8"
+  dependencies:
+    "@dcl/ts-proto" "1.154.0"
+    protobufjs "7.2.4"
+
 "@dcl/rpc@^1.1.2":
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/@dcl/rpc/-/rpc-1.1.2.tgz#789f4f24c8d432a48df3e786b77d017883dda11a"
