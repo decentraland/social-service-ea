@@ -1,15 +1,8 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
-import { StartPrivateVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { startPrivateVoiceChatService } from '../../../../../src/adapters/rpc-server/services/start-private-voice-chat'
 import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
-import {
-  UserAlreadyInVoiceChatError,
-  UsersAreCallingSomeoneElseError,
-  VoiceChatExpiredError,
-  VoiceChatNotAllowedError
-} from '../../../../../src/logic/voice/errors'
+import { VoiceChatExpiredError, VoiceChatNotAllowedError } from '../../../../../src/logic/voice/errors'
 import { AcceptPrivateVoiceChatPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { acceptPrivateVoiceChatService } from '../../../../../src/adapters/rpc-server/services/accept-private-voice-chat'
 
@@ -47,7 +40,7 @@ describe('when accepting a private voice chat', () => {
       })
     })
 
-    it('should resolve with an ok response and the call id', async () => {
+    it('should resolve with an ok response, the call id and the credentials', async () => {
       const result = await service(
         AcceptPrivateVoiceChatPayload.create({
           callId
@@ -60,7 +53,13 @@ describe('when accepting a private voice chat', () => {
 
       expect(result.response?.$case).toBe('ok')
       if (result.response?.$case === 'ok') {
-        expect(result.response.ok.callId).toBe(callId)
+        expect(result.response.ok).toEqual({
+          callId,
+          credentials: {
+            token,
+            url
+          }
+        })
       }
     })
   })

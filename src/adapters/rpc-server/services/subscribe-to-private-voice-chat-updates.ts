@@ -1,6 +1,7 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import {
+  PrivateVoiceChatCredentials,
   PrivateVoiceChatStatus,
   PrivateVoiceChatUpdate,
   User
@@ -9,26 +10,12 @@ import { handleSubscriptionUpdates } from '../../../logic/updates'
 import { VoiceChatStatus } from '../../../logic/voice/types'
 import { isErrorWithMessage } from '../../../utils/errors'
 
-/**
- * Converts the voice chat status from the update to the private voice chat status.
- * @param update - The update to convert.
- * @returns The private voice chat status.
- */
-function getStatusFromUpdate(update: SubscriptionEventsEmitter['privateVoiceChatUpdate']): PrivateVoiceChatStatus {
-  switch (update.status) {
-    case VoiceChatStatus.REQUESTED:
-      return PrivateVoiceChatStatus.VOICE_CHAT_REQUESTED
-    case VoiceChatStatus.ACCEPTED:
-      return PrivateVoiceChatStatus.VOICE_CHAT_ACCEPTED
-    case VoiceChatStatus.REJECTED:
-      return PrivateVoiceChatStatus.VOICE_CHAT_REJECTED
-    case VoiceChatStatus.ENDED:
-      return PrivateVoiceChatStatus.VOICE_CHAT_ENDED
-    case VoiceChatStatus.EXPIRED:
-      return PrivateVoiceChatStatus.VOICE_CHAT_EXPIRED
-    default:
-      throw new Error(`Unknown voice chat status: ${update.status}`)
-  }
+const VOICE_CHAT_STATUS_TO_PRIVATE_VOICE_CHAT_STATUS: Record<VoiceChatStatus, PrivateVoiceChatStatus> = {
+  [VoiceChatStatus.REQUESTED]: PrivateVoiceChatStatus.VOICE_CHAT_REQUESTED,
+  [VoiceChatStatus.ACCEPTED]: PrivateVoiceChatStatus.VOICE_CHAT_ACCEPTED,
+  [VoiceChatStatus.REJECTED]: PrivateVoiceChatStatus.VOICE_CHAT_REJECTED,
+  [VoiceChatStatus.ENDED]: PrivateVoiceChatStatus.VOICE_CHAT_ENDED,
+  [VoiceChatStatus.EXPIRED]: PrivateVoiceChatStatus.VOICE_CHAT_EXPIRED
 }
 
 /**
@@ -39,15 +26,26 @@ function getStatusFromUpdate(update: SubscriptionEventsEmitter['privateVoiceChat
 function parseEmittedUpdateToPrivateVoiceChatUpdate(
   update: SubscriptionEventsEmitter['privateVoiceChatUpdate']
 ): PrivateVoiceChatUpdate {
+  const status = VOICE_CHAT_STATUS_TO_PRIVATE_VOICE_CHAT_STATUS[update.status]
+  if (status === undefined) {
+    throw new Error(`Unknown voice chat status: ${update.status}`)
+  }
+
   return {
     callId: update.callId,
-    status: getStatusFromUpdate(update),
+    status,
     caller:
       update.status === VoiceChatStatus.REQUESTED
         ? User.create({
             address: update.callerAddress
           })
-        : undefined
+        : undefined,
+    credentials: update.credentials
+      ? PrivateVoiceChatCredentials.create({
+          url: update.credentials.url,
+          token: update.credentials.token
+        })
+      : undefined
   }
 }
 

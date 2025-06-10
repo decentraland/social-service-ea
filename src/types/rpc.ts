@@ -35,6 +35,10 @@ export type SubscriptionEventsEmitter = {
     status: VoiceChatStatus
     callerAddress?: string
     calleeAddress?: string
+    credentials?: {
+      url: string
+      token: string
+    }
   }
 }
 

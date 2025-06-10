@@ -40,6 +40,10 @@ describe('when subscribing to private voice chat updates', () => {
     }
   })
 
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
   describe('when the subscription has updates', () => {
     let requestedUpdate: PrivateVoiceChatUpdate
     let acceptedUpdate: PrivateVoiceChatUpdate
@@ -54,7 +58,10 @@ describe('when subscribing to private voice chat updates', () => {
       acceptedUpdate = {
         callId,
         status: PrivateVoiceChatStatus.VOICE_CHAT_ACCEPTED,
-        caller: undefined
+        credentials: {
+          url: 'https://voice.decentraland.org',
+          token: '1234567890'
+        }
       }
 
       mockHandler.mockImplementationOnce(async function* () {
@@ -111,7 +118,11 @@ describe('when subscribing to private voice chat updates', () => {
         update = {
           callId,
           callerAddress,
-          status: VoiceChatStatus.ACCEPTED
+          status: VoiceChatStatus.ACCEPTED,
+          credentials: {
+            url: 'https://voice.decentraland.org',
+            token: '1234567890'
+          }
         }
 
         mockHandler.mockImplementationOnce(async function* () {
@@ -126,7 +137,11 @@ describe('when subscribing to private voice chat updates', () => {
         const result = mockHandler.mock.calls[0][0].parser(update)
         expect(result).toEqual({
           callId,
-          status: PrivateVoiceChatStatus.VOICE_CHAT_ACCEPTED
+          status: PrivateVoiceChatStatus.VOICE_CHAT_ACCEPTED,
+          credentials: {
+            url: 'https://voice.decentraland.org',
+            token: '1234567890'
+          }
         })
       })
     })
