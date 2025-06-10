@@ -38,7 +38,7 @@ components:
                   - privacy
                   - active
                   - membersCount
-                  # - thumbnails TODO
+                  - thumbnails
                 properties:
                   id:
                     type: string
@@ -55,7 +55,11 @@ components:
                     type: boolean
                   membersCount:
                     type: integer
-                  # thumbnails TODO
+                  thumbnails:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    description: 'A map of thumbnail types to URLs.'
                   friends:
                     type: array
                     items:
@@ -84,6 +88,7 @@ components:
     CreateCommunity201OkResponse:
       type: object
       required:
+        - message
         - data
       properties:
         message:
@@ -98,7 +103,6 @@ components:
             - ownerAddress
             - privacy
             - active
-            # - thumbnails TODO
           properties:
             id:
               type: string
@@ -113,7 +117,11 @@ components:
               enum: [public, private]
             active:
               type: boolean
-            # thumbnails TODO
+            thumbnails:
+              type: object
+              additionalProperties:
+                type: string
+              description: 'A map of thumbnail types to URLs.'
     GetCommunityById200OkResponse:
       type: object
       required:
@@ -128,6 +136,7 @@ components:
             - ownerAddress
             - privacy
             - active
+            - membersCount
           properties:
             id:
               type: string
@@ -144,6 +153,9 @@ components:
             active:
               type: boolean
               description: 'Whether the community is active or it was logically deleted'
+            membersCount:
+              type: integer
+              description: 'Number of members in the community'
             thumbnails:
               type: object
               additionalProperties:
@@ -174,43 +186,27 @@ components:
                 properties:
                   address:
                     type: string
+                    description: 'ETH Address of the member'
                   role:
                     type: string
                     enum: [Owner, Moderator, Member]
+                    description: 'Role of the member in the community'
                   joinedAt:
                     type: string
                     format: date-time
+                    description: 'When the member joined the community'
             total:
               type: integer
+              description: 'Total number of members'
             page:
               type: integer
+              description: 'Current page number'
             pages:
               type: integer
+              description: 'Total number of pages'
             limit:
               type: integer
-    AddMemberToCommunity201OkResponse:
-      type: object
-      required:
-        - message
-        - data
-      properties:
-        message:
-          type: string
-        data:
-          type: object
-          required:
-            - address
-            - role
-            - joinedAt
-          properties:
-            address:
-              type: string
-            role:
-              type: string
-              enum: [Owner, Moderator, Member]
-            joinedAt:
-              type: string
-              format: date-time
+              description: 'Number of members per page'
     GetMemberCommunities200OkResponse:
       type: object
       required:
@@ -256,12 +252,16 @@ components:
                     enum: [Owner, Moderator, Member]
             total:
               type: integer
+              description: 'Total number of communities'
             page:
               type: integer
+              description: 'Current page number'
             pages:
               type: integer
+              description: 'Total number of pages'
             limit:
               type: integer
+              description: 'Number of communities per page'
     GetBannedMembers200OkResponse:
       type: object
       required:
@@ -286,14 +286,20 @@ components:
                 properties:
                   address:
                     type: string
+                    description: 'ETH Address of the banned member'
                   bannedAt:
                     type: string
                     format: date-time
+                    description: 'When the member was banned'
             total:
               type: integer
+              description: 'Total number of banned members'
             page:
               type: integer
+              description: 'Current page number'
             pages:
               type: integer
+              description: 'Total number of pages'
             limit:
               type: integer
+              description: 'Number of banned members per page'

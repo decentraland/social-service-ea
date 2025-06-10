@@ -1,0 +1,38 @@
+name: Validate API Documentation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/**'
+
+jobs:
+  validate-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install Redocly CLI
+        run: yarn global add @redocly/cli
+
+      - name: Validate OpenAPI specification
+        run: npx @redocly/cli lint docs/communities-openapi.yaml
+
+      - name: Build documentation
+        run: npx @redocly/cli build-docs docs/communities-openapi.yaml -o docs/index.html
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: docs/index.html
+          retention-days: 1
