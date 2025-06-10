@@ -42,8 +42,10 @@ describe('createRpcServerComponent', () => {
   let mockTransport: Transport
   let subscribersContext: ISubscribersContext
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
+  let endIncomingOrOutgoingPrivateVoiceChatForUserMock: jest.Mock
 
   beforeEach(async () => {
+    endIncomingOrOutgoingPrivateVoiceChatForUserMock = jest.fn()
     subscribersContext = createSubscribersContext()
 
     rpcServerMock = createRpcServer({
@@ -55,7 +57,9 @@ describe('createRpcServerComponent', () => {
 
     const mockCommsGatekeeper: ICommsGatekeeperComponent = createCommsGatekeeperMockedComponent({})
     const mockSettings = createSettingsMockedComponent({})
-    const mockVoice = createVoiceMockedComponent({})
+    const mockVoice = createVoiceMockedComponent({
+      endIncomingOrOutgoingPrivateVoiceChatForUser: endIncomingOrOutgoingPrivateVoiceChatForUserMock
+    })
 
     mockPeersStats = createMockPeersStatsComponent()
 
@@ -184,6 +188,7 @@ describe('createRpcServerComponent', () => {
 
     beforeEach(() => {
       rpcServer.attachUser({ transport: mockTransport, address })
+      endIncomingOrOutgoingPrivateVoiceChatForUserMock.mockResolvedValue(undefined)
     })
 
     it('should remove subscriber when detaching user', () => {
@@ -208,6 +213,11 @@ describe('createRpcServerComponent', () => {
 
       expect(() => rpcServer.detachUser(nonExistentAddress)).not.toThrow()
       expect(subscribersContext.getSubscribersAddresses()).not.toContain(nonExistentAddress)
+    })
+
+    it('should end the incoming or outgoing private voice chat for the user when detaching', () => {
+      rpcServer.detachUser(address)
+      expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).toHaveBeenCalledWith(address)
     })
 
     it('should handle multiple detach calls for same user', () => {
