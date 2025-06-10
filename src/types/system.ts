@@ -29,7 +29,8 @@ import {
   ICommunitiesDatabaseComponent,
   IPgComponent,
   ICommunitiesDbHelperComponent,
-  IVoiceDatabaseComponent
+  IVoiceDatabaseComponent,
+  IStorageComponent
 } from './components'
 import { ICommunityComponent, ICommunityRolesComponent } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
@@ -72,6 +73,7 @@ export type BaseComponents = {
   settings: ISettingsComponent
   voice: IVoiceComponent
   voiceDb: IVoiceDatabaseComponent
+  storage: IStorageComponent
 }
 
 // components used in runtime

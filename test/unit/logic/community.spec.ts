@@ -29,6 +29,7 @@ import { Action } from '../../../src/types/entities'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockPeersStatsComponent } from '../../mocks/components'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
+import { createS3ComponentMock } from '../../mocks/components/s3'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
@@ -59,7 +60,8 @@ describe('when handling community operations', () => {
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
       logs: mockLogs,
-      peersStats: mockPeersStats
+      peersStats: mockPeersStats,
+      storage: createS3ComponentMock()
     })
   })
 

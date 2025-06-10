@@ -27,3 +27,9 @@ export class VoiceChatNotFoundError extends Error {
     super(`The voice chat with id ${callId} was not found`)
   }
 }
+
+export class IncomingVoiceChatNotFoundError extends Error {
+  constructor(address: string) {
+    super(`The incoming voice chat for the address ${address} was not found`)
+  }
+}

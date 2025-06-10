@@ -82,8 +82,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           const nonExistentId = randomUUID()
           const response = await makeRequest(
             identity,
-            `/v1/communities/${nonExistentId}/members/${targetMemberAddress}?role=${CommunityRole.Moderator}`,
-            'PATCH'
+            `/v1/communities/${nonExistentId}/members/${targetMemberAddress}`,
+            'PATCH',
+            {
+              role: CommunityRole.Moderator
+            }
           )
           expect(response.status).toBe(404)
         })
@@ -93,8 +96,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
         it('should respond with a 400 status code when trying to update role with an invalid address', async () => {
           const response = await makeRequest(
             identity,
-            `/v1/communities/${communityId}/members/invalid-address?role=${CommunityRole.Moderator}`,
-            'PATCH'
+            `/v1/communities/${communityId}/members/invalid-address`,
+            'PATCH',
+            {
+              role: CommunityRole.Moderator
+            }
           )
           expect(response.status).toBe(400)
         })
@@ -104,8 +110,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
         it('should respond with a 400 status code when trying to update to an invalid role', async () => {
           const response = await makeRequest(
             identity,
-            `/v1/communities/${communityId}/members/${targetMemberAddress}?role=invalid-role`,
-            'PATCH'
+            `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+            'PATCH',
+            {
+              role: 'invalid-role'
+            }
           )
           expect(response.status).toBe(400)
         })
@@ -116,7 +125,8 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           const response = await makeRequest(
             identity,
             `/v1/communities/${communityId}/members/${targetMemberAddress}`,
-            'PATCH'
+            'PATCH',
+            {}
           )
           expect(response.status).toBe(400)
         })
@@ -127,8 +137,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           it('should respond with a 401 status code', async () => {
             const response = await makeRequest(
               identity,
-              `/v1/communities/${communityId}/members/${targetMemberAddress}?role=${CommunityRole.Moderator}`,
-              'PATCH'
+              `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Moderator
+              }
             )
             expect(response.status).toBe(401)
             const body = await response.json()
@@ -151,8 +164,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           it('should respond with a 401 status code when trying to update another member', async () => {
             const response = await makeRequest(
               identity,
-              `/v1/communities/${communityId}/members/${targetMemberAddress}?role=${CommunityRole.Moderator}`,
-              'PATCH'
+              `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Moderator
+              }
             )
             expect(response.status).toBe(401)
             const body = await response.json()
@@ -165,8 +181,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           it('should respond with a 401 status code when trying to update own role', async () => {
             const response = await makeRequest(
               identity,
-              `/v1/communities/${communityId}/members/${updaterAddress}?role=${CommunityRole.Moderator}`,
-              'PATCH'
+              `/v1/communities/${communityId}/members/${updaterAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Moderator
+              }
             )
             expect(response.status).toBe(401)
             const body = await response.json()
@@ -189,8 +208,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           it('should respond with a 401 status code when trying to update another moderator', async () => {
             const response = await makeRequest(
               identity,
-              `/v1/communities/${communityId}/members/${targetModeratorAddress}?role=${CommunityRole.Member}`,
-              'PATCH'
+              `/v1/communities/${communityId}/members/${targetModeratorAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Member
+              }
             )
             expect(response.status).toBe(401)
             const body = await response.json()
@@ -203,8 +225,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           it('should respond with a 401 status code when trying to update an owner', async () => {
             const response = await makeRequest(
               identity,
-              `/v1/communities/${communityId}/members/${targetOwnerAddress}?role=${CommunityRole.Member}`,
-              'PATCH'
+              `/v1/communities/${communityId}/members/${targetOwnerAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Member
+              }
             )
             expect(response.status).toBe(401)
             const body = await response.json()
@@ -227,8 +252,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           it('should respond with a 204 status code when promoting a member to moderator', async () => {
             const response = await makeRequest(
               identity,
-              `/v1/communities/${communityId}/members/${targetMemberAddress}?role=${CommunityRole.Moderator}`,
-              'PATCH'
+              `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Moderator
+              }
             )
             expect(response.status).toBe(204)
           })
@@ -236,8 +264,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           it('should respond with a 204 status code when demoting a moderator to member', async () => {
             const response = await makeRequest(
               identity,
-              `/v1/communities/${communityId}/members/${targetModeratorAddress}?role=${CommunityRole.Member}`,
-              'PATCH'
+              `/v1/communities/${communityId}/members/${targetModeratorAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Member
+              }
             )
             expect(response.status).toBe(204)
           })
@@ -245,8 +276,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           it('should respond with a 401 status code when trying to update another owner', async () => {
             const response = await makeRequest(
               identity,
-              `/v1/communities/${communityId}/members/${targetOwnerAddress}?role=${CommunityRole.Member}`,
-              'PATCH'
+              `/v1/communities/${communityId}/members/${targetOwnerAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Member
+              }
             )
             expect(response.status).toBe(401)
             const body = await response.json()
@@ -265,8 +299,11 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
           it('should respond with a 500 status code', async () => {
             const response = await makeRequest(
               identity,
-              `/v1/communities/${communityId}/members/${targetMemberAddress}?role=${CommunityRole.Moderator}`,
-              'PATCH'
+              `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Moderator
+              }
             )
             expect(response.status).toBe(500)
           })

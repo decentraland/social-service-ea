@@ -1,6 +1,6 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { CommunityNotFoundError } from '../../logic/community'
+import { CommunityMember, CommunityNotFoundError } from '../../logic/community'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { EthAddress } from '@dcl/schemas'
 import { CommunityRole } from '../../types/entities'
@@ -8,14 +8,14 @@ import { CommunityRole } from '../../types/entities'
 export async function updateMemberRoleHandler(
   context: Pick<
     HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members/:address'>,
-    'components' | 'params' | 'verification' | 'url'
+    'components' | 'params' | 'verification' | 'request'
   >
 ): Promise<HTTPResponse> {
   const {
     components: { community, logs },
     params: { id: communityId, address: targetAddress },
     verification,
-    url
+    request
   } = context
 
   const logger = logs.getLogger('update-member-role-handler')
@@ -28,8 +28,8 @@ export async function updateMemberRoleHandler(
       throw new InvalidRequestError(`Invalid address provided`)
     }
 
-    const searchParams = new URLSearchParams(url.search)
-    const newRole = searchParams.get('role')
+    const body: Partial<CommunityMember> = await request.json()
+    const newRole = body.role
 
     if (!newRole || !Object.values(CommunityRole).includes(newRole as CommunityRole)) {
       throw new InvalidRequestError(`Invalid role provided. Must be one of: ${Object.values(CommunityRole).join(', ')}`)
