@@ -3,8 +3,25 @@ info:
   title: Social Service API
   version: 1.0.0
   description: API documentation for the Social Service.
-# servers:
-#   - url: https://social-service-ea.decentraland.org
+
+servers:
+  # - url: https://social-service-ea.decentraland.org
+  # description: Production server
+  - url: https://social-service-ea.decentraland.zone
+    description: Development server
+
+components:
+  securitySchemes:
+    SignedFetch:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: |
+        Signed Fetch authentication.
+        See ADR-44 for more details about the authentication mechanism.
+
+security:
+  - SignedFetch: []
 
 paths:
   /v1/communities:
@@ -14,6 +31,33 @@ paths:
         Lists all communities.
         This endpoint has optional Signed Fetch authentication.
         When signed, it includes properties related to the authenticated user in its response.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities to skip.
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search term to filter communities by name or description.
+        - name: onlyMemberOf
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter communities where the authenticated user is a member.
       responses:
         '200':
           description: Communities found
@@ -21,6 +65,12 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/GetCommunities200OkResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     post:
@@ -28,6 +78,8 @@ paths:
       description: |
         Creates a new community with the provided details.
         This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
       requestBody:
         required: true
         content:
@@ -37,14 +89,16 @@ paths:
               required:
                 - name
                 - description
-                # - thumbnail TODO
               properties:
                 name:
                   type: string
                 description:
                   type: string
-                # thumbnail:
-                  # type: string
+                thumbnails:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: 'A map of thumbnail types to URLs.'
       responses:
         '201':
           description: Community created successfully
@@ -58,6 +112,12 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
   /v1/communities/{id}:
@@ -66,6 +126,8 @@ paths:
       description: |
         Retrieves a specific community by its unique ID.
         This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
       parameters:
         - name: id
           in: path
@@ -92,6 +154,12 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     delete:
@@ -99,11 +167,15 @@ paths:
       description: |
         Deletes a community.
         This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
       parameters:
         - name: id
           in: path
           required: true
           schema:
+            type: string
+          description: The unique identifier of the community.
       responses:
         '204':
           description: Community deleted successfully
@@ -119,6 +191,12 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -127,7 +205,11 @@ paths:
       summary: List community members
       description: |
         Lists all members of a specific community.
-        This endpoint requires Signed Fetch authentication.
+        This endpoint has optional Signed Fetch authentication.
+        When not signed, it only returns members of public communities.
+        When signed, it returns all members if the user has access to the community.
+      security:
+        - SignedFetch: []
       parameters:
         - name: id
           in: path
@@ -135,18 +217,24 @@ paths:
           schema:
             type: string
           description: The unique identifier of the community.
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-          description: Page number for pagination.
         - name: limit
           in: query
           required: false
           schema:
             type: integer
           description: Number of members per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of members to skip.
+        - name: onlyOnline
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter to show only online members.
       responses:
         '200':
           description: Members found
@@ -166,6 +254,12 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     post:
@@ -173,6 +267,8 @@ paths:
       description: |
         Adds a member to a community.
         This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
       parameters:
         - name: id
           in: path
@@ -180,25 +276,9 @@ paths:
           schema:
             type: string
           description: The unique identifier of the community.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - memberAddress
-              properties:
-                memberAddress:
-                  type: string
-                  description: ETH address of the member to add.
       responses:
-        '201':
+        '204':
           description: Member added successfully
-          content:
-            application/json:
-              schema:
-                $ref: './communities-schemas.yaml#/components/schemas/AddMemberToCommunity201OkResponse'
         '404':
           description: Community not found
           content:
@@ -211,6 +291,12 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
   /v1/communities/{id}/members/{memberAddress}:
@@ -219,6 +305,8 @@ paths:
       description: |
         Removes a member from a community.
         This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
       parameters:
         - name: id
           in: path
@@ -247,6 +335,68 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+    patch:
+      summary: Update member role
+      description: |
+        Updates the role of a member in a community.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: memberAddress
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the member to update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  type: string
+                  enum: [Owner, Moderator, Member]
+                  description: 'New role for the member'
+      responses:
+        '204':
+          description: Member role updated successfully
+        '404':
+          description: Community or member not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
   /v1/members/{address}/communities:
@@ -255,6 +405,8 @@ paths:
       description: |
         Lists all communities a member belongs to.
         This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
       parameters:
         - name: address
           in: path
@@ -262,18 +414,18 @@ paths:
           schema:
             type: string
           description: ETH address of the member.
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-          description: Page number for pagination.
         - name: limit
           in: query
           required: false
           schema:
             type: integer
           description: Number of communities per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities to skip.
       responses:
         '200':
           description: Communities found
@@ -281,14 +433,14 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/GetMemberCommunities200OkResponse'
-        '404':
-          description: Member not found
+        '401':
+          description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized - Signed Fetch required
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -302,6 +454,8 @@ paths:
       description: |
         Lists all banned members of a specific community.
         This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
       parameters:
         - name: id
           in: path
@@ -309,18 +463,18 @@ paths:
           schema:
             type: string
           description: The unique identifier of the community.
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-          description: Page number for pagination.
         - name: limit
           in: query
           required: false
           schema:
             type: integer
           description: Number of banned members per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of banned members to skip.
       responses:
         '200':
           description: Banned members found
@@ -340,6 +494,12 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
   /v1/communities/{id}/members/{memberAddress}/bans:
@@ -348,6 +508,8 @@ paths:
       description: |
         Bans a member from a community.
         This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
       parameters:
         - name: id
           in: path
@@ -376,6 +538,12 @@ paths:
             application/json:
               schema:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     delete:
@@ -383,6 +551,8 @@ paths:
       description: |
         Unbans a member from a community.
         This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
       parameters:
         - name: id
           in: path
@@ -407,6 +577,12 @@ paths:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:

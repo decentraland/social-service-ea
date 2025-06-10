@@ -4,10 +4,6 @@
 
 A microservice that handles social interactions (friendships) for Decentraland, built using the Well Known Components architecture pattern.
 
-## API Documentation
-
-👉 [View Swagger API Docs](https://decentraland.github.io/social-service-ea/)
-
 ## Table of Contents
 
 - [🌟 Features](#-features)
@@ -18,6 +14,9 @@ A microservice that handles social interactions (friendships) for Decentraland, 
     - [Communities](#communities)
   - [Friendship Flow Diagrams](#friendship-flow-diagrams)
   - [Block System Flow](#block-system-flow)
+- [🔗 API Documentation for Communities](#-api-documentation-for-communities)
+  - [Local Development](#local-development)
+  - [Documentation Structure](#documentation-structure)
 - [🚀 Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
   - [Local Development](#local-development)
@@ -239,6 +238,24 @@ sequenceDiagram
         RPC Server-->>Client: Stream Block Update
     end
 ```
+
+## 🔗 API Documentation for Communities
+
+The API documentation is automatically generated and deployed to GitHub Pages when changes are pushed to the main branch.
+
+You can view the latest documentation at: [https://decentraland.github.io/social-service-ea/](https://decentraland.github.io/social-service-ea/).
+
+### Local Development
+
+```bash
+npx @redocly/cli preview-docs docs/communities-openapi.yaml
+```
+
+### Documentation Structure
+
+- `docs/communities-openapi.yaml`: OpenAPI specification for the Communities API
+- `docs/communities-schemas.yaml`: Shared schemas used in the OpenAPI specification
+- `docs/index.html`: Generated documentation (do not edit manually)
 
 ## 🚀 Getting Started
 
