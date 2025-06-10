@@ -42,7 +42,7 @@ jobs:
       pages: write
       id-token: write
     environment:
-      name: docs-preview
+      name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
