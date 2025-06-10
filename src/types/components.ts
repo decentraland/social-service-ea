@@ -159,6 +159,7 @@ export interface IVoiceDatabaseComponent {
   createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
   getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
   deletePrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
+  getPrivateVoiceChatForCalleeAddress(calleeAddress: string): Promise<PrivateVoiceChat | null>
 }
 
 export interface IRedisComponent extends IBaseComponent {
@@ -249,7 +250,7 @@ export type ICommsGatekeeperComponent = {
     user: string,
     privateMessagesPrivacy: PrivateMessagesPrivacy
   ) => Promise<void>
-  endPrivateVoiceChat(callId: string, address: string): Promise<void>
+  endPrivateVoiceChat: (callId: string, address: string) => Promise<string[]>
 }
 
 export type IWebSocketComponent = IBaseComponent & {
@@ -270,4 +271,8 @@ export interface IPgComponent extends IBasePgComponent {
 export interface ICommunitiesDbHelperComponent {
   forceCommunityRemoval: (communityId: string) => Promise<void>
   forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
+}
+
+export interface IStorageComponent {
+  storeFile: (file: Buffer, key: string) => Promise<string>
 }
