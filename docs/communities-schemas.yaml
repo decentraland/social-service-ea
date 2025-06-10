@@ -12,79 +12,96 @@ components:
         error:
           type: string
           description: 'Error code (e.g. Not Found, Invalid Request, Unauthorized, etc.)'
+    PaginationParams:
+      type: object
+      required:
+        - limit
+        - offset
+      properties:
+        limit:
+          type: integer
+          description: 'Number of items per page'
+        offset:
+          type: integer
+          description: 'Number of items to skip'
+    PaginatedResponse:
+      type: object
+      required:
+        - results
+        - total
+        - limit
+        - offset
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+        total:
+          type: integer
+          description: 'Total number of items'
+        limit:
+          type: integer
+          description: 'Number of items per page'
+        offset:
+          type: integer
+          description: 'Number of items skipped'
     GetCommunities200OkResponse:
       type: object
       required:
         - data
       properties:
         data:
-          type: object
-          required:
-            - results
-            - total
-            - page
-            - pages
-            - limit
-          properties:
-            results:
-              type: array
-              items:
-                type: object
-                required:
-                  - id
-                  - name
-                  - description
-                  - ownerAddress
-                  - privacy
-                  - active
-                  - membersCount
-                  - thumbnails
-                properties:
-                  id:
-                    type: string
-                  name:
-                    type: string
-                  description:
-                    type: string
-                  ownerAddress:
-                    type: string
-                  privacy:
-                    type: string
-                    enum: [public, private]
-                  active:
-                    type: boolean
-                  membersCount:
-                    type: integer
-                  thumbnails:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
                     type: object
-                    additionalProperties:
-                      type: string
-                    description: 'A map of thumbnail types to URLs.'
-                  friends:
-                    type: array
-                    items:
-                      type: string
-                      description: |
-                        ETH Address of a friend of the community.
-                        This is only present when the user is signed in.
-                  role:
-                    type: string
-                    enum: [Owner, Moderator, Member, None]
-                    description: |
-                      The role of the user in the community.
-                      This is only present when the user is signed in.
-            total:
-              type: integer
-              description: 'Total number of communities'
-            page:
-              type: integer
-              description: 'Current page number'
-            pages:
-              type: integer
-              description: 'Total number of pages'
-            limit:
-              type: integer
-              description: 'Number of communities per page'
+                    required:
+                      - id
+                      - name
+                      - description
+                      - ownerAddress
+                      - privacy
+                      - active
+                      - membersCount
+                      - thumbnails
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      description:
+                        type: string
+                      ownerAddress:
+                        type: string
+                      privacy:
+                        type: string
+                        enum: [public, private]
+                      active:
+                        type: boolean
+                      membersCount:
+                        type: integer
+                      thumbnails:
+                        type: object
+                        additionalProperties:
+                          type: string
+                        description: 'A map of thumbnail types to URLs.'
+                      friends:
+                        type: array
+                        items:
+                          type: string
+                          description: |
+                            ETH Address of a friend of the community.
+                            This is only present when the user is signed in.
+                      role:
+                        type: string
+                        enum: [Owner, Moderator, Member, None]
+                        description: |
+                          The role of the user in the community.
+                          This is only present when the user is signed in.
     CreateCommunity201OkResponse:
       type: object
       required:
@@ -167,139 +184,91 @@ components:
         - data
       properties:
         data:
-          type: object
-          required:
-            - results
-            - total
-            - page
-            - pages
-            - limit
-          properties:
-            results:
-              type: array
-              items:
-                type: object
-                required:
-                  - address
-                  - role
-                  - joinedAt
-                properties:
-                  address:
-                    type: string
-                    description: 'ETH Address of the member'
-                  role:
-                    type: string
-                    enum: [Owner, Moderator, Member]
-                    description: 'Role of the member in the community'
-                  joinedAt:
-                    type: string
-                    format: date-time
-                    description: 'When the member joined the community'
-            total:
-              type: integer
-              description: 'Total number of members'
-            page:
-              type: integer
-              description: 'Current page number'
-            pages:
-              type: integer
-              description: 'Total number of pages'
-            limit:
-              type: integer
-              description: 'Number of members per page'
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - address
+                      - role
+                      - joinedAt
+                    properties:
+                      address:
+                        type: string
+                        description: 'ETH Address of the member'
+                      role:
+                        type: string
+                        enum: [Owner, Moderator, Member]
+                        description: 'Role of the member in the community'
+                      joinedAt:
+                        type: string
+                        format: date-time
+                        description: 'When the member joined the community'
     GetMemberCommunities200OkResponse:
       type: object
       required:
         - data
       properties:
         data:
-          type: object
-          required:
-            - results
-            - total
-            - page
-            - pages
-            - limit
-          properties:
-            results:
-              type: array
-              items:
-                type: object
-                required:
-                  - id
-                  - name
-                  - description
-                  - ownerAddress
-                  - privacy
-                  - active
-                  - role
-                properties:
-                  id:
-                    type: string
-                  name:
-                    type: string
-                  description:
-                    type: string
-                  ownerAddress:
-                    type: string
-                  privacy:
-                    type: string
-                    enum: [public, private]
-                  active:
-                    type: boolean
-                  role:
-                    type: string
-                    enum: [Owner, Moderator, Member]
-            total:
-              type: integer
-              description: 'Total number of communities'
-            page:
-              type: integer
-              description: 'Current page number'
-            pages:
-              type: integer
-              description: 'Total number of pages'
-            limit:
-              type: integer
-              description: 'Number of communities per page'
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - description
+                      - ownerAddress
+                      - privacy
+                      - active
+                      - role
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      description:
+                        type: string
+                      ownerAddress:
+                        type: string
+                      privacy:
+                        type: string
+                        enum: [public, private]
+                      active:
+                        type: boolean
+                      role:
+                        type: string
+                        enum: [Owner, Moderator, Member]
     GetBannedMembers200OkResponse:
       type: object
       required:
         - data
       properties:
         data:
-          type: object
-          required:
-            - results
-            - total
-            - page
-            - pages
-            - limit
-          properties:
-            results:
-              type: array
-              items:
-                type: object
-                required:
-                  - address
-                  - bannedAt
-                properties:
-                  address:
-                    type: string
-                    description: 'ETH Address of the banned member'
-                  bannedAt:
-                    type: string
-                    format: date-time
-                    description: 'When the member was banned'
-            total:
-              type: integer
-              description: 'Total number of banned members'
-            page:
-              type: integer
-              description: 'Current page number'
-            pages:
-              type: integer
-              description: 'Total number of pages'
-            limit:
-              type: integer
-              description: 'Number of banned members per page'
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - address
+                      - bannedAt
+                    properties:
+                      address:
+                        type: string
+                        description: 'ETH Address of the banned member'
+                      bannedAt:
+                        type: string
+                        format: date-time
+                        description: 'When the member was banned'

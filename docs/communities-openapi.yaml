@@ -34,18 +34,18 @@ paths:
       security:
         - SignedFetch: []
       parameters:
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-          description: Page number for pagination.
         - name: limit
           in: query
           required: false
           schema:
             type: integer
           description: Number of communities per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities to skip.
         - name: search
           in: query
           required: false
@@ -205,7 +205,9 @@ paths:
       summary: List community members
       description: |
         Lists all members of a specific community.
-        This endpoint requires Signed Fetch authentication.
+        This endpoint has optional Signed Fetch authentication.
+        When not signed, it only returns members of public communities.
+        When signed, it returns all members if the user has access to the community.
       security:
         - SignedFetch: []
       parameters:
@@ -215,18 +217,24 @@ paths:
           schema:
             type: string
           description: The unique identifier of the community.
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-          description: Page number for pagination.
         - name: limit
           in: query
           required: false
           schema:
             type: integer
           description: Number of members per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of members to skip.
+        - name: onlyOnline
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter to show only online members.
       responses:
         '200':
           description: Members found
@@ -335,6 +343,62 @@ paths:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
+    patch:
+      summary: Update member role
+      description: |
+        Updates the role of a member in a community.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: memberAddress
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the member to update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  type: string
+                  enum: [Owner, Moderator, Member]
+                  description: 'New role for the member'
+      responses:
+        '204':
+          description: Member role updated successfully
+        '404':
+          description: Community or member not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
   /v1/members/{address}/communities:
     get:
       summary: List communities for a member
@@ -350,18 +414,18 @@ paths:
           schema:
             type: string
           description: ETH address of the member.
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-          description: Page number for pagination.
         - name: limit
           in: query
           required: false
           schema:
             type: integer
           description: Number of communities per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities to skip.
       responses:
         '200':
           description: Communities found
@@ -399,18 +463,18 @@ paths:
           schema:
             type: string
           description: The unique identifier of the community.
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-          description: Page number for pagination.
         - name: limit
           in: query
           required: false
           schema:
             type: integer
           description: Number of banned members per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of banned members to skip.
       responses:
         '200':
           description: Banned members found
