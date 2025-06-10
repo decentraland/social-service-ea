@@ -48,19 +48,6 @@ test('Create Community Controller', async function ({ components, stubComponents
           )
           expect(response.status).toBe(400)
         })
-
-        it('should respond with a 400 status code when missing thumbnails', async () => {
-          const response = await makeMultipartRequest(
-            identity,
-            '/v1/communities',
-            {
-              name: 'Test Community',
-              description: 'Test Description'
-            }
-          )
-
-          expect(response.status).toBe(400)
-        })
       })
 
       describe('and the body is valid', () => {
@@ -94,6 +81,25 @@ test('Create Community Controller', async function ({ components, stubComponents
             const body = await response.json()
             communityId = body.id
   
+            expect(response.status).toBe(201)
+            expect(body).toMatchObject({
+              data: {
+                id: expect.any(String),
+                name: 'Test Community',
+                description: 'Test Description',
+                active: true,
+                ownerAddress: identity.realAccount.address.toLowerCase(),
+                privacy: 'public'
+              },
+              message: 'Community created successfully'
+            })
+          })
+
+          it('should create community even when the thumbnail is not provided', async () => {
+            const response = await makeMultipartRequest(identity, '/v1/communities', validBody)
+            const body = await response.json()
+            communityId = body.id
+
             expect(response.status).toBe(201)
             expect(body).toMatchObject({
               data: {

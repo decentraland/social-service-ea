@@ -189,7 +189,7 @@ export function createCommunityComponent(
 
     createCommunity: async (
       community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
-      thumbnail: Buffer
+      thumbnail?: Buffer
     ): Promise<Community> => {
       const ownedNames = await catalystClient.getOwnedNames(community.ownerAddress, {
         pageSize: '1'
@@ -208,9 +208,11 @@ export function createCommunityComponent(
 
       logger.info('Community created', { communityId: newCommunity.id, name: newCommunity.name })
 
-      const thumbnailUrl = await storage.storeFile(thumbnail, `communities/${newCommunity.id}/raw-thumbnail.png`)
+      if (thumbnail) {
+        const thumbnailUrl = await storage.storeFile(thumbnail, `communities/${newCommunity.id}/raw-thumbnail.png`)
 
-      logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id })
+        logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id })
+      }
 
       await communitiesDb.addCommunityMember({
         communityId: newCommunity.id,
