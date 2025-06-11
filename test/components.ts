@@ -133,13 +133,14 @@ async function initComponents(): Promise<TestComponents> {
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const community = createCommunityComponent({
+  const community = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     logs,
     peersStats,
-    storage
+    storage,
+    config
   })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
