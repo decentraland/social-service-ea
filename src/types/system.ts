@@ -30,7 +30,8 @@ import {
   IPgComponent,
   ICommunitiesDbHelperComponent,
   IVoiceDatabaseComponent,
-  IStorageComponent
+  IStorageComponent,
+  IStorageHelperComponent
 } from './components'
 import { ICommunityComponent, ICommunityRolesComponent } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
@@ -86,4 +87,5 @@ export type TestComponents = BaseComponents & {
   localHttpFetch: IFetchComponent
   rpcClient: IRpcClient
   communitiesDbHelper: ICommunitiesDbHelperComponent
+  storageHelper: IStorageHelperComponent
 }

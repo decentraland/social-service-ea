@@ -42,6 +42,7 @@ import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createSettingsComponent } from '../src/logic/settings'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
+import { createStorageHelper } from './integration/utils/storage'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -150,6 +151,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const communitiesDbHelper = createDbHelper(pg)
 
+  const storageHelper = await createStorageHelper({ config })
+
   return {
     archipelagoStats,
     catalystClient,
@@ -185,6 +188,7 @@ async function initComponents(): Promise<TestComponents> {
     communitiesDbHelper,
     settings,
     voice,
-    voiceDb
+    voiceDb,
+    storageHelper
   }
 }

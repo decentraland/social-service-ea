@@ -22,7 +22,7 @@ export async function createS3Adapter({ config }: Pick<AppComponents, 'config'>)
       }
     })
 
-    return await upload.done().then(() => `${bucketEndpoint}/${bucket}/${key}`)
+    return await upload.done().then(() => `${bucketEndpoint}/${bucket}/${bucketPrefix}/${key}`)
   }
 
   async function exists(key: string): Promise<boolean> {

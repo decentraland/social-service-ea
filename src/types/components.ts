@@ -279,3 +279,7 @@ export interface IStorageComponent {
   storeFile: (file: Buffer, key: string) => Promise<string>
   exists: (key: string) => Promise<boolean>
 }
+
+export interface IStorageHelperComponent {
+  removeFile: (key: string) => Promise<void>
+}
