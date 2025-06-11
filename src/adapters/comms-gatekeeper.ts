@@ -86,8 +86,8 @@ export const createCommsGatekeeperComponent = async ({
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          roomId,
-          userAddresses: [calleeAddress, callerAddress]
+          room_id: roomId,
+          user_addresses: [calleeAddress, callerAddress]
         })
       })
 
