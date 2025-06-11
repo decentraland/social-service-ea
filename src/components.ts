@@ -44,7 +44,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   const apiSeverConfig = createConfigComponent({
-    HTTP_SERVER_PORT: await config.requireString('API_HTTP_SERVER_HOST'), // 5001
+    HTTP_SERVER_PORT: await config.requireString('API_HTTP_SERVER_PORT'), // 5001
     HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
   })
 
