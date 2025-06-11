@@ -37,8 +37,14 @@ import { createS3Adapter } from './adapters/s3'
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
   const config = await createDotEnvConfigComponent({ path: ['.env.default', '.env'] })
+
   const uwsHttpServerConfig = createConfigComponent({
-    HTTP_SERVER_PORT: await config.requireString('UWS_HTTP_SERVER_PORT'),
+    HTTP_SERVER_PORT: await config.requireString('UWS_SERVER_PORT'), // 5000
+    HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
+  })
+
+  const apiSeverConfig = createConfigComponent({
+    HTTP_SERVER_PORT: await config.requireString('API_HTTP_SERVER_PORT'), // 5001
     HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
   })
 
@@ -47,10 +53,10 @@ export async function initComponents(): Promise<AppComponents> {
   const tracing = await createTracingComponent({ config, logs })
 
   const httpServer = await createServerComponent<GlobalContext>(
-    { config, logs },
+    { config: apiSeverConfig, logs },
     {
       cors: {
-        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT'],
+        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT', 'PATCH'],
         maxAge: 86400
       }
     }
