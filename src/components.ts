@@ -56,7 +56,7 @@ export async function initComponents(): Promise<AppComponents> {
     { config: apiSeverConfig, logs },
     {
       cors: {
-        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT'],
+        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT', 'PATCH'],
         maxAge: 86400
       }
     }
