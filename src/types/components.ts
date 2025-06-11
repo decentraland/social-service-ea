@@ -277,4 +277,5 @@ export interface ICommunitiesDbHelperComponent {
 
 export interface IStorageComponent {
   storeFile: (file: Buffer, key: string) => Promise<string>
+  exists: (key: string) => Promise<boolean>
 }

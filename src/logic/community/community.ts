@@ -25,15 +25,16 @@ import {
 } from './utils'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
-export function createCommunityComponent(
+export async function createCommunityComponent(
   components: Pick<
     AppComponents,
-    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats' | 'storage'
+    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats' | 'storage' | 'config'
   >
-): ICommunityComponent {
-  const { communitiesDb, catalystClient, communityRoles, logs, peersStats, storage } = components
+): Promise<ICommunityComponent> {
+  const { communitiesDb, catalystClient, communityRoles, logs, peersStats, storage, config } = components
 
   const logger = logs.getLogger('community-component')
+  const CDN_URL = await config.requireString('CDN_URL')
 
   const filterAndCountCommunityMembers = async (
     id: string,
@@ -77,6 +78,20 @@ export function createCommunityComponent(
     return { members: membersWithProfile, totalMembers }
   }
 
+  const buildThumbnailUrl = (communityId: string) => {
+    return `${CDN_URL}/social/communities/${communityId}/raw-thumbnail.png`
+  }
+
+  const getThumbnail = async (communityId: string): Promise<string | undefined> => {
+    const thumbnailExists = await storage.exists(`communities/${communityId}/raw-thumbnail.png`)
+
+    if (!thumbnailExists) {
+      return undefined
+    }
+
+    return buildThumbnailUrl(communityId)
+  }
+
   return {
     getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount> => {
       const [community, membersCount] = await Promise.all([
@@ -86,6 +101,14 @@ export function createCommunityComponent(
 
       if (!community) {
         throw new CommunityNotFoundError(id)
+      }
+
+      const thumbnail = await getThumbnail(community.id)
+
+      if (thumbnail) {
+        community.thumbnails = {
+          raw: thumbnail
+        }
       }
 
       return toCommunityWithMembersCount(community, membersCount)
@@ -99,10 +122,25 @@ export function createCommunityComponent(
         communitiesDb.getCommunities(userAddress, options),
         communitiesDb.getCommunitiesCount(userAddress, options)
       ])
+
+      const communitiesWithThumbnails = await Promise.all(
+        communities.map(async (community) => {
+          const thumbnail = await getThumbnail(community.id)
+
+          if (thumbnail) {
+            community.thumbnails = {
+              raw: thumbnail
+            }
+          }
+
+          return community
+        })
+      )
+
       const friendsAddresses = Array.from(new Set(communities.flatMap((community) => community.friends)))
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
       return {
-        communities: toCommunityResults(communities, friendsProfiles),
+        communities: toCommunityResults(communitiesWithThumbnails, friendsProfiles),
         total
       }
     },
@@ -116,8 +154,22 @@ export function createCommunityComponent(
         communitiesDb.getPublicCommunitiesCount({ search })
       ])
 
+      const communitiesWithThumbnails = await Promise.all(
+        communities.map(async (community) => {
+          const thumbnail = await getThumbnail(community.id)
+
+          if (thumbnail) {
+            community.thumbnails = {
+              raw: thumbnail
+            }
+          }
+
+          return community
+        })
+      )
+
       return {
-        communities: communities.map(toPublicCommunity),
+        communities: communitiesWithThumbnails.map(toPublicCommunity),
         total
       }
     },
