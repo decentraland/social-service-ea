@@ -83,7 +83,8 @@ export const createCommsGatekeeperComponent = async ({
       const response = await fetch(`${commsUrl}/private-voice-chat`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
         },
         body: JSON.stringify({
           room_id: roomId,
