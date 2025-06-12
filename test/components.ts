@@ -41,6 +41,10 @@ import { createCommunityComponent, createCommunityRolesComponent } from '../src/
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createSettingsComponent } from '../src/logic/settings'
+import { createMessageProcessorComponent } from '../src/logic/message-processor'
+import { createReferralDBComponent } from '../src/adapters/referral-db'
+import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
+import { createMessagesConsumerComponent } from '../src/logic/message-consumer'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
 import { createStorageHelper } from './integration/utils/storage'
 
@@ -77,7 +81,7 @@ async function initComponents(): Promise<TestComponents> {
     { config, logs },
     {
       cors: {
-        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT'],
+        methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT', 'PATCH'],
         maxAge: 86400
       }
     }
@@ -151,6 +155,21 @@ async function initComponents(): Promise<TestComponents> {
 
   const communitiesDbHelper = createDbHelper(pg)
 
+  const referralDb = await createReferralDBComponent({ pg, logs })
+
+  const queue = createMemoryQueueAdapter()
+
+  const messageProcessor = await createMessageProcessorComponent({
+    logs,
+    referralDb
+  })
+
+  const messageConsumer = createMessagesConsumerComponent({
+    logs,
+    queue,
+    messageProcessor
+  })
+
   const storageHelper = await createStorageHelper({ config })
 
   return {
@@ -158,6 +177,7 @@ async function initComponents(): Promise<TestComponents> {
     catalystClient,
     commsGatekeeper,
     communitiesDb,
+    communitiesDbHelper,
     community,
     communityRoles,
     config,
@@ -167,6 +187,8 @@ async function initComponents(): Promise<TestComponents> {
     localHttpFetch,
     localUwsFetch,
     logs,
+    messageConsumer,
+    messageProcessor,
     metrics,
     nats,
     peerTracking,
@@ -174,21 +196,22 @@ async function initComponents(): Promise<TestComponents> {
     peersStats,
     pg,
     pubsub,
+    queue,
     redis,
+    referralDb,
     rpcClient,
     rpcServer,
+    settings,
     sns,
     statusChecks,
     storage,
     subscribersContext,
     tracing: mockTracing,
     uwsServer,
-    worldsStats,
-    wsPool,
-    communitiesDbHelper,
-    settings,
     voice,
     voiceDb,
+    worldsStats,
+    wsPool,
     storageHelper
   }
 }

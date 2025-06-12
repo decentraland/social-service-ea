@@ -36,6 +36,10 @@ import {
 import { ICommunityComponent, ICommunityRolesComponent } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
+import { IReferralDatabaseComponent } from './referral-db.type'
+import { IQueueComponent } from './sqs.type'
+import { IMessageProcessorComponent } from './message-processor.type'
+import { IMessageConsumerComponent } from './message-consumer.type'
 import { IPeersStatsComponent } from '../logic/peers-stats'
 
 export type GlobalContext = {
@@ -55,6 +59,8 @@ export type BaseComponents = {
   friendsDb: IFriendsDatabaseComponent
   httpServer: IHttpServerComponent<GlobalContext>
   logs: ILoggerComponent
+  messageProcessor: IMessageProcessorComponent
+  messageConsumer: IMessageConsumerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
@@ -62,8 +68,10 @@ export type BaseComponents = {
   peersSynchronizer: IPeersSynchronizer
   pg: IPgComponent
   pubsub: IPubSubComponent
+  queue: IQueueComponent
   redis: IRedisComponent & ICacheComponent
   rpcServer: IRPCServerComponent
+  referralDb: IReferralDatabaseComponent
   sns: IPublisherComponent
   statusChecks: IStatusCheckComponent
   subscribersContext: ISubscribersContext
