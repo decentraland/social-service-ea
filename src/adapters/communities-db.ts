@@ -156,7 +156,7 @@ export function createCommunitiesDBComponent(
 
     async getCommunityPlaces(communityId: string, pagination: Pagination): Promise<CommunityPlace[]> {
       const query = SQL`
-        SELECT place_id as "placeId"
+        SELECT id
         FROM community_places
         WHERE community_id = ${communityId}
         ORDER BY added_at DESC
@@ -181,6 +181,21 @@ export function createCommunitiesDBComponent(
         WHERE community_id = ${communityId}
       `
       return pg.getCount(query)
+    },
+
+    async addCommunityPlace(place: Omit<CommunityPlace, 'addedAt'>): Promise<void> {
+      const query = SQL`
+        INSERT INTO community_places (id, community_id, added_by)
+        VALUES (${place.id}, ${place.communityId}, ${normalizeAddress(place.addedBy)})
+      `
+      await pg.query(query)
+    },
+
+    async removeCommunityPlace(id: string): Promise<void> {
+      const query = SQL`
+        DELETE FROM community_places WHERE id = ${id}
+      `
+      await pg.query(query)
     },
 
     async getCommunities(

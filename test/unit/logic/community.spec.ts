@@ -15,7 +15,11 @@ import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockCatalystClient } from '../../mocks/components/catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createMockProfile } from '../../mocks/profile'
-import { CommunityWithMembersCountAndFriends, ICommunityRolesComponent } from '../../../src/logic/community/types'
+import {
+  CommunityPlace,
+  CommunityWithMembersCountAndFriends,
+  ICommunityRolesComponent
+} from '../../../src/logic/community/types'
 import { parseExpectedFriends } from '../../mocks/friend'
 import { MemberCommunity } from '../../../src/logic/community/types'
 import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
@@ -1352,7 +1356,7 @@ describe('when handling community operations', () => {
 
   describe('and getting community places', () => {
     const communityId = 'test-community'
-    const mockPlaces = [{ placeId: 'place-1' }, { placeId: 'place-2' }]
+    const mockPlaces = [{ id: 'place-1' }, { id: 'place-2' }] as CommunityPlace[]
 
     beforeEach(() => {
       mockCommunitiesDB.communityExists.mockResolvedValue(true)

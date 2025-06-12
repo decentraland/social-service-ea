@@ -3,6 +3,7 @@ import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { mockCommunity } from '../mocks/community'
 import { randomUUID } from 'crypto'
+import { Response } from '@well-known-components/interfaces'
 
 test('Get Community Places Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -12,11 +13,14 @@ test('Get Community Places Controller', function ({ components, spyComponents })
     let userAddress: string
     let communityId: string
     let ownerAddress: string
+    let places: Array<{ id: string }>
 
     beforeEach(async () => {
       identity = await createTestIdentity()
       userAddress = identity.realAccount.address.toLowerCase()
       ownerAddress = '0x0000000000000000000000000000000000000001'
+
+      places = [{ id: randomUUID() }, { id: randomUUID() }]
 
       const result = await components.communitiesDb.createCommunity(
         mockCommunity({
@@ -32,6 +36,15 @@ test('Get Community Places Controller', function ({ components, spyComponents })
         memberAddress: ownerAddress,
         role: CommunityRole.Owner
       })
+
+      for (const place of places) {
+        await components.communitiesDb.addCommunityPlace({
+          id: place.id,
+          communityId,
+          addedBy: ownerAddress,
+          addedAt: new Date()
+        })
+      }
     })
 
     afterEach(async () => {
@@ -73,39 +86,31 @@ test('Get Community Places Controller', function ({ components, spyComponents })
         })
 
         describe('and the user is a member of the community', () => {
+          let response: Response
+
           beforeEach(async () => {
             await components.communitiesDb.addCommunityMember({
               communityId,
               memberAddress: userAddress,
               role: CommunityRole.Member
             })
+
+            response = await makeRequest(identity, `/v1/communities/${communityId}/places?limit=2&page=1`)
           })
 
-          it('should respond with a 200 status code and empty places list when no places exist', async () => {
-            const response = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+          it('should respond with a 200 status code', async () => {
             expect(response.status).toBe(200)
+          })
+
+          it('should return the places', async () => {
             const result = await response.json()
 
             expect(result.data).toEqual({
-              results: [],
-              total: 0,
+              results: expect.arrayContaining([{ id: places[0].id }, { id: places[1].id }]),
+              total: 2,
               page: 1,
-              pages: 0,
-              limit: 10
-            })
-          })
-
-          it('should handle pagination correctly', async () => {
-            const response = await makeRequest(identity, `/v1/communities/${communityId}/places?limit=1&page=1`)
-            expect(response.status).toBe(200)
-            const result = await response.json()
-
-            expect(result.data).toEqual({
-              results: [],
-              total: 0,
-              page: 1,
-              pages: 0,
-              limit: 1
+              pages: 1,
+              limit: 2
             })
           })
         })

@@ -52,7 +52,7 @@ export type ICommunityComponent = {
     communityId: string,
     userAddress: EthAddress,
     pagination: PaginatedParameters
-  ) => Promise<{ places: CommunityPlace[]; totalPlaces: number }>
+  ) => Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
 }
 
 export type ICommunityRolesComponent = {
@@ -175,5 +175,8 @@ export type GetCommunitiesWithTotal<T> = {
 export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress'> & { role: CommunityRole }
 
 export type CommunityPlace = {
-  placeId: string
+  id: string
+  communityId: string
+  addedBy: string
+  addedAt: Date
 }

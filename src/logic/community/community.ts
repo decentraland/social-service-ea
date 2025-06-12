@@ -430,7 +430,7 @@ export async function createCommunityComponent(
       communityId: string,
       userAddress: EthAddress,
       pagination: PaginatedParameters
-    ): Promise<{ places: CommunityPlace[]; totalPlaces: number }> => {
+    ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
       const communityExists = await communitiesDb.communityExists(communityId)
       if (!communityExists) {
         throw new CommunityNotFoundError(communityId)

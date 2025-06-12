@@ -10,7 +10,7 @@ export async function getCommunityPlacesHandler(
     HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/places'>,
     'components' | 'url' | 'verification' | 'params'
   >
-): Promise<HTTPResponse<PaginatedResponse<CommunityPlace>>> {
+): Promise<HTTPResponse<PaginatedResponse<Pick<CommunityPlace, 'id'>>>> {
   const {
     components: { community, logs },
     verification,
@@ -38,7 +38,7 @@ export async function getCommunityPlacesHandler(
     }
   } catch (error) {
     const message = errorMessageOrDefault(error)
-    logger.error(`Error getting banned members: ${communityId}, error: ${message}`)
+    logger.error(`Error getting places: ${communityId}, error: ${message}`)
 
     if (error instanceof CommunityNotFoundError || error instanceof NotAuthorizedError) {
       throw error
