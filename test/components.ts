@@ -42,6 +42,7 @@ import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createSettingsComponent } from '../src/logic/settings'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
+import { createStorageHelper } from './integration/utils/storage'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -133,13 +134,14 @@ async function initComponents(): Promise<TestComponents> {
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const community = createCommunityComponent({
+  const community = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     logs,
     peersStats,
-    storage
+    storage,
+    config
   })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
@@ -148,6 +150,8 @@ async function initComponents(): Promise<TestComponents> {
   const rpcClient = await createRpcClientComponent({ config, logs })
 
   const communitiesDbHelper = createDbHelper(pg)
+
+  const storageHelper = await createStorageHelper({ config })
 
   return {
     archipelagoStats,
@@ -184,6 +188,7 @@ async function initComponents(): Promise<TestComponents> {
     communitiesDbHelper,
     settings,
     voice,
-    voiceDb
+    voiceDb,
+    storageHelper
   }
 }

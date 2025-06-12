@@ -55,7 +55,8 @@ services:
       AWS_S3_BUCKET_ENDPOINT: 'http://localstack:4566'
       AWS_REGION: 'us-east-1'
       AWS_S3_BUCKET_PREFIX: 'social'
-      LOG_LEVEL: ALL
+      LOG_LEVEL: 'ALL'
+      CDN_URL: 'http://localhost:4566/social-service-ea'
     ports:
       - '3000:3000'
       - '3001:3001'

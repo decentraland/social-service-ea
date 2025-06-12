@@ -1,4 +1,4 @@
-import { S3Client } from '@aws-sdk/client-s3'
+import { HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 
 import { AppComponents, IStorageComponent } from '../types'
@@ -22,8 +22,22 @@ export async function createS3Adapter({ config }: Pick<AppComponents, 'config'>)
       }
     })
 
-    return await upload.done().then(() => `${bucketEndpoint}/${bucket}/${key}`)
+    return await upload.done().then(() => `${bucketEndpoint}/${bucket}/${bucketPrefix}/${key}`)
   }
 
-  return { storeFile }
+  async function exists(key: string): Promise<boolean> {
+    const command = new HeadObjectCommand({
+      Bucket: bucket,
+      Key: `${bucketPrefix}/${key}`
+    })
+
+    try {
+      await s3.send(command) // throws if file doesn't exist
+      return true
+    } catch (error: any) {
+      return false
+    }
+  }
+
+  return { storeFile, exists }
 }
