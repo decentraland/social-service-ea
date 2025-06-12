@@ -8,7 +8,8 @@ import {
   CommunityPublicInformation,
   CommunityMember,
   MemberCommunity,
-  BannedMember
+  BannedMember,
+  CommunityPlace
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -153,17 +154,33 @@ export function createCommunitiesDBComponent(
       return pg.getCount(query)
     },
 
-    async getCommunityPlaces(communityId: string): Promise<string[]> {
+    async getCommunityPlaces(communityId: string, pagination: Pagination): Promise<CommunityPlace[]> {
       const query = SQL`
-        SELECT 
-          CASE 
-            WHEN place_type = 'parcel' THEN position
-            ELSE world_name
-          END as place
+        SELECT place_id as "placeId"
         FROM community_places
-        WHERE community_id = ${communityId}`
-      const result = await pg.query<{ place: string }>(query)
-      return result.rows.map((row) => row.place)
+        WHERE community_id = ${communityId}
+        ORDER BY added_at DESC
+        `
+
+      if (pagination.limit) {
+        query.append(SQL` LIMIT ${pagination.limit}`)
+      }
+
+      if (pagination.offset) {
+        query.append(SQL` OFFSET ${pagination.offset}`)
+      }
+
+      const result = await pg.query<CommunityPlace>(query)
+      return result.rows
+    },
+
+    async getCommunityPlacesCount(communityId: string): Promise<number> {
+      const query = SQL`
+        SELECT COUNT(1)
+        FROM community_places
+        WHERE community_id = ${communityId}
+      `
+      return pg.getCount(query)
     },
 
     async getCommunities(

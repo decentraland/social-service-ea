@@ -48,6 +48,11 @@ export type ICommunityComponent = {
     targetAddress: EthAddress,
     newRole: CommunityRole
   ) => Promise<void>
+  getPlaces: (
+    communityId: string,
+    userAddress: EthAddress,
+    pagination: PaginatedParameters
+  ) => Promise<{ places: CommunityPlace[]; totalPlaces: number }>
 }
 
 export type ICommunityRolesComponent = {
@@ -168,3 +173,7 @@ export type GetCommunitiesWithTotal<T> = {
 }
 
 export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress'> & { role: CommunityRole }
+
+export type CommunityPlace = {
+  placeId: string
+}

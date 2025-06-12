@@ -7,7 +7,7 @@ import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { EthAddress, FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
+import { EthAddress, FriendshipAcceptedEvent, FriendshipRequestEvent, PaginatedParameters } from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
@@ -33,7 +33,8 @@ import {
   GetCommunitiesOptions,
   CommunityPublicInformation,
   MemberCommunity,
-  BannedMember
+  BannedMember,
+  CommunityPlace
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -116,7 +117,8 @@ export interface IFriendsDatabaseComponent {
 export interface ICommunitiesDatabaseComponent {
   communityExists(communityId: string, options?: Pick<GetCommunitiesOptions, 'onlyPublic'>): Promise<boolean>
   getCommunity(id: string, userAddress: EthAddress): Promise<(Community & { role: CommunityRole }) | null>
-  getCommunityPlaces(communityId: string): Promise<string[]>
+  getCommunityPlaces(communityId: string, pagination: PaginatedParameters): Promise<CommunityPlace[]>
+  getCommunityPlacesCount(communityId: string): Promise<number>
   createCommunity(community: CommunityDB): Promise<Community>
   deleteCommunity(id: string): Promise<void>
   getCommunities(

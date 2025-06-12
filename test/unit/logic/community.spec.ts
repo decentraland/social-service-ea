@@ -15,10 +15,7 @@ import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockCatalystClient } from '../../mocks/components/catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createMockProfile } from '../../mocks/profile'
-import {
-  CommunityWithMembersCountAndFriends,
-  ICommunityRolesComponent
-} from '../../../src/logic/community/types'
+import { CommunityWithMembersCountAndFriends, ICommunityRolesComponent } from '../../../src/logic/community/types'
 import { parseExpectedFriends } from '../../mocks/friend'
 import { MemberCommunity } from '../../../src/logic/community/types'
 import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
@@ -1349,6 +1346,77 @@ describe('when handling community operations', () => {
         await communityComponent.updateMemberRole(communityId, updaterAddress, targetAddress, newRole)
 
         expect(mockCommunitiesDB.updateMemberRole).toHaveBeenCalledWith(communityId, targetAddress, newRole)
+      })
+    })
+  })
+
+  describe('and getting community places', () => {
+    const communityId = 'test-community'
+    const mockPlaces = [{ placeId: 'place-1' }, { placeId: 'place-2' }]
+
+    beforeEach(() => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(true)
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      mockCommunitiesDB.getCommunityPlaces.mockResolvedValue(mockPlaces)
+      mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(2)
+    })
+
+    it('should return places with total count', async () => {
+      const result = await communityComponent.getPlaces(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(result).toEqual({
+        places: mockPlaces,
+        totalPlaces: 2
+      })
+    })
+
+    it('should fetch places and total count from the database', async () => {
+      await communityComponent.getPlaces(communityId, mockUserAddress, {
+        limit: 10,
+        offset: 0
+      })
+
+      expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, {
+        limit: 10,
+        offset: 0
+      })
+      expect(mockCommunitiesDB.getCommunityPlacesCount).toHaveBeenCalledWith(communityId)
+    })
+
+    it('should throw CommunityNotFoundError when community does not exist', async () => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(false)
+
+      await expect(
+        communityComponent.getPlaces(communityId, mockUserAddress, {
+          limit: 10,
+          offset: 0
+        })
+      ).rejects.toThrow(new CommunityNotFoundError(communityId))
+    })
+
+    it('should throw NotAuthorizedError when user is not a member', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+
+      await expect(
+        communityComponent.getPlaces(communityId, mockUserAddress, {
+          limit: 10,
+          offset: 0
+        })
+      ).rejects.toThrow(new NotAuthorizedError("The user doesn't have permission to get places"))
+    })
+
+    it('should handle pagination correctly', async () => {
+      await communityComponent.getPlaces(communityId, mockUserAddress, {
+        limit: 1,
+        offset: 1
+      })
+
+      expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, {
+        limit: 1,
+        offset: 1
       })
     })
   })
