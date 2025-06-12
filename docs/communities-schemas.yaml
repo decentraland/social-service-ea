@@ -88,7 +88,7 @@ components:
                         type: object
                         additionalProperties:
                           type: string
-                        description: 'A map of thumbnail types to URLs.'
+                        description: 'A map of thumbnail types to URLs. The key is the thumbnail type (e.g. "raw") and the value is the URL.'
                       friends:
                         type: array
                         items:
@@ -138,7 +138,7 @@ components:
               type: object
               additionalProperties:
                 type: string
-              description: 'A map of thumbnail types to URLs.'
+              description: 'A map of thumbnail types to URLs. The key is the thumbnail type (e.g. "raw") and the value is the URL.'
     GetCommunityById200OkResponse:
       type: object
       required:
@@ -177,7 +177,7 @@ components:
               type: object
               additionalProperties:
                 type: string
-              description: 'A map of thumbnail types to URLs.'
+              description: 'A map of thumbnail types to URLs. The key is the thumbnail type (e.g. "raw") and the value is the URL.'
     GetCommunityMembers200OkResponse:
       type: object
       required:
