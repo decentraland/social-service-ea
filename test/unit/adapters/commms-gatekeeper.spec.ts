@@ -181,7 +181,8 @@ describe('when getting the private voice chat credentials', () => {
       expect(fetchMock).toHaveBeenCalledWith('https://comms-gatekeeper.org/private-voice-chat', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer comms-gatekeeper-token'
         },
         body: JSON.stringify({ room_id: roomId, user_addresses: [calleeAddress, callerAddress] })
       })
