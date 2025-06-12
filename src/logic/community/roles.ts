@@ -125,6 +125,16 @@ export function createCommunityRolesComponent(
         canActOnMember(updaterRole, targetRole) &&
         newRole !== CommunityRole.Owner
       )
+    },
+
+    async canAddPlacesToCommunity(communityId: string, adderAddress: string): Promise<boolean> {
+      const role = await communitiesDb.getCommunityMemberRole(communityId, adderAddress)
+      return role && hasPermission(role, 'add_places')
+    },
+
+    async canRemovePlacesFromCommunity(communityId: string, removerAddress: string): Promise<boolean> {
+      const role = await communitiesDb.getCommunityMemberRole(communityId, removerAddress)
+      return role && hasPermission(role, 'remove_places')
     }
   }
 }

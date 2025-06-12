@@ -18,6 +18,7 @@ export async function createCommunityHandler(
   try {
     const name: string = formData.fields.name?.value
     const description: string = formData.fields.description?.value
+    const placeIds: string[] = JSON.parse(formData.fields.placeIds?.value ?? [])
 
     const thumbnailFile = formData?.files?.['thumbnail']
 
@@ -25,15 +26,22 @@ export async function createCommunityHandler(
       logger.error('Invalid request body while creating Community', {
         name,
         description,
-        thumbnails: thumbnailFile ? 'present' : 'missing'
+        thumbnails: thumbnailFile ? 'present' : 'missing',
+        placeIds: placeIds.length
       })
 
       throw new InvalidRequestError('Invalid request body')
     }
 
+    if (!Array.isArray(placeIds)) {
+      logger.error('Invalid placeIds format', { placeIds })
+      throw new InvalidRequestError('placeIds must be an array')
+    }
+
     logger.info('Creating community', {
       owner: address,
-      name
+      name,
+      placeIds: placeIds.length
     })
 
     const createdCommunity = await community.createCommunity(
@@ -42,7 +50,8 @@ export async function createCommunityHandler(
         description,
         ownerAddress: address
       },
-      thumbnailFile?.value
+      thumbnailFile?.value,
+      placeIds
     )
 
     logger.info('Community created', {

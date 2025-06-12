@@ -191,9 +191,27 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
-    async removeCommunityPlace(id: string): Promise<void> {
+    async addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void> {
+      if (places.length === 0) return
+
       const query = SQL`
-        DELETE FROM community_places WHERE id = ${id}
+        INSERT INTO community_places (id, community_id, added_by)
+        VALUES 
+      `
+
+      places.forEach((place, index) => {
+        query.append(SQL`(${place.id}, ${place.communityId}, ${normalizeAddress(place.addedBy)})`)
+        if (index < places.length - 1) {
+          query.append(SQL`, `)
+        }
+      })
+
+      await pg.query(query)
+    },
+
+    async removeCommunityPlace(communityId: string, placeId: string): Promise<void> {
+      const query = SQL`
+        DELETE FROM community_places WHERE id = ${placeId} AND community_id = ${communityId}
       `
       await pg.query(query)
     },

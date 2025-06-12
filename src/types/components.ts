@@ -120,7 +120,8 @@ export interface ICommunitiesDatabaseComponent {
   getCommunityPlaces(communityId: string, pagination: PaginatedParameters): Promise<CommunityPlace[]>
   getCommunityPlacesCount(communityId: string): Promise<number>
   addCommunityPlace(place: CommunityPlace): Promise<void>
-  removeCommunityPlace(id: string): Promise<void>
+  addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void>
+  removeCommunityPlace(communityId: string, placeId: string): Promise<void>
   createCommunity(community: CommunityDB): Promise<Community>
   deleteCommunity(id: string): Promise<void>
   getCommunities(

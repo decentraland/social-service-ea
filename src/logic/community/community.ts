@@ -14,8 +14,7 @@ import {
   BannedMemberProfile,
   BannedMember,
   CommunityMember,
-  GetCommunityMembersOptions,
-  CommunityPlace
+  GetCommunityMembersOptions
 } from './types'
 import {
   isOwner,
@@ -29,10 +28,18 @@ import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 export async function createCommunityComponent(
   components: Pick<
     AppComponents,
-    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats' | 'storage' | 'config'
+    | 'communitiesDb'
+    | 'catalystClient'
+    | 'communityRoles'
+    | 'communityPlaces'
+    | 'logs'
+    | 'peersStats'
+    | 'storage'
+    | 'config'
   >
 ): Promise<ICommunityComponent> {
-  const { communitiesDb, catalystClient, communityRoles, logs, peersStats, storage, config } = components
+  const { communitiesDb, catalystClient, communityRoles, communityPlaces, logs, peersStats, storage, config } =
+    components
 
   const logger = logs.getLogger('community-component')
   const CDN_URL = await config.requireString('CDN_URL')
@@ -273,7 +280,8 @@ export async function createCommunityComponent(
 
     createCommunity: async (
       community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
-      thumbnail?: Buffer
+      thumbnail?: Buffer,
+      placeIds: string[] = []
     ): Promise<Community> => {
       const ownedNames = await catalystClient.getOwnedNames(community.ownerAddress, {
         pageSize: '1'
@@ -306,6 +314,10 @@ export async function createCommunityComponent(
         memberAddress: community.ownerAddress,
         role: CommunityRole.Owner
       })
+
+      if (placeIds.length > 0) {
+        await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, placeIds)
+      }
 
       return newCommunity
     },
@@ -424,27 +436,6 @@ export async function createCommunityComponent(
       }
 
       await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
-    },
-
-    getPlaces: async (
-      communityId: string,
-      userAddress: EthAddress,
-      pagination: PaginatedParameters
-    ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
-      const communityExists = await communitiesDb.communityExists(communityId)
-      if (!communityExists) {
-        throw new CommunityNotFoundError(communityId)
-      }
-
-      const memberRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-      if (!memberRole || memberRole === CommunityRole.None) {
-        throw new NotAuthorizedError("The user doesn't have permission to get places")
-      }
-
-      const places = await communitiesDb.getCommunityPlaces(communityId, pagination)
-      const totalPlaces = await communitiesDb.getCommunityPlacesCount(communityId)
-
-      return { places, totalPlaces }
     }
   }
 }
