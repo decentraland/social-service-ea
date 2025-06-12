@@ -10,6 +10,7 @@ import {
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { VoiceChatStatus } from './voice/types'
 
 export type ILogger = ILoggerComponent.ILogger
 
@@ -109,6 +110,62 @@ export function blockUpdateHandler(subscribersContext: ISubscribersContext, logg
     if (updateEmitter) {
       updateEmitter.emit('blockUpdate', update)
     }
+  }, logger)
+}
+
+export function privateVoiceChatUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
+  return handleUpdate<'privateVoiceChatUpdate'>((update) => {
+    logger.info('Private voice chat update', { update: JSON.stringify(update) })
+
+    const addressesToNotify: string[] = []
+
+    switch (update.status) {
+      // Requested voice chats are only relevant for the callee, as they're being invited to the private voice chat
+      case VoiceChatStatus.REQUESTED:
+        if (update.calleeAddress) {
+          addressesToNotify.push(update.calleeAddress)
+        }
+        break
+      // Accepted voice chats are only relevant for the caller, as they're accepting the invitation
+      case VoiceChatStatus.ACCEPTED:
+        if (update.callerAddress) {
+          addressesToNotify.push(update.callerAddress)
+        }
+        break
+      // Rejected voice chats are only relevant for the caller, as they're rejecting the invitation
+      case VoiceChatStatus.REJECTED:
+        if (update.callerAddress) {
+          addressesToNotify.push(update.callerAddress)
+        }
+        break
+      // Ended voice chats are relevant for both the caller and the callee, as one of them is ending the call
+      case VoiceChatStatus.ENDED:
+        if (update.callerAddress) {
+          addressesToNotify.push(update.callerAddress)
+        }
+        if (update.calleeAddress) {
+          addressesToNotify.push(update.calleeAddress)
+        }
+        break
+      // Expired voice chats are relevant for both the caller and the callee, as it has expired for both of them
+      case VoiceChatStatus.EXPIRED:
+        if (update.callerAddress) {
+          addressesToNotify.push(update.callerAddress)
+        }
+        if (update.calleeAddress) {
+          addressesToNotify.push(update.calleeAddress)
+        }
+        break
+      default:
+        return
+    }
+
+    addressesToNotify.forEach((address) => {
+      const updateEmitter = subscribersContext.getOrAddSubscriber(address)
+      if (updateEmitter) {
+        updateEmitter.emit('privateVoiceChatUpdate', update)
+      }
+    })
   }, logger)
 }
 

@@ -21,8 +21,10 @@ export function acceptPrivateVoiceChatService({ components: { logs, voice } }: R
           $case: 'ok',
           ok: {
             callId: request.callId,
-            token,
-            url
+            credentials: {
+              token,
+              url
+            }
           }
         }
       }

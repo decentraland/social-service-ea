@@ -20,6 +20,9 @@ A microservice that handles social interactions (friendships) and referral syste
   - [Friendship Flow Diagrams](#friendship-flow-diagrams)
   - [Block System Flow](#block-system-flow)
   - [Referral System Flow](#referral-system-flow)
+- [🔗 API Documentation for Communities](#-api-documentation-for-communities)
+  - [Local Development](#local-development)
+  - [Documentation Structure](#documentation-structure)
 - [🚀 Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
   - [Local Development](#local-development)
@@ -32,6 +35,7 @@ A microservice that handles social interactions (friendships) and referral syste
 ## 🌟 Features
 
 ### Social Features
+
 - Friendship management (requests, accepts, rejects, cancellations)
 - Real-time friend status updates
 - Mutual friends discovery
@@ -40,6 +44,7 @@ A microservice that handles social interactions (friendships) and referral syste
 - User blocking system
 
 ### Referral Features
+
 - New referral progress validation
 - Referrer tier validation
 - Unlocked tiers calculation
@@ -63,6 +68,7 @@ This service follows the Well Known Components pattern, where each component is 
 - **Peers Synchronization**: Synchronizes peers with the Archipelago Stats service and store them in Redis
 
 #### Referral Components
+
 - **Database (PostgreSQL)**: Stores referral records and rewards
 - **Auth Chain Validator**: Validates authentication chains for referrals
 - **Reward Calculator**: Calculates and manages referral rewards
@@ -313,6 +319,24 @@ sequenceDiagram
     HTTP Server->>DB: Get Referral Stats
     HTTP Server-->>Client: Referral Progress Data
 ```
+
+## 🔗 API Documentation for Communities
+
+The API documentation is automatically generated and deployed to GitHub Pages when changes are pushed to the main branch.
+
+You can view the latest documentation at: [https://decentraland.github.io/social-service-ea/](https://decentraland.github.io/social-service-ea/).
+
+### Local Development
+
+```bash
+npx @redocly/cli preview-docs docs/communities-openapi.yaml
+```
+
+### Documentation Structure
+
+- `docs/communities-openapi.yaml`: OpenAPI specification for the Communities API
+- `docs/communities-schemas.yaml`: Shared schemas used in the OpenAPI specification
+- `docs/index.html`: Generated documentation (do not edit manually)
 
 ## 🚀 Getting Started
 

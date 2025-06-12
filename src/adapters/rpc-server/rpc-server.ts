@@ -10,12 +10,18 @@ import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/socia
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 import { getFriendshipStatusService } from './services/get-friendship-status'
 import { subscribeToFriendConnectivityUpdatesService } from './services/subscribe-to-friend-connectivity-updates'
-import { BLOCK_UPDATES_CHANNEL, FRIEND_STATUS_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../pubsub'
+import {
+  BLOCK_UPDATES_CHANNEL,
+  FRIEND_STATUS_UPDATES_CHANNEL,
+  FRIENDSHIP_UPDATES_CHANNEL,
+  PRIVATE_VOICE_CHAT_UPDATES_CHANNEL
+} from '../pubsub'
 import {
   friendshipUpdateHandler,
   friendConnectivityUpdateHandler,
   friendshipAcceptedUpdateHandler,
-  blockUpdateHandler
+  blockUpdateHandler,
+  privateVoiceChatUpdateHandler
 } from '../../logic/updates'
 import { getPrivateMessagesSettingsService } from './services/get-private-messages-settings'
 import { upsertSocialSettingsService } from './services/upsert-social-settings'
@@ -29,6 +35,9 @@ import { createRpcServerMetricsWrapper, ServiceType } from './metrics-wrapper'
 import { startPrivateVoiceChatService } from './services/start-private-voice-chat'
 import { acceptPrivateVoiceChatService } from './services/accept-private-voice-chat'
 import { rejectPrivateVoiceChatService } from './services/reject-private-voice-chat'
+import { endPrivateVoiceChatService } from './services/end-private-voice-chat'
+import { getIncomingPrivateVoiceChatRequestsService } from './services/get-incoming-private-voice-chat-requests'
+import { subscribeToPrivateVoiceChatUpdatesService } from './services/subscribe-to-private-voice-chat-updates'
 
 export async function createRpcServerComponent({
   logs,
@@ -36,15 +45,14 @@ export async function createRpcServerComponent({
   pubsub,
   config,
   uwsServer,
-  archipelagoStats,
   catalystClient,
   sns,
   subscribersContext,
-  worldsStats,
   commsGatekeeper,
   metrics,
   settings,
-  voice
+  voice,
+  peersStats
 }: Pick<
   AppComponents,
   | 'logs'
@@ -52,15 +60,14 @@ export async function createRpcServerComponent({
   | 'pubsub'
   | 'config'
   | 'uwsServer'
-  | 'archipelagoStats'
   | 'catalystClient'
   | 'sns'
   | 'subscribersContext'
-  | 'worldsStats'
   | 'commsGatekeeper'
   | 'metrics'
   | 'settings'
   | 'voice'
+  | 'peersStats'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -106,7 +113,7 @@ export async function createRpcServerComponent({
     },
     subscribeToFriendConnectivityUpdates: {
       creator: subscribeToFriendConnectivityUpdatesService({
-        components: { logs, friendsDb: friendsDb, archipelagoStats, catalystClient, worldsStats }
+        components: { logs, friendsDb: friendsDb, catalystClient, peersStats }
       }),
       type: ServiceType.STREAM,
       event: 'friend_connectivity_updates'
@@ -115,6 +122,11 @@ export async function createRpcServerComponent({
       creator: subscribeToBlockUpdatesService({ components: { logs, catalystClient } }),
       type: ServiceType.STREAM,
       event: 'block_updates'
+    },
+    subscribeToPrivateVoiceChatUpdates: {
+      creator: subscribeToPrivateVoiceChatUpdatesService({ components: { logs, voice, catalystClient } }),
+      type: ServiceType.STREAM,
+      event: 'private_voice_chat_updates'
     },
     blockUser: {
       creator: blockUserService({ components: { logs, friendsDb: friendsDb, catalystClient, pubsub } }),
@@ -155,6 +167,14 @@ export async function createRpcServerComponent({
     rejectPrivateVoiceChat: {
       creator: rejectPrivateVoiceChatService({ components: { logs, voice } }),
       type: ServiceType.CALL
+    },
+    endPrivateVoiceChat: {
+      creator: endPrivateVoiceChatService({ components: { logs, voice } }),
+      type: ServiceType.CALL
+    },
+    getIncomingPrivateVoiceChatRequest: {
+      creator: getIncomingPrivateVoiceChatRequestsService({ components: { logs, voice } }),
+      type: ServiceType.CALL
     }
   }
 
@@ -180,6 +200,10 @@ export async function createRpcServerComponent({
         friendConnectivityUpdateHandler(subscribersContext, logger, friendsDb)
       )
       await pubsub.subscribeToChannel(BLOCK_UPDATES_CHANNEL, blockUpdateHandler(subscribersContext, logger))
+      await pubsub.subscribeToChannel(
+        PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
+        privateVoiceChatUpdateHandler(subscribersContext, logger)
+      )
     },
     attachUser({ transport, address }) {
       logger.debug('[DEBUGGING CONNECTION] Attaching user to RPC', {
@@ -204,6 +228,10 @@ export async function createRpcServerComponent({
     detachUser(address) {
       logger.debug('[DEBUGGING CONNECTION] Detaching user from RPC', {
         address
+      })
+      // End all calls that the user is involved in
+      voice.endIncomingOrOutgoingPrivateVoiceChatForUser(address).catch((_) => {
+        // Do nothing
       })
       subscribersContext.removeSubscriber(address)
     }

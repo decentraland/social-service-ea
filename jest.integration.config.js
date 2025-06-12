@@ -1,5 +1,6 @@
 module.exports = {
   preset: 'ts-jest',
+  runInBand: true,
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: 'test/tsconfig.json' }]
   },

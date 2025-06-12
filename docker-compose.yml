@@ -28,7 +28,7 @@ services:
     ports:
       - '4566:4566'
     environment:
-      - SERVICES=sns
+      - SERVICES=sns,s3
     volumes:
       - ./localstack:/etc/localstack/init/ready.d
 
@@ -37,6 +37,9 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
+      UWS_SERVER_PORT: '3000'
+      API_HTTP_SERVER_PORT: '3001'
+      RPC_SERVER_PORT: '8085'
       PG_COMPONENT_PSQL_CONNECTION_STRING: 'postgresql://postgres:postgres@postgres:5432/social_service_ea'
       REDIS_HOST: 'redis'
       NATS_URL: 'nats://nats:4222'
@@ -48,8 +51,15 @@ services:
       COMMS_GATEKEEPER_AUTH_TOKEN: 'aToken'
       AWS_SNS_ARN: 'arn:aws:sns:us-east-1:000000000000:events'
       AWS_SNS_ENDPOINT: 'http://localstack:4566'
+      AWS_S3_BUCKET: 'social-service-ea'
+      AWS_S3_BUCKET_ENDPOINT: 'http://localstack:4566'
+      AWS_REGION: 'us-east-1'
+      AWS_S3_BUCKET_PREFIX: 'social'
+      LOG_LEVEL: 'ALL'
+      CDN_URL: 'http://localhost:4566/social-service-ea'
     ports:
       - '3000:3000'
+      - '3001:3001'
       - '8085:8085'
     depends_on:
       - postgres

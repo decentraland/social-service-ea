@@ -36,12 +36,20 @@ import { createMessageProcessorComponent } from './logic/message-processor'
 import { createSqsAdapter } from './adapters/sqs'
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
 import { createMessagesConsumerComponent } from './logic/message-consumer'
+import { createPeersStatsComponent } from './logic/peers-stats'
+import { createS3Adapter } from './adapters/s3'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
   const config = await createDotEnvConfigComponent({ path: ['.env.default', '.env'] })
-  const uwsHttpServerConfig = await createConfigComponent({
-    HTTP_SERVER_PORT: await config.requireString('UWS_HTTP_SERVER_PORT'),
+
+  const uwsHttpServerConfig = createConfigComponent({
+    HTTP_SERVER_PORT: await config.requireString('UWS_SERVER_PORT'), // 5000
+    HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
+  })
+
+  const apiSeverConfig = createConfigComponent({
+    HTTP_SERVER_PORT: await config.requireString('API_HTTP_SERVER_PORT'), // 5001
     HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
   })
 
@@ -50,7 +58,7 @@ export async function initComponents(): Promise<AppComponents> {
   const tracing = await createTracingComponent({ config, logs })
 
   const httpServer = await createServerComponent<GlobalContext>(
-    { config, logs },
+    { config: apiSeverConfig, logs },
     {
       cors: {
         methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT', 'PATCH'],
@@ -102,7 +110,9 @@ export async function initComponents(): Promise<AppComponents> {
   const voiceDb = await createVoiceDBComponent({ pg, config })
   const voice = await createVoiceComponent({ logs, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
   const sns = await createSnsComponent({ config })
+  const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
+  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const rpcServer = await createRpcServerComponent({
     logs,
     commsGatekeeper,
@@ -110,20 +120,27 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     uwsServer,
     config,
-    archipelagoStats,
     catalystClient,
     sns,
     subscribersContext,
-    worldsStats,
     metrics,
     settings,
-    voice
+    voice,
+    peersStats
   })
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const community = createCommunityComponent({ communitiesDb, catalystClient, communityRoles, logs })
+  const community = await createCommunityComponent({
+    communitiesDb,
+    catalystClient,
+    communityRoles,
+    logs,
+    peersStats,
+    storage,
+    config
+  })
 
   const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
   const queue = sqsEndpoint ? await createSqsAdapter(sqsEndpoint) : createMemoryQueueAdapter()
@@ -153,6 +170,7 @@ export async function initComponents(): Promise<AppComponents> {
     metrics,
     nats,
     peerTracking,
+    peersStats,
     peersSynchronizer,
     pg,
     pubsub,
@@ -163,12 +181,13 @@ export async function initComponents(): Promise<AppComponents> {
     settings,
     sns,
     statusChecks,
+    storage,
     subscribersContext,
     tracing,
     uwsServer,
-    voice,
     voiceDb,
-    worldsStats,
-    wsPool
+    voice,
+    wsPool,
+    worldsStats
   }
 }

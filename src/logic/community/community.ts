@@ -13,7 +13,8 @@ import {
   Community,
   BannedMemberProfile,
   BannedMember,
-  CommunityMember
+  CommunityMember,
+  GetCommunityMembersOptions
 } from './types'
 import {
   isOwner,
@@ -24,12 +25,72 @@ import {
 } from './utils'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
-export function createCommunityComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs'>
-): ICommunityComponent {
-  const { communitiesDb, catalystClient, communityRoles, logs } = components
+export async function createCommunityComponent(
+  components: Pick<
+    AppComponents,
+    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats' | 'storage' | 'config'
+  >
+): Promise<ICommunityComponent> {
+  const { communitiesDb, catalystClient, communityRoles, logs, peersStats, storage, config } = components
 
   const logger = logs.getLogger('community-component')
+  const CDN_URL = await config.requireString('CDN_URL')
+
+  const filterAndCountCommunityMembers = async (
+    id: string,
+    options: GetCommunityMembersOptions,
+    userAddress?: EthAddress
+  ) => {
+    const { pagination, onlyOnline } = options
+    const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress })
+
+    if (!communityExists) {
+      throw new CommunityNotFoundError(id)
+    }
+
+    const memberRole = userAddress ? await communitiesDb.getCommunityMemberRole(id, userAddress) : CommunityRole.None
+
+    if (userAddress && memberRole === CommunityRole.None) {
+      throw new NotAuthorizedError("The user doesn't have permission to get community members")
+    }
+
+    let onlinePeers: string[] | undefined = undefined
+
+    if (onlyOnline) {
+      onlinePeers = await peersStats.getConnectedPeers()
+      logger.info(`Getting community members for community using the ${onlinePeers.length} connected peers`)
+    }
+
+    const communityMembers = await communitiesDb.getCommunityMembers(id, {
+      userAddress,
+      pagination,
+      filterByMembers: onlinePeers
+    })
+    const totalMembers = await communitiesDb.getCommunityMembersCount(id, { filterByMembers: onlinePeers })
+
+    const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
+
+    const membersWithProfile: CommunityMemberProfile[] = mapMembersWithProfiles<
+      CommunityMember,
+      CommunityMemberProfile
+    >(userAddress, communityMembers, profiles)
+
+    return { members: membersWithProfile, totalMembers }
+  }
+
+  const buildThumbnailUrl = (communityId: string) => {
+    return `${CDN_URL}/social/communities/${communityId}/raw-thumbnail.png`
+  }
+
+  const getThumbnail = async (communityId: string): Promise<string | undefined> => {
+    const thumbnailExists = await storage.exists(`communities/${communityId}/raw-thumbnail.png`)
+
+    if (!thumbnailExists) {
+      return undefined
+    }
+
+    return buildThumbnailUrl(communityId)
+  }
 
   return {
     getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount> => {
@@ -40,6 +101,14 @@ export function createCommunityComponent(
 
       if (!community) {
         throw new CommunityNotFoundError(id)
+      }
+
+      const thumbnail = await getThumbnail(community.id)
+
+      if (thumbnail) {
+        community.thumbnails = {
+          raw: thumbnail
+        }
       }
 
       return toCommunityWithMembersCount(community, membersCount)
@@ -53,10 +122,25 @@ export function createCommunityComponent(
         communitiesDb.getCommunities(userAddress, options),
         communitiesDb.getCommunitiesCount(userAddress, options)
       ])
+
+      const communitiesWithThumbnails = await Promise.all(
+        communities.map(async (community) => {
+          const thumbnail = await getThumbnail(community.id)
+
+          if (thumbnail) {
+            community.thumbnails = {
+              raw: thumbnail
+            }
+          }
+
+          return community
+        })
+      )
+
       const friendsAddresses = Array.from(new Set(communities.flatMap((community) => community.friends)))
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
       return {
-        communities: toCommunityResults(communities, friendsProfiles),
+        communities: toCommunityResults(communitiesWithThumbnails, friendsProfiles),
         total
       }
     },
@@ -70,8 +154,22 @@ export function createCommunityComponent(
         communitiesDb.getPublicCommunitiesCount({ search })
       ])
 
+      const communitiesWithThumbnails = await Promise.all(
+        communities.map(async (community) => {
+          const thumbnail = await getThumbnail(community.id)
+
+          if (thumbnail) {
+            community.thumbnails = {
+              raw: thumbnail
+            }
+          }
+
+          return community
+        })
+      )
+
       return {
-        communities: communities.map(toPublicCommunity),
+        communities: communitiesWithThumbnails.map(toPublicCommunity),
         total
       }
     },
@@ -79,31 +177,16 @@ export function createCommunityComponent(
     getCommunityMembers: async (
       id: string,
       userAddress: EthAddress,
-      pagination: Required<PaginatedParameters>
+      options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      const communityExists = await communitiesDb.communityExists(id)
+      return filterAndCountCommunityMembers(id, options, userAddress)
+    },
 
-      if (!communityExists) {
-        throw new CommunityNotFoundError(id)
-      }
-
-      const memberRole = await communitiesDb.getCommunityMemberRole(id, userAddress)
-
-      if (memberRole === CommunityRole.None) {
-        throw new NotAuthorizedError("The user doesn't have permission to get community members")
-      }
-
-      const communityMembers = await communitiesDb.getCommunityMembers(id, userAddress, pagination)
-      const totalMembers = await communitiesDb.getCommunityMembersCount(id)
-
-      const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
-
-      const membersWithProfile: CommunityMemberProfile[] = mapMembersWithProfiles<
-        CommunityMember,
-        CommunityMemberProfile
-      >(userAddress, communityMembers, profiles)
-
-      return { members: membersWithProfile, totalMembers }
+    getMembersFromPublicCommunity: async (
+      id: string,
+      options: GetCommunityMembersOptions
+    ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
+      return filterAndCountCommunityMembers(id, options)
     },
 
     getMemberCommunities: async (
@@ -187,7 +270,10 @@ export function createCommunityComponent(
       await communitiesDb.kickMemberFromCommunity(communityId, memberAddress)
     },
 
-    createCommunity: async (community: Omit<Community, 'id' | 'active' | 'privacy'>): Promise<Community> => {
+    createCommunity: async (
+      community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
+      thumbnail?: Buffer
+    ): Promise<Community> => {
       const ownedNames = await catalystClient.getOwnedNames(community.ownerAddress, {
         pageSize: '1'
       })
@@ -202,6 +288,17 @@ export function createCommunityComponent(
         private: false, // TODO: support private communities
         active: true
       })
+
+      logger.info('Community created', { communityId: newCommunity.id, name: newCommunity.name })
+
+      if (thumbnail) {
+        const thumbnailUrl = await storage.storeFile(thumbnail, `communities/${newCommunity.id}/raw-thumbnail.png`)
+
+        logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id })
+        newCommunity.thumbnails = {
+          raw: thumbnailUrl
+        }
+      }
 
       await communitiesDb.addCommunityMember({
         communityId: newCommunity.id,
@@ -303,6 +400,29 @@ export function createCommunityComponent(
       )
 
       return { members: membersWithProfile, totalMembers: totalBannedMembers }
+    },
+
+    updateMemberRole: async (
+      communityId: string,
+      updaterAddress: EthAddress,
+      targetAddress: EthAddress,
+      newRole: CommunityRole
+    ): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const canUpdate = await communityRoles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+
+      if (!canUpdate) {
+        throw new NotAuthorizedError(
+          `The user ${updaterAddress} doesn't have permission to update ${targetAddress}'s role in community ${communityId}`
+        )
+      }
+
+      await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
     }
   }
 }

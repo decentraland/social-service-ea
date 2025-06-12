@@ -37,6 +37,20 @@ export async function createVoiceDBComponent(
       const results = await pg.query<PrivateVoiceChat>(query)
       return results.rows[0] ?? null
     },
+    async getPrivateVoiceChatForCalleeAddress(calleeAddress: string): Promise<PrivateVoiceChat | null> {
+      const query = SQL`
+        SELECT * FROM private_voice_chats WHERE callee_address = ${normalizeAddress(calleeAddress)}
+      `
+      const results = await pg.query<PrivateVoiceChat>(query)
+      return results.rows[0] ?? null
+    },
+    async getPrivateVoiceChatOfUser(address: string): Promise<PrivateVoiceChat | null> {
+      const query = SQL`
+        SELECT * FROM private_voice_chats WHERE caller_address = ${normalizeAddress(address)} OR callee_address = ${normalizeAddress(address)}
+      `
+      const results = await pg.query<PrivateVoiceChat>(query)
+      return results.rows[0] ?? null
+    },
     async deletePrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null> {
       const query = SQL`
         DELETE FROM private_voice_chats WHERE id = ${callId} RETURNING *;

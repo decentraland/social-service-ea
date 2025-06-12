@@ -2,10 +2,9 @@ import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import {
   mockLogs,
-  mockArchipelagoStats,
   mockFriendsDB,
   mockCatalystClient,
-  mockWorldsStats
+  createMockPeersStatsComponent
 } from '../../../../mocks/components'
 import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friend-connectivity-updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -13,6 +12,7 @@ import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
+import { IPeersStatsComponent } from '../../../../../src/logic/peers-stats'
 
 jest.mock('../../../../../src/logic/updates')
 
@@ -21,19 +21,20 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   let rpcContext: RpcServerContext
   const mockFriendProfile = createMockProfile('0x456')
   const mockHandler = handleSubscriptionUpdates as jest.Mock
+  let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   const friend = {
     address: '0x456'
   }
   const subscribersContext = createSubscribersContext()
 
   beforeEach(async () => {
+    mockPeersStats = createMockPeersStatsComponent()
     subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
       components: {
         logs: mockLogs,
         friendsDb: mockFriendsDB,
-        archipelagoStats: mockArchipelagoStats,
         catalystClient: mockCatalystClient,
-        worldsStats: mockWorldsStats
+        peersStats: mockPeersStats
       }
     })
 
@@ -46,8 +47,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   it('should get initial online friends from archipelago stats and then receive updates', async () => {
     mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
-    mockArchipelagoStats.getPeers.mockResolvedValue(['0x456', '0x789'])
-    mockWorldsStats.getPeers.mockResolvedValue(['0x654', '0x987'])
+    mockPeersStats.getConnectedPeers.mockResolvedValueOnce(['0x456', '0x789', '0x654', '0x987'])
     mockHandler.mockImplementationOnce(async function* () {
       yield {
         friend: parseProfileToFriend(mockFriendProfile),
@@ -58,8 +58,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
     const result = await generator.next()
 
-    expect(mockArchipelagoStats.getPeers).toHaveBeenCalled()
-    expect(mockWorldsStats.getPeers).toHaveBeenCalled()
+    expect(mockPeersStats.getConnectedPeers).toHaveBeenCalled()
     expect(result.value).toEqual({
       friend: parseProfileToFriend(mockFriendProfile),
       status: ConnectivityStatus.ONLINE
@@ -87,50 +86,6 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
 
     const result2 = await generator.next()
     expect(result2.done).toBe(true)
-  })
-
-  it('should handle errors from archipelago stats', async () => {
-    mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
-    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
-    mockArchipelagoStats.getPeers.mockRejectedValueOnce(new Error('Archipelago error'))
-    mockWorldsStats.getPeers.mockResolvedValue(['0x456'])
-    mockHandler.mockImplementationOnce(async function* () {
-      yield {
-        friend: parseProfileToFriend(mockFriendProfile),
-        status: ConnectivityStatus.ONLINE
-      }
-    })
-
-    const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
-
-    const result = await generator.next()
-    expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([friend.address])
-    expect(result.done).toBe(false)
-
-    const result2 = await generator.next()
-    expect(result2.done).toBe(false)
-  })
-
-  it('should handle errors from worlds stats', async () => {
-    mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
-    mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
-    mockArchipelagoStats.getPeers.mockResolvedValueOnce(['0x456'])
-    mockWorldsStats.getPeers.mockRejectedValueOnce(new Error('Worlds error'))
-    mockHandler.mockImplementationOnce(async function* () {
-      yield {
-        friend: parseProfileToFriend(mockFriendProfile),
-        status: ConnectivityStatus.ONLINE
-      }
-    })
-
-    const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
-
-    const result = await generator.next()
-    expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([friend.address])
-    expect(result.done).toBe(false)
-
-    const result2 = await generator.next()
-    expect(result2.done).toBe(false)
   })
 
   it('should handle errors during subscription', async () => {

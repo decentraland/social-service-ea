@@ -20,7 +20,8 @@ import {
   getCommunitiesWithMembersCountCTE,
   withSearchAndPagination,
   getLatestFriendshipActionCTE,
-  getMembersCTE
+  getMembersCTE,
+  CTE
 } from '../logic/queries'
 import { EthAddress } from '@dcl/schemas'
 
@@ -30,13 +31,18 @@ export function createCommunitiesDBComponent(
   const { pg } = components
 
   return {
-    async communityExists(communityId: string): Promise<boolean> {
+    async communityExists(
+      communityId: string,
+      { onlyPublic = false }: { onlyPublic?: boolean } = {}
+    ): Promise<boolean> {
       const query = SQL`
         SELECT EXISTS (
           SELECT 1 FROM communities
           WHERE id = ${communityId} AND active = true
-        ) AS "exists"
       `
+        .append(onlyPublic ? SQL` AND private <> true` : SQL``)
+        .append(SQL`) AS "exists"`)
+
       return pg.exists(query, 'exists')
     },
 
@@ -68,29 +74,36 @@ export function createCommunitiesDBComponent(
       return result.rows[0]
     },
 
-    async getCommunityMembers(id: string, userAddress: EthAddress, pagination: Pagination): Promise<CommunityMember[]> {
-      const normalizedUserAddress = normalizeAddress(userAddress)
+    async getCommunityMembers(
+      id: string,
+      options: { userAddress: EthAddress; pagination: Pagination; filterByMembers?: string[] }
+    ): Promise<CommunityMember[]> {
+      const { userAddress, pagination, filterByMembers } = options
+      const normalizedUserAddress = userAddress ? normalizeAddress(userAddress) : null
 
-      const query = useCTEs([
+      const ctes = [
         getMembersCTE(SQL`SELECT member_address FROM community_members WHERE community_id = ${id}`),
-        getLatestFriendshipActionCTE(normalizedUserAddress)
-      ])
+        normalizedUserAddress && getLatestFriendshipActionCTE(normalizedUserAddress)
+      ].filter(Boolean) as CTE[]
+
+      const query = useCTEs(ctes)
         .append(
-          SQL`
-        SELECT 
-          cm.community_id AS "communityId",
-          cm.member_address AS "memberAddress",
-          cm.role AS "role",
-          cm.joined_at AS "joinedAt",
-          lfa.action AS "lastFriendshipAction",
-          lfa.acting_user AS "actingUser"
-        FROM community_members cm
-        LEFT JOIN latest_friendship_actions lfa ON lfa.other_user = cm.member_address
-        WHERE cm.community_id = ${id}
-        ORDER BY cm.joined_at ASC
-      `
+          SQL`SELECT cm.community_id AS "communityId", cm.member_address AS "memberAddress", cm.role AS "role", cm.joined_at AS "joinedAt"`
         )
-        .append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
+        .append(
+          normalizedUserAddress ? SQL`, lfa.action AS "lastFriendshipAction", lfa.acting_user AS "actingUser"` : SQL``
+        )
+        .append(SQL` FROM community_members cm`)
+        .append(
+          normalizedUserAddress
+            ? SQL` LEFT JOIN latest_friendship_actions lfa ON lfa.other_user = cm.member_address`
+            : SQL``
+        )
+        .append(SQL` WHERE cm.community_id = ${id}`)
+        .append(filterByMembers ? SQL` AND cm.member_address = ANY(${filterByMembers.map(normalizeAddress)})` : SQL``)
+        .append(SQL` ORDER BY cm.joined_at ASC`)
+        .append(SQL` LIMIT ${pagination.limit}`)
+        .append(SQL` OFFSET ${pagination.offset}`)
 
       const result = await pg.query<CommunityMember>(query)
       return result.rows
@@ -120,7 +133,7 @@ export function createCommunitiesDBComponent(
       )
     },
 
-    async getCommunityMembersCount(communityId: string): Promise<number> {
+    async getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number> {
       const query = SQL`
         SELECT COUNT(cm.member_address) 
           FROM community_members cm
@@ -132,6 +145,11 @@ export function createCommunitiesDBComponent(
                   AND c.active = true
               )
       `
+
+      if (options && options.filterByMembers) {
+        query.append(SQL` AND cm.member_address = ANY(${options.filterByMembers.map(normalizeAddress)})`)
+      }
+
       return pg.getCount(query)
     },
 
@@ -422,6 +440,15 @@ export function createCommunitiesDBComponent(
           AND active = true
       `
       return pg.getCount(query)
+    },
+
+    async updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void> {
+      const query = SQL`
+        UPDATE community_members 
+        SET role = ${newRole}
+        WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
+      `
+      await pg.query(query)
     }
   }
 }

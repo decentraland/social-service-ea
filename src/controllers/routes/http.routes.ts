@@ -17,6 +17,8 @@ import { getBannedMembersHandler } from '../handlers/get-banned-members-handler'
 import { createReferralHandler } from '../handlers/create-referral-handler'
 import { updateReferralSignedUpHandler } from '../handlers/update-referral-signed-up-handler'
 import { getInvitedUsersAcceptedHandler } from '../handlers/get-invited-users-accepted-handler'
+import { updateMemberRoleHandler } from '../handlers/update-member-role-handler'
+import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -40,10 +42,11 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.get('/v1/communities/:id', signedFetchMiddleware(), getCommunityHandler)
   router.get('/v1/communities', signedFetchMiddleware({ optional: true }), getCommunitiesHandler)
-  router.get('/v1/communities/:id/members', signedFetchMiddleware(), getCommunityMembersHandler)
+  router.get('/v1/communities/:id/members', signedFetchMiddleware({ optional: true }), getCommunityMembersHandler)
 
   router.post('/v1/communities/:id/members', signedFetchMiddleware(), addMemberToCommunityHandler)
   router.delete('/v1/communities/:id/members/:memberAddress', signedFetchMiddleware(), removeMemberFromCommunityHandler)
+  router.patch('/v1/communities/:id/members/:address', signedFetchMiddleware(), updateMemberRoleHandler)
 
   router.get('/v1/communities/:id/bans', signedFetchMiddleware(), getBannedMembersHandler)
   router.post('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), banMemberHandler)
@@ -51,7 +54,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.get('/v1/members/:address/communities', signedFetchMiddleware(), getMemberCommunitiesHandler)
 
-  router.post('/v1/communities', signedFetchMiddleware(), createCommunityHandler)
+  router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
   router.delete('/v1/communities/:id', signedFetchMiddleware(), deleteCommunityHandler)
 
   router.post('/v1/referral-progress', signedFetchMiddleware(), createReferralHandler)

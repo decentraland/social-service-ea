@@ -29,7 +29,9 @@ import {
   ICommunitiesDatabaseComponent,
   IPgComponent,
   ICommunitiesDbHelperComponent,
-  IVoiceDatabaseComponent
+  IVoiceDatabaseComponent,
+  IStorageComponent,
+  IStorageHelperComponent
 } from './components'
 import { ICommunityComponent, ICommunityRolesComponent } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
@@ -38,6 +40,7 @@ import { IReferralDatabaseComponent } from './referral-db.type'
 import { IQueueComponent } from './sqs.type'
 import { IMessageProcessorComponent } from './message-processor.type'
 import { IMessageConsumerComponent } from './message-consumer.type'
+import { IPeersStatsComponent } from '../logic/peers-stats'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -61,6 +64,7 @@ export type BaseComponents = {
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
+  peersStats: IPeersStatsComponent
   peersSynchronizer: IPeersSynchronizer
   pg: IPgComponent
   pubsub: IPubSubComponent
@@ -78,6 +82,7 @@ export type BaseComponents = {
   settings: ISettingsComponent
   voice: IVoiceComponent
   voiceDb: IVoiceDatabaseComponent
+  storage: IStorageComponent
 }
 
 // components used in runtime
@@ -90,4 +95,5 @@ export type TestComponents = BaseComponents & {
   localHttpFetch: IFetchComponent
   rpcClient: IRpcClient
   communitiesDbHelper: ICommunitiesDbHelperComponent
+  storageHelper: IStorageHelperComponent
 }
