@@ -16,14 +16,13 @@ import { mockCatalystClient } from '../../mocks/components/catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createMockProfile } from '../../mocks/profile'
 import {
-  CommunityMemberProfile,
   CommunityWithMembersCountAndFriends,
   ICommunityRolesComponent
 } from '../../../src/logic/community/types'
 import { parseExpectedFriends } from '../../mocks/friend'
 import { MemberCommunity } from '../../../src/logic/community/types'
 import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
-import { mockLogs } from '../../mocks/components'
+import { createMockConfigComponent, mockConfig, mockLogs } from '../../mocks/components'
 import { mapMembersWithProfiles } from '../../../src/logic/community/utils'
 import { Action } from '../../../src/types/entities'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -39,7 +38,7 @@ describe('when handling community operations', () => {
   let mockMembersCount: number
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockCommunity = {
       id: 'test-id',
       name: 'Test Community',
@@ -55,13 +54,14 @@ describe('when handling community operations', () => {
       getConnectedPeers: jest.fn().mockResolvedValue([])
     })
     mockCommunityRoles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
-    communityComponent = createCommunityComponent({
+    communityComponent = await createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
       logs: mockLogs,
       peersStats: mockPeersStats,
-      storage: createS3ComponentMock()
+      storage: createS3ComponentMock(),
+      config: mockConfig
     })
   })
 
