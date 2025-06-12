@@ -1,7 +1,7 @@
 import { ILoggerComponent, IFetchComponent, IConfigComponent } from '@well-known-components/interfaces'
 import { createCommsGatekeeperComponent } from '../../../src/adapters/comms-gatekeeper'
 import { ICommsGatekeeperComponent, PrivateMessagesPrivacy } from '../../../src/types'
-import { createLogsMockedComponent, createMockConfigComponent, mockConfig } from '../../mocks/components'
+import { createLogsMockedComponent, createMockConfigComponent } from '../../mocks/components'
 
 let fetchMock: jest.Mock
 let errorLogMock: jest.Mock
@@ -178,6 +178,13 @@ describe('when getting the private voice chat credentials', () => {
 
     it('should resolve with the credentials', async () => {
       const credentials = await commsGatekeeper.getPrivateVoiceChatCredentials(roomId, calleeAddress, callerAddress)
+      expect(fetchMock).toHaveBeenCalledWith('https://comms-gatekeeper.org/private-voice-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ room_id: roomId, user_addresses: [calleeAddress, callerAddress] })
+      })
       expect(credentials).toEqual(response)
     })
   })
