@@ -3,6 +3,14 @@ import { FormHandlerContextWithPath, HTTPResponse } from '../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../utils/errors'
 
+const parsePlaceIds = (placeIds: string): string[] => {
+  try {
+    return JSON.parse(placeIds)
+  } catch {
+    throw new InvalidRequestError('placeIds must be a valid JSON array')
+  }
+}
+
 export async function createCommunityHandler(
   context: FormHandlerContextWithPath<'community' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
 ): Promise<HTTPResponse> {
@@ -18,7 +26,8 @@ export async function createCommunityHandler(
   try {
     const name: string = formData.fields.name?.value
     const description: string = formData.fields.description?.value
-    const placeIds: string[] = JSON.parse(formData.fields.placeIds?.value ?? [])
+
+    const placeIds: string[] = parsePlaceIds(formData.fields.placeIds?.value || '[]')
 
     const thumbnailFile = formData?.files?.['thumbnail']
 

@@ -46,6 +46,7 @@ export async function createCommunityPlacesComponent(
         )
       }
 
+      // TODO: validate that places are owned by the user
       const places = placeIds.map((id) => ({
         id,
         communityId,

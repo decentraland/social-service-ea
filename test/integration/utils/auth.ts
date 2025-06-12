@@ -57,10 +57,16 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
   return (
     identity: Identity,
     path: string,
-    { name, description, thumbnailPath }: { name?: string; description?: string; thumbnailPath?: string }
+    {
+      name,
+      description,
+      thumbnailPath,
+      placeIds
+    }: { name?: string; description?: string; thumbnailPath?: string; placeIds?: string[] }
   ) => {
     const { localHttpFetch } = components
     const form = new FormData()
+
     if (name) {
       form.append('name', name)
     }
@@ -71,6 +77,10 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
 
     if (thumbnailPath) {
       form.append('thumbnail', fs.createReadStream(thumbnailPath), 'thumbnail.png')
+    }
+
+    if (placeIds) {
+      form.append('placeIds', JSON.stringify(placeIds))
     }
 
     const headers = {
