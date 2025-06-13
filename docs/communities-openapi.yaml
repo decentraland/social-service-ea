@@ -83,7 +83,7 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               required:
@@ -94,11 +94,13 @@ paths:
                   type: string
                 description:
                   type: string
-                thumbnails:
-                  type: object
-                  additionalProperties:
-                    type: string
-                  description: 'A map of thumbnail types to URLs.'
+                placeIds:
+                  type: string
+                  description: 'JSON array of place IDs to add to the community'
+                thumbnail:
+                  type: string
+                  format: binary
+                  description: 'Community thumbnail image'
       responses:
         '201':
           description: Community created successfully
