@@ -1,10 +1,11 @@
 import { test } from '../components'
-import { createTestIdentity, Identity } from './utils/auth'
+import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { makeAuthenticatedMultipartRequest } from './utils/auth'
 import { randomUUID } from 'crypto'
 
 test('Create Community Controller', async function ({ components, stubComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
+  const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when creating a community', () => {
     let identity: Identity
@@ -89,13 +90,10 @@ test('Create Community Controller', async function ({ components, stubComponents
                 message: 'Community created successfully'
               })
 
-              // Verify places were added
-              const places = await components.communityPlaces.getPlaces(
-                communityId,
-                identity.realAccount.address.toLowerCase(),
-                { limit: 10, offset: 0 }
-              )
-              expect(places.places.map((p) => p.id)).toEqual(expect.arrayContaining(mockPlaceIds))
+              const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+              expect(placesResponse.status).toBe(200)
+              const result = await placesResponse.json()
+              expect(result.data.results.map((p: { id: string }) => p.id)).toEqual(expect.arrayContaining(mockPlaceIds))
             })
 
             it('should create community without places when empty array is provided', async () => {
@@ -110,13 +108,10 @@ test('Create Community Controller', async function ({ components, stubComponents
 
               expect(response.status).toBe(201)
 
-              // Verify no places were added
-              const places = await components.communityPlaces.getPlaces(
-                communityId,
-                identity.realAccount.address.toLowerCase(),
-                { limit: 10, offset: 0 }
-              )
-              expect(places.places).toHaveLength(0)
+              const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+              expect(placesResponse.status).toBe(200)
+              const result = await placesResponse.json()
+              expect(result.data.results).toHaveLength(0)
             })
           })
 
