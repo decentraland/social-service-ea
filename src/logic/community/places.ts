@@ -11,6 +11,7 @@ export async function createCommunityPlacesComponent(
 
   const _logger = logs.getLogger('community-places-component')
 
+  // TODO: better way of validating existence and permissions. It should not be responsibility of this component.
   return {
     getPlaces: async (
       communityId: string,
