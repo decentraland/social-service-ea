@@ -31,6 +31,7 @@ import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_servi
 import { createMockPeersStatsComponent } from '../../mocks/components'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { createS3ComponentMock } from '../../mocks/components/s3'
+import { CommunityPlace } from '../../../src/logic/community/types'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
@@ -1455,6 +1456,94 @@ describe('when handling community operations', () => {
       await communityComponent.createCommunity(mockCommunity, mockThumbnail, mockPlaceIds)
 
       expect(mockStorage.storeFile).toHaveBeenCalledWith(mockThumbnail, 'communities/test-id/raw-thumbnail.png')
+    })
+  })
+
+  describe('when getting community places', () => {
+    const communityId = 'test-community'
+    const userAddress = '0x1234567890123456789012345678901234567890'
+    const mockPlaces: CommunityPlace[] = [
+      {
+        id: 'place-1',
+        communityId,
+        addedBy: userAddress,
+        addedAt: new Date()
+      },
+      {
+        id: 'place-2',
+        communityId,
+        addedBy: userAddress,
+        addedAt: new Date()
+      }
+    ]
+
+    beforeEach(() => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(true)
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      mockCommunitiesDB.getCommunityPlaces.mockResolvedValue(mockPlaces.map((mockPlace) => ({ id: mockPlace.id })))
+      mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(2)
+    })
+
+    it('should return places with total count', async () => {
+      const result = await communityComponent.getCommunityPlaces(communityId, {
+        userAddress,
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      expect(result).toEqual({
+        places: mockPlaces.map((place) => ({ id: place.id })),
+        totalPlaces: 2
+      })
+    })
+
+    it('should throw CommunityNotFoundError when community does not exist', async () => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(false)
+
+      await expect(
+        communityComponent.getCommunityPlaces(communityId, {
+          userAddress,
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
+      ).rejects.toThrow(new CommunityNotFoundError(communityId))
+    })
+
+    it('should throw NotAuthorizedError when user is not a member', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+
+      await expect(
+        communityComponent.getCommunityPlaces(communityId, {
+          userAddress,
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
+      ).rejects.toThrow(
+        new NotAuthorizedError(
+          `The user ${userAddress} doesn't have permission to get places from community ${communityId}`
+        )
+      )
+    })
+
+    it('should handle pagination correctly', async () => {
+      await communityComponent.getCommunityPlaces(communityId, {
+        userAddress,
+        pagination: {
+          limit: 1,
+          offset: 1
+        }
+      })
+
+      expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, {
+        limit: 1,
+        offset: 1
+      })
     })
   })
 })

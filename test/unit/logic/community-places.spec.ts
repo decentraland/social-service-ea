@@ -43,14 +43,12 @@ describe('when handling community places operations', () => {
 
   describe('and getting community places', () => {
     beforeEach(() => {
-      mockCommunitiesDB.communityExists.mockResolvedValue(true)
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
       mockCommunitiesDB.getCommunityPlaces.mockResolvedValue(mockPlaces)
       mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(2)
     })
 
     it('should return places with total count', async () => {
-      const result = await communityPlacesComponent.getPlaces(communityId, mockUserAddress, {
+      const result = await communityPlacesComponent.getPlaces(communityId, {
         limit: 10,
         offset: 0
       })
@@ -62,7 +60,7 @@ describe('when handling community places operations', () => {
     })
 
     it('should fetch places and total count from the database', async () => {
-      await communityPlacesComponent.getPlaces(communityId, mockUserAddress, {
+      await communityPlacesComponent.getPlaces(communityId, {
         limit: 10,
         offset: 0
       })
@@ -74,30 +72,8 @@ describe('when handling community places operations', () => {
       expect(mockCommunitiesDB.getCommunityPlacesCount).toHaveBeenCalledWith(communityId)
     })
 
-    it('should throw CommunityNotFoundError when community does not exist', async () => {
-      mockCommunitiesDB.communityExists.mockResolvedValue(false)
-
-      await expect(
-        communityPlacesComponent.getPlaces(communityId, mockUserAddress, {
-          limit: 10,
-          offset: 0
-        })
-      ).rejects.toThrow(new CommunityNotFoundError(communityId))
-    })
-
-    it('should throw NotAuthorizedError when user is not a member', async () => {
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
-
-      await expect(
-        communityPlacesComponent.getPlaces(communityId, mockUserAddress, {
-          limit: 10,
-          offset: 0
-        })
-      ).rejects.toThrow(new NotAuthorizedError("The user doesn't have permission to get places"))
-    })
-
     it('should handle pagination correctly', async () => {
-      await communityPlacesComponent.getPlaces(communityId, mockUserAddress, {
+      await communityPlacesComponent.getPlaces(communityId, {
         limit: 1,
         offset: 1
       })

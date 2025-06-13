@@ -1,5 +1,5 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
-import { AppComponents, CommunityRole } from '../../types'
+import { AppComponents } from '../../types'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
 import { CommunityPlace, ICommunityPlacesComponent } from './types'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
@@ -11,23 +11,11 @@ export async function createCommunityPlacesComponent(
 
   const _logger = logs.getLogger('community-places-component')
 
-  // TODO: better way of validating existence and permissions. It should not be responsibility of this component.
   return {
     getPlaces: async (
       communityId: string,
-      userAddress: EthAddress,
       pagination: PaginatedParameters
     ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
-      const communityExists = await communitiesDb.communityExists(communityId)
-      if (!communityExists) {
-        throw new CommunityNotFoundError(communityId)
-      }
-
-      const memberRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-      if (!memberRole || memberRole === CommunityRole.None) {
-        throw new NotAuthorizedError("The user doesn't have permission to get places")
-      }
-
       const places = await communitiesDb.getCommunityPlaces(communityId, pagination)
       const totalPlaces = await communitiesDb.getCommunityPlacesCount(communityId)
 

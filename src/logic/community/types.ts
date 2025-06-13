@@ -49,6 +49,13 @@ export interface ICommunityComponent {
     targetAddress: EthAddress,
     newRole: CommunityRole
   ): Promise<void>
+  getCommunityPlaces(
+    communityId: string,
+    options: {
+      userAddress?: EthAddress
+      pagination: PaginatedParameters
+    }
+  ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
 }
 
 export type ICommunityRolesComponent = {
@@ -82,7 +89,6 @@ export type ICommunityRolesComponent = {
 export type ICommunityPlacesComponent = {
   getPlaces(
     communityId: string,
-    userAddress: EthAddress,
     pagination: PaginatedParameters
   ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
   addPlaces(communityId: string, userAddress: EthAddress, placeIds: string[]): Promise<void>

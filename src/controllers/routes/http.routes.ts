@@ -55,7 +55,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
   router.delete('/v1/communities/:id', signedFetchMiddleware(), deleteCommunityHandler)
 
-  router.get('/v1/communities/:id/places', signedFetchMiddleware(), getCommunityPlacesHandler)
+  router.get('/v1/communities/:id/places', signedFetchMiddleware({ optional: true }), getCommunityPlacesHandler)
   router.post('/v1/communities/:id/places', signedFetchMiddleware(), addCommunityPlacesHandler)
   router.delete('/v1/communities/:id/places/:placeId', signedFetchMiddleware(), removeCommunityPlaceHandler)
 

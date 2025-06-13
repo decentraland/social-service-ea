@@ -14,7 +14,8 @@ import {
   BannedMemberProfile,
   BannedMember,
   CommunityMember,
-  GetCommunityMembersOptions
+  GetCommunityMembersOptions,
+  CommunityPlace
 } from './types'
 import {
   isOwner,
@@ -436,6 +437,32 @@ export async function createCommunityComponent(
       }
 
       await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
+    },
+
+    getCommunityPlaces: async (
+      communityId: string,
+      options: {
+        userAddress?: EthAddress
+        pagination: PaginatedParameters
+      }
+    ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
+      const communityExists = await communitiesDb.communityExists(communityId, { onlyPublic: !options.userAddress })
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const memberRole = options.userAddress
+        ? await communitiesDb.getCommunityMemberRole(communityId, options.userAddress)
+        : CommunityRole.None
+
+      if (options.userAddress && memberRole === CommunityRole.None) {
+        throw new NotAuthorizedError(
+          `The user ${options.userAddress} doesn't have permission to get places from community ${communityId}`
+        )
+      }
+
+      return communityPlaces.getPlaces(communityId, options.pagination)
     }
   }
 }

@@ -7,12 +7,12 @@ import { getPaginationResultProperties } from '../../utils/pagination'
 
 export async function getCommunityPlacesHandler(
   context: Pick<
-    HandlerContextWithPath<'communityPlaces' | 'logs', '/v1/communities/:id/places'>,
+    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/places'>,
     'components' | 'url' | 'verification' | 'params'
   >
 ): Promise<HTTPResponse<PaginatedResponse<Pick<CommunityPlace, 'id'>>>> {
   const {
-    components: { communityPlaces, logs },
+    components: { community, logs },
     verification,
     url,
     params: { id: communityId }
@@ -22,9 +22,12 @@ export async function getCommunityPlacesHandler(
   logger.info(`Getting places for community ${communityId}`)
 
   try {
-    const userAddress = verification!.auth.toLowerCase()
+    const userAddress = verification?.auth?.toLowerCase()
     const paginationParams = getPaginationParams(url.searchParams)
-    const { places, totalPlaces } = await communityPlaces.getPlaces(communityId, userAddress, paginationParams)
+    const { places, totalPlaces } = await community.getCommunityPlaces(communityId, {
+      userAddress,
+      pagination: paginationParams
+    })
 
     return {
       status: 200,

@@ -11,36 +11,71 @@ test('Get Community Places Controller', function ({ components, spyComponents })
   describe('when getting places from a community', () => {
     let identity: Identity
     let userAddress: string
-    let communityId: string
+    let publicCommunityId: string
+    let privateCommunityId: string
     let ownerAddress: string
-    let places: Array<{ id: string }>
+    let publicPlaces: Array<{ id: string }>
+    let privatePlaces: Array<{ id: string }>
 
     beforeEach(async () => {
       identity = await createTestIdentity()
       userAddress = identity.realAccount.address.toLowerCase()
       ownerAddress = '0x0000000000000000000000000000000000000001'
 
-      places = [{ id: randomUUID() }, { id: randomUUID() }]
+      publicPlaces = [{ id: randomUUID() }, { id: randomUUID() }]
+      privatePlaces = [{ id: randomUUID() }, { id: randomUUID() }]
 
-      const result = await components.communitiesDb.createCommunity(
+      // Create public community
+      const publicResult = await components.communitiesDb.createCommunity(
         mockCommunity({
-          name: 'Test Community',
-          description: 'Test Description',
-          owner_address: ownerAddress
+          name: 'Public Community',
+          description: 'Public Description',
+          owner_address: ownerAddress,
+          private: false
         })
       )
-      communityId = result.id
+      publicCommunityId = publicResult.id
 
-      await components.communitiesDb.addCommunityMember({
-        communityId,
-        memberAddress: ownerAddress,
-        role: CommunityRole.Owner
-      })
+      // Create private community
+      const privateResult = await components.communitiesDb.createCommunity(
+        mockCommunity({
+          name: 'Private Community',
+          description: 'Private Description',
+          owner_address: ownerAddress,
+          private: true
+        })
+      )
+      privateCommunityId = privateResult.id
 
-      for (const place of places) {
+      // Add owner to both communities
+      await Promise.all([
+        components.communitiesDb.addCommunityMember({
+          communityId: publicCommunityId,
+          memberAddress: ownerAddress,
+          role: CommunityRole.Owner
+        }),
+        components.communitiesDb.addCommunityMember({
+          communityId: privateCommunityId,
+          memberAddress: ownerAddress,
+          role: CommunityRole.Owner
+        })
+      ])
+
+      // Add places to public community
+      for (const place of publicPlaces) {
         await components.communitiesDb.addCommunityPlace({
           id: place.id,
-          communityId,
+          communityId: publicCommunityId,
+          addedBy: ownerAddress,
+          addedAt: new Date()
+        })
+      }
+
+      // Add places to private community
+      for (const place of privatePlaces) {
+        await components.communitiesDb.addCommunityPlace({
+          id: place.id,
+          communityId: privateCommunityId,
           addedBy: ownerAddress,
           addedAt: new Date()
         })
@@ -48,15 +83,41 @@ test('Get Community Places Controller', function ({ components, spyComponents })
     })
 
     afterEach(async () => {
-      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [userAddress, ownerAddress])
-      await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(publicCommunityId, [userAddress, ownerAddress])
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(privateCommunityId, [userAddress, ownerAddress])
+      await components.communitiesDbHelper.forceCommunityRemoval(publicCommunityId)
+      await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
     })
 
     describe('and the request is not signed', () => {
-      it('should respond with a 400 status code', async () => {
-        const { localHttpFetch } = components
-        const response = await localHttpFetch.fetch(`/v1/communities/${communityId}/places`)
-        expect(response.status).toBe(400)
+      describe('and the community is public', () => {
+        it('should respond with a 200 status code and return places', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/communities/${publicCommunityId}/places?limit=2&page=1`)
+
+          expect(response.status).toBe(200)
+          const result = await response.json()
+
+          expect(result.data).toEqual({
+            results: expect.arrayContaining([{ id: publicPlaces[0].id }, { id: publicPlaces[1].id }]),
+            total: 2,
+            page: 1,
+            pages: 1,
+            limit: 2
+          })
+        })
+      })
+
+      describe('and the community is private', () => {
+        it('should respond with a 404 status code', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/communities/${privateCommunityId}/places`)
+          expect(response.status).toBe(404)
+          expect(await response.json()).toEqual({
+            error: 'Not Found',
+            message: `Community not found: ${privateCommunityId}`
+          })
+        })
       })
     })
 
@@ -76,11 +137,11 @@ test('Get Community Places Controller', function ({ components, spyComponents })
       describe('and the community exists', () => {
         describe('and the user is not a member of the community', () => {
           it('should respond with a 401 status code', async () => {
-            const response = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+            const response = await makeRequest(identity, `/v1/communities/${privateCommunityId}/places`)
             expect(response.status).toBe(401)
             expect(await response.json()).toEqual({
               error: 'Not Authorized',
-              message: "The user doesn't have permission to get places"
+              message: `The user ${userAddress} doesn't have permission to get places from community ${privateCommunityId}`
             })
           })
         })
@@ -90,12 +151,12 @@ test('Get Community Places Controller', function ({ components, spyComponents })
 
           beforeEach(async () => {
             await components.communitiesDb.addCommunityMember({
-              communityId,
+              communityId: privateCommunityId,
               memberAddress: userAddress,
               role: CommunityRole.Member
             })
 
-            response = await makeRequest(identity, `/v1/communities/${communityId}/places?limit=2&page=1`)
+            response = await makeRequest(identity, `/v1/communities/${privateCommunityId}/places?limit=2&page=1`)
           })
 
           it('should respond with a 200 status code', async () => {
@@ -106,7 +167,7 @@ test('Get Community Places Controller', function ({ components, spyComponents })
             const result = await response.json()
 
             expect(result.data).toEqual({
-              results: expect.arrayContaining([{ id: places[0].id }, { id: places[1].id }]),
+              results: expect.arrayContaining([{ id: privatePlaces[0].id }, { id: privatePlaces[1].id }]),
               total: 2,
               page: 1,
               pages: 1,
@@ -118,7 +179,7 @@ test('Get Community Places Controller', function ({ components, spyComponents })
         describe('and an error occurs', () => {
           beforeEach(async () => {
             await components.communitiesDb.addCommunityMember({
-              communityId,
+              communityId: privateCommunityId,
               memberAddress: userAddress,
               role: CommunityRole.Member
             })
@@ -126,7 +187,7 @@ test('Get Community Places Controller', function ({ components, spyComponents })
           })
 
           it('should respond with a 500 status code', async () => {
-            const response = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+            const response = await makeRequest(identity, `/v1/communities/${privateCommunityId}/places`)
             expect(response.status).toBe(500)
             expect(await response.json()).toEqual({
               message: 'Unable to get places'

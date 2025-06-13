@@ -117,7 +117,7 @@ export interface IFriendsDatabaseComponent {
 export interface ICommunitiesDatabaseComponent {
   communityExists(communityId: string, options?: Pick<GetCommunitiesOptions, 'onlyPublic'>): Promise<boolean>
   getCommunity(id: string, userAddress: EthAddress): Promise<(Community & { role: CommunityRole }) | null>
-  getCommunityPlaces(communityId: string, pagination: PaginatedParameters): Promise<CommunityPlace[]>
+  getCommunityPlaces(communityId: string, pagination: PaginatedParameters): Promise<Pick<CommunityPlace, 'id'>[]>
   getCommunityPlacesCount(communityId: string): Promise<number>
   communityPlaceExists(communityId: string, placeId: string): Promise<boolean>
   addCommunityPlace(place: CommunityPlace): Promise<void>
