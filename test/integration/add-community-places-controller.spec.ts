@@ -39,6 +39,11 @@ test('Add Community Place Controller', function ({ components, spyComponents }) 
     afterEach(async () => {
       await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [userAddress, ownerAddress])
       await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+      await Promise.all(
+        mockPlaceIds.map(async (placeId) => {
+          await components.communitiesDb.removeCommunityPlace(communityId, placeId)
+        })
+      )
     })
 
     describe('and the request is not signed', () => {
@@ -143,6 +148,19 @@ test('Add Community Place Controller', function ({ components, spyComponents }) 
               placeIds: mockPlaceIds
             })
             expect(response.status).toBe(204)
+          })
+
+          it('should respond with a 204 status code when adding a place that already exists', async () => {
+            Array.from({ length: 2 }).forEach(async () => {
+              const response = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'POST', {
+                placeIds: mockPlaceIds
+              })
+              expect(response.status).toBe(204)
+            })
+
+            const response = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+            const result = await response.json()
+            expect(result.data.results).toHaveLength(mockPlaceIds.length)
           })
         })
       })

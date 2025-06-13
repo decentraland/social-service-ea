@@ -33,24 +33,24 @@ export async function createCommunityPlacesComponent(
       return { places, totalPlaces }
     },
 
-    addPlaces: async (communityId: string, userAddress: EthAddress, placeIds: string[]): Promise<void> => {
+    addPlaces: async (communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void> => {
       const communityExists = await communitiesDb.communityExists(communityId)
       if (!communityExists) {
         throw new CommunityNotFoundError(communityId)
       }
 
-      const canAdd = await communityRoles.canAddPlacesToCommunity(communityId, userAddress)
+      const canAdd = await communityRoles.canAddPlacesToCommunity(communityId, placesOwner)
       if (!canAdd) {
         throw new NotAuthorizedError(
-          `The user ${userAddress} doesn't have permission to add places to community ${communityId}`
+          `The user ${placesOwner} doesn't have permission to add places to community ${communityId}`
         )
       }
 
       // TODO: validate that places are owned by the user
-      const places = placeIds.map((id) => ({
+      const places = Array.from(new Set(placeIds)).map((id) => ({
         id,
         communityId,
-        addedBy: userAddress
+        addedBy: placesOwner
       }))
 
       await communitiesDb.addCommunityPlaces(places)

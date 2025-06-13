@@ -184,11 +184,7 @@ export function createCommunitiesDBComponent(
     },
 
     async addCommunityPlace(place: Omit<CommunityPlace, 'addedAt'>): Promise<void> {
-      const query = SQL`
-        INSERT INTO community_places (id, community_id, added_by)
-        VALUES (${place.id}, ${place.communityId}, ${normalizeAddress(place.addedBy)})
-      `
-      await pg.query(query)
+      await this.addCommunityPlaces([place])
     },
 
     async communityPlaceExists(communityId: string, placeId: string): Promise<boolean> {
@@ -215,6 +211,8 @@ export function createCommunitiesDBComponent(
           query.append(SQL`, `)
         }
       })
+
+      query.append(SQL` ON CONFLICT (id, community_id) DO NOTHING`)
 
       await pg.query(query)
     },

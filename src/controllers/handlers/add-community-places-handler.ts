@@ -8,7 +8,7 @@ interface AddPlacesRequest {
   placeIds: string[]
 }
 
-export async function addCommunityPlaceHandler(
+export async function addCommunityPlacesHandler(
   context: HandlerContextWithPath<'communityPlaces' | 'logs', '/v1/communities/:id/places'> &
     DecentralandSignatureContext<any>
 ): Promise<HTTPResponse> {
