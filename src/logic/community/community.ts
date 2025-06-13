@@ -14,7 +14,8 @@ import {
   BannedMemberProfile,
   BannedMember,
   CommunityMember,
-  GetCommunityMembersOptions
+  GetCommunityMembersOptions,
+  CommunityPlace
 } from './types'
 import {
   isOwner,
@@ -28,10 +29,18 @@ import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 export async function createCommunityComponent(
   components: Pick<
     AppComponents,
-    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats' | 'storage' | 'config'
+    | 'communitiesDb'
+    | 'catalystClient'
+    | 'communityRoles'
+    | 'communityPlaces'
+    | 'logs'
+    | 'peersStats'
+    | 'storage'
+    | 'config'
   >
 ): Promise<ICommunityComponent> {
-  const { communitiesDb, catalystClient, communityRoles, logs, peersStats, storage, config } = components
+  const { communitiesDb, catalystClient, communityRoles, communityPlaces, logs, peersStats, storage, config } =
+    components
 
   const logger = logs.getLogger('community-component')
   const CDN_URL = await config.requireString('CDN_URL')
@@ -48,9 +57,17 @@ export async function createCommunityComponent(
       throw new CommunityNotFoundError(id)
     }
 
-    const memberRole = userAddress ? await communitiesDb.getCommunityMemberRole(id, userAddress) : CommunityRole.None
+    const community = await communitiesDb.getCommunity(id)
+    if (!community) {
+      throw new CommunityNotFoundError(id)
+    }
 
-    if (userAddress && memberRole === CommunityRole.None) {
+    const memberRole =
+      community.privacy === 'private' && userAddress
+        ? await communitiesDb.getCommunityMemberRole(id, userAddress)
+        : CommunityRole.None
+
+    if (community.privacy === 'private' && userAddress && memberRole === CommunityRole.None) {
       throw new NotAuthorizedError("The user doesn't have permission to get community members")
     }
 
@@ -272,7 +289,8 @@ export async function createCommunityComponent(
 
     createCommunity: async (
       community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
-      thumbnail?: Buffer
+      thumbnail?: Buffer,
+      placeIds: string[] = []
     ): Promise<Community> => {
       const ownedNames = await catalystClient.getOwnedNames(community.ownerAddress, {
         pageSize: '1'
@@ -305,6 +323,10 @@ export async function createCommunityComponent(
         memberAddress: community.ownerAddress,
         role: CommunityRole.Owner
       })
+
+      if (placeIds.length > 0) {
+        await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, placeIds)
+      }
 
       return newCommunity
     },
@@ -423,6 +445,38 @@ export async function createCommunityComponent(
       }
 
       await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
+    },
+
+    getCommunityPlaces: async (
+      communityId: string,
+      options: {
+        userAddress?: EthAddress
+        pagination: PaginatedParameters
+      }
+    ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
+      const communityExists = await communitiesDb.communityExists(communityId, { onlyPublic: !options.userAddress })
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const community = await communitiesDb.getCommunity(communityId)
+      if (!community) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const memberRole =
+        community.privacy === 'private' && options.userAddress
+          ? await communitiesDb.getCommunityMemberRole(communityId, options.userAddress)
+          : CommunityRole.None
+
+      if (community.privacy === 'private' && options.userAddress && memberRole === CommunityRole.None) {
+        throw new NotAuthorizedError(
+          `The user ${options.userAddress} doesn't have permission to get places from community ${communityId}`
+        )
+      }
+
+      return communityPlaces.getPlaces(communityId, options.pagination)
     }
   }
 }

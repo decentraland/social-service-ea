@@ -15,6 +15,9 @@ import { banMemberHandler } from '../handlers/ban-member-handler'
 import { getBannedMembersHandler } from '../handlers/get-banned-members-handler'
 import { updateMemberRoleHandler } from '../handlers/update-member-role-handler'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
+import { getCommunityPlacesHandler } from '../handlers/get-community-places-handler'
+import { addCommunityPlacesHandler } from '../handlers/add-community-places-handler'
+import { removeCommunityPlaceHandler } from '../handlers/remove-community-place-handler'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -51,6 +54,10 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
   router.delete('/v1/communities/:id', signedFetchMiddleware(), deleteCommunityHandler)
+
+  router.get('/v1/communities/:id/places', signedFetchMiddleware({ optional: true }), getCommunityPlacesHandler)
+  router.post('/v1/communities/:id/places', signedFetchMiddleware(), addCommunityPlacesHandler)
+  router.delete('/v1/communities/:id/places/:placeId', signedFetchMiddleware(), removeCommunityPlaceHandler)
 
   return router
 }

@@ -37,7 +37,11 @@ import { mockPeersSynchronizer } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
-import { createCommunityComponent, createCommunityRolesComponent } from '../src/logic/community'
+import {
+  createCommunityComponent,
+  createCommunityPlacesComponent,
+  createCommunityRolesComponent
+} from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createSettingsComponent } from '../src/logic/settings'
@@ -134,10 +138,12 @@ async function initComponents(): Promise<TestComponents> {
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
+  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs })
   const community = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
+    communityPlaces,
     logs,
     peersStats,
     storage,
@@ -159,6 +165,7 @@ async function initComponents(): Promise<TestComponents> {
     commsGatekeeper,
     communitiesDb,
     community,
+    communityPlaces,
     communityRoles,
     config,
     fetcher,

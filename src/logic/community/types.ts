@@ -5,49 +5,57 @@ import {
 import { CommunityRole, CommunityPermission, Action } from '../../types/entities'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
-export type ICommunityComponent = {
-  getCommunity: (id: string, userAddress: EthAddress) => Promise<CommunityWithMembersCount>
-  getCommunities: (
-    userAddress: EthAddress,
+export interface ICommunityComponent {
+  getCommunity(id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount>
+  getCommunities(
+    userAddress: string,
     options: GetCommunitiesOptions
-  ) => Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>>
-  getCommunitiesPublicInformation: (
+  ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>>
+  getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
-  ) => Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
-  deleteCommunity: (id: string, userAddress: EthAddress) => Promise<void>
-  createCommunity: (
-    community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
-    thumbnail: Buffer
-  ) => Promise<Community>
-  getCommunityMembers: (
+  ): Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
+  getCommunityMembers(
     id: string,
     userAddress: EthAddress,
     options: GetCommunityMembersOptions
-  ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
-  getMembersFromPublicCommunity: (
+  ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
+  getMembersFromPublicCommunity(
     id: string,
     options: GetCommunityMembersOptions
-  ) => Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
-  getMemberCommunities: (
-    memberAddress: EthAddress,
+  ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
+  getMemberCommunities(
+    memberAddress: string,
     options: Pick<GetCommunitiesOptions, 'pagination'>
-  ) => Promise<GetCommunitiesWithTotal<MemberCommunity>>
-  kickMember: (communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
-  joinCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
-  leaveCommunity: (communityId: string, memberAddress: EthAddress) => Promise<void>
-  banMember: (communityId: string, bannerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
-  unbanMember: (communityId: string, unbannerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
-  getBannedMembers: (
+  ): Promise<GetCommunitiesWithTotal<MemberCommunity>>
+  kickMember(communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress): Promise<void>
+  joinCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
+  leaveCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
+  createCommunity(
+    community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
+    thumbnail?: Buffer,
+    placeIds?: string[]
+  ): Promise<Community>
+  deleteCommunity(id: string, userAddress: string): Promise<void>
+  banMember(communityId: string, bannerAddress: EthAddress, targetAddress: EthAddress): Promise<void>
+  unbanMember(communityId: string, unbannerAddress: EthAddress, targetAddress: EthAddress): Promise<void>
+  getBannedMembers(
     id: string,
     userAddress: EthAddress,
     pagination: Required<PaginatedParameters>
-  ) => Promise<{ members: BannedMemberProfile[]; totalMembers: number }>
-  updateMemberRole: (
+  ): Promise<{ members: BannedMemberProfile[]; totalMembers: number }>
+  updateMemberRole(
     communityId: string,
     updaterAddress: EthAddress,
     targetAddress: EthAddress,
     newRole: CommunityRole
-  ) => Promise<void>
+  ): Promise<void>
+  getCommunityPlaces(
+    communityId: string,
+    options: {
+      userAddress?: EthAddress
+      pagination: PaginatedParameters
+    }
+  ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
 }
 
 export type ICommunityRolesComponent = {
@@ -74,6 +82,17 @@ export type ICommunityRolesComponent = {
     targetAddress: string,
     newRole: CommunityRole
   ) => Promise<boolean>
+  canAddPlacesToCommunity: (communityId: string, adderAddress: string) => Promise<boolean>
+  canRemovePlacesFromCommunity: (communityId: string, removerAddress: string) => Promise<boolean>
+}
+
+export type ICommunityPlacesComponent = {
+  getPlaces(
+    communityId: string,
+    pagination: PaginatedParameters
+  ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
+  addPlaces(communityId: string, userAddress: EthAddress, placeIds: string[]): Promise<void>
+  removePlace(communityId: string, userAddress: EthAddress, placeId: string): Promise<void>
 }
 
 export type CommunityDB = {
@@ -102,7 +121,6 @@ type FriendshipAction = {
   actingUser?: string
 }
 
-// TODO: missing friendship status
 export type CommunityMember = {
   communityId: string
   memberAddress: string
@@ -168,3 +186,10 @@ export type GetCommunitiesWithTotal<T> = {
 }
 
 export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress'> & { role: CommunityRole }
+
+export type CommunityPlace = {
+  id: string
+  communityId: string
+  addedBy: string
+  addedAt: Date
+}

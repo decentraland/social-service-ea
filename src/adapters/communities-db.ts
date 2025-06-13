@@ -8,7 +8,8 @@ import {
   CommunityPublicInformation,
   CommunityMember,
   MemberCommunity,
-  BannedMember
+  BannedMember,
+  CommunityPlace
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -56,19 +57,29 @@ export function createCommunitiesDBComponent(
       return pg.exists(query, 'isMember')
     },
 
-    async getCommunity(id: string, userAddress: EthAddress): Promise<Community & { role: CommunityRole }> {
+    async getCommunity(id: string, userAddress?: EthAddress): Promise<Community & { role: CommunityRole }> {
+      const normalizedUserAddress = userAddress ? normalizeAddress(userAddress) : null
       const query = SQL`
         SELECT 
           c.id,
           c.name,
           c.description,
           c.owner_address as "ownerAddress",
-          COALESCE(cm.role, ${CommunityRole.None}) as role,
           CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
-          c.active
-        FROM communities c
-        LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizeAddress(userAddress)}
-        WHERE c.id = ${id} AND c.active = true`
+          c.active,
+      `
+        .append(
+          normalizedUserAddress
+            ? SQL` COALESCE(cm.role, ${CommunityRole.None}) as role`
+            : SQL` ${CommunityRole.None} as role`
+        )
+        .append(SQL` FROM communities c`)
+        .append(
+          normalizedUserAddress
+            ? SQL` LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedUserAddress}`
+            : SQL``
+        )
+        .append(SQL` WHERE c.id = ${id} AND c.active = true`)
 
       const result = await pg.query<Community & { role: CommunityRole }>(query)
       return result.rows[0]
@@ -153,17 +164,74 @@ export function createCommunitiesDBComponent(
       return pg.getCount(query)
     },
 
-    async getCommunityPlaces(communityId: string): Promise<string[]> {
+    async getCommunityPlaces(communityId: string, pagination: Pagination): Promise<Pick<CommunityPlace, 'id'>[]> {
       const query = SQL`
-        SELECT 
-          CASE 
-            WHEN place_type = 'parcel' THEN position
-            ELSE world_name
-          END as place
+        SELECT id
         FROM community_places
-        WHERE community_id = ${communityId}`
-      const result = await pg.query<{ place: string }>(query)
-      return result.rows.map((row) => row.place)
+        WHERE community_id = ${communityId}
+        ORDER BY added_at DESC
+        `
+
+      if (pagination.limit) {
+        query.append(SQL` LIMIT ${pagination.limit}`)
+      }
+
+      if (pagination.offset) {
+        query.append(SQL` OFFSET ${pagination.offset}`)
+      }
+
+      const result = await pg.query<Pick<CommunityPlace, 'id'>>(query)
+      return result.rows
+    },
+
+    async getCommunityPlacesCount(communityId: string): Promise<number> {
+      const query = SQL`
+        SELECT COUNT(1)
+        FROM community_places
+        WHERE community_id = ${communityId}
+      `
+      return pg.getCount(query)
+    },
+
+    async addCommunityPlace(place: Omit<CommunityPlace, 'addedAt'>): Promise<void> {
+      await this.addCommunityPlaces([place])
+    },
+
+    async communityPlaceExists(communityId: string, placeId: string): Promise<boolean> {
+      const query = SQL`
+        SELECT EXISTS (
+          SELECT 1 FROM community_places WHERE id = ${placeId} AND community_id = ${communityId}
+        ) AS "exists"
+      `
+
+      return pg.exists(query, 'exists')
+    },
+
+    async addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void> {
+      if (places.length === 0) return
+
+      const query = SQL`
+        INSERT INTO community_places (id, community_id, added_by)
+        VALUES 
+      `
+
+      places.forEach((place, index) => {
+        query.append(SQL`(${place.id}, ${place.communityId}, ${normalizeAddress(place.addedBy)})`)
+        if (index < places.length - 1) {
+          query.append(SQL`, `)
+        }
+      })
+
+      query.append(SQL` ON CONFLICT (id, community_id) DO NOTHING`)
+
+      await pg.query(query)
+    },
+
+    async removeCommunityPlace(communityId: string, placeId: string): Promise<void> {
+      const query = SQL`
+        DELETE FROM community_places WHERE id = ${placeId} AND community_id = ${communityId}
+      `
+      await pg.query(query)
     },
 
     async getCommunities(
