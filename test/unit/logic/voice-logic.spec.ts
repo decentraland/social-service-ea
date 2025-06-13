@@ -364,12 +364,12 @@ describe('when accepting a private voice chat', () => {
       })
 
       describe('and getting the private voice chat credentials succeeds', () => {
-        let calleeCredentials: { token: string; url: string }
-        let callerCredentials: { token: string; url: string }
+        let calleeCredentials: { connectionUrl: string }
+        let callerCredentials: { connectionUrl: string }
 
         beforeEach(() => {
-          calleeCredentials = { token: 'token', url: 'url' }
-          callerCredentials = { token: 'another-token', url: 'another-url' }
+          calleeCredentials = { connectionUrl: 'livekit:https://url.com?access_token=token' }
+          callerCredentials = { connectionUrl: 'livekit:https://another-url.com?access_token=token' }
 
           getPrivateVoiceChatCredentialsMock.mockResolvedValueOnce({
             [calleeAddress]: calleeCredentials,
@@ -390,14 +390,12 @@ describe('when accepting a private voice chat', () => {
               calleeAddress,
               status: 'accepted',
               credentials: {
-                token: callerCredentials.token,
-                url: callerCredentials.url
+                connectionUrl: callerCredentials.connectionUrl
               }
             })
             expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
             expect(result).toEqual({
-              token: calleeCredentials.token,
-              url: calleeCredentials.url
+              connectionUrl: calleeCredentials.connectionUrl
             })
           })
         })

@@ -14,7 +14,7 @@ export function acceptPrivateVoiceChatService({ components: { logs, voice } }: R
     context: RpcServerContext
   ): Promise<AcceptPrivateVoiceChatResponse> {
     try {
-      const { token, url } = await voice.acceptPrivateVoiceChat(request.callId, context.address)
+      const { connectionUrl } = await voice.acceptPrivateVoiceChat(request.callId, context.address)
 
       return {
         response: {
@@ -22,8 +22,7 @@ export function acceptPrivateVoiceChatService({ components: { logs, voice } }: R
           ok: {
             callId: request.callId,
             credentials: {
-              token,
-              url
+              connectionUrl
             }
           }
         }

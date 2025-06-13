@@ -105,14 +105,12 @@ export function createVoiceComponent({
         status: VoiceChatStatus.ACCEPTED,
         // Credentials for the caller
         credentials: {
-          token: credentials[privateVoiceChat.caller_address].token,
-          url: credentials[privateVoiceChat.caller_address].url
+          connectionUrl: credentials[privateVoiceChat.caller_address].connectionUrl
         }
       })
 
       return {
-        token: credentials[privateVoiceChat.callee_address].token,
-        url: credentials[privateVoiceChat.callee_address].url
+        connectionUrl: credentials[privateVoiceChat.callee_address].connectionUrl
       }
     } else {
       // If the voice chat was not deleted from the database, it means that the call was rejected by the callee

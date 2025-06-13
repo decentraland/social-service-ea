@@ -42,8 +42,7 @@ function parseEmittedUpdateToPrivateVoiceChatUpdate(
         : undefined,
     credentials: update.credentials
       ? PrivateVoiceChatCredentials.create({
-          url: update.credentials.url,
-          token: update.credentials.token
+          connectionUrl: update.credentials.connectionUrl
         })
       : undefined
   }

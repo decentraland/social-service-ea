@@ -159,15 +159,14 @@ describe('when getting the private voice chat credentials', () => {
   describe('and the request resolves with a 200 status code', () => {
     let response: {
       [key: string]: {
-        url: string
-        token: string
+        connection_url: string
       }
     }
 
     beforeEach(() => {
       response = {
-        [calleeAddress]: { url: 'https://url.com', token: 'token' },
-        [callerAddress]: { url: 'https://another-url.com', token: 'another-token' }
+        [calleeAddress]: { connection_url: 'livekit:https://url.com?access_token=token' },
+        [callerAddress]: { connection_url: 'livekit:https://another-url.com?access_token=token' }
       }
       fetchMock.mockResolvedValueOnce({
         ok: true,
@@ -186,7 +185,10 @@ describe('when getting the private voice chat credentials', () => {
         },
         body: JSON.stringify({ room_id: roomId, user_addresses: [calleeAddress, callerAddress] })
       })
-      expect(credentials).toEqual(response)
+      expect(credentials).toEqual({
+        [calleeAddress]: { connectionUrl: response[calleeAddress].connection_url },
+        [callerAddress]: { connectionUrl: response[callerAddress].connection_url }
+      })
     })
   })
 
