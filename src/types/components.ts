@@ -252,7 +252,7 @@ export type ICommsGatekeeperComponent = {
     roomId: string,
     calleeAddress: string,
     callerAddress: string
-  ) => Promise<Record<string, { url: string; token: string }>>
+  ) => Promise<Record<string, { connectionUrl: string }>>
   isUserInAVoiceChat: (address: string) => Promise<boolean>
   updateUserPrivateMessagePrivacyMetadata: (
     user: string,
