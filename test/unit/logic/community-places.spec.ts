@@ -1,6 +1,6 @@
 import { CommunityRole } from '../../../src/types/entities'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
-import { CommunityNotFoundError } from '../../../src/logic/community/errors'
+import { CommunityNotFoundError, CommunityPlaceNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs } from '../../mocks/components'
 import { createCommunityPlacesComponent } from '../../../src/logic/community/places'
@@ -153,6 +153,7 @@ describe('when handling community places operations', () => {
 
     beforeEach(() => {
       mockCommunitiesDB.communityExists.mockResolvedValue(true)
+      mockCommunitiesDB.communityPlaceExists.mockResolvedValue(true)
       mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
     })
 
@@ -167,6 +168,14 @@ describe('when handling community places operations', () => {
 
       await expect(communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)).rejects.toThrow(
         new CommunityNotFoundError(communityId)
+      )
+    })
+
+    it('should throw CommunityPlaceNotFoundError when place does not exist', async () => {
+      mockCommunitiesDB.communityPlaceExists.mockResolvedValue(false)
+
+      await expect(communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)).rejects.toThrow(
+        new CommunityPlaceNotFoundError(`Place ${placeId} not found in community ${communityId}`)
       )
     })
 

@@ -191,6 +191,16 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
+    async communityPlaceExists(communityId: string, placeId: string): Promise<boolean> {
+      const query = SQL`
+        SELECT EXISTS (
+          SELECT 1 FROM community_places WHERE id = ${placeId} AND community_id = ${communityId}
+        ) AS "exists"
+      `
+
+      return pg.exists(query, 'exists')
+    },
+
     async addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void> {
       if (places.length === 0) return
 

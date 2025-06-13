@@ -11,6 +11,7 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
     let identity: Identity
     let userAddress: string
     let communityId: string
+    let secondCommunityId: string
     let ownerAddress: string
     let placeId: string
 
@@ -20,6 +21,7 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
       ownerAddress = '0x0000000000000000000000000000000000000001'
       placeId = randomUUID()
 
+      // Create first community
       const result = await components.communitiesDb.createCommunity(
         mockCommunity({
           name: 'Test Community',
@@ -29,16 +31,49 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
       )
       communityId = result.id
 
+      // Create second community
+      const secondResult = await components.communitiesDb.createCommunity(
+        mockCommunity({
+          name: 'Second Test Community',
+          description: 'Second Test Description',
+          owner_address: ownerAddress
+        })
+      )
+      secondCommunityId = secondResult.id
+
       await components.communitiesDb.addCommunityMember({
         communityId,
         memberAddress: ownerAddress,
         role: CommunityRole.Owner
       })
+
+      await components.communitiesDb.addCommunityMember({
+        communityId: secondCommunityId,
+        memberAddress: ownerAddress,
+        role: CommunityRole.Owner
+      })
+
+      // Add same place to both communities
+      await components.communitiesDb.addCommunityPlace({
+        id: placeId,
+        communityId,
+        addedBy: ownerAddress,
+        addedAt: new Date()
+      })
+
+      await components.communitiesDb.addCommunityPlace({
+        id: placeId,
+        communityId: secondCommunityId,
+        addedBy: ownerAddress,
+        addedAt: new Date()
+      })
     })
 
     afterEach(async () => {
       await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [userAddress, ownerAddress])
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(secondCommunityId, [userAddress, ownerAddress])
       await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+      await components.communitiesDbHelper.forceCommunityRemoval(secondCommunityId)
     })
 
     describe('and the request is not signed', () => {
@@ -120,6 +155,36 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
           it('should respond with a 204 status code when removing a place', async () => {
             const response = await makeRequest(identity, `/v1/communities/${communityId}/places/${placeId}`, 'DELETE')
             expect(response.status).toBe(204)
+          })
+        })
+
+        describe('and the user is the owner of both communities', () => {
+          beforeEach(async () => {
+            await components.communitiesDb.addCommunityMember({
+              communityId,
+              memberAddress: userAddress,
+              role: CommunityRole.Owner
+            })
+
+            await components.communitiesDb.addCommunityMember({
+              communityId: secondCommunityId,
+              memberAddress: userAddress,
+              role: CommunityRole.Owner
+            })
+          })
+
+          it('should remove place from first community without affecting second community', async () => {
+            const response1 = await makeRequest(identity, `/v1/communities/${communityId}/places/${placeId}`, 'DELETE')
+            expect(response1.status).toBe(204)
+          })
+
+          it('should remove place from second community without affecting first community', async () => {
+            const response1 = await makeRequest(
+              identity,
+              `/v1/communities/${secondCommunityId}/places/${placeId}`,
+              'DELETE'
+            )
+            expect(response1.status).toBe(204)
           })
         })
       })

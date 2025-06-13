@@ -1,6 +1,6 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
-import { CommunityNotFoundError } from './errors'
+import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
 import { CommunityPlace, ICommunityPlacesComponent } from './types'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
@@ -60,6 +60,11 @@ export async function createCommunityPlacesComponent(
       const communityExists = await communitiesDb.communityExists(communityId)
       if (!communityExists) {
         throw new CommunityNotFoundError(communityId)
+      }
+
+      const placeExists = await communitiesDb.communityPlaceExists(communityId, placeId)
+      if (!placeExists) {
+        throw new CommunityPlaceNotFoundError(`Place ${placeId} not found in community ${communityId}`)
       }
 
       const canRemove = await communityRoles.canRemovePlacesFromCommunity(communityId, userAddress)

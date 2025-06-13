@@ -1,7 +1,7 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../utils/errors'
-import { CommunityNotFoundError } from '../../logic/community'
+import { CommunityNotFoundError, CommunityPlaceNotFoundError } from '../../logic/community'
 
 export async function removeCommunityPlaceHandler(
   context: Pick<
@@ -30,6 +30,7 @@ export async function removeCommunityPlaceHandler(
 
     if (
       error instanceof CommunityNotFoundError ||
+      error instanceof CommunityPlaceNotFoundError ||
       error instanceof NotAuthorizedError ||
       error instanceof InvalidRequestError
     ) {
