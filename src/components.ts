@@ -33,6 +33,7 @@ import { createVoiceDBComponent } from './adapters/voice-db'
 import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
+import { createCommunityPlacesComponent } from './logic/community'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -127,10 +128,12 @@ export async function initComponents(): Promise<AppComponents> {
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
+  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs })
   const community = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
+    communityPlaces,
     logs,
     peersStats,
     storage,
@@ -142,6 +145,7 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     commsGatekeeper,
     community,
+    communityPlaces,
     communityRoles,
     config,
     friendsDb,

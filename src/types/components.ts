@@ -119,8 +119,10 @@ export interface ICommunitiesDatabaseComponent {
   getCommunity(id: string, userAddress: EthAddress): Promise<(Community & { role: CommunityRole }) | null>
   getCommunityPlaces(communityId: string, pagination: PaginatedParameters): Promise<CommunityPlace[]>
   getCommunityPlacesCount(communityId: string): Promise<number>
+  communityPlaceExists(communityId: string, placeId: string): Promise<boolean>
   addCommunityPlace(place: CommunityPlace): Promise<void>
-  removeCommunityPlace(id: string): Promise<void>
+  addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void>
+  removeCommunityPlace(communityId: string, placeId: string): Promise<void>
   createCommunity(community: CommunityDB): Promise<Community>
   deleteCommunity(id: string): Promise<void>
   getCommunities(

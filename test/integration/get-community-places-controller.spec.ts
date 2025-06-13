@@ -122,7 +122,7 @@ test('Get Community Places Controller', function ({ components, spyComponents })
               memberAddress: userAddress,
               role: CommunityRole.Member
             })
-            spyComponents.community.getPlaces.mockRejectedValue(new Error('Unable to get places'))
+            spyComponents.communityPlaces.getPlaces.mockRejectedValue(new Error('Unable to get places'))
           })
 
           it('should respond with a 500 status code', async () => {

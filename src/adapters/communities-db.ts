@@ -184,16 +184,42 @@ export function createCommunitiesDBComponent(
     },
 
     async addCommunityPlace(place: Omit<CommunityPlace, 'addedAt'>): Promise<void> {
+      await this.addCommunityPlaces([place])
+    },
+
+    async communityPlaceExists(communityId: string, placeId: string): Promise<boolean> {
+      const query = SQL`
+        SELECT EXISTS (
+          SELECT 1 FROM community_places WHERE id = ${placeId} AND community_id = ${communityId}
+        ) AS "exists"
+      `
+
+      return pg.exists(query, 'exists')
+    },
+
+    async addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void> {
+      if (places.length === 0) return
+
       const query = SQL`
         INSERT INTO community_places (id, community_id, added_by)
-        VALUES (${place.id}, ${place.communityId}, ${normalizeAddress(place.addedBy)})
+        VALUES 
       `
+
+      places.forEach((place, index) => {
+        query.append(SQL`(${place.id}, ${place.communityId}, ${normalizeAddress(place.addedBy)})`)
+        if (index < places.length - 1) {
+          query.append(SQL`, `)
+        }
+      })
+
+      query.append(SQL` ON CONFLICT (id, community_id) DO NOTHING`)
+
       await pg.query(query)
     },
 
-    async removeCommunityPlace(id: string): Promise<void> {
+    async removeCommunityPlace(communityId: string, placeId: string): Promise<void> {
       const query = SQL`
-        DELETE FROM community_places WHERE id = ${id}
+        DELETE FROM community_places WHERE id = ${placeId} AND community_id = ${communityId}
       `
       await pg.query(query)
     },

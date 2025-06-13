@@ -6,7 +6,8 @@ import {
   toCommunityWithUserInformation,
   toCommunityResults,
   toPublicCommunity,
-  CommunityPublicInformation
+  CommunityPublicInformation,
+  createCommunityPlacesComponent
 } from '../../../src/logic/community'
 import { CommunityRole } from '../../../src/types/entities'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
@@ -16,14 +17,14 @@ import { mockCatalystClient } from '../../mocks/components/catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createMockProfile } from '../../mocks/profile'
 import {
-  CommunityPlace,
   CommunityWithMembersCountAndFriends,
+  ICommunityPlacesComponent,
   ICommunityRolesComponent
 } from '../../../src/logic/community/types'
 import { parseExpectedFriends } from '../../mocks/friend'
 import { MemberCommunity } from '../../../src/logic/community/types'
 import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
-import { createMockConfigComponent, mockConfig, mockLogs } from '../../mocks/components'
+import { mockConfig, mockLogs } from '../../mocks/components'
 import { mapMembersWithProfiles } from '../../../src/logic/community/utils'
 import { Action } from '../../../src/types/entities'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -38,6 +39,7 @@ describe('when handling community operations', () => {
   let mockUserAddress: string
   let mockMembersCount: number
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
+  let mockCommunityPlaces: ICommunityPlacesComponent
 
   beforeEach(async () => {
     mockCommunity = {
@@ -55,10 +57,16 @@ describe('when handling community operations', () => {
       getConnectedPeers: jest.fn().mockResolvedValue([])
     })
     mockCommunityRoles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
+    mockCommunityPlaces = await createCommunityPlacesComponent({
+      communitiesDb: mockCommunitiesDB,
+      communityRoles: mockCommunityRoles,
+      logs: mockLogs
+    })
     communityComponent = await createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
+      communityPlaces: mockCommunityPlaces,
       logs: mockLogs,
       peersStats: mockPeersStats,
       storage: createS3ComponentMock(),
@@ -1354,74 +1362,99 @@ describe('when handling community operations', () => {
     })
   })
 
-  describe('and getting community places', () => {
-    const communityId = 'test-community'
-    const mockPlaces = [{ id: 'place-1' }, { id: 'place-2' }] as CommunityPlace[]
+  describe('and creating a community', () => {
+    const mockCommunity = {
+      name: 'Test Community',
+      description: 'Test Description',
+      ownerAddress: '0x1234567890123456789012345678901234567890'
+    }
+    const mockThumbnail = Buffer.from('test-thumbnail')
+    const mockPlaceIds = ['place-1', 'place-2']
 
     beforeEach(() => {
-      mockCommunitiesDB.communityExists.mockResolvedValue(true)
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
-      mockCommunitiesDB.getCommunityPlaces.mockResolvedValue(mockPlaces)
-      mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(2)
+      mockCatalystClient.getOwnedNames.mockResolvedValue([
+        {
+          name: 'test-name',
+          id: 'test-id',
+          contractAddress: '0x1234567890123456789012345678901234567890',
+          tokenId: '1'
+        }
+      ])
+      mockCommunitiesDB.createCommunity.mockResolvedValue({
+        ...mockCommunity,
+        id: 'test-id',
+        active: true,
+        privacy: 'public'
+      })
+      mockCommunitiesDB.addCommunityMember.mockResolvedValue(undefined)
+
+      jest.spyOn(mockCommunityPlaces, 'addPlaces')
+      jest.spyOn(mockCommunityPlaces, 'getPlaces')
+      jest.spyOn(mockCommunityPlaces, 'removePlace')
     })
 
-    it('should return places with total count', async () => {
-      const result = await communityComponent.getPlaces(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
-      })
+    it('should create a community with places', async () => {
+      await communityComponent.createCommunity(mockCommunity, mockThumbnail, mockPlaceIds)
 
-      expect(result).toEqual({
-        places: mockPlaces,
-        totalPlaces: 2
+      expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+        ...mockCommunity,
+        owner_address: mockCommunity.ownerAddress,
+        private: false,
+        active: true
       })
+      expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
+        communityId: 'test-id',
+        memberAddress: mockCommunity.ownerAddress,
+        role: CommunityRole.Owner
+      })
+      expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith('test-id', mockCommunity.ownerAddress, mockPlaceIds)
     })
 
-    it('should fetch places and total count from the database', async () => {
-      await communityComponent.getPlaces(communityId, mockUserAddress, {
-        limit: 10,
-        offset: 0
-      })
+    it('should create a community without places when no placeIds provided', async () => {
+      await communityComponent.createCommunity(mockCommunity, mockThumbnail)
 
-      expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, {
-        limit: 10,
-        offset: 0
+      expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+        ...mockCommunity,
+        owner_address: mockCommunity.ownerAddress,
+        private: false,
+        active: true
       })
-      expect(mockCommunitiesDB.getCommunityPlacesCount).toHaveBeenCalledWith(communityId)
+      expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
+        communityId: 'test-id',
+        memberAddress: mockCommunity.ownerAddress,
+        role: CommunityRole.Owner
+      })
+      expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
     })
 
-    it('should throw CommunityNotFoundError when community does not exist', async () => {
-      mockCommunitiesDB.communityExists.mockResolvedValue(false)
+    it('should throw NotAuthorizedError when user has no names', async () => {
+      mockCatalystClient.getOwnedNames.mockResolvedValue([])
 
-      await expect(
-        communityComponent.getPlaces(communityId, mockUserAddress, {
-          limit: 10,
-          offset: 0
-        })
-      ).rejects.toThrow(new CommunityNotFoundError(communityId))
+      await expect(communityComponent.createCommunity(mockCommunity, mockThumbnail, mockPlaceIds)).rejects.toThrow(
+        new NotAuthorizedError(`The user ${mockCommunity.ownerAddress} doesn't have any names`)
+      )
+
+      expect(mockCommunitiesDB.createCommunity).not.toHaveBeenCalled()
+      expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+      expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
     })
 
-    it('should throw NotAuthorizedError when user is not a member', async () => {
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
-
-      await expect(
-        communityComponent.getPlaces(communityId, mockUserAddress, {
-          limit: 10,
-          offset: 0
-        })
-      ).rejects.toThrow(new NotAuthorizedError("The user doesn't have permission to get places"))
-    })
-
-    it('should handle pagination correctly', async () => {
-      await communityComponent.getPlaces(communityId, mockUserAddress, {
-        limit: 1,
-        offset: 1
+    it('should store thumbnail when provided', async () => {
+      const mockStorage = createS3ComponentMock()
+      communityComponent = await createCommunityComponent({
+        communitiesDb: mockCommunitiesDB,
+        catalystClient: mockCatalystClient,
+        communityRoles: mockCommunityRoles,
+        communityPlaces: mockCommunityPlaces,
+        logs: mockLogs,
+        peersStats: mockPeersStats,
+        storage: mockStorage,
+        config: mockConfig
       })
 
-      expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, {
-        limit: 1,
-        offset: 1
-      })
+      await communityComponent.createCommunity(mockCommunity, mockThumbnail, mockPlaceIds)
+
+      expect(mockStorage.storeFile).toHaveBeenCalledWith(mockThumbnail, 'communities/test-id/raw-thumbnail.png')
     })
   })
 })

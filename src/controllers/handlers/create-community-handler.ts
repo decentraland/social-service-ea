@@ -3,6 +3,14 @@ import { FormHandlerContextWithPath, HTTPResponse } from '../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../utils/errors'
 
+const parsePlaceIds = (placeIds: string): string[] => {
+  try {
+    return JSON.parse(placeIds)
+  } catch {
+    throw new InvalidRequestError('placeIds must be a valid JSON array')
+  }
+}
+
 export async function createCommunityHandler(
   context: FormHandlerContextWithPath<'community' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
 ): Promise<HTTPResponse> {
@@ -19,21 +27,30 @@ export async function createCommunityHandler(
     const name: string = formData.fields.name?.value
     const description: string = formData.fields.description?.value
 
+    const placeIds: string[] = parsePlaceIds(formData.fields.placeIds?.value || '[]')
+
     const thumbnailFile = formData?.files?.['thumbnail']
 
     if (!name || !description) {
       logger.error('Invalid request body while creating Community', {
         name,
         description,
-        thumbnails: thumbnailFile ? 'present' : 'missing'
+        thumbnails: thumbnailFile ? 'present' : 'missing',
+        placeIds: placeIds.length
       })
 
       throw new InvalidRequestError('Invalid request body')
     }
 
+    if (!Array.isArray(placeIds)) {
+      logger.error('Invalid placeIds format', { placeIds })
+      throw new InvalidRequestError('placeIds must be an array')
+    }
+
     logger.info('Creating community', {
       owner: address,
-      name
+      name,
+      placeIds: placeIds.length
     })
 
     const createdCommunity = await community.createCommunity(
@@ -42,7 +59,8 @@ export async function createCommunityHandler(
         description,
         ownerAddress: address
       },
-      thumbnailFile?.value
+      thumbnailFile?.value,
+      placeIds
     )
 
     logger.info('Community created', {
