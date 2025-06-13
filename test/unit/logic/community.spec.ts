@@ -36,14 +36,15 @@ import { CommunityPlace } from '../../../src/logic/community/types'
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
   let mockCommunityRoles: ICommunityRolesComponent
-  let mockCommunity: Community & { role: CommunityRole }
+  let mockPublicCommunity: Community & { role: CommunityRole }
+  let mockPrivateCommunity: Community & { role: CommunityRole }
   let mockUserAddress: string
   let mockMembersCount: number
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   let mockCommunityPlaces: ICommunityPlacesComponent
 
   beforeEach(async () => {
-    mockCommunity = {
+    mockPublicCommunity = {
       id: 'test-id',
       name: 'Test Community',
       description: 'Test Description',
@@ -51,6 +52,10 @@ describe('when handling community operations', () => {
       privacy: 'public',
       active: true,
       role: CommunityRole.None
+    }
+    mockPrivateCommunity = {
+      ...mockPublicCommunity,
+      privacy: 'private'
     }
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockMembersCount = 5
@@ -78,12 +83,12 @@ describe('when handling community operations', () => {
   describe('and getting communities', () => {
     const mockCommunities = [
       {
-        ...mockCommunity,
+        ...mockPublicCommunity,
         membersCount: 5,
         friends: ['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222']
       },
       {
-        ...mockCommunity,
+        ...mockPublicCommunity,
         id: 'test-id-2',
         membersCount: 3,
         friends: ['0x3333333333333333333333333333333333333333']
@@ -230,29 +235,29 @@ describe('when handling community operations', () => {
   describe('and getting a community', () => {
     describe('when the community exists', () => {
       beforeEach(() => {
-        mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
+        mockCommunitiesDB.getCommunity.mockResolvedValue(mockPublicCommunity)
         mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(mockMembersCount)
       })
 
       it('should return the community with its members count', async () => {
-        const result = await communityComponent.getCommunity(mockCommunity.id, mockUserAddress)
+        const result = await communityComponent.getCommunity(mockPublicCommunity.id, mockUserAddress)
 
         expect(result).toEqual({
-          ...mockCommunity,
+          ...mockPublicCommunity,
           membersCount: mockMembersCount
         })
       })
 
       it('should fetch the community from the database', async () => {
-        await communityComponent.getCommunity(mockCommunity.id, mockUserAddress)
+        await communityComponent.getCommunity(mockPublicCommunity.id, mockUserAddress)
 
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunity.id, mockUserAddress)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPublicCommunity.id, mockUserAddress)
       })
 
       it('should fetch the community members count from the database', async () => {
-        await communityComponent.getCommunity(mockCommunity.id, mockUserAddress)
+        await communityComponent.getCommunity(mockPublicCommunity.id, mockUserAddress)
 
-        expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(mockCommunity.id)
+        expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(mockPublicCommunity.id)
       })
     })
 
@@ -273,20 +278,20 @@ describe('when handling community operations', () => {
     describe('when the community exists', () => {
       describe('and the user is the owner', () => {
         beforeEach(() => {
-          mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
+          mockCommunitiesDB.getCommunity.mockResolvedValue(mockPublicCommunity)
           mockCommunitiesDB.deleteCommunity.mockResolvedValue(undefined)
         })
 
         it('should delete the community from the database', async () => {
-          await communityComponent.deleteCommunity(mockCommunity.id, mockUserAddress)
+          await communityComponent.deleteCommunity(mockPublicCommunity.id, mockUserAddress)
 
-          expect(mockCommunitiesDB.deleteCommunity).toHaveBeenCalledWith(mockCommunity.id)
+          expect(mockCommunitiesDB.deleteCommunity).toHaveBeenCalledWith(mockPublicCommunity.id)
         })
 
         it('should verify the community exists before deletion', async () => {
-          await communityComponent.deleteCommunity(mockCommunity.id, mockUserAddress)
+          await communityComponent.deleteCommunity(mockPublicCommunity.id, mockUserAddress)
 
-          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunity.id, mockUserAddress)
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPublicCommunity.id, mockUserAddress)
         })
       })
 
@@ -294,11 +299,11 @@ describe('when handling community operations', () => {
         const nonOwnerAddress = '0x9876543210987654321098765432109876543210'
 
         beforeEach(() => {
-          mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
+          mockCommunitiesDB.getCommunity.mockResolvedValue(mockPublicCommunity)
         })
 
         it('should throw a NotAuthorizedError', async () => {
-          await expect(communityComponent.deleteCommunity(mockCommunity.id, nonOwnerAddress)).rejects.toThrow(
+          await expect(communityComponent.deleteCommunity(mockPublicCommunity.id, nonOwnerAddress)).rejects.toThrow(
             new NotAuthorizedError("The user doesn't have permission to delete this community")
           )
         })
@@ -863,6 +868,7 @@ describe('when handling community operations', () => {
 
     beforeEach(async () => {
       mockCommunitiesDB.communityExists.mockResolvedValue(true)
+      mockCommunitiesDB.getCommunity.mockResolvedValue(mockPublicCommunity)
       mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
       mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockMembers)
       mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(2)
@@ -940,6 +946,7 @@ describe('when handling community operations', () => {
     })
 
     it('should throw NotAuthorizedError when user is not a member', async () => {
+      mockCommunitiesDB.getCommunity.mockResolvedValue(mockPrivateCommunity)
       mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
 
       await expect(
@@ -1208,6 +1215,7 @@ describe('when handling community operations', () => {
 
     beforeEach(() => {
       mockCommunitiesDB.communityExists.mockResolvedValue(true)
+      mockCommunitiesDB.getCommunity.mockResolvedValue(mockPublicCommunity)
       mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockMembers)
       mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(2)
       mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
@@ -1514,6 +1522,7 @@ describe('when handling community operations', () => {
     })
 
     it('should throw NotAuthorizedError when user is not a member', async () => {
+      mockCommunitiesDB.getCommunity.mockResolvedValue(mockPrivateCommunity)
       mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
 
       await expect(

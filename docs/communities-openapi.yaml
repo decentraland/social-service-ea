@@ -595,7 +595,9 @@ paths:
       summary: Get community places
       description: |
         Lists all places in a specific community.
-        This endpoint requires Signed Fetch authentication.
+        This endpoint has optional Signed Fetch authentication.
+        When not signed, it only returns places of public communities.
+        When signed, it returns all places if the user has access to the community or the community is public.
       security:
         - SignedFetch: []
       parameters:

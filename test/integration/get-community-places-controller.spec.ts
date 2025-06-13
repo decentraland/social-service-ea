@@ -89,9 +89,9 @@ test('Get Community Places Controller', function ({ components, spyComponents })
       await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
     })
 
-    describe('and the request is not signed', () => {
+    describe('when the request is not signed', () => {
       describe('and the community is public', () => {
-        it('should respond with a 200 status code and return places', async () => {
+        it('should return places with a 200 status code', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${publicCommunityId}/places?limit=2&page=1`)
 
@@ -109,7 +109,7 @@ test('Get Community Places Controller', function ({ components, spyComponents })
       })
 
       describe('and the community is private', () => {
-        it('should respond with a 404 status code', async () => {
+        it('should return a 404 status code', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${privateCommunityId}/places`)
           expect(response.status).toBe(404)
@@ -121,9 +121,9 @@ test('Get Community Places Controller', function ({ components, spyComponents })
       })
     })
 
-    describe('and the request is signed', () => {
+    describe('when the request is signed', () => {
       describe('and the community does not exist', () => {
-        it('should respond with a 404 status code', async () => {
+        it('should return a 404 status code', async () => {
           const nonExistentId = randomUUID()
           const response = await makeRequest(identity, `/v1/communities/${nonExistentId}/places`)
           expect(response.status).toBe(404)
@@ -136,7 +136,7 @@ test('Get Community Places Controller', function ({ components, spyComponents })
 
       describe('and the community exists', () => {
         describe('and the user is not a member of the community', () => {
-          it('should respond with a 401 status code', async () => {
+          it('should return a 401 status code', async () => {
             const response = await makeRequest(identity, `/v1/communities/${privateCommunityId}/places`)
             expect(response.status).toBe(401)
             expect(await response.json()).toEqual({
@@ -159,11 +159,8 @@ test('Get Community Places Controller', function ({ components, spyComponents })
             response = await makeRequest(identity, `/v1/communities/${privateCommunityId}/places?limit=2&page=1`)
           })
 
-          it('should respond with a 200 status code', async () => {
+          it('should return places with a 200 status code', async () => {
             expect(response.status).toBe(200)
-          })
-
-          it('should return the places', async () => {
             const result = await response.json()
 
             expect(result.data).toEqual({
@@ -186,7 +183,7 @@ test('Get Community Places Controller', function ({ components, spyComponents })
             spyComponents.communityPlaces.getPlaces.mockRejectedValue(new Error('Unable to get places'))
           })
 
-          it('should respond with a 500 status code', async () => {
+          it('should return a 500 status code', async () => {
             const response = await makeRequest(identity, `/v1/communities/${privateCommunityId}/places`)
             expect(response.status).toBe(500)
             expect(await response.json()).toEqual({

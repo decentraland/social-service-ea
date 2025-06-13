@@ -57,9 +57,17 @@ export async function createCommunityComponent(
       throw new CommunityNotFoundError(id)
     }
 
-    const memberRole = userAddress ? await communitiesDb.getCommunityMemberRole(id, userAddress) : CommunityRole.None
+    const community = await communitiesDb.getCommunity(id)
+    if (!community) {
+      throw new CommunityNotFoundError(id)
+    }
 
-    if (userAddress && memberRole === CommunityRole.None) {
+    const memberRole =
+      community.privacy === 'private' && userAddress
+        ? await communitiesDb.getCommunityMemberRole(id, userAddress)
+        : CommunityRole.None
+
+    if (community.privacy === 'private' && userAddress && memberRole === CommunityRole.None) {
       throw new NotAuthorizedError("The user doesn't have permission to get community members")
     }
 
@@ -452,11 +460,17 @@ export async function createCommunityComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
-      const memberRole = options.userAddress
-        ? await communitiesDb.getCommunityMemberRole(communityId, options.userAddress)
-        : CommunityRole.None
+      const community = await communitiesDb.getCommunity(communityId)
+      if (!community) {
+        throw new CommunityNotFoundError(communityId)
+      }
 
-      if (options.userAddress && memberRole === CommunityRole.None) {
+      const memberRole =
+        community.privacy === 'private' && options.userAddress
+          ? await communitiesDb.getCommunityMemberRole(communityId, options.userAddress)
+          : CommunityRole.None
+
+      if (community.privacy === 'private' && options.userAddress && memberRole === CommunityRole.None) {
         throw new NotAuthorizedError(
           `The user ${options.userAddress} doesn't have permission to get places from community ${communityId}`
         )

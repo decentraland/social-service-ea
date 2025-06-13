@@ -57,19 +57,29 @@ export function createCommunitiesDBComponent(
       return pg.exists(query, 'isMember')
     },
 
-    async getCommunity(id: string, userAddress: EthAddress): Promise<Community & { role: CommunityRole }> {
+    async getCommunity(id: string, userAddress?: EthAddress): Promise<Community & { role: CommunityRole }> {
+      const normalizedUserAddress = userAddress ? normalizeAddress(userAddress) : null
       const query = SQL`
         SELECT 
           c.id,
           c.name,
           c.description,
           c.owner_address as "ownerAddress",
-          COALESCE(cm.role, ${CommunityRole.None}) as role,
           CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
-          c.active
-        FROM communities c
-        LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizeAddress(userAddress)}
-        WHERE c.id = ${id} AND c.active = true`
+          c.active,
+      `
+        .append(
+          normalizedUserAddress
+            ? SQL` COALESCE(cm.role, ${CommunityRole.None}) as role`
+            : SQL` ${CommunityRole.None} as role`
+        )
+        .append(SQL` FROM communities c`)
+        .append(
+          normalizedUserAddress
+            ? SQL` LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedUserAddress}`
+            : SQL``
+        )
+        .append(SQL` WHERE c.id = ${id} AND c.active = true`)
 
       const result = await pg.query<Community & { role: CommunityRole }>(query)
       return result.rows[0]
