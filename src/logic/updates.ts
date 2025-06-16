@@ -212,6 +212,10 @@ export function communityMemberJoinHandler(
   community: ICommunityComponent
 ) {
   return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
+    if (update.status !== ConnectivityStatus.ONLINE) {
+      return
+    }
+
     logger.info('Community member join update', { update: JSON.stringify(update) })
 
     const PAGE_SIZE = 100
@@ -249,6 +253,10 @@ export function communityMemberLeaveHandler(
   community: ICommunityComponent
 ) {
   return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
+    if (update.status !== ConnectivityStatus.OFFLINE) {
+      return
+    }
+
     logger.info('Community member leave update', { update: JSON.stringify(update) })
 
     const PAGE_SIZE = 100
