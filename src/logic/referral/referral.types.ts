@@ -7,6 +7,7 @@ export interface IReferralComponent {
     invitedUser: string,
     status: ReferralProgressStatus.SIGNED_UP | ReferralProgressStatus.TIER_GRANTED
   ): Promise<void>
+  finalizeReferral(invitedUser: string): Promise<void>
   getInvitedUsersAcceptedStats(
     referrer: string
   ): Promise<{ invitedUsersAccepted: number; invitedUsersAcceptedViewed: number }>

@@ -45,11 +45,10 @@ import {
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createSettingsComponent } from '../src/logic/settings'
-import { createMessageProcessorComponent } from '../src/logic/referral/message-processor'
+import { createMessageProcessorComponent, createMessagesConsumerComponent } from '../src/logic/sqs'
 import { createReferralDBComponent } from '../src/adapters/referral-db'
 import { createReferralComponent } from '../src/logic/referral/referral'
 import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
-import { createMessagesConsumerComponent } from '../src/logic/referral/message-consumer'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
 import { createStorageHelper } from './integration/utils/storage'
 
@@ -170,7 +169,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const messageProcessor = await createMessageProcessorComponent({
     logs,
-    referralDb
+    referral
   })
 
   const messageConsumer = createMessagesConsumerComponent({

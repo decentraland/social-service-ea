@@ -2,6 +2,13 @@ import { IHttpServerComponent } from '@well-known-components/interfaces'
 import { HandlerContextWithPath } from '../../types/http'
 import { CreateReferralPayload, CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { errorMessageOrDefault } from '../../utils/errors'
+import {
+  ReferralNotFoundError,
+  ReferralInvalidInputError,
+  ReferralAlreadyExistsError,
+  SelfReferralError
+} from '../../logic/referral/errors'
 
 export async function createReferralHandler(
   ctx: Pick<HandlerContextWithPath<'logs' | 'referral'>, 'components' | 'request' | 'verification'>
@@ -30,9 +37,30 @@ export async function createReferralHandler(
     invitedUser: verification.auth
   }
 
-  await referral.create(body)
+  try {
+    await referral.create(body)
 
-  return {
-    status: 204
+    return {
+      status: 204
+    }
+  } catch (error: any) {
+    const message = errorMessageOrDefault(error)
+    logger.error(`Error creating referral: ${message}`)
+    logger.debug('Error stack', { stack: error?.stack })
+
+    if (
+      error instanceof ReferralInvalidInputError ||
+      error instanceof SelfReferralError ||
+      error instanceof ReferralAlreadyExistsError ||
+      error instanceof ReferralNotFoundError ||
+      error instanceof InvalidRequestError
+    ) {
+      throw error
+    }
+
+    return {
+      status: 500,
+      body: { message }
+    }
   }
 }

@@ -32,11 +32,10 @@ import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
 import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
-import { createReferralComponent } from './logic/referral/referral'
-import { createMessageProcessorComponent } from './logic/referral/message-processor'
+import { createReferralComponent } from './logic/referral'
+import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
 import { createSqsAdapter } from './adapters/sqs'
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
-import { createMessagesConsumerComponent } from './logic/referral/message-consumer'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
 import { createCommunityPlacesComponent } from './logic/community'
@@ -150,7 +149,7 @@ export async function initComponents(): Promise<AppComponents> {
   const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
   const queue = sqsEndpoint ? await createSqsAdapter(sqsEndpoint) : createMemoryQueueAdapter()
 
-  const messageProcessor = await createMessageProcessorComponent({ logs, referralDb })
+  const messageProcessor = await createMessageProcessorComponent({ logs, referral })
 
   const messageConsumer = createMessagesConsumerComponent({
     logs,

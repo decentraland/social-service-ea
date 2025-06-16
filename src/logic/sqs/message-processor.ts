@@ -2,12 +2,11 @@ import { Event, Events, UserJoinedRoomEvent } from '@dcl/schemas'
 
 import { AppComponents } from '../../types/system'
 import { IMessageProcessorComponent } from '../../types/message-processor.type'
-import { ReferralProgressStatus } from '../../types/referral-db.type'
 
 export async function createMessageProcessorComponent({
   logs,
-  referralDb
-}: Pick<AppComponents, 'logs' | 'referralDb'>): Promise<IMessageProcessorComponent> {
+  referral
+}: Pick<AppComponents, 'logs' | 'referral'>): Promise<IMessageProcessorComponent> {
   const logger = logs.getLogger('message-processor')
 
   async function processMessage(message: Event) {
@@ -23,22 +22,9 @@ export async function createMessageProcessorComponent({
       return
     }
 
-    const userProgress = await referralDb.findReferralProgress({
-      invitedUser: userAddress,
-      status: ReferralProgressStatus.SIGNED_UP
-    })
+    await referral.finalizeReferral(userAddress)
 
-    if (userProgress.length === 0) {
-      return
-    }
-
-    logger.info('Referral tier granted to referrer', {
-      referrer: userProgress[0].referrer,
-      invited_user: userProgress[0].invited_user,
-      status: ReferralProgressStatus.TIER_GRANTED
-    })
-
-    await referralDb.updateReferralProgress(userProgress[0].invited_user, ReferralProgressStatus.TIER_GRANTED)
+    logger.info('Referral tier granted to user', { userAddress })
 
     return
   }
