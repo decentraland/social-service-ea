@@ -97,7 +97,7 @@ test('PATCH /v1/referral-progress', ({ components }) => {
         expect(response.status).toBe(404)
         const json = await response.json()
         expect(json).toEqual({
-          error: 'Not found',
+          error: 'Not Found',
           message: 'Referral progress not found for user: ' + nonExistentUserAddress
         })
       })
