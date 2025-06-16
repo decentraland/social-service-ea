@@ -61,8 +61,9 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
       name,
       description,
       thumbnailPath,
+      thumbnailBuffer,
       placeIds
-    }: { name?: string; description?: string; thumbnailPath?: string; placeIds?: string[] }
+    }: { name?: string; description?: string; thumbnailPath?: string; thumbnailBuffer?: Buffer; placeIds?: string[] }
   ) => {
     const { localHttpFetch } = components
     const form = new FormData()
@@ -77,6 +78,10 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
 
     if (thumbnailPath) {
       form.append('thumbnail', fs.createReadStream(thumbnailPath), 'thumbnail.png')
+    }
+
+    if (thumbnailBuffer) {
+      form.append('thumbnail', thumbnailBuffer, 'thumbnail.png')
     }
 
     if (placeIds) {
