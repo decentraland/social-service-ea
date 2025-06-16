@@ -17,7 +17,8 @@ export type ServiceCreator<T, C extends keyof BaseComponents = keyof BaseCompone
 
 export enum ServiceType {
   CALL = 'call',
-  STREAM = 'stream'
+  STREAM = 'stream',
+  COMMUNITIES = 'communities'
 }
 
 type RpcCallMethod<TParams, TResult extends SocialServiceResponse, TContext> = (
