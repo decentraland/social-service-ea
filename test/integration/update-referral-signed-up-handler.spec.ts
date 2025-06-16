@@ -84,7 +84,7 @@ test('PATCH /v1/referral-progress', ({ components }) => {
     })
 
     describe('and referral does not exist', () => {
-      it('should return 400 with message "No referral progress found for the invited user"', async () => {
+      it('should return 404 with message "No referral progress found for the invited user"', async () => {
         const { localHttpFetch } = components
         const response = await makeRequest(
           localHttpFetch,
@@ -94,11 +94,11 @@ test('PATCH /v1/referral-progress', ({ components }) => {
           },
           nonExistentUserIdentity
         )
-        expect(response.status).toBe(400)
+        expect(response.status).toBe(404)
         const json = await response.json()
         expect(json).toEqual({
-          error: 'Bad request',
-          message: 'No referral progress found for the invited user: ' + nonExistentUserAddress
+          error: 'Not found',
+          message: 'Referral progress not found for user: ' + nonExistentUserAddress
         })
       })
     })
@@ -122,7 +122,7 @@ test('PATCH /v1/referral-progress', ({ components }) => {
         const json = await response.json()
         expect(json).toEqual({
           error: 'Bad request',
-          message: 'Invalid referral status: signed_up. Expected: PENDING'
+          message: 'Invalid referral status: signed_up. Expected: pending'
         })
       })
     })
