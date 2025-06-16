@@ -33,13 +33,15 @@ export async function updateReferralSignedUpHandler(
     logger.error(`Error updating referral signed up: ${message}`)
     logger.debug('Error stack', { stack: error?.stack })
 
-    if (
-      error instanceof ReferralNotFoundError ||
-      error instanceof ReferralInvalidInputError ||
-      error instanceof ReferralInvalidStatusError ||
-      error instanceof InvalidRequestError ||
-      error instanceof NotFoundError
-    ) {
+    if (error instanceof ReferralNotFoundError) {
+      throw new NotFoundError(error.message)
+    }
+
+    if (error instanceof ReferralInvalidInputError || error instanceof ReferralInvalidStatusError) {
+      throw new InvalidRequestError(error.message)
+    }
+
+    if (error instanceof InvalidRequestError || error instanceof NotFoundError) {
       throw error
     }
 

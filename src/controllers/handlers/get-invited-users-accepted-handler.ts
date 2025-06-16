@@ -34,7 +34,11 @@ export async function getInvitedUsersAcceptedHandler(
     logger.error(`Error getting invited users accepted stats: ${message}`)
     logger.debug('Error stack', { stack: error?.stack })
 
-    if (error instanceof ReferralInvalidInputError || error instanceof InvalidRequestError) {
+    if (error instanceof ReferralInvalidInputError) {
+      throw new InvalidRequestError(error.message)
+    }
+
+    if (error instanceof InvalidRequestError) {
       throw error
     }
 

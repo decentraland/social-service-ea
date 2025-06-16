@@ -22,7 +22,7 @@ test('GET /v1/referral-progress', ({ components }) => {
 
     await components.referralDb.createReferral({
       referrer: referrer.authChain[0].payload.toLowerCase(),
-      invited_user: invited_user.authChain[0].payload.toLowerCase()
+      invitedUser: invited_user.authChain[0].payload.toLowerCase()
     })
     await components.referralDb.updateReferralProgress(
       invited_user.authChain[0].payload.toLowerCase(),

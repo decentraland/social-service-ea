@@ -1,6 +1,4 @@
 import { IHttpServerComponent } from '@well-known-components/interfaces'
-import { HandlerContextWithPath } from '../../types/http'
-import { CreateReferralPayload, CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../utils/errors'
 import {
@@ -9,6 +7,8 @@ import {
   ReferralAlreadyExistsError,
   SelfReferralError
 } from '../../logic/referral/errors'
+import type { HandlerContextWithPath } from '../../types/http'
+import type { CreateReferralPayload, CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 
 export async function createReferralHandler(
   ctx: Pick<HandlerContextWithPath<'logs' | 'referral'>, 'components' | 'request' | 'verification'>
@@ -52,9 +52,12 @@ export async function createReferralHandler(
       error instanceof ReferralInvalidInputError ||
       error instanceof SelfReferralError ||
       error instanceof ReferralAlreadyExistsError ||
-      error instanceof ReferralNotFoundError ||
-      error instanceof InvalidRequestError
+      error instanceof ReferralNotFoundError
     ) {
+      throw new InvalidRequestError(error.message)
+    }
+
+    if (error instanceof InvalidRequestError) {
       throw error
     }
 

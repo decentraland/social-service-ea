@@ -1,5 +1,3 @@
-import { IReferralComponent } from './types'
-import { AppComponents } from '../../types/system'
 import { ReferralProgressStatus } from '../../types/referral-db.type'
 import { EthAddress } from '@dcl/schemas'
 import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
@@ -10,6 +8,8 @@ import {
   ReferralInvalidStatusError,
   SelfReferralError
 } from './errors'
+import type { IReferralComponent } from './types'
+import type { AppComponents } from '../../types/system'
 
 function validate(value: string | undefined, field: string): string {
   if (!value) {

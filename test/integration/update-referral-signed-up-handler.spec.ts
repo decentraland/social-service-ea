@@ -27,7 +27,7 @@ test('PATCH /v1/referral-progress', ({ components }) => {
   beforeEach(async () => {
     await components.referralDb.createReferral({
       referrer: referrerAddress,
-      invited_user: invitedUserAddress
+      invitedUser: invitedUserAddress
     })
     cleanup.trackInsert('referral_progress', {
       referrer: referrerAddress,
@@ -55,7 +55,7 @@ test('PATCH /v1/referral-progress', ({ components }) => {
         )
         expect(response.status).toBe(204)
 
-        const progress = await components.referralDb.findReferralProgress({ invited_user: invitedUserAddress })
+        const progress = await components.referralDb.findReferralProgress({ invitedUser: invitedUserAddress })
         expect(progress[0]).toHaveProperty('referrer', referrerAddress)
         expect(progress[0]).toHaveProperty('invited_user', invitedUserAddress)
         expect(progress[0]).toHaveProperty('status', ReferralProgressStatus.SIGNED_UP)
