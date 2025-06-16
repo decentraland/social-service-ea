@@ -10,7 +10,6 @@ import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/socia
 import { getSentFriendshipRequestsService } from './services/get-sent-friendship-requests'
 import { getFriendshipStatusService } from './services/get-friendship-status'
 import { subscribeToFriendConnectivityUpdatesService } from './services/subscribe-to-friend-connectivity-updates'
-import { subscribeToCommunityJoinUpdatesService } from './services/subscribe-to-community-join-updates'
 import {
   BLOCK_UPDATES_CHANNEL,
   FRIEND_STATUS_UPDATES_CHANNEL,
@@ -134,11 +133,6 @@ export async function createRpcServerComponent({
       creator: subscribeToPrivateVoiceChatUpdatesService({ components: { logs, voice, catalystClient } }),
       type: ServiceType.STREAM,
       event: 'private_voice_chat_updates'
-    },
-    subscribeToCommunityJoinUpdates: {
-      creator: subscribeToCommunityJoinUpdatesService({ components: { logs, community } }),
-      type: ServiceType.COMMUNITIES,
-      event: 'community_join_updates'
     },
     blockUser: {
       creator: blockUserService({ components: { logs, friendsDb: friendsDb, catalystClient, pubsub } }),
