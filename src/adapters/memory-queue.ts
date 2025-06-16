@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Message } from '@aws-sdk/client-sqs'
-import { sleep } from '../logic/utils'
 import { IQueueComponent, QueueMessage } from '../types/sqs.type'
+import { sleep } from '../utils/timer'
 
 export function createMemoryQueueAdapter(): IQueueComponent {
   const queue: Map<string, Message> = new Map()

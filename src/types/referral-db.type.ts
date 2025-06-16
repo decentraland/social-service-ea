@@ -1,11 +1,11 @@
 export interface IReferralDatabaseComponent {
-  createReferral(referralInput: { referrer: string; invited_user: string }): Promise<ReferralProgress>
+  createReferral(referralInput: { referrer: string; invitedUser: string }): Promise<ReferralProgress>
   findReferralProgress(filter: ReferralProgressFilter): Promise<ReferralProgress[]>
   updateReferralProgress(
-    invited_user: string,
+    invitedUser: string,
     status: ReferralProgressStatus.SIGNED_UP | ReferralProgressStatus.TIER_GRANTED
   ): Promise<void>
-  hasReferralProgress(invited_user: string): Promise<boolean>
+  hasReferralProgress(invitedUser: string): Promise<boolean>
   listAllReferralProgress(filter?: Pick<ReferralProgressFilter, 'limit' | 'offset'>): Promise<ReferralProgress[]>
   countAcceptedInvitesByReferrer(referrer: string): Promise<number>
   getLastViewedProgressByReferrer(referrer: string): Promise<number>
@@ -20,7 +20,7 @@ export enum ReferralProgressStatus {
 
 export type ReferralProgressFilter = Partial<{
   referrer: string
-  invited_user: string
+  invitedUser: string
   status: ReferralProgressStatus
   limit: number
   offset: number

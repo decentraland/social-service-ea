@@ -709,6 +709,18 @@
     "@smithy/util-utf8" "^4.0.0"
     tslib "^2.6.2"
 
+"@aws-sdk/middleware-sdk-sqs@3.826.0":
+  version "3.826.0"
+  resolved "https://registry.yarnpkg.com/@aws-sdk/middleware-sdk-sqs/-/middleware-sdk-sqs-3.826.0.tgz#5656cc2dcdc4e8ef2ca21ffa1102e3f911ec740f"
+  integrity sha512-NDnA7Fb6AT+AO1tvm9i5WFS+a+nIMtjYY6gYXPUu0GhT2FFkZfRvagOKoXVH+Vddo5iQRbNx4/1Zb1Z7vB42cA==
+  dependencies:
+    "@aws-sdk/types" "3.821.0"
+    "@smithy/smithy-client" "^4.4.3"
+    "@smithy/types" "^4.3.1"
+    "@smithy/util-hex-encoding" "^4.0.0"
+    "@smithy/util-utf8" "^4.0.0"
+    tslib "^2.6.2"
+
 "@aws-sdk/middleware-ssec@3.821.0":
   version "3.821.0"
   resolved "https://registry.yarnpkg.com/@aws-sdk/middleware-ssec/-/middleware-ssec-3.821.0.tgz#4d4c2ba22e5bbf5ac618a1f679cbe256eaaf3d35"
@@ -1341,13 +1353,6 @@
     "@well-known-components/http-server" "^2.1.0"
     "@well-known-components/interfaces" "^1.4.3"
     node-fetch "^2.7.0"
-
-"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15566887274.commit-72a1f9c.tgz":
-  version "1.0.0-15566887274.commit-72a1f9c"
-  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15566887274.commit-72a1f9c.tgz#29e82f2e558e5f82817ea996610ce2eabb0de6f0"
-  dependencies:
-    "@dcl/ts-proto" "1.154.0"
-    protobufjs "7.2.4"
 
 "@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15638769953.commit-8321656.tgz":
   version "1.0.0-15638769953.commit-8321656"
@@ -3444,7 +3449,7 @@
     "@types/node-fetch" "^2.5.12"
     typed-url-params "^1.0.1"
 
-"@well-known-components/interfaces@^1.5.2":
+"@well-known-components/interfaces@^1.3.0", "@well-known-components/interfaces@^1.5.2":
   version "1.5.2"
   resolved "https://registry.yarnpkg.com/@well-known-components/interfaces/-/interfaces-1.5.2.tgz#ef7001a19d410459e65b216dd948d15be19e4efa"
   integrity sha512-TzKQblOci2Azczk1DZ4JL5aJW7hwq7kHrFMO4lCRMmW51bA71BtiZlq0WP72Dln067xTSoHQAU4WHCFJlGYvEQ==

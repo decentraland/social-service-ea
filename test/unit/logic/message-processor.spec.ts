@@ -1,7 +1,7 @@
 import { Event, Events, UserJoinedRoomEvent } from '@dcl/schemas'
 import { ReferralProgress, ReferralProgressStatus } from '../../../src/types/referral-db.type'
 import { IMessageProcessorComponent } from '../../../src/types/message-processor.type'
-import { createMessageProcessorComponent } from '../../../src/logic/message-processor'
+import { createMessageProcessorComponent } from '../../../src/logic/referral/message-processor'
 
 describe('message-processor', () => {
   let mockLogger: any
@@ -91,7 +91,7 @@ describe('message-processor', () => {
 
         expect(result).toBeUndefined()
         expect(mockDb.findReferralProgress).toHaveBeenCalledWith({
-          invited_user: '0x123',
+          invitedUser: '0x123',
           status: ReferralProgressStatus.SIGNED_UP
         })
         expect(mockDb.updateReferralProgress).not.toHaveBeenCalled()
@@ -128,7 +128,7 @@ describe('message-processor', () => {
 
         expect(result).toBeUndefined()
         expect(mockDb.findReferralProgress).toHaveBeenCalledWith({
-          invited_user: '0x123',
+          invitedUser: '0x123',
           status: ReferralProgressStatus.SIGNED_UP
         })
         expect(mockLogger.info).toHaveBeenCalledWith('Referral tier granted to referrer', {

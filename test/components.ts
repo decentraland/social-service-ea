@@ -45,10 +45,11 @@ import {
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createSettingsComponent } from '../src/logic/settings'
-import { createMessageProcessorComponent } from '../src/logic/message-processor'
+import { createMessageProcessorComponent } from '../src/logic/referral/message-processor'
 import { createReferralDBComponent } from '../src/adapters/referral-db'
+import { createReferralComponent } from '../src/logic/referral/referral'
 import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
-import { createMessagesConsumerComponent } from '../src/logic/message-consumer'
+import { createMessagesConsumerComponent } from '../src/logic/referral/message-consumer'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
 import { createStorageHelper } from './integration/utils/storage'
 
@@ -163,6 +164,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const referralDb = await createReferralDBComponent({ pg, logs })
 
+  const referral = await createReferralComponent({ referralDb, logs })
+
   const queue = createMemoryQueueAdapter()
 
   const messageProcessor = await createMessageProcessorComponent({
@@ -205,6 +208,7 @@ async function initComponents(): Promise<TestComponents> {
     pubsub,
     queue,
     redis,
+    referral,
     referralDb,
     rpcClient,
     rpcServer,

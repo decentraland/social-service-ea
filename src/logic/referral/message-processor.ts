@@ -1,8 +1,8 @@
 import { Event, Events, UserJoinedRoomEvent } from '@dcl/schemas'
 
-import { AppComponents } from '../types/system'
-import { IMessageProcessorComponent } from '../types/message-processor.type'
-import { ReferralProgressStatus } from '../types/referral-db.type'
+import { AppComponents } from '../../types/system'
+import { IMessageProcessorComponent } from '../../types/message-processor.type'
+import { ReferralProgressStatus } from '../../types/referral-db.type'
 
 export async function createMessageProcessorComponent({
   logs,
@@ -24,7 +24,7 @@ export async function createMessageProcessorComponent({
     }
 
     const userProgress = await referralDb.findReferralProgress({
-      invited_user: userAddress,
+      invitedUser: userAddress,
       status: ReferralProgressStatus.SIGNED_UP
     })
 

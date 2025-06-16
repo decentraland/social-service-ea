@@ -32,10 +32,11 @@ import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
 import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
-import { createMessageProcessorComponent } from './logic/message-processor'
+import { createReferralComponent } from './logic/referral/referral'
+import { createMessageProcessorComponent } from './logic/referral/message-processor'
 import { createSqsAdapter } from './adapters/sqs'
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
-import { createMessagesConsumerComponent } from './logic/message-consumer'
+import { createMessagesConsumerComponent } from './logic/referral/message-consumer'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
 import { createCommunityPlacesComponent } from './logic/community'
@@ -100,6 +101,7 @@ export async function initComponents(): Promise<AppComponents> {
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const referralDb = await createReferralDBComponent({ pg, logs })
+  const referral = await createReferralComponent({ referralDb, logs })
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
@@ -180,6 +182,7 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     queue,
     redis,
+    referral,
     referralDb,
     rpcServer,
     settings,

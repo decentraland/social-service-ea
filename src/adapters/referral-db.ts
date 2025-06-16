@@ -17,13 +17,13 @@ export async function createReferralDBComponent(
 
   const createReferral = async (referralInput: {
     referrer: string
-    invited_user: string
+    invitedUser: string
   }): Promise<ReferralProgress> => {
-    logger.debug(`Creating referral_progress for ${referralInput.referrer} and ${referralInput.invited_user}`)
+    logger.debug(`Creating referral_progress for ${referralInput.referrer} and ${referralInput.invitedUser}`)
     const now = Date.now()
     const result = await pg.query<ReferralProgress>(
       SQL`INSERT INTO referral_progress (id, referrer, invited_user, status, created_at, updated_at)
-          VALUES (gen_random_uuid(), ${referralInput.referrer.toLowerCase()}, ${referralInput.invited_user.toLowerCase()}, ${
+          VALUES (gen_random_uuid(), ${referralInput.referrer.toLowerCase()}, ${referralInput.invitedUser.toLowerCase()}, ${
             ReferralProgressStatus.PENDING
           }, ${now}, ${now})
           RETURNING *`
@@ -36,12 +36,12 @@ export async function createReferralDBComponent(
     const offset = typeof filter.offset === 'number' && filter.offset >= 0 ? filter.offset : 0
     logger.debug(
       `Finding referral_progress${filter.referrer ? ' for referrer ' + filter.referrer : ''}${
-        filter.invited_user ? ' and invited_user ' + filter.invited_user : ''
+        filter.invitedUser ? ' and invited_user ' + filter.invitedUser : ''
       } with limit ${limit} and offset ${offset}`
     )
     const where: SQLStatement[] = []
     if (filter.referrer) where.push(SQL`referrer = ${filter.referrer.toLowerCase()}`)
-    if (filter.invited_user) where.push(SQL`invited_user = ${filter.invited_user.toLowerCase()}`)
+    if (filter.invitedUser) where.push(SQL`invited_user = ${filter.invitedUser.toLowerCase()}`)
     let query = SQL`SELECT * FROM referral_progress`
     if (where.length > 0) {
       query = query.append(SQL` WHERE `)

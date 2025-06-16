@@ -3,5 +3,5 @@ export type CreateReferralPayload = {
 }
 
 export type CreateReferralWithInvitedUser = CreateReferralPayload & {
-  invited_user: string
+  invitedUser: string
 }

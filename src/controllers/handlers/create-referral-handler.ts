@@ -1,21 +1,17 @@
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import { HandlerContextWithPath } from '../../types/http'
 import { CreateReferralPayload, CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
-import { validateRequestBody, validationRules } from '../../logic/validations'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 
 export async function createReferralHandler(
-  ctx: Pick<
-    HandlerContextWithPath<'logs' | 'referralDb' | 'config' | 'fetcher'>,
-    'components' | 'request' | 'url' | 'params' | 'verification'
-  >
+  ctx: Pick<HandlerContextWithPath<'logs' | 'referral'>, 'components' | 'request' | 'verification'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
-    components: { logs, referralDb },
+    components: { logs, referral },
     request,
     verification
   } = ctx
-  const logger = logs.getLogger('create-referral-progress-handler')
+  const logger = logs.getLogger('create-referral-handler')
 
   if (!verification?.auth) {
     throw new InvalidRequestError('Authentication required')
@@ -29,27 +25,12 @@ export async function createReferralHandler(
     throw new InvalidRequestError('Invalid JSON body')
   }
 
-  const body = await validateRequestBody<CreateReferralWithInvitedUser>(
-    { ...rawBody, invited_user: verification.auth.toLowerCase() },
-    { db: referralDb, logger, request },
-    [
-      {
-        field: 'referrer',
-        rules: [validationRules.required, validationRules.ethAddress]
-      },
-      {
-        field: 'invited_user',
-        rules: [
-          validationRules.required,
-          validationRules.ethAddress,
-          validationRules.referralDoesNotExist,
-          validationRules.notSelfReferral
-        ]
-      }
-    ]
-  )
+  const body: CreateReferralWithInvitedUser = {
+    ...rawBody,
+    invitedUser: verification.auth
+  }
 
-  await referralDb.createReferral(body)
+  await referral.create(body)
 
   return {
     status: 204

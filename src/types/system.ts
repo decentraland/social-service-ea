@@ -36,6 +36,7 @@ import {
 import { ICommunityComponent, ICommunityPlacesComponent, ICommunityRolesComponent } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
+import { IReferralComponent } from '../logic/referral/referral.types'
 import { IReferralDatabaseComponent } from './referral-db.type'
 import { IQueueComponent } from './sqs.type'
 import { IMessageProcessorComponent } from './message-processor.type'
@@ -72,6 +73,7 @@ export type BaseComponents = {
   queue: IQueueComponent
   redis: IRedisComponent & ICacheComponent
   rpcServer: IRPCServerComponent
+  referral: IReferralComponent
   referralDb: IReferralDatabaseComponent
   sns: IPublisherComponent
   statusChecks: IStatusCheckComponent
