@@ -1,4 +1,4 @@
-import { IReferralComponent } from './referral.types'
+import { IReferralComponent } from './types'
 import { AppComponents } from '../../types/system'
 import { ReferralProgressStatus } from '../../types/referral-db.type'
 import { EthAddress } from '@dcl/schemas'

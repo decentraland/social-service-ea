@@ -1,7 +1,7 @@
 import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 
 import { AppComponents } from '../../types/system'
-import { IMessageConsumerComponent } from '../../types/message-consumer.type'
+import { IMessageConsumerComponent } from './types'
 
 export function createMessagesConsumerComponent(
   components: Pick<AppComponents, 'logs' | 'queue' | 'messageProcessor'>

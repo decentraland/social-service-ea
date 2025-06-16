@@ -36,11 +36,10 @@ import {
 import { ICommunityComponent, ICommunityPlacesComponent, ICommunityRolesComponent } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
-import { IReferralComponent } from '../logic/referral/referral.types'
+import { IReferralComponent } from '../logic/referral'
 import { IReferralDatabaseComponent } from './referral-db.type'
 import { IQueueComponent } from './sqs.type'
-import { IMessageProcessorComponent } from './message-processor.type'
-import { IMessageConsumerComponent } from './message-consumer.type'
+import { IMessageProcessorComponent, IMessageConsumerComponent } from '../logic/sqs'
 import { IPeersStatsComponent } from '../logic/peers-stats'
 
 export type GlobalContext = {

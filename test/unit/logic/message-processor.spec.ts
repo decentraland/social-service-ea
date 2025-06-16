@@ -1,6 +1,5 @@
 import { Event, Events, UserJoinedRoomEvent } from '@dcl/schemas'
-import { IMessageProcessorComponent } from '../../../src/types/message-processor.type'
-import { createMessageProcessorComponent } from '../../../src/logic/sqs/message-processor'
+import { IMessageProcessorComponent, createMessageProcessorComponent } from '../../../src/logic/sqs'
 
 describe('message-processor', () => {
   let mockLogger: any

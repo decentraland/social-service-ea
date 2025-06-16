@@ -1,7 +1,7 @@
 import { Event, Events, UserJoinedRoomEvent } from '@dcl/schemas'
 
 import { AppComponents } from '../../types/system'
-import { IMessageProcessorComponent } from '../../types/message-processor.type'
+import { IMessageProcessorComponent } from './types'
 
 export async function createMessageProcessorComponent({
   logs,
