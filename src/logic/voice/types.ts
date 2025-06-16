@@ -1,8 +1,7 @@
 import { PrivateVoiceChat } from '../../types'
 
 export interface AcceptPrivateVoiceChatResult {
-  token: string
-  url: string
+  connectionUrl: string
 }
 
 export interface IVoiceComponent {

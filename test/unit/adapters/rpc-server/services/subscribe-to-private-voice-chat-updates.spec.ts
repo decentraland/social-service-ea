@@ -59,8 +59,7 @@ describe('when subscribing to private voice chat updates', () => {
         callId,
         status: PrivateVoiceChatStatus.VOICE_CHAT_ACCEPTED,
         credentials: {
-          url: 'https://voice.decentraland.org',
-          token: '1234567890'
+          connectionUrl: 'livekit:https://voice.decentraland.org?access_token=1234567890'
         }
       }
 
@@ -120,8 +119,7 @@ describe('when subscribing to private voice chat updates', () => {
           callerAddress,
           status: VoiceChatStatus.ACCEPTED,
           credentials: {
-            url: 'https://voice.decentraland.org',
-            token: '1234567890'
+            connectionUrl: 'livekit:https://voice.decentraland.org?access_token=1234567890'
           }
         }
 
@@ -139,8 +137,7 @@ describe('when subscribing to private voice chat updates', () => {
           callId,
           status: PrivateVoiceChatStatus.VOICE_CHAT_ACCEPTED,
           credentials: {
-            url: 'https://voice.decentraland.org',
-            token: '1234567890'
+            connectionUrl: 'livekit:https://voice.decentraland.org?access_token=1234567890'
           }
         })
       })

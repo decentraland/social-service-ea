@@ -36,8 +36,7 @@ export type SubscriptionEventsEmitter = {
     callerAddress?: string
     calleeAddress?: string
     credentials?: {
-      url: string
-      token: string
+      connectionUrl: string
     }
   }
 }

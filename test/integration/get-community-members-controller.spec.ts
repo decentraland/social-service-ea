@@ -99,7 +99,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
       await removeFriendship(components.friendsDb, secondFriendshipId, addressMakingRequest)
     })
 
-    describe('and the request is not signed', () => {
+    describe('when the request is not signed', () => {
       describe('and the community exists but is not public', () => {
         let privateCommunityId: string
         beforeEach(async () => {
@@ -118,7 +118,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
           await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
         })
 
-        it('should respond with a 404 status code', async () => {
+        it('should return a 404 status code', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${privateCommunityId}/members`)
           expect(response.status).toBe(404)
@@ -138,11 +138,8 @@ test('Get Community Members Controller', function ({ components, spyComponents }
             response = await localHttpFetch.fetch(`/v1/communities/${communityId}/members`)
           })
 
-          it('should respond with a 200 status code', async () => {
+          it('should return members with a 200 status code', async () => {
             expect(response.status).toBe(200)
-          })
-
-          it('should respond with the community members paginated and without friendship status', async () => {
             const result = await response.json()
 
             expect(result.data.results).toEqual(
@@ -190,11 +187,8 @@ test('Get Community Members Controller', function ({ components, spyComponents }
             response = await localHttpFetch.fetch(`/v1/communities/${communityId}/members?onlyOnline=true`)
           })
 
-          it('should respond with a 200 status code', async () => {
+          it('should return online members with a 200 status code', async () => {
             expect(response.status).toBe(200)
-          })
-
-          it('should respond with the community members that are online paginated and without friendship status', async () => {
             const result = await response.json()
 
             expect(result.data.total).toBe(1)
@@ -218,9 +212,9 @@ test('Get Community Members Controller', function ({ components, spyComponents }
       })
     })
 
-    describe('and the request is signed', () => {
+    describe('when the request is signed', () => {
       describe('and the community does not exist', () => {
-        it('should respond with a 404 status code', async () => {
+        it('should return a 404 status code', async () => {
           const nonExistentCommunityId = uuidv4()
           const response = await makeRequest(identity, `/v1/communities/${nonExistentCommunityId}/members`)
           expect(response.status).toBe(404)
@@ -231,18 +225,65 @@ test('Get Community Members Controller', function ({ components, spyComponents }
         })
       })
 
-      describe('and the user is not a member of the community', () => {
-        it('should respond with a 401 status code', async () => {
-          const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
-          expect(response.status).toBe(401)
-          expect(await response.json()).toEqual({
-            error: 'Not Authorized',
-            message: "The user doesn't have permission to get community members"
+      describe('and the community is private', () => {
+        let privateCommunityId: string
+
+        beforeEach(async () => {
+          // Create a private community
+          privateCommunityId = (
+            await components.communitiesDb.createCommunity({
+              name: 'Private Community',
+              description: 'Private Description',
+              private: true,
+              active: true,
+              owner_address: ownerAddress
+            })
+          ).id
+
+          await components.communitiesDb.addCommunityMember({
+            communityId: privateCommunityId,
+            memberAddress: ownerAddress,
+            role: CommunityRole.Owner
+          })
+        })
+
+        afterEach(async () => {
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(privateCommunityId, [ownerAddress])
+          await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
+        })
+
+        describe('and the user is not a member of the community', () => {
+          it('should return a 401 status code', async () => {
+            const response = await makeRequest(identity, `/v1/communities/${privateCommunityId}/members`)
+            expect(response.status).toBe(401)
+            expect(await response.json()).toEqual({
+              error: 'Not Authorized',
+              message: "The user doesn't have permission to get community members"
+            })
+          })
+        })
+
+        describe('and the user is a member of the community', () => {
+          beforeEach(async () => {
+            await components.communitiesDb.addCommunityMember({
+              communityId: privateCommunityId,
+              memberAddress: addressMakingRequest,
+              role: CommunityRole.Member
+            })
+          })
+
+          afterEach(async () => {
+            await components.communitiesDbHelper.forceCommunityMemberRemoval(privateCommunityId, [addressMakingRequest])
+          })
+
+          it('should return a 200 status code', async () => {
+            const response = await makeRequest(identity, `/v1/communities/${privateCommunityId}/members`)
+            expect(response.status).toBe(200)
           })
         })
       })
 
-      describe('and the user is a member of the community', () => {
+      describe('and the community is public', () => {
         let response: Response
 
         beforeEach(async () => {
@@ -262,11 +303,8 @@ test('Get Community Members Controller', function ({ components, spyComponents }
             response = await makeRequest(identity, `/v1/communities/${communityId}/members?limit=3&page=1`)
           })
 
-          it('should respond with a 200 status code', async () => {
+          it('should return members with a 200 status code', async () => {
             expect(response.status).toBe(200)
-          })
-
-          it('should respond with the community members paginated and their friendship status', async () => {
             const result = await response.json()
 
             expect(result.data.results).toHaveLength(3)
@@ -321,11 +359,8 @@ test('Get Community Members Controller', function ({ components, spyComponents }
             response = await makeRequest(identity, `/v1/communities/${communityId}/members?onlyOnline=true`)
           })
 
-          it('should respond with a 200 status code', async () => {
+          it('should return online members with a 200 status code', async () => {
             expect(response.status).toBe(200)
-          })
-
-          it('should respond with the community members that are online paginated and without friendship status', async () => {
             const result = await response.json()
 
             expect(result.data.total).toBe(1)
@@ -353,7 +388,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
           spyComponents.community.getCommunityMembers.mockRejectedValue(new Error('Unable to get community members'))
         })
 
-        it('should respond with a 500 status code', async () => {
+        it('should return a 500 status code', async () => {
           const response = await makeRequest(identity, `/v1/communities/${communityId}/members`)
           expect(response.status).toBe(500)
         })

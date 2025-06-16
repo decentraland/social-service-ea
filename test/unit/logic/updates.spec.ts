@@ -285,6 +285,9 @@ describe('updates handlers', () => {
         id: callId,
         callerAddress,
         calleeAddress,
+        credentials: {
+          connectionUrl: 'livekit:https://voice.decentraland.org?access_token=1234567890'
+        },
         status: VoiceChatStatus.REQUESTED, // Default status, will be overridden in specific tests
         timestamp: Date.now()
       }

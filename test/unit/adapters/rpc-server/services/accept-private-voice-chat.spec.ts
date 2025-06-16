@@ -35,8 +35,7 @@ describe('when accepting a private voice chat', () => {
 
     beforeEach(() => {
       acceptPrivateVoiceChatMock.mockResolvedValue({
-        token,
-        url
+        connectionUrl: 'livekit:https://voice.decentraland.org?access_token=1234567890'
       })
     })
 
@@ -56,8 +55,7 @@ describe('when accepting a private voice chat', () => {
         expect(result.response.ok).toEqual({
           callId,
           credentials: {
-            token,
-            url
+            connectionUrl: 'livekit:https://voice.decentraland.org?access_token=1234567890'
           }
         })
       }

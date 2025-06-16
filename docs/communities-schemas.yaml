@@ -272,3 +272,26 @@ components:
                         type: string
                         format: date-time
                         description: 'When the member was banned'
+    CommunityPlace:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the place
+    GetCommunityPlaces200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/CommunityPlace'

@@ -83,7 +83,7 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               required:
@@ -94,11 +94,13 @@ paths:
                   type: string
                 description:
                   type: string
-                thumbnails:
-                  type: object
-                  additionalProperties:
-                    type: string
-                  description: 'A map of thumbnail types to URLs.'
+                placeIds:
+                  type: string
+                  description: 'JSON array of place IDs to add to the community'
+                thumbnail:
+                  type: string
+                  format: binary
+                  description: 'Community thumbnail image'
       responses:
         '201':
           description: Community created successfully
@@ -577,6 +579,169 @@ paths:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
+  /v1/communities/{id}/places:
+    get:
+      summary: Get community places
+      description: |
+        Lists all places in a specific community.
+        This endpoint has optional Signed Fetch authentication.
+        When not signed, it only returns places of public communities.
+        When signed, it returns all places if the user has access to the community or the community is public.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of places per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of places to skip.
+      responses:
+        '200':
+          description: Places found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityPlaces200OkResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
+    post:
+      summary: Add places to community
+      description: |
+        Adds one or more places to a community.
+        This endpoint requires Signed Fetch authentication.
+        Duplicate places are ignored.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - placeIds
+              properties:
+                placeIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Array of place IDs to add to the community
+      responses:
+        '204':
+          description: Places added successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
+  /v1/communities/{id}/places/{placeId}:
+    delete:
+      summary: Remove place from community
+      description: |
+        Removes a place from a community.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The unique identifier of the place to remove.
+      responses:
+        '204':
+          description: Place removed successfully
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community or place not found
           content:
             application/json:
               schema:

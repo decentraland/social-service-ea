@@ -33,7 +33,7 @@ import {
   IStorageComponent,
   IStorageHelperComponent
 } from './components'
-import { ICommunityComponent, ICommunityRolesComponent } from '../logic/community'
+import { ICommunityComponent, ICommunityPlacesComponent, ICommunityRolesComponent } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
 import { IReferralDatabaseComponent } from './referral-db.type'
@@ -53,6 +53,7 @@ export type BaseComponents = {
   commsGatekeeper: ICommsGatekeeperComponent
   community: ICommunityComponent
   communityRoles: ICommunityRolesComponent
+  communityPlaces: ICommunityPlacesComponent
   communitiesDb: ICommunitiesDatabaseComponent
   config: IConfigComponent
   fetcher: IFetchComponent

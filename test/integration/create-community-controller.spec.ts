@@ -1,9 +1,11 @@
 import { test } from '../components'
-import { createTestIdentity, Identity } from './utils/auth'
+import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { makeAuthenticatedMultipartRequest } from './utils/auth'
+import { randomUUID } from 'crypto'
 
 test('Create Community Controller', async function ({ components, stubComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
+  const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when creating a community', () => {
     let identity: Identity
@@ -42,7 +44,7 @@ test('Create Community Controller', async function ({ components, stubComponents
 
       describe('and the body is valid', () => {
         let communityId: string
-        let validBody: { name: string; description: string; thumbnailPath?: string } = {
+        let validBody: { name: string; description: string; thumbnailPath?: string; placeIds?: string[] } = {
           name: 'Test Community',
           description: 'Test Description'
         }
@@ -53,16 +55,64 @@ test('Create Community Controller', async function ({ components, stubComponents
 
         describe('when the user owns a name', () => {
           beforeEach(async () => {
-            stubComponents.catalystClient.getOwnedNames
-              .onFirstCall()
-              .resolves([
-                {
-                  id: '1',
-                  name: 'testOwnedName',
-                  contractAddress: '0x0000000000000000000000000000000000000000',
-                  tokenId: '1'
-                }
-              ])
+            stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([
+              {
+                id: '1',
+                name: 'testOwnedName',
+                contractAddress: '0x0000000000000000000000000000000000000000',
+                tokenId: '1'
+              }
+            ])
+          })
+
+          describe('and places are provided', () => {
+            const mockPlaceIds = [randomUUID(), randomUUID()]
+            const validBodyWithPlaces = {
+              ...validBody,
+              placeIds: mockPlaceIds
+            }
+
+            it('should create community and add places', async () => {
+              const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithPlaces)
+              const body = await response.json()
+              communityId = body.data.id
+
+              expect(response.status).toBe(201)
+              expect(body).toMatchObject({
+                data: {
+                  id: expect.any(String),
+                  name: 'Test Community',
+                  description: 'Test Description',
+                  active: true,
+                  ownerAddress: identity.realAccount.address.toLowerCase(),
+                  privacy: 'public'
+                },
+                message: 'Community created successfully'
+              })
+
+              const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+              expect(placesResponse.status).toBe(200)
+              const result = await placesResponse.json()
+              expect(result.data.results.map((p: { id: string }) => p.id)).toEqual(expect.arrayContaining(mockPlaceIds))
+            })
+
+            it('should create community without places when empty array is provided', async () => {
+              const validBodyWithEmptyPlaces = {
+                ...validBody,
+                placeIds: []
+              }
+
+              const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithEmptyPlaces)
+              const body = await response.json()
+              communityId = body.data.id
+
+              expect(response.status).toBe(201)
+
+              const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+              expect(placesResponse.status).toBe(200)
+              const result = await placesResponse.json()
+              expect(result.data.results).toHaveLength(0)
+            })
           })
 
           describe('and thumbnail is provided', () => {
@@ -80,7 +130,7 @@ test('Create Community Controller', async function ({ components, stubComponents
             it('should respond with a 201 status code', async () => {
               const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithThumbnail)
               const body = await response.json()
-              communityId = body.id
+              communityId = body.data.id
 
               expect(response.status).toBe(201)
               expect(body).toMatchObject({
@@ -111,7 +161,7 @@ test('Create Community Controller', async function ({ components, stubComponents
             it('should create community even when the thumbnail is not provided', async () => {
               const response = await makeMultipartRequest(identity, '/v1/communities', validBody)
               const body = await response.json()
-              communityId = body.id
+              communityId = body.data.id
 
               expect(response.status).toBe(201)
               expect(body).toMatchObject({
