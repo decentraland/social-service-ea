@@ -3,15 +3,17 @@ import { InvalidRequestError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../logic/community'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { EthAddress } from '@dcl/schemas'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL } from '../../adapters/pubsub'
 
 export async function addMemberToCommunityHandler(
   context: Pick<
-    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members'>,
+    HandlerContextWithPath<'community' | 'logs' | 'pubsub', '/v1/communities/:id/members'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { community, logs },
+    components: { community, logs, pubsub },
     params: { id: communityId },
     verification
   } = context
@@ -28,6 +30,13 @@ export async function addMemberToCommunityHandler(
     }
 
     await community.joinCommunity(communityId, memberAddress)
+
+    await pubsub.publishInChannel(COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL, {
+      communityId,
+      memberAddress,
+      status: ConnectivityStatus.ONLINE
+    })
+
     return {
       status: 204
     }

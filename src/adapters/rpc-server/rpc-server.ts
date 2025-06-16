@@ -14,14 +14,17 @@ import {
   BLOCK_UPDATES_CHANNEL,
   FRIEND_STATUS_UPDATES_CHANNEL,
   FRIENDSHIP_UPDATES_CHANNEL,
-  PRIVATE_VOICE_CHAT_UPDATES_CHANNEL
+  PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
+  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL
 } from '../pubsub'
 import {
   friendshipUpdateHandler,
-  friendConnectivityUpdateHandler,
   friendshipAcceptedUpdateHandler,
+  friendConnectivityUpdateHandler,
   blockUpdateHandler,
-  privateVoiceChatUpdateHandler
+  privateVoiceChatUpdateHandler,
+  communityMemberJoinHandler,
+  communityMemberLeaveHandler
 } from '../../logic/updates'
 import { getPrivateMessagesSettingsService } from './services/get-private-messages-settings'
 import { upsertSocialSettingsService } from './services/upsert-social-settings'
@@ -38,6 +41,7 @@ import { rejectPrivateVoiceChatService } from './services/reject-private-voice-c
 import { endPrivateVoiceChatService } from './services/end-private-voice-chat'
 import { getIncomingPrivateVoiceChatRequestsService } from './services/get-incoming-private-voice-chat-requests'
 import { subscribeToPrivateVoiceChatUpdatesService } from './services/subscribe-to-private-voice-chat-updates'
+import { subscribeToCommunityMemberConnectivityUpdatesService } from './services/subscribe-to-community-member-connectivity-updates'
 
 export async function createRpcServerComponent({
   logs,
@@ -52,7 +56,8 @@ export async function createRpcServerComponent({
   metrics,
   settings,
   voice,
-  peersStats
+  peersStats,
+  community
 }: Pick<
   AppComponents,
   | 'logs'
@@ -68,6 +73,7 @@ export async function createRpcServerComponent({
   | 'settings'
   | 'voice'
   | 'peersStats'
+  | 'community'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -175,6 +181,13 @@ export async function createRpcServerComponent({
     getIncomingPrivateVoiceChatRequest: {
       creator: getIncomingPrivateVoiceChatRequestsService({ components: { logs, voice } }),
       type: ServiceType.CALL
+    },
+    subscribeToCommunityMemberConnectivityUpdates: {
+      creator: subscribeToCommunityMemberConnectivityUpdatesService({
+        components: { logs, catalystClient }
+      }),
+      type: ServiceType.COMMUNITIES,
+      event: 'community_member_connectivity_updates'
     }
   }
 
@@ -197,12 +210,20 @@ export async function createRpcServerComponent({
       )
       await pubsub.subscribeToChannel(
         FRIEND_STATUS_UPDATES_CHANNEL,
-        friendConnectivityUpdateHandler(subscribersContext, logger, friendsDb)
+        friendConnectivityUpdateHandler(subscribersContext, logger, friendsDb, community)
       )
       await pubsub.subscribeToChannel(BLOCK_UPDATES_CHANNEL, blockUpdateHandler(subscribersContext, logger))
       await pubsub.subscribeToChannel(
         PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
         privateVoiceChatUpdateHandler(subscribersContext, logger)
+      )
+      await pubsub.subscribeToChannel(
+        COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+        communityMemberJoinHandler(subscribersContext, logger, community)
+      )
+      await pubsub.subscribeToChannel(
+        COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+        communityMemberLeaveHandler(subscribersContext, logger, community)
       )
     },
     attachUser({ transport, address }) {
