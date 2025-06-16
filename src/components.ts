@@ -109,6 +109,20 @@ export async function initComponents(): Promise<AppComponents> {
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
+
+  const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
+  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs })
+  const community = await createCommunityComponent({
+    communitiesDb,
+    catalystClient,
+    communityRoles,
+    communityPlaces,
+    logs,
+    peersStats,
+    storage,
+    config
+  })
+
   const rpcServer = await createRpcServerComponent({
     logs,
     commsGatekeeper,
@@ -122,23 +136,13 @@ export async function initComponents(): Promise<AppComponents> {
     metrics,
     settings,
     voice,
-    peersStats
+    peersStats,
+    community
   })
+
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
-  const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs })
-  const community = await createCommunityComponent({
-    communitiesDb,
-    catalystClient,
-    communityRoles,
-    communityPlaces,
-    logs,
-    peersStats,
-    storage,
-    config
-  })
 
   return {
     archipelagoStats,
