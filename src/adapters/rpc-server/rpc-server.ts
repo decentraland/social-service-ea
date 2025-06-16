@@ -57,7 +57,7 @@ export async function createRpcServerComponent({
   settings,
   voice,
   peersStats,
-  community
+  communities
 }: Pick<
   AppComponents,
   | 'logs'
@@ -73,7 +73,7 @@ export async function createRpcServerComponent({
   | 'settings'
   | 'voice'
   | 'peersStats'
-  | 'community'
+  | 'communities'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -210,7 +210,7 @@ export async function createRpcServerComponent({
       )
       await pubsub.subscribeToChannel(
         FRIEND_STATUS_UPDATES_CHANNEL,
-        friendConnectivityUpdateHandler(subscribersContext, logger, friendsDb, community)
+        friendConnectivityUpdateHandler(subscribersContext, logger, friendsDb, communities)
       )
       await pubsub.subscribeToChannel(BLOCK_UPDATES_CHANNEL, blockUpdateHandler(subscribersContext, logger))
       await pubsub.subscribeToChannel(
@@ -219,11 +219,11 @@ export async function createRpcServerComponent({
       )
       await pubsub.subscribeToChannel(
         COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
-        communityMemberJoinHandler(subscribersContext, logger, community)
+        communityMemberJoinHandler(subscribersContext, logger, communities)
       )
       await pubsub.subscribeToChannel(
         COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
-        communityMemberLeaveHandler(subscribersContext, logger, community)
+        communityMemberLeaveHandler(subscribersContext, logger, communities)
       )
     },
     attachUser({ transport, address }) {

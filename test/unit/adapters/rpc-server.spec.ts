@@ -27,6 +27,7 @@ import { createSettingsMockedComponent } from '../../mocks/components/settings'
 import { createVoiceMockedComponent } from '../../mocks/components/voice'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
+import { createMockCommunitiesComponent } from '../../mocks/communities'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -60,6 +61,7 @@ describe('createRpcServerComponent', () => {
     const mockVoice = createVoiceMockedComponent({
       endIncomingOrOutgoingPrivateVoiceChatForUser: endIncomingOrOutgoingPrivateVoiceChatForUserMock
     })
+    const mockCommunities = createMockCommunitiesComponent({})
 
     mockPeersStats = createMockPeersStatsComponent()
 
@@ -82,7 +84,8 @@ describe('createRpcServerComponent', () => {
       metrics: mockMetrics,
       settings: mockSettings,
       voice: mockVoice,
-      peersStats: mockPeersStats
+      peersStats: mockPeersStats,
+      communities: mockCommunities
     })
   })
 

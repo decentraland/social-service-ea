@@ -7,7 +7,7 @@ import { createCommunityBansComponent } from '../../../src/logic/community/bans'
 import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
 import { ICommunityBansComponent } from '../../../src/logic/community'
 import { BannedMember, BannedMemberProfile, ICommunityRolesComponent } from '../../../src/logic/community/types'
-import { createMockCommunityRolesComponent } from '../../mocks/community'
+import { createMockCommunityRolesComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 
 describe('Community Bans Component', () => {

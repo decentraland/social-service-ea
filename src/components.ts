@@ -125,24 +125,7 @@ export async function initComponents(): Promise<AppComponents> {
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
-  const rpcServer = await createRpcServerComponent({
-    logs,
-    commsGatekeeper,
-    friendsDb,
-    pubsub,
-    uwsServer,
-    config,
-    catalystClient,
-    sns,
-    subscribersContext,
-    metrics,
-    settings,
-    voice,
-    peersStats
-  })
-  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
-  const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
-  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
   const communityMembers = await createCommunityMembersComponent({
@@ -162,6 +145,27 @@ export async function initComponents(): Promise<AppComponents> {
     storage,
     config
   })
+
+  const rpcServer = await createRpcServerComponent({
+    logs,
+    commsGatekeeper,
+    friendsDb,
+    pubsub,
+    uwsServer,
+    config,
+    catalystClient,
+    sns,
+    subscribersContext,
+    metrics,
+    settings,
+    voice,
+    peersStats,
+    communities
+  })
+
+  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
+  const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   const expirePrivateVoiceChatJob = createJobComponent(
     { logs },

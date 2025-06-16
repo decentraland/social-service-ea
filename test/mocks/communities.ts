@@ -16,7 +16,7 @@ export const mockCommunity = (community: Partial<CommunityDB> = {}): CommunityDB
   active: community.active || true
 })
 
-export function createMockCommunityComponent({
+export function createMockCommunitiesComponent({
   getCommunity = jest.fn(),
   getCommunities = jest.fn(),
   getCommunitiesPublicInformation = jest.fn(),
