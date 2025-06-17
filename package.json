@@ -22,7 +22,7 @@
   "devDependencies": {
     "@dcl/eslint-config": "^2.2.1",
     "@protobuf-ts/protoc": "^2.9.4",
-    "@types/image-type": "^4.0.1",
+    "@types/file-type": "^10.9.3",
     "@types/node": "^20.12.7",
     "@types/redis": "^4.0.11",
     "@types/ws": "^8.5.10",
@@ -63,6 +63,7 @@
     "dcl-catalyst-client": "^21.8.1",
     "decentraland-crypto-fetch": "^2.0.1",
     "dotenv": "^16.4.7",
+    "file-type": "~16.5.4",
     "fp-future": "^1.0.1",
     "lru-cache": "^10.4.3",
     "mitt": "^3.0.1",
