@@ -139,6 +139,8 @@ See migrations for details: [migrations](./src/migrations)
 
 ### Friendship Flow Diagrams
 
+For detailed information about how real-time updates and WebSocket flows, see [WebSocket Updates System](./docs/WS_UPDATES.md).
+
 ```mermaid
 sequenceDiagram
   participant Client
