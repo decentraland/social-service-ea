@@ -312,7 +312,7 @@ export async function createCommunityComponent(
       if (thumbnail) {
         const thumbnailUrl = await storage.storeFile(thumbnail, `communities/${newCommunity.id}/raw-thumbnail.png`)
 
-        logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id })
+        logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id, size: thumbnail.length })
         newCommunity.thumbnails = {
           raw: thumbnailUrl
         }

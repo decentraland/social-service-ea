@@ -2,6 +2,36 @@ import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { makeAuthenticatedMultipartRequest } from './utils/auth'
 import { randomUUID } from 'crypto'
+import { Jimp, rgbaToInt } from 'jimp'
+
+export async function createLargeThumbnailBuffer(targetSize = 501 * 1024): Promise<Buffer> {
+  let width = 1000
+  let height = 1000
+  let buffer: Buffer
+
+  while (true) {
+    const image = new Jimp({width, height})
+    // Fill with random pixels to avoid compression
+    for (let x = 0; x < width; x++) {
+      for (let y = 0; y < height; y++) {
+        const color = rgbaToInt(
+          Math.floor(Math.random() * 256),
+          Math.floor(Math.random() * 256),
+          Math.floor(Math.random() * 256),
+          255
+        )
+        image.setPixelColor(color, x, y)
+      }
+    }
+    buffer = await image.getBuffer('image/png')
+    if (buffer.length >= targetSize) break
+    // Increase size for next iteration
+    width += 100
+    height += 100
+  }
+
+  return buffer
+}
 
 test('Create Community Controller', async function ({ components, stubComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
@@ -23,7 +53,7 @@ test('Create Community Controller', async function ({ components, stubComponents
     })
 
     describe('and the request is signed', () => {
-      describe('but the body is invalid', () => {
+      describe('but the body structure is invalid', () => {
         it('should respond with a 400 status code when missing name', async () => {
           const response = await makeMultipartRequest(identity, '/v1/communities', {
             description: 'Test Description',
@@ -42,7 +72,7 @@ test('Create Community Controller', async function ({ components, stubComponents
         })
       })
 
-      describe('and the body is valid', () => {
+      describe('and the body structure is valid', () => {
         let communityId: string
         let validBody: { name: string; description: string; thumbnailPath?: string; placeIds?: string[] } = {
           name: 'Test Community',
@@ -115,7 +145,7 @@ test('Create Community Controller', async function ({ components, stubComponents
             })
           })
 
-          describe('and thumbnail is provided', () => {
+          describe('and a valid thumbnail is provided', () => {
             const validBodyWithThumbnail = {
               ...validBody,
               thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
@@ -154,6 +184,30 @@ test('Create Community Controller', async function ({ components, stubComponents
               expect(body.data.thumbnails.raw).toBe(
                 `${expectedCdn}/social/communities/${communityId}/raw-thumbnail.png`
               )
+            })
+          })
+
+          describe('and an invalid thumbnail is provided', () => {
+            it('should respond with a 400 status code when trying to upload a file that is not an image', async () => {
+              const response = await makeMultipartRequest(identity, '/v1/communities', {
+                ...validBody,
+                thumbnailPath: require('path').join(__dirname, 'fixtures/example.txt')
+              })
+              expect(response.status).toBe(400)
+              expect(await response.json()).toMatchObject({
+                message: 'Thumbnail must be a valid image file'
+              })
+            })
+
+            it('should respond with a 400 status code when trying to upload a file that is too large', async () => {
+              const response = await makeMultipartRequest(identity, '/v1/communities', {
+                ...validBody,
+                thumbnailBuffer: await createLargeThumbnailBuffer()
+              })
+              expect(response.status).toBe(400)
+              expect(await response.json()).toMatchObject({
+                message: 'Thumbnail size must be between 1KB and 500KB'
+              })
             })
           })
 
