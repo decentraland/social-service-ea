@@ -63,6 +63,7 @@
     "dcl-catalyst-client": "^21.8.1",
     "decentraland-crypto-fetch": "^2.0.1",
     "dotenv": "^16.4.7",
+    "file-type": "^21.0.0",
     "fp-future": "^1.0.1",
     "lru-cache": "^10.4.3",
     "mitt": "^3.0.1",
