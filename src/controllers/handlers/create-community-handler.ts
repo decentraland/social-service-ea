@@ -2,7 +2,7 @@ import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { FormHandlerContextWithPath, HTTPResponse } from '../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../utils/errors'
-import FileType from 'file-type'
+import { fileTypeFromBuffer } from 'file-type'
 
 const parsePlaceIds = (placeIds: string): string[] => {
   try {
@@ -50,7 +50,7 @@ export async function createCommunityHandler(
     }
 
     if (thumbnailBuffer) {
-      const type = await FileType.fromBuffer(thumbnailBuffer)
+      const type = await fileTypeFromBuffer(thumbnailBuffer)
       if (!type || !type.mime.startsWith('image/')) {
         logger.error('Thumbnail is not a valid image', { owner: address })
         throw new InvalidRequestError('Thumbnail must be a valid image file')
