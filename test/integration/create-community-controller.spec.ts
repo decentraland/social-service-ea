@@ -2,7 +2,7 @@ import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { makeAuthenticatedMultipartRequest } from './utils/auth'
 import { randomUUID } from 'crypto'
-import Jimp from 'jimp'
+import { Jimp, rgbaToInt } from 'jimp'
 
 export async function createLargeThumbnailBuffer(targetSize = 501 * 1024): Promise<Buffer> {
   let width = 1000
@@ -10,11 +10,11 @@ export async function createLargeThumbnailBuffer(targetSize = 501 * 1024): Promi
   let buffer: Buffer
 
   while (true) {
-    const image = new Jimp.Jimp({width, height})
+    const image = new Jimp({width, height})
     // Fill with random pixels to avoid compression
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
-        const color = Jimp.rgbaToInt(
+        const color = rgbaToInt(
           Math.floor(Math.random() * 256),
           Math.floor(Math.random() * 256),
           Math.floor(Math.random() * 256),
