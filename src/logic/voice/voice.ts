@@ -5,21 +5,27 @@ import {
   IncomingVoiceChatNotFoundError,
   UserAlreadyInVoiceChatError,
   UsersAreCallingSomeoneElseError,
-  VoiceChatExpiredError,
   VoiceChatNotAllowedError,
   VoiceChatNotFoundError
 } from './errors'
 import { AcceptPrivateVoiceChatResult, IVoiceComponent, VoiceChatStatus } from './types'
 
-export function createVoiceComponent({
+export async function createVoiceComponent({
   logs,
   settings,
+  config,
   commsGatekeeper,
   voiceDb,
   friendsDb,
   pubsub
-}: Pick<AppComponents, 'logs' | 'settings' | 'commsGatekeeper' | 'voiceDb' | 'friendsDb' | 'pubsub'>): IVoiceComponent {
+}: Pick<
+  AppComponents,
+  'logs' | 'settings' | 'config' | 'commsGatekeeper' | 'voiceDb' | 'friendsDb' | 'pubsub'
+>): Promise<IVoiceComponent> {
   const logger = logs.getLogger('voice-logic')
+  const PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE = await config.requireNumber(
+    'PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE'
+  )
 
   async function startPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
     logger.info(`Starting private voice chat from ${callerAddress} to ${calleeAddress}`)
@@ -81,10 +87,6 @@ export function createVoiceComponent({
       throw new VoiceChatNotAllowedError()
     }
 
-    if (privateVoiceChat.expires_at < new Date()) {
-      throw new VoiceChatExpiredError(callId)
-    }
-
     // Call the comms gate-keeper endpoint to get the keys of both users
     const credentials = await commsGatekeeper.getPrivateVoiceChatCredentials(
       callId,
@@ -126,10 +128,6 @@ export function createVoiceComponent({
     const privateVoiceChat = await voiceDb.getPrivateVoiceChat(callId)
     if (!privateVoiceChat || privateVoiceChat.callee_address !== calleeAddress) {
       throw new VoiceChatNotFoundError(callId)
-    }
-
-    if (privateVoiceChat.expires_at < new Date()) {
-      throw new VoiceChatExpiredError(callId)
     }
 
     // Delete the voice chat from the database
@@ -206,7 +204,7 @@ export function createVoiceComponent({
     logger.info(`Getting incoming private voice chats for ${address}`)
 
     const privateVoiceChat = await voiceDb.getPrivateVoiceChatForCalleeAddress(address)
-    if (!privateVoiceChat || privateVoiceChat.expires_at < new Date()) {
+    if (!privateVoiceChat) {
       throw new IncomingVoiceChatNotFoundError(address)
     }
     return privateVoiceChat
@@ -231,7 +229,32 @@ export function createVoiceComponent({
     }
   }
 
+  async function expirePrivateVoiceChat(): Promise<void> {
+    // Get and delete the voice chat from the database
+    while (true) {
+      // Progressively expire the voice chats
+      const expiredPrivateVoiceChats = await voiceDb.expirePrivateVoiceChat(PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE)
+      // If there are no expired voice chats, stop the loop
+      if (expiredPrivateVoiceChats.length === 0) {
+        break
+      }
+
+      // Notify the users that the private voice chat expired
+      for (const expiredPrivateVoiceChat of expiredPrivateVoiceChats) {
+        await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId: expiredPrivateVoiceChat.id,
+          callerAddress: expiredPrivateVoiceChat.caller_address,
+          calleeAddress: expiredPrivateVoiceChat.callee_address,
+          status: VoiceChatStatus.EXPIRED
+        })
+      }
+
+      logger.info(`Expired ${expiredPrivateVoiceChats.length} private voice chats`)
+    }
+  }
+
   return {
+    expirePrivateVoiceChat,
     endIncomingOrOutgoingPrivateVoiceChatForUser,
     endPrivateVoiceChat,
     getIncomingPrivateVoiceChat,

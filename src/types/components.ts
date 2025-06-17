@@ -168,6 +168,7 @@ export interface IVoiceDatabaseComponent {
   deletePrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
   getPrivateVoiceChatForCalleeAddress(calleeAddress: string): Promise<PrivateVoiceChat | null>
   getPrivateVoiceChatOfUser(address: string): Promise<PrivateVoiceChat | null>
+  expirePrivateVoiceChat(limit: number): Promise<PrivateVoiceChat[]>
 }
 
 export interface IRedisComponent extends IBaseComponent {

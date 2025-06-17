@@ -16,12 +16,6 @@ export class UsersAreCallingSomeoneElseError extends Error {
   }
 }
 
-export class VoiceChatExpiredError extends Error {
-  constructor(callId: string) {
-    super(`The voice chat with id ${callId} has expired`)
-  }
-}
-
 export class VoiceChatNotFoundError extends Error {
   constructor(callId: string) {
     super(`The voice chat with id ${callId} was not found`)

@@ -37,6 +37,7 @@ import { ICommunityComponent, ICommunityPlacesComponent, ICommunityRolesComponen
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
 import { IPeersStatsComponent } from '../logic/peers-stats'
+import { IJobComponent } from '../logic/job'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -48,6 +49,7 @@ export type BaseComponents = {
   catalystClient: ICatalystClientComponent
   commsGatekeeper: ICommsGatekeeperComponent
   community: ICommunityComponent
+  expirePrivateVoiceChatJob?: IJobComponent
   communityRoles: ICommunityRolesComponent
   communityPlaces: ICommunityPlacesComponent
   communitiesDb: ICommunitiesDatabaseComponent

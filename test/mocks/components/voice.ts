@@ -6,9 +6,11 @@ export function createVoiceMockedComponent({
   rejectPrivateVoiceChat = jest.fn(),
   endPrivateVoiceChat = jest.fn(),
   getIncomingPrivateVoiceChat = jest.fn(),
-  endIncomingOrOutgoingPrivateVoiceChatForUser = jest.fn()
+  endIncomingOrOutgoingPrivateVoiceChatForUser = jest.fn(),
+  expirePrivateVoiceChat = jest.fn()
 }: Partial<jest.Mocked<IVoiceComponent>>): jest.Mocked<IVoiceComponent> {
   return {
+    expirePrivateVoiceChat,
     startPrivateVoiceChat,
     acceptPrivateVoiceChat,
     rejectPrivateVoiceChat,

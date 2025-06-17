@@ -3,12 +3,15 @@ import { createVoiceComponent, IVoiceComponent, VoiceChatStatus } from '../../..
 import {
   UserAlreadyInVoiceChatError,
   UsersAreCallingSomeoneElseError,
-  VoiceChatExpiredError,
   VoiceChatNotAllowedError,
   VoiceChatNotFoundError,
   IncomingVoiceChatNotFoundError
 } from '../../../src/logic/voice/errors'
-import { createFriendsDBMockedComponent, createMockedPubSubComponent } from '../../mocks/components'
+import {
+  createFriendsDBMockedComponent,
+  createMockConfigComponent,
+  createMockedPubSubComponent
+} from '../../mocks/components'
 import { createVoiceDBMockedComponent } from '../../mocks/components/voice-db'
 import {
   BlockedUsersMessagesVisibilitySetting,
@@ -24,6 +27,7 @@ import { ISettingsComponent } from '../../../src/logic/settings'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 
+const PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE = 20
 let voice: IVoiceComponent
 let publishInChannelMock: jest.MockedFn<IPubSubComponent['publishInChannel']>
 let areUsersBeingCalledOrCallingSomeoneMock: jest.MockedFn<
@@ -41,8 +45,9 @@ let getPrivateVoiceChatForCalleeAddressMock: jest.MockedFn<
   IVoiceDatabaseComponent['getPrivateVoiceChatForCalleeAddress']
 >
 let getPrivateVoiceChatOfUserMock: jest.MockedFn<IVoiceDatabaseComponent['getPrivateVoiceChatOfUser']>
+let expirePrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['expirePrivateVoiceChat']>
 
-beforeEach(() => {
+beforeEach(async () => {
   deletePrivateVoiceChatMock = jest.fn()
   getPrivateVoiceChatMock = jest.fn()
   getUsersSettingsMock = jest.fn()
@@ -55,6 +60,7 @@ beforeEach(() => {
   endPrivateVoiceChatMock = jest.fn()
   getPrivateVoiceChatForCalleeAddressMock = jest.fn()
   getPrivateVoiceChatOfUserMock = jest.fn()
+  expirePrivateVoiceChatMock = jest.fn()
   const logs: ILoggerComponent = {
     getLogger: () => ({
       info: () => undefined,
@@ -71,7 +77,8 @@ beforeEach(() => {
     getPrivateVoiceChat: getPrivateVoiceChatMock,
     deletePrivateVoiceChat: deletePrivateVoiceChatMock,
     getPrivateVoiceChatForCalleeAddress: getPrivateVoiceChatForCalleeAddressMock,
-    getPrivateVoiceChatOfUser: getPrivateVoiceChatOfUserMock
+    getPrivateVoiceChatOfUser: getPrivateVoiceChatOfUserMock,
+    expirePrivateVoiceChat: expirePrivateVoiceChatMock
   })
   const settings = createSettingsMockedComponent({
     getUsersSettings: getUsersSettingsMock
@@ -84,12 +91,16 @@ beforeEach(() => {
     getPrivateVoiceChatCredentials: getPrivateVoiceChatCredentialsMock,
     endPrivateVoiceChat: endPrivateVoiceChatMock
   })
+  const config = createMockConfigComponent({
+    requireNumber: jest.fn().mockResolvedValue(PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE)
+  })
 
-  voice = createVoiceComponent({
+  voice = await createVoiceComponent({
     logs,
     pubsub,
     voiceDb,
     friendsDb,
+    config,
     settings,
     commsGatekeeper
   })
@@ -319,9 +330,7 @@ describe('when accepting a private voice chat', () => {
         id: callId,
         caller_address: callerAddress,
         callee_address: calleeAddress,
-        expires_at: new Date(Date.now() + 1000),
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date()
       }
       getPrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
     })
@@ -336,80 +345,64 @@ describe('when accepting a private voice chat', () => {
       })
     })
 
-    describe('and the voice chat has expired', () => {
+    describe('and getting the private voice chat credentials fails', () => {
       beforeEach(() => {
-        privateVoiceChat.expires_at = new Date(Date.now() - 1000000000)
+        getPrivateVoiceChatCredentialsMock.mockRejectedValueOnce(
+          new Error('Failed to get private voice chat credentials')
+        )
       })
 
-      it('should reject with a voice chat expired error', () => {
-        return expect(voice.acceptPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatExpiredError)
+      it('should reject with the propagated error', () => {
+        return expect(voice.acceptPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow()
       })
     })
 
-    describe('and the voice chat is still valid', () => {
+    describe('and getting the private voice chat credentials succeeds', () => {
+      let calleeCredentials: { connectionUrl: string }
+      let callerCredentials: { connectionUrl: string }
+
       beforeEach(() => {
-        privateVoiceChat.expires_at = new Date(Date.now() + 1000000000)
-      })
+        calleeCredentials = { connectionUrl: 'livekit:https://url.com?access_token=token' }
+        callerCredentials = { connectionUrl: 'livekit:https://another-url.com?access_token=token' }
 
-      describe('and getting the private voice chat credentials fails', () => {
-        beforeEach(() => {
-          getPrivateVoiceChatCredentialsMock.mockRejectedValueOnce(
-            new Error('Failed to get private voice chat credentials')
-          )
-        })
-
-        it('should reject with the propagated error', () => {
-          return expect(voice.acceptPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow()
+        getPrivateVoiceChatCredentialsMock.mockResolvedValueOnce({
+          [calleeAddress]: calleeCredentials,
+          [callerAddress]: callerCredentials
         })
       })
 
-      describe('and getting the private voice chat credentials succeeds', () => {
-        let calleeCredentials: { connectionUrl: string }
-        let callerCredentials: { connectionUrl: string }
-
+      describe('and the voice chat is successfully deleted from the database', () => {
         beforeEach(() => {
-          calleeCredentials = { connectionUrl: 'livekit:https://url.com?access_token=token' }
-          callerCredentials = { connectionUrl: 'livekit:https://another-url.com?access_token=token' }
-
-          getPrivateVoiceChatCredentialsMock.mockResolvedValueOnce({
-            [calleeAddress]: calleeCredentials,
-            [callerAddress]: callerCredentials
-          })
+          deletePrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
         })
 
-        describe('and the voice chat is successfully deleted from the database', () => {
-          beforeEach(() => {
-            deletePrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
+        it('should publish the voice chat accepted event in the channel, delete the voice chat from the database and resolve with the credentials', async () => {
+          const result = await voice.acceptPrivateVoiceChat(callId, calleeAddress)
+          expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+            callId,
+            callerAddress,
+            calleeAddress,
+            status: 'accepted',
+            credentials: {
+              connectionUrl: callerCredentials.connectionUrl
+            }
           })
-
-          it('should publish the voice chat accepted event in the channel, delete the voice chat from the database and resolve with the credentials', async () => {
-            const result = await voice.acceptPrivateVoiceChat(callId, calleeAddress)
-            expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-              callId,
-              callerAddress,
-              calleeAddress,
-              status: 'accepted',
-              credentials: {
-                connectionUrl: callerCredentials.connectionUrl
-              }
-            })
-            expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
-            expect(result).toEqual({
-              connectionUrl: calleeCredentials.connectionUrl
-            })
+          expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+          expect(result).toEqual({
+            connectionUrl: calleeCredentials.connectionUrl
           })
         })
+      })
 
-        describe('and the voice chat deletion fails due to race condition', () => {
-          beforeEach(() => {
-            deletePrivateVoiceChatMock.mockResolvedValueOnce(null)
-          })
+      describe('and the voice chat deletion fails due to race condition', () => {
+        beforeEach(() => {
+          deletePrivateVoiceChatMock.mockResolvedValueOnce(null)
+        })
 
-          it('should end the private voice chat and reject with a voice chat not found error', async () => {
-            await expect(voice.acceptPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
-            expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
-            expect(publishInChannelMock).not.toHaveBeenCalled()
-          })
+        it('should end the private voice chat and reject with a voice chat not found error', async () => {
+          await expect(voice.acceptPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
+          expect(endPrivateVoiceChatMock).toHaveBeenCalledWith(callId, calleeAddress)
+          expect(publishInChannelMock).not.toHaveBeenCalled()
         })
       })
     })
@@ -445,9 +438,7 @@ describe('when rejecting a private voice chat', () => {
         id: callId,
         caller_address: callerAddress,
         callee_address: calleeAddress,
-        expires_at: new Date(Date.now() + 1000000000),
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date()
       }
       getPrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
     })
@@ -462,48 +453,32 @@ describe('when rejecting a private voice chat', () => {
       })
     })
 
-    describe('and the voice chat has expired', () => {
+    describe('and the voice chat is successfully deleted from the database', () => {
       beforeEach(() => {
-        privateVoiceChat.expires_at = new Date(Date.now() - 1000000000)
+        deletePrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
       })
 
-      it('should reject with a voice chat expired error', () => {
-        return expect(voice.rejectPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatExpiredError)
+      it('should publish the voice chat rejected event in the channel and delete the voice chat from the database', async () => {
+        await voice.rejectPrivateVoiceChat(callId, calleeAddress)
+        expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId,
+          callerAddress,
+          calleeAddress,
+          status: 'rejected'
+        })
+        expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
       })
     })
 
-    describe('and the voice chat is still valid', () => {
+    describe('and the voice chat deletion fails due to race condition', () => {
       beforeEach(() => {
-        privateVoiceChat.expires_at = new Date(Date.now() + 1000000000)
+        deletePrivateVoiceChatMock.mockResolvedValueOnce(null)
       })
 
-      describe('and the voice chat is successfully deleted from the database', () => {
-        beforeEach(() => {
-          deletePrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
-        })
-
-        it('should publish the voice chat rejected event in the channel and delete the voice chat from the database', async () => {
-          await voice.rejectPrivateVoiceChat(callId, calleeAddress)
-          expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-            callId,
-            callerAddress,
-            calleeAddress,
-            status: 'rejected'
-          })
-          expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
-        })
-      })
-
-      describe('and the voice chat deletion fails due to race condition', () => {
-        beforeEach(() => {
-          deletePrivateVoiceChatMock.mockResolvedValueOnce(null)
-        })
-
-        it('should not publish the voice chat rejected event and reject with a voice chat not found error', async () => {
-          await expect(voice.rejectPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
-          expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
-          expect(publishInChannelMock).not.toHaveBeenCalled()
-        })
+      it('should not publish the voice chat rejected event and reject with a voice chat not found error', async () => {
+        await expect(voice.rejectPrivateVoiceChat(callId, calleeAddress)).rejects.toThrow(VoiceChatNotFoundError)
+        expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(callId)
+        expect(publishInChannelMock).not.toHaveBeenCalled()
       })
     })
   })
@@ -579,9 +554,7 @@ describe('when ending a private voice chat', () => {
         id: callId,
         caller_address: callerAddress,
         callee_address: calleeAddress,
-        expires_at: new Date(Date.now() + 1000000000),
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date()
       }
       getPrivateVoiceChatMock.mockResolvedValueOnce(privateVoiceChat)
     })
@@ -741,9 +714,7 @@ describe('when getting the incoming private voice chat', () => {
         id: '1',
         caller_address: '0x2B72b8d597c553b3173bca922B9ad871da751dA5',
         callee_address: calleeAddress,
-        expires_at: new Date(Date.now() + 1000000000),
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date()
       }
       getPrivateVoiceChatForCalleeAddressMock.mockResolvedValueOnce(privateVoiceChat)
     })
@@ -782,9 +753,7 @@ describe('when ending incoming or outgoing private voice chat for a user', () =>
         id: 'voice-chat-123',
         caller_address: '0x2B72b8d597c553b3173bca922B9ad871da751dA5',
         callee_address: userAddress,
-        expires_at: new Date(Date.now() + 1000000000),
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date()
       }
       getPrivateVoiceChatOfUserMock.mockResolvedValueOnce(privateVoiceChat)
     })
@@ -818,9 +787,7 @@ describe('when ending incoming or outgoing private voice chat for a user', () =>
           id: 'voice-chat-123',
           caller_address: '0x2B72b8d597c553b3173bca922B9ad871da751dA5',
           callee_address: userAddress,
-          expires_at: new Date(Date.now() + 1000000000),
-          created_at: new Date(),
-          updated_at: new Date()
+          created_at: new Date()
         }
         mockError = new VoiceChatNotFoundError('voice-chat-123')
         getPrivateVoiceChatOfUserMock.mockResolvedValueOnce(privateVoiceChat)
@@ -845,6 +812,115 @@ describe('when ending incoming or outgoing private voice chat for a user', () =>
     it('should not reject', async () => {
       await expect(voice.endIncomingOrOutgoingPrivateVoiceChatForUser(userAddress)).resolves.toBeUndefined()
       expect(getPrivateVoiceChatOfUserMock).toHaveBeenCalledWith(userAddress)
+    })
+  })
+})
+
+describe('when expiring private voice chats', () => {
+  let expiredVoiceChats: PrivateVoiceChat[]
+
+  describe('and there are no expired voice chats', () => {
+    beforeEach(() => {
+      expiredVoiceChats = []
+      expirePrivateVoiceChatMock.mockResolvedValueOnce(expiredVoiceChats)
+    })
+
+    it('should not publish any events', async () => {
+      await voice.expirePrivateVoiceChat()
+      expect(publishInChannelMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('and there are expired voice chats', () => {
+    beforeEach(() => {
+      expiredVoiceChats = [
+        {
+          id: 'voice-chat-1',
+          caller_address: '0x123',
+          callee_address: '0x456',
+          created_at: new Date()
+        },
+        {
+          id: 'voice-chat-2',
+          caller_address: '0x789',
+          callee_address: '0xabc',
+          created_at: new Date()
+        }
+      ]
+      expirePrivateVoiceChatMock.mockResolvedValueOnce(expiredVoiceChats).mockResolvedValueOnce([])
+    })
+
+    it('should publish expiration events for each expired chat and stop when no more chats are found', async () => {
+      await voice.expirePrivateVoiceChat()
+
+      expect(expirePrivateVoiceChatMock).toHaveBeenCalledTimes(2)
+      expect(expirePrivateVoiceChatMock).toHaveBeenNthCalledWith(1, PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE)
+      expect(expirePrivateVoiceChatMock).toHaveBeenNthCalledWith(2, PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE)
+
+      expect(publishInChannelMock).toHaveBeenCalledTimes(2)
+      expect(publishInChannelMock).toHaveBeenNthCalledWith(1, PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        callId: expiredVoiceChats[0].id,
+        callerAddress: expiredVoiceChats[0].caller_address,
+        calleeAddress: expiredVoiceChats[0].callee_address,
+        status: VoiceChatStatus.EXPIRED
+      })
+      expect(publishInChannelMock).toHaveBeenNthCalledWith(2, PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        callId: expiredVoiceChats[1].id,
+        callerAddress: expiredVoiceChats[1].caller_address,
+        calleeAddress: expiredVoiceChats[1].callee_address,
+        status: VoiceChatStatus.EXPIRED
+      })
+    })
+  })
+
+  describe('and there are multiple batches of expired voice chats', () => {
+    let firstBatch: PrivateVoiceChat[]
+    let secondBatch: PrivateVoiceChat[]
+
+    beforeEach(() => {
+      firstBatch = [
+        {
+          id: 'voice-chat-1',
+          caller_address: '0x123',
+          callee_address: '0x456',
+          created_at: new Date()
+        }
+      ]
+      secondBatch = [
+        {
+          id: 'voice-chat-2',
+          caller_address: '0x789',
+          callee_address: '0xabc',
+          created_at: new Date()
+        }
+      ]
+      expirePrivateVoiceChatMock
+        .mockResolvedValueOnce(firstBatch)
+        .mockResolvedValueOnce(secondBatch)
+        .mockResolvedValueOnce([])
+    })
+
+    it('should process all batches and publish events for each expired chat', async () => {
+      await voice.expirePrivateVoiceChat()
+
+      expect(expirePrivateVoiceChatMock).toHaveBeenCalledTimes(3)
+      expect(expirePrivateVoiceChatMock).toHaveBeenNthCalledWith(1, PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE)
+      expect(expirePrivateVoiceChatMock).toHaveBeenNthCalledWith(2, PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE)
+      expect(expirePrivateVoiceChatMock).toHaveBeenNthCalledWith(3, PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE)
+
+      expect(publishInChannelMock).toHaveBeenCalledTimes(2)
+      expect(publishInChannelMock).toHaveBeenNthCalledWith(1, PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        callId: firstBatch[0].id,
+        callerAddress: firstBatch[0].caller_address,
+        calleeAddress: firstBatch[0].callee_address,
+        status: VoiceChatStatus.EXPIRED
+      })
+      expect(publishInChannelMock).toHaveBeenNthCalledWith(2, PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        callId: secondBatch[0].id,
+        callerAddress: secondBatch[0].caller_address,
+        calleeAddress: secondBatch[0].callee_address,
+        status: VoiceChatStatus.EXPIRED
+      })
     })
   })
 })

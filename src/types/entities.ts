@@ -11,9 +11,7 @@ export type PrivateVoiceChat = {
   id: string
   caller_address: string
   callee_address: string
-  expires_at: Date
   created_at: Date
-  updated_at: Date
 }
 
 export type SocialSettings = {

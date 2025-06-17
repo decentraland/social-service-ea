@@ -11,6 +11,7 @@ export interface IVoiceComponent {
   endPrivateVoiceChat(callId: string, address: string): Promise<void>
   endIncomingOrOutgoingPrivateVoiceChatForUser(address: string): Promise<void>
   getIncomingPrivateVoiceChat(address: string): Promise<PrivateVoiceChat>
+  expirePrivateVoiceChat(): Promise<void>
 }
 
 export enum VoiceChatStatus {
