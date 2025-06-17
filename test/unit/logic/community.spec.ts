@@ -2,10 +2,10 @@ import {
   Community,
   CommunityWithMembersCount,
   isOwner,
-  toCommunityWithMembersCount,
+  toCommunityWithMembersCountAndOwner,
   toCommunityWithUserInformation,
   toCommunityResults,
-  toPublicCommunity,
+  toCommunityPublicInformation,
   CommunityPublicInformation,
   createCommunityPlacesComponent
 } from '../../../src/logic/community'
@@ -19,7 +19,8 @@ import { createMockProfile } from '../../mocks/profile'
 import {
   CommunityWithMembersCountAndFriends,
   ICommunityPlacesComponent,
-  ICommunityRolesComponent
+  ICommunityRolesComponent,
+  WithCommunityOwner
 } from '../../../src/logic/community/types'
 import { parseExpectedFriends } from '../../mocks/friend'
 import { MemberCommunity } from '../../../src/logic/community/types'
@@ -81,43 +82,60 @@ describe('when handling community operations', () => {
   })
 
   describe('and getting communities', () => {
-    const mockCommunities = [
-      {
-        ...mockPublicCommunity,
-        membersCount: 5,
-        friends: ['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222']
-      },
-      {
-        ...mockPublicCommunity,
-        id: 'test-id-2',
-        membersCount: 3,
-        friends: ['0x3333333333333333333333333333333333333333']
-      }
-    ]
-
-    const mockProfiles: Profile[] = [
-      createMockProfile('0x1111111111111111111111111111111111111111'),
-      createMockProfile('0x2222222222222222222222222222222222222222')
-    ]
+    let mockCommunities: CommunityWithMembersCountAndFriends[]
+    let mockFriendsProfiles: Profile[]
+    let mockCommunitiesOwnersProfiles: Profile[]
 
     beforeEach(() => {
-      mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunities)
-      mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(2)
-      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+      mockCommunities = [
+        {
+          ...mockPublicCommunity,
+          membersCount: 5,
+          friends: ['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222']
+        },
+        {
+          ...mockPublicCommunity,
+          id: 'test-id-2',
+          membersCount: 3,
+          friends: ['0x3333333333333333333333333333333333333333']
+        }
+      ]
+
+      mockFriendsProfiles = [
+        createMockProfile('0x1111111111111111111111111111111111111111'),
+        createMockProfile('0x2222222222222222222222222222222222222222')
+      ]
+
+      mockCommunitiesOwnersProfiles = mockCommunities.map((c) => createMockProfile(c.ownerAddress))
+      mockCommunitiesDB.getCommunities.mockResolvedValueOnce(mockCommunities)
+      mockCommunitiesDB.getCommunitiesCount.mockResolvedValueOnce(2)
+      mockCatalystClient.getProfiles.mockResolvedValueOnce(mockFriendsProfiles)
+      mockCatalystClient.getProfiles.mockResolvedValueOnce(mockCommunitiesOwnersProfiles)
     })
 
     it('should return communities with friends profiles', async () => {
       const result = await communityComponent.getCommunities(mockUserAddress, { pagination: { limit: 10, offset: 0 } })
 
+      const { ownerAddress: ownerAddress1, ...expectedCommunity1 } = mockCommunities[0]
+      const { ownerAddress: ownerAddress2, ...expectedCommunity2 } = mockCommunities[1]
+
       expect(result).toEqual({
         communities: expect.arrayContaining([
           expect.objectContaining({
-            ...mockCommunities[0],
-            friends: mockProfiles.map(parseExpectedFriends())
+            ...expectedCommunity1,
+            friends: mockFriendsProfiles.map(parseExpectedFriends()),
+            owner: {
+              address: ownerAddress1,
+              name: mockCommunitiesOwnersProfiles[0].avatars[0].name
+            }
           }),
           expect.objectContaining({
-            ...mockCommunities[1],
-            friends: []
+            ...expectedCommunity2,
+            friends: [],
+            owner: {
+              address: ownerAddress2,
+              name: mockCommunitiesOwnersProfiles[1].avatars[0].name
+            }
           })
         ]),
         total: 2
@@ -179,25 +197,41 @@ describe('when handling community operations', () => {
       }
     ]
 
+    let mockCommunitiesOwnersProfiles: Profile[]
+
     beforeEach(() => {
-      mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockPublicCommunities)
-      mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(2)
+      mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValueOnce(mockPublicCommunities)
+      mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValueOnce(2)
+
+      mockCommunitiesOwnersProfiles = mockPublicCommunities.map((c) => createMockProfile(c.ownerAddress))
+      mockCatalystClient.getProfiles.mockResolvedValueOnce(mockCommunitiesOwnersProfiles)
     })
 
     it('should return public communities', async () => {
       const result = await communityComponent.getCommunitiesPublicInformation({ pagination: { limit: 10, offset: 0 } })
 
+      const { ownerAddress: ownerAddress1, ...expectedCommunity1 } = mockPublicCommunities[0]
+      const { ownerAddress: ownerAddress2, ...expectedCommunity2 } = mockPublicCommunities[1]
+
       expect(result).toEqual({
         communities: expect.arrayContaining([
           expect.objectContaining({
-            ...mockPublicCommunities[0],
+            ...expectedCommunity1,
             membersCount: 5,
-            isLive: false
+            isLive: false,
+            owner: {
+              address: ownerAddress1,
+              name: mockCommunitiesOwnersProfiles[0].avatars[0].name
+            }
           }),
           expect.objectContaining({
-            ...mockPublicCommunities[1],
+            ...expectedCommunity2,
             membersCount: 3,
-            isLive: false
+            isLive: false,
+            owner: {
+              address: ownerAddress2,
+              name: mockCommunitiesOwnersProfiles[1].avatars[0].name
+            }
           })
         ]),
         total: 2
@@ -215,7 +249,9 @@ describe('when handling community operations', () => {
     it('should fetch the total count from the database', async () => {
       await communityComponent.getCommunitiesPublicInformation({ pagination: { limit: 10, offset: 0 } })
 
-      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({})
+      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({
+        pagination: { limit: 10, offset: 0 }
+      })
     })
 
     it('should handle search parameter', async () => {
@@ -228,11 +264,21 @@ describe('when handling community operations', () => {
         pagination: { limit: 10, offset: 0 },
         search: 'test'
       })
-      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
+      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({
+        pagination: { limit: 10, offset: 0 },
+        search: 'test'
+      })
     })
   })
 
   describe('and getting a community', () => {
+    let mockOwnerProfile: Profile
+
+    beforeEach(() => {
+      mockOwnerProfile = createMockProfile(mockPublicCommunity.ownerAddress)
+      mockCatalystClient.getProfile.mockResolvedValueOnce(mockOwnerProfile)
+    })
+
     describe('when the community exists', () => {
       beforeEach(() => {
         mockCommunitiesDB.getCommunity.mockResolvedValue(mockPublicCommunity)
@@ -241,10 +287,15 @@ describe('when handling community operations', () => {
 
       it('should return the community with its members count', async () => {
         const result = await communityComponent.getCommunity(mockPublicCommunity.id, mockUserAddress)
+        const { ownerAddress: ownerAddress, ...expectedCommunity } = mockPublicCommunity
 
         expect(result).toEqual({
-          ...mockPublicCommunity,
-          membersCount: mockMembersCount
+          ...expectedCommunity,
+          membersCount: mockMembersCount,
+          owner: {
+            address: ownerAddress,
+            name: mockOwnerProfile.avatars[0].name
+          }
         })
       })
 
@@ -1585,7 +1636,7 @@ describe('Community Utils', () => {
     })
   })
 
-  describe('toCommunityWithMembersCount', () => {
+  describe('toCommunityWithMembersCountAndOwner', () => {
     const mockCommunity: Community & { role: CommunityRole } = {
       id: 'test-id',
       name: 'Test Community',
@@ -1595,15 +1646,20 @@ describe('Community Utils', () => {
       active: true,
       role: CommunityRole.None
     }
+    const mockOwnerProfile = createMockProfile(mockCommunity.ownerAddress)
 
     it('should convert community to CommunityWithMembersCount', () => {
       const membersCount = 5
-      const result = toCommunityWithMembersCount(mockCommunity, membersCount)
+      const result = toCommunityWithMembersCountAndOwner(mockCommunity, membersCount, mockOwnerProfile)
+      const { ownerAddress: ownerAddress, ...expectedCommunity } = mockCommunity
 
-      const expected: CommunityWithMembersCount = {
-        ...mockCommunity,
-        ownerAddress: mockCommunity.ownerAddress,
-        membersCount: 5
+      const expected: WithCommunityOwner<CommunityWithMembersCount> = {
+        ...expectedCommunity,
+        membersCount: 5,
+        owner: {
+          address: ownerAddress,
+          name: mockOwnerProfile.avatars[0].name
+        }
       }
 
       expect(result).toEqual(expected)
@@ -1611,12 +1667,16 @@ describe('Community Utils', () => {
 
     it('should handle string membersCount by converting to number', () => {
       const membersCount = 10
-      const result = toCommunityWithMembersCount(mockCommunity, membersCount)
+      const result = toCommunityWithMembersCountAndOwner(mockCommunity, membersCount, mockOwnerProfile)
+      const { ownerAddress: ownerAddress, ...expectedCommunity } = mockCommunity
 
-      const expected: CommunityWithMembersCount = {
-        ...mockCommunity,
-        ownerAddress: mockCommunity.ownerAddress,
-        membersCount: 10
+      const expected: WithCommunityOwner<CommunityWithMembersCount> = {
+        ...expectedCommunity,
+        membersCount: 10,
+        owner: {
+          address: ownerAddress,
+          name: mockOwnerProfile.avatars[0].name
+        }
       }
 
       expect(result).toEqual(expected)
@@ -1624,13 +1684,14 @@ describe('Community Utils', () => {
 
     it('should preserve all community properties', () => {
       const membersCount = 3
-      const result = toCommunityWithMembersCount(mockCommunity, membersCount)
+      const result = toCommunityWithMembersCountAndOwner(mockCommunity, membersCount, mockOwnerProfile)
 
       // Check that all original properties are preserved
       expect(result.id).toBe(mockCommunity.id)
       expect(result.name).toBe(mockCommunity.name)
       expect(result.description).toBe(mockCommunity.description)
-      expect(result.ownerAddress).toBe(mockCommunity.ownerAddress)
+      expect(result.owner.address).toBe(mockCommunity.ownerAddress)
+      expect(result.owner.name).toBe(mockOwnerProfile.avatars[0].name)
       expect(result.privacy).toBe(mockCommunity.privacy)
       expect(result.active).toBe(mockCommunity.active)
       expect(result.role).toBe(mockCommunity.role)
@@ -1702,24 +1763,31 @@ describe('Community Utils', () => {
       }
     ]
 
-    const mockProfiles: Profile[] = [
-      createMockProfile('0x1111111111111111111111111111111111111111'),
-      createMockProfile('0x2222222222222222222222222222222222222222')
-    ]
+    let mockFriendsProfiles: Profile[]
+    let mockCommunitiesOwnersProfiles: Profile[]
+
+    beforeEach(() => {
+      mockFriendsProfiles = [
+        createMockProfile('0x1111111111111111111111111111111111111111'),
+        createMockProfile('0x2222222222222222222222222222222222222222')
+      ]
+
+      mockCommunitiesOwnersProfiles = mockCommunities.map((c) => createMockProfile(c.ownerAddress))
+    })
 
     it('should convert multiple communities with friends to CommunityResults', () => {
-      const results = toCommunityResults(mockCommunities, mockProfiles)
+      const results = toCommunityResults(mockCommunities, mockFriendsProfiles, mockCommunitiesOwnersProfiles)
 
       expect(results).toHaveLength(2)
       expect(results[0].friends).toHaveLength(1)
-      expect(results[0].friends[0]).toEqual(parseExpectedFriends()(mockProfiles[0]))
+      expect(results[0].friends[0]).toEqual(parseExpectedFriends()(mockFriendsProfiles[0]))
       expect(results[1].friends).toHaveLength(1)
-      expect(results[1].friends[0]).toEqual(parseExpectedFriends()(mockProfiles[1]))
+      expect(results[1].friends[0]).toEqual(parseExpectedFriends()(mockFriendsProfiles[1]))
     })
 
     it('should handle empty friends array', () => {
       const communitiesWithNoFriends = mockCommunities.map((c) => ({ ...c, friends: [] }))
-      const results = toCommunityResults(communitiesWithNoFriends, mockProfiles)
+      const results = toCommunityResults(communitiesWithNoFriends, mockFriendsProfiles, mockCommunitiesOwnersProfiles)
 
       expect(results).toHaveLength(2)
       expect(results[0].friends).toHaveLength(0)
@@ -1727,7 +1795,7 @@ describe('Community Utils', () => {
     })
   })
 
-  describe('toPublicCommunity', () => {
+  describe('toCommunityPublicInformation', () => {
     const mockPublicCommunity: CommunityPublicInformation = {
       id: 'test-id',
       name: 'Test Community',
@@ -1740,7 +1808,7 @@ describe('Community Utils', () => {
     }
 
     it('should convert community to PublicCommunity', () => {
-      const result = toPublicCommunity(mockPublicCommunity)
+      const result = toCommunityPublicInformation(mockPublicCommunity)
 
       expect(result).toEqual({
         ...mockPublicCommunity,
@@ -1754,7 +1822,7 @@ describe('Community Utils', () => {
         ...mockPublicCommunity,
         membersCount: 10
       }
-      const result = toPublicCommunity(communityWithStringCount)
+      const result = toCommunityPublicInformation(communityWithStringCount)
 
       expect(result).toEqual({
         ...mockPublicCommunity,
@@ -1764,7 +1832,7 @@ describe('Community Utils', () => {
     })
 
     it('should preserve all community properties', () => {
-      const result = toPublicCommunity(mockPublicCommunity)
+      const result = toCommunityPublicInformation(mockPublicCommunity)
 
       expect(result.id).toBe(mockPublicCommunity.id)
       expect(result.name).toBe(mockPublicCommunity.name)

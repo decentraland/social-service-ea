@@ -15,14 +15,15 @@ import {
   BannedMember,
   CommunityMember,
   GetCommunityMembersOptions,
-  CommunityPlace
+  CommunityPlace,
+  WithCommunityOwner
 } from './types'
 import {
   isOwner,
-  toCommunityWithMembersCount,
+  toCommunityWithMembersCountAndOwner,
   toCommunityResults,
-  toPublicCommunity,
-  mapMembersWithProfiles
+  mapMembersWithProfiles,
+  toCommunitiesPublicInformation
 } from './utils'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
@@ -109,8 +110,27 @@ export async function createCommunityComponent(
     return buildThumbnailUrl(communityId)
   }
 
+  const toCommunityWithThumbnail = async <T extends Community>(community: T): Promise<T> => {
+    const thumbnail = await getThumbnail(community.id)
+
+    if (thumbnail) {
+      community.thumbnails = {
+        raw: thumbnail
+      }
+    }
+
+    return community
+  }
+
+  const toCommunitiesWithThumbnails = async <T extends Community>(communities: T[]): Promise<T[]> => {
+    return Promise.all(communities.map(toCommunityWithThumbnail))
+  }
+
   return {
-    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount> => {
+    getCommunity: async (
+      id: string,
+      userAddress: EthAddress
+    ): Promise<WithCommunityOwner<CommunityWithMembersCount>> => {
       const [community, membersCount] = await Promise.all([
         communitiesDb.getCommunity(id, userAddress),
         communitiesDb.getCommunityMembersCount(id)
@@ -120,73 +140,50 @@ export async function createCommunityComponent(
         throw new CommunityNotFoundError(id)
       }
 
-      const thumbnail = await getThumbnail(community.id)
+      const communityWithThumbnail = await toCommunityWithThumbnail(community)
+      const ownerProfile = await catalystClient.getProfile(community.ownerAddress)
 
-      if (thumbnail) {
-        community.thumbnails = {
-          raw: thumbnail
-        }
-      }
-
-      return toCommunityWithMembersCount(community, membersCount)
+      return toCommunityWithMembersCountAndOwner(communityWithThumbnail, membersCount, ownerProfile)
     },
 
     getCommunities: async (
       userAddress: string,
       options: GetCommunitiesOptions
-    ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>> => {
+    ): Promise<GetCommunitiesWithTotal<WithCommunityOwner<CommunityWithUserInformation>>> => {
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunities(userAddress, options),
         communitiesDb.getCommunitiesCount(userAddress, options)
       ])
 
-      const communitiesWithThumbnails = await Promise.all(
-        communities.map(async (community) => {
-          const thumbnail = await getThumbnail(community.id)
-
-          if (thumbnail) {
-            community.thumbnails = {
-              raw: thumbnail
-            }
-          }
-
-          return community
-        })
-      )
+      const communitiesWithThumbnails = await toCommunitiesWithThumbnails(communities)
 
       const friendsAddresses = Array.from(new Set(communities.flatMap((community) => community.friends)))
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
+
+      const communitiesOwners = Array.from(new Set(communities.map((community) => community.ownerAddress)))
+      const communitiesOwnersProfiles = await catalystClient.getProfiles(communitiesOwners)
+
       return {
-        communities: toCommunityResults(communitiesWithThumbnails, friendsProfiles),
+        communities: toCommunityResults(communitiesWithThumbnails, friendsProfiles, communitiesOwnersProfiles),
         total
       }
     },
 
     getCommunitiesPublicInformation: async (
       options: GetCommunitiesOptions
-    ): Promise<GetCommunitiesWithTotal<CommunityPublicInformation>> => {
-      const { search } = options
+    ): Promise<GetCommunitiesWithTotal<WithCommunityOwner<CommunityPublicInformation>>> => {
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunitiesPublicInformation(options),
-        communitiesDb.getPublicCommunitiesCount({ search })
+        communitiesDb.getPublicCommunitiesCount(options)
       ])
 
-      const communitiesWithThumbnails = await Promise.all(
-        communities.map(async (community) => {
-          const thumbnail = await getThumbnail(community.id)
+      const communitiesWithThumbnails = await toCommunitiesWithThumbnails(communities)
 
-          if (thumbnail) {
-            community.thumbnails = {
-              raw: thumbnail
-            }
-          }
-
-          return community
-        })
-      )
+      const communitiesOwners = Array.from(new Set(communities.map((community) => community.ownerAddress)))
+      const communitiesOwnersProfiles = await catalystClient.getProfiles(communitiesOwners)
 
       return {
-        communities: communitiesWithThumbnails.map(toPublicCommunity),
+        communities: toCommunitiesPublicInformation(communitiesWithThumbnails, communitiesOwnersProfiles),
         total
       }
     },

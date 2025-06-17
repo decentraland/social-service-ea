@@ -6,14 +6,14 @@ import { CommunityRole, CommunityPermission, Action } from '../../types/entities
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export interface ICommunityComponent {
-  getCommunity(id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount>
+  getCommunity(id: string, userAddress: EthAddress): Promise<WithCommunityOwner<CommunityWithMembersCount>>
   getCommunities(
     userAddress: string,
     options: GetCommunitiesOptions
-  ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>>
+  ): Promise<GetCommunitiesWithTotal<WithCommunityOwner<CommunityWithUserInformation>>>
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
-  ): Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
+  ): Promise<GetCommunitiesWithTotal<WithCommunityOwner<CommunityPublicInformation>>>
   getCommunityMembers(
     id: string,
     userAddress: EthAddress,
@@ -193,3 +193,15 @@ export type CommunityPlace = {
   addedBy: string
   addedAt: Date
 }
+
+export type CommunityOwner = {
+  address: string
+  name: string
+}
+
+export type WithCommunityOwner<T extends Community> = Omit<T, 'ownerAddress'> & {
+  owner: CommunityOwner
+}
+
+export type GetCommunityResponse = WithCommunityOwner<CommunityWithMembersCount>
+export type GetCommunitiesResponse = WithCommunityOwner<CommunityWithUserInformation | CommunityPublicInformation>
