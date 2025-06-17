@@ -49,9 +49,12 @@ export async function createCommunityHandler(
     }
 
     if (thumbnailBuffer) {
-      const { fileTypeFromBuffer } = await import('file-type')
-      const type = await fileTypeFromBuffer(thumbnailBuffer)
-      if (!type || !type.mime.startsWith('image/')) {
+      // Check magic numbers for PNG and JPEG
+      const magicNumbers = thumbnailBuffer.slice(0, 8).toString('hex')
+      const isPNG = magicNumbers.startsWith('89504e470d0a1a0a') // Full PNG signature
+      const isJPEG = magicNumbers.startsWith('ffd8ff') // JPEG signature
+
+      if (!isPNG && !isJPEG) {
         logger.error('Thumbnail is not a valid image', { owner: address })
         throw new InvalidRequestError('Thumbnail must be a valid image file')
       }
