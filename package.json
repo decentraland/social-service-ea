@@ -64,7 +64,6 @@
     "decentraland-crypto-fetch": "^2.0.1",
     "dotenv": "^16.4.7",
     "fp-future": "^1.0.1",
-    "image-type": "^6.0.0",
     "lru-cache": "^10.4.3",
     "mitt": "^3.0.1",
     "nock": "^14.0.1",

@@ -5139,7 +5139,7 @@ image-q@^4.0.0:
   dependencies:
     "@types/node" "16.9.1"
 
-image-type@*, image-type@^6.0.0:
+image-type@*:
   version "6.0.0"
   resolved "https://registry.yarnpkg.com/image-type/-/image-type-6.0.0.tgz#68a9ee921393db5b5737e15c242532d06d531528"
   integrity sha512-efpcYd/E9A7a+oanft11ceIbO9Aw0iszfJ7Qfh4QLWl2Ulsth9nnllV/L1TmzKwlQ2O5FuT08vy5zxLnGxZe8w==
