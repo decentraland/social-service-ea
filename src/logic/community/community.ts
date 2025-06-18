@@ -256,6 +256,12 @@ export async function createCommunityComponent(
         return
       }
 
+      const isBanned = await communitiesDb.isMemberBanned(communityId, memberAddress)
+
+      if (isBanned) {
+        throw new NotAuthorizedError(`The user ${memberAddress} is banned from community ${communityId}`)
+      }
+
       await communitiesDb.addCommunityMember({
         communityId,
         memberAddress,
