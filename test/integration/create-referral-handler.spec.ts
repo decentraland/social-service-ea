@@ -1,6 +1,6 @@
 import { AuthLinkType } from '@dcl/crypto'
 import { test } from '../components'
-import { createTestIdentity, Identity } from './utils/auth'
+import { createTestIdentity, Identity, createAuthHeaders } from './utils/auth'
 import { TestCleanup } from '../db-cleanup'
 import { makeAuthenticatedRequest } from './utils/auth'
 
@@ -127,7 +127,15 @@ test('POST /v1/referral-progress', ({ components }) => {
 
       describe('with invalid JSON body', () => {
         it('should return 400 with message "Invalid JSON body"', async () => {
-          const response = await makeRequest(invited_user, endpoint, 'POST', 'invalid-json{')
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...createAuthHeaders('POST', endpoint, {}, invited_user)
+            },
+            body: '{"referrer": "0x123", "invalid":}'
+          })
           expect(response.status).toBe(400)
           const json = await response.json()
           expect(json).toEqual({
