@@ -1,12 +1,7 @@
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../utils/errors'
-import {
-  ReferralNotFoundError,
-  ReferralInvalidInputError,
-  ReferralAlreadyExistsError,
-  SelfReferralError
-} from '../../logic/referral/errors'
+import { ReferralInvalidInputError, ReferralAlreadyExistsError, SelfReferralError } from '../../logic/referral/errors'
 import type { HandlerContextWithPath } from '../../types/http'
 import type { CreateReferralPayload, CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 
@@ -32,6 +27,10 @@ export async function createReferralHandler(
     throw new InvalidRequestError('Invalid JSON body')
   }
 
+  if (!rawBody.referrer) {
+    throw new InvalidRequestError('Missing required field: referrer')
+  }
+
   const body: CreateReferralWithInvitedUser = {
     ...rawBody,
     invitedUser: verification.auth
@@ -51,8 +50,7 @@ export async function createReferralHandler(
     if (
       error instanceof ReferralInvalidInputError ||
       error instanceof SelfReferralError ||
-      error instanceof ReferralAlreadyExistsError ||
-      error instanceof ReferralNotFoundError
+      error instanceof ReferralAlreadyExistsError
     ) {
       throw new InvalidRequestError(error.message)
     }

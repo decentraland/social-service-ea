@@ -11,10 +11,7 @@ import {
 import type { IReferralComponent } from './types'
 import type { AppComponents } from '../../types/system'
 
-function validate(value: string | undefined, field: string): string {
-  if (!value) {
-    throw new ReferralInvalidInputError(`Missing required field: ${field}`)
-  }
+function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
     throw new ReferralInvalidInputError(`Invalid ${field} address`)
   }
@@ -30,8 +27,8 @@ export async function createReferralComponent(
 
   return {
     create: async (referralInput: CreateReferralWithInvitedUser) => {
-      const referrer = validate(referralInput.referrer, 'referrer')
-      const invitedUser = validate(referralInput.invitedUser, 'invitedUser')
+      const referrer = validateAddress(referralInput.referrer, 'referrer')
+      const invitedUser = validateAddress(referralInput.invitedUser, 'invitedUser')
 
       if (referrer === invitedUser) {
         throw new SelfReferralError(invitedUser)
@@ -49,7 +46,7 @@ export async function createReferralComponent(
 
       const referral = await referralDb.createReferral({ referrer, invitedUser })
 
-      logger.info('Referral created successfully')
+      logger.info(`Referral from ${referrer} to ${invitedUser} created successfully`)
 
       return referral
     },
@@ -58,7 +55,7 @@ export async function createReferralComponent(
       invitedUserToUpdate: string,
       status: ReferralProgressStatus.SIGNED_UP | ReferralProgressStatus.TIER_GRANTED
     ) => {
-      const invitedUser = validate(invitedUserToUpdate, 'invitedUser')
+      const invitedUser = validateAddress(invitedUserToUpdate, 'invitedUser')
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
       if (!progress.length) {
@@ -84,7 +81,7 @@ export async function createReferralComponent(
     },
 
     finalizeReferral: async (invitedUserToFinalize: string) => {
-      const invitedUser = validate(invitedUserToFinalize, 'invitedUser')
+      const invitedUser = validateAddress(invitedUserToFinalize, 'invitedUser')
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
       if (!progress.length) {
@@ -92,10 +89,6 @@ export async function createReferralComponent(
       }
 
       const currentStatus = progress[0].status
-      if (currentStatus !== ReferralProgressStatus.SIGNED_UP) {
-        // TBD should we finalize the referral if the status is not signed up?
-        return
-      }
 
       logger.info('Finalizing referral', {
         invitedUser,
@@ -112,7 +105,7 @@ export async function createReferralComponent(
     },
 
     getInvitedUsersAcceptedStats: async (referrer: string) => {
-      const ref = validate(referrer, 'referrer')
+      const ref = validateAddress(referrer, 'referrer')
       logger.info('Getting invited users accepted stats', { referrer: ref })
 
       const [invitedUsersAccepted, invitedUsersAcceptedViewed] = await Promise.all([

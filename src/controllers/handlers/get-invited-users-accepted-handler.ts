@@ -22,6 +22,10 @@ export async function getInvitedUsersAcceptedHandler(
 
   const referrer = verification.auth.toLowerCase()
 
+  if (!referrer) {
+    throw new InvalidRequestError('Missing required field: referrer')
+  }
+
   try {
     const stats = await referral.getInvitedUsersAcceptedStats(referrer)
 

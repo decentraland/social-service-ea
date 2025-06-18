@@ -44,8 +44,6 @@ describe('referral-component', () => {
     const validReferrer = '0x1234567890123456789012345678901234567890'
     const validInvitedUser = '0x0987654321098765432109876543210987654321'
     let validInput: { referrer: string; invitedUser: string }
-    let invalidInputMissingReferrer: { referrer: undefined; invitedUser: string }
-    let invalidInputMissingInvitedUser: { referrer: string; invitedUser: undefined }
     let invalidInputInvalidReferrer: { referrer: string; invitedUser: string }
     let invalidInputInvalidInvitedUser: { referrer: string; invitedUser: string }
     let selfReferralInput: { referrer: string; invitedUser: string }
@@ -55,8 +53,6 @@ describe('referral-component', () => {
         referrer: validReferrer,
         invitedUser: validInvitedUser
       }
-      invalidInputMissingReferrer = { ...validInput, referrer: undefined }
-      invalidInputMissingInvitedUser = { ...validInput, invitedUser: undefined }
       invalidInputInvalidReferrer = { ...validInput, referrer: 'invalid-address' }
       invalidInputInvalidInvitedUser = { ...validInput, invitedUser: 'invalid-address' }
       selfReferralInput = {
@@ -87,28 +83,14 @@ describe('referral-component', () => {
           referrer: validReferrer.toLowerCase(),
           invitedUser: validInvitedUser.toLowerCase()
         })
-        expect(mockLogger.info).toHaveBeenCalledWith('Referral created successfully')
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          `Referral from ${validReferrer.toLowerCase()} to ${validInvitedUser.toLowerCase()} created successfully`
+        )
         expect(result).toEqual({
           referrer: validReferrer,
           invited_user: validInvitedUser,
           status: ReferralProgressStatus.PENDING
         })
-      })
-    })
-
-    describe('with missing referrer', () => {
-      it('should throw ReferralInvalidInputError', async () => {
-        await expect(referralComponent.create(invalidInputMissingReferrer)).rejects.toThrow(
-          new ReferralInvalidInputError('Missing required field: referrer')
-        )
-      })
-    })
-
-    describe('with missing invitedUser', () => {
-      it('should throw ReferralInvalidInputError', async () => {
-        await expect(referralComponent.create(invalidInputMissingInvitedUser)).rejects.toThrow(
-          new ReferralInvalidInputError('Missing required field: invitedUser')
-        )
       })
     })
 
@@ -278,24 +260,6 @@ describe('referral-component', () => {
       })
 
       it('should return without error', async () => {
-        await expect(referralComponent.finalizeReferral(validInvitedUser)).resolves.toBeUndefined()
-
-        expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('when status is not signed up', () => {
-      beforeEach(() => {
-        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
-          {
-            referrer: '0x0987654321098765432109876543210987654321',
-            invited_user: validInvitedUser,
-            status: ReferralProgressStatus.PENDING
-          }
-        ])
-      })
-
-      it('should return without updating', async () => {
         await expect(referralComponent.finalizeReferral(validInvitedUser)).resolves.toBeUndefined()
 
         expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()

@@ -1,14 +1,16 @@
 import { AuthIdentity, AuthLinkType } from '@dcl/crypto'
 import { test } from '../components'
-import { createAuthChain, makeRequest } from '../utils'
+import { createTestIdentity, Identity } from './utils/auth'
 import { TestCleanup } from '../db-cleanup'
+import { makeAuthenticatedRequest } from './utils/auth'
 
 test('POST /v1/referral-progress', ({ components }) => {
+  const makeRequest = makeAuthenticatedRequest(components)
   let cleanup: TestCleanup
   const endpoint = '/v1/referral-progress'
 
-  let referrer: AuthIdentity
-  let invited_user: AuthIdentity
+  let referrer: Identity
+  let invited_user: Identity
   let body: {}
 
   beforeAll(async () => {
@@ -16,8 +18,8 @@ test('POST /v1/referral-progress', ({ components }) => {
   })
 
   beforeEach(async () => {
-    referrer = await createAuthChain()
-    invited_user = await createAuthChain()
+    referrer = await createTestIdentity()
+    invited_user = await createTestIdentity()
   })
 
   afterEach(async () => {
@@ -32,47 +34,33 @@ test('POST /v1/referral-progress', ({ components }) => {
           referrer: referrer.authChain[0].payload.toLowerCase()
         }
       })
-      afterEach(() => {
-        cleanup.trackInsert('referral_progress', body)
+
+      afterEach(async () => {
+        await cleanup.trackInsert('referral_progress', body)
       })
 
       it('should create referral and return 204', async () => {
-        const { localHttpFetch } = components
-        const response = await makeRequest(
-          localHttpFetch,
-          endpoint,
-          {
-            method: 'POST',
-            body: JSON.stringify(body)
-          },
-          invited_user
-        )
+        const response = await makeRequest(invited_user, endpoint, 'POST', body)
 
         expect(response.status).toBe(204)
       })
+    })
 
-      it('should return 400 when referral progress already exists for the invited user', async () => {
-        const { localHttpFetch } = components
+    describe('when referral progress already exists for the invited user', () => {
+      beforeEach(() => {
+        body = {
+          referrer: referrer.authChain[0].payload.toLowerCase()
+        }
+      })
 
-        await makeRequest(
-          localHttpFetch,
-          endpoint,
-          {
-            method: 'POST',
-            body: JSON.stringify(body)
-          },
-          invited_user
-        )
+      afterEach(async () => {
+        await cleanup.trackInsert('referral_progress', body)
+      })
 
-        const response = await makeRequest(
-          localHttpFetch,
-          endpoint,
-          {
-            method: 'POST',
-            body: JSON.stringify(body)
-          },
-          invited_user
-        )
+      it('should return 400 with referral progress already exists error', async () => {
+        await makeRequest(invited_user, endpoint, 'POST', body)
+
+        const response = await makeRequest(invited_user, endpoint, 'POST', body)
 
         expect(response.status).toBe(400)
         const json = await response.json()
@@ -84,48 +72,14 @@ test('POST /v1/referral-progress', ({ components }) => {
       })
     })
 
-    describe('when authentication fails', () => {
-      beforeEach(() => {
-        body = {
-          referrer: referrer.authChain[0].payload.toLowerCase()
-        }
-      })
-      it('should return 401 with invalid auth chain', async () => {
-        const { localHttpFetch } = components
-        const invalidIdentity = {
-          ...invited_user,
-          authChain: [...invited_user.authChain, { type: AuthLinkType.SIGNER, payload: 'invalid-signature' }]
-        }
-
-        const response = await makeRequest(
-          localHttpFetch,
-          endpoint,
-          {
-            method: 'POST',
-            body: JSON.stringify(body)
-          },
-          invalidIdentity
-        )
-        expect(response.status).toBe(401)
-      })
-    })
-
     describe('when input validation fails', () => {
-      describe('and referrer is missing', () => {
+      describe('with missing referrer', () => {
         beforeEach(() => {
           body = {}
         })
+
         it('should return 400 with message "Missing required field: referrer"', async () => {
-          const { localHttpFetch } = components
-          const response = await makeRequest(
-            localHttpFetch,
-            endpoint,
-            {
-              method: 'POST',
-              body: JSON.stringify(body)
-            },
-            invited_user
-          )
+          const response = await makeRequest(invited_user, endpoint, 'POST', body)
           expect(response.status).toBe(400)
           const json = await response.json()
           expect(json).toEqual({
@@ -135,23 +89,15 @@ test('POST /v1/referral-progress', ({ components }) => {
         })
       })
 
-      describe('and referrer is empty', () => {
+      describe('with empty referrer', () => {
         beforeEach(() => {
           body = {
             referrer: ''
           }
         })
+
         it('should return 400 with message "Missing required field: referrer"', async () => {
-          const { localHttpFetch } = components
-          const response = await makeRequest(
-            localHttpFetch,
-            endpoint,
-            {
-              method: 'POST',
-              body: JSON.stringify(body)
-            },
-            invited_user
-          )
+          const response = await makeRequest(invited_user, endpoint, 'POST', body)
           expect(response.status).toBe(400)
           const json = await response.json()
           expect(json).toEqual({
@@ -161,23 +107,15 @@ test('POST /v1/referral-progress', ({ components }) => {
         })
       })
 
-      describe('and referrer is not a valid ethereum address', () => {
+      describe('with invalid ethereum address', () => {
         beforeEach(() => {
           body = {
             referrer: 'invalid'
           }
         })
+
         it('should return 400 with message "Invalid referrer address"', async () => {
-          const { localHttpFetch } = components
-          const response = await makeRequest(
-            localHttpFetch,
-            endpoint,
-            {
-              method: 'POST',
-              body: JSON.stringify(body)
-            },
-            invited_user
-          )
+          const response = await makeRequest(invited_user, endpoint, 'POST', body)
           expect(response.status).toBe(400)
           const json = await response.json()
           expect(json).toEqual({
@@ -187,18 +125,9 @@ test('POST /v1/referral-progress', ({ components }) => {
         })
       })
 
-      describe('and JSON body is invalid', () => {
+      describe('with invalid JSON body', () => {
         it('should return 400 with message "Invalid JSON body"', async () => {
-          const { localHttpFetch } = components
-          const response = await makeRequest(
-            localHttpFetch,
-            endpoint,
-            {
-              method: 'POST',
-              body: 'invalid-json{'
-            },
-            invited_user
-          )
+          const response = await makeRequest(invited_user, endpoint, 'POST', 'invalid-json{')
           expect(response.status).toBe(400)
           const json = await response.json()
           expect(json).toEqual({
@@ -206,6 +135,30 @@ test('POST /v1/referral-progress', ({ components }) => {
             message: 'Invalid JSON body'
           })
         })
+      })
+    })
+
+    describe('when authentication fails', () => {
+      beforeEach(() => {
+        body = {
+          referrer: referrer.authChain[0].payload.toLowerCase()
+        }
+      })
+
+      it('should return 401 with invalid auth chain', async () => {
+        const invalidIdentity: Identity = {
+          ...invited_user,
+          authChain: {
+            ...invited_user.authChain,
+            authChain: [
+              ...invited_user.authChain.authChain,
+              { type: AuthLinkType.SIGNER, payload: 'invalid-signature' }
+            ]
+          }
+        }
+
+        const response = await makeRequest(invalidIdentity, endpoint, 'POST', body)
+        expect(response.status).toBe(401)
       })
     })
   })

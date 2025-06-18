@@ -1,8 +1,9 @@
 import { AuthIdentity, AuthLinkType } from '@dcl/crypto'
 import { test } from '../components'
-import { createAuthChain, makeRequest } from '../utils'
+import { createAuthChain } from '../utils'
 import { TestCleanup } from '../db-cleanup'
 import { ReferralProgressStatus } from '../../src/types/referral-db.type'
+import { makeAuthenticatedRequest } from './utils/auth'
 
 test('GET /v1/referral-progress', ({ components }) => {
   let cleanup: TestCleanup
@@ -10,8 +11,9 @@ test('GET /v1/referral-progress', ({ components }) => {
   let referrer: AuthIdentity
   let invited_user: AuthIdentity
   let newReferrer: AuthIdentity
+  const makeRequest = makeAuthenticatedRequest(components)
 
-  beforeAll(async () => {
+  beforeAll(() => {
     cleanup = new TestCleanup(components.pg)
   })
 

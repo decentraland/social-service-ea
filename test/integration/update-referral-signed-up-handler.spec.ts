@@ -1,8 +1,9 @@
 import { test } from '../components'
 import { TestCleanup } from '../db-cleanup'
 import { ReferralProgressStatus } from '../../src/types/referral-db.type'
-import { createAuthChain, makeRequest } from '../utils'
+import { createAuthChain } from '../utils'
 import { AuthIdentity, AuthLinkType } from '@dcl/crypto'
+import { makeAuthenticatedRequest } from './utils/auth'
 
 test('PATCH /v1/referral-progress', ({ components }) => {
   let cleanup: TestCleanup
@@ -13,6 +14,7 @@ test('PATCH /v1/referral-progress', ({ components }) => {
   let referrerAddress: string
   let nonExistentUserIdentity: AuthIdentity
   let nonExistentUserAddress: string
+  const makeRequest = makeAuthenticatedRequest(components)
 
   beforeAll(async () => {
     cleanup = new TestCleanup(components.pg)
