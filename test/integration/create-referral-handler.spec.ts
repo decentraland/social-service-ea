@@ -1,4 +1,4 @@
-import { AuthIdentity, AuthLinkType } from '@dcl/crypto'
+import { AuthLinkType } from '@dcl/crypto'
 import { test } from '../components'
 import { createTestIdentity, Identity } from './utils/auth'
 import { TestCleanup } from '../db-cleanup'
@@ -31,7 +31,7 @@ test('POST /v1/referral-progress', ({ components }) => {
     describe('with valid referral data', () => {
       beforeEach(() => {
         body = {
-          referrer: referrer.authChain[0].payload.toLowerCase()
+          referrer: referrer.realAccount.address.toLowerCase()
         }
       })
 
@@ -49,7 +49,7 @@ test('POST /v1/referral-progress', ({ components }) => {
     describe('when referral progress already exists for the invited user', () => {
       beforeEach(() => {
         body = {
-          referrer: referrer.authChain[0].payload.toLowerCase()
+          referrer: referrer.realAccount.address.toLowerCase()
         }
       })
 
@@ -67,7 +67,7 @@ test('POST /v1/referral-progress', ({ components }) => {
         expect(json).toEqual({
           error: 'Bad request',
           message:
-            'Referral progress already exists for the invited user: ' + invited_user.authChain[0].payload.toLowerCase()
+            'Referral progress already exists for the invited user: ' + invited_user.realAccount.address.toLowerCase()
         })
       })
     })
@@ -141,7 +141,7 @@ test('POST /v1/referral-progress', ({ components }) => {
     describe('when authentication fails', () => {
       beforeEach(() => {
         body = {
-          referrer: referrer.authChain[0].payload.toLowerCase()
+          referrer: referrer.realAccount.address.toLowerCase()
         }
       })
 

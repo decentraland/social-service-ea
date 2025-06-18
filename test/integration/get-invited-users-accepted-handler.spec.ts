@@ -1,6 +1,6 @@
-import { AuthIdentity, AuthLinkType } from '@dcl/crypto'
+import { AuthLinkType } from '@dcl/crypto'
 import { test } from '../components'
-import { createAuthChain } from '../utils'
+import { createTestIdentity, Identity } from './utils/auth'
 import { TestCleanup } from '../db-cleanup'
 import { ReferralProgressStatus } from '../../src/types/referral-db.type'
 import { makeAuthenticatedRequest } from './utils/auth'
@@ -8,9 +8,9 @@ import { makeAuthenticatedRequest } from './utils/auth'
 test('GET /v1/referral-progress', ({ components }) => {
   let cleanup: TestCleanup
   const endpoint = '/v1/referral-progress'
-  let referrer: AuthIdentity
-  let invited_user: AuthIdentity
-  let newReferrer: AuthIdentity
+  let referrer: Identity
+  let invited_user: Identity
+  let newReferrer: Identity
   const makeRequest = makeAuthenticatedRequest(components)
 
   beforeAll(() => {
@@ -18,21 +18,21 @@ test('GET /v1/referral-progress', ({ components }) => {
   })
 
   beforeEach(async () => {
-    referrer = await createAuthChain()
-    invited_user = await createAuthChain()
-    newReferrer = await createAuthChain()
+    referrer = await createTestIdentity()
+    invited_user = await createTestIdentity()
+    newReferrer = await createTestIdentity()
 
     await components.referralDb.createReferral({
-      referrer: referrer.authChain[0].payload.toLowerCase(),
-      invitedUser: invited_user.authChain[0].payload.toLowerCase()
+      referrer: referrer.realAccount.address.toLowerCase(),
+      invitedUser: invited_user.realAccount.address.toLowerCase()
     })
     await components.referralDb.updateReferralProgress(
-      invited_user.authChain[0].payload.toLowerCase(),
+      invited_user.realAccount.address.toLowerCase(),
       ReferralProgressStatus.TIER_GRANTED
     )
     cleanup.trackInsert('referral_progress', {
-      referrer: referrer.authChain[0].payload.toLowerCase(),
-      invited_user: invited_user.authChain[0].payload.toLowerCase()
+      referrer: referrer.realAccount.address.toLowerCase(),
+      invited_user: invited_user.realAccount.address.toLowerCase()
     })
   })
 
@@ -45,19 +45,11 @@ test('GET /v1/referral-progress', ({ components }) => {
     describe('with valid authentication and referrer', () => {
       beforeEach(async () => {
         cleanup.trackInsert('referral_progress_viewed', {
-          referrer: referrer.authChain[0].payload.toLowerCase()
+          referrer: referrer.realAccount.address.toLowerCase()
         })
       })
       it('should return invited users accepted and viewed counts and update last viewed', async () => {
-        const { localHttpFetch } = components
-        const response = await makeRequest(
-          localHttpFetch,
-          endpoint,
-          {
-            method: 'GET'
-          },
-          referrer
-        )
+        const response = await makeRequest(referrer, endpoint, 'GET')
 
         expect(response.status).toBe(200)
         const body = await response.json()
@@ -67,7 +59,7 @@ test('GET /v1/referral-progress', ({ components }) => {
         })
 
         const seen = await components.referralDb.getLastViewedProgressByReferrer(
-          referrer.authChain[0].payload.toLowerCase()
+          referrer.realAccount.address.toLowerCase()
         )
         expect(seen).toBe(1)
       })
@@ -75,19 +67,17 @@ test('GET /v1/referral-progress', ({ components }) => {
 
     describe('when authentication fails', () => {
       it('should return 401 with invalid auth chain', async () => {
-        const { localHttpFetch } = components
-        const invalidIdentity = {
+        const invalidIdentity: Identity = {
           ...invited_user,
-          authChain: [...invited_user.authChain, { type: AuthLinkType.SIGNER, payload: 'invalid-signature' }]
+          authChain: {
+            ...invited_user.authChain,
+            authChain: [
+              ...invited_user.authChain.authChain,
+              { type: AuthLinkType.SIGNER, payload: 'invalid-signature' }
+            ]
+          }
         }
-        const response = await makeRequest(
-          localHttpFetch,
-          endpoint,
-          {
-            method: 'GET'
-          },
-          invalidIdentity
-        )
+        const response = await makeRequest(invalidIdentity, endpoint, 'GET')
 
         expect(response.status).toBe(401)
       })
@@ -95,15 +85,7 @@ test('GET /v1/referral-progress', ({ components }) => {
 
     describe('when referrer has no referrals', () => {
       it('should return 0 counts for new referrer and update last viewed to 0', async () => {
-        const { localHttpFetch } = components
-        const response = await makeRequest(
-          localHttpFetch,
-          endpoint,
-          {
-            method: 'GET'
-          },
-          newReferrer
-        )
+        const response = await makeRequest(newReferrer, endpoint, 'GET')
 
         expect(response.status).toBe(200)
         const body = await response.json()
@@ -113,7 +95,7 @@ test('GET /v1/referral-progress', ({ components }) => {
         })
 
         const seen = await components.referralDb.getLastViewedProgressByReferrer(
-          newReferrer.authChain[0].payload.toLowerCase()
+          newReferrer.realAccount.address.toLowerCase()
         )
         expect(seen).toBe(0)
       })
