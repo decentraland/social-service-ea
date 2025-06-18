@@ -1,6 +1,7 @@
 import { ILoggerComponent, START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { IJobComponent, createJobComponent } from '../../../src/logic/job'
 import { createLogsMockedComponent } from '../../mocks/components'
+import { WrongOnTimeError } from '../../../src/logic/job/errors'
 
 let logs: ILoggerComponent
 let component: IJobComponent
@@ -21,6 +22,12 @@ beforeEach(() => {
   mockedSetTimeout.mockImplementation((handler) => {
     ;(handler as any)()
     return 1 as any
+  })
+})
+
+describe('when creating the job component with a lower than 500ms onTime', () => {
+  it('should throw an error', () => {
+    expect(() => createJobComponent({ logs }, job, -1, { repeat: false, onFinish })).toThrow(WrongOnTimeError)
   })
 })
 

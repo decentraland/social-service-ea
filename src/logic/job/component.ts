@@ -1,6 +1,7 @@
 import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { AppComponents } from '../../types'
 import { IJobComponent, JobOptions } from './types'
+import { WrongOnTimeError } from './errors'
 
 export function createJobComponent(
   components: Pick<AppComponents, 'logs'>,
@@ -21,6 +22,10 @@ export function createJobComponent(
   let timeout: ReturnType<typeof setTimeout> | undefined
   let resolveSleepCancel: ((value: unknown) => void) | undefined
   const logger = logs.getLogger('job')
+
+  if (onTime < 500) {
+    throw new WrongOnTimeError(onTime)
+  }
 
   async function sleep(time: number) {
     return new Promise((resolve) => {
