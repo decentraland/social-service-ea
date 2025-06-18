@@ -1,7 +1,6 @@
-export type IJobComponent = {
-  start(): void
-  stop(): Promise<void>
-}
+import { IBaseComponent } from '@well-known-components/interfaces'
+
+export type IJobComponent = IBaseComponent
 
 export type JobOptions = {
   /** Sets if the job will be run repeatedly or once */

@@ -1,3 +1,4 @@
+import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { AppComponents } from '../../types'
 import { IJobComponent, JobOptions } from './types'
 
@@ -39,7 +40,7 @@ export function createJobComponent(
     }
   }
 
-  function start() {
+  async function start() {
     // Start the job but don't wait for it
     runJob().catch(() => {
       // Do nothing
@@ -74,7 +75,7 @@ export function createJobComponent(
   }
 
   return {
-    start,
-    stop
+    [START_COMPONENT]: start,
+    [STOP_COMPONENT]: stop
   }
 }

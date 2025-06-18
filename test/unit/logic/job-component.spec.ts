@@ -1,4 +1,4 @@
-import { ILoggerComponent } from '@well-known-components/interfaces'
+import { ILoggerComponent, START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { IJobComponent, createJobComponent } from '../../../src/logic/job'
 import { createLogsMockedComponent } from '../../mocks/components'
 
@@ -31,7 +31,7 @@ describe('when starting a job', () => {
     })
 
     it('should run the job once and finish', async () => {
-      component.start()
+      await component[START_COMPONENT]({} as any)
       await componentFinished
       expect(job).toHaveBeenCalledTimes(1)
     })
@@ -43,7 +43,7 @@ describe('when starting a job', () => {
     })
 
     it('should wait the defined time before running the job for the first time', async () => {
-      component.start()
+      await component[START_COMPONENT]({} as any)
       await componentFinished
       expect(mockedSetTimeout).toHaveBeenCalledWith(expect.anything(), 4000)
       expect(job).toHaveBeenCalled()
@@ -56,7 +56,7 @@ describe('when starting a job', () => {
     })
 
     it('should not wait before running the job for the first time', async () => {
-      component.start()
+      await component[START_COMPONENT]({} as any)
       await componentFinished
       expect(mockedSetTimeout).toHaveBeenCalledWith(expect.anything(), 0)
       expect(job).toHaveBeenCalled()
@@ -67,12 +67,12 @@ describe('when starting a job', () => {
     beforeEach(() => {
       component = createJobComponent({ logs }, job, time, { repeat: true, onFinish })
       job.mockResolvedValueOnce(undefined).mockImplementationOnce(() => {
-        component.stop()
+        component[STOP_COMPONENT]()
       })
     })
 
     it('should repeat until the job on the given time until cancelled', async () => {
-      component.start()
+      await component[START_COMPONENT]({} as any)
       await componentFinished
       expect(mockedSetTimeout).toHaveBeenCalledWith(expect.anything(), 1000)
       expect(job).toHaveBeenCalledTimes(2)
@@ -91,7 +91,7 @@ describe('when starting a job', () => {
     })
 
     it('should execute the given onError method', async () => {
-      component.start()
+      await component[START_COMPONENT]({} as any)
       await componentFinished
       expect(onError).toHaveBeenCalledWith(error)
     })
@@ -117,9 +117,9 @@ describe('when stopping a started job', () => {
   })
 
   it('should wait until the job has completed and not run any more jobs', async () => {
-    component.start()
+    await component[START_COMPONENT]({} as any)
     await jobExecutingPromise
-    const promiseOfStoppingTheJob = component.stop()
+    const promiseOfStoppingTheJob = component[STOP_COMPONENT]()
     finishJobExecution(undefined)
     await Promise.all([promiseOfStoppingTheJob, componentFinished])
     expect(job).toHaveBeenCalledTimes(1)
