@@ -240,14 +240,16 @@ export async function createVoiceComponent({
       }
 
       // Notify the users that the private voice chat expired
-      for (const expiredPrivateVoiceChat of expiredPrivateVoiceChats) {
-        await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-          callId: expiredPrivateVoiceChat.id,
-          callerAddress: expiredPrivateVoiceChat.caller_address,
-          calleeAddress: expiredPrivateVoiceChat.callee_address,
-          status: VoiceChatStatus.EXPIRED
-        })
-      }
+      await Promise.all(
+        expiredPrivateVoiceChats.map(async (expiredPrivateVoiceChat) =>
+          pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+            callId: expiredPrivateVoiceChat.id,
+            callerAddress: expiredPrivateVoiceChat.caller_address,
+            calleeAddress: expiredPrivateVoiceChat.callee_address,
+            status: VoiceChatStatus.EXPIRED
+          })
+        )
+      )
 
       logger.info(`Expired ${expiredPrivateVoiceChats.length} private voice chats`)
     }
