@@ -24,7 +24,7 @@ import {
   toCommunityResults,
   mapMembersWithProfiles,
   toCommunitiesPublicInformation
-} from './utils'
+} from './adapter'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export async function createCommunityComponent(
