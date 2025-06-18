@@ -1,0 +1,29 @@
+export class ReferralNotFoundError extends Error {
+  constructor(userAddress: string) {
+    super(`Referral progress not found for user: ${userAddress}`)
+  }
+}
+
+export class ReferralInvalidInputError extends Error {
+  constructor(message: string) {
+    super(message)
+  }
+}
+
+export class ReferralAlreadyExistsError extends Error {
+  constructor(invitedUser: string) {
+    super(`Referral progress already exists for the invited user: ${invitedUser}`)
+  }
+}
+
+export class ReferralInvalidStatusError extends Error {
+  constructor(currentStatus: string, expectedStatus: string) {
+    super(`Invalid referral status: ${currentStatus}. Expected: ${expectedStatus}`)
+  }
+}
+
+export class SelfReferralError extends Error {
+  constructor(userAddress: string) {
+    super(`User cannot refer themselves: ${userAddress}`)
+  }
+}

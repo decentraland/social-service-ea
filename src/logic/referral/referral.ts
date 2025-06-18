@@ -1,0 +1,130 @@
+import { ReferralProgressStatus } from '../../types/referral-db.type'
+import { EthAddress } from '@dcl/schemas'
+import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
+import {
+  ReferralNotFoundError,
+  ReferralInvalidInputError,
+  ReferralAlreadyExistsError,
+  ReferralInvalidStatusError,
+  SelfReferralError
+} from './errors'
+import type { IReferralComponent } from './types'
+import type { AppComponents } from '../../types/system'
+
+function validateAddress(value: string, field: string): string {
+  if (!EthAddress.validate(value)) {
+    throw new ReferralInvalidInputError(`Invalid ${field} address`)
+  }
+  return value.toLowerCase()
+}
+
+export async function createReferralComponent(
+  components: Pick<AppComponents, 'referralDb' | 'logs'>
+): Promise<IReferralComponent> {
+  const { referralDb, logs } = components
+
+  const logger = logs.getLogger('referral-component')
+
+  return {
+    create: async (referralInput: CreateReferralWithInvitedUser) => {
+      const referrer = validateAddress(referralInput.referrer, 'referrer')
+      const invitedUser = validateAddress(referralInput.invitedUser, 'invitedUser')
+
+      if (referrer === invitedUser) {
+        throw new SelfReferralError(invitedUser)
+      }
+
+      const referralExists = await referralDb.hasReferralProgress(invitedUser)
+      if (referralExists) {
+        throw new ReferralAlreadyExistsError(invitedUser)
+      }
+
+      logger.info('Creating referral', {
+        referrer,
+        invitedUser
+      })
+
+      const referral = await referralDb.createReferral({ referrer, invitedUser })
+
+      logger.info(`Referral from ${referrer} to ${invitedUser} created successfully`)
+
+      return referral
+    },
+
+    updateProgress: async (
+      invitedUserToUpdate: string,
+      status: ReferralProgressStatus.SIGNED_UP | ReferralProgressStatus.TIER_GRANTED
+    ) => {
+      const invitedUser = validateAddress(invitedUserToUpdate, 'invitedUser')
+
+      const progress = await referralDb.findReferralProgress({ invitedUser })
+      if (!progress.length) {
+        throw new ReferralNotFoundError(invitedUser)
+      }
+
+      const currentStatus = progress[0].status
+      if (currentStatus !== ReferralProgressStatus.PENDING) {
+        throw new ReferralInvalidStatusError(currentStatus, ReferralProgressStatus.PENDING)
+      }
+
+      logger.info('Updating referral progress', {
+        invitedUser,
+        status
+      })
+
+      await referralDb.updateReferralProgress(invitedUser, status)
+
+      logger.info('Referral progress updated successfully', {
+        invitedUser,
+        status
+      })
+    },
+
+    finalizeReferral: async (invitedUserToFinalize: string) => {
+      const invitedUser = validateAddress(invitedUserToFinalize, 'invitedUser')
+
+      const progress = await referralDb.findReferralProgress({ invitedUser })
+      if (!progress.length) {
+        return
+      }
+
+      const currentStatus = progress[0].status
+
+      logger.info('Finalizing referral', {
+        invitedUser,
+        previousStatus: currentStatus,
+        newStatus: ReferralProgressStatus.TIER_GRANTED
+      })
+
+      await referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+
+      logger.info('Referral finalized successfully', {
+        invitedUser,
+        status: ReferralProgressStatus.TIER_GRANTED
+      })
+    },
+
+    getInvitedUsersAcceptedStats: async (referrer: string) => {
+      const ref = validateAddress(referrer, 'referrer')
+      logger.info('Getting invited users accepted stats', { referrer: ref })
+
+      const [invitedUsersAccepted, invitedUsersAcceptedViewed] = await Promise.all([
+        referralDb.countAcceptedInvitesByReferrer(ref),
+        referralDb.getLastViewedProgressByReferrer(ref)
+      ])
+
+      await referralDb.setLastViewedProgressByReferrer(ref, invitedUsersAccepted)
+
+      logger.info('Invited users accepted stats retrieved successfully', {
+        referrer: ref,
+        invitedUsersAccepted,
+        invitedUsersAcceptedViewed
+      })
+
+      return {
+        invitedUsersAccepted,
+        invitedUsersAcceptedViewed
+      }
+    }
+  }
+}
