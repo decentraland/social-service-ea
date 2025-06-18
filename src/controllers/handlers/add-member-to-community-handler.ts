@@ -1,5 +1,5 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../logic/community'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { EthAddress } from '@dcl/schemas'
@@ -35,7 +35,11 @@ export async function addMemberToCommunityHandler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error joining community: ${communityId}, error: ${message}`)
 
-    if (error instanceof CommunityNotFoundError || error instanceof InvalidRequestError) {
+    if (
+      error instanceof CommunityNotFoundError ||
+      error instanceof InvalidRequestError ||
+      error instanceof NotAuthorizedError
+    ) {
       throw error
     }
 
