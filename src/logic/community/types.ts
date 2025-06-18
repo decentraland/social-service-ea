@@ -93,6 +93,10 @@ export type ICommunityPlacesComponent = {
   ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
   addPlaces(communityId: string, userAddress: EthAddress, placeIds: string[]): Promise<void>
   removePlace(communityId: string, userAddress: EthAddress, placeId: string): Promise<void>
+  validateOwnership(
+    placeIds: string[],
+    userAddress: EthAddress
+  ): Promise<{ ownedPlaces: string[]; notOwnedPlaces: string[]; isValid: boolean }>
 }
 
 export type CommunityDB = {

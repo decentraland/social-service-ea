@@ -4,12 +4,20 @@ import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
 import { CommunityPlace, ICommunityPlacesComponent } from './types'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
-export async function createCommunityPlacesComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'communityRoles' | 'logs'>
-): Promise<ICommunityPlacesComponent> {
-  const { communitiesDb, communityRoles, logs } = components
+type PlacesApiResponse = {
+  total?: number
+  ok: boolean
+  data?: { id: string; title: string; positions: string[]; owner: string }[]
+}
 
-  const _logger = logs.getLogger('community-places-component')
+export async function createCommunityPlacesComponent(
+  components: Pick<AppComponents, 'communitiesDb' | 'communityRoles' | 'fetcher' | 'logs' | 'config'>
+): Promise<ICommunityPlacesComponent> {
+  const { communitiesDb, communityRoles, fetcher, logs, config } = components
+
+  const PLACES_API_URL = await config.requireString('PLACES_API_URL')
+
+  const logger = logs.getLogger('community-places-component')
 
   return {
     getPlaces: async (
@@ -64,6 +72,46 @@ export async function createCommunityPlacesComponent(
       }
 
       await communitiesDb.removeCommunityPlace(communityId, placeId)
+    },
+
+    validateOwnership: async (
+      placeIds: string[],
+      userAddress: EthAddress
+    ): Promise<{ ownedPlaces: string[]; notOwnedPlaces: string[]; isValid: boolean }> => {
+      const response = await fetcher.fetch(`${PLACES_API_URL}/api/places`, {
+        method: 'POST',
+        body: JSON.stringify(placeIds)
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to validate ownership')
+      }
+
+      const parsedResponse = (await response.json()) as PlacesApiResponse
+
+      const splitPlacesByOwnership = parsedResponse.data?.reduce(
+        (acc, place) => {
+          if (place.owner?.toLowerCase() === userAddress.toLowerCase()) {
+            acc.ownedPlaces.push(place.id)
+          } else {
+            acc.notOwnedPlaces.push(place.id)
+          }
+          return acc
+        },
+        { ownedPlaces: [] as string[], notOwnedPlaces: [] as string[] }
+      )
+
+      logger.info('Places ownership validation', {
+        ownedPlaces: (splitPlacesByOwnership?.ownedPlaces ?? []).join(','),
+        notOwnedPlaces: (splitPlacesByOwnership?.notOwnedPlaces ?? []).join(','),
+        isValid: splitPlacesByOwnership?.ownedPlaces.length === placeIds.length ? 'true' : 'false'
+      })
+
+      return {
+        ownedPlaces: splitPlacesByOwnership?.ownedPlaces ?? [],
+        notOwnedPlaces: splitPlacesByOwnership?.notOwnedPlaces ?? [],
+        isValid: splitPlacesByOwnership?.ownedPlaces.length === placeIds.length
+      }
     }
   }
 }

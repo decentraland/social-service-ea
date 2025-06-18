@@ -102,7 +102,59 @@ test('Create Community Controller', async function ({ components, stubComponents
               placeIds: mockPlaceIds
             }
 
-            it('should create community and add places', async () => {
+            describe('and the places are owned by the user', () => {
+              beforeEach(async () => {
+                stubComponents.communityPlaces.validateOwnership.onFirstCall().resolves({
+                  ownedPlaces: mockPlaceIds,
+                  notOwnedPlaces: [],
+                  isValid: true
+                })
+              })
+
+              it('should create community and add places', async () => {
+                const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithPlaces)
+                const body = await response.json()
+                communityId = body.data.id
+
+                expect(response.status).toBe(201)
+                expect(body).toMatchObject({
+                  data: {
+                    id: expect.any(String),
+                    name: 'Test Community',
+                    description: 'Test Description',
+                    active: true,
+                    ownerAddress: identity.realAccount.address.toLowerCase(),
+                    privacy: 'public'
+                  },
+                  message: 'Community created successfully'
+                })
+
+                const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+                expect(placesResponse.status).toBe(200)
+                const result = await placesResponse.json()
+                expect(result.data.results.map((p: { id: string }) => p.id)).toEqual(expect.arrayContaining(mockPlaceIds))
+              })
+
+              it('should create community without places when empty array is provided', async () => {
+                const validBodyWithEmptyPlaces = {
+                  ...validBody,
+                  placeIds: []
+                }
+  
+                const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithEmptyPlaces)
+                const body = await response.json()
+                communityId = body.data.id
+  
+                expect(response.status).toBe(201)
+  
+                const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`)
+                expect(placesResponse.status).toBe(200)
+                const result = await placesResponse.json()
+                expect(result.data.results).toHaveLength(0)
+              })
+            })
+
+            it.skip('should create community and add places', async () => {
               const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithPlaces)
               const body = await response.json()
               communityId = body.data.id
@@ -126,7 +178,7 @@ test('Create Community Controller', async function ({ components, stubComponents
               expect(result.data.results.map((p: { id: string }) => p.id)).toEqual(expect.arrayContaining(mockPlaceIds))
             })
 
-            it('should create community without places when empty array is provided', async () => {
+            it.skip('should create community without places when empty array is provided', async () => {
               const validBodyWithEmptyPlaces = {
                 ...validBody,
                 placeIds: []
