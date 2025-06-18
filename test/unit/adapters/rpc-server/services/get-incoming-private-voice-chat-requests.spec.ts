@@ -54,9 +54,7 @@ describe('getIncomingPrivateVoiceChatRequestsService', () => {
         id: callId,
         caller_address: callerAddress,
         callee_address: address,
-        expires_at: new Date('2024-12-31T23:59:59Z'),
-        created_at: new Date('2024-01-01T00:00:00Z'),
-        updated_at: new Date('2024-01-01T00:00:00Z')
+        created_at: new Date('2024-01-01T00:00:00Z')
       }
       getIncomingPrivateVoiceChatMock.mockResolvedValueOnce(mockPrivateVoiceChat)
     })

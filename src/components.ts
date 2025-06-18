@@ -39,6 +39,7 @@ import { createMemoryQueueAdapter } from './adapters/memory-queue'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
 import { createCommunityPlacesComponent } from './logic/community'
+import { createJobComponent } from './logic/job'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -83,6 +84,7 @@ export async function initComponents(): Promise<AppComponents> {
     const dbPassword = await config.requireString('PG_COMPONENT_PSQL_PASSWORD')
     databaseUrl = `postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbDatabaseName}`
   }
+  const privateVoiceChatJobInterval = await config.requireNumber('PRIVATE_VOICE_CHAT_JOB_INTERVAL')
 
   const pg = await createPgComponent(
     { logs, config, metrics },
@@ -110,7 +112,7 @@ export async function initComponents(): Promise<AppComponents> {
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
-  const voice = await createVoiceComponent({ logs, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
+  const voice = await createVoiceComponent({ logs, config, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
   const sns = await createSnsComponent({ config })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
@@ -146,6 +148,12 @@ export async function initComponents(): Promise<AppComponents> {
     config
   })
 
+  const expirePrivateVoiceChatJob = createJobComponent(
+    { logs },
+    voice.expirePrivateVoiceChat,
+    privateVoiceChatJobInterval,
+    { repeat: true }
+  )
   const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
   const queue = sqsEndpoint ? await createSqsAdapter(sqsEndpoint) : createMemoryQueueAdapter()
 
@@ -174,6 +182,7 @@ export async function initComponents(): Promise<AppComponents> {
     messageProcessor,
     metrics,
     nats,
+    expirePrivateVoiceChatJob,
     peerTracking,
     peersStats,
     peersSynchronizer,

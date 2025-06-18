@@ -23,8 +23,8 @@ export async function createVoiceDBComponent(
     },
     async createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
       const query = SQL`
-        INSERT INTO private_voice_chats (id, caller_address, callee_address, expires_at)
-        VALUES (${randomUUID()}, ${normalizeAddress(callerAddress)}, ${normalizeAddress(calleeAddress)}, ${new Date(Date.now() + PRIVATE_VOICE_CHAT_EXPIRATION_TIME).toISOString()})
+        INSERT INTO private_voice_chats (id, caller_address, callee_address)
+        VALUES (${randomUUID()}, ${normalizeAddress(callerAddress)}, ${normalizeAddress(calleeAddress)})
         RETURNING id
       `
       const results = await pg.query<{ id: string }>(query)
@@ -57,6 +57,20 @@ export async function createVoiceDBComponent(
       `
       const results = await pg.query<PrivateVoiceChat>(query)
       return results.rows[0] ?? null
+    },
+    /**
+     * Expire private voice chats that are older than the given date.
+     * @param limit - The maximum number of voice chats to expire.
+     */
+    async expirePrivateVoiceChat(limit: number): Promise<PrivateVoiceChat[]> {
+      const query = SQL`DELETE FROM private_voice_chats WHERE id IN (
+        SELECT id FROM private_voice_chats WHERE 
+          created_at < (now()::timestamp - (${PRIVATE_VOICE_CHAT_EXPIRATION_TIME} * interval '1 millisecond'))
+        ORDER BY created_at ASC
+        LIMIT ${limit})
+      RETURNING *;`
+      const results = await pg.query<PrivateVoiceChat>(query)
+      return results.rows
     }
   }
 }

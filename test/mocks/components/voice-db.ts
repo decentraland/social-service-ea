@@ -6,7 +6,8 @@ export function createVoiceDBMockedComponent({
   getPrivateVoiceChat = jest.fn(),
   deletePrivateVoiceChat = jest.fn(),
   getPrivateVoiceChatForCalleeAddress = jest.fn(),
-  getPrivateVoiceChatOfUser = jest.fn()
+  getPrivateVoiceChatOfUser = jest.fn(),
+  expirePrivateVoiceChat = jest.fn()
 }: Partial<jest.Mocked<IVoiceDatabaseComponent>>): jest.Mocked<IVoiceDatabaseComponent> {
   return {
     areUsersBeingCalledOrCallingSomeone,
@@ -14,6 +15,7 @@ export function createVoiceDBMockedComponent({
     getPrivateVoiceChat,
     deletePrivateVoiceChat,
     getPrivateVoiceChatForCalleeAddress,
-    getPrivateVoiceChatOfUser
+    getPrivateVoiceChatOfUser,
+    expirePrivateVoiceChat
   }
 }

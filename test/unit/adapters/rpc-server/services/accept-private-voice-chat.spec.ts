@@ -2,7 +2,7 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
-import { VoiceChatExpiredError, VoiceChatNotAllowedError } from '../../../../../src/logic/voice/errors'
+import { VoiceChatNotAllowedError } from '../../../../../src/logic/voice/errors'
 import { AcceptPrivateVoiceChatPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { acceptPrivateVoiceChatService } from '../../../../../src/adapters/rpc-server/services/accept-private-voice-chat'
 
@@ -30,9 +30,6 @@ describe('when accepting a private voice chat', () => {
   })
 
   describe('and accepting a private voice chat is successful', () => {
-    let token: string
-    let url: string
-
     beforeEach(() => {
       acceptPrivateVoiceChatMock.mockResolvedValue({
         connectionUrl: 'livekit:https://voice.decentraland.org?access_token=1234567890'
@@ -108,29 +105,6 @@ describe('when accepting a private voice chat', () => {
         expect(result.response.forbiddenError.message).toBe(
           'The callee or the caller are not accepting voice calls from users that are not friends'
         )
-      }
-    })
-  })
-
-  describe('and accepting a private voice chat fails with a voice chat expired error', () => {
-    beforeEach(() => {
-      acceptPrivateVoiceChatMock.mockRejectedValue(new VoiceChatExpiredError(calleeAddress))
-    })
-
-    it('should resolve with an invalid request response', async () => {
-      const result = await service(
-        AcceptPrivateVoiceChatPayload.create({
-          callId
-        }),
-        {
-          address: callerAddress,
-          subscribersContext: undefined
-        }
-      )
-
-      expect(result.response?.$case).toBe('invalidRequest')
-      if (result.response?.$case === 'invalidRequest') {
-        expect(result.response.invalidRequest.message).toBe(`The voice chat with id ${calleeAddress} has expired`)
       }
     })
   })

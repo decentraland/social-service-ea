@@ -3,7 +3,7 @@ import { rejectPrivateVoiceChatService } from '../../../../../src/adapters/rpc-s
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
-import { VoiceChatExpiredError, VoiceChatNotFoundError } from '../../../../../src/logic/voice/errors'
+import { VoiceChatNotFoundError } from '../../../../../src/logic/voice/errors'
 import { RejectPrivateVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('when rejecting a private voice chat', () => {
@@ -65,24 +65,6 @@ describe('when rejecting a private voice chat', () => {
       expect(result.response?.$case).toBe('notFound')
       if (result.response?.$case === 'notFound') {
         expect(result.response.notFound.message).toBe(`The voice chat with id ${callId} was not found`)
-      }
-    })
-  })
-
-  describe('and rejecting a private voice chat fails with a voice chat expired error', () => {
-    beforeEach(() => {
-      rejectPrivateVoiceChatMock.mockRejectedValue(new VoiceChatExpiredError(callId))
-    })
-
-    it('should resolve with an invalid request response', async () => {
-      const result = await service(RejectPrivateVoiceChatPayload.create({ callId }), {
-        address: calleeAddress,
-        subscribersContext: undefined
-      })
-
-      expect(result.response?.$case).toBe('invalidRequest')
-      if (result.response?.$case === 'invalidRequest') {
-        expect(result.response.invalidRequest.message).toBe(`The voice chat with id ${callId} has expired`)
       }
     })
   })

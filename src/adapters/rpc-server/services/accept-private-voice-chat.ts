@@ -2,7 +2,7 @@ import {
   AcceptPrivateVoiceChatPayload,
   AcceptPrivateVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { VoiceChatExpiredError, VoiceChatNotAllowedError, VoiceChatNotFoundError } from '../../../logic/voice/errors'
+import { VoiceChatNotAllowedError, VoiceChatNotFoundError } from '../../../logic/voice/errors'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 
@@ -45,15 +45,6 @@ export function acceptPrivateVoiceChatService({ components: { logs, voice } }: R
           response: {
             $case: 'forbiddenError',
             forbiddenError: {
-              message: errorMessage
-            }
-          }
-        }
-      } else if (error instanceof VoiceChatExpiredError) {
-        return {
-          response: {
-            $case: 'invalidRequest',
-            invalidRequest: {
               message: errorMessage
             }
           }

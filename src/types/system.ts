@@ -41,6 +41,7 @@ import { IReferralDatabaseComponent } from './referral-db.type'
 import { IQueueComponent } from './sqs.type'
 import { IMessageProcessorComponent, IMessageConsumerComponent } from '../logic/sqs'
 import { IPeersStatsComponent } from '../logic/peers-stats'
+import { IJobComponent } from '../logic/job'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -52,6 +53,7 @@ export type BaseComponents = {
   catalystClient: ICatalystClientComponent
   commsGatekeeper: ICommsGatekeeperComponent
   community: ICommunityComponent
+  expirePrivateVoiceChatJob?: IJobComponent
   communityRoles: ICommunityRolesComponent
   communityPlaces: ICommunityPlacesComponent
   communitiesDb: ICommunitiesDatabaseComponent

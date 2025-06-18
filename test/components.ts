@@ -122,7 +122,7 @@ async function initComponents(): Promise<TestComponents> {
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
-  const voice = await createVoiceComponent({ logs, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
+  const voice = await createVoiceComponent({ logs, config, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const rpcServer = await createRpcServerComponent({
     logs,
