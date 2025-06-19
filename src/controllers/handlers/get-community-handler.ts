@@ -1,13 +1,13 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { errorMessageOrDefault } from '../../utils/errors'
-import { CommunityNotFoundError, CommunityWithMembersCount } from '../../logic/community'
+import { CommunityNotFoundError, GetCommunityResponse } from '../../logic/community'
 
 export async function getCommunityHandler(
   context: Pick<
     HandlerContextWithPath<'logs' | 'community', '/v1/communities/:id'>,
     'url' | 'components' | 'params' | 'verification'
   >
-): Promise<HTTPResponse<CommunityWithMembersCount>> {
+): Promise<HTTPResponse<GetCommunityResponse>> {
   const {
     components: { community, logs },
     params: { id },

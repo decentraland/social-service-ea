@@ -1,17 +1,20 @@
 import { EthAddress } from '@dcl/schemas'
 import { Action, CommunityRole, FriendshipAction } from '../../types/entities'
 import { parseProfilesToFriends } from '../friends'
-import { getProfileUserId, getProfileInfo } from '../profiles'
+import { getProfileUserId, getProfileInfo, getProfileName } from '../profiles'
 import {
   Community,
   CommunityWithUserInformation,
   CommunityWithMembersCount,
   CommunityWithMembersCountAndFriends,
-  CommunityPublicInformation
+  CommunityPublicInformation,
+  WithCommunityOwner
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friendships'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+
+// TODO(refactor): this could follow a builder pattern to allow other components to append extra information to the community
 
 export const isOwner = (community: Community, userAddress: string) => {
   return community.ownerAddress.toLowerCase() === userAddress.toLowerCase()
@@ -24,6 +27,18 @@ const withMembersCount = <T extends { membersCount: number | string }>(community
   }
 }
 
+const withCommunityOwner = <T extends Community>(community: T, ownerProfile?: Profile): WithCommunityOwner<T> => {
+  const { ownerAddress, ...rest } = community
+
+  return {
+    ...rest,
+    owner: {
+      address: ownerAddress,
+      name: ownerProfile ? getProfileName(ownerProfile) : ''
+    }
+  }
+}
+
 const toBaseCommunity = <T extends { membersCount: number | string }>(community: T): T & { isLive: boolean } => {
   return {
     ...withMembersCount(community),
@@ -31,15 +46,12 @@ const toBaseCommunity = <T extends { membersCount: number | string }>(community:
   }
 }
 
-export const toCommunityWithMembersCount = (
+export const toCommunityWithMembersCountAndOwner = (
   community: Community & { role: CommunityRole },
-  membersCount: number
-): CommunityWithMembersCount => {
-  return withMembersCount({
-    ...community,
-    ownerAddress: community.ownerAddress,
-    membersCount
-  })
+  membersCount: number,
+  ownerProfile: Profile
+): WithCommunityOwner<CommunityWithMembersCount> => {
+  return withMembersCount({ ...withCommunityOwner(community, ownerProfile), membersCount })
 }
 
 export const toCommunityWithUserInformation = (
@@ -57,14 +69,38 @@ export const toCommunityWithUserInformation = (
 
 export const toCommunityResults = (
   communities: CommunityWithMembersCountAndFriends[],
-  friendsProfiles: Profile[]
-): CommunityWithUserInformation[] => {
+  friendsProfiles: Profile[],
+  communitiesOwnersProfiles: Profile[]
+): WithCommunityOwner<CommunityWithUserInformation>[] => {
   const profilesMap = new Map(friendsProfiles.map((profile) => [getProfileUserId(profile), profile]))
-  return communities.map((community) => toCommunityWithUserInformation(community, profilesMap))
+  const communitiesOwnersProfilesMap = new Map(
+    communitiesOwnersProfiles.map((profile) => [getProfileUserId(profile), profile])
+  )
+  return communities.map((community) =>
+    withCommunityOwner(
+      toCommunityWithUserInformation(community, profilesMap),
+      communitiesOwnersProfilesMap.get(community.ownerAddress)
+    )
+  )
 }
 
-export const toPublicCommunity = (community: CommunityPublicInformation): CommunityPublicInformation => {
+export const toCommunityPublicInformation = (community: CommunityPublicInformation): CommunityPublicInformation => {
   return toBaseCommunity(community)
+}
+
+export const toCommunitiesPublicInformation = (
+  communities: CommunityPublicInformation[],
+  communitiesOwnersProfiles: Profile[]
+): WithCommunityOwner<CommunityPublicInformation>[] => {
+  const communitiesOwnersProfilesMap = new Map(
+    communitiesOwnersProfiles.map((profile) => [getProfileUserId(profile), profile])
+  )
+  return communities.map((community) =>
+    withCommunityOwner(
+      toCommunityPublicInformation(community),
+      communitiesOwnersProfilesMap.get(community.ownerAddress)!
+    )
+  )
 }
 
 export const mapMembersWithProfiles = <

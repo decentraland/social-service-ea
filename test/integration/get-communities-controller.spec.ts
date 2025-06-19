@@ -5,6 +5,7 @@ import { createMockProfile } from '../mocks/profile'
 import { parseExpectedFriends } from '../mocks/friend'
 import { mockCommunity } from '../mocks/community'
 import { createOrUpsertActiveFriendship, removeFriendship } from './utils/friendships'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 test('Get Communities Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -20,15 +21,12 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
     let communityId2: string
     let friendshipId1: string
     let friendshipId2: string
+    let ownerProfile: Profile
 
     beforeEach(async () => {
       identity = await createTestIdentity()
       address = identity.realAccount.address.toLowerCase()
-
-      spyComponents.catalystClient.getProfiles.mockResolvedValue([
-        createMockProfile(friendAddress1),
-        createMockProfile(friendAddress2)
-      ])
+      ownerProfile = createMockProfile(address)
 
       const result1 = await components.communitiesDb.createCommunity(
         mockCommunity({
@@ -80,7 +78,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
     })
 
     describe('and the request is not signed', () => {
-      it('should respond with a 200 status code and the public communities', async () => {
+      beforeEach(() => {
+        spyComponents.catalystClient.getProfiles.mockResolvedValueOnce([ownerProfile])
+      })
+
+      it('should respond with a 200 status code and the public communities with owner profiles', async () => {
         const { localHttpFetch } = components
         const response = await localHttpFetch.fetch('/v1/communities?limit=10&offset=0&search=test')
         const body = await response.json()
@@ -88,28 +90,34 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         expect(response.status).toBe(200)
         expect(body).toEqual({
           data: {
-            results: expect.arrayContaining([
-              expect.objectContaining({
+            results: [
+              {
                 id: communityId1,
                 name: 'Test Community 1',
                 description: 'Test Description 1',
-                ownerAddress: address,
                 privacy: 'public',
                 active: true,
                 membersCount: 2,
-                isLive: false
-              }),
-              expect.objectContaining({
+                isLive: false,
+                owner: {
+                  address,
+                  name: ownerProfile.avatars[0].name
+                }
+              },
+              {
                 id: communityId2,
                 name: 'Test Community 2',
                 description: 'Test Description 2',
-                ownerAddress: address,
                 privacy: 'public',
                 active: true,
                 membersCount: 1,
-                isLive: false
-              })
-            ]),
+                isLive: false,
+                owner: {
+                  address,
+                  name: ownerProfile.avatars[0].name
+                }
+              }
+            ],
             total: 2,
             page: 1,
             pages: 1,
@@ -120,8 +128,17 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
     })
 
     describe('and the request is signed', () => {
+      beforeEach(() => {
+        spyComponents.catalystClient.getProfiles.mockResolvedValueOnce([
+          createMockProfile(friendAddress1),
+          createMockProfile(friendAddress2)
+        ])
+
+        spyComponents.catalystClient.getProfiles.mockResolvedValueOnce([ownerProfile])
+      })
+
       describe('when getting all communities', () => {
-        it('should return all communities with correct role and friends information', async () => {
+        it('should return all communities with correct role, friends information and owner profiles', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&search=test')
           const body = await response.json()
 
@@ -136,25 +153,31 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                   id: communityId1,
                   name: 'Test Community 1',
                   description: 'Test Description 1',
-                  ownerAddress: address,
                   privacy: 'public',
                   active: true,
                   role: CommunityRole.None,
                   membersCount: 2,
                   friends: expect.arrayContaining([parseFriend(friend1Profile), parseFriend(friend2Profile)]),
-                  isLive: false
+                  isLive: false,
+                  owner: {
+                    address: address,
+                    name: ownerProfile.avatars[0].name
+                  }
                 }),
                 expect.objectContaining({
                   id: communityId2,
                   name: 'Test Community 2',
                   description: 'Test Description 2',
-                  ownerAddress: address,
                   privacy: 'public',
                   active: true,
                   role: CommunityRole.None,
                   membersCount: 1,
                   friends: expect.arrayContaining([parseFriend(friend1Profile)]),
-                  isLive: false
+                  isLive: false,
+                  owner: {
+                    address: address,
+                    name: ownerProfile.avatars[0].name
+                  }
                 })
               ]),
               total: 2,
@@ -163,6 +186,36 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               limit: 10
             }
           })
+        })
+
+        it('should handle missing owner profiles gracefully', async () => {
+          spyComponents.catalystClient.getProfiles.mockReset()
+
+          spyComponents.catalystClient.getProfiles.mockResolvedValueOnce([
+            createMockProfile(friendAddress1),
+            createMockProfile(friendAddress2)
+          ])
+
+          spyComponents.catalystClient.getProfiles.mockResolvedValueOnce([])
+
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&search=test')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toEqual([
+            expect.objectContaining({
+              owner: {
+                address,
+                name: ''
+              }
+            }),
+            expect.objectContaining({
+              owner: {
+                address,
+                name: ''
+              }
+            })
+          ])
         })
       })
 
@@ -257,8 +310,12 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         it('should return the thumbnail raw url in the response', async () => {
           const response = await makeRequest(identity, '/v1/communities')
           const body = await response.json()
-          expect(body.data.results[0].thumbnails.raw).toBe(`http://0.0.0.0:4566/social-service-ea/social/communities/${communityId1}/raw-thumbnail.png`)
-          expect(body.data.results[1].thumbnails.raw).toBe(`http://0.0.0.0:4566/social-service-ea/social/communities/${communityId2}/raw-thumbnail.png`)
+          expect(body.data.results[0].thumbnails.raw).toBe(
+            `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId1}/raw-thumbnail.png`
+          )
+          expect(body.data.results[1].thumbnails.raw).toBe(
+            `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId2}/raw-thumbnail.png`
+          )
         })
       })
     })

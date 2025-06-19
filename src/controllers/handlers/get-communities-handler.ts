@@ -2,11 +2,11 @@ import { getPaginationParams } from '@dcl/platform-server-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../types'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
-import { CommunityWithUserInformation, CommunityPublicInformation } from '../../logic/community'
+import { GetCommunitiesResponse } from '../../logic/community'
 
 export async function getCommunitiesHandler(
   context: Pick<HandlerContextWithPath<'community' | 'logs', '/v1/communities'>, 'components' | 'url' | 'verification'>
-): Promise<HTTPResponse<PaginatedResponse<CommunityWithUserInformation | CommunityPublicInformation>>> {
+): Promise<HTTPResponse<PaginatedResponse<GetCommunitiesResponse>>> {
   const {
     components: { community, logs },
     verification,
