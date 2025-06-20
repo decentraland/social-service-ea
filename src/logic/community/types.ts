@@ -56,6 +56,7 @@ export interface ICommunityComponent {
       pagination: PaginatedParameters
     }
   ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
+  updateCommunity(communityId: string, userAddress: EthAddress, updates: CommunityUpdates): Promise<Community>
 }
 
 export type ICommunityRolesComponent = {
@@ -84,6 +85,7 @@ export type ICommunityRolesComponent = {
   ) => Promise<boolean>
   canAddPlacesToCommunity: (communityId: string, adderAddress: string) => Promise<boolean>
   canRemovePlacesFromCommunity: (communityId: string, removerAddress: string) => Promise<boolean>
+  canEditCommunity: (communityId: string, editorAddress: string) => Promise<boolean>
 }
 
 export type ICommunityPlacesComponent = {
@@ -93,6 +95,7 @@ export type ICommunityPlacesComponent = {
   ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
   addPlaces(communityId: string, userAddress: EthAddress, placeIds: string[]): Promise<void>
   removePlace(communityId: string, userAddress: EthAddress, placeId: string): Promise<void>
+  updatePlaces(communityId: string, userAddress: EthAddress, placeIds: string[]): Promise<void>
 }
 
 export type CommunityDB = {
@@ -104,6 +107,13 @@ export type CommunityDB = {
   active: boolean
   created_at?: string
   updated_at?: string
+}
+
+export type CommunityUpdates = {
+  name?: string
+  description?: string
+  placeIds?: string[]
+  thumbnailBuffer?: Buffer
 }
 
 export type Community = {

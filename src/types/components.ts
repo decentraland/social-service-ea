@@ -159,6 +159,10 @@ export interface ICommunitiesDatabaseComponent {
   isMemberBanned(communityId: string, bannedMemberAddress: EthAddress): Promise<boolean>
   getBannedMembers(communityId: string, userAddress: EthAddress, pagination: Pagination): Promise<BannedMember[]>
   getBannedMembersCount(communityId: string): Promise<number>
+  updateCommunity(
+    communityId: string,
+    updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private'>>
+  ): Promise<Community>
 }
 
 export interface IVoiceDatabaseComponent {

@@ -21,6 +21,7 @@ import { multipartParserWrapper } from '@well-known-components/multipart-wrapper
 import { getCommunityPlacesHandler } from '../handlers/get-community-places-handler'
 import { addCommunityPlacesHandler } from '../handlers/add-community-places-handler'
 import { removeCommunityPlaceHandler } from '../handlers/remove-community-place-handler'
+import { updateCommunityHandler } from '../handlers/update-community-handler'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -56,6 +57,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.get('/v1/members/:address/communities', signedFetchMiddleware(), getMemberCommunitiesHandler)
 
   router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
+  router.put('/v1/communities/:id', signedFetchMiddleware(), multipartParserWrapper(updateCommunityHandler))
   router.delete('/v1/communities/:id', signedFetchMiddleware(), deleteCommunityHandler)
 
   router.get('/v1/communities/:id/places', signedFetchMiddleware({ optional: true }), getCommunityPlacesHandler)

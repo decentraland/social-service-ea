@@ -139,6 +139,43 @@ components:
               additionalProperties:
                 type: string
               description: 'A map of thumbnail types to URLs. The key is the thumbnail type (e.g. "raw") and the value is the URL.'
+    UpdateCommunity200OkResponse:
+      type: object
+      required:
+        - message
+        - data
+      properties:
+        message:
+          type: string
+          description: 'A message describing the result'
+        data:
+          type: object
+          required:
+            - id
+            - name
+            - description
+            - ownerAddress
+            - privacy
+            - active
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
+            ownerAddress:
+              type: string
+            privacy:
+              type: string
+              enum: [public, private]
+            active:
+              type: boolean
+            thumbnails:
+              type: object
+              additionalProperties:
+                type: string
+              description: 'A map of thumbnail types to URLs. The key is the thumbnail type (e.g. "raw") and the value is the URL.'
     GetCommunityById200OkResponse:
       type: object
       required:

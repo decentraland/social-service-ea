@@ -15,7 +15,8 @@ import {
   BannedMember,
   CommunityMember,
   GetCommunityMembersOptions,
-  CommunityPlace
+  CommunityPlace,
+  CommunityUpdates
 } from './types'
 import {
   isOwner,
@@ -486,6 +487,72 @@ export async function createCommunityComponent(
       }
 
       return communityPlaces.getPlaces(communityId, options.pagination)
+    },
+
+    updateCommunity: async (
+      communityId: string,
+      userAddress: EthAddress,
+      updates: CommunityUpdates
+    ): Promise<Community> => {
+      const community = await communitiesDb.getCommunity(communityId, userAddress)
+      if (!community) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const canEdit = await communityRoles.canEditCommunity(communityId, userAddress)
+
+      if (!canEdit) {
+        throw new NotAuthorizedError(
+          `The user ${userAddress} doesn't have permission to update community ${communityId}`
+        )
+      }
+
+      logger.info('Updating community', {
+        communityId,
+        userAddress,
+        updates: JSON.stringify(updates),
+        hasThumbnail: updates.thumbnailBuffer ? 'true' : 'false',
+        placeIds: updates.placeIds ? updates.placeIds.length : 0
+      })
+
+      const updatedCommunity = await communitiesDb.updateCommunity(communityId, updates)
+
+      if (updates.thumbnailBuffer) {
+        const thumbnailUrl = await storage.storeFile(
+          updates.thumbnailBuffer,
+          `communities/${communityId}/raw-thumbnail.png`
+        )
+
+        logger.info('Thumbnail updated', {
+          thumbnailUrl,
+          communityId,
+          size: updates.thumbnailBuffer.length
+        })
+
+        updatedCommunity.thumbnails = {
+          raw: thumbnailUrl
+        }
+      }
+
+      if (updates.placeIds && updates.placeIds.length > 0) {
+        await communityPlaces.updatePlaces(communityId, userAddress, updates.placeIds)
+
+        logger.info('Community places updated', {
+          communityId,
+          userAddress,
+          placeIds: updates.placeIds.length
+        })
+      }
+
+      logger.info('Community updated successfully', {
+        communityId,
+        userAddress,
+        updatedFields: JSON.stringify(Object.keys(updates)),
+        hasThumbnail: updates.thumbnailBuffer ? 'true' : 'false',
+        hasPlacesUpdate: updates.placeIds !== undefined ? 'true' : 'false'
+      })
+
+      return updatedCommunity
     }
   }
 }

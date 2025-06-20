@@ -135,6 +135,11 @@ export function createCommunityRolesComponent(
     async canRemovePlacesFromCommunity(communityId: string, removerAddress: string): Promise<boolean> {
       const role = await communitiesDb.getCommunityMemberRole(communityId, removerAddress)
       return role && hasPermission(role, 'remove_places')
+    },
+
+    async canEditCommunity(communityId: string, editorAddress: string): Promise<boolean> {
+      const role = await communitiesDb.getCommunityMemberRole(communityId, editorAddress)
+      return role && hasPermission(role, 'edit_info')
     }
   }
 }

@@ -164,6 +164,73 @@ paths:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
+    put:
+      summary: Update a community
+      description: |
+        Updates a community's details including name, description, privacy settings, and thumbnail.
+        This endpoint requires Signed Fetch authentication and only community owners can update.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: 'Community name'
+                description:
+                  type: string
+                  description: 'Community description'
+                placeIds:
+                  type: string
+                  description: 'JSON array of place IDs to replace all current community places'
+                thumbnail:
+                  type: string
+                  format: binary
+                  description: 'Community thumbnail image'
+      responses:
+        '200':
+          description: Community updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/UpdateCommunity200OkResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required or not owner
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
     delete:
       summary: Delete a community
       description: |
