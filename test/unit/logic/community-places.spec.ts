@@ -2,7 +2,7 @@ import { CommunityRole } from '../../../src/types/entities'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs } from '../../mocks/components'
+import { mockConfig, mockFetcher, mockLogs } from '../../mocks/components'
 import { createCommunityPlacesComponent } from '../../../src/logic/community/places'
 import {
   ICommunityPlacesComponent,
@@ -37,7 +37,9 @@ describe('when handling community places operations', () => {
     communityPlacesComponent = await createCommunityPlacesComponent({
       communitiesDb: mockCommunitiesDB,
       communityRoles: mockCommunityRoles,
-      logs: mockLogs
+      logs: mockLogs,
+      fetcher: mockFetcher,
+      config: mockConfig
     })
   })
 
