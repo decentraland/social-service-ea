@@ -517,6 +517,56 @@ export function createCommunitiesDBComponent(
         WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
       `
       await pg.query(query)
+    },
+
+    async updateCommunity(
+      communityId: string,
+      updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private'>>
+    ): Promise<Community> {
+      let query = SQL`UPDATE communities SET `
+      const setClauses: ReturnType<typeof SQL>[] = []
+
+      if (updates.name !== undefined) {
+        setClauses.push(SQL`name = ${updates.name}`)
+      }
+
+      if (updates.description !== undefined) {
+        setClauses.push(SQL`description = ${updates.description}`)
+      }
+
+      if (updates.private !== undefined) {
+        setClauses.push(SQL`private = ${updates.private}`)
+      }
+
+      setClauses.push(SQL`updated_at = now()`)
+
+      // Join the SET clauses
+      for (let i = 0; i < setClauses.length; i++) {
+        query = query.append(setClauses[i])
+        if (i < setClauses.length - 1) {
+          query = query.append(SQL`, `)
+        }
+      }
+
+      query = query
+        .append(SQL` WHERE id = ${communityId} AND active = true`)
+        .append(SQL` RETURNING id, name, description, owner_address, private, active, created_at, updated_at`)
+
+      const result = await pg.query<CommunityDB>(query)
+      const row = result.rows[0]
+
+      if (!row) {
+        throw new Error(`Community with id ${communityId} not found`)
+      }
+
+      return {
+        id: row.id!,
+        name: row.name,
+        description: row.description,
+        ownerAddress: row.owner_address,
+        privacy: row.private ? 'private' : 'public',
+        active: row.active
+      }
     }
   }
 }

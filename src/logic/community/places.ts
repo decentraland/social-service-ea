@@ -105,6 +105,47 @@ export async function createCommunityPlacesComponent(
       }
 
       await communitiesDb.removeCommunityPlace(communityId, placeId)
+    },
+
+    updatePlaces: async (communityId: string, userAddress: EthAddress, placeIds: string[]): Promise<void> => {
+      const communityExists = await communitiesDb.communityExists(communityId)
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const canUpdate =
+        (await communityRoles.canRemovePlacesFromCommunity(communityId, userAddress)) &&
+        (await communityRoles.canAddPlacesToCommunity(communityId, userAddress))
+      if (!canUpdate) {
+        throw new NotAuthorizedError(
+          `The user ${userAddress} doesn't have permission to update places in community ${communityId}`
+        )
+      }
+
+      const { ownedPlaces, notOwnedPlaces, isValid } = await validateOwnership(placeIds, userAddress)
+
+      if (!isValid) {
+        logger.error('Invalid places ownership', {
+          ownedPlaces: ownedPlaces.join(','),
+          notOwnedPlaces: notOwnedPlaces.join(','),
+          communityId: communityId,
+          owner: userAddress.toLowerCase()
+        })
+        throw new NotAuthorizedError(`The user ${userAddress} doesn't own all the places`)
+      }
+
+      const existingPlaces = await communitiesDb.getCommunityPlaces(communityId, { limit: 1000, offset: 0 })
+
+      for (const place of existingPlaces) {
+        await communitiesDb.removeCommunityPlace(communityId, place.id)
+      }
+
+      const newPlaces = placeIds.map((placeId) => ({
+        id: placeId,
+        communityId,
+        addedBy: userAddress.toLowerCase()
+      }))
+      await communitiesDb.addCommunityPlaces(newPlaces)
     }
   }
 }

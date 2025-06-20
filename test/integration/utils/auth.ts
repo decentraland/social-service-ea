@@ -63,16 +63,23 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
       thumbnailPath,
       thumbnailBuffer,
       placeIds
-    }: { name?: string; description?: string; thumbnailPath?: string; thumbnailBuffer?: Buffer; placeIds?: string[] }
+    }: { 
+      name?: string; 
+      description?: string; 
+      thumbnailPath?: string; 
+      thumbnailBuffer?: Buffer; 
+      placeIds?: string[];
+    },
+    method: string = 'POST'
   ) => {
     const { localHttpFetch } = components
     const form = new FormData()
 
-    if (name) {
+    if (name !== undefined) {
       form.append('name', name)
     }
 
-    if (description) {
+    if (description !== undefined) {
       form.append('description', description)
     }
 
@@ -84,16 +91,16 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
       form.append('thumbnail', thumbnailBuffer, 'thumbnail.png')
     }
 
-    if (placeIds) {
+    if (placeIds !== undefined) {
       form.append('placeIds', JSON.stringify(placeIds))
     }
 
     const headers = {
-      ...createAuthHeaders('POST', path, {}, identity)
+      ...createAuthHeaders(method, path, {}, identity)
     }
 
     return localHttpFetch.fetch(path, {
-      method: 'POST',
+      method,
       headers,
       body: form as any
     })
