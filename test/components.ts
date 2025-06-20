@@ -31,6 +31,7 @@ import { createPeerTrackingComponent } from '../src/adapters/peer-tracking'
 import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-stats'
 import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
 import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
+import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
 import { mockPeersSynchronizer } from './mocks/components'
@@ -142,7 +143,8 @@ async function initComponents(): Promise<TestComponents> {
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, fetcher, logs, config })
+  const placesApi = await createPlacesApiAdapter({ fetcher, config })
+  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
   const community = await createCommunityComponent({
     communitiesDb,
     catalystClient,
@@ -222,6 +224,7 @@ async function initComponents(): Promise<TestComponents> {
     voiceDb,
     worldsStats,
     wsPool,
-    storageHelper
+    storageHelper,
+    placesApi
   }
 }
