@@ -499,6 +499,17 @@ export async function createCommunityComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
+      if (Object.keys(updates).length === 0) {
+        return {
+          id: community.id,
+          name: community.name,
+          description: community.description,
+          ownerAddress: community.ownerAddress,
+          privacy: community.privacy,
+          active: community.active
+        }
+      }
+
       const canEdit = await communityRoles.canEditCommunity(communityId, userAddress)
 
       if (!canEdit) {

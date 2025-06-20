@@ -37,7 +37,7 @@ test('Update Community Controller', async function ({ components, stubComponents
         headers: createHeaders,
         body: createForm as any
       })
-      
+
       const createBody = await createResponse.json()
       communityId = createBody.data.id
     })
@@ -269,4 +269,4 @@ test('Update Community Controller', async function ({ components, stubComponents
       })
     })
   })
-}) 
+})

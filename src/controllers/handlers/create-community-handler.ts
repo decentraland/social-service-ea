@@ -2,15 +2,7 @@ import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { FormHandlerContextWithPath, HTTPResponse } from '../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../utils/errors'
-import fileType from 'file-type'
-
-const parsePlaceIds = (placeIds: string): string[] => {
-  try {
-    return JSON.parse(placeIds)
-  } catch {
-    throw new InvalidRequestError('placeIds must be a valid JSON array')
-  }
-}
+import { validateCommunityFields } from '../../utils/community-validation'
 
 export async function createCommunityHandler(
   context: FormHandlerContextWithPath<'community' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
@@ -25,58 +17,28 @@ export async function createCommunityHandler(
   const address = verification!.auth.toLowerCase()
 
   try {
-    const name: string = formData.fields.name?.value
-    const description: string = formData.fields.description?.value
-
-    const placeIds: string[] = parsePlaceIds(formData.fields.placeIds?.value || '[]')
-
     const thumbnailFile = formData?.files?.['thumbnail']
     const thumbnailBuffer = thumbnailFile?.value
 
-    if (!name || !description) {
-      logger.error('Invalid request body while creating Community', {
-        name,
-        description,
-        thumbnails: thumbnailFile ? 'present' : 'missing',
-        placeIds: placeIds.length
-      })
-
-      throw new InvalidRequestError('Invalid request body')
-    }
-
-    if (!Array.isArray(placeIds)) {
-      logger.error('Invalid placeIds format', { placeIds })
-      throw new InvalidRequestError('placeIds must be an array')
-    }
-
-    if (thumbnailBuffer) {
-      const type = await fileType.fromBuffer(thumbnailBuffer)
-      if (!type || !type.mime.startsWith('image/')) {
-        logger.error('Thumbnail is not a valid image', { owner: address })
-        throw new InvalidRequestError('Thumbnail must be a valid image file')
-      }
-
-      const size = thumbnailBuffer.length
-      if (size < 1024 || size > 500 * 1024) {
-        logger.error('Thumbnail size out of bounds', { size, owner: address })
-        throw new InvalidRequestError('Thumbnail size must be between 1KB and 500KB')
-      }
-    }
+    const { name, description, placeIds } = await validateCommunityFields(formData, thumbnailBuffer, {
+      requireName: true,
+      requireDescription: true
+    })
 
     logger.info('Creating community', {
       owner: address,
-      name,
-      placeIds: placeIds.length
+      name: name!,
+      placeIds: placeIds?.length || 0
     })
 
     const createdCommunity = await community.createCommunity(
       {
-        name,
-        description,
+        name: name!,
+        description: description!,
         ownerAddress: address
       },
       thumbnailBuffer,
-      placeIds
+      placeIds ?? []
     )
 
     logger.info('Community created', {

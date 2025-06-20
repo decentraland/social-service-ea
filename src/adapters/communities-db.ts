@@ -523,22 +523,6 @@ export function createCommunitiesDBComponent(
       communityId: string,
       updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private'>>
     ): Promise<Community> {
-      if (Object.keys(updates).length === 0) {
-        // No fields to update, return current community
-        const community = await this.getCommunity(communityId)
-        if (!community) {
-          throw new Error(`Community with id ${communityId} not found`)
-        }
-        return {
-          id: community.id,
-          name: community.name,
-          description: community.description,
-          ownerAddress: community.ownerAddress,
-          privacy: community.privacy,
-          active: community.active
-        }
-      }
-
       let query = SQL`UPDATE communities SET `
       const setClauses: ReturnType<typeof SQL>[] = []
 
