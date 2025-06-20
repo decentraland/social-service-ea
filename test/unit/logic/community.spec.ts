@@ -32,6 +32,8 @@ import { createMockPeersStatsComponent } from '../../mocks/components'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { createS3ComponentMock } from '../../mocks/components/s3'
 import { CommunityPlace } from '../../../src/logic/community/types'
+import { createPlacesApiAdapterMockComponent } from '../../mocks/components/places-api'
+import { IPlacesApiComponent } from '../../../src/types'
 
 describe('when handling community operations', () => {
   let communityComponent: ICommunityComponent
@@ -42,6 +44,7 @@ describe('when handling community operations', () => {
   let mockMembersCount: number
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   let mockCommunityPlaces: ICommunityPlacesComponent
+  let mockPlacesApi: IPlacesApiComponent
 
   beforeEach(async () => {
     mockPublicCommunity = {
@@ -63,12 +66,12 @@ describe('when handling community operations', () => {
       getConnectedPeers: jest.fn().mockResolvedValue([])
     })
     mockCommunityRoles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
+    mockPlacesApi = createPlacesApiAdapterMockComponent()
     mockCommunityPlaces = await createCommunityPlacesComponent({
       communitiesDb: mockCommunitiesDB,
       communityRoles: mockCommunityRoles,
       logs: mockLogs,
-      fetcher: mockFetcher,
-      config: mockConfig
+      placesApi: mockPlacesApi
     })
     communityComponent = await createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
@@ -1404,23 +1407,6 @@ describe('when handling community operations', () => {
       jest.spyOn(mockCommunityPlaces, 'removePlace')
     })
 
-    it('should create a community with places', async () => {
-      await communityComponent.createCommunity(mockCommunity, mockThumbnail, mockPlaceIds)
-
-      expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
-        ...mockCommunity,
-        owner_address: mockCommunity.ownerAddress,
-        private: false,
-        active: true
-      })
-      expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
-        communityId: 'test-id',
-        memberAddress: mockCommunity.ownerAddress,
-        role: CommunityRole.Owner
-      })
-      expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith('test-id', mockCommunity.ownerAddress, mockPlaceIds)
-    })
-
     it('should create a community without places when no placeIds provided', async () => {
       await communityComponent.createCommunity(mockCommunity, mockThumbnail)
 
@@ -1463,9 +1449,34 @@ describe('when handling community operations', () => {
         config: mockConfig
       })
 
-      await communityComponent.createCommunity(mockCommunity, mockThumbnail, mockPlaceIds)
+      await communityComponent.createCommunity(mockCommunity, mockThumbnail)
 
       expect(mockStorage.storeFile).toHaveBeenCalledWith(mockThumbnail, 'communities/test-id/raw-thumbnail.png')
+    })
+
+    describe('when places are owned by the user', () => {
+      beforeEach(() => {
+        mockPlacesApi.getPlaces = jest.fn().mockResolvedValueOnce(mockPlaceIds.map((id) => ({ id, title: 'Test Place', positions: ['0,0,0'], owner: mockCommunity.ownerAddress })))
+        mockCommunitiesDB.communityExists = jest.fn().mockResolvedValueOnce(true)
+        mockCommunityRoles.canAddPlacesToCommunity = jest.fn().mockResolvedValueOnce(true)
+      })
+
+      it('should create a community with places', async () => {
+        await communityComponent.createCommunity(mockCommunity, mockThumbnail, mockPlaceIds)
+  
+        expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+          ...mockCommunity,
+          owner_address: mockCommunity.ownerAddress,
+          private: false,
+          active: true
+        })
+        expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
+          communityId: 'test-id',
+          memberAddress: mockCommunity.ownerAddress,
+          role: CommunityRole.Owner
+        })
+        expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith('test-id', mockCommunity.ownerAddress, mockPlaceIds)
+      })
     })
   })
 

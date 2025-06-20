@@ -4,18 +4,10 @@ import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
 import { CommunityPlace, ICommunityPlacesComponent } from './types'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
-type PlacesApiResponse = {
-  total?: number
-  ok: boolean
-  data?: { id: string; title: string; positions: string[]; owner: string }[]
-}
-
 export async function createCommunityPlacesComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'communityRoles' | 'fetcher' | 'logs' | 'config'>
+  components: Pick<AppComponents, 'communitiesDb' | 'communityRoles' | 'placesApi' | 'logs'>
 ): Promise<ICommunityPlacesComponent> {
-  const { communitiesDb, communityRoles, fetcher, logs, config } = components
-
-  const PLACES_API_URL = await config.requireString('PLACES_API_URL')
+  const { communitiesDb, communityRoles, placesApi, logs } = components
 
   const logger = logs.getLogger('community-places-component')
 
@@ -77,18 +69,9 @@ export async function createCommunityPlacesComponent(
       placeIds: string[],
       userAddress: EthAddress
     ): Promise<{ ownedPlaces: string[]; notOwnedPlaces: string[]; isValid: boolean }> => {
-      const response = await fetcher.fetch(`${PLACES_API_URL}/api/places`, {
-        method: 'POST',
-        body: JSON.stringify(placeIds)
-      })
+      const places = await placesApi.getPlaces(placeIds)
 
-      if (!response.ok) {
-        throw new Error('Failed to validate ownership')
-      }
-
-      const parsedResponse = (await response.json()) as PlacesApiResponse
-
-      const splitPlacesByOwnership = parsedResponse.data?.reduce(
+      const splitPlacesByOwnership = places?.reduce(
         (acc, place) => {
           if (place.owner?.toLowerCase() === userAddress.toLowerCase()) {
             acc.ownedPlaces.push(place.id)

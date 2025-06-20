@@ -290,3 +290,13 @@ export interface IStorageComponent {
 export interface IStorageHelperComponent {
   removeFile: (key: string) => Promise<void>
 }
+
+export interface IPlacesApiComponent {
+  getPlaces: (placesIds: string[]) => Promise<PlacesApiResponse['data']>
+}
+
+export type PlacesApiResponse = {
+  total?: number
+  ok: boolean
+  data?: { id: string; title: string; positions: string[]; owner: string }[]
+}
