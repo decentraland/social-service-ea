@@ -28,7 +28,7 @@ export async function createCommunityHandler(
     logger.info('Creating community', {
       owner: address,
       name: name!,
-      placeIds: placeIds?.length || 0
+      placeIds: placeIds?.length ? placeIds.join(',') : 'N/A'
     })
 
     const createdCommunity = await community.createCommunity(
