@@ -61,7 +61,6 @@ export function createJobComponent(
       } catch (error) {
         onError(error)
       }
-      logger.info('[Executed]')
       if (!repeat) {
         break
       }
