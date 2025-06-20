@@ -313,7 +313,20 @@ export async function createCommunityComponent(
         active: true
       })
 
-      logger.info('Community created', { communityId: newCommunity.id, name: newCommunity.name })
+      await communitiesDb.addCommunityMember({
+        communityId: newCommunity.id,
+        memberAddress: community.ownerAddress,
+        role: CommunityRole.Owner
+      })
+
+      placeIds.length > 0 && (await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, placeIds))
+
+      logger.info('Community created', {
+        communityId: newCommunity.id,
+        name: newCommunity.name,
+        owner: community.ownerAddress.toLowerCase(),
+        amountOfPlacesAssociated: placeIds.length
+      })
 
       if (thumbnail) {
         const thumbnailUrl = await storage.storeFile(thumbnail, `communities/${newCommunity.id}/raw-thumbnail.png`)
@@ -322,16 +335,6 @@ export async function createCommunityComponent(
         newCommunity.thumbnails = {
           raw: thumbnailUrl
         }
-      }
-
-      await communitiesDb.addCommunityMember({
-        communityId: newCommunity.id,
-        memberAddress: community.ownerAddress,
-        role: CommunityRole.Owner
-      })
-
-      if (placeIds.length > 0) {
-        await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, placeIds)
       }
 
       return newCommunity

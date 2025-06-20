@@ -40,6 +40,7 @@ import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
 import { createCommunityPlacesComponent } from './logic/community'
 import { createJobComponent } from './logic/job'
+import { createPlacesApiAdapter } from './adapters/places-api'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -103,6 +104,8 @@ export async function initComponents(): Promise<AppComponents> {
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const referralDb = await createReferralDBComponent({ pg, logs })
   const referral = await createReferralComponent({ referralDb, logs })
+
+  const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
@@ -136,7 +139,7 @@ export async function initComponents(): Promise<AppComponents> {
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs })
+  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
   const community = await createCommunityComponent({
     communitiesDb,
     catalystClient,
@@ -203,6 +206,7 @@ export async function initComponents(): Promise<AppComponents> {
     voiceDb,
     voice,
     wsPool,
-    worldsStats
+    worldsStats,
+    placesApi
   }
 }
