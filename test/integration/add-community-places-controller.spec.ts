@@ -4,7 +4,7 @@ import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/
 import { mockCommunity } from '../mocks/community'
 import { randomUUID } from 'crypto'
 
-test('Add Community Place Controller', function ({ components, spyComponents }) {
+test('Add Community Place Controller', function ({ components, spyComponents, stubComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when adding places to a community', () => {
@@ -112,6 +112,12 @@ test('Add Community Place Controller', function ({ components, spyComponents }) 
               memberAddress: userAddress,
               role: CommunityRole.Moderator
             })
+            stubComponents.placesApi.getPlaces.resolves(mockPlaceIds.map((placeId) => ({
+              id: placeId,
+              title: placeId,
+              positions: [],
+              owner: userAddress
+            })))
           })
 
           it('should respond with a 204 status code when adding places', async () => {
@@ -141,6 +147,16 @@ test('Add Community Place Controller', function ({ components, spyComponents }) 
               memberAddress: userAddress,
               role: CommunityRole.Owner
             })
+            stubComponents.placesApi.getPlaces.resolves(mockPlaceIds.map((placeId) => ({
+              id: placeId,
+              title: placeId,
+              positions: [],
+              owner: userAddress
+            })))
+          })
+
+          afterEach(() => {
+            stubComponents.placesApi.getPlaces.reset()
           })
 
           it('should respond with a 204 status code when adding places', async () => {

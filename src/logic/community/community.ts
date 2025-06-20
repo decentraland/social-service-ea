@@ -324,7 +324,8 @@ export async function createCommunityComponent(
       logger.info('Community created', {
         communityId: newCommunity.id,
         name: newCommunity.name,
-        owner: community.ownerAddress.toLowerCase()
+        owner: community.ownerAddress.toLowerCase(),
+        amountOfPlacesAssociated: placeIds.length
       })
 
       if (thumbnail) {
