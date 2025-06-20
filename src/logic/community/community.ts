@@ -306,23 +306,6 @@ export async function createCommunityComponent(
         throw new NotAuthorizedError(`The user ${community.ownerAddress} doesn't have any names`)
       }
 
-      if (placeIds.length > 0) {
-        const { ownedPlaces, notOwnedPlaces, isValid } = await communityPlaces.validateOwnership(
-          placeIds,
-          community.ownerAddress
-        )
-
-        if (!isValid) {
-          logger.error('Invalid places ownership', {
-            ownedPlaces: ownedPlaces.join(','),
-            notOwnedPlaces: notOwnedPlaces.join(','),
-            community: community.name,
-            owner: community.ownerAddress.toLowerCase()
-          })
-          throw new NotAuthorizedError(`The user ${community.ownerAddress} doesn't own all the places`)
-        }
-      }
-
       const newCommunity = await communitiesDb.createCommunity({
         ...community,
         owner_address: community.ownerAddress,

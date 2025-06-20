@@ -2,7 +2,7 @@ import { CommunityRole } from '../../../src/types/entities'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockConfig, mockFetcher, mockLogs } from '../../mocks/components'
+import { mockLogs, createPlacesApiAdapterMockComponent } from '../../mocks/components'
 import { createCommunityPlacesComponent } from '../../../src/logic/community/places'
 import {
   ICommunityPlacesComponent,
@@ -10,10 +10,12 @@ import {
   ICommunityRolesComponent,
   createCommunityRolesComponent
 } from '../../../src/logic/community'
+import { IPlacesApiComponent } from '../../../src/types/components'
 
 describe('when handling community places operations', () => {
   let communityPlacesComponent: ICommunityPlacesComponent
   let mockCommunityRoles: ICommunityRolesComponent
+  let mockPlacesApi: IPlacesApiComponent
   let mockUserAddress: string
   const communityId = 'test-community'
   const mockPlaces: CommunityPlace[] = [
@@ -34,12 +36,12 @@ describe('when handling community places operations', () => {
   beforeEach(async () => {
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockCommunityRoles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
+    mockPlacesApi = createPlacesApiAdapterMockComponent()
     communityPlacesComponent = await createCommunityPlacesComponent({
       communitiesDb: mockCommunitiesDB,
       communityRoles: mockCommunityRoles,
       logs: mockLogs,
-      fetcher: mockFetcher,
-      config: mockConfig
+      placesApi: mockPlacesApi
     })
   })
 
@@ -87,12 +89,18 @@ describe('when handling community places operations', () => {
     })
   })
 
-  describe('and adding places to a community', () => {
+  describe('and adding owned places to a community', () => {
     const placeIds = ['place-1', 'place-2']
 
     beforeEach(() => {
       mockCommunitiesDB.communityExists.mockResolvedValue(true)
       mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      mockPlacesApi.getPlaces = jest.fn().mockResolvedValue(mockPlaces.map((place) => ({
+        id: place.id,
+        title: place.id,
+        positions: [],
+        owner: mockUserAddress
+      })))
     })
 
     it('should add places to the community', async () => {

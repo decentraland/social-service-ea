@@ -11,6 +11,37 @@ export async function createCommunityPlacesComponent(
 
   const logger = logs.getLogger('community-places-component')
 
+  const validateOwnership = async (
+    placeIds: string[],
+    userAddress: EthAddress
+  ): Promise<{ ownedPlaces: string[]; notOwnedPlaces: string[]; isValid: boolean }> => {
+    const places = await placesApi.getPlaces(placeIds)
+
+    const splitPlacesByOwnership = places?.reduce(
+      (acc, place) => {
+        if (place.owner?.toLowerCase() === userAddress.toLowerCase()) {
+          acc.ownedPlaces.push(place.id)
+        } else {
+          acc.notOwnedPlaces.push(place.id)
+        }
+        return acc
+      },
+      { ownedPlaces: [] as string[], notOwnedPlaces: [] as string[] }
+    )
+
+    logger.info('Places ownership validation', {
+      ownedPlaces: (splitPlacesByOwnership?.ownedPlaces ?? []).join(','),
+      notOwnedPlaces: (splitPlacesByOwnership?.notOwnedPlaces ?? []).join(','),
+      isValid: splitPlacesByOwnership?.ownedPlaces.length === placeIds.length ? 'true' : 'false'
+    })
+
+    return {
+      ownedPlaces: splitPlacesByOwnership?.ownedPlaces ?? [],
+      notOwnedPlaces: splitPlacesByOwnership?.notOwnedPlaces ?? [],
+      isValid: splitPlacesByOwnership?.ownedPlaces.length === placeIds.length
+    }
+  }
+
   return {
     getPlaces: async (
       communityId: string,
@@ -34,7 +65,18 @@ export async function createCommunityPlacesComponent(
         )
       }
 
-      // TODO: validate that places are owned by the user
+      const { ownedPlaces, notOwnedPlaces, isValid } = await validateOwnership(placeIds, placesOwner)
+
+      if (!isValid) {
+        logger.error('Invalid places ownership', {
+          ownedPlaces: ownedPlaces.join(','),
+          notOwnedPlaces: notOwnedPlaces.join(','),
+          communityId: communityId,
+          owner: placesOwner.toLowerCase()
+        })
+        throw new NotAuthorizedError(`The user ${placesOwner} doesn't own all the places`)
+      }
+
       const places = Array.from(new Set(placeIds)).map((id) => ({
         id,
         communityId,
@@ -63,37 +105,6 @@ export async function createCommunityPlacesComponent(
       }
 
       await communitiesDb.removeCommunityPlace(communityId, placeId)
-    },
-
-    validateOwnership: async (
-      placeIds: string[],
-      userAddress: EthAddress
-    ): Promise<{ ownedPlaces: string[]; notOwnedPlaces: string[]; isValid: boolean }> => {
-      const places = await placesApi.getPlaces(placeIds)
-
-      const splitPlacesByOwnership = places?.reduce(
-        (acc, place) => {
-          if (place.owner?.toLowerCase() === userAddress.toLowerCase()) {
-            acc.ownedPlaces.push(place.id)
-          } else {
-            acc.notOwnedPlaces.push(place.id)
-          }
-          return acc
-        },
-        { ownedPlaces: [] as string[], notOwnedPlaces: [] as string[] }
-      )
-
-      logger.info('Places ownership validation', {
-        ownedPlaces: (splitPlacesByOwnership?.ownedPlaces ?? []).join(','),
-        notOwnedPlaces: (splitPlacesByOwnership?.notOwnedPlaces ?? []).join(','),
-        isValid: splitPlacesByOwnership?.ownedPlaces.length === placeIds.length ? 'true' : 'false'
-      })
-
-      return {
-        ownedPlaces: splitPlacesByOwnership?.ownedPlaces ?? [],
-        notOwnedPlaces: splitPlacesByOwnership?.notOwnedPlaces ?? [],
-        isValid: splitPlacesByOwnership?.ownedPlaces.length === placeIds.length
-      }
     }
   }
 }
