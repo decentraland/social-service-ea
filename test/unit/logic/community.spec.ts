@@ -24,7 +24,7 @@ import {
 import { parseExpectedFriends } from '../../mocks/friend'
 import { MemberCommunity } from '../../../src/logic/community/types'
 import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
-import { mockConfig, mockLogs } from '../../mocks/components'
+import { mockConfig, mockFetcher, mockLogs } from '../../mocks/components'
 import { mapMembersWithProfiles } from '../../../src/logic/community/utils'
 import { Action } from '../../../src/types/entities'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -66,7 +66,9 @@ describe('when handling community operations', () => {
     mockCommunityPlaces = await createCommunityPlacesComponent({
       communitiesDb: mockCommunitiesDB,
       communityRoles: mockCommunityRoles,
-      logs: mockLogs
+      logs: mockLogs,
+      fetcher: mockFetcher,
+      config: mockConfig
     })
     communityComponent = await createCommunityComponent({
       communitiesDb: mockCommunitiesDB,

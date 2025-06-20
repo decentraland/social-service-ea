@@ -330,6 +330,12 @@ export async function createCommunityComponent(
         active: true
       })
 
+      await communitiesDb.addCommunityMember({
+        communityId: newCommunity.id,
+        memberAddress: community.ownerAddress,
+        role: CommunityRole.Owner
+      })
+
       placeIds.length > 0 && (await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, placeIds))
 
       logger.info('Community created', {
@@ -346,12 +352,6 @@ export async function createCommunityComponent(
           raw: thumbnailUrl
         }
       }
-
-      await communitiesDb.addCommunityMember({
-        communityId: newCommunity.id,
-        memberAddress: community.ownerAddress,
-        role: CommunityRole.Owner
-      })
 
       return newCommunity
     },

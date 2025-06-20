@@ -26,7 +26,6 @@ export async function createCommunityPlacesComponent(
     ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
       const places = await communitiesDb.getCommunityPlaces(communityId, pagination)
       const totalPlaces = await communitiesDb.getCommunityPlacesCount(communityId)
-
       return { places, totalPlaces }
     },
 

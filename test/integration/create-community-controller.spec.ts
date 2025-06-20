@@ -104,11 +104,18 @@ test('Create Community Controller', async function ({ components, stubComponents
 
             describe('and the places are owned by the user', () => {
               beforeEach(async () => {
-                stubComponents.communityPlaces.validateOwnership.onFirstCall().resolves({
-                  ownedPlaces: mockPlaceIds,
-                  notOwnedPlaces: [],
-                  isValid: true
-                })
+                stubComponents.fetcher.fetch.onFirstCall().resolves({
+                  ok: true,
+                  status: 200,
+                  json: () => Promise.resolve({
+                    data: mockPlaceIds.map(id => ({
+                      id,
+                      title: 'Test Place',
+                      positions: ['0,0,0'],
+                      owner: identity.realAccount.address.toLowerCase()
+                    }))
+                  })
+                } as any)
               })
 
               it('should create community and add places', async () => {
