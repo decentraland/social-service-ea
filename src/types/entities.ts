@@ -38,6 +38,7 @@ export type BlockUserWithDate = User & {
   blocked_at: Date
 }
 
+// TODO: this is too ambiguous, should we rename it?
 export enum Action {
   REQUEST = 'request', // request a friendship
   CANCEL = 'cancel', // cancel a friendship request

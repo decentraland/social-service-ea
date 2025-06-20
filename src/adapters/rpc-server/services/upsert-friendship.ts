@@ -10,7 +10,7 @@ import {
   parseFriendshipRequestToFriendshipRequestResponse
 } from '../../../logic/friendships'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
-import { sendNotification, shouldNotify } from '../../../logic/notifications'
+import { sendNotification, shouldNotifyAction } from '../../../logic/notifications'
 import { getProfileUserId } from '../../../logic/profiles'
 
 export function upsertFriendshipService({
@@ -140,7 +140,7 @@ export function upsertFriendshipService({
       }
 
       setImmediate(async () => {
-        if (shouldNotify(parsedRequest.action)) {
+        if (shouldNotifyAction(parsedRequest.action)) {
           await sendNotification(
             parsedRequest.action,
             {
