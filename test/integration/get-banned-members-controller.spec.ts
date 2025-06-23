@@ -89,7 +89,7 @@ test('Get Banned Members Controller', function ({ components, spyComponents }) {
         expect(response.status).toBe(401)
         expect(await response.json()).toEqual({
           error: 'Not Authorized',
-          message: "The user doesn't have permission to get banned members"
+          message: `The user ${addressMakingRequest} doesn't have permission to get banned members from the community`
         })
       })
     })
@@ -112,7 +112,7 @@ test('Get Banned Members Controller', function ({ components, spyComponents }) {
         expect(response.status).toBe(401)
         expect(await response.json()).toEqual({
           error: 'Not Authorized',
-          message: "The user doesn't have permission to get banned members"
+          message: `The user ${addressMakingRequest} doesn't have permission to get banned members from the community`
         })
       })
     })

@@ -385,7 +385,9 @@ test('Get Community Members Controller', function ({ components, spyComponents }
 
       describe('and the request fails', () => {
         beforeEach(() => {
-          spyComponents.community.getCommunityMembers.mockRejectedValue(new Error('Unable to get community members'))
+          spyComponents.communityMembers.getCommunityMembers.mockRejectedValue(
+            new Error('Unable to get community members')
+          )
         })
 
         it('should return a 500 status code', async () => {
