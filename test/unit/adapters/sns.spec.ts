@@ -1,7 +1,13 @@
 import { PublishCommand, PublishCommandOutput, SNSClient } from '@aws-sdk/client-sns'
 import { createSnsComponent } from '../../../src/adapters/sns'
 import { mockConfig } from '../../mocks/components'
-import { Events, FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
+import {
+  Events,
+  FriendshipAcceptedEvent,
+  FriendshipRequestEvent,
+  ReferralInvitedUsersAcceptedEvent,
+  ReferralNewTierReachedEvent
+} from '@dcl/schemas'
 
 jest.mock('@aws-sdk/client-sns', () => ({
   ...jest.requireActual('@aws-sdk/client-sns'),
@@ -58,6 +64,42 @@ describe('SNS Component', () => {
     }
   }
 
+  const mockReferralInvitedUsersAcceptedEvent: ReferralInvitedUsersAcceptedEvent = {
+    type: Events.Type.REFERRAL,
+    subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED,
+    key: `${Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED}-0x123-0x456-${Date.now()}`,
+    timestamp: Date.now(),
+    metadata: {
+      address: '0x123',
+      title: 'Referral Completed!',
+      description: `Your friend jumped into Decentraland, so you're closer to unlocking your next reward!`,
+      tier: 1,
+      url: `https://decentraland.org/profile/accounts/0x123/referral`,
+      image: 'https://assets-cdn.decentraland.org/referral/referral-invited-user-accepted-icon.png',
+      invitedUserAddress: '0x456',
+      invitedUsers: 5,
+      rarity: null
+    }
+  }
+
+  const mockReferralNewTierReachedEvent: ReferralNewTierReachedEvent = {
+    type: Events.Type.REFERRAL,
+    subType: Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED,
+    key: `${Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED}-0x123-0x456-${Date.now()}`,
+    timestamp: Date.now(),
+    metadata: {
+      address: '0x123',
+      title: 'Referral Reward Unlocked!',
+      description: `Check the 'Referral Rewards' tab in your web profile to see your prize!`,
+      tier: 1,
+      url: `https://decentraland.org/profile/accounts/0x123/referral`,
+      image: 'https://assets-cdn.decentraland.org/referral/referral-new-tier-reached-icon.png',
+      invitedUserAddress: '0x456',
+      invitedUsers: 5,
+      rarity: 'common'
+    }
+  }
+
   beforeEach(() => {
     mockClient = new SNSClient({}) as jest.Mocked<SNSClient>
   })
@@ -90,7 +132,9 @@ describe('SNS Component', () => {
   describe('publishMessage', () => {
     it.each([
       ['friendship request', mockRequestEvent],
-      ['friendship accepted', mockAcceptedEvent]
+      ['friendship accepted', mockAcceptedEvent],
+      ['referral invited users accepted', mockReferralInvitedUsersAcceptedEvent],
+      ['referral new tier reached', mockReferralNewTierReachedEvent]
     ])('should publish %s events', async (_, event) => {
       mockConfig.requireString.mockResolvedValueOnce('arn:aws:sns:region:account:topic')
       mockConfig.getString.mockResolvedValueOnce(undefined)
