@@ -1,6 +1,11 @@
 import { PublishCommand, PublishCommandOutput, SNSClient } from '@aws-sdk/client-sns'
 import { AppComponents, IPublisherComponent } from '../types'
-import { FriendshipAcceptedEvent, FriendshipRequestEvent } from '@dcl/schemas'
+import {
+  FriendshipAcceptedEvent,
+  FriendshipRequestEvent,
+  ReferralInvitedUsersAcceptedEvent,
+  ReferralNewTierReachedEvent
+} from '@dcl/schemas'
 
 export async function createSnsComponent({ config }: Pick<AppComponents, 'config'>): Promise<IPublisherComponent> {
   const snsArn = await config.requireString('AWS_SNS_ARN')
@@ -11,7 +16,11 @@ export async function createSnsComponent({ config }: Pick<AppComponents, 'config
   })
 
   async function publishMessage(
-    event: FriendshipRequestEvent | FriendshipAcceptedEvent
+    event:
+      | FriendshipRequestEvent
+      | FriendshipAcceptedEvent
+      | ReferralNewTierReachedEvent
+      | ReferralInvitedUsersAcceptedEvent
   ): Promise<PublishCommandOutput> {
     const command = new PublishCommand({
       TopicArn: snsArn,

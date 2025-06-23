@@ -1,5 +1,6 @@
 import { ReferralProgress, ReferralProgressStatus } from '../../types/referral-db.type'
 import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
+import { ChainId, Rarity } from '@dcl/schemas'
 
 export interface IReferralComponent {
   create(referralInput: CreateReferralWithInvitedUser): Promise<ReferralProgress>
@@ -11,4 +12,30 @@ export interface IReferralComponent {
   getInvitedUsersAcceptedStats(
     referrer: string
   ): Promise<{ invitedUsersAccepted: number; invitedUsersAcceptedViewed: number }>
+}
+
+export enum RewardStatus {
+  unassigned = 'unassigned',
+
+  // assigned and waiting for a confirmation (example: blockchain confirmation)
+  pending = 'pending',
+
+  assigned = 'assigned',
+  sending = 'sending',
+  success = 'success',
+  rejected = 'rejected',
+  confirmed = 'confirmed'
+}
+
+export type RewardAttributes = {
+  id: string
+  user: string | null
+  status: RewardStatus
+  chain_id: ChainId | 0
+  target: string
+  value: string
+  token: string
+  image: string
+
+  rarity: Rarity | null
 }

@@ -1,5 +1,5 @@
 import { ReferralProgressStatus } from '../../types/referral-db.type'
-import { EthAddress } from '@dcl/schemas'
+import { EthAddress, Events, ReferralInvitedUsersAcceptedEvent, ReferralNewTierReachedEvent } from '@dcl/schemas'
 import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 import {
   ReferralNotFoundError,
@@ -8,8 +8,10 @@ import {
   ReferralInvalidStatusError,
   SelfReferralError
 } from './errors'
-import type { IReferralComponent } from './types'
+import type { IReferralComponent, RewardAttributes } from './types'
 import type { AppComponents } from '../../types/system'
+
+const TIERS = [5, 10, 20, 25, 30, 50, 60, 75, 100]
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -18,10 +20,59 @@ function validateAddress(value: string, field: string): string {
   return value.toLowerCase()
 }
 
+function createReferralInvitedUsersAcceptedEvent(
+  referrer: string,
+  invitedUser: string,
+  totalInvitedUsers: number
+): ReferralInvitedUsersAcceptedEvent {
+  return {
+    type: Events.Type.REFERRAL,
+    subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED,
+    key: `${Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED}-${referrer}-${invitedUser}-${Date.now()}`,
+    timestamp: Date.now(),
+    metadata: {
+      address: referrer,
+      title: 'Referral Completed!',
+      description: `Your friend jumped into Decentraland, so you're closer to unlocking your next reward!`,
+      tier: TIERS.findIndex((tier) => totalInvitedUsers <= tier) + 1,
+      url: `https://decentraland.org/profile/accounts/${referrer}/referral`,
+      image: 'https://assets-cdn.decentraland.org/referral/referral-invited-user-accepted-icon.png',
+      invitedUserAddress: invitedUser,
+      invitedUsers: totalInvitedUsers,
+      rarity: null
+    }
+  }
+}
+
+function createReferralNewTierReachedEvent(
+  referrer: string,
+  invitedUser: string,
+  totalInvitedUsers: number,
+  reward: RewardAttributes
+): ReferralNewTierReachedEvent {
+  return {
+    type: Events.Type.REFERRAL,
+    subType: Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED,
+    key: `${Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED}-${referrer}-${invitedUser}-${Date.now()}`,
+    timestamp: Date.now(),
+    metadata: {
+      address: referrer,
+      title: 'Referral Reward Unlocked!',
+      description: `Check the 'Referral Rewards' tab in your web profile to see your prize!`,
+      tier: TIERS.findIndex((tier) => totalInvitedUsers <= tier) + 1,
+      url: `https://decentraland.org/profile/accounts/${referrer}/referral`,
+      image: 'https://assets-cdn.decentraland.org/referral/referral-new-tier-reached-icon.png',
+      invitedUserAddress: invitedUser,
+      invitedUsers: totalInvitedUsers,
+      rarity: reward.rarity
+    }
+  }
+}
+
 export async function createReferralComponent(
-  components: Pick<AppComponents, 'referralDb' | 'logs'>
+  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns'>
 ): Promise<IReferralComponent> {
-  const { referralDb, logs } = components
+  const { referralDb, logs, sns } = components
 
   const logger = logs.getLogger('referral-component')
 
@@ -88,7 +139,7 @@ export async function createReferralComponent(
         return
       }
 
-      const currentStatus = progress[0].status
+      const { status: currentStatus, referrer } = progress[0]
 
       logger.info('Finalizing referral', {
         invitedUser,
@@ -97,6 +148,17 @@ export async function createReferralComponent(
       })
 
       await referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+
+      const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
+
+      const event = createReferralInvitedUsersAcceptedEvent(referrer, invitedUser, acceptedInvites)
+      await sns.publishMessage(event)
+
+      if (TIERS.includes(acceptedInvites)) {
+        // TODO: send notification to referrer getting the information from the reward server
+        /* const event = createReferralNewTierReachedEvent(referrer, invitedUser, acceptedInvites, reward)
+        await sns.publishMessage(event) */
+      }
 
       logger.info('Referral finalized successfully', {
         invitedUser,
