@@ -10,11 +10,10 @@ import {
   CommunityWithMembersCount,
   MemberCommunity,
   Community,
-  CommunityPlace,
   CommunityUpdates
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
-import { EthAddress, PaginatedParameters } from '@dcl/schemas'
+import { EthAddress } from '@dcl/schemas'
 
 export async function createCommunityComponent(
   components: Pick<
@@ -199,39 +198,6 @@ export async function createCommunityComponent(
       }
 
       await communitiesDb.deleteCommunity(id)
-    },
-
-    // TODO: move to places component
-    getCommunityPlaces: async (
-      communityId: string,
-      options: {
-        userAddress?: EthAddress
-        pagination: PaginatedParameters
-      }
-    ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
-      const communityExists = await communitiesDb.communityExists(communityId, { onlyPublic: !options.userAddress })
-
-      if (!communityExists) {
-        throw new CommunityNotFoundError(communityId)
-      }
-
-      const community = await communitiesDb.getCommunity(communityId)
-      if (!community) {
-        throw new CommunityNotFoundError(communityId)
-      }
-
-      const memberRole =
-        community.privacy === 'private' && options.userAddress
-          ? await communitiesDb.getCommunityMemberRole(communityId, options.userAddress)
-          : CommunityRole.None
-
-      if (community.privacy === 'private' && options.userAddress && memberRole === CommunityRole.None) {
-        throw new NotAuthorizedError(
-          `The user ${options.userAddress} doesn't have permission to get places from community ${communityId}`
-        )
-      }
-
-      return communityPlaces.getPlaces(communityId, options.pagination)
     },
 
     updateCommunity: async (

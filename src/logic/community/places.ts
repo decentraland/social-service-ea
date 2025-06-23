@@ -1,5 +1,5 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
-import { AppComponents } from '../../types'
+import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
 import { CommunityPlace, ICommunityPlacesComponent } from './types'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
@@ -80,10 +80,36 @@ export async function createCommunityPlacesComponent(
   return {
     getPlaces: async (
       communityId: string,
-      pagination: PaginatedParameters
+      options: {
+        userAddress?: EthAddress
+        pagination: PaginatedParameters
+      }
     ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
-      const places = await communitiesDb.getCommunityPlaces(communityId, pagination)
+      const communityExists = await communitiesDb.communityExists(communityId, { onlyPublic: !options.userAddress })
+
+      if (!communityExists) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const community = await communitiesDb.getCommunity(communityId)
+      if (!community) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const memberRole =
+        community.privacy === 'private' && options.userAddress
+          ? await communitiesDb.getCommunityMemberRole(communityId, options.userAddress)
+          : CommunityRole.None
+
+      if (community.privacy === 'private' && options.userAddress && memberRole === CommunityRole.None) {
+        throw new NotAuthorizedError(
+          `The user ${options.userAddress} doesn't have permission to get places from community ${communityId}`
+        )
+      }
+
+      const places = await communitiesDb.getCommunityPlaces(communityId, options.pagination)
       const totalPlaces = await communitiesDb.getCommunityPlacesCount(communityId)
+
       return { places, totalPlaces }
     },
 

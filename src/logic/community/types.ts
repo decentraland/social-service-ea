@@ -25,13 +25,6 @@ export interface ICommunitiesComponent {
   ): Promise<Community>
   updateCommunity(communityId: string, userAddress: EthAddress, updates: CommunityUpdates): Promise<Community>
   deleteCommunity(id: string, userAddress: string): Promise<void>
-  getCommunityPlaces(
-    communityId: string,
-    options: {
-      userAddress?: EthAddress
-      pagination: PaginatedParameters
-    }
-  ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> // TODO: move to places component
 }
 
 export interface ICommunityMembersComponent {
@@ -89,7 +82,10 @@ export type ICommunityRolesComponent = {
 export interface ICommunityPlacesComponent {
   getPlaces(
     communityId: string,
-    pagination: PaginatedParameters
+    options: {
+      userAddress?: EthAddress
+      pagination: PaginatedParameters
+    }
   ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
   validateAndAddPlaces(communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void>
   addPlaces(communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void>

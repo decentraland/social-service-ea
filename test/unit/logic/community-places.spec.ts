@@ -46,50 +46,200 @@ describe('Community Places Component', () => {
     })
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   describe('getPlaces', () => {
-    beforeEach(() => {
-      mockCommunitiesDB.getCommunityPlaces.mockResolvedValueOnce(mockPlaces.map((place) => ({ id: place.id })))
-      mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValueOnce(2)
+    const userAddress = '0x1234567890123456789012345678901234567890'
+    const options = { userAddress, pagination: { limit: 10, offset: 0 } }
+    const mockPlaces = [{ id: 'place-1' }, { id: 'place-2' }]
+
+    describe('when all validations pass for public community', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: 'public',
+          active: true,
+          role: CommunityRole.Member
+        })
+        mockCommunitiesDB.getCommunityPlaces.mockResolvedValue(mockPlaces)
+        mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(2)
+      })
+
+      it('should return community places', async () => {
+        const result = await communityPlacesComponent.getPlaces(communityId, options)
+
+        expect(result).toEqual({
+          places: mockPlaces,
+          totalPlaces: 2
+        })
+
+        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId, { onlyPublic: false })
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, options.pagination)
+        expect(mockCommunitiesDB.getCommunityPlacesCount).toHaveBeenCalledWith(communityId)
+      })
     })
 
-    it('should return places with total count', async () => {
-      const result = await communityPlacesComponent.getPlaces(communityId, {
-        limit: 10,
-        offset: 0
+    describe('when all validations pass for private community with member access', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: 'private',
+          active: true,
+          role: CommunityRole.Member
+        })
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+        mockCommunitiesDB.getCommunityPlaces.mockResolvedValue(mockPlaces)
+        mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(2)
       })
 
-      expect(result).toEqual({
-        places: mockPlaces.map((place) => ({ id: place.id })),
-        totalPlaces: 2
+      it('should return community places', async () => {
+        const result = await communityPlacesComponent.getPlaces(communityId, options)
+
+        expect(result).toEqual({
+          places: mockPlaces,
+          totalPlaces: 2
+        })
+
+        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId, { onlyPublic: false })
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
+        expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, options.pagination)
+        expect(mockCommunitiesDB.getCommunityPlacesCount).toHaveBeenCalledWith(communityId)
       })
     })
 
-    it('should fetch places and total count from the database', async () => {
-      await communityPlacesComponent.getPlaces(communityId, {
-        limit: 10,
-        offset: 0
+    describe('when the community does not exist', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(false)
       })
 
-      expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, {
-        limit: 10,
-        offset: 0
+      it('should throw CommunityNotFoundError', async () => {
+        await expect(communityPlacesComponent.getPlaces(communityId, options)).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId, { onlyPublic: false })
+        expect(mockCommunitiesDB.getCommunity).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.getCommunityPlaces).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.getCommunityPlacesCount).not.toHaveBeenCalled()
       })
-      expect(mockCommunitiesDB.getCommunityPlacesCount).toHaveBeenCalledWith(communityId)
     })
 
-    it('should handle pagination correctly', async () => {
-      await communityPlacesComponent.getPlaces(communityId, {
-        limit: 1,
-        offset: 1
+    describe('when the community exists but getCommunity returns null', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
       })
 
-      expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, {
-        limit: 1,
-        offset: 1
+      it('should throw CommunityNotFoundError', async () => {
+        await expect(communityPlacesComponent.getPlaces(communityId, options)).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId, { onlyPublic: false })
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunityMemberRole).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.getCommunityPlaces).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.getCommunityPlacesCount).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when the community is private and user is not a member', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: 'private',
+          active: true,
+          role: CommunityRole.None
+        })
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      })
+
+      it('should throw NotAuthorizedError', async () => {
+        await expect(communityPlacesComponent.getPlaces(communityId, options)).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${userAddress} doesn't have permission to get places from community ${communityId}`
+          )
+        )
+
+        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId, { onlyPublic: false })
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
+        expect(mockCommunitiesDB.getCommunityPlaces).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.getCommunityPlacesCount).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when called without user address (public access)', () => {
+      const publicOptions = { pagination: { limit: 10, offset: 0 } }
+
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: 'public',
+          active: true,
+          role: CommunityRole.Member
+        })
+        mockCommunitiesDB.getCommunityPlaces.mockResolvedValue(mockPlaces)
+        mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(2)
+      })
+
+      it('should return community places for public community', async () => {
+        const result = await communityPlacesComponent.getPlaces(communityId, publicOptions)
+
+        expect(result).toEqual({
+          places: mockPlaces,
+          totalPlaces: 2
+        })
+
+        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId, { onlyPublic: true })
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, publicOptions.pagination)
+        expect(mockCommunitiesDB.getCommunityPlacesCount).toHaveBeenCalledWith(communityId)
+      })
+    })
+
+    describe('when called with pagination parameters', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: 'public',
+          active: true,
+          role: CommunityRole.Member
+        })
+        mockCommunitiesDB.getCommunityPlaces.mockResolvedValue([{ id: 'place-1' }])
+        mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(1)
+      })
+
+      it('should handle pagination correctly', async () => {
+        const paginationOptions = { userAddress, pagination: { limit: 1, offset: 1 } }
+
+        await communityPlacesComponent.getPlaces(communityId, paginationOptions)
+
+        expect(mockCommunitiesDB.getCommunityPlaces).toHaveBeenCalledWith(communityId, {
+          limit: 1,
+          offset: 1
+        })
+        expect(mockCommunitiesDB.getCommunityPlacesCount).toHaveBeenCalledWith(communityId)
       })
     })
   })
