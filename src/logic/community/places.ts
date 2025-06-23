@@ -15,7 +15,8 @@ export async function createCommunityPlacesComponent(
     placeIds: string[],
     userAddress: EthAddress
   ): Promise<{ ownedPlaces: string[]; notOwnedPlaces: string[]; isValid: boolean }> => {
-    const places = await placesApi.getPlaces(placeIds)
+    const uniquePlaceIds = Array.from(new Set(placeIds))
+    const places = await placesApi.getPlaces(uniquePlaceIds)
 
     const splitPlacesByOwnership = places?.reduce(
       (acc, place) => {
@@ -31,7 +32,7 @@ export async function createCommunityPlacesComponent(
 
     const ownedPlaces = splitPlacesByOwnership?.ownedPlaces ?? []
     const notOwnedPlaces = splitPlacesByOwnership?.notOwnedPlaces ?? []
-    const isValid = ownedPlaces.length === placeIds.length
+    const isValid = ownedPlaces.length === uniquePlaceIds.length
 
     logger.info('Places ownership validation', {
       owner: userAddress.toLowerCase(),

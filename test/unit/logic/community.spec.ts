@@ -66,7 +66,7 @@ describe('when handling community operations', () => {
       getConnectedPeers: jest.fn().mockResolvedValue([])
     })
     mockCommunityRoles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
-    mockPlacesApi = createPlacesApiAdapterMockComponent()
+    mockPlacesApi = createPlacesApiAdapterMockComponent({})
     mockCommunityPlaces = await createCommunityPlacesComponent({
       communitiesDb: mockCommunitiesDB,
       communityRoles: mockCommunityRoles,
@@ -1456,14 +1456,20 @@ describe('when handling community operations', () => {
 
     describe('when places are owned by the user', () => {
       beforeEach(() => {
-        mockPlacesApi.getPlaces = jest.fn().mockResolvedValueOnce(mockPlaceIds.map((id) => ({ id, title: 'Test Place', positions: ['0,0,0'], owner: mockCommunity.ownerAddress })))
+        mockPlacesApi.getPlaces = jest.fn().mockResolvedValueOnce(
+          mockPlaceIds.map((id) => ({
+            id,
+            title: 'Test Place',
+            positions: ['0,0,0'],
+            owner: mockCommunity.ownerAddress
+          }))
+        )
         mockCommunitiesDB.communityExists = jest.fn().mockResolvedValueOnce(true)
-        mockCommunityRoles.canAddPlacesToCommunity = jest.fn().mockResolvedValueOnce(true)
       })
 
       it('should create a community with places', async () => {
         await communityComponent.createCommunity(mockCommunity, mockThumbnail, mockPlaceIds)
-  
+
         expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
           ...mockCommunity,
           owner_address: mockCommunity.ownerAddress,

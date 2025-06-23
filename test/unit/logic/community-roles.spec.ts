@@ -3,66 +3,10 @@ import { createCommunityRolesComponent, ROLE_ACTION_TRANSITIONS } from '../../..
 import { OWNER_PERMISSIONS, MODERATOR_PERMISSIONS, COMMUNITY_ROLES } from '../../../src/logic/community/roles'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs } from '../../mocks/components/logs'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 
 describe('Community Roles Component', () => {
   const roles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
-
-  describe('hasPermission', () => {
-    describe('when checking permissions for owner role', () => {
-      it.each(OWNER_PERMISSIONS)('should grant %s permission to owner', (permission) => {
-        expect(roles.hasPermission(CommunityRole.Owner, permission)).toBe(true)
-      })
-    })
-
-    describe('when checking permissions for moderator role', () => {
-      it.each(MODERATOR_PERMISSIONS)('should grant %s permission to moderator', (permission) => {
-        expect(roles.hasPermission(CommunityRole.Moderator, permission)).toBe(true)
-      })
-
-      it.each(OWNER_PERMISSIONS.filter((p) => !MODERATOR_PERMISSIONS.includes(p)))(
-        'should deny %s permission to moderator as it is owner-only',
-        (permission) => {
-          expect(roles.hasPermission(CommunityRole.Moderator, permission)).toBe(false)
-        }
-      )
-    })
-
-    describe('when checking permissions for member role', () => {
-      it.each([...OWNER_PERMISSIONS, ...MODERATOR_PERMISSIONS])(
-        'should deny %s permission to member as it requires elevated privileges',
-        (permission) => {
-          expect(roles.hasPermission(CommunityRole.Member, permission)).toBe(false)
-        }
-      )
-    })
-
-    describe('when checking permissions for none role', () => {
-      it.each([...OWNER_PERMISSIONS, ...MODERATOR_PERMISSIONS])(
-        'should deny %s permission to none role as it requires any role',
-        (permission) => {
-          expect(roles.hasPermission(CommunityRole.None, permission)).toBe(false)
-        }
-      )
-    })
-  })
-
-  describe('getRolePermissions', () => {
-    describe('when getting permissions for defined roles', () => {
-      it.each(Object.entries(COMMUNITY_ROLES))(
-        'should return the correct set of permissions for %s role',
-        (role, permissions) => {
-          expect(roles.getRolePermissions(role as CommunityRole)).toEqual(permissions)
-        }
-      )
-    })
-
-    describe('when getting permissions for undefined role', () => {
-      it('should return an empty array for unknown role', () => {
-        const permissions = roles.getRolePermissions('unknown' as CommunityRole)
-        expect(permissions).toEqual([])
-      })
-    })
-  })
 
   describe('ROLE_ACTION_TRANSITIONS', () => {
     it('should define correct transitions for each role', () => {
@@ -73,11 +17,11 @@ describe('Community Roles Component', () => {
     })
   })
 
-  describe('canKickMemberFromCommunity', () => {
+  describe('validatePermissionToKickMemberFromCommunity', () => {
     const communityId = 'test-community'
-    const ownerAddress = '0xowner'
-    const moderatorAddress = '0xmoderator'
-    const memberAddress = '0xmember'
+    const ownerAddress = '0xOwner'
+    const moderatorAddress = '0xModerator'
+    const memberAddress = '0xMember'
 
     describe('when checking if owner can kick', () => {
       it('should allow owner to kick a member', async () => {
@@ -85,8 +29,9 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           [memberAddress]: CommunityRole.Member
         })
-        const result = await roles.canKickMemberFromCommunity(communityId, ownerAddress, memberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, ownerAddress, memberAddress)
+        ).resolves.not.toThrow()
       })
 
       it('should allow owner to kick a moderator', async () => {
@@ -94,8 +39,9 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           [moderatorAddress]: CommunityRole.Moderator
         })
-        const result = await roles.canKickMemberFromCommunity(communityId, ownerAddress, moderatorAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, ownerAddress, moderatorAddress)
+        ).resolves.not.toThrow()
       })
 
       it('should not allow owner to kick another owner', async () => {
@@ -103,8 +49,13 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           ['0xother-owner']: CommunityRole.Owner
         })
-        const result = await roles.canKickMemberFromCommunity(communityId, ownerAddress, '0xother-owner')
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, ownerAddress, '0xother-owner')
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${ownerAddress} doesn't have permission to kick 0xother-owner from community ${communityId}`
+          )
+        )
       })
     })
 
@@ -114,8 +65,9 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           [memberAddress]: CommunityRole.Member
         })
-        const result = await roles.canKickMemberFromCommunity(communityId, moderatorAddress, memberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, moderatorAddress, memberAddress)
+        ).resolves.not.toThrow()
       })
 
       it('should not allow moderator to kick another moderator', async () => {
@@ -123,8 +75,13 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           ['0xother-moderator']: CommunityRole.Moderator
         })
-        const result = await roles.canKickMemberFromCommunity(communityId, moderatorAddress, '0xother-moderator')
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, moderatorAddress, '0xother-moderator')
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${moderatorAddress} doesn't have permission to kick 0xother-moderator from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow moderator to kick an owner', async () => {
@@ -132,8 +89,13 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           [ownerAddress]: CommunityRole.Owner
         })
-        const result = await roles.canKickMemberFromCommunity(communityId, moderatorAddress, ownerAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, moderatorAddress, ownerAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${moderatorAddress} doesn't have permission to kick ${ownerAddress} from community ${communityId}`
+          )
+        )
       })
     })
 
@@ -143,8 +105,13 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           ['0xother-member']: CommunityRole.Member
         })
-        const result = await roles.canKickMemberFromCommunity(communityId, memberAddress, '0xother-member')
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, memberAddress, '0xother-member')
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to kick 0xother-member from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow member to kick a moderator', async () => {
@@ -152,8 +119,13 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           [moderatorAddress]: CommunityRole.Moderator
         })
-        const result = await roles.canKickMemberFromCommunity(communityId, memberAddress, moderatorAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, memberAddress, moderatorAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to kick ${moderatorAddress} from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow member to kick an owner', async () => {
@@ -161,13 +133,18 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           [ownerAddress]: CommunityRole.Owner
         })
-        const result = await roles.canKickMemberFromCommunity(communityId, memberAddress, ownerAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, memberAddress, ownerAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to kick ${ownerAddress} from community ${communityId}`
+          )
+        )
       })
     })
   })
 
-  describe('canBanMemberFromCommunity', () => {
+  describe('validatePermissionToBanMemberFromCommunity', () => {
     const communityId = 'test-community'
     const ownerAddress = '0xowner'
     const moderatorAddress = '0xmoderator'
@@ -180,8 +157,9 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           [memberAddress]: CommunityRole.Member
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, ownerAddress, memberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, ownerAddress, memberAddress)
+        ).resolves.not.toThrow()
       })
 
       it('should allow owner to ban a moderator', async () => {
@@ -189,8 +167,9 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           [moderatorAddress]: CommunityRole.Moderator
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, ownerAddress, moderatorAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, ownerAddress, moderatorAddress)
+        ).resolves.not.toThrow()
       })
 
       it('should not allow owner to ban another owner', async () => {
@@ -198,8 +177,13 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           ['0xother-owner']: CommunityRole.Owner
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, ownerAddress, '0xother-owner')
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, ownerAddress, '0xother-owner')
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${ownerAddress} doesn't have permission to ban 0xother-owner from community ${communityId}`
+          )
+        )
       })
 
       it('should allow owner to ban a non-member', async () => {
@@ -207,8 +191,9 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           [nonMemberAddress]: CommunityRole.None
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, ownerAddress, nonMemberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, ownerAddress, nonMemberAddress)
+        ).resolves.not.toThrow()
       })
     })
 
@@ -218,8 +203,9 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           [memberAddress]: CommunityRole.Member
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, moderatorAddress, memberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, moderatorAddress, memberAddress)
+        ).resolves.not.toThrow()
       })
 
       it('should not allow moderator to ban another moderator', async () => {
@@ -227,8 +213,13 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           ['0xother-moderator']: CommunityRole.Moderator
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, moderatorAddress, '0xother-moderator')
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, moderatorAddress, '0xother-moderator')
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${moderatorAddress} doesn't have permission to ban 0xother-moderator from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow moderator to ban an owner', async () => {
@@ -236,8 +227,13 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           [ownerAddress]: CommunityRole.Owner
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, moderatorAddress, ownerAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, moderatorAddress, ownerAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${moderatorAddress} doesn't have permission to ban ${ownerAddress} from community ${communityId}`
+          )
+        )
       })
 
       it('should allow moderator to ban a non-member', async () => {
@@ -245,8 +241,9 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           [nonMemberAddress]: CommunityRole.None
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, moderatorAddress, nonMemberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, moderatorAddress, nonMemberAddress)
+        ).resolves.not.toThrow()
       })
     })
 
@@ -256,8 +253,13 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           ['0xother-member']: CommunityRole.Member
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, memberAddress, '0xother-member')
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, memberAddress, '0xother-member')
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to ban 0xother-member from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow member to ban a moderator', async () => {
@@ -265,8 +267,13 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           [moderatorAddress]: CommunityRole.Moderator
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, memberAddress, moderatorAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, memberAddress, moderatorAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to ban ${moderatorAddress} from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow member to ban an owner', async () => {
@@ -274,8 +281,13 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           [ownerAddress]: CommunityRole.Owner
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, memberAddress, ownerAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, memberAddress, ownerAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to ban ${ownerAddress} from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow member to ban a non-member', async () => {
@@ -283,13 +295,18 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           [nonMemberAddress]: CommunityRole.None
         })
-        const result = await roles.canBanMemberFromCommunity(communityId, memberAddress, nonMemberAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToBanMemberFromCommunity(communityId, memberAddress, nonMemberAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to ban ${nonMemberAddress} from community ${communityId}`
+          )
+        )
       })
     })
   })
 
-  describe('canUnbanMemberFromCommunity', () => {
+  describe('validatePermissionToUnbanMemberFromCommunity', () => {
     const communityId = 'test-community'
     const ownerAddress = '0xowner'
     const moderatorAddress = '0xmoderator'
@@ -302,8 +319,9 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           [memberAddress]: CommunityRole.Member
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, ownerAddress, memberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, ownerAddress, memberAddress)
+        ).resolves.not.toThrow()
       })
 
       it('should allow owner to unban a moderator', async () => {
@@ -311,8 +329,9 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           [moderatorAddress]: CommunityRole.Moderator
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, ownerAddress, moderatorAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, ownerAddress, moderatorAddress)
+        ).resolves.not.toThrow()
       })
 
       it('should not allow owner to unban another owner', async () => {
@@ -320,8 +339,13 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           ['0xother-owner']: CommunityRole.Owner
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, ownerAddress, '0xother-owner')
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, ownerAddress, '0xother-owner')
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${ownerAddress} doesn't have permission to unban 0xother-owner from community ${communityId}`
+          )
+        )
       })
 
       it('should allow owner to unban a non-member', async () => {
@@ -329,8 +353,9 @@ describe('Community Roles Component', () => {
           [ownerAddress]: CommunityRole.Owner,
           [nonMemberAddress]: CommunityRole.None
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, ownerAddress, nonMemberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, ownerAddress, nonMemberAddress)
+        ).resolves.not.toThrow()
       })
     })
 
@@ -340,8 +365,9 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           [memberAddress]: CommunityRole.Member
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, moderatorAddress, memberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, moderatorAddress, memberAddress)
+        ).resolves.not.toThrow()
       })
 
       it('should not allow moderator to unban another moderator', async () => {
@@ -349,8 +375,13 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           ['0xother-moderator']: CommunityRole.Moderator
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, moderatorAddress, '0xother-moderator')
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, moderatorAddress, '0xother-moderator')
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${moderatorAddress} doesn't have permission to unban 0xother-moderator from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow moderator to unban an owner', async () => {
@@ -358,8 +389,13 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           [ownerAddress]: CommunityRole.Owner
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, moderatorAddress, ownerAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, moderatorAddress, ownerAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${moderatorAddress} doesn't have permission to unban ${ownerAddress} from community ${communityId}`
+          )
+        )
       })
 
       it('should allow moderator to unban a non-member', async () => {
@@ -367,8 +403,9 @@ describe('Community Roles Component', () => {
           [moderatorAddress]: CommunityRole.Moderator,
           [nonMemberAddress]: CommunityRole.None
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, moderatorAddress, nonMemberAddress)
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, moderatorAddress, nonMemberAddress)
+        ).resolves.not.toThrow()
       })
     })
 
@@ -378,8 +415,13 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           ['0xother-member']: CommunityRole.Member
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, memberAddress, '0xother-member')
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, memberAddress, '0xother-member')
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to unban 0xother-member from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow member to unban a moderator', async () => {
@@ -387,8 +429,13 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           [moderatorAddress]: CommunityRole.Moderator
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, memberAddress, moderatorAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, memberAddress, moderatorAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to unban ${moderatorAddress} from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow member to unban an owner', async () => {
@@ -396,8 +443,13 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           [ownerAddress]: CommunityRole.Owner
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, memberAddress, ownerAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, memberAddress, ownerAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to unban ${ownerAddress} from community ${communityId}`
+          )
+        )
       })
 
       it('should not allow member to unban a non-member', async () => {
@@ -405,42 +457,56 @@ describe('Community Roles Component', () => {
           [memberAddress]: CommunityRole.Member,
           [nonMemberAddress]: CommunityRole.None
         })
-        const result = await roles.canUnbanMemberFromCommunity(communityId, memberAddress, nonMemberAddress)
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUnbanMemberFromCommunity(communityId, memberAddress, nonMemberAddress)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to unban ${nonMemberAddress} from community ${communityId}`
+          )
+        )
       })
     })
   })
 
-  describe('canUpdateMemberRole', () => {
+  describe('validatePermissionToUpdateMemberRole', () => {
     describe('when trying to update own role', () => {
-      it('should return false', async () => {
+      it('should throw NotAuthorizedError', async () => {
         const communityId = 'community-1'
         const address = '0x123'
         const newRole = CommunityRole.Moderator
 
-        const result = await roles.canUpdateMemberRole(communityId, address, address, newRole)
-
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUpdateMemberRole(communityId, address, address, newRole)
+        ).rejects.toThrow(
+          new NotAuthorizedError(`The user ${address} cannot update their own role in community ${communityId}`)
+        )
       })
     })
 
     describe('when updater does not have assign_roles permission', () => {
-      it('should return false', async () => {
+      it('should throw NotAuthorizedError', async () => {
         const communityId = 'community-1'
         const updaterAddress = '0x123'
         const targetAddress = '0x456'
         const newRole = CommunityRole.Moderator
 
-        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Member,
+          [targetAddress]: CommunityRole.Member
+        })
 
-        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
-
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
+          )
+        )
       })
     })
 
     describe('when trying to set role to Owner', () => {
-      it('should return false', async () => {
+      it('should throw NotAuthorizedError', async () => {
         const communityId = 'community-1'
         const updaterAddress = '0x123'
         const targetAddress = '0x456'
@@ -451,14 +517,18 @@ describe('Community Roles Component', () => {
           [targetAddress]: CommunityRole.Moderator
         })
 
-        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
-
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
+          )
+        )
       })
     })
 
     describe('when updater cannot act on target member', () => {
-      it('should return false', async () => {
+      it('should throw NotAuthorizedError', async () => {
         const communityId = 'community-1'
         const updaterAddress = '0x123'
         const targetAddress = '0x456'
@@ -469,9 +539,13 @@ describe('Community Roles Component', () => {
           [targetAddress]: CommunityRole.Owner
         })
 
-        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
-
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
+          )
+        )
       })
     })
 
@@ -487,9 +561,9 @@ describe('Community Roles Component', () => {
           [targetAddress]: CommunityRole.Member
         })
 
-        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
-
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).resolves.not.toThrow()
       })
 
       it('should allow demoting a moderator to member', async () => {
@@ -498,13 +572,14 @@ describe('Community Roles Component', () => {
         const targetAddress = '0x456'
         const newRole = CommunityRole.Member
 
-        mockCommunitiesDB.getCommunityMemberRole
-          .mockResolvedValueOnce(CommunityRole.Owner) // updater role
-          .mockResolvedValueOnce(CommunityRole.Moderator) // target role
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [updaterAddress]: CommunityRole.Owner,
+          [targetAddress]: CommunityRole.Moderator
+        })
 
-        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
-
-        expect(result).toBe(true)
+        await expect(
+          roles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).resolves.not.toThrow()
       })
     })
 
@@ -520,9 +595,13 @@ describe('Community Roles Component', () => {
           [targetAddress]: CommunityRole.Member
         })
 
-        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
-
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
+          )
+        )
       })
 
       it('should not allow demoting another moderator to member', async () => {
@@ -536,10 +615,208 @@ describe('Community Roles Component', () => {
           [targetAddress]: CommunityRole.Moderator
         })
 
-        const result = await roles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
-
-        expect(result).toBe(false)
+        await expect(
+          roles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
+        ).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
+          )
+        )
       })
+    })
+  })
+
+  describe('validatePermissionToAddPlacesToCommunity', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xowner'
+    const moderatorAddress = '0xmoderator'
+    const memberAddress = '0xmember'
+
+    it('should allow owner to add places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      await expect(roles.validatePermissionToAddPlacesToCommunity(communityId, ownerAddress)).resolves.not.toThrow()
+    })
+
+    it('should allow moderator to add places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+      await expect(roles.validatePermissionToAddPlacesToCommunity(communityId, moderatorAddress)).resolves.not.toThrow()
+    })
+
+    it('should not allow member to add places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      await expect(roles.validatePermissionToAddPlacesToCommunity(communityId, memberAddress)).rejects.toThrow(
+        new NotAuthorizedError(`The user ${memberAddress} doesn't have permission to add places to the community`)
+      )
+    })
+
+    it('should not allow non-member to add places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      await expect(roles.validatePermissionToAddPlacesToCommunity(communityId, '0xnonmember')).rejects.toThrow(
+        new NotAuthorizedError(`The user 0xnonmember doesn't have permission to add places to the community`)
+      )
+    })
+  })
+
+  describe('validatePermissionToRemovePlacesFromCommunity', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xowner'
+    const moderatorAddress = '0xmoderator'
+    const memberAddress = '0xmember'
+
+    it('should allow owner to remove places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      await expect(
+        roles.validatePermissionToRemovePlacesFromCommunity(communityId, ownerAddress)
+      ).resolves.not.toThrow()
+    })
+
+    it('should allow moderator to remove places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+      await expect(
+        roles.validatePermissionToRemovePlacesFromCommunity(communityId, moderatorAddress)
+      ).resolves.not.toThrow()
+    })
+
+    it('should not allow member to remove places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      await expect(roles.validatePermissionToRemovePlacesFromCommunity(communityId, memberAddress)).rejects.toThrow(
+        new NotAuthorizedError(`The user ${memberAddress} doesn't have permission to remove places from the community`)
+      )
+    })
+
+    it('should not allow non-member to remove places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      await expect(roles.validatePermissionToRemovePlacesFromCommunity(communityId, '0xnonmember')).rejects.toThrow(
+        new NotAuthorizedError(`The user 0xnonmember doesn't have permission to remove places from the community`)
+      )
+    })
+  })
+
+  describe('validatePermissionToUpdatePlaces', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xowner'
+    const moderatorAddress = '0xmoderator'
+    const memberAddress = '0xmember'
+
+    it('should allow owner to update places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      await expect(roles.validatePermissionToUpdatePlaces(communityId, ownerAddress)).resolves.not.toThrow()
+    })
+
+    it('should allow moderator to update places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+      await expect(roles.validatePermissionToUpdatePlaces(communityId, moderatorAddress)).resolves.not.toThrow()
+    })
+
+    it('should not allow member to update places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      await expect(roles.validatePermissionToUpdatePlaces(communityId, memberAddress)).rejects.toThrow(
+        new NotAuthorizedError(`The user ${memberAddress} doesn't have permission to update places in the community`)
+      )
+    })
+
+    it('should not allow non-member to update places', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      await expect(roles.validatePermissionToUpdatePlaces(communityId, '0xnonmember')).rejects.toThrow(
+        new NotAuthorizedError(`The user 0xnonmember doesn't have permission to update places in the community`)
+      )
+    })
+  })
+
+  describe('validatePermissionToEditCommunity', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xowner'
+    const moderatorAddress = '0xmoderator'
+    const memberAddress = '0xmember'
+
+    it('should allow owner to edit community', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      await expect(roles.validatePermissionToEditCommunity(communityId, ownerAddress)).resolves.not.toThrow()
+    })
+
+    it('should allow moderator to edit community', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+      await expect(roles.validatePermissionToEditCommunity(communityId, moderatorAddress)).resolves.not.toThrow()
+    })
+
+    it('should not allow member to edit community', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      await expect(roles.validatePermissionToEditCommunity(communityId, memberAddress)).rejects.toThrow(
+        new NotAuthorizedError(`The user ${memberAddress} doesn't have permission to edit the community`)
+      )
+    })
+
+    it('should not allow non-member to edit community', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      await expect(roles.validatePermissionToEditCommunity(communityId, '0xnonmember')).rejects.toThrow(
+        new NotAuthorizedError(`The user 0xnonmember doesn't have permission to edit the community`)
+      )
+    })
+  })
+
+  describe('validatePermissionToDeleteCommunity', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xowner'
+    const moderatorAddress = '0xmoderator'
+    const memberAddress = '0xmember'
+
+    it('should allow owner to delete community', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      await expect(roles.validatePermissionToDeleteCommunity(communityId, ownerAddress)).resolves.not.toThrow()
+    })
+
+    it('should not allow moderator to delete community', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+      await expect(roles.validatePermissionToDeleteCommunity(communityId, moderatorAddress)).rejects.toThrow(
+        new NotAuthorizedError(`The user ${moderatorAddress} doesn't have permission to delete the community`)
+      )
+    })
+
+    it('should not allow member to delete community', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      await expect(roles.validatePermissionToDeleteCommunity(communityId, memberAddress)).rejects.toThrow(
+        new NotAuthorizedError(`The user ${memberAddress} doesn't have permission to delete the community`)
+      )
+    })
+
+    it('should not allow non-member to delete community', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      await expect(roles.validatePermissionToDeleteCommunity(communityId, '0xnonmember')).rejects.toThrow(
+        new NotAuthorizedError(`The user 0xnonmember doesn't have permission to delete the community`)
+      )
+    })
+  })
+
+  describe('validatePermissionToGetBannedMembers', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xowner'
+    const moderatorAddress = '0xmoderator'
+    const memberAddress = '0xmember'
+
+    it('should allow owner to get banned members', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      await expect(roles.validatePermissionToGetBannedMembers(communityId, ownerAddress)).resolves.not.toThrow()
+    })
+
+    it('should allow moderator to get banned members', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+      await expect(roles.validatePermissionToGetBannedMembers(communityId, moderatorAddress)).resolves.not.toThrow()
+    })
+
+    it('should not allow member to get banned members', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      await expect(roles.validatePermissionToGetBannedMembers(communityId, memberAddress)).rejects.toThrow(
+        new NotAuthorizedError(
+          `The user ${memberAddress} doesn't have permission to get banned members from the community`
+        )
+      )
+    })
+
+    it('should not allow non-member to get banned members', async () => {
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      await expect(roles.validatePermissionToGetBannedMembers(communityId, '0xnonmember')).rejects.toThrow(
+        new NotAuthorizedError(`The user 0xnonmember doesn't have permission to get banned members from the community`)
+      )
     })
   })
 })
