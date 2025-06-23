@@ -6,10 +6,10 @@ import { CommunityNotFoundError } from '../../logic/community'
 import { validateCommunityFields } from '../../utils/community-validation'
 
 export async function updateCommunityHandler(
-  context: FormHandlerContextWithPath<'community' | 'logs', '/v1/communities/:id'> & DecentralandSignatureContext<any>
+  context: FormHandlerContextWithPath<'communities' | 'logs', '/v1/communities/:id'> & DecentralandSignatureContext<any>
 ): Promise<HTTPResponse> {
   const {
-    components: { community, logs },
+    components: { communities, logs },
     verification,
     formData,
     params
@@ -37,7 +37,7 @@ export async function updateCommunityHandler(
       hasThumbnail: validatedThumbnail ? 'true' : 'false'
     })
 
-    const updatedCommunity = await community.updateCommunity(communityId, userAddress, {
+    const updatedCommunity = await communities.updateCommunity(communityId, userAddress, {
       name,
       description,
       placeIds,

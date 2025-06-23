@@ -39,7 +39,9 @@ import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
 import {
+  createCommunityBansComponent,
   createCommunityComponent,
+  createCommunityMembersComponent,
   createCommunityPlacesComponent,
   createCommunityRolesComponent
 } from '../src/logic/community'
@@ -145,13 +147,20 @@ async function initComponents(): Promise<TestComponents> {
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
-  const community = await createCommunityComponent({
+  const communityMembers = await createCommunityMembersComponent({
+    communitiesDb,
+    communityRoles,
+    logs,
+    catalystClient,
+    peersStats
+  })
+  const communityBans = await createCommunityBansComponent({ communitiesDb, communityRoles, logs, catalystClient })
+  const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
     logs,
-    peersStats,
     storage,
     config
   })
@@ -188,7 +197,9 @@ async function initComponents(): Promise<TestComponents> {
     commsGatekeeper,
     communitiesDb,
     communitiesDbHelper,
-    community,
+    communities,
+    communityBans,
+    communityMembers,
     communityPlaces,
     communityRoles,
     config,

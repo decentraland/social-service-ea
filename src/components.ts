@@ -30,7 +30,12 @@ import { createVoiceComponent } from './logic/voice'
 import { createSettingsComponent } from './logic/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
-import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
+import {
+  createCommunityBansComponent,
+  createCommunityComponent,
+  createCommunityMembersComponent,
+  createCommunityRolesComponent
+} from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
@@ -140,13 +145,20 @@ export async function initComponents(): Promise<AppComponents> {
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
-  const community = await createCommunityComponent({
+  const communityMembers = await createCommunityMembersComponent({
+    communitiesDb,
+    communityRoles,
+    logs,
+    catalystClient,
+    peersStats
+  })
+  const communityBans = await createCommunityBansComponent({ communitiesDb, communityRoles, logs, catalystClient })
+  const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
     logs,
-    peersStats,
     storage,
     config
   })
@@ -172,7 +184,9 @@ export async function initComponents(): Promise<AppComponents> {
     archipelagoStats,
     catalystClient,
     commsGatekeeper,
-    community,
+    communities,
+    communityMembers,
+    communityBans,
     communityPlaces,
     communityRoles,
     communitiesDb,

@@ -168,6 +168,14 @@ export function createCommunityRolesComponent(
     validatePermissionToUpdatePlaces: validatePermissions(
       ['add_places', 'remove_places'],
       'update places in the community'
-    )
+    ),
+    validatePermissionToLeaveCommunity: async (communityId: string, memberAddress: string): Promise<void> => {
+      const memberRole = await communitiesDb.getCommunityMemberRole(communityId, memberAddress)
+
+      // Owners cannot leave their communities
+      if (memberRole === CommunityRole.Owner) {
+        throw new NotAuthorizedError(`The owner cannot leave the community ${communityId}`)
+      }
+    }
   }
 }

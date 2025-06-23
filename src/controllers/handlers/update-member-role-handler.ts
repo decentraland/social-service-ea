@@ -7,12 +7,12 @@ import { CommunityRole } from '../../types/entities'
 
 export async function updateMemberRoleHandler(
   context: Pick<
-    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members/:address'>,
+    HandlerContextWithPath<'communityMembers' | 'logs', '/v1/communities/:id/members/:address'>,
     'components' | 'params' | 'verification' | 'request'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { community, logs },
+    components: { communityMembers, logs },
     params: { id: communityId, address: targetAddress },
     verification,
     request
@@ -37,7 +37,7 @@ export async function updateMemberRoleHandler(
 
     logger.info(`Updating member role in community ${communityId} for member ${targetAddress} to ${newRole}`)
 
-    await community.updateMemberRole(communityId, updaterAddress, targetAddressLower, newRole as CommunityRole)
+    await communityMembers.updateMemberRole(communityId, updaterAddress, targetAddressLower, newRole as CommunityRole)
     return {
       status: 204
     }
