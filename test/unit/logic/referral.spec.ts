@@ -51,8 +51,6 @@ describe('referral-component', () => {
     const validReferrer = '0x1234567890123456789012345678901234567890'
     const validInvitedUser = '0x0987654321098765432109876543210987654321'
     let validInput: { referrer: string; invitedUser: string }
-    let invalidInputInvalidReferrer: { referrer: string; invitedUser: string }
-    let invalidInputInvalidInvitedUser: { referrer: string; invitedUser: string }
     let selfReferralInput: { referrer: string; invitedUser: string }
 
     beforeEach(() => {
@@ -60,25 +58,21 @@ describe('referral-component', () => {
         referrer: validReferrer,
         invitedUser: validInvitedUser
       }
-      invalidInputInvalidReferrer = { ...validInput, referrer: 'invalid-address' }
-      invalidInputInvalidInvitedUser = { ...validInput, invitedUser: 'invalid-address' }
       selfReferralInput = {
         referrer: validReferrer,
         invitedUser: validReferrer
       }
     })
 
-    describe('with valid data', () => {
-      beforeEach(() => {
+    describe('with a valid referral input', () => {
+      it('should create referral successfully', async () => {
         mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
         mockReferralDb.createReferral.mockResolvedValueOnce({
           referrer: validReferrer,
           invited_user: validInvitedUser,
           status: ReferralProgressStatus.PENDING
         })
-      })
 
-      it('should create referral successfully', async () => {
         const result = await referralComponent.create(validInput)
 
         expect(mockReferralDb.hasReferralProgress).toHaveBeenCalledWith(validInvitedUser)
@@ -101,7 +95,7 @@ describe('referral-component', () => {
       })
     })
 
-    describe('with invalid referrer address', () => {
+    describe('with an invalid referrer address', () => {
       it.each([
         'invalid-address',
         '0x123',
@@ -118,7 +112,7 @@ describe('referral-component', () => {
       })
     })
 
-    describe('with invalid invitedUser address', () => {
+    describe('with an invalid invitedUser address', () => {
       it.each([
         'invalid-address',
         '0x123',
@@ -512,13 +506,11 @@ describe('referral-component', () => {
     const validReferrer = '0x1234567890123456789012345678901234567890'
 
     describe('with valid data', () => {
-      beforeEach(() => {
+      it('should return stats and update last viewed', async () => {
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
         mockReferralDb.getLastViewedProgressByReferrer.mockResolvedValueOnce(3)
         mockReferralDb.setLastViewedProgressByReferrer.mockResolvedValueOnce(undefined)
-      })
 
-      it('should return stats and update last viewed', async () => {
         const result = await referralComponent.getInvitedUsersAcceptedStats(validReferrer)
 
         expect(mockReferralDb.countAcceptedInvitesByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase())
