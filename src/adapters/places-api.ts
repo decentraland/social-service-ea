@@ -11,6 +11,9 @@ export async function createPlacesApiAdapter(
     getPlaces: async (placesIds: string[]): Promise<PlacesApiResponse['data']> => {
       const response = await fetcher.fetch(`${placesApiUrl}/api/places`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(placesIds)
       })
 
