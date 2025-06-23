@@ -234,6 +234,16 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
+    async removeCommunityPlacesWithExceptions(communityId: string, exceptPlaceIds: string[]): Promise<void> {
+      const query = SQL`DELETE FROM community_places WHERE community_id = ${communityId}`
+
+      if (exceptPlaceIds.length > 0) {
+        query.append(SQL` AND id <> ANY(${exceptPlaceIds})`)
+      }
+
+      await pg.query(query)
+    },
+
     async getCommunities(
       memberAddress: EthAddress,
       options: GetCommunitiesOptions

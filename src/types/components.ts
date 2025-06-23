@@ -123,6 +123,7 @@ export interface ICommunitiesDatabaseComponent {
   addCommunityPlace(place: CommunityPlace): Promise<void>
   addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void>
   removeCommunityPlace(communityId: string, placeId: string): Promise<void>
+  removeCommunityPlacesWithExceptions(communityId: string, exceptPlaceIds: string[]): Promise<void>
   createCommunity(community: CommunityDB): Promise<Community>
   deleteCommunity(id: string): Promise<void>
   getCommunities(

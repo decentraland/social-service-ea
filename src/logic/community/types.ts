@@ -2,7 +2,7 @@ import {
   FriendProfile,
   FriendshipStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { CommunityRole, CommunityPermission, Action } from '../../types/entities'
+import { CommunityRole, Action } from '../../types/entities'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export interface ICommunityComponent {
@@ -60,32 +60,33 @@ export interface ICommunityComponent {
 }
 
 export type ICommunityRolesComponent = {
-  hasPermission: (role: CommunityRole, permission: CommunityPermission) => boolean
-  getRolePermissions: (role: CommunityRole) => CommunityPermission[]
-  canKickMemberFromCommunity: (
+  validatePermissionToKickMemberFromCommunity: (
     communityId: string,
     kickerAddress: string,
     memberToKickAddress: string
-  ) => Promise<boolean>
-  canBanMemberFromCommunity: (
+  ) => Promise<void>
+  validatePermissionToGetBannedMembers: (communityId: string, userAddress: string) => Promise<void>
+  validatePermissionToBanMemberFromCommunity: (
     communityId: string,
     bannerAddress: string,
     memberToBanAddress: string
-  ) => Promise<boolean>
-  canUnbanMemberFromCommunity: (
+  ) => Promise<void>
+  validatePermissionToUnbanMemberFromCommunity: (
     communityId: string,
     unbannerAddress: string,
     memberToUnbanAddress: string
-  ) => Promise<boolean>
-  canUpdateMemberRole: (
+  ) => Promise<void>
+  validatePermissionToUpdateMemberRole: (
     communityId: string,
     updaterAddress: string,
     targetAddress: string,
     newRole: CommunityRole
-  ) => Promise<boolean>
-  canAddPlacesToCommunity: (communityId: string, adderAddress: string) => Promise<boolean>
-  canRemovePlacesFromCommunity: (communityId: string, removerAddress: string) => Promise<boolean>
-  canEditCommunity: (communityId: string, editorAddress: string) => Promise<boolean>
+  ) => Promise<void>
+  validatePermissionToAddPlacesToCommunity: (communityId: string, adderAddress: string) => Promise<void>
+  validatePermissionToRemovePlacesFromCommunity: (communityId: string, removerAddress: string) => Promise<void>
+  validatePermissionToUpdatePlaces: (communityId: string, editorAddress: string) => Promise<void>
+  validatePermissionToEditCommunity: (communityId: string, editorAddress: string) => Promise<void>
+  validatePermissionToDeleteCommunity: (communityId: string, removerAddress: string) => Promise<void>
 }
 
 export type ICommunityPlacesComponent = {
@@ -93,9 +94,18 @@ export type ICommunityPlacesComponent = {
     communityId: string,
     pagination: PaginatedParameters
   ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
-  addPlaces(communityId: string, userAddress: EthAddress, placeIds: string[]): Promise<void>
+  validateAndAddPlaces(communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void>
+  addPlaces(communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void>
   removePlace(communityId: string, userAddress: EthAddress, placeId: string): Promise<void>
   updatePlaces(communityId: string, userAddress: EthAddress, placeIds: string[]): Promise<void>
+  validateOwnership(
+    placeIds: string[],
+    userAddress: EthAddress
+  ): Promise<{
+    ownedPlaces: string[]
+    notOwnedPlaces: string[]
+    isValid: boolean
+  }>
 }
 
 export type CommunityDB = {

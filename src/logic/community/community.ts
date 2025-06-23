@@ -232,13 +232,7 @@ export async function createCommunityComponent(
         return
       }
 
-      const canKick = await communityRoles.canKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
-
-      if (!canKick) {
-        throw new NotAuthorizedError(
-          `The user ${kickerAddress} doesn't have permission to kick ${targetAddress} from community ${communityId}`
-        )
-      }
+      await communityRoles.validatePermissionToKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
 
       await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
     },
@@ -307,6 +301,10 @@ export async function createCommunityComponent(
         throw new NotAuthorizedError(`The user ${community.ownerAddress} doesn't have any names`)
       }
 
+      if (placeIds.length > 0) {
+        await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
+      }
+
       const newCommunity = await communitiesDb.createCommunity({
         ...community,
         owner_address: community.ownerAddress,
@@ -320,7 +318,9 @@ export async function createCommunityComponent(
         role: CommunityRole.Owner
       })
 
-      placeIds.length > 0 && (await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, placeIds))
+      if (placeIds.length > 0) {
+        await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, placeIds)
+      }
 
       logger.info('Community created', {
         communityId: newCommunity.id,
@@ -362,13 +362,7 @@ export async function createCommunityComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
-      const canBan = await communityRoles.canBanMemberFromCommunity(communityId, bannerAddress, targetAddress)
-
-      if (!canBan) {
-        throw new NotAuthorizedError(
-          `The user ${bannerAddress} doesn't have permission to ban ${targetAddress} from community ${communityId}`
-        )
-      }
+      await communityRoles.validatePermissionToBanMemberFromCommunity(communityId, bannerAddress, targetAddress)
 
       const doesTargetUserBelongsToCommunity = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
 
@@ -386,13 +380,7 @@ export async function createCommunityComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
-      const canUnban = await communityRoles.canUnbanMemberFromCommunity(communityId, unbannerAddress, targetAddress)
-
-      if (!canUnban) {
-        throw new NotAuthorizedError(
-          `The user ${unbannerAddress} doesn't have permission to unban ${targetAddress} from community ${communityId}`
-        )
-      }
+      await communityRoles.validatePermissionToUnbanMemberFromCommunity(communityId, unbannerAddress, targetAddress)
 
       const isBanned = await communitiesDb.isMemberBanned(communityId, targetAddress)
 
@@ -415,11 +403,7 @@ export async function createCommunityComponent(
         throw new CommunityNotFoundError(id)
       }
 
-      const memberRole = await communitiesDb.getCommunityMemberRole(id, userAddress)
-
-      if (!memberRole || !communityRoles.hasPermission(memberRole, 'ban_players')) {
-        throw new NotAuthorizedError("The user doesn't have permission to get banned members")
-      }
+      await communityRoles.validatePermissionToGetBannedMembers(id, userAddress)
 
       const bannedMembers = await communitiesDb.getBannedMembers(id, userAddress, pagination)
       const totalBannedMembers = await communitiesDb.getBannedMembersCount(id)
@@ -446,13 +430,7 @@ export async function createCommunityComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
-      const canUpdate = await communityRoles.canUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
-
-      if (!canUpdate) {
-        throw new NotAuthorizedError(
-          `The user ${updaterAddress} doesn't have permission to update ${targetAddress}'s role in community ${communityId}`
-        )
-      }
+      await communityRoles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
 
       await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
     },
@@ -510,12 +488,10 @@ export async function createCommunityComponent(
         }
       }
 
-      const canEdit = await communityRoles.canEditCommunity(communityId, userAddress)
+      await communityRoles.validatePermissionToEditCommunity(communityId, userAddress)
 
-      if (!canEdit) {
-        throw new NotAuthorizedError(
-          `The user ${userAddress} doesn't have permission to update community ${communityId}`
-        )
+      if (updates.placeIds && updates.placeIds.length > 0) {
+        await communityPlaces.validateOwnership(updates.placeIds, userAddress)
       }
 
       logger.info('Updating community', {

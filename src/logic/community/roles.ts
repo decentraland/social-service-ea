@@ -1,3 +1,4 @@
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityRole, CommunityPermission } from '../../types/entities'
 import { AppComponents } from '../../types/system'
 import { ICommunityRolesComponent } from './types'
@@ -61,85 +62,112 @@ export function createCommunityRolesComponent(
     return ROLE_ACTION_TRANSITIONS[targetRole]?.includes(actorRole) ?? false
   }
 
-  return {
-    hasPermission,
-    getRolePermissions,
+  const validatePermission = (permission: CommunityPermission, action: string) =>
+    validatePermissions([permission], action)
 
-    async canKickMemberFromCommunity(
+  const validatePermissions = (permissions: CommunityPermission[], action: string) => {
+    return async (communityId: string, userAddress: string): Promise<void> => {
+      const role = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
+      if (!role || !permissions.every((permission) => hasPermission(role, permission))) {
+        throw new NotAuthorizedError(`The user ${userAddress} doesn't have permission to ${action}`)
+      }
+    }
+  }
+
+  return {
+    async validatePermissionToKickMemberFromCommunity(
       communityId: string,
       kickerAddress: string,
       targetAddress: string
-    ): Promise<boolean> {
+    ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [kickerAddress, targetAddress])
       const kickerRole = roles[kickerAddress]
       const targetRole = roles[targetAddress]
 
-      return canActOnMember(kickerRole, targetRole)
+      if (!canActOnMember(kickerRole, targetRole)) {
+        throw new NotAuthorizedError(
+          `The user ${kickerAddress} doesn't have permission to kick ${targetAddress} from community ${communityId}`
+        )
+      }
     },
 
-    async canBanMemberFromCommunity(
+    validatePermissionToGetBannedMembers: validatePermission('ban_players', 'get banned members from the community'),
+
+    async validatePermissionToBanMemberFromCommunity(
       communityId: string,
       bannerAddress: string,
       targetAddress: string
-    ): Promise<boolean> {
+    ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [bannerAddress, targetAddress])
       const bannerRole = roles[bannerAddress]
       const targetRole = roles[targetAddress]
 
-      return (
-        hasPermission(bannerRole, 'ban_players') && (canActOnMember(bannerRole, targetRole) || !isMember(targetRole))
-      )
+      if (
+        !hasPermission(bannerRole, 'ban_players') ||
+        (!canActOnMember(bannerRole, targetRole) && isMember(targetRole))
+      ) {
+        throw new NotAuthorizedError(
+          `The user ${bannerAddress} doesn't have permission to ban ${targetAddress} from community ${communityId}`
+        )
+      }
     },
 
-    async canUnbanMemberFromCommunity(
+    async validatePermissionToUnbanMemberFromCommunity(
       communityId: string,
       unbannerAddress: string,
       targetAddress: string
-    ): Promise<boolean> {
+    ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [unbannerAddress, targetAddress])
       const unbannerRole = roles[unbannerAddress]
       const targetRole = roles[targetAddress]
 
-      return (
-        hasPermission(unbannerRole, 'ban_players') &&
-        (canActOnMember(unbannerRole, targetRole) || !isMember(targetRole))
-      )
+      if (
+        !hasPermission(unbannerRole, 'ban_players') ||
+        (!canActOnMember(unbannerRole, targetRole) && isMember(targetRole))
+      ) {
+        throw new NotAuthorizedError(
+          `The user ${unbannerAddress} doesn't have permission to unban ${targetAddress} from community ${communityId}`
+        )
+      }
     },
 
-    async canUpdateMemberRole(
+    async validatePermissionToUpdateMemberRole(
       communityId: string,
       updaterAddress: string,
       targetAddress: string,
       newRole: CommunityRole
-    ): Promise<boolean> {
+    ): Promise<void> {
       if (updaterAddress.toLowerCase() === targetAddress.toLowerCase()) {
-        return false
+        throw new NotAuthorizedError(
+          `The user ${updaterAddress} cannot update their own role in community ${communityId}`
+        )
       }
 
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [updaterAddress, targetAddress])
       const updaterRole = roles[updaterAddress]
       const targetRole = roles[targetAddress]
 
-      return (
-        hasPermission(updaterRole, 'assign_roles') &&
-        canActOnMember(updaterRole, targetRole) &&
-        newRole !== CommunityRole.Owner
-      )
+      if (
+        !hasPermission(updaterRole, 'assign_roles') ||
+        !canActOnMember(updaterRole, targetRole) ||
+        newRole === CommunityRole.Owner
+      ) {
+        throw new NotAuthorizedError(
+          `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
+        )
+      }
     },
 
-    async canAddPlacesToCommunity(communityId: string, adderAddress: string): Promise<boolean> {
-      const role = await communitiesDb.getCommunityMemberRole(communityId, adderAddress)
-      return role && hasPermission(role, 'add_places')
-    },
-
-    async canRemovePlacesFromCommunity(communityId: string, removerAddress: string): Promise<boolean> {
-      const role = await communitiesDb.getCommunityMemberRole(communityId, removerAddress)
-      return role && hasPermission(role, 'remove_places')
-    },
-
-    async canEditCommunity(communityId: string, editorAddress: string): Promise<boolean> {
-      const role = await communitiesDb.getCommunityMemberRole(communityId, editorAddress)
-      return role && hasPermission(role, 'edit_info')
-    }
+    validatePermissionToAddPlacesToCommunity: validatePermission('add_places', 'add places to the community'),
+    validatePermissionToRemovePlacesFromCommunity: validatePermission(
+      'remove_places',
+      'remove places from the community'
+    ),
+    validatePermissionToEditCommunity: validatePermission('edit_info', 'edit the community'),
+    validatePermissionToDeleteCommunity: validatePermission('delete_community', 'delete the community'),
+    validatePermissionToUpdatePlaces: validatePermissions(
+      ['add_places', 'remove_places'],
+      'update places in the community'
+    )
   }
 }
