@@ -95,37 +95,141 @@ describe('referral-component', () => {
       })
     })
 
-    describe('with an invalid referrer address', () => {
-      it.each([
-        'invalid-address',
-        '0x123',
-        '0x123456789012345678901234567890123456789',
-        '0x12345678901234567890123456789012345678901',
-        '',
-        'not-an-address'
-      ])('should throw ReferralInvalidInputError for invalid address: %s', async (invalidAddress) => {
-        const invalidInput = { ...validInput, referrer: invalidAddress }
+    describe('when validating the referrer address', () => {
+      let address: string
+      let invalidInput: { referrer: string; invitedUser: string }
 
-        await expect(referralComponent.create(invalidInput)).rejects.toThrow(
-          new ReferralInvalidInputError('Invalid referrer address')
-        )
+      beforeEach(() => {
+        invalidInput = { ...validInput, referrer: address }
+      })
+
+      describe('and the address is shorter than an Ethereum address', () => {
+        beforeEach(() => {
+          address = '0x123'
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid referrer address')
+          )
+        })
+      })
+
+      describe('and the address contains non hexa characters', () => {
+        beforeEach(() => {
+          address = 'invalid-address'
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid referrer address')
+          )
+        })
+      })
+
+      describe('and the address is longer than an Ethereum address', () => {
+        beforeEach(() => {
+          address = '0x12345678901234567890123456789012345678901'
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid referrer address')
+          )
+        })
+      })
+
+      describe('and the address is an empty string', () => {
+        beforeEach(() => {
+          address = ''
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid referrer address')
+          )
+        })
+      })
+
+      describe('and the address is not an address format', () => {
+        beforeEach(() => {
+          address = 'not-an-address'
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid referrer address')
+          )
+        })
       })
     })
 
-    describe('with an invalid invitedUser address', () => {
-      it.each([
-        'invalid-address',
-        '0x123',
-        '0x123456789012345678901234567890123456789',
-        '0x12345678901234567890123456789012345678901',
-        '',
-        'not-an-address'
-      ])('should throw ReferralInvalidInputError for invalid address: %s', async (invalidAddress) => {
-        const invalidInput = { ...validInput, invitedUser: invalidAddress }
+    describe('when validating the invited user address', () => {
+      let address: string
+      let invalidInput: { referrer: string; invitedUser: string }
 
-        await expect(referralComponent.create(invalidInput)).rejects.toThrow(
-          new ReferralInvalidInputError('Invalid invitedUser address')
-        )
+      beforeEach(() => {
+        invalidInput = { ...validInput, invitedUser: address }
+      })
+
+      describe('and the address is shorter than an Ethereum address', () => {
+        beforeEach(() => {
+          address = '0x123'
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid invitedUser address')
+          )
+        })
+      })
+
+      describe('and the address contains non hexa characters', () => {
+        beforeEach(() => {
+          address = 'invalid-address'
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid invitedUser address')
+          )
+        })
+      })
+
+      describe('and the address is longer than an Ethereum address', () => {
+        beforeEach(() => {
+          address = '0x12345678901234567890123456789012345678901'
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid invitedUser address')
+          )
+        })
+      })
+
+      describe('and the address is an empty string', () => {
+        beforeEach(() => {
+          address = ''
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid invitedUser address')
+          )
+        })
+      })
+
+      describe('and the address is not an address format', () => {
+        beforeEach(() => {
+          address = 'not-an-address'
+        })
+
+        it('should throw a referral invalid input error', async () => {
+          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+            new ReferralInvalidInputError('Invalid invitedUser address')
+          )
+        })
       })
     })
 
@@ -298,106 +402,10 @@ describe('referral-component', () => {
       })
     })
 
-    describe('when referral reaches a tier milestones', () => {
-      it.each([
-        [5, 1], // 5 invited users = Tier 1
-        [10, 2], // 10 invited users = Tier 2
-        [20, 3], // 20 invited users = Tier 3
-        [25, 4], // 25 invited users = Tier 4
-        [30, 5], // 30 invited users = Tier 5
-        [50, 6], // 50 invited users = Tier 6
-        [60, 7], // 60 invited users = Tier 7
-        [75, 8], // 75 invited users = Tier 8
-        [100, 9] // 100 invited users = Tier 9
-      ])('should calculate correct tier for %i invited users', async (invitedUsers, expectedTier) => {
-        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
-          {
-            referrer: validReferrer,
-            invited_user: validInvitedUser,
-            status: ReferralProgressStatus.SIGNED_UP
-          }
-        ])
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
-        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
-
-        await referralComponent.finalizeReferral(validInvitedUser)
-
-        expect(mockSns.publishMessage).toHaveBeenCalledWith(
-          expect.objectContaining({
-            metadata: expect.objectContaining({
-              tier: expectedTier,
-              invitedUsers
-            })
-          })
-        )
-      })
-    })
-
-    describe('when referral does not reach a tier milestone', () => {
-      it.each([
-        [1, 1], // 1 invited user = Tier 1 (default)
-        [3, 1], // 3 invited users = Tier 1 (default)
-        [7, 2], // 7 invited users = Tier 2 (default)
-        [15, 3], // 15 invited users = Tier 3 (default)
-        [22, 4], // 22 invited users = Tier 4 (default)
-        [28, 5], // 28 invited users = Tier 5 (default)
-        [45, 6], // 45 invited users = Tier 6 (default)
-        [55, 7], // 55 invited users = Tier 7 (default)
-        [70, 8], // 70 invited users = Tier 8 (default)
-        [95, 9] // 95 invited users = Tier 9 (default)
-      ])('should calculate correct tier for %i invited users', async (invitedUsers, expectedTier) => {
-        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
-          {
-            referrer: validReferrer,
-            invited_user: validInvitedUser,
-            status: ReferralProgressStatus.SIGNED_UP
-          }
-        ])
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
-        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
-
-        await referralComponent.finalizeReferral(validInvitedUser)
-
-        expect(mockSns.publishMessage).toHaveBeenCalledWith(
-          expect.objectContaining({
-            metadata: expect.objectContaining({
-              tier: expectedTier,
-              invitedUsers
-            })
-          })
-        )
-      })
-    })
-
-    describe('when referral exceeds maximum tier', () => {
-      it.each([
-        [101, 0], // 101 invited users = Tier 0 (no tier found)
-        [150, 0] // 150 invited users = Tier 0 (no tier found)
-      ])('should return tier 0 for %i invited users (exceeds max)', async (invitedUsers, expectedTier) => {
-        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
-          {
-            referrer: validReferrer,
-            invited_user: validInvitedUser,
-            status: ReferralProgressStatus.SIGNED_UP
-          }
-        ])
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
-        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
-
-        await referralComponent.finalizeReferral(validInvitedUser)
-
-        expect(mockSns.publishMessage).toHaveBeenCalledWith(
-          expect.objectContaining({
-            metadata: expect.objectContaining({
-              tier: expectedTier,
-              invitedUsers
-            })
-          })
-        )
-      })
-    })
-
     describe('when referral reaches a tier milestone', () => {
+      let invitedUsers: number
+      let expectedTier: number
+
       beforeEach(() => {
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
           {
@@ -407,22 +415,461 @@ describe('referral-component', () => {
           }
         ])
         mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
-        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5) // Tier 1 milestone
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
       })
 
-      it('should finalize referral and publish invited users accepted event', async () => {
-        await referralComponent.finalizeReferral(validInvitedUser)
+      describe('and the referral reaches tier 1 milestone', () => {
+        beforeEach(() => {
+          invitedUsers = 5
+          expectedTier = 1
+        })
 
-        expect(mockSns.publishMessage).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: 'referral',
-            subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED,
-            metadata: expect.objectContaining({
-              tier: 1,
-              invitedUsers: 5
+        it('should calculate correct tier for 5 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
             })
-          })
-        )
+          )
+        })
+      })
+
+      describe('and the referral reaches tier 2 milestone', () => {
+        beforeEach(() => {
+          invitedUsers = 10
+          expectedTier = 2
+        })
+
+        it('should calculate correct tier for 10 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral reaches tier 3 milestone', () => {
+        beforeEach(() => {
+          invitedUsers = 20
+          expectedTier = 3
+        })
+
+        it('should calculate correct tier for 20 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral reaches tier 4 milestone', () => {
+        beforeEach(() => {
+          invitedUsers = 25
+          expectedTier = 4
+        })
+
+        it('should calculate correct tier for 25 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral reaches tier 5 milestone', () => {
+        beforeEach(() => {
+          invitedUsers = 30
+          expectedTier = 5
+        })
+
+        it('should calculate correct tier for 30 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral reaches tier 6 milestone', () => {
+        beforeEach(() => {
+          invitedUsers = 50
+          expectedTier = 6
+        })
+
+        it('should calculate correct tier for 50 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral reaches tier 7 milestone', () => {
+        beforeEach(() => {
+          invitedUsers = 60
+          expectedTier = 7
+        })
+
+        it('should calculate correct tier for 60 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral reaches tier 8 milestone', () => {
+        beforeEach(() => {
+          invitedUsers = 75
+          expectedTier = 8
+        })
+
+        it('should calculate correct tier for 75 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral reaches tier 9 milestone', () => {
+        beforeEach(() => {
+          invitedUsers = 100
+          expectedTier = 9
+        })
+
+        it('should calculate correct tier for 100 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+    })
+
+    describe('when referral does not reach a tier milestone', () => {
+      let invitedUsers: number
+      let expectedTier: number
+
+      beforeEach(() => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.SIGNED_UP
+          }
+        ])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
+      })
+
+      describe('and the referral has 1 invited user', () => {
+        beforeEach(() => {
+          invitedUsers = 1
+          expectedTier = 1
+        })
+
+        it('should calculate correct tier for 1 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 3 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 3
+          expectedTier = 1
+        })
+
+        it('should calculate correct tier for 3 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 7 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 7
+          expectedTier = 2
+        })
+
+        it('should calculate correct tier for 7 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 15 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 15
+          expectedTier = 3
+        })
+
+        it('should calculate correct tier for 15 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 22 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 22
+          expectedTier = 4
+        })
+
+        it('should calculate correct tier for 22 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 28 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 28
+          expectedTier = 5
+        })
+
+        it('should calculate correct tier for 28 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 45 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 45
+          expectedTier = 6
+        })
+
+        it('should calculate correct tier for 45 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 55 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 55
+          expectedTier = 7
+        })
+
+        it('should calculate correct tier for 55 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 70 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 70
+          expectedTier = 8
+        })
+
+        it('should calculate correct tier for 70 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 95 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 95
+          expectedTier = 9
+        })
+
+        it('should calculate correct tier for 95 invited users', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+    })
+
+    describe('when referral exceeds maximum tier', () => {
+      let invitedUsers: number
+      let expectedTier: number
+
+      beforeEach(() => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.SIGNED_UP
+          }
+        ])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
+      })
+
+      describe('and the referral has 101 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 101
+          expectedTier = 0
+        })
+
+        it('should return tier 0 for 101 invited users (exceeds max)', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
+      })
+
+      describe('and the referral has 150 invited users', () => {
+        beforeEach(() => {
+          invitedUsers = 150
+          expectedTier = 0
+        })
+
+        it('should return tier 0 for 150 invited users (exceeds max)', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              metadata: expect.objectContaining({
+                tier: expectedTier,
+                invitedUsers
+              })
+            })
+          )
+        })
       })
     })
 
