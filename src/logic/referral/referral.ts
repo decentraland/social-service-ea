@@ -64,7 +64,7 @@ function createReferralNewTierReachedEvent(
       image: 'https://assets-cdn.decentraland.org/referral/referral-new-tier-reached-icon.png',
       invitedUserAddress: invitedUser,
       invitedUsers: totalInvitedUsers,
-      rarity: reward.rarity
+      rarity: reward.rarity!
     }
   }
 }
