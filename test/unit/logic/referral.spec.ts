@@ -540,8 +540,8 @@ describe('referral-component', () => {
 
       describe('with zero invited users', () => {
         beforeEach(() => {
-          mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(0)
-          mockReferralDb.getLastViewedProgressByReferrer.mockResolvedValueOnce(0)
+          mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(0)
+          mockReferralDb.getLastViewedProgressByReferrer.mockResolvedValue(0)
         })
 
         it('should return 0 for both accepted and viewed', async () => {
@@ -552,6 +552,23 @@ describe('referral-component', () => {
             invitedUsersAcceptedViewed: 0
           })
           expect(mockReferralDb.setLastViewedProgressByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase(), 0)
+        })
+      })
+
+      describe('with null last viewed progress', () => {
+        beforeEach(() => {
+          mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(5)
+          mockReferralDb.getLastViewedProgressByReferrer.mockResolvedValue(null)
+        })
+
+        it('should return null for viewed', async () => {
+          const result = await referralComponent.getInvitedUsersAcceptedStats(validReferrer)
+
+          expect(result).toEqual({
+            invitedUsersAccepted: 5,
+            invitedUsersAcceptedViewed: null
+          })
+          expect(mockReferralDb.setLastViewedProgressByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase(), 5)
         })
       })
     })
