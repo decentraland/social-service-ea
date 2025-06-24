@@ -49,10 +49,10 @@ describe('Community Component', () => {
     })
   })
 
-  describe('getCommunity', () => {
+  describe('when getting a community', () => {
     const userAddress = '0x1234567890123456789012345678901234567890'
 
-    describe('when all validations pass', () => {
+    describe('and the community exists', () => {
       beforeEach(() => {
         mockCommunitiesDB.getCommunity.mockResolvedValue({
           ...mockCommunity,
@@ -82,18 +82,22 @@ describe('Community Component', () => {
         expect(mockStorage.exists).toHaveBeenCalledWith(`communities/${communityId}/raw-thumbnail.png`)
       })
 
-      it('should include thumbnail when it exists', async () => {
-        mockStorage.exists.mockResolvedValueOnce(true)
+      describe('when the community has a thumbnail', () => {
+        beforeEach(() => {
+          mockStorage.exists.mockResolvedValueOnce(true)
+        })
 
-        const result = await communityComponent.getCommunity(communityId, userAddress)
+        it('should include thumbnail when it exists', async () => {
+          const result = await communityComponent.getCommunity(communityId, userAddress)
 
-        expect(result.thumbnails).toEqual({
-          raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+          expect(result.thumbnails).toEqual({
+            raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+          })
         })
       })
     })
 
-    describe('when the community does not exist', () => {
+    describe('and the community does not exist', () => {
       beforeEach(() => {
         mockCommunitiesDB.getCommunity.mockResolvedValue(null)
         mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(0)
@@ -111,7 +115,7 @@ describe('Community Component', () => {
     })
   })
 
-  describe('getCommunities', () => {
+  describe('when getting communities', () => {
     const userAddress = '0x1234567890123456789012345678901234567890'
     const options = { pagination: { limit: 10, offset: 0 }, search: 'test' }
     const mockCommunities = [
@@ -124,51 +128,55 @@ describe('Community Component', () => {
     ]
     const mockProfiles = [createMockProfile('0xfriend1'), createMockProfile('0xfriend2')]
 
-    describe('when all validations pass', () => {
+    beforeEach(() => {
+      mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunities)
+      mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+      mockStorage.exists.mockResolvedValue(false)
+      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+    })
+
+    it('should return communities with total count', async () => {
+      const result = await communityComponent.getCommunities(userAddress, options)
+
+      expect(result).toEqual({
+        communities: expect.arrayContaining([
+          expect.objectContaining({
+            id: mockCommunity.id,
+            name: mockCommunity.name,
+            description: mockCommunity.description,
+            ownerAddress: mockCommunity.ownerAddress,
+            privacy: mockCommunity.privacy,
+            active: mockCommunity.active,
+            friends: expect.arrayContaining([
+              expect.objectContaining({
+                address: '0xfriend1',
+                name: 'Profile name 0xfriend1',
+                hasClaimedName: true
+              }),
+              expect.objectContaining({
+                address: '0xfriend2',
+                name: 'Profile name 0xfriend2',
+                hasClaimedName: true
+              })
+            ])
+          })
+        ]),
+        total: 1
+      })
+
+      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, options)
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, options)
+      expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
+    })
+
+    describe('and the communities have a thumbnail', () => {
       beforeEach(() => {
-        mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunities)
-        mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
-        mockStorage.exists.mockResolvedValue(false)
-        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
-      })
-
-      it('should return communities with total count', async () => {
-        const result = await communityComponent.getCommunities(userAddress, options)
-
-        expect(result).toEqual({
-          communities: expect.arrayContaining([
-            expect.objectContaining({
-              id: mockCommunity.id,
-              name: mockCommunity.name,
-              description: mockCommunity.description,
-              ownerAddress: mockCommunity.ownerAddress,
-              privacy: mockCommunity.privacy,
-              active: mockCommunity.active,
-              friends: expect.arrayContaining([
-                expect.objectContaining({
-                  address: '0xfriend1',
-                  name: 'Profile name 0xfriend1',
-                  hasClaimedName: true
-                }),
-                expect.objectContaining({
-                  address: '0xfriend2',
-                  name: 'Profile name 0xfriend2',
-                  hasClaimedName: true
-                })
-              ])
-            })
-          ]),
-          total: 1
+        mockCommunities.forEach(() => {
+          mockStorage.exists.mockResolvedValueOnce(true)
         })
-
-        expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, options)
-        expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, options)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
       })
 
-      it('should include thumbnails when they exist', async () => {
-        mockStorage.exists.mockResolvedValueOnce(true)
-
+      it('should include thumbnails', async () => {
         const result = await communityComponent.getCommunities(userAddress, options)
 
         expect(result.communities[0].thumbnails).toEqual({
@@ -178,7 +186,7 @@ describe('Community Component', () => {
     })
   })
 
-  describe('getCommunitiesPublicInformation', () => {
+  describe('when getting public communities', () => {
     const options = { pagination: { limit: 10, offset: 0 }, search: 'test' }
     const mockCommunities = [
       {
@@ -193,40 +201,43 @@ describe('Community Component', () => {
         isLive: false
       }
     ]
+    beforeEach(() => {
+      mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunities)
+      mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(1)
+      mockStorage.exists.mockResolvedValue(false)
+    })
 
-    describe('when all validations pass', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunities)
-        mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(1)
-        mockStorage.exists.mockResolvedValue(false)
+    it('should return public communities with total count', async () => {
+      const result = await communityComponent.getCommunitiesPublicInformation(options)
+
+      expect(result).toEqual({
+        communities: expect.arrayContaining([
+          expect.objectContaining({
+            id: mockCommunity.id,
+            name: mockCommunity.name,
+            description: mockCommunity.description,
+            ownerAddress: mockCommunity.ownerAddress,
+            privacy: 'public',
+            active: mockCommunity.active,
+            membersCount: 10,
+            isLive: false
+          })
+        ]),
+        total: 1
       })
 
-      it('should return public communities with total count', async () => {
-        const result = await communityComponent.getCommunitiesPublicInformation(options)
+      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
+      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
+    })
 
-        expect(result).toEqual({
-          communities: expect.arrayContaining([
-            expect.objectContaining({
-              id: mockCommunity.id,
-              name: mockCommunity.name,
-              description: mockCommunity.description,
-              ownerAddress: mockCommunity.ownerAddress,
-              privacy: 'public',
-              active: mockCommunity.active,
-              membersCount: 10,
-              isLive: false
-            })
-          ]),
-          total: 1
+    describe('and the communities have a thumbnail', () => {
+      beforeEach(() => {
+        mockCommunities.forEach(() => {
+          mockStorage.exists.mockResolvedValueOnce(true)
         })
-
-        expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
-        expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
       })
 
       it('should include thumbnails when they exist', async () => {
-        mockStorage.exists.mockResolvedValueOnce(true)
-
         const result = await communityComponent.getCommunitiesPublicInformation(options)
 
         expect(result.communities[0].thumbnails).toEqual({
@@ -236,7 +247,7 @@ describe('Community Component', () => {
     })
   })
 
-  describe('getMemberCommunities', () => {
+  describe('when getting member communities', () => {
     const memberAddress = '0x1234567890123456789012345678901234567890'
     const options = { pagination: { limit: 10, offset: 0 } }
     const mockMemberCommunities = [
@@ -252,27 +263,25 @@ describe('Community Component', () => {
       }
     ]
 
-    describe('when all validations pass', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.getMemberCommunities.mockResolvedValue(mockMemberCommunities)
-        mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+    beforeEach(() => {
+      mockCommunitiesDB.getMemberCommunities.mockResolvedValue(mockMemberCommunities)
+      mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+    })
+
+    it('should return member communities with total count', async () => {
+      const result = await communityComponent.getMemberCommunities(memberAddress, options)
+
+      expect(result).toEqual({
+        communities: mockMemberCommunities,
+        total: 1
       })
 
-      it('should return member communities with total count', async () => {
-        const result = await communityComponent.getMemberCommunities(memberAddress, options)
-
-        expect(result).toEqual({
-          communities: mockMemberCommunities,
-          total: 1
-        })
-
-        expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(memberAddress, options)
-        expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(memberAddress, { onlyMemberOf: true })
-      })
+      expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(memberAddress, options)
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(memberAddress, { onlyMemberOf: true })
     })
   })
 
-  describe('createCommunity', () => {
+  describe('when creating a community', () => {
     const ownerAddress = '0x1234567890123456789012345678901234567890'
     const communityData = {
       name: 'New Community',
@@ -281,74 +290,198 @@ describe('Community Component', () => {
     }
     const placeIds = ['place-1', 'place-2']
     const thumbnail = Buffer.from('fake-thumbnail')
+    let ownedNames: any[]
+    let createdCommunity: any
 
-    describe('when all validations pass', () => {
+    beforeEach(() => {
+      ownedNames = []
+      createdCommunity = {
+        ...mockCommunity,
+        ...communityData,
+        id: 'new-community-id'
+      }
+      mockCatalystClient.getOwnedNames.mockResolvedValue(ownedNames)
+      mockCommunitiesDB.createCommunity.mockResolvedValue(createdCommunity)
+      mockCommunitiesDB.addCommunityMember.mockResolvedValue()
+      mockCommunityPlaces.addPlaces.mockResolvedValue()
+      mockStorage.storeFile.mockResolvedValue('https://cdn.decentraland.org/thumbnail.png')
+    })
+
+    describe('and the user has owned names', () => {
       beforeEach(() => {
-        mockCatalystClient.getOwnedNames.mockResolvedValue([
-          { id: '1', name: 'test-name', contractAddress: '0xcontract', tokenId: '1' }
-        ])
-        mockCommunityPlaces.validateOwnership.mockResolvedValue({
-          isValid: true,
-          ownedPlaces: placeIds,
-          notOwnedPlaces: []
-        })
-        mockCommunitiesDB.createCommunity.mockResolvedValue({
-          ...mockCommunity,
-          ...communityData,
-          id: 'new-community-id'
-        })
-        mockCommunitiesDB.addCommunityMember.mockResolvedValue()
-        mockCommunityPlaces.addPlaces.mockResolvedValue()
-        mockStorage.storeFile.mockResolvedValue('https://cdn.decentraland.org/thumbnail.png')
+        ownedNames = [{ id: '1', name: 'test-name', contractAddress: '0xcontract', tokenId: '1' }]
+        mockCatalystClient.getOwnedNames.mockResolvedValue(ownedNames)
       })
 
-      it('should create community successfully', async () => {
-        const result = await communityComponent.createCommunity(communityData, thumbnail, placeIds)
-
-        expect(result).toEqual({
-          ...mockCommunity,
-          ...communityData,
-          id: 'new-community-id',
-          thumbnails: {
-            raw: 'https://cdn.decentraland.org/thumbnail.png'
-          }
+      describe('and no places are provided', () => {
+        beforeEach(() => {
+          mockCommunityPlaces.validateOwnership.mockResolvedValue({
+            isValid: true,
+            ownedPlaces: [],
+            notOwnedPlaces: []
+          })
         })
 
-        expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
-        expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
-        expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
-          ...communityData,
-          owner_address: ownerAddress,
-          private: false,
-          active: true
+        describe('and no thumbnail is provided', () => {
+          it('should create community successfully without places and thumbnail', async () => {
+            const result = await communityComponent.createCommunity(communityData)
+
+            expect(result).toEqual({
+              ...mockCommunity,
+              ...communityData,
+              id: 'new-community-id'
+            })
+
+            expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
+            expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+              ...communityData,
+              owner_address: ownerAddress,
+              private: false,
+              active: true
+            })
+            expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
+              communityId: 'new-community-id',
+              memberAddress: ownerAddress,
+              role: CommunityRole.Owner
+            })
+            expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
+            expect(mockStorage.storeFile).not.toHaveBeenCalled()
+          })
         })
-        expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
-          communityId: 'new-community-id',
-          memberAddress: ownerAddress,
-          role: CommunityRole.Owner
+
+        describe('and a thumbnail is provided', () => {
+          it('should create community successfully with thumbnail', async () => {
+            const result = await communityComponent.createCommunity(communityData, thumbnail)
+
+            expect(result).toEqual({
+              ...mockCommunity,
+              ...communityData,
+              id: 'new-community-id',
+              thumbnails: {
+                raw: 'https://cdn.decentraland.org/thumbnail.png'
+              }
+            })
+
+            expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
+            expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+              ...communityData,
+              owner_address: ownerAddress,
+              private: false,
+              active: true
+            })
+            expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
+              communityId: 'new-community-id',
+              memberAddress: ownerAddress,
+              role: CommunityRole.Owner
+            })
+            expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
+            expect(mockStorage.storeFile).toHaveBeenCalledWith(
+              thumbnail,
+              `communities/new-community-id/raw-thumbnail.png`
+            )
+          })
         })
-        expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith('new-community-id', ownerAddress, placeIds)
-        expect(mockStorage.storeFile).toHaveBeenCalledWith(thumbnail, `communities/new-community-id/raw-thumbnail.png`)
       })
 
-      it('should create community without places and thumbnail', async () => {
-        const result = await communityComponent.createCommunity(communityData)
-
-        expect(result).toEqual({
-          ...mockCommunity,
-          ...communityData,
-          id: 'new-community-id'
+      describe('and places are provided', () => {
+        beforeEach(() => {
+          mockCommunityPlaces.validateOwnership.mockResolvedValue({
+            isValid: true,
+            ownedPlaces: placeIds,
+            notOwnedPlaces: []
+          })
         })
 
-        expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
-        expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
-        expect(mockStorage.storeFile).not.toHaveBeenCalled()
+        describe('and the user owns all places', () => {
+          describe('and no thumbnail is provided', () => {
+            it('should create community successfully with places', async () => {
+              const result = await communityComponent.createCommunity(communityData, undefined, placeIds)
+
+              expect(result).toEqual({
+                ...mockCommunity,
+                ...communityData,
+                id: 'new-community-id'
+              })
+
+              expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
+              expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
+              expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+                ...communityData,
+                owner_address: ownerAddress,
+                private: false,
+                active: true
+              })
+              expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
+                communityId: 'new-community-id',
+                memberAddress: ownerAddress,
+                role: CommunityRole.Owner
+              })
+              expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith('new-community-id', ownerAddress, placeIds)
+              expect(mockStorage.storeFile).not.toHaveBeenCalled()
+            })
+          })
+
+          describe('and a thumbnail is provided', () => {
+            it('should create community successfully with places and thumbnail', async () => {
+              const result = await communityComponent.createCommunity(communityData, thumbnail, placeIds)
+
+              expect(result).toEqual({
+                ...mockCommunity,
+                ...communityData,
+                id: 'new-community-id',
+                thumbnails: {
+                  raw: 'https://cdn.decentraland.org/thumbnail.png'
+                }
+              })
+
+              expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
+              expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
+              expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+                ...communityData,
+                owner_address: ownerAddress,
+                private: false,
+                active: true
+              })
+              expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
+                communityId: 'new-community-id',
+                memberAddress: ownerAddress,
+                role: CommunityRole.Owner
+              })
+              expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith('new-community-id', ownerAddress, placeIds)
+              expect(mockStorage.storeFile).toHaveBeenCalledWith(
+                thumbnail,
+                `communities/new-community-id/raw-thumbnail.png`
+              )
+            })
+          })
+        })
+
+        describe('and the user does not own all places', () => {
+          beforeEach(() => {
+            mockCommunityPlaces.validateOwnership.mockRejectedValue(
+              new NotAuthorizedError(`The user ${ownerAddress} doesn't own all the places`)
+            )
+          })
+
+          it('should throw NotAuthorizedError', async () => {
+            await expect(communityComponent.createCommunity(communityData, undefined, placeIds)).rejects.toThrow(
+              new NotAuthorizedError(`The user ${ownerAddress} doesn't own all the places`)
+            )
+
+            expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
+            expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
+            expect(mockCommunitiesDB.createCommunity).not.toHaveBeenCalled()
+          })
+        })
       })
     })
 
-    describe('when the user has no owned names', () => {
+    describe('and the user has no owned names', () => {
       beforeEach(() => {
-        mockCatalystClient.getOwnedNames.mockResolvedValue([])
+        ownedNames = []
+        mockCatalystClient.getOwnedNames.mockResolvedValue(ownedNames)
       })
 
       it('should throw NotAuthorizedError', async () => {
@@ -360,52 +493,75 @@ describe('Community Component', () => {
         expect(mockCommunitiesDB.createCommunity).not.toHaveBeenCalled()
       })
     })
-
-    describe('when the user does not own all places', () => {
-      beforeEach(() => {
-        mockCatalystClient.getOwnedNames.mockResolvedValue([
-          { id: '1', name: 'test-name', contractAddress: '0xcontract', tokenId: '1' }
-        ])
-        mockCommunityPlaces.validateOwnership.mockRejectedValue(
-          new NotAuthorizedError(`The user ${ownerAddress} doesn't own all the places`)
-        )
-      })
-
-      it('should throw NotAuthorizedError', async () => {
-        await expect(communityComponent.createCommunity(communityData, undefined, placeIds)).rejects.toThrow(
-          new NotAuthorizedError(`The user ${ownerAddress} doesn't own all the places`)
-        )
-
-        expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
-        expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
-        expect(mockCommunitiesDB.createCommunity).not.toHaveBeenCalled()
-      })
-    })
   })
 
-  describe('deleteCommunity', () => {
+  describe('when deleting a community', () => {
     const userAddress = '0x1234567890123456789012345678901234567890'
+    let community: any
 
-    describe('when all validations pass', () => {
+    beforeEach(() => {
+      community = null
+      mockCommunitiesDB.getCommunity.mockResolvedValue(community)
+      mockCommunitiesDB.deleteCommunity.mockResolvedValue()
+    })
+
+    describe('and the community exists', () => {
       beforeEach(() => {
-        mockCommunitiesDB.getCommunity.mockResolvedValue({
-          ...mockCommunity,
-          role: CommunityRole.Owner
-        })
-        mockCommunitiesDB.deleteCommunity.mockResolvedValue()
+        community = { ...mockCommunity }
+        mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       })
 
-      it('should delete the community', async () => {
-        await communityComponent.deleteCommunity(communityId, userAddress)
+      describe('and the user is the owner', () => {
+        beforeEach(() => {
+          community.role = CommunityRole.Owner
+          community.ownerAddress = userAddress
+        })
 
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunitiesDB.deleteCommunity).toHaveBeenCalledWith(communityId)
+        it('should delete the community', async () => {
+          await communityComponent.deleteCommunity(communityId, userAddress)
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.deleteCommunity).toHaveBeenCalledWith(communityId)
+        })
+      })
+
+      describe('and the user is not the owner', () => {
+        beforeEach(() => {
+          community.role = CommunityRole.Member
+          community.ownerAddress = '0xother-owner'
+        })
+
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityComponent.deleteCommunity(communityId, userAddress)).rejects.toThrow(
+            new NotAuthorizedError("The user doesn't have permission to delete this community")
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the user is a moderator', () => {
+        beforeEach(() => {
+          community.role = CommunityRole.Moderator
+          community.ownerAddress = '0xother-owner'
+        })
+
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityComponent.deleteCommunity(communityId, userAddress)).rejects.toThrow(
+            new NotAuthorizedError("The user doesn't have permission to delete this community")
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
+        })
       })
     })
 
-    describe('when the community does not exist', () => {
+    describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
+        community = null
+        mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       })
 
       it('should throw CommunityNotFoundError', async () => {
@@ -417,28 +573,9 @@ describe('Community Component', () => {
         expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
       })
     })
-
-    describe('when the user is not the owner', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.getCommunity.mockResolvedValue({
-          ...mockCommunity,
-          ownerAddress: '0xother-owner',
-          role: CommunityRole.Member
-        })
-      })
-
-      it('should throw NotAuthorizedError', async () => {
-        await expect(communityComponent.deleteCommunity(communityId, userAddress)).rejects.toThrow(
-          new NotAuthorizedError("The user doesn't have permission to delete this community")
-        )
-
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
-      })
-    })
   })
 
-  describe('updateCommunity', () => {
+  describe('when updating a community', () => {
     const userAddress = '0x1234567890123456789012345678901234567890'
     const updates = {
       name: 'Updated Community',
@@ -446,70 +583,264 @@ describe('Community Component', () => {
       placeIds: ['place-1', 'place-2'],
       thumbnailBuffer: Buffer.from('fake-thumbnail')
     }
+    let community: any
+    let updatedCommunity: any
 
-    describe('when all validations pass', () => {
+    beforeEach(() => {
+      community = null
+      updatedCommunity = { ...mockCommunity, ...updates }
+      mockCommunitiesDB.getCommunity.mockResolvedValue(community)
+      mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+      mockCommunityRoles.validatePermissionToEditCommunity.mockResolvedValue()
+      mockCommunityPlaces.validateOwnership.mockResolvedValue({
+        isValid: true,
+        ownedPlaces: updates.placeIds,
+        notOwnedPlaces: []
+      })
+      mockStorage.storeFile.mockResolvedValue('https://cdn.decentraland.org/thumbnail.png')
+      mockCommunityPlaces.updatePlaces.mockResolvedValue()
+    })
+
+    describe('and the community exists', () => {
       beforeEach(() => {
-        mockCommunitiesDB.getCommunity.mockResolvedValue({
-          ...mockCommunity,
-          role: CommunityRole.Owner
-        })
-        mockCommunityRoles.validatePermissionToEditCommunity.mockResolvedValue()
-        mockCommunityPlaces.validateOwnership.mockResolvedValue({
-          isValid: true,
-          ownedPlaces: updates.placeIds,
-          notOwnedPlaces: []
-        })
-        mockCommunitiesDB.updateCommunity.mockResolvedValue({
-          ...mockCommunity,
-          ...updates
-        })
-        mockStorage.storeFile.mockResolvedValue('https://cdn.decentraland.org/thumbnail.png')
-        mockCommunityPlaces.updatePlaces.mockResolvedValue()
+        community = { ...mockCommunity }
+        mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       })
 
-      it('should update the community', async () => {
-        const result = await communityComponent.updateCommunity(communityId, userAddress, updates)
+      describe('and no updates are provided', () => {
+        it('should return community without updates', async () => {
+          const result = await communityComponent.updateCommunity(communityId, userAddress, {})
 
-        expect(result).toEqual({
-          ...mockCommunity,
-          ...updates,
-          thumbnails: {
-            raw: 'https://cdn.decentraland.org/thumbnail.png'
-          }
+          expect(result).toEqual({
+            id: mockCommunity.id,
+            name: mockCommunity.name,
+            description: mockCommunity.description,
+            ownerAddress: mockCommunity.ownerAddress,
+            privacy: mockCommunity.privacy,
+            active: mockCommunity.active
+          })
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunityRoles.validatePermissionToEditCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
         })
-
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
-        expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updates)
-        expect(mockStorage.storeFile).toHaveBeenCalledWith(
-          updates.thumbnailBuffer,
-          `communities/${communityId}/raw-thumbnail.png`
-        )
-        expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, updates.placeIds)
       })
 
-      it('should return community without updates when no updates provided', async () => {
-        const result = await communityComponent.updateCommunity(communityId, userAddress, {})
+      describe('and updates are provided', () => {
+        describe('and the user has permission to edit', () => {
+          beforeEach(() => {
+            mockCommunityRoles.validatePermissionToEditCommunity.mockResolvedValue()
+          })
 
-        expect(result).toEqual({
-          id: mockCommunity.id,
-          name: mockCommunity.name,
-          description: mockCommunity.description,
-          ownerAddress: mockCommunity.ownerAddress,
-          privacy: mockCommunity.privacy,
-          active: mockCommunity.active
+          describe('and no places are provided', () => {
+            const updatesWithoutPlaces = {
+              name: 'Updated Community',
+              description: 'Updated Description',
+              thumbnailBuffer: Buffer.from('fake-thumbnail')
+            }
+
+            beforeEach(() => {
+              updatedCommunity = { ...mockCommunity, ...updatesWithoutPlaces }
+              mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+            })
+
+            describe('and no thumbnail is provided', () => {
+              const updatesWithoutThumbnail = {
+                name: 'Updated Community',
+                description: 'Updated Description'
+              }
+
+              beforeEach(() => {
+                updatedCommunity = { ...mockCommunity, ...updatesWithoutThumbnail }
+                mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+              })
+
+              it('should update the community without thumbnail', async () => {
+                const result = await communityComponent.updateCommunity(
+                  communityId,
+                  userAddress,
+                  updatesWithoutThumbnail
+                )
+
+                expect(result).toEqual({
+                  ...mockCommunity,
+                  ...updatesWithoutThumbnail
+                })
+
+                expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+                expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                  communityId,
+                  userAddress
+                )
+                expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
+                expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutThumbnail)
+                expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                expect(mockCommunityPlaces.updatePlaces).not.toHaveBeenCalled()
+              })
+            })
+
+            describe('and a thumbnail is provided', () => {
+              it('should update the community with thumbnail', async () => {
+                const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutPlaces)
+
+                expect(result).toEqual({
+                  ...mockCommunity,
+                  ...updatesWithoutPlaces,
+                  thumbnails: {
+                    raw: 'https://cdn.decentraland.org/thumbnail.png'
+                  }
+                })
+
+                expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+                expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                  communityId,
+                  userAddress
+                )
+                expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
+                expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutPlaces)
+                expect(mockStorage.storeFile).toHaveBeenCalledWith(
+                  updatesWithoutPlaces.thumbnailBuffer,
+                  `communities/${communityId}/raw-thumbnail.png`
+                )
+                expect(mockCommunityPlaces.updatePlaces).not.toHaveBeenCalled()
+              })
+            })
+          })
+
+          describe('and places are provided', () => {
+            describe('and the user owns all places', () => {
+              beforeEach(() => {
+                mockCommunityPlaces.validateOwnership.mockResolvedValue({
+                  isValid: true,
+                  ownedPlaces: updates.placeIds,
+                  notOwnedPlaces: []
+                })
+              })
+
+              describe('and no thumbnail is provided', () => {
+                const updatesWithoutThumbnail = {
+                  name: 'Updated Community',
+                  description: 'Updated Description',
+                  placeIds: ['place-1', 'place-2']
+                }
+
+                beforeEach(() => {
+                  updatedCommunity = { ...mockCommunity, ...updatesWithoutThumbnail }
+                  mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+                })
+
+                it('should update the community with places', async () => {
+                  const result = await communityComponent.updateCommunity(
+                    communityId,
+                    userAddress,
+                    updatesWithoutThumbnail
+                  )
+
+                  expect(result).toEqual({
+                    ...mockCommunity,
+                    ...updatesWithoutThumbnail
+                  })
+
+                  expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+                  expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                    communityId,
+                    userAddress
+                  )
+                  expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(
+                    updatesWithoutThumbnail.placeIds,
+                    userAddress
+                  )
+                  expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutThumbnail)
+                  expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                  expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
+                    communityId,
+                    userAddress,
+                    updatesWithoutThumbnail.placeIds
+                  )
+                })
+              })
+
+              describe('and a thumbnail is provided', () => {
+                it('should update the community with places and thumbnail', async () => {
+                  const result = await communityComponent.updateCommunity(communityId, userAddress, updates)
+
+                  expect(result).toEqual({
+                    ...mockCommunity,
+                    ...updates,
+                    thumbnails: {
+                      raw: 'https://cdn.decentraland.org/thumbnail.png'
+                    }
+                  })
+
+                  expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+                  expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                    communityId,
+                    userAddress
+                  )
+                  expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
+                  expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updates)
+                  expect(mockStorage.storeFile).toHaveBeenCalledWith(
+                    updates.thumbnailBuffer,
+                    `communities/${communityId}/raw-thumbnail.png`
+                  )
+                  expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
+                    communityId,
+                    userAddress,
+                    updates.placeIds
+                  )
+                })
+              })
+            })
+
+            describe('and the user does not own all places', () => {
+              beforeEach(() => {
+                mockCommunityPlaces.validateOwnership.mockRejectedValue(
+                  new NotAuthorizedError(`The user ${userAddress} doesn't own all the places`)
+                )
+              })
+
+              it('should throw NotAuthorizedError', async () => {
+                await expect(communityComponent.updateCommunity(communityId, userAddress, updates)).rejects.toThrow(
+                  new NotAuthorizedError(`The user ${userAddress} doesn't own all the places`)
+                )
+
+                expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+                expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                  communityId,
+                  userAddress
+                )
+                expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
+                expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
+              })
+            })
+          })
         })
 
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunityRoles.validatePermissionToEditCommunity).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
+        describe('and the user does not have permission to edit', () => {
+          beforeEach(() => {
+            const permissionError = new NotAuthorizedError(
+              `The user ${userAddress} doesn't have permission to edit the community`
+            )
+            mockCommunityRoles.validatePermissionToEditCommunity.mockRejectedValue(permissionError)
+          })
+
+          it('should throw NotAuthorizedError', async () => {
+            await expect(communityComponent.updateCommunity(communityId, userAddress, updates)).rejects.toThrow(
+              new NotAuthorizedError(`The user ${userAddress} doesn't have permission to edit the community`)
+            )
+
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+            expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
+            expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
+          })
+        })
       })
     })
 
-    describe('when the community does not exist', () => {
+    describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.getCommunity.mockResolvedValueOnce(null)
+        community = null
+        mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       })
 
       it('should throw CommunityNotFoundError', async () => {
@@ -519,53 +850,6 @@ describe('Community Component', () => {
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
         expect(mockCommunityRoles.validatePermissionToEditCommunity).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('when the user does not have permission', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.getCommunity.mockResolvedValue({
-          ...mockCommunity,
-          role: CommunityRole.Member
-        })
-        const permissionError = new NotAuthorizedError(
-          `The user ${userAddress} doesn't have permission to edit the community`
-        )
-        mockCommunityRoles.validatePermissionToEditCommunity.mockRejectedValue(permissionError)
-      })
-
-      it('should throw NotAuthorizedError', async () => {
-        await expect(communityComponent.updateCommunity(communityId, userAddress, updates)).rejects.toThrow(
-          new NotAuthorizedError(`The user ${userAddress} doesn't have permission to edit the community`)
-        )
-
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('when the user does not own all places', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.getCommunity.mockResolvedValue({
-          ...mockCommunity,
-          role: CommunityRole.Owner
-        })
-        mockCommunityRoles.validatePermissionToEditCommunity.mockResolvedValue()
-        mockCommunityPlaces.validateOwnership.mockRejectedValue(
-          new NotAuthorizedError(`The user ${userAddress} doesn't own all the places`)
-        )
-      })
-
-      it('should throw NotAuthorizedError', async () => {
-        await expect(communityComponent.updateCommunity(communityId, userAddress, updates)).rejects.toThrow(
-          new NotAuthorizedError(`The user ${userAddress} doesn't own all the places`)
-        )
-
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
         expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
       })
     })
