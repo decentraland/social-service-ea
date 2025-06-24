@@ -147,7 +147,7 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${updaterAddress} doesn't have permission to update ${targetMemberAddress}'s role in community ${communityId}`
+              message: `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
             })
           })
         })
@@ -174,7 +174,7 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${updaterAddress} doesn't have permission to update ${targetMemberAddress}'s role in community ${communityId}`
+              message: `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
             })
           })
 
@@ -191,7 +191,7 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${updaterAddress} doesn't have permission to update ${updaterAddress}'s role in community ${communityId}`
+              message: `The user ${updaterAddress} cannot update their own role in community ${communityId}`
             })
           })
         })
@@ -218,7 +218,7 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${updaterAddress} doesn't have permission to update ${targetModeratorAddress}'s role in community ${communityId}`
+              message: `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
             })
           })
 
@@ -235,7 +235,7 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${updaterAddress} doesn't have permission to update ${targetOwnerAddress}'s role in community ${communityId}`
+              message: `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
             })
           })
         })
@@ -286,14 +286,14 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${updaterAddress} doesn't have permission to update ${targetOwnerAddress}'s role in community ${communityId}`
+              message: `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
             })
           })
         })
 
         describe('and an error occurs', () => {
           beforeEach(() => {
-            spyComponents.community.updateMemberRole.mockRejectedValue(new Error('Unable to update member role'))
+            spyComponents.communityMembers.updateMemberRole.mockRejectedValue(new Error('Unable to update member role'))
           })
 
           it('should respond with a 500 status code', async () => {

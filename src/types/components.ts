@@ -117,12 +117,13 @@ export interface IFriendsDatabaseComponent {
 export interface ICommunitiesDatabaseComponent {
   communityExists(communityId: string, options?: Pick<GetCommunitiesOptions, 'onlyPublic'>): Promise<boolean>
   getCommunity(id: string, userAddress?: EthAddress): Promise<(Community & { role: CommunityRole }) | null>
-  getCommunityPlaces(communityId: string, pagination: PaginatedParameters): Promise<Pick<CommunityPlace, 'id'>[]>
+  getCommunityPlaces(communityId: string, pagination?: PaginatedParameters): Promise<Pick<CommunityPlace, 'id'>[]>
   getCommunityPlacesCount(communityId: string): Promise<number>
   communityPlaceExists(communityId: string, placeId: string): Promise<boolean>
   addCommunityPlace(place: CommunityPlace): Promise<void>
   addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void>
   removeCommunityPlace(communityId: string, placeId: string): Promise<void>
+  removeCommunityPlacesWithExceptions(communityId: string, exceptPlaceIds: string[]): Promise<void>
   createCommunity(community: CommunityDB): Promise<Community>
   deleteCommunity(id: string): Promise<void>
   getCommunities(

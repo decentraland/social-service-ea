@@ -253,7 +253,7 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
           const testTargetAddress = '0x0000000000000000000000000000000000000004'
 
           beforeEach(async () => {
-            spyComponents.community.banMember.mockRejectedValue(new Error('Unable to ban member'))
+            spyComponents.communityBans.banMember.mockRejectedValue(new Error('Unable to ban member'))
           })
 
           it('should respond with a 500 status code', async () => {

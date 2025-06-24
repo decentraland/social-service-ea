@@ -7,12 +7,12 @@ import { CommunityNotFoundError } from '../../logic/community/errors'
 
 export async function unbanMemberHandler(
   context: Pick<
-    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members/:memberAddress/bans'>,
+    HandlerContextWithPath<'communityBans' | 'logs', '/v1/communities/:id/members/:memberAddress/bans'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { community, logs },
+    components: { communityBans, logs },
     params: { id: communityId, memberAddress },
     verification
   } = context
@@ -29,7 +29,7 @@ export async function unbanMemberHandler(
 
     logger.info(`Unbanning member ${userAddressToUnban} from community ${communityId}`)
 
-    await community.unbanMember(communityId, addressPerformingUnban, userAddressToUnban)
+    await communityBans.unbanMember(communityId, addressPerformingUnban, userAddressToUnban)
 
     return { status: 204 }
   } catch (error) {

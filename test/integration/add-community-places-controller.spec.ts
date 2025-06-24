@@ -78,7 +78,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${userAddress} doesn't have permission to add places to community ${communityId}`
+              message: `The user ${userAddress} doesn't have permission to add places to the community`
             })
           })
         })
@@ -100,7 +100,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${userAddress} doesn't have permission to add places to community ${communityId}`
+              message: `The user ${userAddress} doesn't have permission to add places to the community`
             })
           })
         })
@@ -112,12 +112,14 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
               memberAddress: userAddress,
               role: CommunityRole.Moderator
             })
-            stubComponents.placesApi.getPlaces.resolves(mockPlaceIds.map((placeId) => ({
-              id: placeId,
-              title: placeId,
-              positions: [],
-              owner: userAddress
-            })))
+            stubComponents.placesApi.getPlaces.resolves(
+              mockPlaceIds.map((placeId) => ({
+                id: placeId,
+                title: placeId,
+                positions: [],
+                owner: userAddress
+              }))
+            )
           })
 
           it('should respond with a 204 status code when adding places', async () => {
@@ -138,6 +140,35 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
               message: 'placeIds must be an array'
             })
           })
+
+          it('should respond with a 401 status code when user does not own the places', async () => {
+            stubComponents.placesApi.getPlaces.resolves(
+              mockPlaceIds.map((placeId) => ({
+                id: placeId,
+                title: placeId,
+                positions: [],
+                owner: '0xother-owner'
+              }))
+            )
+
+            const response = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'POST', {
+              placeIds: mockPlaceIds
+            })
+            expect(response.status).toBe(401)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Not Authorized',
+              message: `The user ${userAddress} doesn't own all the places`
+            })
+          })
+
+          it('should handle duplicate place IDs by deduplicating them', async () => {
+            const duplicatePlaceIds = [...mockPlaceIds, mockPlaceIds[0]]
+            const response = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'POST', {
+              placeIds: duplicatePlaceIds
+            })
+            expect(response.status).toBe(204)
+          })
         })
 
         describe('and the user is the owner', () => {
@@ -147,12 +178,14 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
               memberAddress: userAddress,
               role: CommunityRole.Owner
             })
-            stubComponents.placesApi.getPlaces.resolves(mockPlaceIds.map((placeId) => ({
-              id: placeId,
-              title: placeId,
-              positions: [],
-              owner: userAddress
-            })))
+            stubComponents.placesApi.getPlaces.resolves(
+              mockPlaceIds.map((placeId) => ({
+                id: placeId,
+                title: placeId,
+                positions: [],
+                owner: userAddress
+              }))
+            )
           })
 
           afterEach(() => {
@@ -188,7 +221,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
             memberAddress: userAddress,
             role: CommunityRole.Owner
           })
-          spyComponents.communityPlaces.addPlaces.mockRejectedValue(new Error('Unable to add places'))
+          spyComponents.placesApi.getPlaces.mockRejectedValue(new Error('Unable to get places'))
         })
 
         it('should respond with a 500 status code', async () => {
@@ -196,6 +229,29 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
             placeIds: mockPlaceIds
           })
           expect(response.status).toBe(500)
+        })
+      })
+
+      describe('and the places API fails', () => {
+        beforeEach(async () => {
+          await components.communitiesDb.addCommunityMember({
+            communityId,
+            memberAddress: userAddress,
+            role: CommunityRole.Owner
+          })
+          stubComponents.placesApi.getPlaces.resolves(null)
+        })
+
+        it('should respond with a 401 status code when places API returns null', async () => {
+          const response = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'POST', {
+            placeIds: mockPlaceIds
+          })
+          expect(response.status).toBe(401)
+          const body = await response.json()
+          expect(body).toEqual({
+            error: 'Not Authorized',
+            message: `The user ${userAddress} doesn't own all the places`
+          })
         })
       })
     })

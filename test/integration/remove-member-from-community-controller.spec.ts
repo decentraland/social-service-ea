@@ -300,7 +300,7 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
           const testTargetAddress = '0x0000000000000000000000000000000000000004'
 
           beforeEach(async () => {
-            spyComponents.community.kickMember.mockRejectedValue(new Error('Unable to remove member'))
+            spyComponents.communityMembers.kickMember.mockRejectedValue(new Error('Unable to remove member'))
           })
 
           it('should respond with a 500 status code', async () => {

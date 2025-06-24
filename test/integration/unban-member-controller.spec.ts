@@ -258,7 +258,7 @@ test('Unban Member Controller', function ({ components, spyComponents }) {
               memberAddress: unbannerAddress,
               role: CommunityRole.Moderator
             })
-            spyComponents.community.unbanMember.mockRejectedValue(new Error('Unable to unban member'))
+            spyComponents.communityBans.unbanMember.mockRejectedValue(new Error('Unable to unban member'))
           })
 
           it('should respond with a 500 status code', async () => {

@@ -7,12 +7,12 @@ import { normalizeAddress } from '../../utils/address'
 
 export async function removeMemberFromCommunityHandler(
   context: Pick<
-    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members/:memberAddress'>,
+    HandlerContextWithPath<'communityMembers' | 'logs', '/v1/communities/:id/members/:memberAddress'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { community, logs },
+    components: { communityMembers, logs },
     params: { id: communityId, memberAddress: memberToRemoveAddress },
     verification
   } = context
@@ -29,9 +29,9 @@ export async function removeMemberFromCommunityHandler(
     }
 
     if (removerAddress === normalizedMemberToRemoveAddress) {
-      await community.leaveCommunity(communityId, removerAddress)
+      await communityMembers.leaveCommunity(communityId, removerAddress)
     } else {
-      await community.kickMember(communityId, removerAddress, normalizedMemberToRemoveAddress)
+      await communityMembers.kickMember(communityId, removerAddress, normalizedMemberToRemoveAddress)
     }
 
     return {

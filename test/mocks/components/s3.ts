@@ -1,8 +1,8 @@
-import { IStorageComponent } from "../../../src/types";
+import { IStorageComponent } from '../../../src/types'
 
-export function createS3ComponentMock(): IStorageComponent {
-    return {
-        storeFile: jest.fn(),
-        exists: jest.fn()
-    }
+export function createS3ComponentMock(): jest.Mocked<IStorageComponent> {
+  return {
+    storeFile: jest.fn(),
+    exists: jest.fn()
+  }
 }

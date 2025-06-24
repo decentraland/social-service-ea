@@ -34,7 +34,13 @@ import {
   IStorageHelperComponent,
   IPlacesApiComponent
 } from './components'
-import { ICommunityComponent, ICommunityPlacesComponent, ICommunityRolesComponent } from '../logic/community'
+import {
+  ICommunitiesComponent,
+  ICommunityBansComponent,
+  ICommunityMembersComponent,
+  ICommunityPlacesComponent,
+  ICommunityRolesComponent
+} from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
 import { IReferralComponent } from '../logic/referral'
@@ -53,11 +59,13 @@ export type BaseComponents = {
   archipelagoStats: IArchipelagoStatsComponent
   catalystClient: ICatalystClientComponent
   commsGatekeeper: ICommsGatekeeperComponent
-  community: ICommunityComponent
+  communities: ICommunitiesComponent
   expirePrivateVoiceChatJob?: IJobComponent
   communityRoles: ICommunityRolesComponent
   communityPlaces: ICommunityPlacesComponent
   communitiesDb: ICommunitiesDatabaseComponent
+  communityMembers: ICommunityMembersComponent
+  communityBans: ICommunityBansComponent
   config: IConfigComponent
   fetcher: IFetchComponent
   friendsDb: IFriendsDatabaseComponent

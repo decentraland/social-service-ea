@@ -4,12 +4,12 @@ import { CommunityNotFoundError, CommunityWithMembersCount } from '../../logic/c
 
 export async function getCommunityHandler(
   context: Pick<
-    HandlerContextWithPath<'logs' | 'community', '/v1/communities/:id'>,
+    HandlerContextWithPath<'logs' | 'communities', '/v1/communities/:id'>,
     'url' | 'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse<CommunityWithMembersCount>> {
   const {
-    components: { community, logs },
+    components: { communities, logs },
     params: { id },
     verification
   } = context
@@ -23,7 +23,7 @@ export async function getCommunityHandler(
     return {
       status: 200,
       body: {
-        data: await community.getCommunity(id, userAddress)
+        data: await communities.getCommunity(id, userAddress)
       }
     }
   } catch (error) {
