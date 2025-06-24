@@ -54,6 +54,8 @@ import { createReferralComponent } from '../src/logic/referral/referral'
 import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
 import { createStorageHelper } from './integration/utils/storage'
+import { createAnalyticsComponent } from '../src/logic/analytics'
+import { AnalyticsEventPayload } from '../src/types/analytics'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -125,7 +127,23 @@ async function initComponents(): Promise<TestComponents> {
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
-  const voice = await createVoiceComponent({ logs, config, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
+  const analytics = await createAnalyticsComponent<AnalyticsEventPayload>(
+    { logs, fetcher },
+    'social-service',
+    'dev',
+    'https://analytics.test.com',
+    'test'
+  )
+  const voice = await createVoiceComponent({
+    logs,
+    config,
+    voiceDb,
+    friendsDb,
+    commsGatekeeper,
+    settings,
+    pubsub,
+    analytics
+  })
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const rpcServer = await createRpcServerComponent({
     logs,
@@ -192,6 +210,7 @@ async function initComponents(): Promise<TestComponents> {
   const storageHelper = await createStorageHelper({ config })
 
   return {
+    analytics,
     archipelagoStats,
     catalystClient,
     commsGatekeeper,

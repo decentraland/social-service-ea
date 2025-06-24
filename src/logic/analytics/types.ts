@@ -2,7 +2,7 @@ import { IFetchComponent, ILoggerComponent } from '@well-known-components/interf
 
 export interface IAnalyticsDependencies {
   logs: ILoggerComponent
-  fetch: IFetchComponent
+  fetcher: IFetchComponent
 }
 
 export type AnalyticsEvent = {
