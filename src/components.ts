@@ -108,7 +108,8 @@ export async function initComponents(): Promise<AppComponents> {
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const referralDb = await createReferralDBComponent({ pg, logs })
-  const referral = await createReferralComponent({ referralDb, logs })
+  const sns = await createSnsComponent({ config })
+  const referral = await createReferralComponent({ referralDb, logs, sns })
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
@@ -121,7 +122,6 @@ export async function initComponents(): Promise<AppComponents> {
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
   const voice = await createVoiceComponent({ logs, config, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
-  const sns = await createSnsComponent({ config })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
