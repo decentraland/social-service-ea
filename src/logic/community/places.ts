@@ -15,6 +15,10 @@ export async function createCommunityPlacesComponent(
     placeIds: string[],
     userAddress: EthAddress
   ): Promise<{ ownedPlaces: string[]; notOwnedPlaces: string[]; isValid: boolean }> => {
+    if (placeIds.length === 0) {
+      return { ownedPlaces: [], notOwnedPlaces: [], isValid: true }
+    }
+
     const uniquePlaceIds = Array.from(new Set(placeIds))
     const places = await placesApi.getPlaces(uniquePlaceIds)
 

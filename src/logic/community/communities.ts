@@ -226,7 +226,10 @@ export async function createCommunityComponent(
       const { placeIds, thumbnailBuffer, ...restUpdates } = updates
 
       if (placeIds && placeIds.length > 0) {
-        await communityPlaces.validateOwnership(placeIds, userAddress)
+        const uniquePlaceIds = Array.from(new Set(placeIds))
+        const currentPlaces = await communitiesDb.getCommunityPlaces(communityId)
+        const placeIdsToValidate = uniquePlaceIds.filter((placeId) => !currentPlaces.some((p) => p.id === placeId))
+        await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
       }
 
       logger.info('Updating community', {

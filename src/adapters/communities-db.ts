@@ -164,7 +164,7 @@ export function createCommunitiesDBComponent(
       return pg.getCount(query)
     },
 
-    async getCommunityPlaces(communityId: string, pagination: Pagination): Promise<Pick<CommunityPlace, 'id'>[]> {
+    async getCommunityPlaces(communityId: string, pagination?: Pagination): Promise<Pick<CommunityPlace, 'id'>[]> {
       const query = SQL`
         SELECT id
         FROM community_places
@@ -172,11 +172,11 @@ export function createCommunitiesDBComponent(
         ORDER BY added_at DESC
         `
 
-      if (pagination.limit) {
+      if (pagination?.limit) {
         query.append(SQL` LIMIT ${pagination.limit}`)
       }
 
-      if (pagination.offset) {
+      if (pagination?.offset) {
         query.append(SQL` OFFSET ${pagination.offset}`)
       }
 
