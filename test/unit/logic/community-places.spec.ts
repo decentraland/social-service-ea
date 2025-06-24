@@ -637,7 +637,7 @@ describe('Community Places Component', () => {
         expect(result.isValid).toBe(true)
         expect(result.ownedPlaces).toEqual([])
         expect(result.notOwnedPlaces).toEqual([])
-        expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith([])
+        expect(mockPlacesApi.getPlaces).not.toHaveBeenCalled()
       })
     })
 
