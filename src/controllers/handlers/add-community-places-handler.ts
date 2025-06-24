@@ -31,7 +31,7 @@ export async function addCommunityPlacesHandler(
       throw new InvalidRequestError('placeIds must be an array')
     }
 
-    await communityPlaces.addPlaces(communityId, userAddress, placeIds)
+    await communityPlaces.validateAndAddPlaces(communityId, userAddress, placeIds)
     return {
       status: 204
     }

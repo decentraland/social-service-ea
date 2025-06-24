@@ -7,12 +7,12 @@ import { PaginatedResponse } from '@dcl/schemas'
 
 export async function getCommunityMembersHandler(
   context: Pick<
-    HandlerContextWithPath<'logs' | 'community', '/v1/communities/:id/members'>,
+    HandlerContextWithPath<'logs' | 'communityMembers', '/v1/communities/:id/members'>,
     'url' | 'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse<PaginatedResponse<CommunityMemberProfile>>> {
   const {
-    components: { community, logs },
+    components: { communityMembers, logs },
     params: { id: communityId },
     verification,
     url
@@ -29,8 +29,8 @@ export async function getCommunityMembersHandler(
     const options: GetCommunityMembersOptions = { pagination: paginationParams, onlyOnline }
 
     const { members, totalMembers } = userAddress
-      ? await community.getCommunityMembers(communityId, userAddress, options)
-      : await community.getMembersFromPublicCommunity(communityId, options)
+      ? await communityMembers.getCommunityMembers(communityId, userAddress, options)
+      : await communityMembers.getMembersFromPublicCommunity(communityId, options)
 
     return {
       status: 200,

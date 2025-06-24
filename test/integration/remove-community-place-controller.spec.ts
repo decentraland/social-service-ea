@@ -103,7 +103,7 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${userAddress} doesn't have permission to remove places from community ${communityId}`
+              message: `The user ${userAddress} doesn't have permission to remove places from the community`
             })
           })
         })
@@ -123,7 +123,7 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
             const body = await response.json()
             expect(body).toEqual({
               error: 'Not Authorized',
-              message: `The user ${userAddress} doesn't have permission to remove places from community ${communityId}`
+              message: `The user ${userAddress} doesn't have permission to remove places from the community`
             })
           })
         })

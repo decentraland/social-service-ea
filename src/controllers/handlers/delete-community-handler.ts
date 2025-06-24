@@ -5,12 +5,12 @@ import { NotAuthorizedError } from '@dcl/platform-server-commons'
 
 export async function deleteCommunityHandler(
   context: Pick<
-    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id'>,
+    HandlerContextWithPath<'communities' | 'logs', '/v1/communities/:id'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { community, logs },
+    components: { communities, logs },
     params: { id },
     verification
   } = context
@@ -21,7 +21,7 @@ export async function deleteCommunityHandler(
   try {
     const userAddress = verification!.auth.toLowerCase()
 
-    await community.deleteCommunity(id, userAddress)
+    await communities.deleteCommunity(id, userAddress)
 
     return {
       status: 204

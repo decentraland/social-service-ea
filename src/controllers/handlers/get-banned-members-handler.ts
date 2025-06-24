@@ -7,12 +7,12 @@ import { getPaginationResultProperties } from '../../utils/pagination'
 
 export async function getBannedMembersHandler(
   context: Pick<
-    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/bans'>,
+    HandlerContextWithPath<'communityBans' | 'logs', '/v1/communities/:id/bans'>,
     'components' | 'url' | 'verification' | 'params'
   >
 ): Promise<HTTPResponse<PaginatedResponse<BannedMemberProfile>>> {
   const {
-    components: { community, logs },
+    components: { communityBans, logs },
     verification,
     url,
     params: { id: communityId }
@@ -24,7 +24,7 @@ export async function getBannedMembersHandler(
   try {
     const userAddress = verification!.auth.toLowerCase()
     const paginationParams = getPaginationParams(url.searchParams)
-    const { members, totalMembers } = await community.getBannedMembers(communityId, userAddress, paginationParams)
+    const { members, totalMembers } = await communityBans.getBannedMembers(communityId, userAddress, paginationParams)
 
     return {
       status: 200,

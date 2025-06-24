@@ -8,12 +8,12 @@ import { normalizeAddress } from '../../utils/address'
 
 export async function getMemberCommunitiesHandler(
   context: Pick<
-    HandlerContextWithPath<'logs' | 'community', '/v1/members/:address/communities'>,
+    HandlerContextWithPath<'logs' | 'communities', '/v1/members/:address/communities'>,
     'url' | 'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse<PaginatedResponse<MemberCommunity>>> {
   const {
-    components: { community, logs },
+    components: { communities, logs },
     params: { address: memberAddress },
     verification
   } = context
@@ -30,13 +30,15 @@ export async function getMemberCommunitiesHandler(
       throw new NotAuthorizedError('You are not authorized to get communities for this member')
     }
 
-    const { communities, total } = await community.getMemberCommunities(normalizedMemberAddress, { pagination })
+    const { communities: communitiesData, total } = await communities.getMemberCommunities(normalizedMemberAddress, {
+      pagination
+    })
 
     return {
       status: 200,
       body: {
         data: {
-          results: communities,
+          results: communitiesData,
           total,
           ...getPaginationResultProperties(total, pagination)
         }

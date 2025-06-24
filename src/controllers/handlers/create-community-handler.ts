@@ -5,10 +5,10 @@ import { errorMessageOrDefault } from '../../utils/errors'
 import { validateCommunityFields } from '../../utils/community-validation'
 
 export async function createCommunityHandler(
-  context: FormHandlerContextWithPath<'community' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
+  context: FormHandlerContextWithPath<'communities' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
 ): Promise<HTTPResponse> {
   const {
-    components: { community, logs },
+    components: { communities, logs },
     verification,
     formData
   } = context
@@ -31,7 +31,7 @@ export async function createCommunityHandler(
       placeIds: placeIds?.length ? placeIds.join(',') : 'N/A'
     })
 
-    const createdCommunity = await community.createCommunity(
+    const createdCommunity = await communities.createCommunity(
       {
         name: name!,
         description: description!,

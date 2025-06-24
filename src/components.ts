@@ -30,7 +30,12 @@ import { createVoiceComponent } from './logic/voice'
 import { createSettingsComponent } from './logic/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
-import { createCommunityComponent, createCommunityRolesComponent } from './logic/community'
+import {
+  createCommunityBansComponent,
+  createCommunityComponent,
+  createCommunityMembersComponent,
+  createCommunityRolesComponent
+} from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
@@ -109,7 +114,6 @@ export async function initComponents(): Promise<AppComponents> {
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const referralDb = await createReferralDBComponent({ pg, logs })
-  const referral = await createReferralComponent({ referralDb, logs })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>(
     { logs, fetch: fetcher },
     serverName,
@@ -117,6 +121,8 @@ export async function initComponents(): Promise<AppComponents> {
     analyticsApiUrl,
     analyticsApiToken
   )
+  const sns = await createSnsComponent({ config })
+  const referral = await createReferralComponent({ referralDb, logs, sns })
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
@@ -138,7 +144,6 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     analytics
   })
-  const sns = await createSnsComponent({ config })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
@@ -162,13 +167,20 @@ export async function initComponents(): Promise<AppComponents> {
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
-  const community = await createCommunityComponent({
+  const communityMembers = await createCommunityMembersComponent({
+    communitiesDb,
+    communityRoles,
+    logs,
+    catalystClient,
+    peersStats
+  })
+  const communityBans = await createCommunityBansComponent({ communitiesDb, communityRoles, logs, catalystClient })
+  const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
     logs,
-    peersStats,
     storage,
     config
   })
@@ -195,7 +207,9 @@ export async function initComponents(): Promise<AppComponents> {
     archipelagoStats,
     catalystClient,
     commsGatekeeper,
-    community,
+    communities,
+    communityMembers,
+    communityBans,
     communityPlaces,
     communityRoles,
     communitiesDb,

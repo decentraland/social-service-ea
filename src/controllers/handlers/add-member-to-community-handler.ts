@@ -6,12 +6,12 @@ import { EthAddress } from '@dcl/schemas'
 
 export async function addMemberToCommunityHandler(
   context: Pick<
-    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members'>,
+    HandlerContextWithPath<'communityMembers' | 'logs', '/v1/communities/:id/members'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { community, logs },
+    components: { communityMembers, logs },
     params: { id: communityId },
     verification
   } = context
@@ -27,7 +27,7 @@ export async function addMemberToCommunityHandler(
       throw new InvalidRequestError(`Invalid address ${memberAddress}`)
     }
 
-    await community.joinCommunity(communityId, memberAddress)
+    await communityMembers.joinCommunity(communityId, memberAddress)
     return {
       status: 204
     }

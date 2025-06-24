@@ -7,12 +7,12 @@ import { CommunityNotFoundError } from '../../logic/community/errors'
 
 export async function banMemberHandler(
   context: Pick<
-    HandlerContextWithPath<'community' | 'logs', '/v1/communities/:id/members/:memberAddress/bans'>,
+    HandlerContextWithPath<'communityBans' | 'logs', '/v1/communities/:id/members/:memberAddress/bans'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { community, logs },
+    components: { communityBans, logs },
     params: { id: communityId, memberAddress },
     verification
   } = context
@@ -28,7 +28,7 @@ export async function banMemberHandler(
 
     logger.info(`Banning member ${addressToBan} from community ${communityId}`)
 
-    await community.banMember(communityId, addressPerformingBan, addressToBan)
+    await communityBans.banMember(communityId, addressPerformingBan, addressToBan)
 
     return { status: 204 }
   } catch (error) {

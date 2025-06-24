@@ -5,10 +5,13 @@ import { PaginatedResponse } from '@dcl/schemas'
 import { CommunityWithUserInformation, CommunityPublicInformation } from '../../logic/community'
 
 export async function getCommunitiesHandler(
-  context: Pick<HandlerContextWithPath<'community' | 'logs', '/v1/communities'>, 'components' | 'url' | 'verification'>
+  context: Pick<
+    HandlerContextWithPath<'communities' | 'logs', '/v1/communities'>,
+    'components' | 'url' | 'verification'
+  >
 ): Promise<HTTPResponse<PaginatedResponse<CommunityWithUserInformation | CommunityPublicInformation>>> {
   const {
-    components: { community, logs },
+    components: { communities, logs },
     verification,
     url
   } = context
@@ -22,15 +25,15 @@ export async function getCommunitiesHandler(
   const onlyMemberOf = url.searchParams.get('onlyMemberOf')?.toLowerCase() === 'true'
 
   try {
-    const { communities, total } = userAddress
-      ? await community.getCommunities(userAddress, { pagination, search, onlyMemberOf })
-      : await community.getCommunitiesPublicInformation({ pagination, search })
+    const { communities: communitiesData, total } = userAddress
+      ? await communities.getCommunities(userAddress, { pagination, search, onlyMemberOf })
+      : await communities.getCommunitiesPublicInformation({ pagination, search })
 
     return {
       status: 200,
       body: {
         data: {
-          results: communities,
+          results: communitiesData,
           total,
           page: Math.floor(pagination.offset / pagination.limit) + 1,
           pages: Math.ceil(total / pagination.limit),

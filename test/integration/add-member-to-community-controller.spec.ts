@@ -122,7 +122,7 @@ test('Add Member to Community Controller', function ({ components, spyComponents
 
       describe('and an error occurs', () => {
         beforeEach(async () => {
-          spyComponents.community.joinCommunity.mockRejectedValue(new Error('Unable to join community'))
+          spyComponents.communityMembers.joinCommunity.mockRejectedValue(new Error('Unable to join community'))
         })
 
         it('should respond with a 500 status code', async () => {

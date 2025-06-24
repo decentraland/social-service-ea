@@ -7,7 +7,14 @@ import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { EthAddress, FriendshipAcceptedEvent, FriendshipRequestEvent, PaginatedParameters } from '@dcl/schemas'
+import {
+  EthAddress,
+  FriendshipAcceptedEvent,
+  FriendshipRequestEvent,
+  PaginatedParameters,
+  ReferralInvitedUsersAcceptedEvent,
+  ReferralNewTierReachedEvent
+} from '@dcl/schemas'
 import { PublishCommandOutput } from '@aws-sdk/client-sns'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
@@ -117,12 +124,13 @@ export interface IFriendsDatabaseComponent {
 export interface ICommunitiesDatabaseComponent {
   communityExists(communityId: string, options?: Pick<GetCommunitiesOptions, 'onlyPublic'>): Promise<boolean>
   getCommunity(id: string, userAddress?: EthAddress): Promise<(Community & { role: CommunityRole }) | null>
-  getCommunityPlaces(communityId: string, pagination: PaginatedParameters): Promise<Pick<CommunityPlace, 'id'>[]>
+  getCommunityPlaces(communityId: string, pagination?: PaginatedParameters): Promise<Pick<CommunityPlace, 'id'>[]>
   getCommunityPlacesCount(communityId: string): Promise<number>
   communityPlaceExists(communityId: string, placeId: string): Promise<boolean>
   addCommunityPlace(place: CommunityPlace): Promise<void>
   addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void>
   removeCommunityPlace(communityId: string, placeId: string): Promise<void>
+  removeCommunityPlacesWithExceptions(communityId: string, exceptPlaceIds: string[]): Promise<void>
   createCommunity(community: CommunityDB): Promise<Community>
   deleteCommunity(id: string): Promise<void>
   getCommunities(
@@ -228,7 +236,13 @@ export type ICatalystClientComponent = {
 }
 
 export type IPublisherComponent = {
-  publishMessage(event: FriendshipRequestEvent | FriendshipAcceptedEvent): Promise<PublishCommandOutput>
+  publishMessage(
+    event:
+      | FriendshipRequestEvent
+      | FriendshipAcceptedEvent
+      | ReferralInvitedUsersAcceptedEvent
+      | ReferralNewTierReachedEvent
+  ): Promise<PublishCommandOutput>
 }
 
 export type IWSPoolComponent = {
