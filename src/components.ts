@@ -41,6 +41,8 @@ import { createS3Adapter } from './adapters/s3'
 import { createCommunityPlacesComponent } from './logic/community'
 import { createJobComponent } from './logic/job'
 import { createPlacesApiAdapter } from './adapters/places-api'
+import { createAnalyticsComponent, Environment } from './logic/analytics'
+import { AnalyticsEventPayload } from './types/analytics'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -85,7 +87,11 @@ export async function initComponents(): Promise<AppComponents> {
     const dbPassword = await config.requireString('PG_COMPONENT_PSQL_PASSWORD')
     databaseUrl = `postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbDatabaseName}`
   }
+  const serverName = 'social-service'
   const privateVoiceChatJobInterval = await config.requireNumber('PRIVATE_VOICE_CHAT_JOB_INTERVAL')
+  const analyticsApiUrl = await config.requireString('ANALYTICS_API_URL')
+  const analyticsApiToken = await config.requireString('ANALYTICS_API_TOKEN')
+  const env = (await config.requireString('ENV')) as Environment
 
   const pg = await createPgComponent(
     { logs, config, metrics },
@@ -104,6 +110,13 @@ export async function initComponents(): Promise<AppComponents> {
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const referralDb = await createReferralDBComponent({ pg, logs })
   const referral = await createReferralComponent({ referralDb, logs })
+  const analytics = await createAnalyticsComponent<AnalyticsEventPayload>(
+    { logs, fetch: fetcher },
+    serverName,
+    env,
+    analyticsApiUrl,
+    analyticsApiToken
+  )
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
@@ -115,7 +128,16 @@ export async function initComponents(): Promise<AppComponents> {
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
-  const voice = await createVoiceComponent({ logs, config, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
+  const voice = await createVoiceComponent({
+    logs,
+    config,
+    voiceDb,
+    friendsDb,
+    commsGatekeeper,
+    settings,
+    pubsub,
+    analytics
+  })
   const sns = await createSnsComponent({ config })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
@@ -169,6 +191,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   return {
+    analytics,
     archipelagoStats,
     catalystClient,
     commsGatekeeper,

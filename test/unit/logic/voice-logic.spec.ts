@@ -9,6 +9,7 @@ import {
 } from '../../../src/logic/voice/errors'
 import {
   createFriendsDBMockedComponent,
+  createLogsMockedComponent,
   createMockConfigComponent,
   createMockedPubSubComponent
 } from '../../mocks/components'
@@ -26,6 +27,8 @@ import { createSettingsMockedComponent } from '../../mocks/components/settings'
 import { ISettingsComponent } from '../../../src/logic/settings'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import { IAnalyticsComponent } from '../../../src/logic/analytics'
+import { AnalyticsEventPayload } from '../../../src/types/analytics'
 
 const PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE = 20
 let voice: IVoiceComponent
@@ -61,14 +64,9 @@ beforeEach(async () => {
   getPrivateVoiceChatForCalleeAddressMock = jest.fn()
   getPrivateVoiceChatOfUserMock = jest.fn()
   expirePrivateVoiceChatMock = jest.fn()
-  const logs: ILoggerComponent = {
-    getLogger: () => ({
-      info: () => undefined,
-      error: () => undefined,
-      debug: () => undefined,
-      warn: () => undefined,
-      log: () => undefined
-    })
+  const logs: ILoggerComponent = createLogsMockedComponent()
+  const analytics: IAnalyticsComponent<AnalyticsEventPayload> = {
+    sendEvent: jest.fn()
   }
   const pubsub = createMockedPubSubComponent({ publishInChannel: publishInChannelMock })
   const voiceDb = createVoiceDBMockedComponent({
@@ -97,6 +95,7 @@ beforeEach(async () => {
 
   voice = await createVoiceComponent({
     logs,
+    analytics,
     pubsub,
     voiceDb,
     friendsDb,

@@ -1,5 +1,6 @@
 import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, PrivateMessagesPrivacy, PrivateVoiceChat } from '../../types'
+import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage } from '../../utils/errors'
 import {
   IncomingVoiceChatNotFoundError,
@@ -17,10 +18,11 @@ export async function createVoiceComponent({
   commsGatekeeper,
   voiceDb,
   friendsDb,
-  pubsub
+  pubsub,
+  analytics
 }: Pick<
   AppComponents,
-  'logs' | 'settings' | 'config' | 'commsGatekeeper' | 'voiceDb' | 'friendsDb' | 'pubsub'
+  'logs' | 'settings' | 'config' | 'commsGatekeeper' | 'voiceDb' | 'friendsDb' | 'pubsub' | 'analytics'
 >): Promise<IVoiceComponent> {
   const logger = logs.getLogger('voice-logic')
   const PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE = await config.requireNumber(
@@ -64,13 +66,20 @@ export async function createVoiceComponent({
     // Records the call intent in the database
     const callId = await voiceDb.createPrivateVoiceChat(callerAddress, calleeAddress)
 
-    // Send the call to the callee
-    await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-      callId,
-      callerAddress,
-      calleeAddress,
-      status: VoiceChatStatus.REQUESTED
-    })
+    // Send the call to the callee and send the event to the analytics
+    await Promise.all([
+      pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        callId,
+        callerAddress,
+        calleeAddress,
+        status: VoiceChatStatus.REQUESTED
+      }),
+      analytics.sendEvent(AnalyticsEvent.START_CALL, {
+        call_id: callId,
+        user_id: callerAddress,
+        receiver_id: calleeAddress
+      })
+    ])
 
     return callId
   }
@@ -99,17 +108,22 @@ export async function createVoiceComponent({
 
     // In order to avoid race conditions, we need to check if the voice chat was deleted from the database
     if (deletedVoiceChat) {
-      // Notify the other user about the voice call being accepted
-      await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-        callId,
-        callerAddress: privateVoiceChat.caller_address,
-        calleeAddress: privateVoiceChat.callee_address,
-        status: VoiceChatStatus.ACCEPTED,
-        // Credentials for the caller
-        credentials: {
-          connectionUrl: credentials[privateVoiceChat.caller_address].connectionUrl
-        }
-      })
+      // Notify the other user about the voice call being accepted and send the event to the analytics
+      await Promise.all([
+        pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId,
+          callerAddress: privateVoiceChat.caller_address,
+          calleeAddress: privateVoiceChat.callee_address,
+          status: VoiceChatStatus.ACCEPTED,
+          // Credentials for the caller
+          credentials: {
+            connectionUrl: credentials[privateVoiceChat.caller_address].connectionUrl
+          }
+        }),
+        analytics.sendEvent(AnalyticsEvent.ACCEPT_CALL, {
+          call_id: callId
+        })
+      ])
 
       return {
         connectionUrl: credentials[privateVoiceChat.callee_address].connectionUrl
@@ -135,13 +149,18 @@ export async function createVoiceComponent({
 
     // In order to avoid race conditions, we need to check if the voice chat was deleted from the database
     if (deletedVoiceChat) {
-      // Notify the other user that the call was rejected
-      await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-        callId,
-        callerAddress: privateVoiceChat.caller_address,
-        calleeAddress: privateVoiceChat.callee_address,
-        status: VoiceChatStatus.REJECTED
-      })
+      // Notify the other user that the call was rejected and send the event to the analytics
+      await Promise.all([
+        pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId,
+          callerAddress: privateVoiceChat.caller_address,
+          calleeAddress: privateVoiceChat.callee_address,
+          status: VoiceChatStatus.REJECTED
+        }),
+        analytics.sendEvent(AnalyticsEvent.REJECT_CALL, {
+          call_id: callId
+        })
+      ])
     } else {
       // If the voice chat was not deleted from the database, it means that the operation was not successful
       // We need to notify the user that rejected the call
@@ -167,13 +186,19 @@ export async function createVoiceComponent({
       // In order to avoid race conditions, we need to check if the voice chat was deleted from the database
       if (deletedVoiceChat) {
         // Notify the other user that the call ended
-        return pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-          callId,
-          // Set the callee or the caller address to undefined if they are the ones ending the call
-          calleeAddress: address === privateVoiceChat.callee_address ? undefined : privateVoiceChat.callee_address,
-          callerAddress: address === privateVoiceChat.caller_address ? undefined : privateVoiceChat.caller_address,
-          status: VoiceChatStatus.ENDED
-        })
+        await Promise.all([
+          pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+            callId,
+            // Set the callee or the caller address to undefined if they are the ones ending the call
+            calleeAddress: address === privateVoiceChat.callee_address ? undefined : privateVoiceChat.callee_address,
+            callerAddress: address === privateVoiceChat.caller_address ? undefined : privateVoiceChat.caller_address,
+            status: VoiceChatStatus.ENDED
+          }),
+          analytics.sendEvent(AnalyticsEvent.END_CALL, {
+            call_id: callId
+          })
+        ])
+        return
       }
     }
 
@@ -185,14 +210,19 @@ export async function createVoiceComponent({
       throw new VoiceChatNotFoundError(callId)
     }
 
-    // Notify the other user that the call ended
-    await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-      callId,
-      // Set the caller address to the other user in the voice chat
-      // We don't know if it's the callee or the caller, but the event handler will resolve it
-      callerAddress: usersInVoiceChat.find((user) => user !== address),
-      status: VoiceChatStatus.ENDED
-    })
+    // Notify the other user that the call ended and send the event to the analytics
+    await Promise.all([
+      pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+        callId,
+        // Set the caller address to the other user in the voice chat
+        // We don't know if it's the callee or the caller, but the event handler will resolve it
+        callerAddress: usersInVoiceChat.find((user) => user !== address),
+        status: VoiceChatStatus.ENDED
+      }),
+      analytics.sendEvent(AnalyticsEvent.END_CALL, {
+        call_id: callId
+      })
+    ])
   }
 
   /**
@@ -239,15 +269,20 @@ export async function createVoiceComponent({
         break
       }
 
-      // Notify the users that the private voice chat expired
+      // Notify the users that the private voice chat expired and send the event to the analytics
       await Promise.all(
         expiredPrivateVoiceChats.map(async (expiredPrivateVoiceChat) =>
-          pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
-            callId: expiredPrivateVoiceChat.id,
-            callerAddress: expiredPrivateVoiceChat.caller_address,
-            calleeAddress: expiredPrivateVoiceChat.callee_address,
-            status: VoiceChatStatus.EXPIRED
-          })
+          Promise.all([
+            pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+              callId: expiredPrivateVoiceChat.id,
+              callerAddress: expiredPrivateVoiceChat.caller_address,
+              calleeAddress: expiredPrivateVoiceChat.callee_address,
+              status: VoiceChatStatus.EXPIRED
+            }),
+            analytics.sendEvent(AnalyticsEvent.EXPIRE_CALL, {
+              call_id: expiredPrivateVoiceChat.id
+            })
+          ])
         )
       )
 

@@ -3,7 +3,7 @@ import { test } from '../components'
 import { createVoiceDbHelper } from '../helpers/voice-db-helper'
 import { generateRandomWalletAddresses } from '../mocks/wallet'
 
-test('Private voice chat expiration', ({ components }) => {
+test('Private voice chat expiration', ({ components, spyComponents }) => {
   const halfAnHourInMilliseconds = 1000 * 60 * 30
   let batchSizeOfPrivateVoiceChats: number
   let expirationTimeInMilliseconds: number
@@ -15,6 +15,7 @@ test('Private voice chat expiration', ({ components }) => {
     voiceDbHelper = createVoiceDbHelper(components.pg)
     batchSizeOfPrivateVoiceChats = await components.config.requireNumber('PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE')
     expirationTimeInMilliseconds = await components.config.requireNumber('PRIVATE_VOICE_CHAT_EXPIRATION_TIME')
+    spyComponents.analytics.sendEvent.mockResolvedValue(undefined)
   })
 
   describe(`when there are less than the batch size of private chats that have been started for longer than the expiration time`, () => {
