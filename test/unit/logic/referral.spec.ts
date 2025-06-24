@@ -99,7 +99,7 @@ describe('referral-component', () => {
       })
     })
 
-    describe('and the address is shorter than an Ethereum address', () => {
+    describe('and the referral address is shorter than an Ethereum address', () => {
       beforeEach(() => {
         address = '0x123'
       })
@@ -159,60 +159,55 @@ describe('referral-component', () => {
       })
     })
 
-    describe('when validating the invited user address', () => {
-      let address: string
-      let invalidInput: { referrer: string; invitedUser: string }
-
+    describe('and the invited user address is shorter than an Ethereum address', () => {
       beforeEach(() => {
+        address = '0x123'
         invalidInput = { ...validInput, invitedUser: address }
       })
 
-      describe('and the address is shorter than an Ethereum address', () => {
-        beforeEach(() => {
-          address = '0x123'
-        })
+      it('should throw a referral invalid input error', async () => {
+        await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+          new ReferralInvalidInputError('Invalid invitedUser address')
+        )
+      })
+    })
 
-        it('should throw a referral invalid input error', async () => {
-          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
-            new ReferralInvalidInputError('Invalid invitedUser address')
-          )
-        })
+    describe('and the invited user address is longer than an Ethereum address', () => {
+      beforeEach(() => {
+        address = '0x12345678901234567890123456789012345678901'
+        invalidInput = { ...validInput, invitedUser: address }
       })
 
-      describe('and the address is longer than an Ethereum address', () => {
-        beforeEach(() => {
-          address = '0x12345678901234567890123456789012345678901'
-        })
+      it('should throw a referral invalid input error', async () => {
+        await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+          new ReferralInvalidInputError('Invalid invitedUser address')
+        )
+      })
+    })
 
-        it('should throw a referral invalid input error', async () => {
-          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
-            new ReferralInvalidInputError('Invalid invitedUser address')
-          )
-        })
+    describe('and the invited user address is an empty string', () => {
+      beforeEach(() => {
+        address = ''
+        invalidInput = { ...validInput, invitedUser: address }
       })
 
-      describe('and the address is an empty string', () => {
-        beforeEach(() => {
-          address = ''
-        })
+      it('should throw a referral invalid input error', async () => {
+        await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+          new ReferralInvalidInputError('Invalid invitedUser address')
+        )
+      })
+    })
 
-        it('should throw a referral invalid input error', async () => {
-          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
-            new ReferralInvalidInputError('Invalid invitedUser address')
-          )
-        })
+    describe('and the invited user address is not an address format', () => {
+      beforeEach(() => {
+        address = 'not-an-address'
+        invalidInput = { ...validInput, invitedUser: address }
       })
 
-      describe('and the address is not an address format', () => {
-        beforeEach(() => {
-          address = 'not-an-address'
-        })
-
-        it('should throw a referral invalid input error', async () => {
-          await expect(referralComponent.create(invalidInput)).rejects.toThrow(
-            new ReferralInvalidInputError('Invalid invitedUser address')
-          )
-        })
+      it('should throw a referral invalid input error', async () => {
+        await expect(referralComponent.create(invalidInput)).rejects.toThrow(
+          new ReferralInvalidInputError('Invalid invitedUser address')
+        )
       })
     })
 
@@ -393,16 +388,16 @@ describe('referral-component', () => {
 
     describe('when referral reaches a tier milestone', () => {
       describe.each([
-        { invitedUsers: 5, tier: 1, description: 'tier 1 milestone' },
-        { invitedUsers: 10, tier: 2, description: 'tier 2 milestone' },
-        { invitedUsers: 20, tier: 3, description: 'tier 3 milestone' },
-        { invitedUsers: 25, tier: 4, description: 'tier 4 milestone' },
-        { invitedUsers: 30, tier: 5, description: 'tier 5 milestone' },
-        { invitedUsers: 50, tier: 6, description: 'tier 6 milestone' },
-        { invitedUsers: 60, tier: 7, description: 'tier 7 milestone' },
-        { invitedUsers: 75, tier: 8, description: 'tier 8 milestone' },
-        { invitedUsers: 100, tier: 9, description: 'tier 9 milestone' }
-      ])('and the referral reaches $description', ({ invitedUsers, tier }) => {
+        { invitedUsers: 5, tier: 1 },
+        { invitedUsers: 10, tier: 2 },
+        { invitedUsers: 20, tier: 3 },
+        { invitedUsers: 25, tier: 4 },
+        { invitedUsers: 30, tier: 5 },
+        { invitedUsers: 50, tier: 6 },
+        { invitedUsers: 60, tier: 7 },
+        { invitedUsers: 75, tier: 8 },
+        { invitedUsers: 100, tier: 9 }
+      ])('and the referral reaches tier $tier milestone', ({ invitedUsers, tier }) => {
         beforeEach(() => {
           mockReferralDb.findReferralProgress.mockResolvedValueOnce([
             {
@@ -415,7 +410,7 @@ describe('referral-component', () => {
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
         })
 
-        it(`should calculate correct tier for ${invitedUsers} invited users`, async () => {
+        it(`should send the notification with the correct tier for ${invitedUsers} invited users`, async () => {
           await referralComponent.finalizeReferral(validInvitedUser)
 
           expect(mockSns.publishMessage).toHaveBeenCalledWith(
@@ -455,7 +450,7 @@ describe('referral-component', () => {
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
         })
 
-        it(`should calculate correct tier for ${invitedUsers} invited users`, async () => {
+        it(`should send the notification with the correct tier for ${invitedUsers} invited users`, async () => {
           await referralComponent.finalizeReferral(validInvitedUser)
 
           expect(mockSns.publishMessage).toHaveBeenCalledWith(
