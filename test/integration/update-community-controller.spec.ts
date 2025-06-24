@@ -1,5 +1,11 @@
 import { test } from '../components'
-import { createTestIdentity, Identity, makeAuthenticatedRequest, createAuthHeaders, makeAuthenticatedMultipartRequest } from './utils/auth'
+import {
+  createTestIdentity,
+  Identity,
+  makeAuthenticatedRequest,
+  createAuthHeaders,
+  makeAuthenticatedMultipartRequest
+} from './utils/auth'
 import { randomUUID } from 'crypto'
 import FormData from 'form-data'
 
@@ -13,7 +19,7 @@ test('Update Community Controller', async function ({ components, stubComponents
 
     beforeEach(async () => {
       identity = await createTestIdentity()
-      
+
       // Create a test community first
       stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([
         {
@@ -27,7 +33,7 @@ test('Update Community Controller', async function ({ components, stubComponents
       const createForm = new FormData()
       createForm.append('name', 'Original Community')
       createForm.append('description', 'Original Description')
-      
+
       const createHeaders = {
         ...createAuthHeaders('POST', '/v1/communities', {}, identity)
       }
@@ -68,9 +74,14 @@ test('Update Community Controller', async function ({ components, stubComponents
       describe('and valid fields are provided', () => {
         describe('when updating name only', () => {
           it('should update the community name', async () => {
-            const response = await makeMultipartRequest(identity, `/v1/communities/${communityId}`, {
-              name: 'Updated Community Name'
-            }, 'PUT')
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                name: 'Updated Community Name'
+              },
+              'PUT'
+            )
 
             expect(response.status).toBe(200)
             const body = await response.json()
@@ -82,9 +93,14 @@ test('Update Community Controller', async function ({ components, stubComponents
 
         describe('when updating description only', () => {
           it('should update the community description', async () => {
-            const response = await makeMultipartRequest(identity, `/v1/communities/${communityId}`, {
-              description: 'Updated Description'
-            }, 'PUT')
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                description: 'Updated Description'
+              },
+              'PUT'
+            )
 
             expect(response.status).toBe(200)
             const body = await response.json()
@@ -98,18 +114,19 @@ test('Update Community Controller', async function ({ components, stubComponents
           let newPlaceIds: string[]
           beforeEach(async () => {
             newPlaceIds = [randomUUID(), randomUUID()]
-            
+
             stubComponents.fetcher.fetch.onFirstCall().resolves({
               ok: true,
               status: 200,
-              json: () => Promise.resolve({
-                data: newPlaceIds.map(id => ({
-                  id,
-                  title: 'Test Place',
-                  positions: ['0,0,0'],
-                  owner: identity.realAccount.address.toLowerCase()
-                }))
-              })
+              json: () =>
+                Promise.resolve({
+                  data: newPlaceIds.map((id) => ({
+                    id,
+                    title: 'Test Place',
+                    positions: ['0,0,0'],
+                    owner: identity.realAccount.address.toLowerCase()
+                  }))
+                })
             } as any)
           })
 
@@ -119,9 +136,14 @@ test('Update Community Controller', async function ({ components, stubComponents
           })
 
           it('should replace all community places with new ones', async () => {
-            const response = await makeMultipartRequest(identity, `/v1/communities/${communityId}`, {
-              placeIds: newPlaceIds
-            }, 'PUT')
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                placeIds: newPlaceIds
+              },
+              'PUT'
+            )
 
             expect(response.status).toBe(200)
             const body = await response.json()
@@ -130,13 +152,20 @@ test('Update Community Controller', async function ({ components, stubComponents
             const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
             expect(placesResponse.status).toBe(200)
             const placesResult = await placesResponse.json()
-            expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(expect.arrayContaining(newPlaceIds))
+            expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
+              expect.arrayContaining(newPlaceIds)
+            )
           })
 
           it('should remove all places when empty array is provided', async () => {
-            const response = await makeMultipartRequest(identity, `/v1/communities/${communityId}`, {
-              placeIds: []
-            }, 'PUT')
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                placeIds: []
+              },
+              'PUT'
+            )
 
             expect(response.status).toBe(200)
             const body = await response.json()
@@ -149,12 +178,83 @@ test('Update Community Controller', async function ({ components, stubComponents
           })
         })
 
+        describe('when updating without placeIds field', () => {
+          it('should not modify places when placeIds field is not provided', async () => {
+            // First, add some places to the community
+            const initialPlaceIds = [randomUUID(), randomUUID()]
+
+            stubComponents.fetcher.fetch.onFirstCall().resolves({
+              ok: true,
+              status: 200,
+              json: () =>
+                Promise.resolve({
+                  data: initialPlaceIds.map((id) => ({
+                    id,
+                    title: 'Test Place',
+                    positions: ['0,0,0'],
+                    owner: identity.realAccount.address.toLowerCase()
+                  }))
+                })
+            } as any)
+
+            await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                placeIds: initialPlaceIds
+              },
+              'PUT'
+            )
+
+            // Verify places were added
+            let placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
+            expect(placesResponse.status).toBe(200)
+            let placesResult = await placesResponse.json()
+            expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
+              expect.arrayContaining(initialPlaceIds)
+            )
+
+            // Now update without placeIds field
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                name: 'Updated Without Places'
+              },
+              'PUT'
+            )
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            expect(body.data.name).toBe('Updated Without Places')
+            expect(body.message).toBe('Community updated successfully')
+
+            // Verify places remain unchanged
+            placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
+            expect(placesResponse.status).toBe(200)
+            placesResult = await placesResponse.json()
+            expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
+              expect.arrayContaining(initialPlaceIds)
+            )
+
+            // Cleanup
+            for (const placeId of initialPlaceIds) {
+              await components.communitiesDb.removeCommunityPlace(communityId, placeId)
+            }
+          })
+        })
+
         describe('when updating with thumbnail', () => {
           it('should update the community with new thumbnail', async () => {
-            const response = await makeMultipartRequest(identity, `/v1/communities/${communityId}`, {
-              name: 'Thumbnail Updated',
-              thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
-            }, 'PUT')
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                name: 'Thumbnail Updated',
+                thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+              },
+              'PUT'
+            )
 
             expect(response.status).toBe(200)
             const body = await response.json()
@@ -167,10 +267,15 @@ test('Update Community Controller', async function ({ components, stubComponents
 
         describe('when updating multiple fields', () => {
           it('should update all provided fields', async () => {
-            const response = await makeMultipartRequest(identity, `/v1/communities/${communityId}`, {
-              name: 'Multi Updated Name',
-              description: 'Multi Updated Description'
-            }, 'PUT')
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                name: 'Multi Updated Name',
+                description: 'Multi Updated Description'
+              },
+              'PUT'
+            )
 
             expect(response.status).toBe(200)
             const body = await response.json()
@@ -189,9 +294,14 @@ test('Update Community Controller', async function ({ components, stubComponents
         })
 
         it('should respond with a 401 status code', async () => {
-          const response = await makeMultipartRequest(otherIdentity, `/v1/communities/${communityId}`, {
-            name: 'Unauthorized Update'
-          }, 'PUT')
+          const response = await makeMultipartRequest(
+            otherIdentity,
+            `/v1/communities/${communityId}`,
+            {
+              name: 'Unauthorized Update'
+            },
+            'PUT'
+          )
 
           expect(response.status).toBe(401)
         })
@@ -200,9 +310,14 @@ test('Update Community Controller', async function ({ components, stubComponents
       describe('but the community does not exist', () => {
         it('should respond with a 404 status code', async () => {
           const nonExistentId = randomUUID()
-          const response = await makeMultipartRequest(identity, `/v1/communities/${nonExistentId}`, {
-            name: 'Non Existent Update'
-          }, 'PUT')
+          const response = await makeMultipartRequest(
+            identity,
+            `/v1/communities/${nonExistentId}`,
+            {
+              name: 'Non Existent Update'
+            },
+            'PUT'
+          )
 
           expect(response.status).toBe(404)
         })
@@ -210,17 +325,27 @@ test('Update Community Controller', async function ({ components, stubComponents
 
       describe('but invalid data is provided', () => {
         it('should respond with a 400 status code for empty name', async () => {
-          const response = await makeMultipartRequest(identity, `/v1/communities/${communityId}`, {
-            name: ''
-          }, 'PUT')
+          const response = await makeMultipartRequest(
+            identity,
+            `/v1/communities/${communityId}`,
+            {
+              name: ''
+            },
+            'PUT'
+          )
 
           expect(response.status).toBe(400)
         })
 
         it('should respond with a 400 status code for empty description', async () => {
-          const response = await makeMultipartRequest(identity, `/v1/communities/${communityId}`, {
-            description: ''
-          }, 'PUT')
+          const response = await makeMultipartRequest(
+            identity,
+            `/v1/communities/${communityId}`,
+            {
+              description: ''
+            },
+            'PUT'
+          )
 
           expect(response.status).toBe(400)
         })
@@ -228,7 +353,7 @@ test('Update Community Controller', async function ({ components, stubComponents
         it('should respond with a 400 status code for invalid placeIds JSON', async () => {
           const form = new FormData()
           form.append('placeIds', 'invalid json')
-          
+
           const headers = {
             ...createAuthHeaders('PUT', `/v1/communities/${communityId}`, {}, identity)
           }
@@ -245,7 +370,7 @@ test('Update Community Controller', async function ({ components, stubComponents
         it('should respond with a 400 status code when placeIds is not an array', async () => {
           const form = new FormData()
           form.append('placeIds', '"not an array"')
-          
+
           const headers = {
             ...createAuthHeaders('PUT', `/v1/communities/${communityId}`, {}, identity)
           }
@@ -260,9 +385,14 @@ test('Update Community Controller', async function ({ components, stubComponents
         })
 
         it('should respond with a 400 status code for invalid thumbnail', async () => {
-          const response = await makeMultipartRequest(identity, `/v1/communities/${communityId}`, {
-            thumbnailPath: require('path').join(__dirname, 'fixtures/example.txt')
-          }, 'PUT')
+          const response = await makeMultipartRequest(
+            identity,
+            `/v1/communities/${communityId}`,
+            {
+              thumbnailPath: require('path').join(__dirname, 'fixtures/example.txt')
+            },
+            'PUT'
+          )
 
           expect(response.status).toBe(400)
         })

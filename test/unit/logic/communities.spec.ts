@@ -813,6 +813,79 @@ describe('Community Component', () => {
                 expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
               })
             })
+
+            describe('and empty placeIds array is provided', () => {
+              const updatesWithEmptyPlaces = {
+                name: 'Updated Community',
+                description: 'Updated Description',
+                placeIds: []
+              }
+
+              beforeEach(() => {
+                updatedCommunity = { ...mockCommunity, ...updatesWithEmptyPlaces }
+                mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+                mockCommunityPlaces.validateOwnership.mockResolvedValue({
+                  isValid: true,
+                  ownedPlaces: [],
+                  notOwnedPlaces: []
+                })
+              })
+
+              it('should remove all places from the community', async () => {
+                const result = await communityComponent.updateCommunity(
+                  communityId,
+                  userAddress,
+                  updatesWithEmptyPlaces
+                )
+
+                expect(result).toEqual({
+                  ...mockCommunity,
+                  ...updatesWithEmptyPlaces
+                })
+
+                expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+                expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                  communityId,
+                  userAddress
+                )
+                expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
+                expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithEmptyPlaces)
+                expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, [])
+              })
+            })
+
+            describe('and placeIds is undefined', () => {
+              const updatesWithoutPlaces = {
+                name: 'Updated Community',
+                description: 'Updated Description'
+                // placeIds is intentionally undefined
+              }
+
+              beforeEach(() => {
+                updatedCommunity = { ...mockCommunity, ...updatesWithoutPlaces }
+                mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+              })
+
+              it('should not update places when placeIds is undefined', async () => {
+                const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutPlaces)
+
+                expect(result).toEqual({
+                  ...mockCommunity,
+                  ...updatesWithoutPlaces
+                })
+
+                expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+                expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                  communityId,
+                  userAddress
+                )
+                expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
+                expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutPlaces)
+                expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                expect(mockCommunityPlaces.updatePlaces).not.toHaveBeenCalled()
+              })
+            })
           })
         })
 

@@ -253,7 +253,9 @@ export async function createCommunityComponent(
         }
       }
 
-      if (placeIds && placeIds.length > 0) {
+      // Update places if placeIds is provided (even if empty array to remove all places)
+      // If placeIds is undefined, it means nothing changed related to places
+      if (placeIds !== undefined) {
         await communityPlaces.updatePlaces(communityId, userAddress, placeIds)
 
         logger.info('Community places updated', {
