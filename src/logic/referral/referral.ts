@@ -154,12 +154,6 @@ export async function createReferralComponent(
       const event = createReferralInvitedUsersAcceptedEvent(referrer, invitedUser, acceptedInvites)
       await sns.publishMessage(event)
 
-      if (TIERS.includes(acceptedInvites)) {
-        // TODO: send notification to referrer getting the information from the reward server
-        /* const event = createReferralNewTierReachedEvent(referrer, invitedUser, acceptedInvites, reward)
-        await sns.publishMessage(event) */
-      }
-
       logger.info('Referral finalized successfully', {
         invitedUser,
         status: ReferralProgressStatus.TIER_GRANTED
