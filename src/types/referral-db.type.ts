@@ -10,6 +10,12 @@ export interface IReferralDatabaseComponent {
   countAcceptedInvitesByReferrer(referrer: string): Promise<number>
   getLastViewedProgressByReferrer(referrer: string): Promise<number>
   setLastViewedProgressByReferrer(referrer: string, invitedUsersSeen: number): Promise<void>
+  setReferralEmail(referralEmailInput: { referrer: string; email: string }): Promise<ReferralEmail>
+  setReferralRewardImage(referralRewardImageInput: {
+    referrer: string
+    rewardImageUrl: string
+    tier: number
+  }): Promise<ReferralRewardImage>
 }
 
 export enum ReferralProgressStatus {
@@ -43,4 +49,20 @@ export type ReferralTierSeen = {
   invites_accepted_viewed: number
   created_at: number
   updated_at: number
+}
+
+export type ReferralEmail = {
+  id: string
+  referrer: string
+  email: string
+  created_at: number
+  updated_at: number
+}
+
+export type ReferralRewardImage = {
+  id: string
+  referrer: string
+  reward_image_url: string
+  tier: number
+  created_at: number
 }

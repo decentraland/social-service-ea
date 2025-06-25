@@ -1,4 +1,9 @@
-import { ReferralProgress, ReferralProgressStatus } from '../../types/referral-db.type'
+import {
+  ReferralProgress,
+  ReferralProgressStatus,
+  ReferralEmail,
+  ReferralRewardImage
+} from '../../types/referral-db.type'
 import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 import { ChainId, Rarity } from '@dcl/schemas'
 
@@ -12,6 +17,12 @@ export interface IReferralComponent {
   getInvitedUsersAcceptedStats(
     referrer: string
   ): Promise<{ invitedUsersAccepted: number; invitedUsersAcceptedViewed: number }>
+  setReferralEmail(referralEmailInput: { referrer: string; email: string }): Promise<ReferralEmail>
+  setReferralRewardImage(referralRewardImageInput: {
+    referrer: string
+    rewardImageUrl: string
+    tier: number
+  }): Promise<ReferralRewardImage>
 }
 
 export enum RewardStatus {

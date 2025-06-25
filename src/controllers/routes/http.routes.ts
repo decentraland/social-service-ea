@@ -22,6 +22,7 @@ import { getCommunityPlacesHandler } from '../handlers/get-community-places-hand
 import { addCommunityPlacesHandler } from '../handlers/add-community-places-handler'
 import { removeCommunityPlaceHandler } from '../handlers/remove-community-place-handler'
 import { updateCommunityHandler } from '../handlers/update-community-handler'
+import { addReferralEmailHandler } from '../handlers/add-referral-email-handler'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -67,6 +68,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.post('/v1/referral-progress', signedFetchMiddleware(), createReferralHandler)
   router.patch('/v1/referral-progress', signedFetchMiddleware(), updateReferralSignedUpHandler)
   router.get('/v1/referral-progress', signedFetchMiddleware(), getInvitedUsersAcceptedHandler)
+  router.post('/v1/referral-email', signedFetchMiddleware(), addReferralEmailHandler)
 
   return router
 }

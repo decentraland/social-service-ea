@@ -181,6 +181,76 @@ export async function createReferralComponent(
         invitedUsersAccepted,
         invitedUsersAcceptedViewed
       }
+    },
+
+    setReferralEmail: async (referralEmailInput: { referrer: string; email: string }) => {
+      const referrer = validateAddress(referralEmailInput.referrer, 'referrer')
+
+      if (!referralEmailInput.email || !referralEmailInput.email.trim()) {
+        throw new ReferralInvalidInputError('Email is required')
+      }
+
+      const email = referralEmailInput.email.trim().toLowerCase()
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        throw new ReferralInvalidInputError('Invalid email format')
+      }
+
+      logger.info('Setting referral email', {
+        referrer,
+        email
+      })
+
+      const referralEmail = await referralDb.setReferralEmail({ referrer, email })
+
+      logger.info('Referral email set successfully', {
+        referrer,
+        email
+      })
+
+      return referralEmail
+    },
+
+    setReferralRewardImage: async (referralRewardImageInput: {
+      referrer: string
+      rewardImageUrl: string
+      tier: number
+    }) => {
+      const referrer = validateAddress(referralRewardImageInput.referrer, 'referrer')
+
+      if (!referralRewardImageInput.rewardImageUrl || !referralRewardImageInput.rewardImageUrl.trim()) {
+        throw new ReferralInvalidInputError('Reward image URL is required')
+      }
+
+      const rewardImageUrl = referralRewardImageInput.rewardImageUrl.trim()
+      const urlRegex = /^https?:\/\/.+/
+      if (!urlRegex.test(rewardImageUrl)) {
+        throw new ReferralInvalidInputError('Invalid reward image URL format')
+      }
+
+      if (!Number.isInteger(referralRewardImageInput.tier) || referralRewardImageInput.tier <= 0) {
+        throw new ReferralInvalidInputError('Tier must be a positive integer')
+      }
+
+      logger.info('Setting referral reward image', {
+        referrer,
+        rewardImageUrl,
+        tier: referralRewardImageInput.tier
+      })
+
+      const referralRewardImage = await referralDb.setReferralRewardImage({
+        referrer,
+        rewardImageUrl,
+        tier: referralRewardImageInput.tier
+      })
+
+      logger.info('Referral reward image set successfully', {
+        referrer,
+        rewardImageUrl,
+        tier: referralRewardImageInput.tier
+      })
+
+      return referralRewardImage
     }
   }
 }
