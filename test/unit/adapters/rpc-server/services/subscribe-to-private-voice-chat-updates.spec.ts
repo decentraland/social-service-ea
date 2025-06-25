@@ -36,10 +36,6 @@ describe('when subscribing to private voice chat updates', () => {
     }
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   describe('when the subscription has updates', () => {
     let requestedUpdate: PrivateVoiceChatUpdate
     let acceptedUpdate: PrivateVoiceChatUpdate

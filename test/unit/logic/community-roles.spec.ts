@@ -20,9 +20,6 @@ describe('Community Roles Component', () => {
 
   beforeEach(() => {
     roles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
-
-    // Reset all mocks
-    jest.clearAllMocks()
   })
 
   describe('ROLE_ACTION_TRANSITIONS', () => {
