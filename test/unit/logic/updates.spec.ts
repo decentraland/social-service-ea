@@ -1,40 +1,46 @@
-import {
-  friendshipUpdateHandler,
-  friendConnectivityUpdateHandler,
-  handleSubscriptionUpdates,
-  friendshipAcceptedUpdateHandler,
-  blockUpdateHandler,
-  privateVoiceChatUpdateHandler,
-  communityMemberConnectivityUpdateHandler,
-  communityMemberJoinHandler,
-  communityMemberLeaveHandler
-} from '../../../src/logic/updates-old'
+import { createUpdateHandlerComponent } from '../../../src/logic/updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../mocks/components'
 import mitt, { Emitter } from 'mitt'
-import { Action, ISubscribersContext, RpcServerContext, SubscriptionEventsEmitter } from '../../../src/types'
+import {
+  Action,
+  IUpdateHandlerComponent,
+  ISubscribersContext,
+  SubscriptionEventsEmitter,
+  RpcServerContext
+} from '../../../src/types'
 import { sleep } from '../../../src/utils/timer'
 import { mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
 import { VoiceChatStatus } from '../../../src/logic/voice/types'
 import { ICommunityMembersComponent } from '../../../src/logic/community/types'
 import { createMockCommunityMembersComponent } from '../../mocks/communities'
-import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('Updates Handlers', () => {
   const logger = mockLogs.getLogger('test')
   let subscribersContext: ISubscribersContext
+  let updateHandler: IUpdateHandlerComponent
+  let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
 
   beforeEach(() => {
     subscribersContext = createSubscribersContext()
     subscribersContext.addSubscriber('0x456', mitt<SubscriptionEventsEmitter>())
     subscribersContext.addSubscriber('0x789', mitt<SubscriptionEventsEmitter>())
+
+    mockCommunityMembers = createMockCommunityMembersComponent({})
+
+    updateHandler = createUpdateHandlerComponent({
+      logs: mockLogs,
+      subscribersContext,
+      friendsDb: mockFriendsDB,
+      catalystClient: mockCatalystClient,
+      communityMembers: mockCommunityMembers
+    })
   })
 
   describe('when handling friendship updates', () => {
     describe('and the target subscriber exists', () => {
       it('should emit friendship update to the target subscriber', () => {
-        const handler = friendshipUpdateHandler(subscribersContext, logger)
         const subscriber = subscribersContext.getOrAddSubscriber('0x456')
         const emitSpy = jest.spyOn(subscriber, 'emit')
 
@@ -47,7 +53,7 @@ describe('Updates Handlers', () => {
           metadata: { message: 'Hello!' }
         }
 
-        handler(JSON.stringify(update))
+        updateHandler.friendshipUpdateHandler(JSON.stringify(update))
 
         expect(emitSpy).toHaveBeenCalledWith('friendshipUpdate', update)
       })
@@ -55,7 +61,6 @@ describe('Updates Handlers', () => {
 
     describe('and the target subscriber does not exist', () => {
       it('should not emit any updates', () => {
-        const handler = friendshipUpdateHandler(subscribersContext, logger)
         const nonExistentUpdate = {
           id: 'update-1',
           from: '0x123',
@@ -64,16 +69,15 @@ describe('Updates Handlers', () => {
           timestamp: Date.now()
         }
 
-        expect(handler(JSON.stringify(nonExistentUpdate))).resolves.toBeUndefined()
+        expect(updateHandler.friendshipUpdateHandler(JSON.stringify(nonExistentUpdate))).resolves.toBeUndefined()
       })
     })
 
     describe('and the update format is invalid', () => {
       it('should log an error with invalid JSON message', () => {
-        const handler = friendshipUpdateHandler(subscribersContext, logger)
         const errorSpy = jest.spyOn(logger, 'error')
 
-        handler('invalid json')
+        updateHandler.friendshipUpdateHandler('invalid json')
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -86,7 +90,6 @@ describe('Updates Handlers', () => {
   describe('when handling friendship accepted updates', () => {
     describe('and the action is accept', () => {
       it('should emit friend connectivity updates to both users with ONLINE status', () => {
-        const handler = friendshipAcceptedUpdateHandler(subscribersContext, logger)
         const subscriber123 = subscribersContext.getOrAddSubscriber('0x123')
         const subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
         const emitSpy123 = jest.spyOn(subscriber123, 'emit')
@@ -101,7 +104,7 @@ describe('Updates Handlers', () => {
           metadata: { message: 'Hello!' }
         }
 
-        handler(JSON.stringify(update))
+        updateHandler.friendshipAcceptedUpdateHandler(JSON.stringify(update))
 
         expect(emitSpy123).toHaveBeenCalledWith('friendConnectivityUpdate', {
           address: '0x456',
@@ -117,7 +120,6 @@ describe('Updates Handlers', () => {
 
     describe.each([Action.DELETE, Action.REQUEST, Action.REJECT, Action.CANCEL])('and the action is %s', (action) => {
       it('should ignore the update', () => {
-        const handler = friendshipAcceptedUpdateHandler(subscribersContext, logger)
         const nonExistentUpdate = {
           id: 'update-1',
           from: '0x123',
@@ -126,13 +128,14 @@ describe('Updates Handlers', () => {
           timestamp: Date.now()
         }
 
-        expect(handler(JSON.stringify(nonExistentUpdate))).resolves.toBeUndefined()
+        expect(
+          updateHandler.friendshipAcceptedUpdateHandler(JSON.stringify(nonExistentUpdate))
+        ).resolves.toBeUndefined()
       })
     })
 
     describe('and the target subscriber does not exist', () => {
       it('should not emit any updates', () => {
-        const handler = friendshipAcceptedUpdateHandler(subscribersContext, logger)
         const nonExistentUpdate = {
           id: 'update-1',
           from: '0x123',
@@ -141,16 +144,17 @@ describe('Updates Handlers', () => {
           timestamp: Date.now()
         }
 
-        expect(handler(JSON.stringify(nonExistentUpdate))).resolves.toBeUndefined()
+        expect(
+          updateHandler.friendshipAcceptedUpdateHandler(JSON.stringify(nonExistentUpdate))
+        ).resolves.toBeUndefined()
       })
     })
 
     describe('and the update format is invalid', () => {
       it('should log an error with invalid JSON message', () => {
-        const handler = friendshipAcceptedUpdateHandler(subscribersContext, logger)
         const errorSpy = jest.spyOn(logger, 'error')
 
-        handler('invalid json')
+        updateHandler.friendshipAcceptedUpdateHandler('invalid json')
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -163,7 +167,6 @@ describe('Updates Handlers', () => {
   describe('when handling friend connectivity updates', () => {
     describe('and there are online friends', () => {
       it('should emit connectivity update to all online friends', async () => {
-        const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockFriendsDB)
         const subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
         const subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
         const emitSpy456 = jest.spyOn(subscriber456, 'emit')
@@ -177,7 +180,7 @@ describe('Updates Handlers', () => {
           status: ConnectivityStatus.ONLINE
         }
 
-        await handler(JSON.stringify(update))
+        await updateHandler.friendConnectivityUpdateHandler(JSON.stringify(update))
 
         expect(mockFriendsDB.getOnlineFriends).toHaveBeenCalledWith('0x123', ['0x456', '0x789'])
         expect(emitSpy456).toHaveBeenCalledWith('friendConnectivityUpdate', update)
@@ -187,7 +190,6 @@ describe('Updates Handlers', () => {
 
     describe('and there are no online friends', () => {
       it('should not emit any updates', async () => {
-        const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockFriendsDB)
         mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
 
         const update = {
@@ -195,7 +197,7 @@ describe('Updates Handlers', () => {
           status: ConnectivityStatus.ONLINE
         }
 
-        await handler(JSON.stringify(update))
+        await updateHandler.friendConnectivityUpdateHandler(JSON.stringify(update))
 
         expect(mockFriendsDB.getOnlineFriends).toHaveBeenCalled()
       })
@@ -203,10 +205,9 @@ describe('Updates Handlers', () => {
 
     describe('and the update format is invalid', () => {
       it('should log an error with invalid JSON message', async () => {
-        const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockFriendsDB)
         const errorSpy = jest.spyOn(logger, 'error')
 
-        await handler('invalid json')
+        await updateHandler.friendConnectivityUpdateHandler('invalid json')
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -217,7 +218,6 @@ describe('Updates Handlers', () => {
 
     describe('and the database throws an error', () => {
       it('should log an error and handle database errors gracefully', async () => {
-        const handler = friendConnectivityUpdateHandler(subscribersContext, logger, mockFriendsDB)
         const errorSpy = jest.spyOn(logger, 'error')
         const error = new Error('Database error')
 
@@ -228,7 +228,7 @@ describe('Updates Handlers', () => {
           status: ConnectivityStatus.ONLINE
         }
 
-        await handler(JSON.stringify(update))
+        await updateHandler.friendConnectivityUpdateHandler(JSON.stringify(update))
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -246,7 +246,6 @@ describe('Updates Handlers', () => {
     let subscriber789: Emitter<SubscriptionEventsEmitter>
     let emitSpy456: jest.SpyInstance
     let emitSpy789: jest.SpyInstance
-    let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
 
     beforeEach(() => {
       subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
@@ -254,8 +253,6 @@ describe('Updates Handlers', () => {
 
       emitSpy456 = jest.spyOn(subscriber456, 'emit')
       emitSpy789 = jest.spyOn(subscriber789, 'emit')
-
-      mockCommunityMembers = createMockCommunityMembersComponent({})
     })
 
     describe('when the user is not a member of any community', () => {
@@ -264,13 +261,12 @@ describe('Updates Handlers', () => {
       })
 
       it('should not emit any updates', async () => {
-        const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
         const update = {
           memberAddress: '0x123',
           status: ConnectivityStatus.ONLINE
         }
 
-        await handler(JSON.stringify(update))
+        await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
         expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
           '0x456',
@@ -288,13 +284,12 @@ describe('Updates Handlers', () => {
         })
 
         it('should not emit any updates', async () => {
-          const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
           const update = {
             memberAddress: '0x123',
             status: ConnectivityStatus.ONLINE
           }
 
-          await handler(JSON.stringify(update))
+          await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
           expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
             '0x456',
@@ -314,13 +309,12 @@ describe('Updates Handlers', () => {
         })
 
         it('should emit connectivity update to all online members of the communities', async () => {
-          const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
           const update = {
             memberAddress: '0x123',
             status: ConnectivityStatus.ONLINE
           }
 
-          await handler(JSON.stringify(update))
+          await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
           expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
             '0x456',
@@ -340,10 +334,9 @@ describe('Updates Handlers', () => {
 
     describe('when the update format is invalid', () => {
       it('should log an error', () => {
-        const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
         const errorSpy = jest.spyOn(logger, 'error')
 
-        handler('invalid json')
+        updateHandler.communityMemberConnectivityUpdateHandler('invalid json')
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -361,7 +354,6 @@ describe('Updates Handlers', () => {
       })
 
       it('should log an error and not emit any updates', async () => {
-        const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
         const errorSpy = jest.spyOn(logger, 'error')
 
         const update = {
@@ -369,7 +361,7 @@ describe('Updates Handlers', () => {
           status: ConnectivityStatus.ONLINE
         }
 
-        await handler(JSON.stringify(update))
+        await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -387,7 +379,6 @@ describe('Updates Handlers', () => {
     let subscriber789: Emitter<SubscriptionEventsEmitter>
     let emitSpy456: jest.SpyInstance
     let emitSpy789: jest.SpyInstance
-    let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
 
     beforeEach(() => {
       subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
@@ -395,20 +386,17 @@ describe('Updates Handlers', () => {
 
       emitSpy456 = jest.spyOn(subscriber456, 'emit')
       emitSpy789 = jest.spyOn(subscriber789, 'emit')
-
-      mockCommunityMembers = createMockCommunityMembersComponent({})
     })
 
     describe('when the status is not ONLINE', () => {
       it('should not emit any updates', async () => {
-        const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
         const update = {
           communityId: 'community-1',
           memberAddress: '0x123',
           status: ConnectivityStatus.OFFLINE
         }
 
-        await handler(JSON.stringify(update))
+        await updateHandler.communityMemberJoinHandler(JSON.stringify(update))
 
         expect(mockCommunityMembers.getCommunityMembers).not.toHaveBeenCalled()
         expect(emitSpy456).not.toHaveBeenCalled()
@@ -426,14 +414,13 @@ describe('Updates Handlers', () => {
         })
 
         it('should not emit any updates', async () => {
-          const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
           const update = {
             communityId: 'community-1',
             memberAddress: '0x123',
             status: ConnectivityStatus.ONLINE
           }
 
-          await handler(JSON.stringify(update))
+          await updateHandler.communityMemberJoinHandler(JSON.stringify(update))
 
           expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
             onlyOnline: true,
@@ -474,14 +461,13 @@ describe('Updates Handlers', () => {
         })
 
         it('should emit connectivity update to all online members of the community', async () => {
-          const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
           const update = {
             communityId: 'community-1',
             memberAddress: '0x123',
             status: ConnectivityStatus.ONLINE
           }
 
-          await handler(JSON.stringify(update))
+          await updateHandler.communityMemberJoinHandler(JSON.stringify(update))
 
           expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
             onlyOnline: true,
@@ -544,14 +530,13 @@ describe('Updates Handlers', () => {
         })
 
         it('should emit connectivity update to all online members across multiple pages', async () => {
-          const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
           const update = {
             communityId: 'community-1',
             memberAddress: '0x123',
             status: ConnectivityStatus.ONLINE
           }
 
-          await handler(JSON.stringify(update))
+          await updateHandler.communityMemberJoinHandler(JSON.stringify(update))
 
           expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledTimes(3)
           expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(1, 'community-1', '0x123', {
@@ -575,10 +560,9 @@ describe('Updates Handlers', () => {
 
     describe('when the update format is invalid', () => {
       it('should log an error', () => {
-        const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
         const errorSpy = jest.spyOn(logger, 'error')
 
-        handler('invalid json')
+        updateHandler.communityMemberJoinHandler('invalid json')
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -596,7 +580,6 @@ describe('Updates Handlers', () => {
       })
 
       it('should log an error and not emit any updates', async () => {
-        const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
         const errorSpy = jest.spyOn(logger, 'error')
 
         const update = {
@@ -605,7 +588,7 @@ describe('Updates Handlers', () => {
           status: ConnectivityStatus.ONLINE
         }
 
-        await handler(JSON.stringify(update))
+        await updateHandler.communityMemberJoinHandler(JSON.stringify(update))
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -623,7 +606,6 @@ describe('Updates Handlers', () => {
     let subscriber789: Emitter<SubscriptionEventsEmitter>
     let emitSpy456: jest.SpyInstance
     let emitSpy789: jest.SpyInstance
-    let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
 
     beforeEach(() => {
       subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
@@ -631,20 +613,17 @@ describe('Updates Handlers', () => {
 
       emitSpy456 = jest.spyOn(subscriber456, 'emit')
       emitSpy789 = jest.spyOn(subscriber789, 'emit')
-
-      mockCommunityMembers = createMockCommunityMembersComponent({})
     })
 
     describe('when the status is not OFFLINE', () => {
       it('should not emit any updates', async () => {
-        const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
         const update = {
           communityId: 'community-1',
           memberAddress: '0x123',
           status: ConnectivityStatus.ONLINE
         }
 
-        await handler(JSON.stringify(update))
+        await updateHandler.communityMemberLeaveHandler(JSON.stringify(update))
 
         expect(mockCommunityMembers.getCommunityMembers).not.toHaveBeenCalled()
         expect(emitSpy456).not.toHaveBeenCalled()
@@ -662,14 +641,13 @@ describe('Updates Handlers', () => {
         })
 
         it('should not emit any updates', async () => {
-          const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
           const update = {
             communityId: 'community-1',
             memberAddress: '0x123',
             status: ConnectivityStatus.OFFLINE
           }
 
-          await handler(JSON.stringify(update))
+          await updateHandler.communityMemberLeaveHandler(JSON.stringify(update))
 
           expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
             onlyOnline: true,
@@ -710,14 +688,13 @@ describe('Updates Handlers', () => {
         })
 
         it('should emit connectivity update with OFFLINE status to all online members of the community', async () => {
-          const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
           const update = {
             communityId: 'community-1',
             memberAddress: '0x123',
             status: ConnectivityStatus.OFFLINE
           }
 
-          await handler(JSON.stringify(update))
+          await updateHandler.communityMemberLeaveHandler(JSON.stringify(update))
 
           expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
             onlyOnline: true,
@@ -786,14 +763,13 @@ describe('Updates Handlers', () => {
         })
 
         it('should emit connectivity update with OFFLINE status to all online members across multiple pages', async () => {
-          const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
           const update = {
             communityId: 'community-1',
             memberAddress: '0x123',
             status: ConnectivityStatus.OFFLINE
           }
 
-          await handler(JSON.stringify(update))
+          await updateHandler.communityMemberLeaveHandler(JSON.stringify(update))
 
           expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledTimes(3)
           expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(1, 'community-1', '0x123', {
@@ -823,10 +799,9 @@ describe('Updates Handlers', () => {
 
     describe('when the update format is invalid', () => {
       it('should log an error', () => {
-        const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
         const errorSpy = jest.spyOn(logger, 'error')
 
-        handler('invalid json')
+        updateHandler.communityMemberLeaveHandler('invalid json')
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -844,7 +819,6 @@ describe('Updates Handlers', () => {
       })
 
       it('should log an error and not emit any updates', async () => {
-        const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
         const errorSpy = jest.spyOn(logger, 'error')
 
         const update = {
@@ -853,7 +827,7 @@ describe('Updates Handlers', () => {
           status: ConnectivityStatus.OFFLINE
         }
 
-        await handler(JSON.stringify(update))
+        await updateHandler.communityMemberLeaveHandler(JSON.stringify(update))
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -869,7 +843,6 @@ describe('Updates Handlers', () => {
   describe('when handling block updates', () => {
     describe('and the blocked user is subscribed', () => {
       it('should emit block update to the blocked user', () => {
-        const handler = blockUpdateHandler(subscribersContext, logger)
         const subscriber = subscribersContext.getOrAddSubscriber('0x456')
         const emitSpy = jest.spyOn(subscriber, 'emit')
 
@@ -879,7 +852,7 @@ describe('Updates Handlers', () => {
           isBlocked: true
         }
 
-        handler(JSON.stringify(update))
+        updateHandler.blockUpdateHandler(JSON.stringify(update))
 
         expect(emitSpy).toHaveBeenCalledWith('blockUpdate', update)
       })
@@ -887,7 +860,6 @@ describe('Updates Handlers', () => {
 
     describe('and the blocked user is not subscribed', () => {
       it('should not emit any updates', () => {
-        const handler = blockUpdateHandler(subscribersContext, logger)
         const nonExistentUpdate = {
           id: 'update-1',
           from: '0x123',
@@ -896,16 +868,15 @@ describe('Updates Handlers', () => {
           timestamp: Date.now()
         }
 
-        expect(handler(JSON.stringify(nonExistentUpdate))).resolves.toBeUndefined()
+        expect(updateHandler.blockUpdateHandler(JSON.stringify(nonExistentUpdate))).resolves.toBeUndefined()
       })
     })
 
     describe('and the update format is invalid', () => {
       it('should log an error with invalid JSON message', () => {
-        const handler = blockUpdateHandler(subscribersContext, logger)
         const errorSpy = jest.spyOn(logger, 'error')
 
-        handler('invalid json')
+        updateHandler.blockUpdateHandler('invalid json')
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
@@ -916,7 +887,6 @@ describe('Updates Handlers', () => {
   })
 
   describe('when handling private voice chat updates', () => {
-    let handler: ReturnType<typeof privateVoiceChatUpdateHandler>
     let callerAddress: string
     let calleeAddress: string
     let callId: string
@@ -925,7 +895,6 @@ describe('Updates Handlers', () => {
     let update: any
 
     beforeEach(() => {
-      handler = privateVoiceChatUpdateHandler(subscribersContext, logger)
       callerAddress = '0x123'
       calleeAddress = '0x456'
       callId = 'voice-call-1'
@@ -955,7 +924,7 @@ describe('Updates Handlers', () => {
 
       describe('and the calleeAddress is present', () => {
         it('should emit the update to the callee', () => {
-          handler(JSON.stringify(update))
+          updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
           expect(calleeEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
         })
@@ -967,7 +936,7 @@ describe('Updates Handlers', () => {
         })
 
         it('should not emit the update to any subscriber', () => {
-          handler(JSON.stringify(update))
+          updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
           expect(callerEmitSpy).not.toHaveBeenCalled()
           expect(calleeEmitSpy).not.toHaveBeenCalled()
@@ -982,7 +951,7 @@ describe('Updates Handlers', () => {
 
       describe('and the callerAddress is present', () => {
         it('should emit the update to the caller', () => {
-          handler(JSON.stringify(update))
+          updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
           expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
         })
@@ -994,7 +963,7 @@ describe('Updates Handlers', () => {
         })
 
         it('should not emit the update to any subscriber', () => {
-          handler(JSON.stringify(update))
+          updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
           expect(callerEmitSpy).not.toHaveBeenCalled()
           expect(calleeEmitSpy).not.toHaveBeenCalled()
@@ -1009,7 +978,7 @@ describe('Updates Handlers', () => {
 
       describe('and the callerAddress is present', () => {
         it('should emit the update to the caller', () => {
-          handler(JSON.stringify(update))
+          updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
           expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
         })
@@ -1021,7 +990,7 @@ describe('Updates Handlers', () => {
         })
 
         it('should not emit the update to any subscriber', () => {
-          handler(JSON.stringify(update))
+          updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
           expect(callerEmitSpy).not.toHaveBeenCalled()
           expect(calleeEmitSpy).not.toHaveBeenCalled()
@@ -1036,7 +1005,7 @@ describe('Updates Handlers', () => {
 
       describe('and both callerAddress and calleeAddress are present', () => {
         it('should emit the update to both the caller and the callee', () => {
-          handler(JSON.stringify(update))
+          updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
           expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
           expect(calleeEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
@@ -1049,7 +1018,7 @@ describe('Updates Handlers', () => {
         })
 
         it('should emit the update only to the caller', () => {
-          handler(JSON.stringify(update))
+          updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
           expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
         })
@@ -1061,7 +1030,7 @@ describe('Updates Handlers', () => {
         })
 
         it('should emit the update only to the callee', () => {
-          handler(JSON.stringify(update))
+          updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
           expect(calleeEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
         })
@@ -1074,7 +1043,7 @@ describe('Updates Handlers', () => {
       })
 
       it('should emit the update to both the caller and the callee', () => {
-        handler(JSON.stringify(update))
+        updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
         expect(callerEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
         expect(calleeEmitSpy).toHaveBeenCalledWith('privateVoiceChatUpdate', update)
@@ -1087,7 +1056,7 @@ describe('Updates Handlers', () => {
       })
 
       it('should not emit the update to any subscriber', () => {
-        handler(JSON.stringify(update))
+        updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
 
         expect(callerEmitSpy).not.toHaveBeenCalled()
         expect(calleeEmitSpy).not.toHaveBeenCalled()
@@ -1101,14 +1070,13 @@ describe('Updates Handlers', () => {
       })
 
       it('should resolve without emitting to any subscriber', () => {
-        expect(handler(JSON.stringify(update))).resolves.toBeUndefined()
+        expect(updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))).resolves.toBeUndefined()
       })
     })
   })
 
   describe('when handling subscription updates', () => {
     let eventEmitter: Emitter<SubscriptionEventsEmitter>
-    let logger: ILoggerComponent.ILogger
     let parser: jest.Mock
     let rpcContext: RpcServerContext
     let subscribersContext: ISubscribersContext
@@ -1118,7 +1086,6 @@ describe('Updates Handlers', () => {
 
     beforeEach(() => {
       eventEmitter = mitt<SubscriptionEventsEmitter>()
-      logger = mockLogs.getLogger('test')
       parser = jest.fn()
       mockCatalystClient.getProfile.mockResolvedValue(mockProfile)
 
@@ -1135,13 +1102,9 @@ describe('Updates Handlers', () => {
       it('should use existing emitter from context', async () => {
         parser.mockResolvedValueOnce({ parsed: true })
 
-        const generator = handleSubscriptionUpdates({
+        const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
-          components: {
-            catalystClient: mockCatalystClient,
-            logger
-          },
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
           parser
@@ -1159,13 +1122,9 @@ describe('Updates Handlers', () => {
       it('should yield parsed updates', async () => {
         parser.mockResolvedValueOnce({ parsed: true })
 
-        const generator = handleSubscriptionUpdates({
+        const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
-          components: {
-            catalystClient: mockCatalystClient,
-            logger
-          },
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
           parser
@@ -1180,13 +1139,9 @@ describe('Updates Handlers', () => {
       })
 
       it('should yield multiple updates', async () => {
-        const generator = handleSubscriptionUpdates({
+        const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
-          components: {
-            catalystClient: mockCatalystClient,
-            logger
-          },
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
           parser
@@ -1206,10 +1161,9 @@ describe('Updates Handlers', () => {
     describe('and the parser returns null', () => {
       it('should log error if parser returns null', async () => {
         parser.mockResolvedValueOnce(null)
-        const generator = handleSubscriptionUpdates({
+        const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
-          components: { catalystClient: mockCatalystClient, logger },
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
           parser
@@ -1230,10 +1184,9 @@ describe('Updates Handlers', () => {
       it('should skip update if shouldHandleUpdate returns false', async () => {
         parser.mockResolvedValueOnce({ parsed: true })
 
-        const generator = handleSubscriptionUpdates({
+        const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
-          components: { catalystClient: mockCatalystClient, logger },
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: () => false,
           parser
@@ -1253,10 +1206,9 @@ describe('Updates Handlers', () => {
         const error = new Error('Test error')
         parser.mockRejectedValueOnce(error)
 
-        const generator = handleSubscriptionUpdates({
+        const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
-          components: { catalystClient: mockCatalystClient, logger },
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: () => true,
           parser
@@ -1278,13 +1230,9 @@ describe('Updates Handlers', () => {
       it('should skip retrieving profile if shouldRetrieveProfile is false', async () => {
         parser.mockResolvedValueOnce({ parsed: true })
 
-        const generator = handleSubscriptionUpdates({
+        const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'blockUpdate',
-          components: {
-            catalystClient: mockCatalystClient,
-            logger
-          },
           shouldRetrieveProfile: false,
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.blockerAddress,
           shouldHandleUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.blockedAddress === '0x123',
