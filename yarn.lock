@@ -1211,13 +1211,6 @@
     "@well-known-components/interfaces" "^1.4.3"
     node-fetch "^2.7.0"
 
-"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15679684946.commit-494af9e.tgz":
-  version "1.0.0-15679684946.commit-494af9e"
-  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15679684946.commit-494af9e.tgz#a9c5180870b85a392b5b68f930580868df95e87b"
-  dependencies:
-    "@dcl/ts-proto" "1.154.0"
-    protobufjs "7.2.4"
-
 "@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15868960827.commit-dc884c3.tgz":
   version "1.0.0-15868960827.commit-dc884c3"
   resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-15868960827.commit-dc884c3.tgz#2c828efbd812799cd1f1fc12c50aececc54fae79"
