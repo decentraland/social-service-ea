@@ -1,4 +1,4 @@
-import { subscribeToFriendshipUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friendship-updates'
+import { subscribeToFriendshipUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-friendship-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { Action, RpcServerContext } from '../../../../../src/types'
 import { createMockUpdateHandlerComponent, mockLogs } from '../../../../mocks/components'

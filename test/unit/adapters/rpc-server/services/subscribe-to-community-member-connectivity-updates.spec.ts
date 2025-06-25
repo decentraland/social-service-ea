@@ -1,6 +1,6 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
-import { subscribeToCommunityMemberConnectivityUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-community-member-connectivity-updates'
+import { subscribeToCommunityMemberConnectivityUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-member-connectivity-updates'
 import { createMockUpdateHandlerComponent, mockLogs } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'

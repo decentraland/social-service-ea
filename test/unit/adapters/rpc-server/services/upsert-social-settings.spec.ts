@@ -4,7 +4,7 @@ import {
   PrivateMessagePrivacySetting,
   UpsertSocialSettingsPayload
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { upsertSocialSettingsService } from '../../../../../src/adapters/rpc-server/services/upsert-social-settings'
+import { upsertSocialSettingsService } from '../../../../../src/controllers/handlers/rpc/upsert-social-settings'
 import { convertDBSettingsToRPCSettings } from '../../../../../src/logic/settings'
 import {
   IFriendsDatabaseComponent,

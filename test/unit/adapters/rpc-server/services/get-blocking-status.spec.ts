@@ -1,6 +1,6 @@
 import { mockFriendsDB, mockLogs } from '../../../../mocks/components'
 import { RpcServerContext } from '../../../../../src/types'
-import { getBlockingStatusService } from '../../../../../src/adapters/rpc-server/services/get-blocking-status'
+import { getBlockingStatusService } from '../../../../../src/controllers/handlers/rpc/get-blocking-status'
 
 describe('getBlockingStatusService', () => {
   let getBlockingStatus: ReturnType<typeof getBlockingStatusService>

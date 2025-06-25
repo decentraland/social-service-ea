@@ -1,18 +1,17 @@
 import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
 import {
-  BlockUserPayload,
-  BlockUserResponse
+  UnblockUserPayload,
+  UnblockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
+import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../adapters/pubsub'
 import { parseProfileToBlockedUser } from '../../../logic/blocks'
 import { EthAddress } from '@dcl/schemas'
-
-export function blockUserService({
+export function unblockUserService({
   components: { logs, friendsDb, catalystClient, pubsub }
 }: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient' | 'pubsub'>) {
-  const logger = logs.getLogger('block-user-service')
+  const logger = logs.getLogger('unblock-user-service')
 
-  return async function (request: BlockUserPayload, context: RpcServerContext): Promise<BlockUserResponse> {
+  return async function (request: UnblockUserPayload, context: RpcServerContext): Promise<UnblockUserResponse> {
     try {
       const { address: blockerAddress } = context
       const blockedAddress = request.user?.address
@@ -21,7 +20,7 @@ export function blockUserService({
         return {
           response: {
             $case: 'invalidRequest',
-            invalidRequest: { message: 'Cannot block yourself' }
+            invalidRequest: { message: 'Cannot unblock yourself' }
           }
         }
       }
@@ -41,25 +40,19 @@ export function blockUserService({
         return {
           response: {
             $case: 'profileNotFound',
-            profileNotFound: {
-              message: `Profile not found for address ${blockedAddress}`
-            }
+            profileNotFound: { message: `Profile not found for address ${blockedAddress}` }
           }
         }
       }
 
-      const { actionId, blockedAt } = await friendsDb.executeTx(async (tx) => {
-        const { blocked_at: blockedAt } = await friendsDb.blockUser(blockerAddress, blockedAddress, tx)
+      const actionId = await friendsDb.executeTx(async (tx) => {
+        await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
 
         const friendship = await friendsDb.getFriendship([blockerAddress, blockedAddress], tx)
-        if (!friendship) return { blockedAt }
+        if (!friendship) return
 
-        const [_, actionId] = await Promise.all([
-          friendsDb.updateFriendshipStatus(friendship.id, false, tx),
-          friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.BLOCK, null, tx)
-        ])
-
-        return { actionId, blockedAt }
+        const actionId = await friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
+        return actionId
       })
 
       if (actionId) {
@@ -67,27 +60,27 @@ export function blockUserService({
           id: actionId,
           from: blockerAddress,
           to: blockedAddress,
-          action: Action.BLOCK,
-          timestamp: blockedAt.getTime()
+          action: Action.DELETE,
+          timestamp: Date.now()
         })
       }
 
       await pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
         blockerAddress,
         blockedAddress,
-        isBlocked: true
+        isBlocked: false
       })
 
       return {
         response: {
           $case: 'ok',
           ok: {
-            profile: parseProfileToBlockedUser(profile, blockedAt)
+            profile: parseProfileToBlockedUser(profile)
           }
         }
       }
     } catch (error: any) {
-      logger.error(`Error blocking user: ${error.message}`, {
+      logger.error(`Error unblocking user: ${error.message}`, {
         error: error.message,
         stack: error.stack
       })

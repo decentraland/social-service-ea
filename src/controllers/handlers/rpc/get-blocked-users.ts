@@ -1,7 +1,7 @@
 import { parseProfilesToBlockedUsers } from '../../../logic/blocks'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { getPage } from '../../../utils/pagination'
-import { FRIENDSHIPS_PER_PAGE } from '../constants'
+import { FRIENDSHIPS_PER_PAGE } from '../../../adapters/rpc-server/constants'
 import {
   GetBlockedUsersPayload,
   GetBlockedUsersResponse
