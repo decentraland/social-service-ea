@@ -13,8 +13,6 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { VoiceChatStatus } from './voice/types'
 import { GetCommunityMembersOptions, ICommunityMembersComponent } from './community'
 
-export type ILogger = ILoggerComponent.ILogger
-
 type UpdateHandler<T extends keyof SubscriptionEventsEmitter> = (
   update: SubscriptionEventsEmitter[T]
 ) => void | Promise<void>
@@ -25,7 +23,7 @@ interface SubscriptionHandlerParams<T, U> {
   rpcContext: RpcServerContext
   eventName: keyof SubscriptionEventsEmitter
   components: {
-    logger: ILogger
+    logger: ILoggerComponent.ILogger
     catalystClient: ICatalystClientComponent
   }
   shouldRetrieveProfile?: boolean
@@ -35,7 +33,10 @@ interface SubscriptionHandlerParams<T, U> {
   parseArgs?: any[]
 }
 
-function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>, logger: ILogger) {
+function handleUpdate<T extends keyof SubscriptionEventsEmitter>(
+  handler: UpdateHandler<T>,
+  logger: ILoggerComponent.ILogger
+) {
   return async (message: string) => {
     try {
       const update = JSON.parse(message) as SubscriptionEventsEmitter[T]
@@ -49,7 +50,7 @@ function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: Update
   }
 }
 
-export function friendshipUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
+export function friendshipUpdateHandler(subscribersContext: ISubscribersContext, logger: ILoggerComponent.ILogger) {
   return handleUpdate<'friendshipUpdate'>((update) => {
     const updateEmitter = subscribersContext.getOrAddSubscriber(update.to)
     if (updateEmitter) {
@@ -58,7 +59,10 @@ export function friendshipUpdateHandler(subscribersContext: ISubscribersContext,
   }, logger)
 }
 
-export function friendshipAcceptedUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
+export function friendshipAcceptedUpdateHandler(
+  subscribersContext: ISubscribersContext,
+  logger: ILoggerComponent.ILogger
+) {
   return handleUpdate<'friendshipUpdate'>((update) => {
     if (update.action !== Action.ACCEPT) {
       return
@@ -83,7 +87,7 @@ export function friendshipAcceptedUpdateHandler(subscribersContext: ISubscribers
 
 export function friendConnectivityUpdateHandler(
   rpcContext: ISubscribersContext,
-  logger: ILogger,
+  logger: ILoggerComponent.ILogger,
   friendsDb: IFriendsDatabaseComponent
 ) {
   return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
@@ -104,7 +108,7 @@ export function friendConnectivityUpdateHandler(
 
 export function communityMemberConnectivityUpdateHandler(
   rpcContext: ISubscribersContext,
-  logger: ILogger,
+  logger: ILoggerComponent.ILogger,
   communityMembers: ICommunityMembersComponent
 ) {
   return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
@@ -128,7 +132,7 @@ export function communityMemberConnectivityUpdateHandler(
   }, logger)
 }
 
-export function blockUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
+export function blockUpdateHandler(subscribersContext: ISubscribersContext, logger: ILoggerComponent.ILogger) {
   return handleUpdate<'blockUpdate'>((update) => {
     logger.info('Block update', {
       update: JSON.stringify(update)
@@ -141,7 +145,10 @@ export function blockUpdateHandler(subscribersContext: ISubscribersContext, logg
   }, logger)
 }
 
-export function privateVoiceChatUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
+export function privateVoiceChatUpdateHandler(
+  subscribersContext: ISubscribersContext,
+  logger: ILoggerComponent.ILogger
+) {
   return handleUpdate<'privateVoiceChatUpdate'>((update) => {
     logger.info('Private voice chat update', { update: JSON.stringify(update) })
 
@@ -198,7 +205,11 @@ export function privateVoiceChatUpdateHandler(subscribersContext: ISubscribersCo
 }
 
 function createCommunityMemberStatusHandler(expectedStatus: ConnectivityStatus) {
-  return (rpcContext: ISubscribersContext, logger: ILogger, communityMembers: ICommunityMembersComponent) => {
+  return (
+    rpcContext: ISubscribersContext,
+    logger: ILoggerComponent.ILogger,
+    communityMembers: ICommunityMembersComponent
+  ) => {
     return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
       if (update.status !== expectedStatus) {
         return

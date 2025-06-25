@@ -2,7 +2,6 @@ import {
   friendshipUpdateHandler,
   friendConnectivityUpdateHandler,
   handleSubscriptionUpdates,
-  ILogger,
   friendshipAcceptedUpdateHandler,
   blockUpdateHandler,
   privateVoiceChatUpdateHandler,
@@ -20,6 +19,7 @@ import { createSubscribersContext } from '../../../src/adapters/rpc-server/subsc
 import { VoiceChatStatus } from '../../../src/logic/voice/types'
 import { ICommunityMembersComponent } from '../../../src/logic/community/types'
 import { createMockCommunityMembersComponent } from '../../mocks/communities'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('Updates Handlers', () => {
   const logger = mockLogs.getLogger('test')
@@ -1108,7 +1108,7 @@ describe('Updates Handlers', () => {
 
   describe('when handling subscription updates', () => {
     let eventEmitter: Emitter<SubscriptionEventsEmitter>
-    let logger: ILogger
+    let logger: ILoggerComponent.ILogger
     let parser: jest.Mock
     let rpcContext: RpcServerContext
     let subscribersContext: ISubscribersContext
