@@ -66,7 +66,8 @@ beforeEach(async () => {
   expirePrivateVoiceChatMock = jest.fn()
   const logs: ILoggerComponent = createLogsMockedComponent()
   const analytics: IAnalyticsComponent<AnalyticsEventPayload> = {
-    sendEvent: jest.fn()
+    sendEvent: jest.fn(),
+    fireEvent: jest.fn()
   }
   const pubsub = createMockedPubSubComponent({ publishInChannel: publishInChannelMock })
   const voiceDb = createVoiceDBMockedComponent({

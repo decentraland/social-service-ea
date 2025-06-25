@@ -11,7 +11,7 @@ export async function createAnalyticsComponent<T extends Record<string, any>>(
   const { fetcher, logs } = components
   const logger = logs.getLogger('analytics-component')
 
-  async function sendEvent(name: keyof T, body: T[keyof T]): Promise<void> {
+  async function _sendEvent(name: keyof T, body: T[keyof T]): Promise<void> {
     logger.info(`Sending event to Analytics ${name.toString()}`)
 
     try {
@@ -41,7 +41,16 @@ export async function createAnalyticsComponent<T extends Record<string, any>>(
     }
   }
 
+  function fireEvent(name: keyof T, body: T[keyof T]): void {
+    void _sendEvent(name, body)
+  }
+
+  async function sendEvent(name: keyof T, body: T[keyof T]): Promise<void> {
+    return _sendEvent(name, body)
+  }
+
   return {
-    sendEvent
+    sendEvent,
+    fireEvent
   }
 }
