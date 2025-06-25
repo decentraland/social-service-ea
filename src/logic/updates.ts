@@ -197,90 +197,48 @@ export function privateVoiceChatUpdateHandler(subscribersContext: ISubscribersCo
   }, logger)
 }
 
-export function communityMemberJoinHandler(
-  rpcContext: ISubscribersContext,
-  logger: ILogger,
-  communityMembers: ICommunityMembersComponent
-) {
-  return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
-    if (update.status !== ConnectivityStatus.ONLINE) {
-      return
-    }
-
-    logger.info('Community member join update', { update: JSON.stringify(update) })
-
-    const PAGE_SIZE = 100
-    let offset = 0
-    let hasMoreMembers = true
-
-    while (hasMoreMembers) {
-      const options: GetCommunityMembersOptions = {
-        onlyOnline: true,
-        pagination: { limit: PAGE_SIZE, offset }
+function createCommunityMemberStatusHandler(expectedStatus: ConnectivityStatus) {
+  return (rpcContext: ISubscribersContext, logger: ILogger, communityMembers: ICommunityMembersComponent) => {
+    return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
+      if (update.status !== expectedStatus) {
+        return
       }
 
-      const { members, totalMembers } = await communityMembers.getCommunityMembers(
-        update.communityId,
-        update.memberAddress,
-        options
-      )
+      logger.info('Community member status update', { update: JSON.stringify(update) })
 
-      members.forEach(({ memberAddress }) => {
-        const updateEmitter = rpcContext.getOrAddSubscriber(memberAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityMemberConnectivityUpdate', update)
+      const PAGE_SIZE = 100
+      let offset = 0
+      let hasMoreMembers = true
+
+      while (hasMoreMembers) {
+        const options: GetCommunityMembersOptions = {
+          onlyOnline: true,
+          pagination: { limit: PAGE_SIZE, offset }
         }
-      })
 
-      offset += PAGE_SIZE
-      hasMoreMembers = offset < totalMembers
-    }
-  }, logger)
-}
+        const { members, totalMembers } = await communityMembers.getCommunityMembers(
+          update.communityId,
+          update.memberAddress,
+          options
+        )
 
-export function communityMemberLeaveHandler(
-  rpcContext: ISubscribersContext,
-  logger: ILogger,
-  communityMembers: ICommunityMembersComponent
-) {
-  return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
-    if (update.status !== ConnectivityStatus.OFFLINE) {
-      return
-    }
+        members.forEach(({ memberAddress }) => {
+          const updateEmitter = rpcContext.getOrAddSubscriber(memberAddress)
+          if (updateEmitter) {
+            updateEmitter.emit('communityMemberConnectivityUpdate', update)
+          }
+        })
 
-    logger.info('Community member leave update', { update: JSON.stringify(update) })
-
-    const PAGE_SIZE = 100
-    let offset = 0
-    let hasMoreMembers = true
-
-    while (hasMoreMembers) {
-      const options: GetCommunityMembersOptions = {
-        onlyOnline: true,
-        pagination: { limit: PAGE_SIZE, offset }
+        offset += PAGE_SIZE
+        hasMoreMembers = offset < totalMembers
       }
-
-      const { members, totalMembers } = await communityMembers.getCommunityMembers(
-        update.communityId,
-        update.memberAddress,
-        options
-      )
-
-      members.forEach(({ memberAddress }) => {
-        const updateEmitter = rpcContext.getOrAddSubscriber(memberAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityMemberConnectivityUpdate', {
-            ...update,
-            status: ConnectivityStatus.OFFLINE
-          })
-        }
-      })
-
-      offset += PAGE_SIZE
-      hasMoreMembers = offset < totalMembers
-    }
-  }, logger)
+    }, logger)
+  }
 }
+
+export const communityMemberJoinHandler = createCommunityMemberStatusHandler(ConnectivityStatus.ONLINE)
+
+export const communityMemberLeaveHandler = createCommunityMemberStatusHandler(ConnectivityStatus.OFFLINE)
 
 export async function* handleSubscriptionUpdates<T, U>({
   rpcContext,
