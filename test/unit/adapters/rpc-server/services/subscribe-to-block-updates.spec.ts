@@ -2,7 +2,7 @@ import { subscribeToBlockUpdatesService } from '../../../../../src/adapters/rpc-
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { mockCatalystClient, mockLogs } from '../../../../mocks/components'
-import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
+import { handleSubscriptionUpdates } from '../../../../../src/logic/updates-old'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 
 jest.mock('../../../../../src/logic/updates')

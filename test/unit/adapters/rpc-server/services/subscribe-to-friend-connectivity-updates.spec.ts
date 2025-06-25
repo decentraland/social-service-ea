@@ -10,7 +10,7 @@ import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
-import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
+import { handleSubscriptionUpdates } from '../../../../../src/logic/updates-old'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { IPeersStatsComponent } from '../../../../../src/logic/peers-stats'
 

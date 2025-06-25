@@ -1,7 +1,7 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { SubscriptionEventsEmitter, RpcServerContext, RPCServiceContext } from '../../../types'
 import { CommunityMemberConnectivityUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { handleSubscriptionUpdates } from '../../../logic/updates'
+import { handleSubscriptionUpdates } from '../../../logic/updates-old'
 import { parseCommunityMemberConnectivityUpdate } from '../../../logic/community/parsers'
 
 export function subscribeToCommunityMemberConnectivityUpdatesService({

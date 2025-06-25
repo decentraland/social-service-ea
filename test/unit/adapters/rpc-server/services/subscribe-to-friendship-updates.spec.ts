@@ -3,7 +3,7 @@ import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { Action, RpcServerContext } from '../../../../../src/types'
 import { mockCatalystClient, mockLogs } from '../../../../mocks/components'
 import { createMockProfile } from '../../../../mocks/profile'
-import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
+import { handleSubscriptionUpdates } from '../../../../../src/logic/updates-old'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 

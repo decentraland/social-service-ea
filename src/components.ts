@@ -46,6 +46,7 @@ import { createS3Adapter } from './adapters/s3'
 import { createCommunityPlacesComponent } from './logic/community'
 import { createJobComponent } from './logic/job'
 import { createPlacesApiAdapter } from './adapters/places-api'
+import { createUpdateHandlerComponent } from './logic/updates'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -125,7 +126,6 @@ export async function initComponents(): Promise<AppComponents> {
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
-
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
   const communityMembers = await createCommunityMembersComponent({
@@ -145,17 +145,23 @@ export async function initComponents(): Promise<AppComponents> {
     storage,
     config
   })
+  const updateHandler = createUpdateHandlerComponent({
+    logs,
+    subscribersContext,
+    friendsDb,
+    communityMembers,
+    catalystClient
+  })
 
   const rpcServer = await createRpcServerComponent({
     logs,
-    friendsDb,
     pubsub,
     uwsServer,
     config,
     subscribersContext,
     metrics,
     voice,
-    communityMembers
+    updateHandler
   })
 
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
@@ -184,12 +190,13 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     commsGatekeeper,
     communities,
-    communityMembers,
+    communitiesDb,
     communityBans,
+    communityMembers,
     communityPlaces,
     communityRoles,
-    communitiesDb,
     config,
+    expirePrivateVoiceChatJob,
     fetcher,
     friendsDb,
     httpServer,
@@ -198,11 +205,11 @@ export async function initComponents(): Promise<AppComponents> {
     messageProcessor,
     metrics,
     nats,
-    expirePrivateVoiceChatJob,
-    peerTracking,
     peersStats,
     peersSynchronizer,
+    peerTracking,
     pg,
+    placesApi,
     pubsub,
     queue,
     redis,
@@ -215,11 +222,11 @@ export async function initComponents(): Promise<AppComponents> {
     storage,
     subscribersContext,
     tracing,
+    updateHandler,
     uwsServer,
-    voiceDb,
     voice,
-    wsPool,
+    voiceDb,
     worldsStats,
-    placesApi
+    wsPool
   }
 }

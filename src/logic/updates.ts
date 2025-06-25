@@ -1,17 +1,10 @@
-import { ILoggerComponent } from '@well-known-components/interfaces'
-import {
-  Action,
-  ICatalystClientComponent,
-  IFriendsDatabaseComponent,
-  ISubscribersContext,
-  RpcServerContext,
-  SubscriptionEventsEmitter
-} from '../types'
+import { Action, AppComponents, ICatalystClientComponent, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { VoiceChatStatus } from './voice/types'
-import { GetCommunityMembersOptions, ICommunityMembersComponent } from './community'
+import { GetCommunityMembersOptions } from './community'
+import { IUpdateHandlerComponent } from '../types/components'
 
 type UpdateHandler<T extends keyof SubscriptionEventsEmitter> = (
   update: SubscriptionEventsEmitter[T]
@@ -19,13 +12,12 @@ type UpdateHandler<T extends keyof SubscriptionEventsEmitter> = (
 
 type UpdateParser<T, U> = (update: U, ...args: any[]) => T | null
 
-interface SubscriptionHandlerParams<T, U> {
+export type UpdatesMessageHandler = (message: string) => void | Promise<void>
+
+export type SubscriptionHandlerParams<T, U> = {
   rpcContext: RpcServerContext
   eventName: keyof SubscriptionEventsEmitter
-  components: {
-    logger: ILoggerComponent.ILogger
-    catalystClient: ICatalystClientComponent
-  }
+  catalystClient: ICatalystClientComponent
   shouldRetrieveProfile?: boolean
   getAddressFromUpdate: (update: U) => string
   shouldHandleUpdate: (update: U) => boolean
@@ -33,37 +25,34 @@ interface SubscriptionHandlerParams<T, U> {
   parseArgs?: any[]
 }
 
-function handleUpdate<T extends keyof SubscriptionEventsEmitter>(
-  handler: UpdateHandler<T>,
-  logger: ILoggerComponent.ILogger
-) {
-  return async (message: string) => {
-    try {
-      const update = JSON.parse(message) as SubscriptionEventsEmitter[T]
-      await handler(update)
-    } catch (error: any) {
-      logger.error(`Error handling update: ${error.message}`, {
-        error,
-        message
-      })
+export function createUpdateHandlerComponent(
+  components: Pick<AppComponents, 'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'catalystClient'>
+): IUpdateHandlerComponent {
+  const { logs, subscribersContext, friendsDb, communityMembers, catalystClient } = components
+  const logger = logs.getLogger('update-handler')
+
+  function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
+    return async (message: string) => {
+      try {
+        const update = JSON.parse(message) as SubscriptionEventsEmitter[T]
+        await handler(update)
+      } catch (error: any) {
+        logger.error(`Error handling update: ${error.message}`, {
+          error,
+          message
+        })
+      }
     }
   }
-}
 
-export function friendshipUpdateHandler(subscribersContext: ISubscribersContext, logger: ILoggerComponent.ILogger) {
-  return handleUpdate<'friendshipUpdate'>((update) => {
+  const friendshipUpdateHandler = handleUpdate<'friendshipUpdate'>((update) => {
     const updateEmitter = subscribersContext.getOrAddSubscriber(update.to)
     if (updateEmitter) {
       updateEmitter.emit('friendshipUpdate', update)
     }
-  }, logger)
-}
+  })
 
-export function friendshipAcceptedUpdateHandler(
-  subscribersContext: ISubscribersContext,
-  logger: ILoggerComponent.ILogger
-) {
-  return handleUpdate<'friendshipUpdate'>((update) => {
+  const friendshipAcceptedUpdateHandler = handleUpdate<'friendshipUpdate'>((update) => {
     if (update.action !== Action.ACCEPT) {
       return
     }
@@ -82,37 +71,25 @@ export function friendshipAcceptedUpdateHandler(
         })
       }
     })
-  }, logger)
-}
+  })
 
-export function friendConnectivityUpdateHandler(
-  rpcContext: ISubscribersContext,
-  logger: ILoggerComponent.ILogger,
-  friendsDb: IFriendsDatabaseComponent
-) {
-  return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = rpcContext.getSubscribersAddresses()
+  const friendConnectivityUpdateHandler = handleUpdate<'friendConnectivityUpdate'>(async (update) => {
+    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
     const friends = await friendsDb.getOnlineFriends(update.address, onlineSubscribers)
 
     // Notify friends about connectivity change
     friends.forEach(({ address: friendAddress }) => {
-      const emitter = rpcContext.getOrAddSubscriber(friendAddress)
+      const emitter = subscribersContext.getOrAddSubscriber(friendAddress)
       if (emitter) {
         emitter.emit('friendConnectivityUpdate', update)
       } else {
         logger.warn('No emitter found for friend:', { friendAddress })
       }
     })
-  }, logger)
-}
+  })
 
-export function communityMemberConnectivityUpdateHandler(
-  rpcContext: ISubscribersContext,
-  logger: ILoggerComponent.ILogger,
-  communityMembers: ICommunityMembersComponent
-) {
-  return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = rpcContext.getSubscribersAddresses()
+  const communityMemberConnectivityUpdateHandler = handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
+    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
     // TODO: paginate this and emit the updates in batches
     const onlineMembers = await communityMembers.getOnlineMembersFromUserCommunities(
       update.memberAddress,
@@ -120,7 +97,7 @@ export function communityMemberConnectivityUpdateHandler(
     )
 
     onlineMembers.forEach(({ communityId, memberAddress }) => {
-      const emitter = rpcContext.getOrAddSubscriber(memberAddress)
+      const emitter = subscribersContext.getOrAddSubscriber(memberAddress)
       if (emitter) {
         emitter.emit('communityMemberConnectivityUpdate', {
           communityId,
@@ -129,11 +106,9 @@ export function communityMemberConnectivityUpdateHandler(
         })
       }
     })
-  }, logger)
-}
+  })
 
-export function blockUpdateHandler(subscribersContext: ISubscribersContext, logger: ILoggerComponent.ILogger) {
-  return handleUpdate<'blockUpdate'>((update) => {
+  const blockUpdateHandler = handleUpdate<'blockUpdate'>((update) => {
     logger.info('Block update', {
       update: JSON.stringify(update)
     })
@@ -142,14 +117,9 @@ export function blockUpdateHandler(subscribersContext: ISubscribersContext, logg
     if (updateEmitter) {
       updateEmitter.emit('blockUpdate', update)
     }
-  }, logger)
-}
+  })
 
-export function privateVoiceChatUpdateHandler(
-  subscribersContext: ISubscribersContext,
-  logger: ILoggerComponent.ILogger
-) {
-  return handleUpdate<'privateVoiceChatUpdate'>((update) => {
+  const privateVoiceChatUpdateHandler = handleUpdate<'privateVoiceChatUpdate'>((update) => {
     logger.info('Private voice chat update', { update: JSON.stringify(update) })
 
     const addressesToNotify: string[] = []
@@ -201,16 +171,10 @@ export function privateVoiceChatUpdateHandler(
         updateEmitter.emit('privateVoiceChatUpdate', update)
       }
     })
-  }, logger)
-}
+  })
 
-function createCommunityMemberStatusHandler(expectedStatus: ConnectivityStatus) {
-  return (
-    rpcContext: ISubscribersContext,
-    logger: ILoggerComponent.ILogger,
-    communityMembers: ICommunityMembersComponent
-  ) => {
-    return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
+  const createCommunityMemberStatusHandler = (expectedStatus: ConnectivityStatus) =>
+    handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
       if (update.status !== expectedStatus) {
         return
       }
@@ -234,7 +198,7 @@ function createCommunityMemberStatusHandler(expectedStatus: ConnectivityStatus) 
         )
 
         members.forEach(({ memberAddress }) => {
-          const updateEmitter = rpcContext.getOrAddSubscriber(memberAddress)
+          const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
           if (updateEmitter) {
             updateEmitter.emit('communityMemberConnectivityUpdate', update)
           }
@@ -243,59 +207,71 @@ function createCommunityMemberStatusHandler(expectedStatus: ConnectivityStatus) 
         offset += PAGE_SIZE
         hasMoreMembers = offset < totalMembers
       }
-    }, logger)
-  }
-}
-
-export const communityMemberJoinHandler = createCommunityMemberStatusHandler(ConnectivityStatus.ONLINE)
-
-export const communityMemberLeaveHandler = createCommunityMemberStatusHandler(ConnectivityStatus.OFFLINE)
-
-export async function* handleSubscriptionUpdates<T, U>({
-  rpcContext,
-  eventName,
-  components: { catalystClient, logger },
-  shouldRetrieveProfile = true,
-  getAddressFromUpdate,
-  shouldHandleUpdate,
-  parser,
-  parseArgs = []
-}: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
-  const normalizedAddress = normalizeAddress(rpcContext.address)
-  const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
-  const eventNameString = String(eventName)
-
-  const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
-
-  try {
-    for await (const update of updatesGenerator) {
-      if (!shouldHandleUpdate(update as U)) {
-        continue
-      }
-
-      const profile = shouldRetrieveProfile ? await catalystClient.getProfile(getAddressFromUpdate(update as U)) : null
-      const parsedUpdate = await parser(update as U, profile, ...parseArgs)
-
-      if (parsedUpdate) {
-        yield parsedUpdate
-      } else {
-        logger.error(`Unable to parse ${eventNameString}`, { update: JSON.stringify(update) })
-      }
-    }
-  } catch (error) {
-    logger.error('Error in generator loop', {
-      error: JSON.stringify(error),
-      address: rpcContext.address,
-      event: eventNameString
     })
-    throw error
-  } finally {
-    await updatesGenerator.return(undefined)
+
+  const communityMemberJoinHandler = createCommunityMemberStatusHandler(ConnectivityStatus.ONLINE)
+
+  const communityMemberLeaveHandler = createCommunityMemberStatusHandler(ConnectivityStatus.OFFLINE)
+
+  async function* handleSubscriptionUpdates<T, U>({
+    rpcContext,
+    eventName,
+    shouldRetrieveProfile = true,
+    getAddressFromUpdate,
+    shouldHandleUpdate,
+    parser,
+    parseArgs = []
+  }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
+    const normalizedAddress = normalizeAddress(rpcContext.address)
+    const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
+    const eventNameString = String(eventName)
+
+    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
+
+    try {
+      for await (const update of updatesGenerator) {
+        if (!shouldHandleUpdate(update as U)) {
+          continue
+        }
+
+        const profile = shouldRetrieveProfile
+          ? await catalystClient.getProfile(getAddressFromUpdate(update as U))
+          : null
+        const parsedUpdate = await parser(update as U, profile, ...parseArgs)
+
+        if (parsedUpdate) {
+          yield parsedUpdate
+        } else {
+          logger.error(`Unable to parse ${eventNameString}`, { update: JSON.stringify(update) })
+        }
+      }
+    } catch (error) {
+      logger.error('Error in generator loop', {
+        error: JSON.stringify(error),
+        address: rpcContext.address,
+        event: eventNameString
+      })
+      throw error
+    } finally {
+      await updatesGenerator.return(undefined)
+    }
+
+    // Return a cleanup function
+    return () => {
+      logger.debug(`Cleaning up subscription for ${eventNameString}`, { address: rpcContext.address })
+      void updatesGenerator.return(undefined)
+    }
   }
 
-  // Return a cleanup function
-  return () => {
-    logger.debug(`Cleaning up subscription for ${eventNameString}`, { address: rpcContext.address })
-    void updatesGenerator.return(undefined)
+  return {
+    friendshipUpdateHandler,
+    friendshipAcceptedUpdateHandler,
+    friendConnectivityUpdateHandler,
+    communityMemberConnectivityUpdateHandler,
+    blockUpdateHandler,
+    privateVoiceChatUpdateHandler,
+    communityMemberJoinHandler,
+    communityMemberLeaveHandler,
+    handleSubscriptionUpdates
   }
 }

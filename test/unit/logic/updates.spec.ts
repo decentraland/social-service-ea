@@ -8,7 +8,7 @@ import {
   communityMemberConnectivityUpdateHandler,
   communityMemberJoinHandler,
   communityMemberLeaveHandler
-} from '../../../src/logic/updates'
+} from '../../../src/logic/updates-old'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../mocks/components'
 import mitt, { Emitter } from 'mitt'

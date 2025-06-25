@@ -32,7 +32,8 @@ import {
   IVoiceDatabaseComponent,
   IStorageComponent,
   IStorageHelperComponent,
-  IPlacesApiComponent
+  IPlacesApiComponent,
+  IUpdateHandlerComponent
 } from './components'
 import {
   ICommunitiesComponent,
@@ -89,6 +90,7 @@ export type BaseComponents = {
   statusChecks: IStatusCheckComponent
   subscribersContext: ISubscribersContext
   tracing: ITracingComponent
+  updateHandler: IUpdateHandlerComponent
   uwsServer: IUWsComponent
   worldsStats: IWorldsStatsComponent
   wsPool: IWSPoolComponent

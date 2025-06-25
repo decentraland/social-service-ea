@@ -6,7 +6,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { parseEmittedUpdateToFriendConnectivityUpdate } from '../../../logic/friendships'
 import { parseProfilesToFriends } from '../../../logic/friends'
-import { handleSubscriptionUpdates } from '../../../logic/updates'
+import { handleSubscriptionUpdates } from '../../../logic/updates-old'
 
 export function subscribeToFriendConnectivityUpdatesService({
   components: { logs, friendsDb, catalystClient, peersStats }

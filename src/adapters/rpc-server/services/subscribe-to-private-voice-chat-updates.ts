@@ -6,7 +6,7 @@ import {
   PrivateVoiceChatUpdate,
   User
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { handleSubscriptionUpdates } from '../../../logic/updates'
+import { handleSubscriptionUpdates } from '../../../logic/updates-old'
 import { VoiceChatStatus } from '../../../logic/voice/types'
 import { isErrorWithMessage } from '../../../utils/errors'
 

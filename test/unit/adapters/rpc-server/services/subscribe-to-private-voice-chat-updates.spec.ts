@@ -4,7 +4,7 @@ import { subscribeToPrivateVoiceChatUpdatesService } from '../../../../../src/ad
 import { RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { createLogsMockedComponent, mockCatalystClient } from '../../../../mocks/components'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
-import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
+import { handleSubscriptionUpdates } from '../../../../../src/logic/updates-old'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import {
   PrivateVoiceChatStatus,
