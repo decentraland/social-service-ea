@@ -148,18 +148,13 @@ export async function initComponents(): Promise<AppComponents> {
 
   const rpcServer = await createRpcServerComponent({
     logs,
-    commsGatekeeper,
     friendsDb,
     pubsub,
     uwsServer,
     config,
-    catalystClient,
-    sns,
     subscribersContext,
     metrics,
-    settings,
     voice,
-    peersStats,
     communityMembers
   })
 

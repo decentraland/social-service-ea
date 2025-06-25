@@ -1,5 +1,6 @@
 import { Lifecycle } from '@well-known-components/interfaces'
 import { setupUWSRoutes } from './controllers/routes/uws.routes'
+import { setupRpcRoutes } from './controllers/routes/rpc.routes'
 import { AppComponents, GlobalContext, TestComponents } from './types'
 import { setupHttpRoutes } from './controllers/routes'
 
@@ -20,7 +21,12 @@ export async function main(program: Lifecycle.EntryPointParameters<AppComponents
   // set the context to be passed to the handlers
   components.httpServer.setContext(globalContext)
 
+  // wire the UWS routes
   await setupUWSRoutes(components)
+
+  // wire the RPC routes
+  const rpcServiceCreators = await setupRpcRoutes(components)
+  components.rpcServer.setServiceCreators(rpcServiceCreators)
 
   await startComponents()
 

@@ -21,6 +21,14 @@ export enum ServiceType {
   COMMUNITIES = 'communities'
 }
 
+export enum StreamEvent {
+  FRIENDSHIP_UPDATES = 'friendship_updates',
+  FRIEND_CONNECTIVITY_UPDATES = 'friend_connectivity_updates',
+  BLOCK_UPDATES = 'block_updates',
+  PRIVATE_VOICE_CHAT_UPDATES = 'private_voice_chat_updates',
+  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES = 'community_member_connectivity_updates'
+}
+
 type RpcCallMethod<TParams, TResult extends SocialServiceResponse, TContext> = (
   params: TParams,
   context: TContext
@@ -39,7 +47,7 @@ export type ServiceMethodDefinition =
   | {
       creator: RpcStreamMethod<any, any, RpcServerContext>
       type: ServiceType.STREAM
-      event: string
+      event: StreamEvent
     }
 
 type RpcServerMetrics = {

@@ -45,6 +45,7 @@ import {
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
+import { RpcServiceCreators } from '../controllers/routes/rpc.routes'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -55,6 +56,7 @@ export interface IRpcClient extends IBaseComponent {
 export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
   detachUser(address: string): void
+  setServiceCreators(creators: RpcServiceCreators): void
 }
 export interface IFriendsDatabaseComponent {
   createFriendship(
