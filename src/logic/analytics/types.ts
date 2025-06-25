@@ -1,8 +1,9 @@
-import { IFetchComponent, ILoggerComponent } from '@well-known-components/interfaces'
+import { IConfigComponent, IFetchComponent, ILoggerComponent } from '@well-known-components/interfaces'
 
 export interface IAnalyticsDependencies {
   logs: ILoggerComponent
   fetcher: IFetchComponent
+  config: IConfigComponent
 }
 
 export type AnalyticsEvent = {

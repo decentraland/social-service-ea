@@ -127,13 +127,7 @@ async function initComponents(): Promise<TestComponents> {
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
-  const analytics = await createAnalyticsComponent<AnalyticsEventPayload>(
-    { logs, fetcher },
-    'social-service',
-    'dev',
-    'https://analytics.test.com',
-    'test'
-  )
+  const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const voice = await createVoiceComponent({
     logs,
     config,

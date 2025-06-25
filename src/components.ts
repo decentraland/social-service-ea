@@ -92,11 +92,7 @@ export async function initComponents(): Promise<AppComponents> {
     const dbPassword = await config.requireString('PG_COMPONENT_PSQL_PASSWORD')
     databaseUrl = `postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbDatabaseName}`
   }
-  const serverName = 'social-service'
   const privateVoiceChatJobInterval = await config.requireNumber('PRIVATE_VOICE_CHAT_JOB_INTERVAL')
-  const analyticsApiUrl = await config.requireString('ANALYTICS_API_URL')
-  const analyticsApiToken = await config.requireString('ANALYTICS_API_TOKEN')
-  const env = (await config.requireString('ENV')) as Environment
 
   const pg = await createPgComponent(
     { logs, config, metrics },
@@ -114,13 +110,7 @@ export async function initComponents(): Promise<AppComponents> {
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const referralDb = await createReferralDBComponent({ pg, logs })
-  const analytics = await createAnalyticsComponent<AnalyticsEventPayload>(
-    { logs, fetcher },
-    serverName,
-    env,
-    analyticsApiUrl,
-    analyticsApiToken
-  )
+  const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
   const referral = await createReferralComponent({ referralDb, logs, sns })
 

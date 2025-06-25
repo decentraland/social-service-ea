@@ -1,15 +1,15 @@
 import { isErrorWithMessage } from '../../utils/errors'
-import { Environment, IAnalyticsComponent, IAnalyticsDependencies } from './types'
+import { IAnalyticsComponent, IAnalyticsDependencies } from './types'
 
 export async function createAnalyticsComponent<T extends Record<string, any>>(
-  components: Pick<IAnalyticsDependencies, 'fetcher' | 'logs'>,
-  context: string,
-  env: Environment,
-  analyticsApiUrl: string,
-  analyticsApiToken: string
+  components: Pick<IAnalyticsDependencies, 'fetcher' | 'logs' | 'config'>
 ): Promise<IAnalyticsComponent<T>> {
-  const { fetcher, logs } = components
+  const { fetcher, logs, config } = components
   const logger = logs.getLogger('analytics-component')
+  const context = config.requireString('ANALYTICS_CONTEXT')
+  const analyticsApiUrl = await config.requireString('ANALYTICS_API_URL')
+  const analyticsApiToken = await config.requireString('ANALYTICS_API_TOKEN')
+  const env = config.requireString('ENV')
 
   async function _sendEvent(name: keyof T, body: T[keyof T]): Promise<void> {
     logger.info(`Sending event to Analytics ${name.toString()}`)
