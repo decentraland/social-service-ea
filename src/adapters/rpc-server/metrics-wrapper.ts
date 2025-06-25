@@ -225,6 +225,12 @@ export function createRpcServerMetricsWrapper({
     }
   }
 
+  /**
+   * Wraps the service creators with metrics
+   * @param serviceCreators - The service creators to wrap
+   * @returns The wrapped service creators
+   * @throws An error if a stream service does not have an event property
+   */
   function withMetrics<
     T extends Record<
       string,
