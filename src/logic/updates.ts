@@ -11,7 +11,7 @@ import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { VoiceChatStatus } from './voice/types'
-import { GetCommunityMembersOptions, ICommunityComponent } from './community'
+import { GetCommunityMembersOptions, ICommunityMembersComponent } from './community'
 
 export type ILogger = ILoggerComponent.ILogger
 
@@ -84,8 +84,7 @@ export function friendshipAcceptedUpdateHandler(subscribersContext: ISubscribers
 export function friendConnectivityUpdateHandler(
   rpcContext: ISubscribersContext,
   logger: ILogger,
-  friendsDb: IFriendsDatabaseComponent,
-  community: ICommunityComponent
+  friendsDb: IFriendsDatabaseComponent
 ) {
   return handleUpdate<'friendConnectivityUpdate'>(async (update) => {
     const onlineSubscribers = rpcContext.getSubscribersAddresses()
@@ -100,40 +99,6 @@ export function friendConnectivityUpdateHandler(
         logger.warn('No emitter found for friend:', { friendAddress })
       }
     })
-
-    const { communities } = await community.getMemberCommunities(update.address, {
-      pagination: { limit: 100, offset: 0 }
-    })
-
-    for (const { id: communityId } of communities) {
-      const PAGE_SIZE = 100
-      let offset = 0
-      let hasMoreMembers = true
-
-      while (hasMoreMembers) {
-        const options: GetCommunityMembersOptions = {
-          onlyOnline: true,
-          pagination: { limit: PAGE_SIZE, offset }
-        }
-
-        const { members, totalMembers } = await community.getCommunityMembers(communityId, update.address, options)
-
-        // Notify community members about connectivity change
-        members.forEach(({ memberAddress }) => {
-          const emitter = rpcContext.getOrAddSubscriber(memberAddress)
-          if (emitter) {
-            emitter.emit('communityMemberConnectivityUpdate', {
-              communityId,
-              memberAddress: update.address,
-              status: update.status
-            })
-          }
-        })
-
-        offset += PAGE_SIZE
-        hasMoreMembers = offset < totalMembers
-      }
-    }
   }, logger)
 }
 
@@ -209,7 +174,7 @@ export function privateVoiceChatUpdateHandler(subscribersContext: ISubscribersCo
 export function communityMemberJoinHandler(
   rpcContext: ISubscribersContext,
   logger: ILogger,
-  community: ICommunityComponent
+  communityMembers: ICommunityMembersComponent
 ) {
   return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
     if (update.status !== ConnectivityStatus.ONLINE) {
@@ -228,7 +193,7 @@ export function communityMemberJoinHandler(
         pagination: { limit: PAGE_SIZE, offset }
       }
 
-      const { members, totalMembers } = await community.getCommunityMembers(
+      const { members, totalMembers } = await communityMembers.getCommunityMembers(
         update.communityId,
         update.memberAddress,
         options
@@ -250,7 +215,7 @@ export function communityMemberJoinHandler(
 export function communityMemberLeaveHandler(
   rpcContext: ISubscribersContext,
   logger: ILogger,
-  community: ICommunityComponent
+  communityMembers: ICommunityMembersComponent
 ) {
   return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
     if (update.status !== ConnectivityStatus.OFFLINE) {
@@ -269,7 +234,7 @@ export function communityMemberLeaveHandler(
         pagination: { limit: PAGE_SIZE, offset }
       }
 
-      const { members, totalMembers } = await community.getCommunityMembers(
+      const { members, totalMembers } = await communityMembers.getCommunityMembers(
         update.communityId,
         update.memberAddress,
         options

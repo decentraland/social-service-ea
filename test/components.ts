@@ -127,23 +127,6 @@ async function initComponents(): Promise<TestComponents> {
   const settings = await createSettingsComponent({ friendsDb })
   const voice = await createVoiceComponent({ logs, config, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
-  const rpcServer = await createRpcServerComponent({
-    logs,
-    commsGatekeeper,
-    friendsDb,
-    pubsub,
-    uwsServer,
-    config,
-    catalystClient,
-    sns,
-    subscribersContext,
-    metrics,
-    settings,
-    voice,
-    peersStats
-  })
-  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
-  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
@@ -164,6 +147,24 @@ async function initComponents(): Promise<TestComponents> {
     storage,
     config
   })
+  const rpcServer = await createRpcServerComponent({
+    logs,
+    commsGatekeeper,
+    friendsDb,
+    pubsub,
+    uwsServer,
+    config,
+    catalystClient,
+    sns,
+    subscribersContext,
+    metrics,
+    settings,
+    voice,
+    peersStats,
+    communityMembers
+  })
+  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
   const localHttpFetch = await createLocalFetchComponent(config)

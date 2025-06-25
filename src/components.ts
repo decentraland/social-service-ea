@@ -160,7 +160,7 @@ export async function initComponents(): Promise<AppComponents> {
     settings,
     voice,
     peersStats,
-    communities
+    communityMembers
   })
 
   const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
