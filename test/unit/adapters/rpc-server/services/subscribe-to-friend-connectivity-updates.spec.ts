@@ -4,23 +4,21 @@ import {
   mockLogs,
   mockFriendsDB,
   mockCatalystClient,
-  createMockPeersStatsComponent
+  createMockPeersStatsComponent,
+  createMockUpdateHandlerComponent
 } from '../../../../mocks/components'
 import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-friend-connectivity-updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
-import { handleSubscriptionUpdates } from '../../../../../src/logic/updates-old'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { IPeersStatsComponent } from '../../../../../src/logic/peers-stats'
 
-jest.mock('../../../../../src/logic/updates')
-
-describe('subscribeToFriendConnectivityUpdatesService', () => {
+describe('when subscribing to friend connectivity updates', () => {
   let subscribeToFriendConnectivityUpdates: ReturnType<typeof subscribeToFriendConnectivityUpdatesService>
   let rpcContext: RpcServerContext
   const mockFriendProfile = createMockProfile('0x456')
-  const mockHandler = handleSubscriptionUpdates as jest.Mock
+  const mockUpdateHandler = createMockUpdateHandlerComponent({})
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   const friend = {
     address: '0x456'
@@ -34,7 +32,8 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
         logs: mockLogs,
         friendsDb: mockFriendsDB,
         catalystClient: mockCatalystClient,
-        peersStats: mockPeersStats
+        peersStats: mockPeersStats,
+        updateHandler: mockUpdateHandler
       }
     })
 
@@ -48,7 +47,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
     mockPeersStats.getConnectedPeers.mockResolvedValueOnce(['0x456', '0x789', '0x654', '0x987'])
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       yield {
         friend: parseProfileToFriend(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
@@ -71,7 +70,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   it('should handle empty online friends list and then receive updates', async () => {
     mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([])
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       yield {
         friend: parseProfileToFriend(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
@@ -98,7 +97,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   })
 
   it('should properly clean up subscription on return', async () => {
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       while (true) {
         yield undefined
       }
@@ -113,7 +112,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   it('should get the address from the update', async () => {
     mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([])
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       yield {
         friend: parseProfileToFriend(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
@@ -123,7 +122,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
     await generator.next()
 
-    const getAddressFromUpdate = mockHandler.mock.calls[0][0].getAddressFromUpdate
+    const getAddressFromUpdate = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].getAddressFromUpdate
     const mockUpdate = { address: '0x456', status: ConnectivityStatus.ONLINE }
     expect(getAddressFromUpdate(mockUpdate)).toBe('0x456')
   })
@@ -131,7 +130,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
   it('should filter connectivity updates based on address conditions', async () => {
     mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
     mockCatalystClient.getProfiles.mockResolvedValueOnce([])
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       yield {
         friend: parseProfileToFriend(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
@@ -152,7 +151,7 @@ describe('subscribeToFriendConnectivityUpdatesService', () => {
     await generator.next()
 
     // Extract the shouldHandleUpdate function from the handler call
-    const shouldHandleUpdate = mockHandler.mock.calls[0][0].shouldHandleUpdate
+    const shouldHandleUpdate = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].shouldHandleUpdate
 
     // Verify filtering logic
     expect(shouldHandleUpdate(mockUpdateFromOther)).toBe(true) // Should handle: from different address

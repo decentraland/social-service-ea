@@ -1,4 +1,4 @@
-import { Action, AppComponents, ICatalystClientComponent, RpcServerContext, SubscriptionEventsEmitter } from '../types'
+import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -17,7 +17,6 @@ export type UpdatesMessageHandler = (message: string) => void | Promise<void>
 export type SubscriptionHandlerParams<T, U> = {
   rpcContext: RpcServerContext
   eventName: keyof SubscriptionEventsEmitter
-  catalystClient: ICatalystClientComponent
   shouldRetrieveProfile?: boolean
   getAddressFromUpdate: (update: U) => string
   shouldHandleUpdate: (update: U) => boolean

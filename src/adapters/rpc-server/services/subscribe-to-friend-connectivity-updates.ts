@@ -6,11 +6,10 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { parseEmittedUpdateToFriendConnectivityUpdate } from '../../../logic/friendships'
 import { parseProfilesToFriends } from '../../../logic/friends'
-import { handleSubscriptionUpdates } from '../../../logic/updates-old'
 
 export function subscribeToFriendConnectivityUpdatesService({
-  components: { logs, friendsDb, catalystClient, peersStats }
-}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient' | 'peersStats'>) {
+  components: { logs, friendsDb, catalystClient, peersStats, updateHandler }
+}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient' | 'peersStats' | 'updateHandler'>) {
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
@@ -28,13 +27,12 @@ export function subscribeToFriendConnectivityUpdatesService({
 
       yield* parsedProfiles
 
-      cleanup = yield* handleSubscriptionUpdates({
+      cleanup = yield* updateHandler.handleSubscriptionUpdates<
+        FriendConnectivityUpdate,
+        SubscriptionEventsEmitter['friendConnectivityUpdate']
+      >({
         rpcContext: context,
         eventName: 'friendConnectivityUpdate',
-        components: {
-          catalystClient,
-          logger
-        },
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) => update.address,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) =>
           update.address !== context.address,

@@ -6,7 +6,6 @@ import {
   PrivateVoiceChatUpdate,
   User
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { handleSubscriptionUpdates } from '../../../logic/updates-old'
 import { VoiceChatStatus } from '../../../logic/voice/types'
 import { isErrorWithMessage } from '../../../utils/errors'
 
@@ -49,24 +48,20 @@ function parseEmittedUpdateToPrivateVoiceChatUpdate(
 }
 
 export function subscribeToPrivateVoiceChatUpdatesService({
-  components: { logs, catalystClient }
-}: RPCServiceContext<'logs' | 'catalystClient' | 'voice'>) {
+  components: { logs, updateHandler }
+}: RPCServiceContext<'logs' | 'updateHandler'>) {
   const logger = logs.getLogger('subscribe-to-private-voice-chat-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<PrivateVoiceChatUpdate> {
     let cleanup: (() => void) | undefined
 
     try {
-      cleanup = yield* handleSubscriptionUpdates<
+      cleanup = yield* updateHandler.handleSubscriptionUpdates<
         PrivateVoiceChatUpdate,
         SubscriptionEventsEmitter['privateVoiceChatUpdate']
       >({
         rpcContext: context,
         eventName: 'privateVoiceChatUpdate',
-        components: {
-          catalystClient,
-          logger
-        },
         shouldRetrieveProfile: false,
         getAddressFromUpdate: () => 'not-needed',
         parser: parseEmittedUpdateToPrivateVoiceChatUpdate,

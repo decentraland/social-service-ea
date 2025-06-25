@@ -1,17 +1,14 @@
 import { subscribeToBlockUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-block-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext } from '../../../../../src/types'
-import { mockCatalystClient, mockLogs } from '../../../../mocks/components'
-import { handleSubscriptionUpdates } from '../../../../../src/logic/updates-old'
+import { mockLogs, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 
-jest.mock('../../../../../src/logic/updates')
-
-describe('subscribeToBlockUpdatesService', () => {
+describe('when subscribing to block updates', () => {
   let subscribeToBlockUpdates: ReturnType<typeof subscribeToBlockUpdatesService>
   let rpcContext: RpcServerContext
   const subscribersContext = createSubscribersContext()
-  const mockHandler = handleSubscriptionUpdates as jest.Mock
+  const mockUpdateHandler = createMockUpdateHandlerComponent({})
 
   const mockUpdate = {
     blockerAddress: '0x123',
@@ -23,7 +20,7 @@ describe('subscribeToBlockUpdatesService', () => {
     subscribeToBlockUpdates = subscribeToBlockUpdatesService({
       components: {
         logs: mockLogs,
-        catalystClient: mockCatalystClient
+        updateHandler: mockUpdateHandler
       }
     })
 
@@ -34,7 +31,7 @@ describe('subscribeToBlockUpdatesService', () => {
   })
 
   it('should handle subscription updates', async () => {
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       yield mockUpdate
     })
 
@@ -47,7 +44,7 @@ describe('subscribeToBlockUpdatesService', () => {
 
   it('should handle errors during subscription', async () => {
     const testError = new Error('Test error')
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       throw testError
     })
 
@@ -56,7 +53,7 @@ describe('subscribeToBlockUpdatesService', () => {
   })
 
   it('should properly clean up subscription on return', async () => {
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       while (true) {
         yield undefined
       }
@@ -69,19 +66,19 @@ describe('subscribeToBlockUpdatesService', () => {
   })
 
   it('should get the proper address from the update', async () => {
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       yield mockUpdate
     })
 
     const generator = subscribeToBlockUpdates({} as Empty, rpcContext)
     const result = await generator.next()
 
-    const getAddressFromUpdate = mockHandler.mock.calls[0][0].getAddressFromUpdate
+    const getAddressFromUpdate = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].getAddressFromUpdate
     expect(getAddressFromUpdate(mockUpdate)).toBe(mockUpdate.blockerAddress)
   })
 
   it('should filter updates based on address conditions', async () => {
-    mockHandler.mockImplementationOnce(async function* () {
+    mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
       yield mockUpdate
     })
 
@@ -103,7 +100,7 @@ describe('subscribeToBlockUpdatesService', () => {
     const result = await generator.next()
 
     // Extract the shouldHandleUpdate function from the handler call
-    const shouldHandleUpdate = mockHandler.mock.calls[0][0].shouldHandleUpdate
+    const shouldHandleUpdate = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].shouldHandleUpdate
 
     expect(shouldHandleUpdate(mockUpdateBlockingNonLoggedUser)).toBe(false)
     expect(shouldHandleUpdate(mockUpdateBlockingLoggedUser)).toBe(true)
