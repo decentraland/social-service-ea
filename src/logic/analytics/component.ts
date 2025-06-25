@@ -6,13 +6,13 @@ export async function createAnalyticsComponent<T extends Record<string, any>>(
 ): Promise<IAnalyticsComponent<T>> {
   const { fetcher, logs, config } = components
   const logger = logs.getLogger('analytics-component')
-  const context = config.requireString('ANALYTICS_CONTEXT')
+  const context = await config.requireString('ANALYTICS_CONTEXT')
   const analyticsApiUrl = await config.requireString('ANALYTICS_API_URL')
   const analyticsApiToken = await config.requireString('ANALYTICS_API_TOKEN')
-  const env = config.requireString('ENV')
+  const env = await config.requireString('ENV')
 
   async function _sendEvent(name: keyof T, body: T[keyof T]): Promise<void> {
-    logger.info(`Sending event to Analytics ${name.toString()}`)
+    logger.debug(`Sending event to Analytics ${name.toString()}`)
 
     try {
       const response = await fetcher.fetch(analyticsApiUrl, {
