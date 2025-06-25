@@ -15,6 +15,7 @@ export const mockCommunitiesDB: jest.Mocked<ICommunitiesDatabaseComponent> = {
   getCommunitiesPublicInformation: jest.fn(),
   getPublicCommunitiesCount: jest.fn(),
   getMemberCommunities: jest.fn(),
+  getOnlineMembersFromUserCommunities: jest.fn(),
   createCommunity: jest.fn(),
   deleteCommunity: jest.fn(),
   addCommunityMember: jest.fn(),

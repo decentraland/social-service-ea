@@ -102,6 +102,32 @@ export function friendConnectivityUpdateHandler(
   }, logger)
 }
 
+export function communityMemberConnectivityUpdateHandler(
+  rpcContext: ISubscribersContext,
+  logger: ILogger,
+  communityMembers: ICommunityMembersComponent
+) {
+  return handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
+    const onlineSubscribers = rpcContext.getSubscribersAddresses()
+    // TODO: paginate this and emit the updates in batches
+    const onlineMembers = await communityMembers.getOnlineMembersFromUserCommunities(
+      update.memberAddress,
+      onlineSubscribers
+    )
+
+    onlineMembers.forEach(({ communityId, memberAddress }) => {
+      const emitter = rpcContext.getOrAddSubscriber(memberAddress)
+      if (emitter) {
+        emitter.emit('communityMemberConnectivityUpdate', {
+          communityId,
+          memberAddress: update.memberAddress,
+          status: update.status
+        })
+      }
+    })
+  }, logger)
+}
+
 export function blockUpdateHandler(subscribersContext: ISubscribersContext, logger: ILogger) {
   return handleUpdate<'blockUpdate'>((update) => {
     logger.info('Block update', {

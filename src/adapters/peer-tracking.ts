@@ -3,7 +3,7 @@ import { IPeerTrackingComponent } from '../types'
 import { AppComponents } from '../types'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { NatsMsg } from '@well-known-components/nats-component/dist/types'
-import { FRIEND_STATUS_UPDATES_CHANNEL } from './pubsub'
+import { COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL, FRIEND_STATUS_UPDATES_CHANNEL } from './pubsub'
 
 export type PeerStatusHandler = {
   event: PeerStatusHandlerEvent
@@ -52,10 +52,16 @@ export async function createPeerTrackingComponent({
       await redis.put(key, status, {
         EX: statusCacheTtlInSeconds
       })
-      await pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
-        address: peerId,
-        status
-      })
+      await Promise.all([
+        pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
+          address: peerId,
+          status
+        }),
+        pubsub.publishInChannel(COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL, {
+          memberAddress: peerId,
+          status
+        })
+      ])
     }
   }
 

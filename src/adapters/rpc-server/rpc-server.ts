@@ -24,7 +24,8 @@ import {
   blockUpdateHandler,
   privateVoiceChatUpdateHandler,
   communityMemberJoinHandler,
-  communityMemberLeaveHandler
+  communityMemberLeaveHandler,
+  communityMemberConnectivityUpdateHandler
 } from '../../logic/updates'
 import { getPrivateMessagesSettingsService } from './services/get-private-messages-settings'
 import { upsertSocialSettingsService } from './services/upsert-social-settings'
@@ -211,6 +212,10 @@ export async function createRpcServerComponent({
       await pubsub.subscribeToChannel(
         FRIEND_STATUS_UPDATES_CHANNEL,
         friendConnectivityUpdateHandler(subscribersContext, logger, friendsDb)
+      )
+      await pubsub.subscribeToChannel(
+        COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+        communityMemberConnectivityUpdateHandler(subscribersContext, logger, communityMembers)
       )
       await pubsub.subscribeToChannel(BLOCK_UPDATES_CHANNEL, blockUpdateHandler(subscribersContext, logger))
       await pubsub.subscribeToChannel(

@@ -5,7 +5,10 @@ import {
   ILogger,
   friendshipAcceptedUpdateHandler,
   blockUpdateHandler,
-  privateVoiceChatUpdateHandler
+  privateVoiceChatUpdateHandler,
+  communityMemberConnectivityUpdateHandler,
+  communityMemberJoinHandler,
+  communityMemberLeaveHandler
 } from '../../../src/logic/updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../mocks/components'
@@ -15,6 +18,8 @@ import { sleep } from '../../../src/utils/timer'
 import { mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
 import { VoiceChatStatus } from '../../../src/logic/voice/types'
+import { ICommunityMembersComponent } from '../../../src/logic/community/types'
+import { createMockCommunityMembersComponent } from '../../mocks/communities'
 
 describe('updates handlers', () => {
   const logger = mockLogs.getLogger('test')
@@ -214,6 +219,631 @@ describe('updates handlers', () => {
           message: JSON.stringify(update)
         })
       )
+    })
+  })
+
+  describe('communityMemberConnectivityUpdateHandler', () => {
+    let subscriber456: Emitter<SubscriptionEventsEmitter>
+    let subscriber789: Emitter<SubscriptionEventsEmitter>
+    let emitSpy456: jest.SpyInstance
+    let emitSpy789: jest.SpyInstance
+    let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
+
+    beforeEach(() => {
+      subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
+      subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
+
+      emitSpy456 = jest.spyOn(subscriber456, 'emit')
+      emitSpy789 = jest.spyOn(subscriber789, 'emit')
+
+      mockCommunityMembers = createMockCommunityMembersComponent({})
+    })
+
+    describe('when the user is not a member of any community', () => {
+      beforeEach(() => {
+        mockCommunityMembers.getOnlineMembersFromUserCommunities.mockResolvedValueOnce([])
+      })
+
+      it('should not emit any updates', async () => {
+        const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
+        const update = {
+          memberAddress: '0x123',
+          status: ConnectivityStatus.ONLINE
+        }
+
+        await handler(JSON.stringify(update))
+
+        expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
+          '0x456',
+          '0x789'
+        ])
+        expect(emitSpy456).not.toHaveBeenCalled()
+        expect(emitSpy789).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when the user is a member of a community', () => {
+      describe('and there are no online members in the community', () => {
+        beforeEach(() => {
+          mockCommunityMembers.getOnlineMembersFromUserCommunities.mockResolvedValueOnce([])
+        })
+
+        it('should not emit any updates', async () => {
+          const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
+          const update = {
+            memberAddress: '0x123',
+            status: ConnectivityStatus.ONLINE
+          }
+
+          await handler(JSON.stringify(update))
+
+          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
+            '0x456',
+            '0x789'
+          ])
+          expect(emitSpy456).not.toHaveBeenCalled()
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and there are online members in the community', () => {
+        beforeEach(() => {
+          mockCommunityMembers.getOnlineMembersFromUserCommunities.mockResolvedValueOnce([
+            { communityId: '1', memberAddress: '0x456' },
+            { communityId: '2', memberAddress: '0x789' }
+          ])
+        })
+
+        it('should emit connectivity update to all online members of the communities', async () => {
+          const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
+          const update = {
+            memberAddress: '0x123',
+            status: ConnectivityStatus.ONLINE
+          }
+
+          await handler(JSON.stringify(update))
+
+          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
+            '0x456',
+            '0x789'
+          ])
+          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            ...update,
+            communityId: '1'
+          })
+          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            ...update,
+            communityId: '2'
+          })
+        })
+      })
+    })
+
+    describe('when the update format is invalid', () => {
+      it('should log an error', () => {
+        const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
+        const errorSpy = jest.spyOn(logger, 'error')
+
+        handler('invalid json')
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error handling update:'),
+          expect.objectContaining({ message: 'invalid json' })
+        )
+      })
+    })
+
+    describe('when the community members logic component throws an error', () => {
+      let error: Error
+
+      beforeEach(() => {
+        error = new Error('Cannot get online members from user communities')
+        mockCommunityMembers.getOnlineMembersFromUserCommunities.mockRejectedValueOnce(error)
+      })
+
+      it('should log an error and not emit any updates', async () => {
+        const handler = communityMemberConnectivityUpdateHandler(subscribersContext, logger, mockCommunityMembers)
+        const errorSpy = jest.spyOn(logger, 'error')
+
+        const update = {
+          memberAddress: '0x123',
+          status: ConnectivityStatus.ONLINE
+        }
+
+        await handler(JSON.stringify(update))
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error handling update:'),
+          expect.objectContaining({ error, message: JSON.stringify(update) })
+        )
+
+        expect(emitSpy456).not.toHaveBeenCalled()
+        expect(emitSpy789).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('communityMemberJoinHandler', () => {
+    let subscriber456: Emitter<SubscriptionEventsEmitter>
+    let subscriber789: Emitter<SubscriptionEventsEmitter>
+    let emitSpy456: jest.SpyInstance
+    let emitSpy789: jest.SpyInstance
+    let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
+
+    beforeEach(() => {
+      subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
+      subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
+
+      emitSpy456 = jest.spyOn(subscriber456, 'emit')
+      emitSpy789 = jest.spyOn(subscriber789, 'emit')
+
+      mockCommunityMembers = createMockCommunityMembersComponent({})
+    })
+
+    describe('when the status is not ONLINE', () => {
+      it('should not emit any updates', async () => {
+        const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
+        const update = {
+          communityId: 'community-1',
+          memberAddress: '0x123',
+          status: ConnectivityStatus.OFFLINE
+        }
+
+        await handler(JSON.stringify(update))
+
+        expect(mockCommunityMembers.getCommunityMembers).not.toHaveBeenCalled()
+        expect(emitSpy456).not.toHaveBeenCalled()
+        expect(emitSpy789).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when the status is ONLINE', () => {
+      describe('and there are no online members in the community', () => {
+        beforeEach(() => {
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [],
+            totalMembers: 0
+          })
+        })
+
+        it('should not emit any updates', async () => {
+          const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
+          const update = {
+            communityId: 'community-1',
+            memberAddress: '0x123',
+            status: ConnectivityStatus.ONLINE
+          }
+
+          await handler(JSON.stringify(update))
+
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 0 }
+          })
+          expect(emitSpy456).not.toHaveBeenCalled()
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and there are online members in the community', () => {
+        beforeEach(() => {
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [
+              {
+                communityId: 'community-1',
+                memberAddress: '0x456',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar1.jpg',
+                hasClaimedName: true,
+                name: 'User 456',
+                friendshipStatus: 'NONE' as any
+              },
+              {
+                communityId: 'community-1',
+                memberAddress: '0x789',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar2.jpg',
+                hasClaimedName: true,
+                name: 'User 789',
+                friendshipStatus: 'NONE' as any
+              }
+            ],
+            totalMembers: 2
+          })
+        })
+
+        it('should emit connectivity update to all online members of the community', async () => {
+          const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
+          const update = {
+            communityId: 'community-1',
+            memberAddress: '0x123',
+            status: ConnectivityStatus.ONLINE
+          }
+
+          await handler(JSON.stringify(update))
+
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 0 }
+          })
+          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
+          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
+        })
+      })
+
+      describe('and there are more members than the page size', () => {
+        beforeEach(() => {
+          // First page
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [
+              {
+                communityId: 'community-1',
+                memberAddress: '0x456',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar1.jpg',
+                hasClaimedName: true,
+                name: 'User 456',
+                friendshipStatus: 'NONE' as any
+              },
+              {
+                communityId: 'community-1',
+                memberAddress: '0x789',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar2.jpg',
+                hasClaimedName: true,
+                name: 'User 789',
+                friendshipStatus: 'NONE' as any
+              }
+            ],
+            totalMembers: 250
+          })
+          // Second page
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [
+              {
+                communityId: 'community-1',
+                memberAddress: '0x999',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar3.jpg',
+                hasClaimedName: true,
+                name: 'User 999',
+                friendshipStatus: 'NONE' as any
+              }
+            ],
+            totalMembers: 250
+          })
+          // Third page (empty)
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [],
+            totalMembers: 250
+          })
+        })
+
+        it('should emit connectivity update to all online members across multiple pages', async () => {
+          const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
+          const update = {
+            communityId: 'community-1',
+            memberAddress: '0x123',
+            status: ConnectivityStatus.ONLINE
+          }
+
+          await handler(JSON.stringify(update))
+
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledTimes(3)
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(1, 'community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 0 }
+          })
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(2, 'community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 100 }
+          })
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(3, 'community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 200 }
+          })
+
+          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
+          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
+        })
+      })
+    })
+
+    describe('when the update format is invalid', () => {
+      it('should log an error', () => {
+        const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
+        const errorSpy = jest.spyOn(logger, 'error')
+
+        handler('invalid json')
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error handling update:'),
+          expect.objectContaining({ message: 'invalid json' })
+        )
+      })
+    })
+
+    describe('when the community members logic component throws an error', () => {
+      let error: Error
+
+      beforeEach(() => {
+        error = new Error('Cannot get community members')
+        mockCommunityMembers.getCommunityMembers.mockRejectedValueOnce(error)
+      })
+
+      it('should log an error and not emit any updates', async () => {
+        const handler = communityMemberJoinHandler(subscribersContext, logger, mockCommunityMembers)
+        const errorSpy = jest.spyOn(logger, 'error')
+
+        const update = {
+          communityId: 'community-1',
+          memberAddress: '0x123',
+          status: ConnectivityStatus.ONLINE
+        }
+
+        await handler(JSON.stringify(update))
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error handling update:'),
+          expect.objectContaining({ error, message: JSON.stringify(update) })
+        )
+
+        expect(emitSpy456).not.toHaveBeenCalled()
+        expect(emitSpy789).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('communityMemberLeaveHandler', () => {
+    let subscriber456: Emitter<SubscriptionEventsEmitter>
+    let subscriber789: Emitter<SubscriptionEventsEmitter>
+    let emitSpy456: jest.SpyInstance
+    let emitSpy789: jest.SpyInstance
+    let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
+
+    beforeEach(() => {
+      subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
+      subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
+
+      emitSpy456 = jest.spyOn(subscriber456, 'emit')
+      emitSpy789 = jest.spyOn(subscriber789, 'emit')
+
+      mockCommunityMembers = createMockCommunityMembersComponent({})
+    })
+
+    describe('when the status is not OFFLINE', () => {
+      it('should not emit any updates', async () => {
+        const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
+        const update = {
+          communityId: 'community-1',
+          memberAddress: '0x123',
+          status: ConnectivityStatus.ONLINE
+        }
+
+        await handler(JSON.stringify(update))
+
+        expect(mockCommunityMembers.getCommunityMembers).not.toHaveBeenCalled()
+        expect(emitSpy456).not.toHaveBeenCalled()
+        expect(emitSpy789).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when the status is OFFLINE', () => {
+      describe('and there are no online members in the community', () => {
+        beforeEach(() => {
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [],
+            totalMembers: 0
+          })
+        })
+
+        it('should not emit any updates', async () => {
+          const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
+          const update = {
+            communityId: 'community-1',
+            memberAddress: '0x123',
+            status: ConnectivityStatus.OFFLINE
+          }
+
+          await handler(JSON.stringify(update))
+
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 0 }
+          })
+          expect(emitSpy456).not.toHaveBeenCalled()
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and there are online members in the community', () => {
+        beforeEach(() => {
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [
+              {
+                communityId: 'community-1',
+                memberAddress: '0x456',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar1.jpg',
+                hasClaimedName: true,
+                name: 'User 456',
+                friendshipStatus: 'NONE' as any
+              },
+              {
+                communityId: 'community-1',
+                memberAddress: '0x789',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar2.jpg',
+                hasClaimedName: true,
+                name: 'User 789',
+                friendshipStatus: 'NONE' as any
+              }
+            ],
+            totalMembers: 2
+          })
+        })
+
+        it('should emit connectivity update with OFFLINE status to all online members of the community', async () => {
+          const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
+          const update = {
+            communityId: 'community-1',
+            memberAddress: '0x123',
+            status: ConnectivityStatus.OFFLINE
+          }
+
+          await handler(JSON.stringify(update))
+
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 0 }
+          })
+          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            ...update,
+            status: ConnectivityStatus.OFFLINE
+          })
+          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            ...update,
+            status: ConnectivityStatus.OFFLINE
+          })
+        })
+      })
+
+      describe('and there are more members than the page size', () => {
+        beforeEach(() => {
+          // First page
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [
+              {
+                communityId: 'community-1',
+                memberAddress: '0x456',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar1.jpg',
+                hasClaimedName: true,
+                name: 'User 456',
+                friendshipStatus: 'NONE' as any
+              },
+              {
+                communityId: 'community-1',
+                memberAddress: '0x789',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar2.jpg',
+                hasClaimedName: true,
+                name: 'User 789',
+                friendshipStatus: 'NONE' as any
+              }
+            ],
+            totalMembers: 250
+          })
+          // Second page
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [
+              {
+                communityId: 'community-1',
+                memberAddress: '0x999',
+                role: 'Member' as any,
+                joinedAt: '2023-01-01T00:00:00Z',
+                profilePictureUrl: 'https://example.com/avatar3.jpg',
+                hasClaimedName: true,
+                name: 'User 999',
+                friendshipStatus: 'NONE' as any
+              }
+            ],
+            totalMembers: 250
+          })
+          // Third page (empty)
+          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
+            members: [],
+            totalMembers: 250
+          })
+        })
+
+        it('should emit connectivity update with OFFLINE status to all online members across multiple pages', async () => {
+          const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
+          const update = {
+            communityId: 'community-1',
+            memberAddress: '0x123',
+            status: ConnectivityStatus.OFFLINE
+          }
+
+          await handler(JSON.stringify(update))
+
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledTimes(3)
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(1, 'community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 0 }
+          })
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(2, 'community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 100 }
+          })
+          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(3, 'community-1', '0x123', {
+            onlyOnline: true,
+            pagination: { limit: 100, offset: 200 }
+          })
+
+          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            ...update,
+            status: ConnectivityStatus.OFFLINE
+          })
+          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            ...update,
+            status: ConnectivityStatus.OFFLINE
+          })
+        })
+      })
+    })
+
+    describe('when the update format is invalid', () => {
+      it('should log an error', () => {
+        const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
+        const errorSpy = jest.spyOn(logger, 'error')
+
+        handler('invalid json')
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error handling update:'),
+          expect.objectContaining({ message: 'invalid json' })
+        )
+      })
+    })
+
+    describe('when the community members logic component throws an error', () => {
+      let error: Error
+
+      beforeEach(() => {
+        error = new Error('Cannot get community members')
+        mockCommunityMembers.getCommunityMembers.mockRejectedValueOnce(error)
+      })
+
+      it('should log an error and not emit any updates', async () => {
+        const handler = communityMemberLeaveHandler(subscribersContext, logger, mockCommunityMembers)
+        const errorSpy = jest.spyOn(logger, 'error')
+
+        const update = {
+          communityId: 'community-1',
+          memberAddress: '0x123',
+          status: ConnectivityStatus.OFFLINE
+        }
+
+        await handler(JSON.stringify(update))
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error handling update:'),
+          expect.objectContaining({ error, message: JSON.stringify(update) })
+        )
+
+        expect(emitSpy456).not.toHaveBeenCalled()
+        expect(emitSpy789).not.toHaveBeenCalled()
+      })
     })
   })
 

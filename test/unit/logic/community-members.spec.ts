@@ -319,6 +319,29 @@ describe('Community Members Component', () => {
     })
   })
 
+  describe('when getting online members from communities a user belongs to', () => {
+    const userAddress = '0x1234567890123456789012345678901234567890'
+    const onlineUsers = ['0x1234567890123456789012345678901234567890', '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd']
+
+    beforeEach(() => {
+      mockCommunitiesDB.getOnlineMembersFromUserCommunities.mockResolvedValue([
+        { communityId: '1', memberAddress: '0x1234567890123456789012345678901234567890' },
+        { communityId: '2', memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' }
+      ])
+    })
+
+    it('should return the members that are online from all the communities a user belongs to', async () => {
+      const result = await communityMembersComponent.getOnlineMembersFromUserCommunities(userAddress, onlineUsers)
+
+      expect(mockCommunitiesDB.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(userAddress, onlineUsers)
+
+      expect(result).toEqual([
+        { communityId: '1', memberAddress: '0x1234567890123456789012345678901234567890' },
+        { communityId: '2', memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' }
+      ])
+    })
+  })
+
   describe('when kicking a member from a community', () => {
     const kickerAddress = '0x9876543210987654321098765432109876543210'
     const targetAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'

@@ -51,7 +51,7 @@ export type SubscriptionEventsEmitter = {
   }
   communityMemberConnectivityUpdate: {
     communityId: string
-    memberAddress: string
+    memberAddress: EthAddress
     status: ConnectivityStatus
   }
 }

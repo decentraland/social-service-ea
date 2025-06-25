@@ -158,6 +158,10 @@ export interface ICommunitiesDatabaseComponent {
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ): Promise<MemberCommunity[]>
+  getOnlineMembersFromUserCommunities(
+    userAddress: EthAddress,
+    onlineUsers: string[]
+  ): Promise<{ communityId: string; memberAddress: string }[]>
   banMemberFromCommunity(communityId: string, bannedBy: EthAddress, bannedMemberAddress: EthAddress): Promise<void>
   unbanMemberFromCommunity(
     communityId: string,

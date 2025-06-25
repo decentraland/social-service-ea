@@ -83,6 +83,13 @@ export async function createCommunityMembersComponent(
       return filterAndCountCommunityMembers(id, options)
     },
 
+    getOnlineMembersFromUserCommunities: async (
+      userAddress: string,
+      onlineUsers: string[]
+    ): Promise<{ communityId: string; memberAddress: string }[]> => {
+      return communitiesDb.getOnlineMembersFromUserCommunities(userAddress, onlineUsers)
+    },
+
     kickMember: async (communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
       const communityExists = await communitiesDb.communityExists(communityId)
 
