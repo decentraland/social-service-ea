@@ -1,9 +1,9 @@
 import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
-import { errorMessageOrDefault } from '../../utils/errors'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
-import { CommunityNotFoundError, CommunityPlace } from '../../logic/community'
-import { getPaginationResultProperties } from '../../utils/pagination'
+import { CommunityNotFoundError, CommunityPlace } from '../../../logic/community'
+import { getPaginationResultProperties } from '../../../utils/pagination'
 
 export async function getCommunityPlacesHandler(
   context: Pick<

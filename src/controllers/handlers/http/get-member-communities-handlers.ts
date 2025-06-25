@@ -1,10 +1,10 @@
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
-import { errorMessageOrDefault } from '../../utils/errors'
-import { MemberCommunity } from '../../logic/community'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { errorMessageOrDefault } from '../../../utils/errors'
+import { MemberCommunity } from '../../../logic/community'
 import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { getPaginationResultProperties } from '../../utils/pagination'
+import { getPaginationResultProperties } from '../../../utils/pagination'
 import { PaginatedResponse } from '@dcl/schemas'
-import { normalizeAddress } from '../../utils/address'
+import { normalizeAddress } from '../../../utils/address'
 
 export async function getMemberCommunitiesHandler(
   context: Pick<

@@ -1,10 +1,10 @@
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { CommunityNotFoundError } from '../../logic/community'
-import { errorMessageOrDefault } from '../../utils/errors'
+import { CommunityNotFoundError } from '../../../logic/community'
+import { errorMessageOrDefault } from '../../../utils/errors'
 import { EthAddress } from '@dcl/schemas'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL } from '../../adapters/pubsub'
+import { COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL } from '../../../adapters/pubsub'
 
 export async function addMemberToCommunityHandler(
   context: Pick<

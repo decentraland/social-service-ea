@@ -1,6 +1,6 @@
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
-import { errorMessageOrDefault } from '../../utils/errors'
-import { CommunityNotFoundError } from '../../logic/community/errors'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { errorMessageOrDefault } from '../../../utils/errors'
+import { CommunityNotFoundError } from '../../../logic/community/errors'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 
 export async function deleteCommunityHandler(

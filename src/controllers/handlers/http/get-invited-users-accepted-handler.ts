@@ -1,8 +1,8 @@
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
-import { HandlerContextWithPath } from '../../types/http'
-import { errorMessageOrDefault } from '../../utils/errors'
-import { ReferralInvalidInputError } from '../../logic/referral/errors'
+import { HandlerContextWithPath } from '../../../types/http'
+import { errorMessageOrDefault } from '../../../utils/errors'
+import { ReferralInvalidInputError } from '../../../logic/referral/errors'
 
 export async function getInvitedUsersAcceptedHandler(
   ctx: Pick<

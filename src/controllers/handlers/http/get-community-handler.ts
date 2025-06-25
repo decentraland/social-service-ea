@@ -1,6 +1,6 @@
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
-import { errorMessageOrDefault } from '../../utils/errors'
-import { CommunityNotFoundError, CommunityWithMembersCount } from '../../logic/community'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { errorMessageOrDefault } from '../../../utils/errors'
+import { CommunityNotFoundError, CommunityWithMembersCount } from '../../../logic/community'
 
 export async function getCommunityHandler(
   context: Pick<
