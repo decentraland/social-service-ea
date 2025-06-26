@@ -1,27 +1,29 @@
 import { Router } from '@well-known-components/http-server'
 import { GlobalContext } from '../../types'
 import { errorHandler } from '@dcl/platform-server-commons'
-import { getCommunityHandler } from '../handlers/http/get-community-handler'
-import { getCommunitiesHandler } from '../handlers/http/get-communities-handler'
-import { deleteCommunityHandler } from '../handlers/http/delete-community-handler'
+import {
+  getCommunityHandler,
+  getCommunitiesHandler,
+  deleteCommunityHandler,
+  getCommunityMembersHandler,
+  getMemberCommunitiesHandler,
+  removeMemberFromCommunityHandler,
+  createCommunityHandler,
+  addMemberToCommunityHandler,
+  unbanMemberHandler,
+  banMemberHandler,
+  getBannedMembersHandler,
+  createReferralHandler,
+  updateReferralSignedUpHandler,
+  getInvitedUsersAcceptedHandler,
+  updateMemberRoleHandler,
+  getCommunityPlacesHandler,
+  addCommunityPlacesHandler,
+  removeCommunityPlaceHandler,
+  updateCommunityHandler
+} from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
-import { getCommunityMembersHandler } from '../handlers/http/get-community-members-handlers'
-import { getMemberCommunitiesHandler } from '../handlers/http/get-member-communities-handlers'
-import { removeMemberFromCommunityHandler } from '../handlers/http/remove-member-from-community-handler'
-import { createCommunityHandler } from '../handlers/http/create-community-handler'
-import { addMemberToCommunityHandler } from '../handlers/http/add-member-to-community-handler'
-import { unbanMemberHandler } from '../handlers/http/unban-member-handler'
-import { banMemberHandler } from '../handlers/http/ban-member-handler'
-import { getBannedMembersHandler } from '../handlers/http/get-banned-members-handler'
-import { createReferralHandler } from '../handlers/http/create-referral-handler'
-import { updateReferralSignedUpHandler } from '../handlers/http/update-referral-signed-up-handler'
-import { getInvitedUsersAcceptedHandler } from '../handlers/http/get-invited-users-accepted-handler'
-import { updateMemberRoleHandler } from '../handlers/http/update-member-role-handler'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
-import { getCommunityPlacesHandler } from '../handlers/http/get-community-places-handler'
-import { addCommunityPlacesHandler } from '../handlers/http/add-community-places-handler'
-import { removeCommunityPlaceHandler } from '../handlers/http/remove-community-place-handler'
-import { updateCommunityHandler } from '../handlers/http/update-community-handler'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {

@@ -1,27 +1,29 @@
 import { AppComponents } from '../../types'
-import { getFriendsService } from '../handlers/rpc/get-friends'
-import { getMutualFriendsService } from '../handlers/rpc/get-mutual-friends'
-import { getPendingFriendshipRequestsService } from '../handlers/rpc/get-pending-friendship-requests'
-import { upsertFriendshipService } from '../handlers/rpc/upsert-friendship'
-import { subscribeToFriendshipUpdatesService } from '../handlers/rpc/subscribe-to-friendship-updates'
-import { getSentFriendshipRequestsService } from '../handlers/rpc/get-sent-friendship-requests'
-import { getFriendshipStatusService } from '../handlers/rpc/get-friendship-status'
-import { subscribeToFriendConnectivityUpdatesService } from '../handlers/rpc/subscribe-to-friend-connectivity-updates'
-import { getPrivateMessagesSettingsService } from '../handlers/rpc/get-private-messages-settings'
-import { upsertSocialSettingsService } from '../handlers/rpc/upsert-social-settings'
-import { getSocialSettingsService } from '../handlers/rpc/get-social-settings'
-import { blockUserService } from '../handlers/rpc/block-user'
-import { getBlockedUsersService } from '../handlers/rpc/get-blocked-users'
-import { unblockUserService } from '../handlers/rpc/unblock-user'
-import { getBlockingStatusService } from '../handlers/rpc/get-blocking-status'
-import { subscribeToBlockUpdatesService } from '../handlers/rpc/subscribe-to-block-updates'
-import { startPrivateVoiceChatService } from '../handlers/rpc/start-private-voice-chat'
-import { acceptPrivateVoiceChatService } from '../handlers/rpc/accept-private-voice-chat'
-import { rejectPrivateVoiceChatService } from '../handlers/rpc/reject-private-voice-chat'
-import { endPrivateVoiceChatService } from '../handlers/rpc/end-private-voice-chat'
-import { getIncomingPrivateVoiceChatRequestsService } from '../handlers/rpc/get-incoming-private-voice-chat-requests'
-import { subscribeToPrivateVoiceChatUpdatesService } from '../handlers/rpc/subscribe-to-private-voice-chat-updates'
-import { subscribeToCommunityMemberConnectivityUpdatesService } from '../handlers/rpc/subscribe-to-community-member-connectivity-updates'
+import {
+  getFriendsService,
+  getMutualFriendsService,
+  getPendingFriendshipRequestsService,
+  upsertFriendshipService,
+  subscribeToFriendshipUpdatesService,
+  getSentFriendshipRequestsService,
+  getFriendshipStatusService,
+  blockUserService,
+  getBlockedUsersService,
+  unblockUserService,
+  getBlockingStatusService,
+  getPrivateMessagesSettingsService,
+  upsertSocialSettingsService,
+  getSocialSettingsService,
+  startPrivateVoiceChatService,
+  acceptPrivateVoiceChatService,
+  rejectPrivateVoiceChatService,
+  endPrivateVoiceChatService,
+  getIncomingPrivateVoiceChatRequestsService,
+  subscribeToCommunityMemberConnectivityUpdatesService,
+  subscribeToFriendConnectivityUpdatesService,
+  subscribeToBlockUpdatesService,
+  subscribeToPrivateVoiceChatUpdatesService
+} from '../handlers/rpc'
 import { ServiceType, StreamEvent } from '../../adapters/rpc-server/metrics-wrapper'
 
 export type RpcServiceCreator = {
