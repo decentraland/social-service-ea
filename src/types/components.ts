@@ -328,7 +328,6 @@ export interface IUpdateHandlerComponent {
   communityMemberConnectivityUpdateHandler: UpdatesMessageHandler
   blockUpdateHandler: UpdatesMessageHandler
   privateVoiceChatUpdateHandler: UpdatesMessageHandler
-  communityMemberJoinHandler: UpdatesMessageHandler
-  communityMemberLeaveHandler: UpdatesMessageHandler
+  communityMemberStatusHandler: UpdatesMessageHandler
   handleSubscriptionUpdates: <T, U>(params: SubscriptionHandlerParams<T, U>) => AsyncGenerator<T>
 }

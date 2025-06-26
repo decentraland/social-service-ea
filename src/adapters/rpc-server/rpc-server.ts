@@ -45,8 +45,7 @@ export async function createRpcServerComponent({
     [FRIEND_STATUS_UPDATES_CHANNEL]: [updateHandler.friendConnectivityUpdateHandler],
     [COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL]: [
       updateHandler.communityMemberConnectivityUpdateHandler,
-      updateHandler.communityMemberJoinHandler,
-      updateHandler.communityMemberLeaveHandler
+      updateHandler.communityMemberStatusHandler
     ],
     [BLOCK_UPDATES_CHANNEL]: [updateHandler.blockUpdateHandler],
     [PRIVATE_VOICE_CHAT_UPDATES_CHANNEL]: [updateHandler.privateVoiceChatUpdateHandler]
