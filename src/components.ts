@@ -8,6 +8,7 @@ import { createConfigComponent, createDotEnvConfigComponent } from '@well-known-
 import { createLogComponent } from '@well-known-components/logger'
 import { createMetricsComponent } from '@well-known-components/metrics'
 import { createFetchComponent } from '@well-known-components/fetch-component'
+import { createAnalyticsComponent } from '@dcl/analytics-component'
 import { createPgComponent } from './adapters/pg'
 import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
@@ -47,7 +48,6 @@ import { createCommunityPlacesComponent } from './logic/community'
 import { createJobComponent } from './logic/job'
 import { createPlacesApiAdapter } from './adapters/places-api'
 import { createUpdateHandlerComponent } from './logic/updates'
-import { createAnalyticsComponent } from './logic/analytics'
 import { AnalyticsEventPayload } from './types/analytics'
 
 // Initialize all the components of the app
