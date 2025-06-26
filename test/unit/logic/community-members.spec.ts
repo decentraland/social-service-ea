@@ -334,9 +334,15 @@ describe('Community Members Component', () => {
     })
 
     it('should return the members that are online from all the communities a user belongs to', async () => {
-      const result = await communityMembersComponent.getOnlineMembersFromUserCommunities(userAddress, onlineUsers)
+      const result = await communityMembersComponent.getOnlineMembersFromUserCommunities(userAddress, onlineUsers, {
+        limit: 10,
+        offset: 0
+      })
 
-      expect(mockCommunitiesDB.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(userAddress, onlineUsers)
+      expect(mockCommunitiesDB.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(userAddress, onlineUsers, {
+        limit: 10,
+        offset: 0
+      })
 
       expect(result).toEqual([
         { communityId: '1', memberAddress: '0x1234567890123456789012345678901234567890' },

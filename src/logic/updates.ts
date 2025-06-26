@@ -89,22 +89,33 @@ export function createUpdateHandlerComponent(
 
   const communityMemberConnectivityUpdateHandler = handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
     const onlineSubscribers = subscribersContext.getSubscribersAddresses()
-    // TODO: paginate this and emit the updates in batches
-    const onlineMembers = await communityMembers.getOnlineMembersFromUserCommunities(
-      update.memberAddress,
-      onlineSubscribers
-    )
+    const BATCH_SIZE = 100
 
-    onlineMembers.forEach(({ communityId, memberAddress }) => {
-      const emitter = subscribersContext.getOrAddSubscriber(memberAddress)
-      if (emitter) {
-        emitter.emit('communityMemberConnectivityUpdate', {
-          communityId,
-          memberAddress: update.memberAddress,
-          status: update.status
-        })
-      }
-    })
+    let offset = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const batch = await communityMembers.getOnlineMembersFromUserCommunities(
+        update.memberAddress,
+        onlineSubscribers,
+        { limit: BATCH_SIZE, offset }
+      )
+      if (batch.length === 0) break
+
+      batch.forEach(({ communityId, memberAddress }) => {
+        const emitter = subscribersContext.getOrAddSubscriber(memberAddress)
+        if (emitter) {
+          emitter.emit('communityMemberConnectivityUpdate', {
+            communityId,
+            memberAddress: update.memberAddress,
+            status: update.status
+          })
+        }
+      })
+
+      offset += BATCH_SIZE
+      hasMore = batch.length === BATCH_SIZE
+    }
   })
 
   const blockUpdateHandler = handleUpdate<'blockUpdate'>((update) => {

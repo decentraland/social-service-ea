@@ -398,7 +398,8 @@ export function createCommunitiesDBComponent(
 
     async getOnlineMembersFromUserCommunities(
       userAddress: EthAddress,
-      onlineUsers: string[]
+      onlineUsers: string[],
+      pagination: Pagination
     ): Promise<Array<{ communityId: string; memberAddress: string }>> {
       if (onlineUsers.length === 0) {
         return []
@@ -422,6 +423,7 @@ export function createCommunitiesDBComponent(
             AND c.active = true
           )
         ORDER BY cm.community_id, cm.member_address
+        LIMIT ${pagination.limit} OFFSET ${pagination.offset}
       `
 
       const result = await pg.query<{ communityId: string; memberAddress: string }>(query)

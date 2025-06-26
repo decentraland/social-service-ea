@@ -268,10 +268,11 @@ describe('Updates Handlers', () => {
 
         await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
-        expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
-          '0x456',
-          '0x789'
-        ])
+        expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(
+          '0x123',
+          ['0x456', '0x789'],
+          { limit: 100, offset: 0 }
+        )
         expect(emitSpy456).not.toHaveBeenCalled()
         expect(emitSpy789).not.toHaveBeenCalled()
       })
@@ -291,10 +292,11 @@ describe('Updates Handlers', () => {
 
           await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
-          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
-            '0x456',
-            '0x789'
-          ])
+          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(
+            '0x123',
+            ['0x456', '0x789'],
+            { limit: 100, offset: 0 }
+          )
           expect(emitSpy456).not.toHaveBeenCalled()
           expect(emitSpy789).not.toHaveBeenCalled()
         })
@@ -316,10 +318,11 @@ describe('Updates Handlers', () => {
 
           await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
-          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
-            '0x456',
-            '0x789'
-          ])
+          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(
+            '0x123',
+            ['0x456', '0x789'],
+            { limit: 100, offset: 0 }
+          )
           expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
             ...update,
             communityId: '1'
