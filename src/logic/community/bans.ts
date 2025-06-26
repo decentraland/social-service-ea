@@ -1,13 +1,15 @@
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { AppComponents } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import { BannedMemberProfile, BannedMember, ICommunityBansComponent } from './types'
 import { mapMembersWithProfiles } from './utils'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
 
 export async function createCommunityBansComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs'>
+  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'pubsub'>
 ): Promise<ICommunityBansComponent> {
-  const { communitiesDb, catalystClient, communityRoles, logs } = components
+  const { communitiesDb, catalystClient, communityRoles, logs, pubsub } = components
 
   const logger = logs.getLogger('community-bans-component')
 
@@ -28,6 +30,12 @@ export async function createCommunityBansComponent(
       }
 
       await communitiesDb.banMemberFromCommunity(communityId, bannerAddress, targetAddress)
+
+      await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+        communityId,
+        memberAddress: targetAddress,
+        status: ConnectivityStatus.OFFLINE
+      })
     },
 
     unbanMember: async (communityId: string, unbannerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
@@ -47,6 +55,12 @@ export async function createCommunityBansComponent(
       }
 
       await communitiesDb.unbanMemberFromCommunity(communityId, unbannerAddress, targetAddress)
+
+      await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+        communityId,
+        memberAddress: targetAddress,
+        status: ConnectivityStatus.ONLINE
+      })
     },
 
     getBannedMembers: async (

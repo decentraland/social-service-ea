@@ -4,17 +4,15 @@ import { EthAddress } from '@dcl/schemas'
 import { normalizeAddress } from '../../../utils/address'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityNotFoundError } from '../../../logic/community/errors'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../adapters/pubsub'
 
 export async function banMemberHandler(
   context: Pick<
-    HandlerContextWithPath<'communityBans' | 'logs' | 'pubsub', '/v1/communities/:id/members/:memberAddress/bans'>,
+    HandlerContextWithPath<'communityBans' | 'logs', '/v1/communities/:id/members/:memberAddress/bans'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { communityBans, logs, pubsub },
+    components: { communityBans, logs },
     params: { id: communityId, memberAddress },
     verification
   } = context
@@ -31,13 +29,6 @@ export async function banMemberHandler(
     logger.info(`Banning member ${addressToBan} from community ${communityId}`)
 
     await communityBans.banMember(communityId, addressPerformingBan, addressToBan)
-
-    // Notify community member disconnection
-    await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-      communityId,
-      memberAddress: addressToBan,
-      status: ConnectivityStatus.OFFLINE
-    })
 
     return { status: 204 }
   } catch (error) {

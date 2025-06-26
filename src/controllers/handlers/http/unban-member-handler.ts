@@ -4,17 +4,15 @@ import { EthAddress } from '@dcl/schemas'
 import { normalizeAddress } from '../../../utils/address'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityNotFoundError } from '../../../logic/community/errors'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../adapters/pubsub'
 
 export async function unbanMemberHandler(
   context: Pick<
-    HandlerContextWithPath<'communityBans' | 'logs' | 'pubsub', '/v1/communities/:id/members/:memberAddress/bans'>,
+    HandlerContextWithPath<'communityBans' | 'logs', '/v1/communities/:id/members/:memberAddress/bans'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { communityBans, logs, pubsub },
+    components: { communityBans, logs },
     params: { id: communityId, memberAddress },
     verification
   } = context
@@ -32,12 +30,6 @@ export async function unbanMemberHandler(
     logger.info(`Unbanning member ${userAddressToUnban} from community ${communityId}`)
 
     await communityBans.unbanMember(communityId, addressPerformingUnban, userAddressToUnban)
-
-    await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-      communityId,
-      memberAddress: userAddressToUnban,
-      status: ConnectivityStatus.ONLINE
-    })
 
     return { status: 204 }
   } catch (error) {

@@ -4,17 +4,15 @@ import { CommunityNotFoundError } from '../../../logic/community'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { EthAddress } from '@dcl/schemas'
 import { normalizeAddress } from '../../../utils/address'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../adapters/pubsub'
 
 export async function removeMemberFromCommunityHandler(
   context: Pick<
-    HandlerContextWithPath<'communityMembers' | 'logs' | 'pubsub', '/v1/communities/:id/members/:memberAddress'>,
+    HandlerContextWithPath<'communityMembers' | 'logs', '/v1/communities/:id/members/:memberAddress'>,
     'components' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse> {
   const {
-    components: { communityMembers, logs, pubsub },
+    components: { communityMembers, logs },
     params: { id: communityId, memberAddress: memberToRemoveAddress },
     verification
   } = context
@@ -35,12 +33,6 @@ export async function removeMemberFromCommunityHandler(
     } else {
       await communityMembers.kickMember(communityId, removerAddress, normalizedMemberToRemoveAddress)
     }
-
-    await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-      communityId,
-      memberAddress: normalizedMemberToRemoveAddress,
-      status: ConnectivityStatus.OFFLINE
-    })
 
     return {
       status: 204

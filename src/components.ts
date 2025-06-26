@@ -133,9 +133,16 @@ export async function initComponents(): Promise<AppComponents> {
     communityRoles,
     logs,
     catalystClient,
-    peersStats
+    peersStats,
+    pubsub
   })
-  const communityBans = await createCommunityBansComponent({ communitiesDb, communityRoles, logs, catalystClient })
+  const communityBans = await createCommunityBansComponent({
+    communitiesDb,
+    communityRoles,
+    logs,
+    catalystClient,
+    pubsub
+  })
   const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
