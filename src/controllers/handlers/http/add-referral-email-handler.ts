@@ -2,7 +2,7 @@ import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { ReferralInvalidInputError, ReferralEmailUpdateTooSoonError } from '../../../logic/referral/errors'
+import { ReferralInvalidInputError } from '../../../logic/referral/errors'
 
 interface AddReferralEmailRequest {
   email: string
