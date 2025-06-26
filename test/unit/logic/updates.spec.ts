@@ -257,7 +257,11 @@ describe('Updates Handlers', () => {
 
     describe('when the user is not a member of any community', () => {
       beforeEach(() => {
-        mockCommunityMembers.getOnlineMembersFromUserCommunities.mockResolvedValueOnce([])
+        // Mock the generator to return no batches
+        const mockGenerator = (async function* () {
+          // No batches to yield
+        })()
+        mockCommunityMembers.getOnlineMembersFromUserCommunities.mockReturnValue(mockGenerator)
       })
 
       it('should not emit any updates', async () => {
@@ -268,11 +272,10 @@ describe('Updates Handlers', () => {
 
         await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
-        expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(
-          '0x123',
-          ['0x456', '0x789'],
-          { limit: 100, offset: 0 }
-        )
+        expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
+          '0x456',
+          '0x789'
+        ])
         expect(emitSpy456).not.toHaveBeenCalled()
         expect(emitSpy789).not.toHaveBeenCalled()
       })
@@ -281,7 +284,11 @@ describe('Updates Handlers', () => {
     describe('when the user is a member of a community', () => {
       describe('and there are no online members in the community', () => {
         beforeEach(() => {
-          mockCommunityMembers.getOnlineMembersFromUserCommunities.mockResolvedValueOnce([])
+          // Mock the generator to return no batches
+          const mockGenerator = (async function* () {
+            // No batches to yield
+          })()
+          mockCommunityMembers.getOnlineMembersFromUserCommunities.mockReturnValue(mockGenerator)
         })
 
         it('should not emit any updates', async () => {
@@ -292,11 +299,10 @@ describe('Updates Handlers', () => {
 
           await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
-          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(
-            '0x123',
-            ['0x456', '0x789'],
-            { limit: 100, offset: 0 }
-          )
+          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
+            '0x456',
+            '0x789'
+          ])
           expect(emitSpy456).not.toHaveBeenCalled()
           expect(emitSpy789).not.toHaveBeenCalled()
         })
@@ -304,10 +310,14 @@ describe('Updates Handlers', () => {
 
       describe('and there are online members in the community', () => {
         beforeEach(() => {
-          mockCommunityMembers.getOnlineMembersFromUserCommunities.mockResolvedValueOnce([
-            { communityId: '1', memberAddress: '0x456' },
-            { communityId: '2', memberAddress: '0x789' }
-          ])
+          // Mock the generator to return one batch
+          const mockGenerator = (async function* () {
+            yield [
+              { communityId: '1', memberAddress: '0x456' },
+              { communityId: '2', memberAddress: '0x789' }
+            ]
+          })()
+          mockCommunityMembers.getOnlineMembersFromUserCommunities.mockReturnValue(mockGenerator)
         })
 
         it('should emit connectivity update to all online members of the communities', async () => {
@@ -318,11 +328,10 @@ describe('Updates Handlers', () => {
 
           await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
 
-          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(
-            '0x123',
-            ['0x456', '0x789'],
-            { limit: 100, offset: 0 }
-          )
+          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
+            '0x456',
+            '0x789'
+          ])
           expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
             ...update,
             communityId: '1'
@@ -330,6 +339,51 @@ describe('Updates Handlers', () => {
           expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
             ...update,
             communityId: '2'
+          })
+        })
+      })
+
+      describe('and there are multiple batches of online members', () => {
+        beforeEach(() => {
+          // Mock the generator to return multiple batches
+          const mockGenerator = (async function* () {
+            yield [
+              { communityId: '1', memberAddress: '0x456' },
+              { communityId: '2', memberAddress: '0x789' }
+            ]
+            yield [{ communityId: '3', memberAddress: '0x999' }]
+          })()
+          mockCommunityMembers.getOnlineMembersFromUserCommunities.mockReturnValue(mockGenerator)
+        })
+
+        it('should emit connectivity update to all online members across multiple batches', async () => {
+          const update = {
+            memberAddress: '0x123',
+            status: ConnectivityStatus.ONLINE
+          }
+
+          // Add the third subscriber for the test
+          const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
+          const emitSpy999 = jest.spyOn(subscriber999, 'emit')
+
+          await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
+
+          expect(mockCommunityMembers.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith('0x123', [
+            '0x456',
+            '0x789',
+            '0x999'
+          ])
+          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            ...update,
+            communityId: '1'
+          })
+          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            ...update,
+            communityId: '2'
+          })
+          expect(emitSpy999).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            ...update,
+            communityId: '3'
           })
         })
       })
@@ -353,7 +407,11 @@ describe('Updates Handlers', () => {
 
       beforeEach(() => {
         error = new Error('Cannot get online members from user communities')
-        mockCommunityMembers.getOnlineMembersFromUserCommunities.mockRejectedValueOnce(error)
+        // Mock the generator to throw an error
+        const mockGenerator = (async function* () {
+          throw error
+        })()
+        mockCommunityMembers.getOnlineMembersFromUserCommunities.mockReturnValue(mockGenerator)
       })
 
       it('should log an error and not emit any updates', async () => {

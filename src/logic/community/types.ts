@@ -40,8 +40,8 @@ export interface ICommunityMembersComponent {
   getOnlineMembersFromUserCommunities(
     userAddress: EthAddress,
     onlineUsers: EthAddress[],
-    pagination: Pagination
-  ): Promise<{ communityId: string; memberAddress: string }[]>
+    batchSize?: number
+  ): AsyncGenerator<Array<{ communityId: string; memberAddress: string }>>
   kickMember(communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress): Promise<void>
   joinCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
   leaveCommunity(communityId: string, memberAddress: EthAddress): Promise<void>

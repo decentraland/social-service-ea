@@ -334,20 +334,108 @@ describe('Community Members Component', () => {
     })
 
     it('should return the members that are online from all the communities a user belongs to', async () => {
-      const result = await communityMembersComponent.getOnlineMembersFromUserCommunities(userAddress, onlineUsers, {
-        limit: 10,
-        offset: 0
-      })
+      const generator = communityMembersComponent.getOnlineMembersFromUserCommunities(userAddress, onlineUsers)
+      const results: Array<{ communityId: string; memberAddress: string }> = []
+
+      for await (const batch of generator) {
+        results.push(...batch)
+      }
 
       expect(mockCommunitiesDB.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(userAddress, onlineUsers, {
-        limit: 10,
+        limit: 100,
         offset: 0
       })
 
-      expect(result).toEqual([
+      expect(results).toEqual([
         { communityId: '1', memberAddress: '0x1234567890123456789012345678901234567890' },
         { communityId: '2', memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' }
       ])
+    })
+
+    describe('when there are multiple batches', () => {
+      beforeEach(() => {
+        // First call returns a full batch
+        mockCommunitiesDB.getOnlineMembersFromUserCommunities
+          .mockResolvedValueOnce([
+            { communityId: '1', memberAddress: '0x1234567890123456789012345678901234567890' },
+            { communityId: '2', memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' }
+          ])
+          // Second call returns a partial batch (indicating end)
+          .mockResolvedValueOnce([{ communityId: '3', memberAddress: '0x9999999999999999999999999999999999999999' }])
+      })
+
+      it('should yield all batches correctly', async () => {
+        const generator = communityMembersComponent.getOnlineMembersFromUserCommunities(userAddress, onlineUsers, 2)
+        const results: Array<{ communityId: string; memberAddress: string }> = []
+
+        for await (const batch of generator) {
+          results.push(...batch)
+        }
+
+        expect(mockCommunitiesDB.getOnlineMembersFromUserCommunities).toHaveBeenCalledTimes(2)
+        expect(mockCommunitiesDB.getOnlineMembersFromUserCommunities).toHaveBeenNthCalledWith(
+          1,
+          userAddress,
+          onlineUsers,
+          {
+            limit: 2,
+            offset: 0
+          }
+        )
+        expect(mockCommunitiesDB.getOnlineMembersFromUserCommunities).toHaveBeenNthCalledWith(
+          2,
+          userAddress,
+          onlineUsers,
+          {
+            limit: 2,
+            offset: 2
+          }
+        )
+
+        expect(results).toEqual([
+          { communityId: '1', memberAddress: '0x1234567890123456789012345678901234567890' },
+          { communityId: '2', memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' },
+          { communityId: '3', memberAddress: '0x9999999999999999999999999999999999999999' }
+        ])
+      })
+    })
+
+    describe('when there are no results', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getOnlineMembersFromUserCommunities.mockResolvedValue([])
+      })
+
+      it('should not yield any batches', async () => {
+        const generator = communityMembersComponent.getOnlineMembersFromUserCommunities(userAddress, onlineUsers)
+        const results: Array<{ communityId: string; memberAddress: string }> = []
+
+        for await (const batch of generator) {
+          results.push(...batch)
+        }
+
+        expect(mockCommunitiesDB.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(userAddress, onlineUsers, {
+          limit: 100,
+          offset: 0
+        })
+
+        expect(results).toEqual([])
+      })
+    })
+
+    describe('when using custom batch size', () => {
+      it('should use the provided batch size', async () => {
+        const generator = communityMembersComponent.getOnlineMembersFromUserCommunities(userAddress, onlineUsers, 50)
+        const results: Array<{ communityId: string; memberAddress: string }> = []
+
+        for await (const batch of generator) {
+          results.push(...batch)
+        }
+
+        expect(mockCommunitiesDB.getOnlineMembersFromUserCommunities).toHaveBeenCalledWith(userAddress, onlineUsers, {
+          limit: 50,
+          offset: 0
+        })
+      })
     })
   })
 

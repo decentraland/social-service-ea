@@ -1,5 +1,5 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
-import { AppComponents, CommunityRole, Pagination } from '../../types'
+import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import {
   CommunityMemberProfile,
@@ -88,12 +88,26 @@ export async function createCommunityMembersComponent(
       return filterAndCountCommunityMembers(id, options)
     },
 
-    getOnlineMembersFromUserCommunities: async (
+    async *getOnlineMembersFromUserCommunities(
       userAddress: string,
       onlineUsers: string[],
-      pagination: Pagination
-    ): Promise<{ communityId: string; memberAddress: string }[]> => {
-      return communitiesDb.getOnlineMembersFromUserCommunities(userAddress, onlineUsers, pagination)
+      batchSize: number = 100
+    ): AsyncGenerator<Array<{ communityId: string; memberAddress: string }>> {
+      let offset = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const batch = await communitiesDb.getOnlineMembersFromUserCommunities(userAddress, onlineUsers, {
+          limit: batchSize,
+          offset
+        })
+
+        if (batch.length === 0) break
+
+        yield batch
+        offset += batchSize
+        hasMore = batch.length === batchSize
+      }
     },
 
     kickMember: async (communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
