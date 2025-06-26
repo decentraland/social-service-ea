@@ -115,25 +115,33 @@ describe('createRpcServerComponent', () => {
       it('should wire the updateHandler component to pubsub channels', async () => {
         await rpcServer.start({} as any)
 
-        const subscribeCalls = mockPubSub.subscribeToChannel.mock.calls
-
-        const usedHandlers = subscribeCalls.map((call) => call[1])
-        const expectedHandlers = [
-          mockUpdateHandler.friendshipUpdateHandler,
-          mockUpdateHandler.friendshipAcceptedUpdateHandler,
-          mockUpdateHandler.friendConnectivityUpdateHandler,
-          mockUpdateHandler.communityMemberConnectivityUpdateHandler,
-          mockUpdateHandler.blockUpdateHandler,
-          mockUpdateHandler.privateVoiceChatUpdateHandler,
-          mockUpdateHandler.communityMemberJoinHandler,
-          mockUpdateHandler.communityMemberLeaveHandler
+        // Define the expected channel to handler mappings
+        const expectedSubscriptions = [
+          { channel: FRIENDSHIP_UPDATES_CHANNEL, handler: mockUpdateHandler.friendshipUpdateHandler },
+          { channel: FRIENDSHIP_UPDATES_CHANNEL, handler: mockUpdateHandler.friendshipAcceptedUpdateHandler },
+          { channel: FRIEND_STATUS_UPDATES_CHANNEL, handler: mockUpdateHandler.friendConnectivityUpdateHandler },
+          {
+            channel: COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+            handler: mockUpdateHandler.communityMemberConnectivityUpdateHandler
+          },
+          { channel: BLOCK_UPDATES_CHANNEL, handler: mockUpdateHandler.blockUpdateHandler },
+          { channel: PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, handler: mockUpdateHandler.privateVoiceChatUpdateHandler },
+          {
+            channel: COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+            handler: mockUpdateHandler.communityMemberJoinHandler
+          },
+          {
+            channel: COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+            handler: mockUpdateHandler.communityMemberLeaveHandler
+          }
         ]
 
-        expectedHandlers.forEach((handler) => {
-          expect(usedHandlers).toContain(handler)
+        // Verify each expected subscription
+        expectedSubscriptions.forEach(({ channel, handler }) => {
+          expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(channel, handler)
         })
 
-        expect(subscribeCalls).toHaveLength(expectedHandlers.length)
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledTimes(expectedSubscriptions.length)
       })
     })
   })

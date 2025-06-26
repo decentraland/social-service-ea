@@ -171,31 +171,22 @@ describe('when subscribing to community member connectivity updates', () => {
       generator.next()
     })
 
-    it('should parse the update correctly', () => {
-      const parser = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser
-      const result = parser(update)
-
-      expect(result).toEqual({
-        communityId: 'community-1',
-        member: { address: '0x456' },
-        status: ConnectivityStatus.ONLINE
+    describe.each([
+      { description: 'online', status: ConnectivityStatus.ONLINE },
+      { description: 'offline', status: ConnectivityStatus.OFFLINE }
+    ])('and the update has an $description status', ({ status }) => {
+      beforeEach(() => {
+        update.status = status
       })
-    })
 
-    it('should handle OFFLINE status updates', () => {
-      const offlineUpdate = {
-        communityId: 'community-1',
-        memberAddress: '0x456',
-        status: ConnectivityStatus.OFFLINE
-      }
-
-      const parser = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser
-      const result = parser(offlineUpdate)
-
-      expect(result).toEqual({
-        communityId: 'community-1',
-        member: { address: '0x456' },
-        status: ConnectivityStatus.OFFLINE
+      it('should parse the update correctly', () => {
+        const parser = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser
+        const result = parser(update)
+        expect(result).toEqual({
+          communityId: 'community-1',
+          member: { address: '0x456' },
+          status
+        })
       })
     })
   })
