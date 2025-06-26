@@ -352,14 +352,15 @@ describe('Community Component', () => {
 
         describe('and a thumbnail is provided', () => {
           it('should create community successfully with thumbnail', async () => {
+            const newCommunityId = 'new-community-id'
             const result = await communityComponent.createCommunity(communityData, thumbnail)
 
             expect(result).toEqual({
               ...mockCommunity,
               ...communityData,
-              id: 'new-community-id',
+              id: newCommunityId,
               thumbnails: {
-                raw: 'https://cdn.decentraland.org/thumbnail.png'
+                raw: `https://cdn.decentraland.org/social/communities/${newCommunityId}/raw-thumbnail.png`
               }
             })
 
@@ -372,14 +373,14 @@ describe('Community Component', () => {
               active: true
             })
             expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
-              communityId: 'new-community-id',
+              communityId: newCommunityId,
               memberAddress: ownerAddress,
               role: CommunityRole.Owner
             })
             expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
             expect(mockStorage.storeFile).toHaveBeenCalledWith(
               thumbnail,
-              `communities/new-community-id/raw-thumbnail.png`
+              `communities/${newCommunityId}/raw-thumbnail.png`
             )
           })
         })
@@ -425,14 +426,15 @@ describe('Community Component', () => {
 
           describe('and a thumbnail is provided', () => {
             it('should create community successfully with places and thumbnail', async () => {
+              const newCommunityId = 'new-community-id'
               const result = await communityComponent.createCommunity(communityData, thumbnail, placeIds)
 
               expect(result).toEqual({
                 ...mockCommunity,
                 ...communityData,
-                id: 'new-community-id',
+                id: newCommunityId,
                 thumbnails: {
-                  raw: 'https://cdn.decentraland.org/thumbnail.png'
+                  raw: `https://cdn.decentraland.org/social/communities/${newCommunityId}/raw-thumbnail.png`
                 }
               })
 
@@ -445,14 +447,14 @@ describe('Community Component', () => {
                 active: true
               })
               expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
-                communityId: 'new-community-id',
+                communityId: newCommunityId,
                 memberAddress: ownerAddress,
                 role: CommunityRole.Owner
               })
-              expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith('new-community-id', ownerAddress, placeIds)
+              expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith(newCommunityId, ownerAddress, placeIds)
               expect(mockStorage.storeFile).toHaveBeenCalledWith(
                 thumbnail,
-                `communities/new-community-id/raw-thumbnail.png`
+                `communities/${newCommunityId}/raw-thumbnail.png`
               )
             })
           })
@@ -723,7 +725,7 @@ describe('Community Component', () => {
                       ...mockCommunity,
                       ...updates,
                       thumbnails: {
-                        raw: 'https://cdn.decentraland.org/thumbnail.png'
+                        raw: `https://cdn.decentraland.org/social/communities/${communityId}/raw-thumbnail.png`
                       }
                     })
 
@@ -880,7 +882,7 @@ describe('Community Component', () => {
                     ...mockCommunity,
                     ...updatesWithMixedPlaces,
                     thumbnails: {
-                      raw: 'https://cdn.decentraland.org/thumbnail.png'
+                      raw: `https://cdn.decentraland.org/social/communities/${communityId}/raw-thumbnail.png`
                     }
                   })
 
@@ -930,7 +932,7 @@ describe('Community Component', () => {
                     ...mockCommunity,
                     ...updatesWithExistingPlaces,
                     thumbnails: {
-                      raw: 'https://cdn.decentraland.org/thumbnail.png'
+                      raw: `https://cdn.decentraland.org/social/communities/${communityId}/raw-thumbnail.png`
                     }
                   })
 
@@ -985,7 +987,7 @@ describe('Community Component', () => {
                     ...mockCommunity,
                     ...updatesWithDuplicates,
                     thumbnails: {
-                      raw: 'https://cdn.decentraland.org/thumbnail.png'
+                      raw: `https://cdn.decentraland.org/social/communities/${communityId}/raw-thumbnail.png`
                     }
                   })
 
