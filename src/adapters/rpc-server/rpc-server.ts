@@ -7,7 +7,8 @@ import {
   FRIEND_STATUS_UPDATES_CHANNEL,
   FRIENDSHIP_UPDATES_CHANNEL,
   PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
-  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL
+  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+  COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL
 } from '../pubsub'
 import { createRpcServerMetricsWrapper } from './metrics-wrapper'
 import { RpcServiceCreators } from '../../controllers/routes/rpc.routes'
@@ -43,10 +44,8 @@ export async function createRpcServerComponent({
       updateHandler.friendshipAcceptedUpdateHandler
     ],
     [FRIEND_STATUS_UPDATES_CHANNEL]: [updateHandler.friendConnectivityUpdateHandler],
-    [COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL]: [
-      updateHandler.communityMemberConnectivityUpdateHandler,
-      updateHandler.communityMemberStatusHandler
-    ],
+    [COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL]: [updateHandler.communityMemberConnectivityUpdateHandler],
+    [COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL]: [updateHandler.communityMemberStatusHandler],
     [BLOCK_UPDATES_CHANNEL]: [updateHandler.blockUpdateHandler],
     [PRIVATE_VOICE_CHAT_UPDATES_CHANNEL]: [updateHandler.privateVoiceChatUpdateHandler]
   }

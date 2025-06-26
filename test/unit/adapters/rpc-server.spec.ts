@@ -5,6 +5,7 @@ import { mockConfig, mockFriendsDB, mockLogs, mockMetrics, mockPubSub, mockUWs }
 import {
   BLOCK_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+  COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
   FRIEND_STATUS_UPDATES_CHANNEL,
   FRIENDSHIP_UPDATES_CHANNEL,
   PRIVATE_VOICE_CHAT_UPDATES_CHANNEL
@@ -107,6 +108,10 @@ describe('createRpcServerComponent', () => {
           expect.any(Function)
         )
         expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(
+          COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+          expect.any(Function)
+        )
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(
           PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
           expect.any(Function)
         )
@@ -127,12 +132,8 @@ describe('createRpcServerComponent', () => {
           { channel: BLOCK_UPDATES_CHANNEL, handler: mockUpdateHandler.blockUpdateHandler },
           { channel: PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, handler: mockUpdateHandler.privateVoiceChatUpdateHandler },
           {
-            channel: COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
-            handler: mockUpdateHandler.communityMemberJoinHandler
-          },
-          {
-            channel: COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
-            handler: mockUpdateHandler.communityMemberLeaveHandler
+            channel: COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+            handler: mockUpdateHandler.communityMemberStatusHandler
           }
         ]
 

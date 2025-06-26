@@ -5,7 +5,7 @@ import { normalizeAddress } from '../../../utils/address'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityNotFoundError } from '../../../logic/community/errors'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL } from '../../../adapters/pubsub'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../adapters/pubsub'
 
 export async function unbanMemberHandler(
   context: Pick<
@@ -33,7 +33,7 @@ export async function unbanMemberHandler(
 
     await communityBans.unbanMember(communityId, addressPerformingUnban, userAddressToUnban)
 
-    await pubsub.publishInChannel(COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL, {
+    await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
       communityId,
       memberAddress: userAddressToUnban,
       status: ConnectivityStatus.ONLINE
