@@ -4,7 +4,7 @@ import {
   PrivateMessagePrivacySetting,
   User
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { getPrivateMessagesSettingsService } from '../../../../../src/adapters/rpc-server/services/get-private-messages-settings'
+import { getPrivateMessagesSettingsService } from '../../../../../src/controllers/handlers/rpc/get-private-messages-settings'
 import {
   IFriendsDatabaseComponent,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,

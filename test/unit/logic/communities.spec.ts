@@ -10,7 +10,7 @@ import {
   ICommunityRolesComponent,
   ICommunityPlacesComponent
 } from '../../../src/logic/community/types'
-import { createMockCommunityRolesComponent, createMockCommunityPlacesComponent } from '../../mocks/community'
+import { createMockCommunityRolesComponent, createMockCommunityPlacesComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { Community } from '../../../src/logic/community/types'
 

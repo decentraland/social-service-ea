@@ -45,6 +45,9 @@ import {
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
+import { RpcServiceCreators } from '../controllers/routes/rpc.routes'
+import { SubscriptionHandlerParams, UpdatesMessageHandler } from '../logic/updates'
+import { PlacesApiResponse } from '../adapters/places-api'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -55,6 +58,7 @@ export interface IRpcClient extends IBaseComponent {
 export type IRPCServerComponent = IBaseComponent & {
   attachUser(user: { transport: Transport; address: string }): void
   detachUser(address: string): void
+  setServiceCreators(creators: RpcServiceCreators): void
 }
 export interface IFriendsDatabaseComponent {
   createFriendship(
@@ -158,6 +162,11 @@ export interface ICommunitiesDatabaseComponent {
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'pagination'>
   ): Promise<MemberCommunity[]>
+  getOnlineMembersFromUserCommunities(
+    userAddress: EthAddress,
+    onlineUsers: string[],
+    pagination: Pagination
+  ): Promise<{ communityId: string; memberAddress: string }[]>
   banMemberFromCommunity(communityId: string, bannedBy: EthAddress, bannedMemberAddress: EthAddress): Promise<void>
   unbanMemberFromCommunity(
     communityId: string,
@@ -313,8 +322,13 @@ export interface IPlacesApiComponent {
   getPlaces: (placesIds: string[]) => Promise<PlacesApiResponse['data']>
 }
 
-export type PlacesApiResponse = {
-  total?: number
-  ok: boolean
-  data?: { id: string; title: string; positions: string[]; owner: string }[]
+export interface IUpdateHandlerComponent {
+  friendshipUpdateHandler: UpdatesMessageHandler
+  friendshipAcceptedUpdateHandler: UpdatesMessageHandler
+  friendConnectivityUpdateHandler: UpdatesMessageHandler
+  communityMemberConnectivityUpdateHandler: UpdatesMessageHandler
+  blockUpdateHandler: UpdatesMessageHandler
+  privateVoiceChatUpdateHandler: UpdatesMessageHandler
+  communityMemberStatusHandler: UpdatesMessageHandler
+  handleSubscriptionUpdates: <T, U>(params: SubscriptionHandlerParams<T, U>) => AsyncGenerator<T>
 }

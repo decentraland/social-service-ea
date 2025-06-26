@@ -17,7 +17,16 @@ export type ServiceCreator<T, C extends keyof BaseComponents = keyof BaseCompone
 
 export enum ServiceType {
   CALL = 'call',
-  STREAM = 'stream'
+  STREAM = 'stream',
+  COMMUNITIES = 'communities'
+}
+
+export enum StreamEvent {
+  FRIENDSHIP_UPDATES = 'friendship_updates',
+  FRIEND_CONNECTIVITY_UPDATES = 'friend_connectivity_updates',
+  BLOCK_UPDATES = 'block_updates',
+  PRIVATE_VOICE_CHAT_UPDATES = 'private_voice_chat_updates',
+  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES = 'community_member_connectivity_updates'
 }
 
 type RpcCallMethod<TParams, TResult extends SocialServiceResponse, TContext> = (
@@ -38,7 +47,7 @@ export type ServiceMethodDefinition =
   | {
       creator: RpcStreamMethod<any, any, RpcServerContext>
       type: ServiceType.STREAM
-      event: string
+      event: StreamEvent
     }
 
 type RpcServerMetrics = {
@@ -216,6 +225,12 @@ export function createRpcServerMetricsWrapper({
     }
   }
 
+  /**
+   * Wraps the service creators with metrics
+   * @param serviceCreators - The service creators to wrap
+   * @returns The wrapped service creators
+   * @throws An error if a stream service does not have an event property
+   */
   function withMetrics<
     T extends Record<
       string,

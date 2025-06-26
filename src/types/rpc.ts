@@ -5,6 +5,7 @@ import { AppComponents, GlobalContext } from './system'
 import { Action } from './entities'
 import { ISubscribersContext } from './components'
 import { VoiceChatStatus } from '../logic/voice/types'
+import { EthAddress } from '@dcl/schemas'
 
 export type RPCServiceContext<ComponentNames extends keyof AppComponents> = {
   components: Pick<AppComponents, ComponentNames>
@@ -39,6 +40,26 @@ export type SubscriptionEventsEmitter = {
       connectionUrl: string
     }
   }
+  communityJoinUpdate: {
+    communityId: string
+    memberAddress: EthAddress
+  }
+  communityLeaveUpdate: {
+    communityId: string
+    memberAddress: EthAddress
+    reason: CommunityLeaveReason
+  }
+  communityMemberConnectivityUpdate: {
+    communityId: string
+    memberAddress: EthAddress
+    status: ConnectivityStatus
+  }
+}
+
+export enum CommunityLeaveReason {
+  Kicked = 'kicked',
+  Banned = 'banned',
+  Left = 'left'
 }
 
 export type Subscribers = Record<string, Emitter<SubscriptionEventsEmitter>>

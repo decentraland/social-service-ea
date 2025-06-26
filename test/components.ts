@@ -54,6 +54,7 @@ import { createReferralComponent } from '../src/logic/referral/referral'
 import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
 import { createStorageHelper } from './integration/utils/storage'
+import { createUpdateHandlerComponent } from '../src/logic/updates'
 import { createAnalyticsComponent } from '../src/logic/analytics'
 import { AnalyticsEventPayload } from '../src/types/analytics'
 
@@ -139,23 +140,6 @@ async function initComponents(): Promise<TestComponents> {
     analytics
   })
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
-  const rpcServer = await createRpcServerComponent({
-    logs,
-    commsGatekeeper,
-    friendsDb,
-    pubsub,
-    uwsServer,
-    config,
-    catalystClient,
-    sns,
-    subscribersContext,
-    metrics,
-    settings,
-    voice,
-    peersStats
-  })
-  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
-  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
@@ -164,9 +148,16 @@ async function initComponents(): Promise<TestComponents> {
     communityRoles,
     logs,
     catalystClient,
-    peersStats
+    peersStats,
+    pubsub
   })
-  const communityBans = await createCommunityBansComponent({ communitiesDb, communityRoles, logs, catalystClient })
+  const communityBans = await createCommunityBansComponent({
+    communitiesDb,
+    communityRoles,
+    logs,
+    catalystClient,
+    pubsub
+  })
   const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
@@ -176,6 +167,25 @@ async function initComponents(): Promise<TestComponents> {
     storage,
     config
   })
+  const updateHandler = createUpdateHandlerComponent({
+    logs,
+    subscribersContext,
+    friendsDb,
+    communityMembers,
+    catalystClient
+  })
+  const rpcServer = await createRpcServerComponent({
+    logs,
+    pubsub,
+    uwsServer,
+    config,
+    subscribersContext,
+    metrics,
+    voice,
+    updateHandler
+  })
+  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
   const localHttpFetch = await createLocalFetchComponent(config)
@@ -208,9 +218,9 @@ async function initComponents(): Promise<TestComponents> {
     archipelagoStats,
     catalystClient,
     commsGatekeeper,
+    communities,
     communitiesDb,
     communitiesDbHelper,
-    communities,
     communityBans,
     communityMembers,
     communityPlaces,
@@ -226,10 +236,11 @@ async function initComponents(): Promise<TestComponents> {
     messageProcessor,
     metrics,
     nats,
-    peerTracking,
-    peersSynchronizer: mockPeersSynchronizer,
     peersStats,
+    peersSynchronizer: mockPeersSynchronizer,
+    peerTracking,
     pg,
+    placesApi,
     pubsub,
     queue,
     redis,
@@ -241,14 +252,14 @@ async function initComponents(): Promise<TestComponents> {
     sns,
     statusChecks,
     storage,
+    storageHelper,
     subscribersContext,
     tracing: mockTracing,
+    updateHandler,
     uwsServer,
     voice,
     voiceDb,
     worldsStats,
-    wsPool,
-    storageHelper,
-    placesApi
+    wsPool
   }
 }

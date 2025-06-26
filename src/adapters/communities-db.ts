@@ -396,6 +396,40 @@ export function createCommunitiesDBComponent(
       return result.rows
     },
 
+    async getOnlineMembersFromUserCommunities(
+      userAddress: EthAddress,
+      onlineUsers: string[],
+      pagination: Pagination
+    ): Promise<Array<{ communityId: string; memberAddress: string }>> {
+      if (onlineUsers.length === 0) {
+        return []
+      }
+
+      const normalizedUserAddress = normalizeAddress(userAddress)
+
+      const query = SQL`
+        SELECT DISTINCT
+          cm.community_id as "communityId",
+          cm.member_address as "memberAddress"
+        FROM community_members cm
+        JOIN community_members ucm ON cm.community_id = ucm.community_id
+        WHERE ucm.member_address = ${normalizedUserAddress}
+          AND cm.member_address = ANY(${onlineUsers.map(normalizeAddress)})
+          AND cm.member_address != ${normalizedUserAddress}
+          AND EXISTS (
+            SELECT 1 
+            FROM communities c 
+            WHERE c.id = cm.community_id 
+            AND c.active = true
+          )
+        ORDER BY cm.community_id, cm.member_address
+        LIMIT ${pagination.limit} OFFSET ${pagination.offset}
+      `
+
+      const result = await pg.query<{ communityId: string; memberAddress: string }>(query)
+      return result.rows
+    },
+
     async createCommunity(community: CommunityDB): Promise<Community> {
       const id = randomUUID()
       const query = SQL`
