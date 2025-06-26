@@ -179,7 +179,7 @@ export async function createCommunityComponent(
 
         logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id, size: thumbnail.length })
         newCommunity.thumbnails = {
-          raw: thumbnailUrl
+          raw: buildThumbnailUrl(newCommunity.id)
         }
       }
 
@@ -252,7 +252,7 @@ export async function createCommunityComponent(
         })
 
         updatedCommunity.thumbnails = {
-          raw: thumbnailUrl
+          raw: buildThumbnailUrl(communityId)
         }
       }
 
