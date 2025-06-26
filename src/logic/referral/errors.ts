@@ -27,3 +27,9 @@ export class SelfReferralError extends Error {
     super(`User cannot refer themselves: ${userAddress}`)
   }
 }
+
+export class ReferralEmailUpdateTooSoonError extends Error {
+  constructor(referrer: string) {
+    super(`Email can only be updated once per day. Last update was less than 24 hours ago for user: ${referrer}`)
+  }
+}

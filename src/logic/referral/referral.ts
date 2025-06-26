@@ -6,7 +6,8 @@ import {
   ReferralInvalidInputError,
   ReferralAlreadyExistsError,
   ReferralInvalidStatusError,
-  SelfReferralError
+  SelfReferralError,
+  ReferralEmailUpdateTooSoonError
 } from './errors'
 import type { IReferralComponent, RewardAttributes } from './types'
 import type { AppComponents } from '../../types/system'
@@ -194,6 +195,18 @@ export async function createReferralComponent(
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(email)) {
         throw new ReferralInvalidInputError('Invalid email format')
+      }
+
+      // Check if user has updated email in the last 24 hours
+      const lastEmailRecord = await referralDb.getLastReferralEmailByReferrer(referrer)
+      if (lastEmailRecord) {
+        const now = Date.now()
+        const lastUpdate = lastEmailRecord.updated_at
+        const twentyFourHoursInMs = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+
+        if (now - lastUpdate < twentyFourHoursInMs) {
+          throw new ReferralEmailUpdateTooSoonError(referrer)
+        }
       }
 
       logger.info('Setting referral email', {

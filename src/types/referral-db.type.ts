@@ -16,6 +16,7 @@ export interface IReferralDatabaseComponent {
     rewardImageUrl: string
     tier: number
   }): Promise<ReferralRewardImage>
+  getLastReferralEmailByReferrer(referrer: string): Promise<ReferralEmail | null>
 }
 
 export enum ReferralProgressStatus {
