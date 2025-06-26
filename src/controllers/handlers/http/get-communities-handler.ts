@@ -1,8 +1,8 @@
 import { getPaginationParams } from '@dcl/platform-server-commons'
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
-import { errorMessageOrDefault } from '../../utils/errors'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
-import { CommunityWithUserInformation, CommunityPublicInformation } from '../../logic/community'
+import { CommunityWithUserInformation, CommunityPublicInformation } from '../../../logic/community'
 
 export async function getCommunitiesHandler(
   context: Pick<

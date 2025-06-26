@@ -1,13 +1,13 @@
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import { InvalidRequestError, NotFoundError } from '@dcl/platform-server-commons'
-import { ReferralProgressStatus } from '../../types/referral-db.type'
-import { HandlerContextWithPath } from '../../types/http'
-import { errorMessageOrDefault } from '../../utils/errors'
+import { ReferralProgressStatus } from '../../../types/referral-db.type'
+import { HandlerContextWithPath } from '../../../types/http'
+import { errorMessageOrDefault } from '../../../utils/errors'
 import {
   ReferralNotFoundError,
   ReferralInvalidInputError,
   ReferralInvalidStatusError
-} from '../../logic/referral/errors'
+} from '../../../logic/referral/errors'
 
 export async function updateReferralSignedUpHandler(
   ctx: Pick<HandlerContextWithPath<'logs' | 'referral'>, 'components' | 'verification'>

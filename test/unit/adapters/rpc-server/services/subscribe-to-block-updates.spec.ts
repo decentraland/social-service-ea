@@ -1,4 +1,4 @@
-import { subscribeToBlockUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-block-updates'
+import { subscribeToBlockUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-block-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { mockLogs, createMockUpdateHandlerComponent } from '../../../../mocks/components'

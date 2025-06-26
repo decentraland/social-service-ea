@@ -1,9 +1,9 @@
 import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
-import { errorMessageOrDefault } from '../../utils/errors'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
-import { BannedMemberProfile, CommunityNotFoundError } from '../../logic/community'
-import { getPaginationResultProperties } from '../../utils/pagination'
+import { BannedMemberProfile, CommunityNotFoundError } from '../../../logic/community'
+import { getPaginationResultProperties } from '../../../utils/pagination'
 
 export async function getBannedMembersHandler(
   context: Pick<

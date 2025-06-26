@@ -1,8 +1,8 @@
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
-import { FormHandlerContextWithPath, HTTPResponse } from '../../types/http'
+import { FormHandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { errorMessageOrDefault } from '../../utils/errors'
-import { validateCommunityFields } from '../../utils/community-validation'
+import { errorMessageOrDefault } from '../../../utils/errors'
+import { validateCommunityFields } from '../../../utils/community-validation'
 
 export async function createCommunityHandler(
   context: FormHandlerContextWithPath<'communities' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>

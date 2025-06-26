@@ -9,7 +9,7 @@ import {
   getNewFriendshipStatus,
   parseFriendshipRequestToFriendshipRequestResponse
 } from '../../../logic/friendships'
-import { FRIENDSHIP_UPDATES_CHANNEL } from '../../pubsub'
+import { FRIENDSHIP_UPDATES_CHANNEL } from '../../../adapters/pubsub'
 import { sendNotification, shouldNotify } from '../../../logic/notifications'
 import { getProfileUserId } from '../../../logic/profiles'
 

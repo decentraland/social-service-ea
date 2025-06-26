@@ -1,7 +1,7 @@
 import { EthAddress } from '@dcl/schemas'
 import { HttpRequest, HttpResponse } from '@well-known-components/uws-http-server'
-import { AppComponents, PrivateMessagesPrivacy } from '../../types'
-import { isErrorWithMessage } from '../../utils/errors'
+import { AppComponents, PrivateMessagesPrivacy } from '../../../types'
+import { isErrorWithMessage } from '../../../utils/errors'
 
 export async function createPrivacyHandler(components: Pick<AppComponents, 'friendsDb' | 'logs'>) {
   const { friendsDb, logs } = components

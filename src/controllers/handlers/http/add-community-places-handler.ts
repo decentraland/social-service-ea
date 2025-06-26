@@ -1,8 +1,8 @@
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
-import { errorMessageOrDefault } from '../../utils/errors'
-import { CommunityNotFoundError } from '../../logic/community'
+import { errorMessageOrDefault } from '../../../utils/errors'
+import { CommunityNotFoundError } from '../../../logic/community'
 
 interface AddPlacesRequest {
   placeIds: string[]

@@ -1,5 +1,5 @@
 import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../../../mocks/components'
-import { getMutualFriendsService } from '../../../../../src/adapters/rpc-server/services/get-mutual-friends'
+import { getMutualFriendsService } from '../../../../../src/controllers/handlers/rpc/get-mutual-friends'
 import { GetMutualFriendsPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'

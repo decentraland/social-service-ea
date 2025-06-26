@@ -1,5 +1,5 @@
 import { RpcServerContext, RPCServiceContext } from '../../../types'
-import { FRIENDSHIPS_PER_PAGE } from '../constants'
+import { FRIENDSHIPS_PER_PAGE } from '../../../adapters/rpc-server/constants'
 import {
   GetMutualFriendsPayload,
   PaginatedFriendsProfilesResponse

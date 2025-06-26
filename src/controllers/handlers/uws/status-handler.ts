@@ -1,4 +1,4 @@
-import { AppComponents } from '../../types'
+import { AppComponents } from '../../../types'
 
 export async function createStatusHandler(components: Pick<AppComponents, 'config'>) {
   const { config } = components

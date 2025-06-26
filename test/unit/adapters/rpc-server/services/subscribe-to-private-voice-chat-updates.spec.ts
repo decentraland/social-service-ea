@@ -1,6 +1,6 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { subscribeToPrivateVoiceChatUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-private-voice-chat-updates'
+import { subscribeToPrivateVoiceChatUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-private-voice-chat-updates'
 import { IUpdateHandlerComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'

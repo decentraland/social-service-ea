@@ -1,5 +1,5 @@
 import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../../../mocks/components'
-import { getFriendsService } from '../../../../../src/adapters/rpc-server/services/get-friends'
+import { getFriendsService } from '../../../../../src/controllers/handlers/rpc/get-friends'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { createMockFriend, parseExpectedFriends } from '../../../../mocks/friend'

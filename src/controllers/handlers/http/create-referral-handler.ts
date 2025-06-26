@@ -1,9 +1,13 @@
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
-import { errorMessageOrDefault } from '../../utils/errors'
-import { ReferralInvalidInputError, ReferralAlreadyExistsError, SelfReferralError } from '../../logic/referral/errors'
-import type { HandlerContextWithPath } from '../../types/http'
-import type { CreateReferralPayload, CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
+import { errorMessageOrDefault } from '../../../utils/errors'
+import {
+  ReferralInvalidInputError,
+  ReferralAlreadyExistsError,
+  SelfReferralError
+} from '../../../logic/referral/errors'
+import type { HandlerContextWithPath } from '../../../types/http'
+import type { CreateReferralPayload, CreateReferralWithInvitedUser } from '../../../types/create-referral-handler.type'
 
 export async function createReferralHandler(
   ctx: Pick<HandlerContextWithPath<'logs' | 'referral'>, 'components' | 'request' | 'verification'>

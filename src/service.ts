@@ -1,8 +1,6 @@
 import { Lifecycle } from '@well-known-components/interfaces'
-import { setupUWSRoutes } from './controllers/routes/uws.routes'
-import { setupRpcRoutes } from './controllers/routes/rpc.routes'
 import { AppComponents, GlobalContext, TestComponents } from './types'
-import { setupHttpRoutes } from './controllers/routes'
+import { setupHttpRoutes, setupUWSRoutes, setupRpcRoutes } from './controllers/routes'
 
 // this function wires the business logic (adapters & controllers) with the components (ports)
 export async function main(program: Lifecycle.EntryPointParameters<AppComponents | TestComponents>) {

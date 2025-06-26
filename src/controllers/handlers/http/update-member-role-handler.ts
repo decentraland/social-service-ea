@@ -1,9 +1,9 @@
-import { HandlerContextWithPath, HTTPResponse } from '../../types'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { CommunityMember, CommunityNotFoundError } from '../../logic/community'
-import { errorMessageOrDefault } from '../../utils/errors'
+import { CommunityMember, CommunityNotFoundError } from '../../../logic/community'
+import { errorMessageOrDefault } from '../../../utils/errors'
 import { EthAddress } from '@dcl/schemas'
-import { CommunityRole } from '../../types/entities'
+import { CommunityRole } from '../../../types/entities'
 
 export async function updateMemberRoleHandler(
   context: Pick<
