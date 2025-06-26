@@ -47,6 +47,8 @@ import { createCommunityPlacesComponent } from './logic/community'
 import { createJobComponent } from './logic/job'
 import { createPlacesApiAdapter } from './adapters/places-api'
 import { createUpdateHandlerComponent } from './logic/updates'
+import { createAnalyticsComponent } from './logic/analytics'
+import { AnalyticsEventPayload } from './types/analytics'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -109,6 +111,7 @@ export async function initComponents(): Promise<AppComponents> {
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const referralDb = await createReferralDBComponent({ pg, logs })
+  const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
   const referral = await createReferralComponent({ referralDb, logs, sns })
 
@@ -122,7 +125,16 @@ export async function initComponents(): Promise<AppComponents> {
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
-  const voice = await createVoiceComponent({ logs, config, voiceDb, friendsDb, commsGatekeeper, settings, pubsub })
+  const voice = await createVoiceComponent({
+    logs,
+    config,
+    voiceDb,
+    friendsDb,
+    commsGatekeeper,
+    settings,
+    pubsub,
+    analytics
+  })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
@@ -193,6 +205,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   return {
+    analytics,
     archipelagoStats,
     catalystClient,
     commsGatekeeper,

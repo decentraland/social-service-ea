@@ -50,6 +50,8 @@ import { IQueueComponent } from './sqs.type'
 import { IMessageProcessorComponent, IMessageConsumerComponent } from '../logic/sqs'
 import { IPeersStatsComponent } from '../logic/peers-stats'
 import { IJobComponent } from '../logic/job'
+import { IAnalyticsComponent } from '../logic/analytics'
+import { AnalyticsEventPayload } from './analytics'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -99,6 +101,7 @@ export type BaseComponents = {
   voiceDb: IVoiceDatabaseComponent
   storage: IStorageComponent
   placesApi: IPlacesApiComponent
+  analytics: IAnalyticsComponent<AnalyticsEventPayload>
 }
 
 // components used in runtime
