@@ -46,6 +46,8 @@ import {
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
 import { RpcServiceCreators } from '../controllers/routes/rpc.routes'
+import { SubscriptionHandlerParams, UpdatesMessageHandler } from '../logic/updates'
+import { PlacesApiResponse } from '../adapters/places-api'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -319,8 +321,14 @@ export interface IPlacesApiComponent {
   getPlaces: (placesIds: string[]) => Promise<PlacesApiResponse['data']>
 }
 
-export type PlacesApiResponse = {
-  total?: number
-  ok: boolean
-  data?: { id: string; title: string; positions: string[]; owner: string }[]
+export interface IUpdateHandlerComponent {
+  friendshipUpdateHandler: UpdatesMessageHandler
+  friendshipAcceptedUpdateHandler: UpdatesMessageHandler
+  friendConnectivityUpdateHandler: UpdatesMessageHandler
+  communityMemberConnectivityUpdateHandler: UpdatesMessageHandler
+  blockUpdateHandler: UpdatesMessageHandler
+  privateVoiceChatUpdateHandler: UpdatesMessageHandler
+  communityMemberJoinHandler: UpdatesMessageHandler
+  communityMemberLeaveHandler: UpdatesMessageHandler
+  handleSubscriptionUpdates: <T, U>(params: SubscriptionHandlerParams<T, U>) => AsyncGenerator<T>
 }

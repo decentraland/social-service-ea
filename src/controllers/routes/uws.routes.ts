@@ -6,9 +6,7 @@ import {
   onRequestStart
 } from '@well-known-components/uws-http-server'
 import { AppComponents, IHandler, TestComponents } from '../../types'
-import { createStatusHandler } from '../handlers/status-handler'
-import { registerWsHandler } from '../handlers/ws-handler'
-import { createPrivacyHandler } from '../handlers/privacy-handler'
+import { createStatusHandler, registerWsHandler, createPrivacyHandler } from '../handlers/uws'
 
 export async function setupUWSRoutes(components: AppComponents | TestComponents): Promise<void> {
   const { metrics, uwsServer } = components

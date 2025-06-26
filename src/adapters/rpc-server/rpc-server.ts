@@ -9,40 +9,21 @@ import {
   PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL
 } from '../pubsub'
-import {
-  friendshipUpdateHandler,
-  friendshipAcceptedUpdateHandler,
-  friendConnectivityUpdateHandler,
-  blockUpdateHandler,
-  privateVoiceChatUpdateHandler,
-  communityMemberJoinHandler,
-  communityMemberLeaveHandler,
-  communityMemberConnectivityUpdateHandler
-} from '../../logic/updates'
 import { createRpcServerMetricsWrapper } from './metrics-wrapper'
 import { RpcServiceCreators } from '../../controllers/routes/rpc.routes'
 
 export async function createRpcServerComponent({
   logs,
-  friendsDb,
   pubsub,
   config,
   uwsServer,
   subscribersContext,
   metrics,
   voice,
-  communityMembers
+  updateHandler
 }: Pick<
   AppComponents,
-  | 'logs'
-  | 'friendsDb'
-  | 'pubsub'
-  | 'config'
-  | 'uwsServer'
-  | 'subscribersContext'
-  | 'metrics'
-  | 'voice'
-  | 'communityMembers'
+  'logs' | 'pubsub' | 'config' | 'uwsServer' | 'subscribersContext' | 'metrics' | 'voice' | 'updateHandler'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -55,6 +36,21 @@ export async function createRpcServerComponent({
   })
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
+
+  const subscriptionsMap = {
+    [FRIENDSHIP_UPDATES_CHANNEL]: [
+      updateHandler.friendshipUpdateHandler,
+      updateHandler.friendshipAcceptedUpdateHandler
+    ],
+    [FRIEND_STATUS_UPDATES_CHANNEL]: [updateHandler.friendConnectivityUpdateHandler],
+    [COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL]: [
+      updateHandler.communityMemberConnectivityUpdateHandler,
+      updateHandler.communityMemberJoinHandler,
+      updateHandler.communityMemberLeaveHandler
+    ],
+    [BLOCK_UPDATES_CHANNEL]: [updateHandler.blockUpdateHandler],
+    [PRIVATE_VOICE_CHAT_UPDATES_CHANNEL]: [updateHandler.privateVoiceChatUpdateHandler]
+  }
 
   let serviceCreators: RpcServiceCreators | null = null
 
@@ -76,31 +72,10 @@ export async function createRpcServerComponent({
         logger.info(`[RPC] RPC Server listening on port ${rpcServerPort}`)
       })
 
-      await pubsub.subscribeToChannel(FRIENDSHIP_UPDATES_CHANNEL, friendshipUpdateHandler(subscribersContext, logger))
-      await pubsub.subscribeToChannel(
-        FRIENDSHIP_UPDATES_CHANNEL,
-        friendshipAcceptedUpdateHandler(subscribersContext, logger)
-      )
-      await pubsub.subscribeToChannel(
-        FRIEND_STATUS_UPDATES_CHANNEL,
-        friendConnectivityUpdateHandler(subscribersContext, logger, friendsDb)
-      )
-      await pubsub.subscribeToChannel(
-        COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
-        communityMemberConnectivityUpdateHandler(subscribersContext, logger, communityMembers)
-      )
-      await pubsub.subscribeToChannel(BLOCK_UPDATES_CHANNEL, blockUpdateHandler(subscribersContext, logger))
-      await pubsub.subscribeToChannel(
-        PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
-        privateVoiceChatUpdateHandler(subscribersContext, logger)
-      )
-      await pubsub.subscribeToChannel(
-        COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
-        communityMemberJoinHandler(subscribersContext, logger, communityMembers)
-      )
-      await pubsub.subscribeToChannel(
-        COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
-        communityMemberLeaveHandler(subscribersContext, logger, communityMembers)
+      await Promise.all(
+        Object.entries(subscriptionsMap).map(([channel, handlers]) =>
+          handlers.forEach((handler) => pubsub.subscribeToChannel(channel, handler))
+        )
       )
     },
     attachUser({ transport, address }) {

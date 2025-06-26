@@ -1,5 +1,5 @@
 import { mockCatalystClient, mockFriendsDB, mockLogs, mockPubSub } from '../../../../mocks/components'
-import { upsertFriendshipService } from '../../../../../src/adapters/rpc-server/services/upsert-friendship'
+import { upsertFriendshipService } from '../../../../../src/controllers/handlers/rpc/upsert-friendship'
 import { Action, FriendshipStatus, RpcServerContext } from '../../../../../src/types'
 import * as FriendshipsLogic from '../../../../../src/logic/friendships'
 import {

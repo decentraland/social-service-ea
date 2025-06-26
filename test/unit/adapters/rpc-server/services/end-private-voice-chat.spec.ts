@@ -1,4 +1,4 @@
-import { endPrivateVoiceChatService } from '../../../../../src/adapters/rpc-server/services/end-private-voice-chat'
+import { endPrivateVoiceChatService } from '../../../../../src/controllers/handlers/rpc/end-private-voice-chat'
 import { EndPrivateVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext, RPCServiceContext } from '../../../../../src/types'
 import { IVoiceComponent } from '../../../../../src/logic/voice'

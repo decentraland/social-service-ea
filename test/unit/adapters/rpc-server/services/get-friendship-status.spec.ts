@@ -1,4 +1,4 @@
-import { getFriendshipStatusService } from '../../../../../src/adapters/rpc-server/services/get-friendship-status'
+import { getFriendshipStatusService } from '../../../../../src/controllers/handlers/rpc/get-friendship-status'
 import { Action, RpcServerContext, AppComponents } from '../../../../../src/types'
 import {
   FriendshipStatus,
