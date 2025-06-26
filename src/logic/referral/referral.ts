@@ -1,4 +1,4 @@
-import { ReferralProgressStatus } from '../../types/referral-db.type'
+import { ReferralEmail, ReferralProgressStatus } from '../../types/referral-db.type'
 import { EthAddress, Events, ReferralInvitedUsersAcceptedEvent, ReferralNewTierReachedEvent } from '@dcl/schemas'
 import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 import {
@@ -9,7 +9,7 @@ import {
   SelfReferralError,
   ReferralEmailUpdateTooSoonError
 } from './errors'
-import type { IReferralComponent, RewardAttributes } from './types'
+import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput } from './types'
 import type { AppComponents } from '../../types/system'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75, 100]
@@ -184,7 +184,7 @@ export async function createReferralComponent(
       }
     },
 
-    setReferralEmail: async (referralEmailInput: { referrer: string; email: string }) => {
+    setReferralEmail: async (referralEmailInput: Pick<ReferralEmail, 'referrer' | 'email'>) => {
       const referrer = validateAddress(referralEmailInput.referrer, 'referrer')
 
       if (!referralEmailInput.email || !referralEmailInput.email.trim()) {
@@ -224,11 +224,7 @@ export async function createReferralComponent(
       return referralEmail
     },
 
-    setReferralRewardImage: async (referralRewardImageInput: {
-      referrer: string
-      rewardImageUrl: string
-      tier: number
-    }) => {
+    setReferralRewardImage: async (referralRewardImageInput: SetReferralRewardImageInput) => {
       const referrer = validateAddress(referralRewardImageInput.referrer, 'referrer')
 
       if (!referralRewardImageInput.rewardImageUrl || !referralRewardImageInput.rewardImageUrl.trim()) {

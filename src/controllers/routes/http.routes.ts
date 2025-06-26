@@ -20,11 +20,11 @@ import {
   getCommunityPlacesHandler,
   addCommunityPlacesHandler,
   removeCommunityPlaceHandler,
-  updateCommunityHandler
+  updateCommunityHandler,
+  addReferralEmailHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
-import { addReferralEmailHandler } from '../handlers/add-referral-email-handler'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {

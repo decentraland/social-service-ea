@@ -40,21 +40,23 @@ test('POST /v1/referral-email', function ({ components }) {
     })
 
     describe('and the request is signed', () => {
-      describe('with valid email', () => {
+      describe('and the email is valid', () => {
         let validEmail: string
 
         beforeEach(() => {
           validEmail = 'test@example.com'
         })
 
-        it('should set referral email and return 204', async () => {
+        it('should return 204', async () => {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: validEmail
           })
           expect(response.status).toBe(204)
         })
+      })
 
-        it('should set referral email with email containing spaces and return 204', async () => {
+      describe('and the email contains spaces', () => {
+        it('should return 204', async () => {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: '  test@example.com  '
           })
@@ -62,14 +64,8 @@ test('POST /v1/referral-email', function ({ components }) {
         })
       })
 
-      describe('with invalid email format', () => {
-        let invalidEmail: string
-
-        beforeEach(() => {
-          invalidEmail = 'invalid-email'
-        })
-
-        it('should return 400 when email is missing', async () => {
+      describe('and the email is missing', () => {
+        it('should return 400', async () => {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {})
           expect(response.status).toBe(400)
           const body = await response.json()
@@ -78,8 +74,10 @@ test('POST /v1/referral-email', function ({ components }) {
             message: 'email is required and must be a string'
           })
         })
+      })
 
-        it('should return 400 when email is null', async () => {
+      describe('and the email is null', () => {
+        it('should return 400', async () => {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: null
           })
@@ -90,8 +88,10 @@ test('POST /v1/referral-email', function ({ components }) {
             message: 'email is required and must be a string'
           })
         })
+      })
 
-        it('should return 400 when email is empty string', async () => {
+      describe('and the email is empty string', () => {
+        it('should return 400', async () => {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: ''
           })
@@ -102,8 +102,10 @@ test('POST /v1/referral-email', function ({ components }) {
             message: 'email is required and must be a string'
           })
         })
+      })
 
-        it('should return 400 when email is only whitespace', async () => {
+      describe('and the email is only whitespace', () => {
+        it('should return 400', async () => {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: '   '
           })
@@ -114,8 +116,16 @@ test('POST /v1/referral-email', function ({ components }) {
             message: 'Email is required'
           })
         })
+      })
 
-        it('should return 400 when email has invalid format', async () => {
+      describe('and the email has invalid format', () => {
+        let invalidEmail: string
+
+        beforeEach(() => {
+          invalidEmail = 'invalid-email'
+        })
+
+        it('should return 400', async () => {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: invalidEmail
           })
@@ -126,8 +136,10 @@ test('POST /v1/referral-email', function ({ components }) {
             message: 'Invalid email format'
           })
         })
+      })
 
-        it('should return 400 when email is not a string', async () => {
+      describe('and the email is not a string', () => {
+        it('should return 400', async () => {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: 123
           })
@@ -138,8 +150,10 @@ test('POST /v1/referral-email', function ({ components }) {
             message: 'email is required and must be a string'
           })
         })
+      })
 
-        it('should return 400 when email is an array', async () => {
+      describe('and the email is an array', () => {
+        it('should return 400', async () => {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: ['test@example.com']
           })
@@ -159,35 +173,39 @@ test('POST /v1/referral-email', function ({ components }) {
           validEmail = 'test@example.com'
         })
 
-        it('should return 400 when trying to update email within 24 hours', async () => {
-          const response1 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
-            email: validEmail
-          })
-          expect(response1.status).toBe(204)
+        describe('and trying to update email within 24 hours', () => {
+          it('should return 400', async () => {
+            const response1 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: validEmail
+            })
+            expect(response1.status).toBe(204)
 
-          const response2 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
-            email: 'newemail@example.com'
-          })
-          expect(response2.status).toBe(400)
-          const body = await response2.json()
-          expect(body).toEqual({
-            error: 'Bad request',
-            message: `Email can only be updated once per day. Last update was less than 24 hours ago for user: ${userAddress}`
+            const response2 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: 'newemail@example.com'
+            })
+            expect(response2.status).toBe(400)
+            const body = await response2.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: `Email can only be updated once per day. Last update was less than 24 hours ago for user: ${userAddress}`
+            })
           })
         })
 
-        it('should allow setting the same email multiple times for different users', async () => {
-          const identity2 = await createTestIdentity()
+        describe('and setting the same email for different users', () => {
+          it('should return 204 for both users', async () => {
+            const identity2 = await createTestIdentity()
 
-          const response1 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
-            email: validEmail
-          })
-          expect(response1.status).toBe(204)
+            const response1 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: validEmail
+            })
+            expect(response1.status).toBe(204)
 
-          const response2 = await makeAuthenticatedRequest(components)(identity2, '/v1/referral-email', 'POST', {
-            email: validEmail
+            const response2 = await makeAuthenticatedRequest(components)(identity2, '/v1/referral-email', 'POST', {
+              email: validEmail
+            })
+            expect(response2.status).toBe(204)
           })
-          expect(response2.status).toBe(204)
         })
       })
 
@@ -200,7 +218,7 @@ test('POST /v1/referral-email', function ({ components }) {
           email2 = 'user2@example.com'
         })
 
-        it('should allow different users to set their own emails', async () => {
+        it('should return 204 for both users', async () => {
           const identity2 = await createTestIdentity()
           const userAddress2 = identity2.realAccount.address.toLowerCase()
 

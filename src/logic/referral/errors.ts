@@ -1,3 +1,5 @@
+import { InvalidRequestError } from '@dcl/platform-server-commons'
+
 export class ReferralNotFoundError extends Error {
   constructor(userAddress: string) {
     super(`Referral progress not found for user: ${userAddress}`)
@@ -28,7 +30,7 @@ export class SelfReferralError extends Error {
   }
 }
 
-export class ReferralEmailUpdateTooSoonError extends Error {
+export class ReferralEmailUpdateTooSoonError extends InvalidRequestError {
   constructor(referrer: string) {
     super(`Email can only be updated once per day. Last update was less than 24 hours ago for user: ${referrer}`)
   }

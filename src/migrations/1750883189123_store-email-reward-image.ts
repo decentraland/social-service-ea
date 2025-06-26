@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { MigrationBuilder, ColumnDefinitions } from 'node-pg-migrate'
 
-export const ReferralEmailsColumns: ColumnDefinitions = {
+export const referralEmailsColumns: ColumnDefinitions = {
   id: { type: 'uuid', primaryKey: true },
   referrer: { type: 'text', notNull: true },
   email: { type: 'text', notNull: true },
@@ -9,7 +9,7 @@ export const ReferralEmailsColumns: ColumnDefinitions = {
   updated_at: { type: 'bigint', notNull: true }
 }
 
-export const ReferralRewardImagesColumns: ColumnDefinitions = {
+export const referralRewardImagesColumns: ColumnDefinitions = {
   id: { type: 'uuid', primaryKey: true },
   referrer: { type: 'text', notNull: true },
   reward_image_url: { type: 'text', notNull: true },
@@ -18,7 +18,7 @@ export const ReferralRewardImagesColumns: ColumnDefinitions = {
 }
 
 export async function up(pgm: MigrationBuilder): Promise<void> {
-  pgm.createTable('referral_emails', ReferralEmailsColumns)
+  pgm.createTable('referral_emails', referralEmailsColumns)
   pgm.createIndex('referral_emails', ['referrer'], {
     name: 'idx_referral_emails_referrer'
   })
@@ -26,7 +26,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     name: 'idx_referral_emails_email'
   })
 
-  pgm.createTable('referral_reward_images', ReferralRewardImagesColumns)
+  pgm.createTable('referral_reward_images', referralRewardImagesColumns)
   pgm.createIndex('referral_reward_images', ['referrer'], {
     name: 'idx_referral_reward_images_referrer'
   })

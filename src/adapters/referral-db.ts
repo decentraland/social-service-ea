@@ -1,5 +1,6 @@
 import SQL, { SQLStatement } from 'sql-template-strings'
 import { IPgComponent } from '@well-known-components/pg-component'
+import { randomUUID } from 'node:crypto'
 import {
   IReferralDatabaseComponent,
   ReferralProgress,
@@ -25,7 +26,7 @@ export async function createReferralDBComponent(
     const now = Date.now()
     const result = await pg.query<ReferralProgress>(
       SQL`INSERT INTO referral_progress (id, referrer, invited_user, status, created_at, updated_at)
-          VALUES (gen_random_uuid(), ${referralInput.referrer.toLowerCase()}, ${referralInput.invitedUser.toLowerCase()}, ${
+          VALUES (${randomUUID()}, ${referralInput.referrer.toLowerCase()}, ${referralInput.invitedUser.toLowerCase()}, ${
             ReferralProgressStatus.PENDING
           }, ${now}, ${now})
           RETURNING *`
@@ -137,7 +138,7 @@ export async function createReferralDBComponent(
     const now = Date.now()
     const result = await pg.query<ReferralEmail>(
       SQL`INSERT INTO referral_emails (id, referrer, email, created_at, updated_at)
-          VALUES (gen_random_uuid(), ${referralEmailInput.referrer.toLowerCase()}, ${referralEmailInput.email}, ${now}, ${now})
+          VALUES (${randomUUID()}, ${referralEmailInput.referrer.toLowerCase()}, ${referralEmailInput.email}, ${now}, ${now})
           RETURNING *`
     )
     return result.rows[0]
@@ -154,7 +155,7 @@ export async function createReferralDBComponent(
     const now = Date.now()
     const result = await pg.query<ReferralRewardImage>(
       SQL`INSERT INTO referral_reward_images (id, referrer, reward_image_url, tier, created_at)
-          VALUES (gen_random_uuid(), ${referralRewardImageInput.referrer.toLowerCase()}, ${referralRewardImageInput.rewardImageUrl}, ${referralRewardImageInput.tier}, ${now})
+          VALUES (${randomUUID()}, ${referralRewardImageInput.referrer.toLowerCase()}, ${referralRewardImageInput.rewardImageUrl}, ${referralRewardImageInput.tier}, ${now})
           RETURNING *`
     )
     return result.rows[0]

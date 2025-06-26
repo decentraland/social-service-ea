@@ -17,12 +17,14 @@ export interface IReferralComponent {
   getInvitedUsersAcceptedStats(
     referrer: string
   ): Promise<{ invitedUsersAccepted: number; invitedUsersAcceptedViewed: number }>
-  setReferralEmail(referralEmailInput: { referrer: string; email: string }): Promise<ReferralEmail>
-  setReferralRewardImage(referralRewardImageInput: {
-    referrer: string
-    rewardImageUrl: string
-    tier: number
-  }): Promise<ReferralRewardImage>
+  setReferralEmail(referralEmailInput: Pick<ReferralEmail, 'referrer' | 'email'>): Promise<ReferralEmail>
+  setReferralRewardImage(referralRewardImageInput: SetReferralRewardImageInput): Promise<ReferralRewardImage>
+}
+
+export type SetReferralRewardImageInput = {
+  referrer: string
+  rewardImageUrl: string
+  tier: number
 }
 
 export enum RewardStatus {
