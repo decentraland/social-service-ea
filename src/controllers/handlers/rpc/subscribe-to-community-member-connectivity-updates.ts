@@ -1,7 +1,24 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { SubscriptionEventsEmitter, RpcServerContext, RPCServiceContext } from '../../../types'
+import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import { CommunityMemberConnectivityUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { parseCommunityMemberConnectivityUpdate } from '../../../logic/community/parsers'
+
+/**
+ * Converts the emitted update to the community member connectivity update.
+ * @param update - The update to convert.
+ * @returns The community member connectivity update.
+ */
+function parseEmittedUpdateToCommunityMemberConnectivityUpdate(
+  update: SubscriptionEventsEmitter['communityMemberConnectivityUpdate']
+): CommunityMemberConnectivityUpdate | null {
+  const { communityId, memberAddress, status } = update
+  return {
+    communityId,
+    member: {
+      address: memberAddress
+    },
+    status
+  }
+}
 
 export function subscribeToCommunityMemberConnectivityUpdatesService({
   components: { logs, updateHandler }
@@ -25,7 +42,7 @@ export function subscribeToCommunityMemberConnectivityUpdatesService({
           update.memberAddress,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['communityMemberConnectivityUpdate']) =>
           update.memberAddress !== context.address,
-        parser: parseCommunityMemberConnectivityUpdate
+        parser: parseEmittedUpdateToCommunityMemberConnectivityUpdate
       })
     } catch (error: any) {
       logger.error('Error in community member connectivity updates subscription:', error)
