@@ -1,4 +1,10 @@
-import { AppComponents, IPlacesApiComponent, PlacesApiResponse } from '../types'
+import { AppComponents, IPlacesApiComponent } from '../types'
+
+export type PlacesApiResponse = {
+  total?: number
+  ok: boolean
+  data?: { id: string; title: string; positions: string[]; owner: string }[]
+}
 
 export async function createPlacesApiAdapter(
   components: Pick<AppComponents, 'fetcher' | 'config'>

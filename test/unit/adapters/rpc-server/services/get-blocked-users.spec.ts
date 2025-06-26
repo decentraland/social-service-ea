@@ -1,5 +1,5 @@
 import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../../../mocks/components'
-import { getBlockedUsersService } from '../../../../../src/adapters/rpc-server/services/get-blocked-users'
+import { getBlockedUsersService } from '../../../../../src/controllers/handlers/rpc/get-blocked-users'
 import { GetBlockedUsersPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'

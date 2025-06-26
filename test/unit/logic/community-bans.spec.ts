@@ -1,14 +1,14 @@
-import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, mockCatalystClient } from '../../mocks/components'
+import { mockLogs, mockCatalystClient, mockPubSub } from '../../mocks/components'
 import { createCommunityBansComponent } from '../../../src/logic/community/bans'
-import { createCommunityRolesComponent } from '../../../src/logic/community/roles'
 import { ICommunityBansComponent } from '../../../src/logic/community'
-import { BannedMember, BannedMemberProfile, ICommunityRolesComponent } from '../../../src/logic/community/types'
+import { BannedMember, ICommunityRolesComponent } from '../../../src/logic/community/types'
 import { createMockCommunityRolesComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 
 describe('Community Bans Component', () => {
   let communityBansComponent: ICommunityBansComponent
@@ -41,7 +41,8 @@ describe('Community Bans Component', () => {
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
-      logs: mockLogs
+      logs: mockLogs,
+      pubsub: mockPubSub
     })
   })
 
@@ -68,6 +69,11 @@ describe('Community Bans Component', () => {
         expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
         expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
         expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(communityId, bannerAddress, targetAddress)
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+          communityId,
+          memberAddress: targetAddress,
+          status: ConnectivityStatus.OFFLINE
+        })
       })
 
       it('should ban a non-member without kicking them', async () => {
@@ -87,6 +93,11 @@ describe('Community Bans Component', () => {
         expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(communityId, bannerAddress, targetAddress)
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+          communityId,
+          memberAddress: targetAddress,
+          status: ConnectivityStatus.OFFLINE
+        })
       })
     })
 
@@ -103,6 +114,7 @@ describe('Community Bans Component', () => {
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.banMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
 
@@ -129,6 +141,7 @@ describe('Community Bans Component', () => {
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.banMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
   })
@@ -158,6 +171,11 @@ describe('Community Bans Component', () => {
           unbannerAddress,
           targetAddress
         )
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+          communityId,
+          memberAddress: targetAddress,
+          status: ConnectivityStatus.ONLINE
+        })
       })
     })
 
@@ -177,6 +195,7 @@ describe('Community Bans Component', () => {
         )
         expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetAddress)
         expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
 
@@ -192,6 +211,7 @@ describe('Community Bans Component', () => {
         expect(mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
 
@@ -217,6 +237,7 @@ describe('Community Bans Component', () => {
         )
         expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
   })

@@ -1,6 +1,6 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { getSocialSettingsService } from '../../../../../src/adapters/rpc-server/services/get-social-settings'
+import { getSocialSettingsService } from '../../../../../src/controllers/handlers/rpc/get-social-settings'
 import {
   getDefaultSettings,
   convertDBSettingsToRPCSettings,

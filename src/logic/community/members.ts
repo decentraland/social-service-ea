@@ -9,11 +9,16 @@ import {
 } from './types'
 import { mapMembersWithProfiles } from './utils'
 import { EthAddress } from '@dcl/schemas'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export async function createCommunityMembersComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats'>
+  components: Pick<
+    AppComponents,
+    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats' | 'pubsub'
+  >
 ): Promise<ICommunityMembersComponent> {
-  const { communitiesDb, catalystClient, communityRoles, logs, peersStats } = components
+  const { communitiesDb, catalystClient, communityRoles, logs, peersStats, pubsub } = components
 
   const logger = logs.getLogger('community-component')
 
@@ -107,6 +112,12 @@ export async function createCommunityMembersComponent(
       await communityRoles.validatePermissionToKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
 
       await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
+
+      await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+        communityId,
+        memberAddress: targetAddress,
+        status: ConnectivityStatus.OFFLINE
+      })
     },
 
     joinCommunity: async (communityId: string, memberAddress: EthAddress): Promise<void> => {
@@ -134,6 +145,12 @@ export async function createCommunityMembersComponent(
         memberAddress,
         role: CommunityRole.Member
       })
+
+      await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+        communityId,
+        memberAddress,
+        status: ConnectivityStatus.ONLINE
+      })
     },
 
     leaveCommunity: async (communityId: string, memberAddress: EthAddress): Promise<void> => {
@@ -153,6 +170,12 @@ export async function createCommunityMembersComponent(
       await communityRoles.validatePermissionToLeaveCommunity(communityId, memberAddress)
 
       await communitiesDb.kickMemberFromCommunity(communityId, memberAddress)
+
+      await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+        communityId,
+        memberAddress,
+        status: ConnectivityStatus.OFFLINE
+      })
     },
 
     updateMemberRole: async (

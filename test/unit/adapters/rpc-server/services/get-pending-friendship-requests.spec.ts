@@ -1,5 +1,5 @@
 import { mockCatalystClient, mockConfig, mockFriendsDB, mockLogs } from '../../../../mocks/components'
-import { getPendingFriendshipRequestsService } from '../../../../../src/adapters/rpc-server/services/get-pending-friendship-requests'
+import { getPendingFriendshipRequestsService } from '../../../../../src/controllers/handlers/rpc/get-pending-friendship-requests'
 import { RpcServerContext } from '../../../../../src/types'
 import { PaginatedFriendshipRequestsResponse } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { emptyRequest } from '../../../../mocks/empty-request'

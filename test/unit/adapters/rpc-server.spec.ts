@@ -1,33 +1,18 @@
 import { createRpcServerComponent, createSubscribersContext } from '../../../src/adapters/rpc-server'
-import {
-  ICommsGatekeeperComponent,
-  IRPCServerComponent,
-  ISubscribersContext,
-  RpcServerContext
-} from '../../../src/types'
+import { IRPCServerComponent, ISubscribersContext, IUpdateHandlerComponent, RpcServerContext } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
-import {
-  mockCatalystClient,
-  mockConfig,
-  mockFriendsDB,
-  mockLogs,
-  mockMetrics,
-  mockPubSub,
-  mockUWs,
-  createMockPeersStatsComponent
-} from '../../mocks/components'
+import { mockConfig, mockFriendsDB, mockLogs, mockMetrics, mockPubSub, mockUWs } from '../../mocks/components'
 import {
   BLOCK_UPDATES_CHANNEL,
+  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+  COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
   FRIEND_STATUS_UPDATES_CHANNEL,
-  FRIENDSHIP_UPDATES_CHANNEL
+  FRIENDSHIP_UPDATES_CHANNEL,
+  PRIVATE_VOICE_CHAT_UPDATES_CHANNEL
 } from '../../../src/adapters/pubsub'
-import { mockSns } from '../../mocks/components/sns'
-import * as updates from '../../../src/logic/updates'
-import { createSettingsMockedComponent } from '../../mocks/components/settings'
 import { createVoiceMockedComponent } from '../../mocks/components/voice'
-import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
-import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
-import { createMockCommunityMembersComponent } from '../../mocks/communities'
+import { setupRpcRoutes } from '../../../src/controllers/routes/rpc.routes'
+import { createMockUpdateHandlerComponent } from '../../mocks/components/updates'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -42,8 +27,8 @@ describe('createRpcServerComponent', () => {
   let setHandlerMock: jest.Mock, attachTransportMock: jest.Mock
   let mockTransport: Transport
   let subscribersContext: ISubscribersContext
-  let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   let endIncomingOrOutgoingPrivateVoiceChatForUserMock: jest.Mock
+  let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
 
   beforeEach(async () => {
     endIncomingOrOutgoingPrivateVoiceChatForUserMock = jest.fn()
@@ -56,14 +41,9 @@ describe('createRpcServerComponent', () => {
     setHandlerMock = rpcServerMock.setHandler as jest.Mock
     attachTransportMock = rpcServerMock.attachTransport as jest.Mock
 
-    const mockCommsGatekeeper: ICommsGatekeeperComponent = createCommsGatekeeperMockedComponent({})
-    const mockSettings = createSettingsMockedComponent({})
     const mockVoice = createVoiceMockedComponent({
       endIncomingOrOutgoingPrivateVoiceChatForUser: endIncomingOrOutgoingPrivateVoiceChatForUserMock
     })
-    const mockCommunityMembers = createMockCommunityMembersComponent({})
-
-    mockPeersStats = createMockPeersStatsComponent()
 
     mockTransport = {
       on: jest.fn(),
@@ -71,61 +51,99 @@ describe('createRpcServerComponent', () => {
       close: jest.fn()
     } as unknown as Transport
 
+    mockUpdateHandler = createMockUpdateHandlerComponent({})
+
     rpcServer = await createRpcServerComponent({
-      commsGatekeeper: mockCommsGatekeeper,
       logs: mockLogs,
-      friendsDb: mockFriendsDB,
       pubsub: mockPubSub,
       config: mockConfig,
       uwsServer: mockUWs,
-      catalystClient: mockCatalystClient,
-      sns: mockSns,
       subscribersContext,
       metrics: mockMetrics,
-      settings: mockSettings,
       voice: mockVoice,
-      peersStats: mockPeersStats,
-      communityMembers: mockCommunityMembers
+      updateHandler: mockUpdateHandler
     })
   })
 
-  it('should register all services correctly', async () => {
-    expect(setHandlerMock).toHaveBeenCalledWith(expect.any(Function))
-  })
-
-  describe('start', () => {
+  describe('when starting the server', () => {
     beforeEach(() => {
-      jest.spyOn(updates, 'friendshipUpdateHandler')
-      jest.spyOn(updates, 'friendshipAcceptedUpdateHandler')
-      jest.spyOn(updates, 'friendConnectivityUpdateHandler')
-      jest.spyOn(updates, 'blockUpdateHandler')
-
       mockConfig.getNumber.mockResolvedValueOnce(8085)
     })
 
-    it('should start the server and subscribe to pubsub updates', async () => {
-      await rpcServer.start({} as any)
-
-      expect(mockUWs.app.listen).toHaveBeenCalledWith(8085, expect.any(Function))
-      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Function))
-      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Function))
-      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIEND_STATUS_UPDATES_CHANNEL, expect.any(Function))
-      expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, expect.any(Function))
+    describe('when the service creators are not set', () => {
+      it('should throw an error', () => {
+        expect(rpcServer.start({} as any)).rejects.toThrow(
+          'Service creators must be set before starting the RPC server'
+        )
+      })
     })
 
-    it('should call the correct handlers', async () => {
-      const mockLogger = mockLogs.getLogger('rpcServer-test')
+    describe('when the service creators are set', () => {
+      beforeEach(async () => {
+        rpcServer.setServiceCreators(
+          await setupRpcRoutes({
+            logs: mockLogs,
+            friendsDb: mockFriendsDB,
+            pubsub: mockPubSub,
+            config: mockConfig,
+            uwsServer: mockUWs
+          } as any)
+        )
+      })
 
-      await rpcServer.start({} as any)
+      it('should register all services correctly', async () => {
+        expect(setHandlerMock).toHaveBeenCalledWith(expect.any(Function))
+      })
 
-      expect(updates.friendshipUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
-      expect(updates.friendshipAcceptedUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
-      expect(updates.friendConnectivityUpdateHandler).toHaveBeenCalledWith(
-        subscribersContext,
-        mockLogger,
-        mockFriendsDB
-      )
-      expect(updates.blockUpdateHandler).toHaveBeenCalledWith(subscribersContext, mockLogger)
+      it('should start the server and subscribe to pubsub updates', async () => {
+        await rpcServer.start({} as any)
+
+        expect(mockUWs.app.listen).toHaveBeenCalledWith(8085, expect.any(Function))
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Function))
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Function))
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(FRIEND_STATUS_UPDATES_CHANNEL, expect.any(Function))
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, expect.any(Function))
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(
+          COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+          expect.any(Function)
+        )
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(
+          COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+          expect.any(Function)
+        )
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(
+          PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
+          expect.any(Function)
+        )
+      })
+
+      it('should wire the updateHandler component to pubsub channels', async () => {
+        await rpcServer.start({} as any)
+
+        // Define the expected channel to handler mappings
+        const expectedSubscriptions = [
+          { channel: FRIENDSHIP_UPDATES_CHANNEL, handler: mockUpdateHandler.friendshipUpdateHandler },
+          { channel: FRIENDSHIP_UPDATES_CHANNEL, handler: mockUpdateHandler.friendshipAcceptedUpdateHandler },
+          { channel: FRIEND_STATUS_UPDATES_CHANNEL, handler: mockUpdateHandler.friendConnectivityUpdateHandler },
+          {
+            channel: COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
+            handler: mockUpdateHandler.communityMemberConnectivityUpdateHandler
+          },
+          { channel: BLOCK_UPDATES_CHANNEL, handler: mockUpdateHandler.blockUpdateHandler },
+          { channel: PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, handler: mockUpdateHandler.privateVoiceChatUpdateHandler },
+          {
+            channel: COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+            handler: mockUpdateHandler.communityMemberStatusHandler
+          }
+        ]
+
+        // Verify each expected subscription
+        expectedSubscriptions.forEach(({ channel, handler }) => {
+          expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(channel, handler)
+        })
+
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledTimes(expectedSubscriptions.length)
+      })
     })
   })
 

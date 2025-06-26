@@ -2,13 +2,15 @@ import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, mockCatalystClient, createMockPeersStatsComponent } from '../../mocks/components'
+import { mockLogs, mockCatalystClient, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
 import { createCommunityMembersComponent } from '../../../src/logic/community/members'
 import { ICommunityMembersComponent, ICommunityRolesComponent } from '../../../src/logic/community/types'
 import { createMockCommunityRolesComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { CommunityMember, CommunityMemberProfile } from '../../../src/logic/community/types'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 
 describe('Community Members Component', () => {
   let communityMembersComponent: ICommunityMembersComponent
@@ -45,7 +47,8 @@ describe('Community Members Component', () => {
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
       logs: mockLogs,
-      peersStats: mockPeersStats
+      peersStats: mockPeersStats,
+      pubsub: mockPubSub
     })
   })
 
@@ -382,6 +385,11 @@ describe('Community Members Component', () => {
               targetAddress
             )
             expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId,
+              memberAddress: targetAddress,
+              status: ConnectivityStatus.OFFLINE
+            })
           })
         })
 
@@ -410,6 +418,7 @@ describe('Community Members Component', () => {
               targetAddress
             )
             expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+            expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
           })
         })
       })
@@ -427,6 +436,7 @@ describe('Community Members Component', () => {
           expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
           expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+          expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
         })
       })
     })
@@ -445,6 +455,7 @@ describe('Community Members Component', () => {
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
   })
@@ -491,6 +502,11 @@ describe('Community Members Component', () => {
               memberAddress,
               role: CommunityRole.Member
             })
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId,
+              memberAddress,
+              status: ConnectivityStatus.ONLINE
+            })
           })
         })
 
@@ -509,6 +525,7 @@ describe('Community Members Component', () => {
             expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
             expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, memberAddress)
             expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+            expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
           })
         })
       })
@@ -526,6 +543,7 @@ describe('Community Members Component', () => {
           expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
           expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+          expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
         })
       })
     })
@@ -544,6 +562,7 @@ describe('Community Members Component', () => {
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
   })
@@ -586,6 +605,11 @@ describe('Community Members Component', () => {
               memberAddress
             )
             expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, memberAddress)
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId,
+              memberAddress,
+              status: ConnectivityStatus.OFFLINE
+            })
           })
         })
 
@@ -607,6 +631,7 @@ describe('Community Members Component', () => {
               memberAddress
             )
             expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+            expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
           })
         })
       })
@@ -624,6 +649,7 @@ describe('Community Members Component', () => {
           expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
           expect(mockCommunityRoles.validatePermissionToLeaveCommunity).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+          expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
         })
       })
     })
@@ -642,6 +668,7 @@ describe('Community Members Component', () => {
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunityRoles.validatePermissionToLeaveCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
   })

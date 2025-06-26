@@ -1,5 +1,5 @@
 import { mockCatalystClient, mockConfig, mockFriendsDB, mockLogs } from '../../../../mocks/components'
-import { getSentFriendshipRequestsService } from '../../../../../src/adapters/rpc-server/services/get-sent-friendship-requests'
+import { getSentFriendshipRequestsService } from '../../../../../src/controllers/handlers/rpc/get-sent-friendship-requests'
 import { RpcServerContext } from '../../../../../src/types'
 import { emptyRequest } from '../../../../mocks/empty-request'
 import { createMockFriendshipRequest, createMockExpectedFriendshipRequest } from '../../../../mocks/friendship-request'

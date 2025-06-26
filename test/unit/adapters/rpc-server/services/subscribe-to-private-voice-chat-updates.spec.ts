@@ -1,10 +1,8 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { subscribeToPrivateVoiceChatUpdatesService } from '../../../../../src/adapters/rpc-server/services/subscribe-to-private-voice-chat-updates'
-import { RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
-import { createLogsMockedComponent, mockCatalystClient } from '../../../../mocks/components'
-import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
-import { handleSubscriptionUpdates } from '../../../../../src/logic/updates'
+import { subscribeToPrivateVoiceChatUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-private-voice-chat-updates'
+import { IUpdateHandlerComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
+import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import {
   PrivateVoiceChatStatus,
@@ -12,13 +10,11 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { VoiceChatStatus } from '../../../../../src/logic/voice/types'
 
-jest.mock('../../../../../src/logic/updates')
-
 describe('when subscribing to private voice chat updates', () => {
   let logs: jest.Mocked<ILoggerComponent>
   let service: ReturnType<typeof subscribeToPrivateVoiceChatUpdatesService>
   let rpcContext: RpcServerContext
-  let mockHandler: jest.MockedFunction<typeof handleSubscriptionUpdates>
+  let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
   let callerAddress: string
   let calleeAddress: string
   let callId: string
@@ -28,20 +24,16 @@ describe('when subscribing to private voice chat updates', () => {
     calleeAddress = '0xC001010101010101010101010101010101010101'
     callId = '1'
     logs = createLogsMockedComponent()
-    mockHandler = handleSubscriptionUpdates as jest.MockedFunction<typeof handleSubscriptionUpdates>
+    mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     service = subscribeToPrivateVoiceChatUpdatesService({
-      components: { logs, catalystClient: mockCatalystClient, voice: createVoiceMockedComponent({}) }
+      components: { logs, updateHandler: mockUpdateHandler }
     })
 
     rpcContext = {
       address: callerAddress,
       subscribersContext: createSubscribersContext()
     }
-  })
-
-  afterEach(() => {
-    jest.clearAllMocks()
   })
 
   describe('when the subscription has updates', () => {
@@ -63,7 +55,7 @@ describe('when subscribing to private voice chat updates', () => {
         }
       }
 
-      mockHandler.mockImplementationOnce(async function* () {
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
         yield requestedUpdate
         yield acceptedUpdate
       })
@@ -94,7 +86,7 @@ describe('when subscribing to private voice chat updates', () => {
           status: VoiceChatStatus.REQUESTED
         }
 
-        mockHandler.mockImplementationOnce(async function* () {
+        mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
           yield update
         })
 
@@ -103,7 +95,7 @@ describe('when subscribing to private voice chat updates', () => {
       })
 
       it('should build the update with the call id, the request status and the caller address', () => {
-        const result = mockHandler.mock.calls[0][0].parser(update)
+        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)
         expect(result).toEqual({
           callId,
           status: PrivateVoiceChatStatus.VOICE_CHAT_REQUESTED,
@@ -123,7 +115,7 @@ describe('when subscribing to private voice chat updates', () => {
           }
         }
 
-        mockHandler.mockImplementationOnce(async function* () {
+        mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
           yield update
         })
 
@@ -132,7 +124,7 @@ describe('when subscribing to private voice chat updates', () => {
       })
 
       it('should build the update with the call id and the accepted status', () => {
-        const result = mockHandler.mock.calls[0][0].parser(update)
+        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)
         expect(result).toEqual({
           callId,
           status: PrivateVoiceChatStatus.VOICE_CHAT_ACCEPTED,
@@ -151,7 +143,7 @@ describe('when subscribing to private voice chat updates', () => {
           status: VoiceChatStatus.REJECTED
         }
 
-        mockHandler.mockImplementationOnce(async function* () {
+        mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
           yield update
         })
 
@@ -160,7 +152,7 @@ describe('when subscribing to private voice chat updates', () => {
       })
 
       it('should build the update with the call id and the rejected status', () => {
-        const result = mockHandler.mock.calls[0][0].parser(update)
+        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)
         expect(result).toEqual({
           callId,
           status: PrivateVoiceChatStatus.VOICE_CHAT_REJECTED
@@ -176,7 +168,7 @@ describe('when subscribing to private voice chat updates', () => {
           status: VoiceChatStatus.EXPIRED
         }
 
-        mockHandler.mockImplementationOnce(async function* () {
+        mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
           yield update
         })
 
@@ -185,7 +177,7 @@ describe('when subscribing to private voice chat updates', () => {
       })
 
       it('should build the update with the call id and the ended status', () => {
-        const result = mockHandler.mock.calls[0][0].parser(update)
+        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)
         expect(result).toEqual({
           callId,
           status: PrivateVoiceChatStatus.VOICE_CHAT_EXPIRED
@@ -202,7 +194,7 @@ describe('when subscribing to private voice chat updates', () => {
           status: VoiceChatStatus.ENDED
         }
 
-        mockHandler.mockImplementationOnce(async function* () {
+        mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
           yield update
         })
 
@@ -211,7 +203,7 @@ describe('when subscribing to private voice chat updates', () => {
       })
 
       it('should build the update with the call id and the ended status', () => {
-        const result = mockHandler.mock.calls[0][0].parser(update)
+        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)
         expect(result).toEqual({
           callId,
           status: PrivateVoiceChatStatus.VOICE_CHAT_ENDED
@@ -226,7 +218,7 @@ describe('when subscribing to private voice chat updates', () => {
           status: 'unknown' as VoiceChatStatus
         }
 
-        mockHandler.mockImplementationOnce(async function* () {
+        mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
           yield update
         })
 
@@ -235,7 +227,9 @@ describe('when subscribing to private voice chat updates', () => {
       })
 
       it('should throw an error', () => {
-        expect(() => mockHandler.mock.calls[0][0].parser(update)).toThrow('Unknown voice chat status: unknown')
+        expect(() => mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)).toThrow(
+          'Unknown voice chat status: unknown'
+        )
       })
     })
   })

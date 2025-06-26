@@ -1,5 +1,5 @@
 import { Empty } from '@dcl/protocol/out-ts/google/protobuf/empty.gen'
-import { getIncomingPrivateVoiceChatRequestsService } from '../../../../../src/adapters/rpc-server/services/get-incoming-private-voice-chat-requests'
+import { getIncomingPrivateVoiceChatRequestsService } from '../../../../../src/controllers/handlers/rpc/get-incoming-private-voice-chat-requests'
 import { RpcServerContext, RPCServiceContext, PrivateVoiceChat } from '../../../../../src/types'
 import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
