@@ -3,7 +3,7 @@ import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { createMockProfile } from '../mocks/profile'
 import { parseExpectedFriends } from '../mocks/friend'
-import { mockCommunity } from '../mocks/community'
+import { mockCommunity } from '../mocks/communities'
 import { createOrUpsertActiveFriendship, removeFriendship } from './utils/friendships'
 
 test('Get Communities Controller', function ({ components, spyComponents }) {
@@ -257,8 +257,12 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         it('should return the thumbnail raw url in the response', async () => {
           const response = await makeRequest(identity, '/v1/communities')
           const body = await response.json()
-          expect(body.data.results[0].thumbnails.raw).toBe(`http://0.0.0.0:4566/social-service-ea/social/communities/${communityId1}/raw-thumbnail.png`)
-          expect(body.data.results[1].thumbnails.raw).toBe(`http://0.0.0.0:4566/social-service-ea/social/communities/${communityId2}/raw-thumbnail.png`)
+          expect(body.data.results[0].thumbnails.raw).toBe(
+            `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId1}/raw-thumbnail.png`
+          )
+          expect(body.data.results[1].thumbnails.raw).toBe(
+            `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId2}/raw-thumbnail.png`
+          )
         })
       })
     })

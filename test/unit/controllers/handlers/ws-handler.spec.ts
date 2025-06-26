@@ -1,6 +1,6 @@
 import mitt from 'mitt'
 import { verify } from '@dcl/platform-crypto-middleware'
-import { registerWsHandler, THREE_MINUTES_IN_MS } from '../../../../src/controllers/handlers/ws-handler'
+import { registerWsHandler, THREE_MINUTES_IN_MS } from '../../../../src/controllers/handlers/uws/ws-handler'
 import {
   mockLogs,
   mockMetrics,

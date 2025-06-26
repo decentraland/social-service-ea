@@ -1,5 +1,5 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
-import { rejectPrivateVoiceChatService } from '../../../../../src/adapters/rpc-server/services/reject-private-voice-chat'
+import { rejectPrivateVoiceChatService } from '../../../../../src/controllers/handlers/rpc/reject-private-voice-chat'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import { IVoiceComponent } from '../../../../../src/logic/voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'

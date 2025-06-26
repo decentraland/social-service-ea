@@ -6,7 +6,7 @@ import { mockLogs, createPlacesApiAdapterMockComponent } from '../../mocks/compo
 import { createCommunityPlacesComponent } from '../../../src/logic/community/places'
 import { ICommunityPlacesComponent, CommunityPlace, ICommunityRolesComponent } from '../../../src/logic/community'
 import { IPlacesApiComponent } from '../../../src/types/components'
-import { createMockCommunityRolesComponent } from '../../mocks/community'
+import { createMockCommunityRolesComponent } from '../../mocks/communities'
 
 describe('Community Places Component', () => {
   let communityPlacesComponent: ICommunityPlacesComponent

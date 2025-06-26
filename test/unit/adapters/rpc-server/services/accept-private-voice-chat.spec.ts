@@ -4,7 +4,7 @@ import { createLogsMockedComponent } from '../../../../mocks/components'
 import { createVoiceMockedComponent } from '../../../../mocks/components/voice'
 import { VoiceChatNotAllowedError } from '../../../../../src/logic/voice/errors'
 import { AcceptPrivateVoiceChatPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { acceptPrivateVoiceChatService } from '../../../../../src/adapters/rpc-server/services/accept-private-voice-chat'
+import { acceptPrivateVoiceChatService } from '../../../../../src/controllers/handlers/rpc/accept-private-voice-chat'
 
 describe('when accepting a private voice chat', () => {
   let acceptPrivateVoiceChatMock: jest.MockedFn<IVoiceComponent['acceptPrivateVoiceChat']>
