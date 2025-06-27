@@ -2,7 +2,7 @@ import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { ReferralInvalidInputError } from '../../../logic/referral/errors'
+import { ReferralEmailUpdateTooSoonError, ReferralInvalidInputError } from '../../../logic/referral/errors'
 
 interface AddReferralEmailRequest {
   email: string
@@ -37,7 +37,7 @@ export async function addReferralEmailHandler(
     logger.error(`Error setting referral email for ${userAddress}: ${message}`)
     logger.debug('Error stack', { stack: (error as any)?.stack })
 
-    if (error instanceof ReferralInvalidInputError) {
+    if (error instanceof ReferralInvalidInputError || error instanceof ReferralEmailUpdateTooSoonError) {
       throw new InvalidRequestError(error.message)
     }
 
