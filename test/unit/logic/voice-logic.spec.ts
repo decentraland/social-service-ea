@@ -1,4 +1,5 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
+import { IAnalyticsComponent } from '@dcl/analytics-component'
 import { createVoiceComponent, IVoiceComponent, VoiceChatStatus } from '../../../src/logic/voice'
 import {
   UserAlreadyInVoiceChatError,
@@ -27,7 +28,6 @@ import { createSettingsMockedComponent } from '../../mocks/components/settings'
 import { ISettingsComponent } from '../../../src/logic/settings'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { PRIVATE_VOICE_CHAT_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
-import { IAnalyticsComponent } from '../../../src/logic/analytics'
 import { AnalyticsEventPayload } from '../../../src/types/analytics'
 
 const PRIVATE_VOICE_CHAT_EXPIRATION_BATCH_SIZE = 20
