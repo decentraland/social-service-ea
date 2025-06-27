@@ -18,9 +18,7 @@ describe('UWebSocketTransport', () => {
     WS_TRANSPORT_RETRY_DELAY_MS: 1000,
     WS_TRANSPORT_MAX_RETRY_ATTEMPTS: 5,
     WS_TRANSPORT_MAX_BACKOFF_DELAY_MS: 30000,
-    WS_MAX_BACKPRESSURE: 128 * 1024,
-    WS_TRANSPORT_CIRCUIT_BREAKER_THRESHOLD: 10,
-    WS_TRANSPORT_CIRCUIT_BREAKER_COOLDOWN_MS: 5000
+    WS_MAX_BACKPRESSURE: 128 * 1024
   }
 
   const mockMessage = new Uint8Array([1, 2, 3])
@@ -350,133 +348,6 @@ describe('UWebSocketTransport', () => {
     })
   })
 
-  describe('when handling circuit breaker', () => {
-    const circuitBreakerConfig = {
-      ...DEFAULT_CONFIG,
-      WS_TRANSPORT_CIRCUIT_BREAKER_THRESHOLD: 3,
-      WS_TRANSPORT_CIRCUIT_BREAKER_COOLDOWN_MS: 1000
-    }
-
-    let circuitBreakerTransport: Transport
-
-    beforeEach(async () => {
-      mockConfig.getNumber.mockImplementation(async (key) => circuitBreakerConfig[key] || null)
-
-      circuitBreakerTransport = await createUWebSocketTransport(mockSocket, mockEmitter, components)
-    })
-
-    afterEach(async () => {
-      if (circuitBreakerTransport) {
-        circuitBreakerTransport.close()
-        await jest.runAllTimersAsync()
-      }
-    })
-
-    it('should open circuit breaker after consecutive failures', async () => {
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
-
-      // Send messages to trigger circuit breaker
-      for (let i = 0; i < 3; i++) {
-        const promise = circuitBreakerTransport.sendMessage(mockMessage)
-        ;(promise as unknown as Promise<void>)?.catch(() => {})
-      }
-
-      await jest.advanceTimersByTimeAsync(0)
-
-      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_circuit_breaker_events', {
-        action: 'opened'
-      })
-    })
-
-    it('should reset circuit breaker on successful message', async () => {
-      mockSocket.send
-        .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
-        .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
-        .mockReturnValue(UWebSocketSendResult.SUCCESS)
-
-      // Send first two messages (failures)
-      for (let i = 0; i < 2; i++) {
-        const promise = circuitBreakerTransport.sendMessage(mockMessage)
-        ;(promise as unknown as Promise<void>)?.catch(() => {})
-      }
-
-      await jest.advanceTimersByTimeAsync(0)
-
-      // Send third message (success)
-      const successPromise = circuitBreakerTransport.sendMessage(mockMessage)
-      await jest.advanceTimersByTimeAsync(0)
-
-      await successPromise
-    })
-
-    it('should reset circuit breaker on backpressure result', async () => {
-      mockSocket.send
-        .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
-        .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
-        .mockReturnValue(UWebSocketSendResult.BACKPRESSURE)
-
-      // Send first two messages (failures)
-      for (let i = 0; i < 2; i++) {
-        const promise = circuitBreakerTransport.sendMessage(mockMessage)
-        ;(promise as unknown as Promise<void>)?.catch(() => {})
-      }
-
-      await jest.advanceTimersByTimeAsync(0)
-
-      // Send third message (backpressure) - this should resolve immediately
-      const backpressurePromise = circuitBreakerTransport.sendMessage(mockMessage)
-      await jest.advanceTimersByTimeAsync(0)
-
-      // The backpressure promise should resolve immediately
-      await expect(backpressurePromise).resolves.not.toThrow()
-    }, 10000) // Increase timeout for this test
-
-    it('should close circuit breaker after cooldown period', async () => {
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
-
-      // Send messages to trigger circuit breaker
-      for (let i = 0; i < 3; i++) {
-        const promise = circuitBreakerTransport.sendMessage(mockMessage)
-        ;(promise as unknown as Promise<void>)?.catch(() => {})
-      }
-
-      await jest.advanceTimersByTimeAsync(0)
-
-      // Advance timer to trigger cooldown reset
-      await jest.advanceTimersByTimeAsync(1000)
-
-      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_circuit_breaker_events', {
-        action: 'closed'
-      })
-    })
-
-    it('should resume processing after circuit breaker closes', async () => {
-      mockSocket.send
-        .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
-        .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
-        .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
-        .mockReturnValue(UWebSocketSendResult.SUCCESS)
-
-      // Send first three messages (failures)
-      for (let i = 0; i < 3; i++) {
-        const promise = circuitBreakerTransport.sendMessage(mockMessage)
-        ;(promise as unknown as Promise<void>)?.catch(() => {})
-      }
-
-      await jest.advanceTimersByTimeAsync(0)
-
-      // Send fourth message (should be queued during circuit breaker)
-      const fourthPromise = circuitBreakerTransport.sendMessage(mockMessage)
-      ;(fourthPromise as unknown as Promise<void>)?.catch(() => {})
-
-      // Advance timer to trigger cooldown reset
-      await jest.advanceTimersByTimeAsync(1000)
-
-      // Verify processing resumed
-      expect(mockSocket.send).toHaveBeenCalledWith(mockMessage, true)
-    })
-  })
-
   describe('when handling adaptive queue sizing', () => {
     describe('and maxBackpressure is null', () => {
       let noBackpressureTransport: Transport
@@ -588,33 +459,6 @@ describe('UWebSocketTransport', () => {
       transport.close()
 
       await expect(sendPromise).rejects.toThrow('Connection closed')
-    })
-
-    it('should clean up with circuit breaker timeout', async () => {
-      const circuitBreakerConfig = {
-        ...DEFAULT_CONFIG,
-        WS_TRANSPORT_CIRCUIT_BREAKER_THRESHOLD: 3,
-        WS_TRANSPORT_CIRCUIT_BREAKER_COOLDOWN_MS: 1000
-      }
-
-      mockConfig.getNumber.mockImplementation(async (key) => circuitBreakerConfig[key] || null)
-
-      const circuitBreakerTransport = await createUWebSocketTransport(mockSocket, mockEmitter, components)
-
-      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
-
-      // Send messages to trigger circuit breaker
-      for (let i = 0; i < 3; i++) {
-        const promise = circuitBreakerTransport.sendMessage(mockMessage)
-        ;(promise as unknown as Promise<void>)?.catch(() => {})
-      }
-
-      await jest.advanceTimersByTimeAsync(0)
-
-      circuitBreakerTransport.close()
-
-      // Test that cleanup occurred
-      expect(circuitBreakerTransport.isConnected).toBe(false)
     })
 
     it('should handle cleanup with null timeouts', () => {
