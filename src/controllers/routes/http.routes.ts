@@ -20,7 +20,8 @@ import {
   getCommunityPlacesHandler,
   addCommunityPlacesHandler,
   removeCommunityPlaceHandler,
-  updateCommunityHandler
+  updateCommunityHandler,
+  addReferralEmailHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
@@ -69,6 +70,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.post('/v1/referral-progress', signedFetchMiddleware(), createReferralHandler)
   router.patch('/v1/referral-progress', signedFetchMiddleware(), updateReferralSignedUpHandler)
   router.get('/v1/referral-progress', signedFetchMiddleware(), getInvitedUsersAcceptedHandler)
+  router.post('/v1/referral-email', signedFetchMiddleware(), addReferralEmailHandler)
 
   return router
 }

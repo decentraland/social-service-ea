@@ -1,11 +1,14 @@
 import SQL, { SQLStatement } from 'sql-template-strings'
 import { IPgComponent } from '@well-known-components/pg-component'
+import { randomUUID } from 'node:crypto'
 import {
   IReferralDatabaseComponent,
   ReferralProgress,
   ReferralProgressFilter,
   ReferralProgressStatus,
-  ReferralTierSeen
+  ReferralTierSeen,
+  ReferralEmail,
+  ReferralRewardImage
 } from '../types/referral-db.type'
 import { AppComponents } from '../types/system'
 
@@ -23,7 +26,7 @@ export async function createReferralDBComponent(
     const now = Date.now()
     const result = await pg.query<ReferralProgress>(
       SQL`INSERT INTO referral_progress (id, referrer, invited_user, status, created_at, updated_at)
-          VALUES (gen_random_uuid(), ${referralInput.referrer.toLowerCase()}, ${referralInput.invitedUser.toLowerCase()}, ${
+          VALUES (${randomUUID()}, ${referralInput.referrer.toLowerCase()}, ${referralInput.invitedUser.toLowerCase()}, ${
             ReferralProgressStatus.PENDING
           }, ${now}, ${now})
           RETURNING *`
@@ -130,6 +133,45 @@ export async function createReferralDBComponent(
     `)
   }
 
+  async function setReferralEmail(referralEmailInput: { referrer: string; email: string }): Promise<ReferralEmail> {
+    logger.debug(`Setting referral email for ${referralEmailInput.referrer} with email ${referralEmailInput.email}`)
+    const now = Date.now()
+    const result = await pg.query<ReferralEmail>(
+      SQL`INSERT INTO referral_emails (id, referrer, email, created_at, updated_at)
+          VALUES (${randomUUID()}, ${referralEmailInput.referrer.toLowerCase()}, ${referralEmailInput.email}, ${now}, ${now})
+          RETURNING *`
+    )
+    return result.rows[0]
+  }
+
+  async function setReferralRewardImage(referralRewardImageInput: {
+    referrer: string
+    rewardImageUrl: string
+    tier: number
+  }): Promise<ReferralRewardImage> {
+    logger.debug(
+      `Setting referral reward image for ${referralRewardImageInput.referrer} with tier ${referralRewardImageInput.tier}`
+    )
+    const now = Date.now()
+    const result = await pg.query<ReferralRewardImage>(
+      SQL`INSERT INTO referral_reward_images (id, referrer, reward_image_url, tier, created_at)
+          VALUES (${randomUUID()}, ${referralRewardImageInput.referrer.toLowerCase()}, ${referralRewardImageInput.rewardImageUrl}, ${referralRewardImageInput.tier}, ${now})
+          RETURNING *`
+    )
+    return result.rows[0]
+  }
+
+  async function getLastReferralEmailByReferrer(referrer: string): Promise<ReferralEmail | null> {
+    logger.debug('Getting last referral email by referrer', { referrer })
+    const result = await pg.query<ReferralEmail>(
+      SQL`SELECT * FROM referral_emails 
+          WHERE referrer = ${referrer.toLowerCase()} 
+          ORDER BY updated_at DESC 
+          LIMIT 1`
+    )
+    return result.rows[0] || null
+  }
+
   return {
     createReferral,
     findReferralProgress,
@@ -138,6 +180,9 @@ export async function createReferralDBComponent(
     listAllReferralProgress,
     countAcceptedInvitesByReferrer,
     getLastViewedProgressByReferrer,
-    setLastViewedProgressByReferrer
+    setLastViewedProgressByReferrer,
+    setReferralEmail,
+    setReferralRewardImage,
+    getLastReferralEmailByReferrer
   }
 }
