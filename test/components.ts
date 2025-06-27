@@ -11,6 +11,7 @@ import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createLogComponent } from '@well-known-components/logger'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
 import { createFetchComponent } from '@well-known-components/fetch-component'
+import { createAnalyticsComponent } from '@dcl/analytics-component'
 import { createPgComponent } from '../src/adapters/pg'
 
 import { main } from '../src/service'
@@ -55,7 +56,6 @@ import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
 import { createStorageHelper } from './integration/utils/storage'
 import { createUpdateHandlerComponent } from '../src/logic/updates'
-import { createAnalyticsComponent } from '../src/logic/analytics'
 import { AnalyticsEventPayload } from '../src/types/analytics'
 
 /**

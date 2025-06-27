@@ -8,6 +8,7 @@ import type {
 import { metricDeclarations } from '../metrics'
 import { IUWsComponent } from '@well-known-components/uws-http-server'
 import { INatsComponent } from '@well-known-components/nats-component/dist/types'
+import { IAnalyticsComponent } from '@dcl/analytics-component'
 import {
   IFriendsDatabaseComponent,
   IRPCServerComponent,
@@ -50,7 +51,6 @@ import { IQueueComponent } from './sqs.type'
 import { IMessageProcessorComponent, IMessageConsumerComponent } from '../logic/sqs'
 import { IPeersStatsComponent } from '../logic/peers-stats'
 import { IJobComponent } from '../logic/job'
-import { IAnalyticsComponent } from '../logic/analytics'
 import { AnalyticsEventPayload } from './analytics'
 
 export type GlobalContext = {
