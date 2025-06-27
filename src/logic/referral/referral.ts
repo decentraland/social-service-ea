@@ -1,4 +1,4 @@
-import { ReferralProgressStatus } from '../../types/referral-db.type'
+import { ReferralEmail, ReferralProgressStatus } from '../../types/referral-db.type'
 import { EthAddress, Events, ReferralInvitedUsersAcceptedEvent, ReferralNewTierReachedEvent } from '@dcl/schemas'
 import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 import {
@@ -6,9 +6,10 @@ import {
   ReferralInvalidInputError,
   ReferralAlreadyExistsError,
   ReferralInvalidStatusError,
-  SelfReferralError
+  SelfReferralError,
+  ReferralEmailUpdateTooSoonError
 } from './errors'
-import type { IReferralComponent, RewardAttributes } from './types'
+import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput } from './types'
 import type { AppComponents } from '../../types/system'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75, 100]
@@ -181,6 +182,84 @@ export async function createReferralComponent(
         invitedUsersAccepted,
         invitedUsersAcceptedViewed
       }
+    },
+
+    setReferralEmail: async (referralEmailInput: Pick<ReferralEmail, 'referrer' | 'email'>) => {
+      const referrer = validateAddress(referralEmailInput.referrer, 'referrer')
+
+      if (!referralEmailInput.email || !referralEmailInput.email.trim()) {
+        throw new ReferralInvalidInputError('Email is required')
+      }
+
+      const email = referralEmailInput.email.trim().toLowerCase()
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        throw new ReferralInvalidInputError('Invalid email format')
+      }
+
+      // Check if user has updated email in the last 24 hours
+      const lastEmailRecord = await referralDb.getLastReferralEmailByReferrer(referrer)
+      if (lastEmailRecord) {
+        const now = Date.now()
+        const lastUpdate = lastEmailRecord.updated_at
+        const twentyFourHoursInMs = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+
+        if (now - lastUpdate < twentyFourHoursInMs) {
+          throw new ReferralEmailUpdateTooSoonError(referrer)
+        }
+      }
+
+      logger.info('Setting referral email', {
+        referrer,
+        email
+      })
+
+      const referralEmail = await referralDb.setReferralEmail({ referrer, email })
+
+      logger.info('Referral email set successfully', {
+        referrer,
+        email
+      })
+
+      return referralEmail
+    },
+
+    setReferralRewardImage: async (referralRewardImageInput: SetReferralRewardImageInput) => {
+      const referrer = validateAddress(referralRewardImageInput.referrer, 'referrer')
+
+      if (!referralRewardImageInput.rewardImageUrl || !referralRewardImageInput.rewardImageUrl.trim()) {
+        throw new ReferralInvalidInputError('Reward image URL is required')
+      }
+
+      const rewardImageUrl = referralRewardImageInput.rewardImageUrl.trim()
+      const urlRegex = /^https?:\/\/.+/
+      if (!urlRegex.test(rewardImageUrl)) {
+        throw new ReferralInvalidInputError('Invalid reward image URL format')
+      }
+
+      if (!Number.isInteger(referralRewardImageInput.tier) || referralRewardImageInput.tier <= 0) {
+        throw new ReferralInvalidInputError('Tier must be a positive integer')
+      }
+
+      logger.info('Setting referral reward image', {
+        referrer,
+        rewardImageUrl,
+        tier: referralRewardImageInput.tier
+      })
+
+      const referralRewardImage = await referralDb.setReferralRewardImage({
+        referrer,
+        rewardImageUrl,
+        tier: referralRewardImageInput.tier
+      })
+
+      logger.info('Referral reward image set successfully', {
+        referrer,
+        rewardImageUrl,
+        tier: referralRewardImageInput.tier
+      })
+
+      return referralRewardImage
     }
   }
 }
