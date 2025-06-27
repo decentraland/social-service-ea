@@ -113,8 +113,7 @@ describe('UWebSocketTransport', () => {
 
     it('should handle close event from uServerEmitter', () => {
       const closeEvent = { code: 1006, reason: 'Connection abnormally closed' }
-      // The uServerEmitter emits close events with separate parameters, not as an object
-      ;(mockEmitter.emit as any)('close', closeEvent)
+      mockEmitter.emit('close', closeEvent)
 
       expect(closeListener).toHaveBeenCalledWith(closeEvent)
       expect(transport.isConnected).toBe(false)
@@ -283,10 +282,8 @@ describe('UWebSocketTransport', () => {
         ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
         await jest.advanceTimersByTimeAsync(0)
 
-        // The message should remain in queue and not be processed further
         expect(mockSocket.send).toHaveBeenCalledTimes(1)
 
-        // Clean up
         mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
         await jest.runAllTimersAsync()
       })

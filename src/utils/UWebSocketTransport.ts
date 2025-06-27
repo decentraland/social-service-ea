@@ -388,7 +388,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     // Reset circuit breaker state
     consecutiveFailures = 0
 
-    // Reject all queued messages
+    // Reject all queued messages and clear the queue
     while (messageQueue.length > 0) {
       const item = messageQueue.shift()
       if (item) {
@@ -400,7 +400,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     uServerEmitter.off('close', handleClose)
   }
 
-  function handleClose(payload: { code: number; reason: string }) {
+  function handleClose(payload: { code: number; reason: string } = { code: 1000, reason: '' }) {
     const { code, reason } = payload
     cleanup(code, reason)
     events.emit('close', { code, reason })
@@ -413,11 +413,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
   uServerEmitter.on('close', handleClose)
   uServerEmitter.on('message', handleMessage)
-
-  events.on('error', () => {
-    uServerEmitter.off('message', handleMessage)
-    uServerEmitter.off('close', handleClose)
-  })
 
   const api: Transport = {
     ...events,
