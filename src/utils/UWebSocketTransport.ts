@@ -51,19 +51,29 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   const logger = logs.getLogger('ws-transport')
   const transportId = randomUUID()
 
-  // Get configuration values
-  const baseMaxQueueSize = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')) || 1000
-  const minQueueSize = (await config.getNumber('WS_TRANSPORT_MIN_QUEUE_SIZE')) || 100
-  const maxQueueSizeLimit = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE_LIMIT')) || 5000
-  const estimatedMessageSize = (await config.getNumber('WS_TRANSPORT_ESTIMATED_MESSAGE_SIZE')) || 1024 // 1KB default
-  const retryDelayMs = (await config.getNumber('WS_TRANSPORT_RETRY_DELAY_MS')) || 1000
-  const maxRetryAttempts = (await config.getNumber('WS_TRANSPORT_MAX_RETRY_ATTEMPTS')) || 5
-  const maxBackoffDelayMs = (await config.getNumber('WS_TRANSPORT_MAX_BACKOFF_DELAY_MS')) || 30000 // 30 seconds maximum delay
-  const maxBackpressure = (await config.getNumber('WS_MAX_BACKPRESSURE')) || 128 * 1024 // should be adjusted based on metrics
-
-  // Circuit breaker configuration
-  const circuitBreakerThreshold = (await config.getNumber('WS_TRANSPORT_CIRCUIT_BREAKER_THRESHOLD')) || 10
-  const circuitBreakerCooldownMs = (await config.getNumber('WS_TRANSPORT_CIRCUIT_BREAKER_COOLDOWN_MS')) || 5000
+  const [
+    baseMaxQueueSize = 1000,
+    minQueueSize = 100,
+    maxQueueSizeLimit = 5000,
+    estimatedMessageSize = 1024,
+    retryDelayMs = 1000,
+    maxRetryAttempts = 5,
+    maxBackoffDelayMs = 30000,
+    maxBackpressure = 128 * 1024,
+    circuitBreakerThreshold = 10,
+    circuitBreakerCooldownMs = 5000
+  ] = await Promise.all([
+    config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE'),
+    config.getNumber('WS_TRANSPORT_MIN_QUEUE_SIZE'),
+    config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE_LIMIT'),
+    config.getNumber('WS_TRANSPORT_ESTIMATED_MESSAGE_SIZE'),
+    config.getNumber('WS_TRANSPORT_RETRY_DELAY_MS'),
+    config.getNumber('WS_TRANSPORT_MAX_RETRY_ATTEMPTS'),
+    config.getNumber('WS_TRANSPORT_MAX_BACKOFF_DELAY_MS'),
+    config.getNumber('WS_MAX_BACKPRESSURE'),
+    config.getNumber('WS_TRANSPORT_CIRCUIT_BREAKER_THRESHOLD'),
+    config.getNumber('WS_TRANSPORT_CIRCUIT_BREAKER_COOLDOWN_MS')
+  ])
 
   // Calculate adaptive queue size based on backpressure buffer
   const adaptiveQueueSize = maxBackpressure
