@@ -57,6 +57,8 @@ export type GlobalContext = {
   components: BaseComponents
 }
 
+export type MetricsDeclaration = keyof typeof metricDeclarations
+
 // components used in every environment
 export type BaseComponents = {
   archipelagoStats: IArchipelagoStatsComponent
@@ -76,7 +78,7 @@ export type BaseComponents = {
   logs: ILoggerComponent
   messageProcessor: IMessageProcessorComponent
   messageConsumer: IMessageConsumerComponent
-  metrics: IMetricsComponent<keyof typeof metricDeclarations>
+  metrics: IMetricsComponent<MetricsDeclaration>
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
   peersStats: IPeersStatsComponent
