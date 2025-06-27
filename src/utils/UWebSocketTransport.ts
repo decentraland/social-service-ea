@@ -113,8 +113,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     try {
       const bufferedAmount = socket.getBufferedAmount()
       if (bufferedAmount > 0) {
-        const ratio = messageQueue.length / (bufferedAmount / 1024)
-        metrics.observe('ws_queue_vs_backpressure_ratio', { transport_id: transportId }, ratio)
+        const ratio = messageQueue.length / (bufferedAmount / estimatedMessageSize)
+        metrics.observe('ws_queue_vs_backpressure_ratio', {}, ratio)
       }
     } catch (error) {
       // Silently fail if getBufferedAmount is not available
@@ -237,8 +237,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
             })
 
             metrics.increment('ws_circuit_breaker_events', {
-              action: 'opened',
-              transport_id: transportId
+              action: 'opened'
             })
 
             // Stop processing queue temporarily
@@ -251,8 +250,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
               logger.debug('Circuit breaker reset after cooldown', { transportId })
 
               metrics.increment('ws_circuit_breaker_events', {
-                action: 'closed',
-                transport_id: transportId
+                action: 'closed'
               })
 
               // Resume processing

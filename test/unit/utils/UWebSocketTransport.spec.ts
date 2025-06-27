@@ -856,11 +856,7 @@ describe('UWebSocketTransport', () => {
       await jest.advanceTimersByTimeAsync(0)
 
       // Verify the ratio tracking was called
-      expect(mockMetrics.observe).toHaveBeenCalledWith(
-        'ws_queue_vs_backpressure_ratio',
-        { transport_id: expect.any(String) },
-        expect.any(Number)
-      )
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_queue_vs_backpressure_ratio', {}, expect.any(Number))
 
       await sendPromise
     })
@@ -923,8 +919,7 @@ describe('UWebSocketTransport', () => {
       )
 
       expect(mockMetrics.increment).toHaveBeenCalledWith('ws_circuit_breaker_events', {
-        action: 'opened',
-        transport_id: expect.any(String)
+        action: 'opened'
       })
     })
 
@@ -1010,8 +1005,7 @@ describe('UWebSocketTransport', () => {
       )
 
       expect(mockMetrics.increment).toHaveBeenCalledWith('ws_circuit_breaker_events', {
-        action: 'closed',
-        transport_id: expect.any(String)
+        action: 'closed'
       })
     })
 
