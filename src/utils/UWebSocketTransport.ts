@@ -56,9 +56,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     retryDelayMs = 1000,
     maxRetryAttempts = 5,
     maxBackoffDelayMs = 30000,
-    maxBackpressure = 128 * 1024,
-    circuitBreakerThreshold = 10,
-    circuitBreakerCooldownMs = 5000
+    maxBackpressure = 128 * 1024
   ] = await Promise.all([
     config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE'),
     config.getNumber('WS_TRANSPORT_MIN_QUEUE_SIZE'),
@@ -67,9 +65,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     config.getNumber('WS_TRANSPORT_RETRY_DELAY_MS'),
     config.getNumber('WS_TRANSPORT_MAX_RETRY_ATTEMPTS'),
     config.getNumber('WS_TRANSPORT_MAX_BACKOFF_DELAY_MS'),
-    config.getNumber('WS_MAX_BACKPRESSURE'),
-    config.getNumber('WS_TRANSPORT_CIRCUIT_BREAKER_THRESHOLD'),
-    config.getNumber('WS_TRANSPORT_CIRCUIT_BREAKER_COOLDOWN_MS')
+    config.getNumber('WS_MAX_BACKPRESSURE')
   ])
 
   // Calculate adaptive queue size based on backpressure buffer
@@ -88,17 +84,11 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     maxBackpressure: maxBackpressure || 'not configured',
     estimatedMessageSize,
     minQueueSize,
-    maxQueueSizeLimit,
-    circuitBreakerThreshold,
-    circuitBreakerCooldownMs
+    maxQueueSizeLimit
   })
 
   let isTransportActive = true
   let isInitialized = false
-
-  // Circuit breaker state
-  let consecutiveFailures = 0
-  let circuitBreakerTimeout: NodeJS.Timeout | null = null
 
   // Simple queue for messages that couldn't be sent immediately
   const messageQueue: Array<{
@@ -209,21 +199,11 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
 
       switch (result) {
         case UWebSocketSendResult.SUCCESS:
-          // Reset circuit breaker on success
-          if (consecutiveFailures > 0) {
-            consecutiveFailures = 0
-            logger.debug('Circuit breaker reset on successful message', { transportId })
-          }
           item.future.resolve()
           messageQueue.shift()
           break
 
         case UWebSocketSendResult.BACKPRESSURE:
-          // Reset circuit breaker on backpressure (this is normal behavior)
-          if (consecutiveFailures > 0) {
-            consecutiveFailures = 0
-            logger.debug('Circuit breaker reset on backpressure', { transportId })
-          }
           metrics.increment('ws_backpressure_events', { result: 'backpressure' })
           // Message is already queued by the underlying library, no need to retry
           item.future.resolve()
@@ -231,49 +211,12 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
           break
 
         case UWebSocketSendResult.DROPPED:
-          // Increment consecutive failures for circuit breaker
-          consecutiveFailures++
-
-          // Check if circuit breaker should open
-          if (consecutiveFailures >= circuitBreakerThreshold) {
-            logger.warn('Circuit breaker opened due to consecutive failures', {
-              transportId,
-              consecutiveFailures,
-              threshold: circuitBreakerThreshold,
-              cooldownMs: circuitBreakerCooldownMs
-            })
-
-            metrics.increment('ws_circuit_breaker_events', {
-              action: 'opened'
-            })
-
-            // Stop processing queue temporarily
-            isProcessing = false
-
-            // Schedule circuit breaker reset
-            circuitBreakerTimeout = setTimeout(() => {
-              consecutiveFailures = 0
-              circuitBreakerTimeout = null
-              logger.debug('Circuit breaker reset after cooldown', { transportId })
-
-              metrics.increment('ws_circuit_breaker_events', {
-                action: 'closed'
-              })
-
-              // Resume processing
-              void processQueue()
-            }, circuitBreakerCooldownMs)
-
-            return result
-          }
-
           // Message was dropped by the underlying library due to maxBackpressure limit.
           // We should retry this message with exponential backoff
           logger.warn('Message dropped due to backpressure limit, will retry', {
             transportId,
             messageSize: item.message.byteLength,
-            attempts: item.attempts,
-            consecutiveFailures
+            attempts: item.attempts
           })
           metrics.increment('ws_backpressure_events', { result: 'dropped' })
           item.attempts++ // Increment attempts to enable exponential backoff
@@ -387,14 +330,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       clearTimeout(processingTimeout)
       processingTimeout = null
     }
-
-    if (circuitBreakerTimeout) {
-      clearTimeout(circuitBreakerTimeout)
-      circuitBreakerTimeout = null
-    }
-
-    // Reset circuit breaker state
-    consecutiveFailures = 0
 
     // Reject all queued messages and clear the queue
     while (messageQueue.length > 0) {
