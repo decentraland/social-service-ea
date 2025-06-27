@@ -400,7 +400,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     uServerEmitter.off('close', handleClose)
   }
 
-  function handleClose(code: number = 1000, reason: string = '') {
+  function handleClose(payload: { code: number; reason: string }) {
+    const { code, reason } = payload
     cleanup(code, reason)
     events.emit('close', { code, reason })
   }
