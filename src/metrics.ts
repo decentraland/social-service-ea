@@ -87,6 +87,11 @@ export const metricDeclarations = {
     type: IMetricsComponent.GaugeType,
     help: 'Ratio of message queue size to uWebSocket buffered amount',
     labelNames: ['transport_id']
+  },
+  ws_circuit_breaker_events: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of circuit breaker events (opened/closed)',
+    labelNames: ['action', 'transport_id']
   }
 }
 
