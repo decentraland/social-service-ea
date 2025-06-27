@@ -60,7 +60,7 @@ describe('ws-pool-component', () => {
       expect(mockSetInterval).toHaveBeenCalledWith(expect.any(Function), 60000)
     })
 
-    it('should handle idle timeout cleanup', async () => {
+    it('should handle idle timeout cleanup and update metrics when connections are cleaned', async () => {
       const cleanupFn = mockSetInterval.mock.calls[0][0]
       const mockIterator = ['ws:conn:test-1', 'ws:conn:test-2'][Symbol.iterator]()
       mockRedisClient.scanIterator.mockReturnValue(mockIterator)
@@ -68,6 +68,9 @@ describe('ws-pool-component', () => {
       mockRedis.get
         .mockResolvedValueOnce({ lastActivity: Date.now() - 400000 })
         .mockResolvedValueOnce({ lastActivity: Date.now() - 100000 })
+
+      // Mock getActiveConnections to return 1 after cleanup (since one connection was cleaned)
+      mockRedisClient.sCard.mockResolvedValueOnce(1)
 
       await cleanupFn()
 
@@ -77,6 +80,28 @@ describe('ws-pool-component', () => {
 
       expect(mockRedisClient.multi().del).not.toHaveBeenCalledWith('ws:conn:test-2')
       expect(mockRedisClient.multi().sRem).not.toHaveBeenCalledWith('ws:conn_ids', 'test-2')
+
+      // Should update metrics after cleanup since connections were cleaned
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, 1)
+    })
+
+    it('should not update metrics when no connections are cleaned up', async () => {
+      const cleanupFn = mockSetInterval.mock.calls[0][0]
+
+      const mockIterator = ['ws:conn:test-1'][Symbol.iterator]()
+      mockRedisClient.scanIterator.mockReturnValue(mockIterator)
+      mockRedis.get.mockResolvedValueOnce({ lastActivity: Date.now() - 100000 }) // Not idle
+
+      await cleanupFn()
+
+      expect(mockRedisClient.multi().del).not.toHaveBeenCalled()
+      expect(mockRedisClient.multi().sRem).not.toHaveBeenCalled()
+      expect(mockMetrics.increment).not.toHaveBeenCalled()
+      expect(mockMetrics.observe).not.toHaveBeenCalledWith(
+        'ws_active_connections',
+        { type: 'total' },
+        expect.any(Number)
+      )
     })
 
     it('should handle null data in cleanup', async () => {
@@ -91,6 +116,11 @@ describe('ws-pool-component', () => {
       expect(mockRedisClient.multi().del).not.toHaveBeenCalled()
       expect(mockRedisClient.multi().sRem).not.toHaveBeenCalled()
       expect(mockMetrics.increment).not.toHaveBeenCalled()
+      expect(mockMetrics.observe).not.toHaveBeenCalledWith(
+        'ws_active_connections',
+        { type: 'total' },
+        expect.any(Number)
+      )
     })
 
     it('should handle invalid JSON in cleanup', async () => {
@@ -105,6 +135,11 @@ describe('ws-pool-component', () => {
       expect(mockRedisClient.multi().del).not.toHaveBeenCalled()
       expect(mockRedisClient.multi().sRem).not.toHaveBeenCalled()
       expect(mockMetrics.increment).not.toHaveBeenCalled()
+      expect(mockMetrics.observe).not.toHaveBeenCalledWith(
+        'ws_active_connections',
+        { type: 'total' },
+        expect.any(Number)
+      )
     })
   })
 
@@ -116,7 +151,10 @@ describe('ws-pool-component', () => {
 
     jest.spyOn(Date, 'now').mockReturnValue(now)
 
-    it('should acquire new connection with correct Redis operations', async () => {
+    it('should acquire new connection with correct Redis operations and update metrics', async () => {
+      // Mock getActiveConnections to return 1 after acquisition
+      mockRedisClient.sCard.mockResolvedValueOnce(1)
+
       await wsPool.acquireConnection(testId)
 
       expect(mockRedisClient.multi).toHaveBeenCalled()
@@ -127,7 +165,7 @@ describe('ws-pool-component', () => {
         EX: Math.ceil(300000 / 1000)
       })
       expect(multiChain.sAdd).toHaveBeenCalledWith('ws:conn_ids', testId)
-      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, expect.any(Number))
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, 1)
     })
 
     it('should handle transaction failure', async () => {
@@ -149,21 +187,26 @@ describe('ws-pool-component', () => {
   })
 
   describe('releaseConnection', () => {
-    it('should release existing connection', async () => {
+    it('should release existing connection and update metrics immediately', async () => {
+      // Mock getActiveConnections to return 0 after release
+      mockRedisClient.sCard.mockResolvedValueOnce(0)
+
       await wsPool.releaseConnection('test-1')
       expect(mockRedisClient.multi().del).toHaveBeenCalledWith('ws:conn:test-1')
       expect(mockRedisClient.multi().sRem).toHaveBeenCalledWith('ws:conn_ids', 'test-1')
+      // Should update ws_active_connections metric immediately after release
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, 0)
     })
 
-    it('should update total connections and duration metrics after release', async () => {
+    it('should track connection duration metrics after release', async () => {
       const now = Date.now()
       mockRedis.get.mockResolvedValueOnce({ startTime: now - 10000, lastActivity: now - 5000 })
-      mockRedisClient.sCard.mockResolvedValue(0)
+      mockRedisClient.sCard.mockResolvedValueOnce(0)
 
       await wsPool.releaseConnection('test-1')
 
-      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, 0)
       expect(mockMetrics.observe).toHaveBeenCalledWith('ws_connection_duration_seconds', {}, expect.any(Number))
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, 0)
     })
   })
 
@@ -201,15 +244,20 @@ describe('ws-pool-component', () => {
   })
 
   describe('cleanup', () => {
-    it('should cleanup all connections and clear interval', async () => {
+    it('should cleanup all connections, clear interval, and update metrics', async () => {
       const mockIterator = ['ws:conn:test-1', 'ws:conn:test-2'][Symbol.iterator]()
       mockRedisClient.scanIterator.mockReturnValue(mockIterator as any)
+
+      // Mock getActiveConnections to return 0 after cleanup
+      mockRedisClient.sCard.mockResolvedValueOnce(0)
 
       await wsPool.cleanup()
 
       expect(mockRedisClient.multi().del).toHaveBeenCalledTimes(2)
       expect(mockRedisClient.multi().sRem).toHaveBeenCalledTimes(2)
       expect(mockClearInterval).toHaveBeenCalled()
+      // Should update metrics after cleanup (initial state reporting)
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', { type: 'total' }, 0)
     })
   })
 })
