@@ -37,6 +37,8 @@ export interface IUWebSocket<T extends { isConnected: boolean; auth?: boolean }>
   close(): void
 
   getUserData(): T
+
+  getBufferedAmount(): number
 }
 
 export async function createUWebSocketTransport<T extends { isConnected: boolean; auth?: boolean }>(
@@ -49,10 +51,34 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   const logger = logs.getLogger('ws-transport')
   const transportId = randomUUID()
 
-  const maxQueueSize = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')) || 1000
+  // Get configuration values
+  const baseMaxQueueSize = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE')) || 1000
+  const minQueueSize = (await config.getNumber('WS_TRANSPORT_MIN_QUEUE_SIZE')) || 100
+  const maxQueueSizeLimit = (await config.getNumber('WS_TRANSPORT_MAX_QUEUE_SIZE_LIMIT')) || 5000
+  const estimatedMessageSize = (await config.getNumber('WS_TRANSPORT_ESTIMATED_MESSAGE_SIZE')) || 1024 // 1KB default
   const retryDelayMs = (await config.getNumber('WS_TRANSPORT_RETRY_DELAY_MS')) || 1000
   const maxRetryAttempts = (await config.getNumber('WS_TRANSPORT_MAX_RETRY_ATTEMPTS')) || 5
   const maxBackoffDelayMs = (await config.getNumber('WS_TRANSPORT_MAX_BACKOFF_DELAY_MS')) || 30000 // 30 seconds maximum delay
+  const maxBackpressure = (await config.getNumber('WS_MAX_BACKPRESSURE')) || 128 * 1024 // should be adjusted based on metrics
+
+  // Calculate adaptive queue size based on backpressure buffer
+  const adaptiveQueueSize = maxBackpressure
+    ? Math.max(minQueueSize, Math.min(maxQueueSizeLimit, Math.ceil(maxBackpressure / estimatedMessageSize)))
+    : baseMaxQueueSize
+
+  // Use the smaller of baseMaxQueueSize or adaptiveQueueSize to be conservative
+  const maxQueueSize = Math.min(baseMaxQueueSize, adaptiveQueueSize)
+
+  logger.debug('Queue size configuration', {
+    transportId,
+    baseMaxQueueSize,
+    adaptiveQueueSize,
+    finalMaxQueueSize: maxQueueSize,
+    maxBackpressure: maxBackpressure || 'not configured',
+    estimatedMessageSize,
+    minQueueSize,
+    maxQueueSizeLimit
+  })
 
   let isTransportActive = true
   let isInitialized = false
@@ -71,6 +97,19 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     message: Uint8Array
     future: IFuture<void>
     attempts: number
+  }
+
+  function trackQueueVsBackpressureRatio() {
+    try {
+      const bufferedAmount = socket.getBufferedAmount()
+      if (bufferedAmount > 0) {
+        const ratio = messageQueue.length / (bufferedAmount / 1024)
+        metrics.observe('ws_queue_vs_backpressure_ratio', { transport_id: transportId }, ratio)
+      }
+    } catch (error) {
+      // Silently fail if getBufferedAmount is not available
+      logger.debug('Could not track queue vs backpressure ratio', { transportId, error: (error as Error).message })
+    }
   }
 
   async function processQueue() {
@@ -126,6 +165,9 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   function processNextMessage(item: QueuedMessage): UWebSocketSendResult {
     try {
       const result = socket.send(item.message, true)
+
+      // Track queue vs backpressure ratio for monitoring
+      trackQueueVsBackpressureRatio()
 
       // Only record metrics for known results
       if (

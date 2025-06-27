@@ -82,6 +82,11 @@ export const metricDeclarations = {
     help: 'Size of WebSocket messages in bytes',
     labelNames: ['result'], // 'success', 'backpressure', or 'dropped'
     buckets: [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
+  },
+  ws_queue_vs_backpressure_ratio: {
+    type: IMetricsComponent.GaugeType,
+    help: 'Ratio of message queue size to uWebSocket buffered amount',
+    labelNames: ['transport_id']
   }
 }
 

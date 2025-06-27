@@ -20,9 +20,13 @@ describe('UWebSocketTransport', () => {
       async (key) =>
         ({
           WS_TRANSPORT_MAX_QUEUE_SIZE: 3,
+          WS_TRANSPORT_MIN_QUEUE_SIZE: 1,
+          WS_TRANSPORT_MAX_QUEUE_SIZE_LIMIT: 10,
+          WS_TRANSPORT_ESTIMATED_MESSAGE_SIZE: 1024,
           WS_TRANSPORT_RETRY_DELAY_MS: 1000,
           WS_TRANSPORT_MAX_RETRY_ATTEMPTS: 5,
-          WS_TRANSPORT_MAX_BACKOFF_DELAY_MS: 30000
+          WS_TRANSPORT_MAX_BACKOFF_DELAY_MS: 30000,
+          WS_MAX_BACKPRESSURE: 128 * 1024
         })[key] || null
     )
 
@@ -31,7 +35,8 @@ describe('UWebSocketTransport', () => {
       send: jest.fn().mockReturnValue(UWebSocketSendResult.SUCCESS),
       close: jest.fn(),
       end: jest.fn(),
-      getUserData: jest.fn().mockReturnValue({ isConnected: true })
+      getUserData: jest.fn().mockReturnValue({ isConnected: true }),
+      getBufferedAmount: jest.fn().mockReturnValue(0)
     } as jest.Mocked<IUWebSocket<{ isConnected: boolean }>>
 
     // Initialize event emitter and transport
@@ -702,6 +707,162 @@ describe('UWebSocketTransport', () => {
       // Ensure timer doesn't fire later
       await jest.advanceTimersByTimeAsync(5000)
       expect(mockSocket.send).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('Adaptive Queue Sizing', () => {
+    describe.each([
+      {
+        maxBackpressure: 64 * 1024,
+        expectedQueueSize: 10,
+        description: '64KB backpressure limited by maxQueueSizeLimit'
+      },
+      {
+        maxBackpressure: 128 * 1024,
+        expectedQueueSize: 10,
+        description: '128KB backpressure limited by maxQueueSizeLimit'
+      },
+      {
+        maxBackpressure: 256 * 1024,
+        expectedQueueSize: 10,
+        description: '256KB backpressure limited by maxQueueSizeLimit'
+      }
+    ])('with $description', ({ maxBackpressure, expectedQueueSize }) => {
+      let testTransport: Transport
+      let testConfig: any
+
+      beforeEach(async () => {
+        // Mock config for this specific test case
+        testConfig = {
+          getNumber: jest.fn().mockImplementation(
+            async (key) =>
+              ({
+                WS_TRANSPORT_MAX_QUEUE_SIZE: 3,
+                WS_TRANSPORT_MIN_QUEUE_SIZE: 1,
+                WS_TRANSPORT_MAX_QUEUE_SIZE_LIMIT: 10,
+                WS_TRANSPORT_ESTIMATED_MESSAGE_SIZE: 1024,
+                WS_TRANSPORT_RETRY_DELAY_MS: 1000,
+                WS_TRANSPORT_MAX_RETRY_ATTEMPTS: 5,
+                WS_TRANSPORT_MAX_BACKOFF_DELAY_MS: 30000,
+                WS_MAX_BACKPRESSURE: maxBackpressure
+              })[key] || null
+          )
+        }
+
+        testTransport = await createUWebSocketTransport(mockSocket, mockEmitter, testConfig, mockLogs, mockMetrics)
+      })
+
+      afterEach(async () => {
+        if (testTransport) {
+          testTransport.close()
+          await jest.runAllTimersAsync()
+        }
+      })
+
+      it('should respect the calculated queue size limit', async () => {
+        // Send messages to fill the queue
+        const messages = Array(expectedQueueSize + 1).fill(new Uint8Array([1]))
+        mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
+
+        // Fill the queue to its limit
+        for (let i = 0; i < expectedQueueSize; i++) {
+          const promise = testTransport.sendMessage(messages[i])
+          ;(promise as unknown as Promise<void>)?.catch(() => {})
+        }
+
+        await jest.advanceTimersByTimeAsync(0)
+
+        // The next message should trigger queue size limit error
+        const errorListener = jest.fn()
+        testTransport.on('error', errorListener)
+
+        testTransport.sendMessage(messages[expectedQueueSize])
+
+        expect(errorListener).toHaveBeenCalledWith(new Error('Message queue size limit reached'))
+      })
+
+      it('should allow messages when queue is not full', async () => {
+        mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
+
+        // Send a message when queue is empty
+        const message = new Uint8Array([1])
+        const sendPromise = testTransport.sendMessage(message)
+
+        await jest.advanceTimersByTimeAsync(0)
+
+        await expect(sendPromise).resolves.not.toThrow()
+        expect(mockSocket.send).toHaveBeenCalledWith(message, true)
+      })
+    })
+
+    describe('when adaptive queue size is smaller than base queue size', () => {
+      let testTransport: Transport
+      let testConfig: any
+
+      beforeEach(async () => {
+        // Mock config where adaptive queue size (2) is smaller than base queue size (10)
+        testConfig = {
+          getNumber: jest.fn().mockImplementation(
+            async (key) =>
+              ({
+                WS_TRANSPORT_MAX_QUEUE_SIZE: 10, // Base queue size
+                WS_TRANSPORT_MIN_QUEUE_SIZE: 1,
+                WS_TRANSPORT_MAX_QUEUE_SIZE_LIMIT: 100,
+                WS_TRANSPORT_ESTIMATED_MESSAGE_SIZE: 1024,
+                WS_TRANSPORT_RETRY_DELAY_MS: 1000,
+                WS_TRANSPORT_MAX_RETRY_ATTEMPTS: 5,
+                WS_TRANSPORT_MAX_BACKOFF_DELAY_MS: 30000,
+                WS_MAX_BACKPRESSURE: 2 * 1024 // 2KB backpressure = 2 messages
+              })[key] || null
+          )
+        }
+
+        testTransport = await createUWebSocketTransport(mockSocket, mockEmitter, testConfig, mockLogs, mockMetrics)
+      })
+
+      afterEach(async () => {
+        testTransport.close()
+        await jest.runAllTimersAsync()
+      })
+
+      it('should use the adaptive queue size (2) instead of base queue size (10)', async () => {
+        const messages = Array(3).fill(new Uint8Array([1])) // 3 messages to exceed limit of 2
+        mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
+
+        // Fill the queue to its adaptive limit (2)
+        for (let i = 0; i < 2; i++) {
+          const promise = testTransport.sendMessage(messages[i])
+          ;(promise as unknown as Promise<void>)?.catch(() => {})
+        }
+
+        await jest.advanceTimersByTimeAsync(0)
+
+        // The third message should trigger queue size limit error
+        const errorListener = jest.fn()
+        testTransport.on('error', errorListener)
+
+        testTransport.sendMessage(messages[2])
+
+        expect(errorListener).toHaveBeenCalledWith(new Error('Message queue size limit reached'))
+      })
+    })
+
+    it('should track queue vs backpressure ratio', async () => {
+      const message = new Uint8Array([1])
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
+      mockSocket.getBufferedAmount.mockReturnValue(2048) // 2KB buffered
+
+      const sendPromise = transport.sendMessage(message)
+      await jest.advanceTimersByTimeAsync(0)
+
+      // Verify the ratio tracking was called
+      expect(mockMetrics.observe).toHaveBeenCalledWith(
+        'ws_queue_vs_backpressure_ratio',
+        { transport_id: expect.any(String) },
+        expect.any(Number)
+      )
+
+      await sendPromise
     })
   })
 })
