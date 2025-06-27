@@ -282,6 +282,7 @@ describe('UWebSocketTransport', () => {
         await jest.advanceTimersByTimeAsync(0)
 
         expect(mockSocket.send).toHaveBeenCalledTimes(1)
+        expect(mockMetrics.increment).toHaveBeenCalledWith('ws_unexpected_send_result_events')
 
         mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
         await jest.runAllTimersAsync()

@@ -68,10 +68,14 @@ export const metricDeclarations = {
     help: 'Number of updates sent on RPC subscription streams',
     labelNames: ['event']
   },
+  ws_unexpected_send_result_events: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of unexpected send result events'
+  },
   ws_backpressure_events: {
     type: IMetricsComponent.CounterType,
     help: 'Number of WebSocket messages that encountered backpressure or were dropped',
-    labelNames: ['result'] // 'backpressure' or 'dropped'
+    labelNames: ['result'] // 'backpressure', 'dropped', or 'error'
   },
   ws_drain_events: {
     type: IMetricsComponent.CounterType,

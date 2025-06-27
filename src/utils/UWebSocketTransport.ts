@@ -284,6 +284,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
             transportId,
             result
           })
+          metrics.increment('ws_unexpected_send_result_events')
           break
       }
       return result
