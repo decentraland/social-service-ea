@@ -1,6 +1,6 @@
 import mitt from 'mitt'
 import { verify } from '@dcl/platform-crypto-middleware'
-import { registerWsHandler, THREE_MINUTES_IN_MS } from '../../../../src/controllers/handlers/uws/ws-handler'
+import { registerWsHandler } from '../../../../src/controllers/handlers/uws/ws-handler'
 import {
   mockLogs,
   mockMetrics,
@@ -14,6 +14,8 @@ import { WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from 
 import { mockTracing } from '../../../mocks/components/tracing'
 
 jest.mock('@dcl/platform-crypto-middleware')
+
+const WS_AUTH_TIMEOUT_IN_SECONDS = 180000
 
 describe('ws-handler', () => {
   let wsHandlers: any
@@ -34,7 +36,8 @@ describe('ws-handler', () => {
       getUserData: jest.fn().mockReturnValue(mockData),
       send: jest.fn(),
       end: jest.fn(),
-      close: jest.fn()
+      close: jest.fn(),
+      getBufferedAmount: jest.fn()
     }
 
     mockRes = { upgrade: jest.fn() }
@@ -50,6 +53,13 @@ describe('ws-handler', () => {
       )
     }
     mockContext = {}
+
+    mockConfig.getNumber.mockImplementation(
+      async (key) =>
+        ({
+          WS_AUTH_TIMEOUT_IN_SECONDS
+        })[key] || null
+    )
 
     await registerWsHandler({
       logs: mockLogs,
@@ -105,7 +115,7 @@ describe('ws-handler', () => {
 
       expect(mockWs.getUserData().timeout).toBeDefined()
 
-      jest.advanceTimersByTime(THREE_MINUTES_IN_MS)
+      jest.advanceTimersByTime(WS_AUTH_TIMEOUT_IN_SECONDS)
       expect(mockWs.end).toHaveBeenCalled()
       jest.useRealTimers()
     })
@@ -313,6 +323,13 @@ describe('ws-handler', () => {
     it('should update connection activity', async () => {
       await wsHandlers.ping(mockWs)
       expect(mockWsPool.updateActivity).toHaveBeenCalledWith('test-client-id')
+    })
+  })
+
+  describe('drain handler', () => {
+    it('should increment drain event', () => {
+      wsHandlers.drain(mockWs)
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_drain_events')
     })
   })
 })

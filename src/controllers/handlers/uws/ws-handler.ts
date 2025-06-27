@@ -26,6 +26,8 @@ export async function registerWsHandler(
   const { logs, uwsServer, metrics, fetcher, rpcServer, config, wsPool, tracing } = components
   const logger = logs.getLogger('ws-handler')
 
+  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_SECONDS')) ?? 180000 // 3 minutes in ms
+
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
   }
@@ -96,7 +98,7 @@ export async function registerWsHandler(
       logger.debug('Authenticated User', { address, wsConnectionId: data.wsConnectionId })
 
       const eventEmitter = mitt<IUWebSocketEventMap>()
-      const transport = await createUWebSocketTransport(ws, eventEmitter, config, logs)
+      const transport = await createUWebSocketTransport(ws, eventEmitter, components)
 
       changeStage(data, {
         auth: true,
@@ -180,6 +182,20 @@ export async function registerWsHandler(
   uwsServer.app.ws<WsUserData>('/', {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS,
     sendPingsAutomatically: true,
+    maxBackpressure: (await config.getNumber('WS_MAX_BACKPRESSURE')) ?? 128 * 1024, // should be adjusted based on metrics
+    drain: (ws) => {
+      const data = ws.getUserData()
+      const address = getAddress(data)
+      const bufferedAmount = ws.getBufferedAmount()
+
+      logger.debug('WebSocket drain event', {
+        wsConnectionId: data.wsConnectionId,
+        bufferedAmount,
+        address
+      })
+
+      metrics.increment('ws_drain_events')
+    },
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
       const wsConnectionId = randomUUID()
@@ -225,7 +241,7 @@ export async function registerWsHandler(
               })
               ws.end()
             } catch (err) {}
-          }, THREE_MINUTES_IN_MS)
+          }, authTimeoutInMs)
         }
 
         changeStage(data, { isConnected: true, connectionStartTime: Date.now() })
