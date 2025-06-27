@@ -1,9 +1,8 @@
 import { Transport, TransportEvents } from '@dcl/rpc'
 import mitt, { Emitter } from 'mitt'
 import { future, IFuture } from 'fp-future'
-import { IConfigComponent, ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
 import { randomUUID } from 'crypto'
-import { MetricsDeclaration } from '../types'
+import { AppComponents } from '../types'
 
 export type RecognizedString =
   | string
@@ -44,9 +43,7 @@ export interface IUWebSocket<T extends { isConnected: boolean; auth?: boolean }>
 export async function createUWebSocketTransport<T extends { isConnected: boolean; auth?: boolean }>(
   socket: IUWebSocket<T>,
   uServerEmitter: Emitter<IUWebSocketEventMap>,
-  config: IConfigComponent,
-  logs: ILoggerComponent,
-  metrics: IMetricsComponent<MetricsDeclaration>
+  { config, logs, metrics }: Pick<AppComponents, 'config' | 'logs' | 'metrics'>
 ): Promise<Transport> {
   const logger = logs.getLogger('ws-transport')
   const transportId = randomUUID()

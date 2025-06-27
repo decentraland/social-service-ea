@@ -7,6 +7,7 @@ import {
 } from '../../../src/utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
 import { mockConfig, mockLogs, mockMetrics } from '../../mocks/components'
+import { AppComponents } from '../../../src/types'
 
 describe('UWebSocketTransport', () => {
   const DEFAULT_CONFIG = {
@@ -31,6 +32,8 @@ describe('UWebSocketTransport', () => {
   let errorListener: jest.Mock
   let closeListener: jest.Mock
 
+  let components: Pick<AppComponents, 'config' | 'logs' | 'metrics'>
+
   beforeEach(async () => {
     mockConfig.getNumber.mockImplementation(async (key) => DEFAULT_CONFIG[key] || null)
 
@@ -43,7 +46,8 @@ describe('UWebSocketTransport', () => {
     } as jest.Mocked<IUWebSocket<{ isConnected: boolean }>>
 
     mockEmitter = mitt<IUWebSocketEventMap>()
-    transport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs, mockMetrics)
+    components = { config: mockConfig, logs: mockLogs, metrics: mockMetrics }
+    transport = await createUWebSocketTransport(mockSocket, mockEmitter, components)
 
     errorListener = jest.fn()
     closeListener = jest.fn()
@@ -61,9 +65,7 @@ describe('UWebSocketTransport', () => {
 
   describe('when initializing the transport', () => {
     it('should initialize with correct state', async () => {
-      const newTransport = await createUWebSocketTransport(mockSocket, mockEmitter, mockConfig, mockLogs, mockMetrics)
-
-      expect(newTransport.isConnected).toBe(true)
+      expect(transport.isConnected).toBe(true)
     })
 
     it('should use default configuration values when config returns null', async () => {
@@ -74,13 +76,10 @@ describe('UWebSocketTransport', () => {
         requireString: jest.fn()
       }
 
-      const fallbackTransport = await createUWebSocketTransport(
-        mockSocket,
-        mockEmitter,
-        nullConfig,
-        mockLogs,
-        mockMetrics
-      )
+      const fallbackTransport = await createUWebSocketTransport(mockSocket, mockEmitter, {
+        ...components,
+        config: nullConfig
+      })
 
       mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
       const sendPromise = fallbackTransport.sendMessage(mockMessage)
@@ -335,13 +334,7 @@ describe('UWebSocketTransport', () => {
 
       // Create a new transport instance and immediately close it to test uninitialized state
       // We need to test the case where isInitialized is false
-      const uninitializedTransport = createUWebSocketTransport(
-        mockSocket,
-        mockEmitter,
-        mockConfig,
-        mockLogs,
-        mockMetrics
-      )
+      const uninitializedTransport = createUWebSocketTransport(mockSocket, mockEmitter, components)
 
       // Close the transport immediately to set isInitialized to false
       uninitializedTransport.then((t) => {
@@ -368,13 +361,7 @@ describe('UWebSocketTransport', () => {
     beforeEach(async () => {
       mockConfig.getNumber.mockImplementation(async (key) => circuitBreakerConfig[key] || null)
 
-      circuitBreakerTransport = await createUWebSocketTransport(
-        mockSocket,
-        mockEmitter,
-        mockConfig,
-        mockLogs,
-        mockMetrics
-      )
+      circuitBreakerTransport = await createUWebSocketTransport(mockSocket, mockEmitter, components)
     })
 
     afterEach(async () => {
@@ -501,13 +488,7 @@ describe('UWebSocketTransport', () => {
 
         mockConfig.getNumber.mockImplementation(async (key) => noBackpressureConfig[key] || null)
 
-        noBackpressureTransport = await createUWebSocketTransport(
-          mockSocket,
-          mockEmitter,
-          mockConfig,
-          mockLogs,
-          mockMetrics
-        )
+        noBackpressureTransport = await createUWebSocketTransport(mockSocket, mockEmitter, components)
       })
 
       afterEach(() => {
@@ -534,13 +515,7 @@ describe('UWebSocketTransport', () => {
 
         mockConfig.getNumber.mockImplementation(async (key) => largeAdaptiveConfig[key] || null)
 
-        largeAdaptiveTransport = await createUWebSocketTransport(
-          mockSocket,
-          mockEmitter,
-          mockConfig,
-          mockLogs,
-          mockMetrics
-        )
+        largeAdaptiveTransport = await createUWebSocketTransport(mockSocket, mockEmitter, components)
       })
 
       afterEach(() => {
@@ -623,13 +598,7 @@ describe('UWebSocketTransport', () => {
 
       mockConfig.getNumber.mockImplementation(async (key) => circuitBreakerConfig[key] || null)
 
-      const circuitBreakerTransport = await createUWebSocketTransport(
-        mockSocket,
-        mockEmitter,
-        mockConfig,
-        mockLogs,
-        mockMetrics
-      )
+      const circuitBreakerTransport = await createUWebSocketTransport(mockSocket, mockEmitter, components)
 
       mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
 

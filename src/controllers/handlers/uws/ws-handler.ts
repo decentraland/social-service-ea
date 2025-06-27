@@ -98,7 +98,7 @@ export async function registerWsHandler(
       logger.debug('Authenticated User', { address, wsConnectionId: data.wsConnectionId })
 
       const eventEmitter = mitt<IUWebSocketEventMap>()
-      const transport = await createUWebSocketTransport(ws, eventEmitter, config, logs, metrics)
+      const transport = await createUWebSocketTransport(ws, eventEmitter, components)
 
       changeStage(data, {
         auth: true,
