@@ -34,7 +34,8 @@ import {
   IStorageComponent,
   IStorageHelperComponent,
   IPlacesApiComponent,
-  IUpdateHandlerComponent
+  IUpdateHandlerComponent,
+  IRewardComponent
 } from './components'
 import {
   ICommunitiesComponent,
@@ -61,49 +62,50 @@ export type MetricsDeclaration = keyof typeof metricDeclarations
 
 // components used in every environment
 export type BaseComponents = {
+  analytics: IAnalyticsComponent<AnalyticsEventPayload>
   archipelagoStats: IArchipelagoStatsComponent
   catalystClient: ICatalystClientComponent
   commsGatekeeper: ICommsGatekeeperComponent
   communities: ICommunitiesComponent
-  expirePrivateVoiceChatJob?: IJobComponent
-  communityRoles: ICommunityRolesComponent
-  communityPlaces: ICommunityPlacesComponent
   communitiesDb: ICommunitiesDatabaseComponent
-  communityMembers: ICommunityMembersComponent
   communityBans: ICommunityBansComponent
+  communityMembers: ICommunityMembersComponent
+  communityPlaces: ICommunityPlacesComponent
+  communityRoles: ICommunityRolesComponent
   config: IConfigComponent
+  expirePrivateVoiceChatJob?: IJobComponent
   fetcher: IFetchComponent
   friendsDb: IFriendsDatabaseComponent
   httpServer: IHttpServerComponent<GlobalContext>
   logs: ILoggerComponent
-  messageProcessor: IMessageProcessorComponent
   messageConsumer: IMessageConsumerComponent
+  messageProcessor: IMessageProcessorComponent
   metrics: IMetricsComponent<MetricsDeclaration>
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
   peersStats: IPeersStatsComponent
   peersSynchronizer: IPeersSynchronizer
   pg: IPgComponent
+  placesApi: IPlacesApiComponent
   pubsub: IPubSubComponent
   queue: IQueueComponent
   redis: IRedisComponent & ICacheComponent
-  rpcServer: IRPCServerComponent
   referral: IReferralComponent
   referralDb: IReferralDatabaseComponent
+  rewards: IRewardComponent
+  rpcServer: IRPCServerComponent
+  settings: ISettingsComponent
   sns: IPublisherComponent
   statusChecks: IStatusCheckComponent
+  storage: IStorageComponent
   subscribersContext: ISubscribersContext
   tracing: ITracingComponent
   updateHandler: IUpdateHandlerComponent
   uwsServer: IUWsComponent
-  worldsStats: IWorldsStatsComponent
-  wsPool: IWSPoolComponent
-  settings: ISettingsComponent
   voice: IVoiceComponent
   voiceDb: IVoiceDatabaseComponent
-  storage: IStorageComponent
-  placesApi: IPlacesApiComponent
-  analytics: IAnalyticsComponent<AnalyticsEventPayload>
+  worldsStats: IWorldsStatsComponent
+  wsPool: IWSPoolComponent
 }
 
 // components used in runtime
