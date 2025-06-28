@@ -48,6 +48,7 @@ import { Subscribers, SubscriptionEventsEmitter } from './rpc'
 import { RpcServiceCreators } from '../controllers/routes/rpc.routes'
 import { SubscriptionHandlerParams, UpdatesMessageHandler } from '../logic/updates'
 import { PlacesApiResponse } from '../adapters/places-api'
+import { RewardAttributes } from '../logic/referral/types'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -331,4 +332,8 @@ export interface IUpdateHandlerComponent {
   privateVoiceChatUpdateHandler: UpdatesMessageHandler
   communityMemberStatusHandler: UpdatesMessageHandler
   handleSubscriptionUpdates: <T, U>(params: SubscriptionHandlerParams<T, U>) => AsyncGenerator<T>
+}
+
+export type IRewardComponent = IBaseComponent & {
+  sendReward(campaignKey: string, beneficiary: string): Promise<{ ok: boolean; data: RewardAttributes[] }>
 }
