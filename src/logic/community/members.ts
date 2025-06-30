@@ -88,6 +88,28 @@ export async function createCommunityMembersComponent(
       return filterAndCountCommunityMembers(id, options)
     },
 
+    async *getOnlineMembersFromCommunity(
+      id: string,
+      onlineUsers: EthAddress[],
+      batchSize: number = 100
+    ): AsyncGenerator<Array<{ memberAddress: string }>> {
+      let offset = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const batch = await communitiesDb.getCommunityMembers(id, {
+          pagination: { limit: batchSize, offset },
+          filterByMembers: onlineUsers
+        })
+
+        if (batch.length === 0) break
+
+        yield batch.map(({ memberAddress }) => ({ memberAddress }))
+        offset += batchSize
+        hasMore = batch.length === batchSize
+      }
+    },
+
     async *getOnlineMembersFromUserCommunities(
       userAddress: string,
       onlineUsers: string[],

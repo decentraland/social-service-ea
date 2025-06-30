@@ -439,6 +439,143 @@ describe('Community Members Component', () => {
     })
   })
 
+  describe('when getting online members from a specific community', () => {
+    const communityId = 'test-community'
+    let onlineUsers: string[]
+
+    beforeEach(() => {
+      mockCommunitiesDB.getCommunityMembers.mockResolvedValue([
+        {
+          communityId,
+          memberAddress: '0x1234567890123456789012345678901234567890',
+          role: CommunityRole.Member,
+          joinedAt: '2023-01-01T00:00:00Z'
+        },
+        {
+          communityId,
+          memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+          role: CommunityRole.Moderator,
+          joinedAt: '2023-01-02T00:00:00Z'
+        }
+      ])
+      onlineUsers = ['0x1234567890123456789012345678901234567890', '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd']
+    })
+
+    describe('when there is a single batch', () => {
+      it('should return the members that are online from the specific community', async () => {
+        const generator = communityMembersComponent.getOnlineMembersFromCommunity(communityId, onlineUsers)
+        const results: Array<{ memberAddress: string }> = []
+
+        for await (const batch of generator) {
+          results.push(...batch)
+        }
+
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+          pagination: { limit: 100, offset: 0 },
+          filterByMembers: onlineUsers
+        })
+
+        expect(results).toEqual([
+          { memberAddress: '0x1234567890123456789012345678901234567890' },
+          { memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' }
+        ])
+      })
+    })
+
+    describe('when there are multiple batches', () => {
+      beforeEach(() => {
+        // First call returns a full batch
+        mockCommunitiesDB.getCommunityMembers
+          .mockResolvedValueOnce([
+            {
+              communityId,
+              memberAddress: '0x1234567890123456789012345678901234567890',
+              role: CommunityRole.Member,
+              joinedAt: '2023-01-01T00:00:00Z'
+            },
+            {
+              communityId,
+              memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+              role: CommunityRole.Moderator,
+              joinedAt: '2023-01-02T00:00:00Z'
+            }
+          ])
+          // Second call returns a partial batch (indicating end)
+          .mockResolvedValueOnce([
+            {
+              communityId,
+              memberAddress: '0x9999999999999999999999999999999999999999',
+              role: CommunityRole.Member,
+              joinedAt: '2023-01-03T00:00:00Z'
+            }
+          ])
+      })
+
+      it('should yield all batches correctly', async () => {
+        const generator = communityMembersComponent.getOnlineMembersFromCommunity(communityId, onlineUsers, 2)
+        const results: Array<{ memberAddress: string }> = []
+
+        for await (const batch of generator) {
+          results.push(...batch)
+        }
+
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledTimes(2)
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenNthCalledWith(1, communityId, {
+          pagination: { limit: 2, offset: 0 },
+          filterByMembers: onlineUsers
+        })
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenNthCalledWith(2, communityId, {
+          pagination: { limit: 2, offset: 2 },
+          filterByMembers: onlineUsers
+        })
+
+        expect(results).toEqual([
+          { memberAddress: '0x1234567890123456789012345678901234567890' },
+          { memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' },
+          { memberAddress: '0x9999999999999999999999999999999999999999' }
+        ])
+      })
+    })
+
+    describe('when there are no results', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
+      })
+
+      it('should not yield any batches', async () => {
+        const generator = communityMembersComponent.getOnlineMembersFromCommunity(communityId, onlineUsers)
+        const results: Array<{ memberAddress: string }> = []
+
+        for await (const batch of generator) {
+          results.push(...batch)
+        }
+
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+          pagination: { limit: 100, offset: 0 },
+          filterByMembers: onlineUsers
+        })
+
+        expect(results).toEqual([])
+      })
+    })
+
+    describe('when using custom batch size', () => {
+      it('should use the provided batch size', async () => {
+        const generator = communityMembersComponent.getOnlineMembersFromCommunity(communityId, onlineUsers, 50)
+        const results: Array<{ memberAddress: string }> = []
+
+        for await (const batch of generator) {
+          results.push(...batch)
+        }
+
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+          pagination: { limit: 50, offset: 0 },
+          filterByMembers: onlineUsers
+        })
+      })
+    })
+  })
+
   describe('when kicking a member from a community', () => {
     const kickerAddress = '0x9876543210987654321098765432109876543210'
     const targetAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
