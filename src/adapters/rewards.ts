@@ -12,8 +12,12 @@ export async function createRewardComponent(
     campaignKey: string,
     beneficiary: string
   ): Promise<{ ok: boolean; data: RewardAttributes[] }> {
-    rewardUrl.pathname = '/rewards'
-    const response = await fetcher.fetch(rewardUrl.toString(), {
+    let url = rewardUrl.toString()
+    if (!url.endsWith('/')) {
+      url += '/'
+    }
+    url += 'rewards'
+    const response = await fetcher.fetch(url, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -26,7 +30,7 @@ export async function createRewardComponent(
       return response.json()
     }
 
-    throw new Error(`Failed to fetch ${rewardUrl.toString()}: ${response.status} ${await response.text()}`)
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${await response.text()}`)
   }
 
   return {

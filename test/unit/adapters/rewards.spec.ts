@@ -1,15 +1,40 @@
 import { createRewardComponent } from '../../../src/adapters/rewards'
+import { ChainId, Rarity } from '@dcl/schemas'
+import { RewardAttributes, RewardStatus } from '../../../src/logic/referral/types'
 import { IRewardComponent } from '../../../src/types'
 import { mockConfig, mockFetcher } from '../../mocks/components'
-import {
-  createMockRewardData,
-  createMockRewardSuccessResponse,
-  createMockRewardEmptyResponse,
-  createMockRewardBadRequestResponse,
-  createMockRewardNetworkError,
-  createMockRewardTextReadError,
-  mockRewardTestData
-} from '../../mocks/rewards'
+
+const mockRewardData = {
+  id: '550e8400-e29b-41d4-a716-446655440000',
+  user: '0x1234567890123456789012345678901234567890',
+  status: RewardStatus.assigned,
+  chain_id: ChainId.MATIC_MAINNET,
+  target: '0x7434a847c5e1ff250db456c55f99d1612e93d6a3',
+  value: '0',
+  token: 'Polygon sunglasses',
+  image:
+    'https://peer.decentraland.zone/lambdas/collections/contents/urn:decentraland:mumbai:collections-v2:0x7434a847c5e1ff250db456c55f99d1612e93d6a3:0/thumbnail',
+  rarity: Rarity.COMMON
+} as RewardAttributes
+
+const createMockRewardEmptyResponse = () =>
+  ({
+    ok: true,
+    status: 201,
+    json: jest.fn().mockResolvedValue({ ok: true, data: [] }),
+    text: jest.fn().mockResolvedValue('')
+  }) as any
+
+const mockRewardTestData = {
+  campaignKey: 'test-campaign-123',
+  beneficiary: '0x1234567890123456789012345678901234567890',
+  requestBody: {
+    campaign_key: 'test-campaign-123',
+    beneficiary: '0x1234567890123456789012345678901234567890'
+  },
+  rewardUrl: 'https://rewards.decentraland.org/api',
+  rewardUrlWithSlash: 'https://rewards.decentraland.org/api/'
+}
 
 describe('RewardComponent', () => {
   let rewardComponent: IRewardComponent
@@ -19,7 +44,7 @@ describe('RewardComponent', () => {
     mockRewardUrl = mockRewardTestData.rewardUrl
     mockConfig.requireString.mockResolvedValue(mockRewardUrl)
 
-    rewardComponent = createRewardComponent({
+    rewardComponent = await createRewardComponent({
       fetcher: mockFetcher,
       config: mockConfig
     })
@@ -42,8 +67,12 @@ describe('RewardComponent', () => {
 
     describe('with valid data and reward available', () => {
       beforeEach(() => {
-        const mockRewardData = createMockRewardData()
-        mockFetcher.fetch.mockResolvedValue(createMockRewardSuccessResponse([mockRewardData]))
+        mockFetcher.fetch.mockResolvedValue({
+          ok: true,
+          status: 201,
+          json: jest.fn().mockResolvedValue({ ok: true, data: [mockRewardData] }),
+          text: jest.fn().mockResolvedValue('')
+        } as any)
       })
 
       it('should send reward successfully and return API response', async () => {
@@ -101,11 +130,11 @@ describe('RewardComponent', () => {
     })
 
     describe('when the reward server URL ends with slash', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         mockConfig.requireString.mockResolvedValue(mockRewardTestData.rewardUrlWithSlash)
         mockFetcher.fetch.mockResolvedValue(createMockRewardEmptyResponse())
 
-        rewardComponent = createRewardComponent({
+        rewardComponent = await createRewardComponent({
           fetcher: mockFetcher,
           config: mockConfig
         })
@@ -125,11 +154,11 @@ describe('RewardComponent', () => {
     })
 
     describe('when the reward server URL does not end with slash', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         mockConfig.requireString.mockResolvedValue(mockRewardTestData.rewardUrl)
         mockFetcher.fetch.mockResolvedValue(createMockRewardEmptyResponse())
 
-        rewardComponent = createRewardComponent({
+        rewardComponent = await createRewardComponent({
           fetcher: mockFetcher,
           config: mockConfig
         })
@@ -150,7 +179,18 @@ describe('RewardComponent', () => {
 
     describe('when the API returns a bad request error', () => {
       beforeEach(() => {
-        mockFetcher.fetch.mockResolvedValue(createMockRewardBadRequestResponse())
+        mockFetcher.fetch.mockResolvedValue({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          text: jest.fn().mockResolvedValue(
+            JSON.stringify({
+              ok: false,
+              code: 'bad_request',
+              error: 'Invalid data was sent to the server'
+            })
+          )
+        } as any)
       })
 
       it('should throw an error with response details', async () => {
@@ -162,7 +202,7 @@ describe('RewardComponent', () => {
 
     describe('when the fetch fails with network error', () => {
       beforeEach(() => {
-        mockFetcher.fetch.mockRejectedValue(createMockRewardNetworkError())
+        mockFetcher.fetch.mockRejectedValue(new Error('Network error'))
       })
 
       it('should throw the network error', async () => {
@@ -172,7 +212,12 @@ describe('RewardComponent', () => {
 
     describe('when the response text cannot be read', () => {
       beforeEach(() => {
-        mockFetcher.fetch.mockResolvedValue(createMockRewardTextReadError())
+        mockFetcher.fetch.mockResolvedValue({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          text: jest.fn().mockRejectedValue(new Error('Cannot read response'))
+        } as any)
       })
 
       it('should throw the text reading error', async () => {
