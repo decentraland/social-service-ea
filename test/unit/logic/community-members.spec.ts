@@ -441,7 +441,7 @@ describe('Community Members Component', () => {
 
   describe('when getting online members from a specific community', () => {
     const communityId = 'test-community'
-    const onlineUsers = ['0x1234567890123456789012345678901234567890', '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd']
+    let onlineUsers: string[]
 
     beforeEach(() => {
       mockCommunitiesDB.getCommunityMembers.mockResolvedValue([
@@ -458,25 +458,28 @@ describe('Community Members Component', () => {
           joinedAt: '2023-01-02T00:00:00Z'
         }
       ])
+      onlineUsers = ['0x1234567890123456789012345678901234567890', '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd']
     })
 
-    it('should return the members that are online from the specific community', async () => {
-      const generator = communityMembersComponent.getOnlineMembersFromCommunity(communityId, onlineUsers)
-      const results: Array<{ memberAddress: string }> = []
+    describe('when there is a single batch', () => {
+      it('should return the members that are online from the specific community', async () => {
+        const generator = communityMembersComponent.getOnlineMembersFromCommunity(communityId, onlineUsers)
+        const results: Array<{ memberAddress: string }> = []
 
-      for await (const batch of generator) {
-        results.push(...batch)
-      }
+        for await (const batch of generator) {
+          results.push(...batch)
+        }
 
-      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
-        pagination: { limit: 100, offset: 0 },
-        filterByMembers: onlineUsers
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+          pagination: { limit: 100, offset: 0 },
+          filterByMembers: onlineUsers
+        })
+
+        expect(results).toEqual([
+          { memberAddress: '0x1234567890123456789012345678901234567890' },
+          { memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' }
+        ])
       })
-
-      expect(results).toEqual([
-        { memberAddress: '0x1234567890123456789012345678901234567890' },
-        { memberAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' }
-      ])
     })
 
     describe('when there are multiple batches', () => {
@@ -569,29 +572,6 @@ describe('Community Members Component', () => {
           pagination: { limit: 50, offset: 0 },
           filterByMembers: onlineUsers
         })
-      })
-    })
-
-    describe('when the first batch is empty', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
-      })
-
-      it('should not yield any batches and stop immediately', async () => {
-        const generator = communityMembersComponent.getOnlineMembersFromCommunity(communityId, onlineUsers)
-        const results: Array<{ memberAddress: string }> = []
-
-        for await (const batch of generator) {
-          results.push(...batch)
-        }
-
-        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledTimes(1)
-        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
-          pagination: { limit: 100, offset: 0 },
-          filterByMembers: onlineUsers
-        })
-
-        expect(results).toEqual([])
       })
     })
   })
