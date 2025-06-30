@@ -455,10 +455,11 @@ describe('Updates Handlers', () => {
     ])('when the status is $description', ({ status }) => {
       describe('and there are no online members in the community', () => {
         beforeEach(() => {
-          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
-            members: [],
-            totalMembers: 0
-          })
+          // Mock the generator to return no batches
+          const mockGenerator = (async function* () {
+            // No batches to yield
+          })()
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockReturnValue(mockGenerator)
         })
 
         it('should not emit any updates', async () => {
@@ -470,10 +471,10 @@ describe('Updates Handlers', () => {
 
           await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
 
-          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
-            onlyOnline: true,
-            pagination: { limit: 100, offset: 0 }
-          })
+          expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
+            '0x456',
+            '0x789'
+          ])
           expect(emitSpy456).not.toHaveBeenCalled()
           expect(emitSpy789).not.toHaveBeenCalled()
         })
@@ -481,31 +482,11 @@ describe('Updates Handlers', () => {
 
       describe('and there are online members in the community', () => {
         beforeEach(() => {
-          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
-            members: [
-              {
-                communityId: 'community-1',
-                memberAddress: '0x456',
-                role: 'Member' as any,
-                joinedAt: '2023-01-01T00:00:00Z',
-                profilePictureUrl: 'https://example.com/avatar1.jpg',
-                hasClaimedName: true,
-                name: 'User 456',
-                friendshipStatus: 'NONE' as any
-              },
-              {
-                communityId: 'community-1',
-                memberAddress: '0x789',
-                role: 'Member' as any,
-                joinedAt: '2023-01-01T00:00:00Z',
-                profilePictureUrl: 'https://example.com/avatar2.jpg',
-                hasClaimedName: true,
-                name: 'User 789',
-                friendshipStatus: 'NONE' as any
-              }
-            ],
-            totalMembers: 2
-          })
+          // Mock the generator to return one batch
+          const mockGenerator = (async function* () {
+            yield [{ memberAddress: '0x456' }, { memberAddress: '0x789' }]
+          })()
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockReturnValue(mockGenerator)
         })
 
         it('should emit connectivity update to all online members of the community', async () => {
@@ -517,91 +498,66 @@ describe('Updates Handlers', () => {
 
           await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
 
-          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledWith('community-1', '0x123', {
-            onlyOnline: true,
-            pagination: { limit: 100, offset: 0 }
+          expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
+            '0x456',
+            '0x789'
+          ])
+          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            communityId: 'community-1',
+            memberAddress: '0x456',
+            status
           })
-          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
-          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
+          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            communityId: 'community-1',
+            memberAddress: '0x789',
+            status
+          })
         })
       })
 
-      describe('and there are more members than the page size', () => {
+      describe('and there are multiple batches of online members', () => {
         beforeEach(() => {
-          // First page
-          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
-            members: [
-              {
-                communityId: 'community-1',
-                memberAddress: '0x456',
-                role: 'Member' as any,
-                joinedAt: '2023-01-01T00:00:00Z',
-                profilePictureUrl: 'https://example.com/avatar1.jpg',
-                hasClaimedName: true,
-                name: 'User 456',
-                friendshipStatus: 'NONE' as any
-              },
-              {
-                communityId: 'community-1',
-                memberAddress: '0x789',
-                role: 'Member' as any,
-                joinedAt: '2023-01-01T00:00:00Z',
-                profilePictureUrl: 'https://example.com/avatar2.jpg',
-                hasClaimedName: true,
-                name: 'User 789',
-                friendshipStatus: 'NONE' as any
-              }
-            ],
-            totalMembers: 250
-          })
-          // Second page
-          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
-            members: [
-              {
-                communityId: 'community-1',
-                memberAddress: '0x999',
-                role: 'Member' as any,
-                joinedAt: '2023-01-01T00:00:00Z',
-                profilePictureUrl: 'https://example.com/avatar3.jpg',
-                hasClaimedName: true,
-                name: 'User 999',
-                friendshipStatus: 'NONE' as any
-              }
-            ],
-            totalMembers: 250
-          })
-          // Third page (empty)
-          mockCommunityMembers.getCommunityMembers.mockResolvedValueOnce({
-            members: [],
-            totalMembers: 250
-          })
+          // Mock the generator to return multiple batches
+          const mockGenerator = (async function* () {
+            yield [{ memberAddress: '0x456' }, { memberAddress: '0x789' }]
+            yield [{ memberAddress: '0x999' }]
+          })()
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockReturnValue(mockGenerator)
         })
 
-        it('should emit connectivity update to all online members across multiple pages', async () => {
+        it('should emit connectivity update to all online members across multiple batches', async () => {
           const update = {
             communityId: 'community-1',
             memberAddress: '0x123',
             status
           }
 
+          // Add the third subscriber for the test
+          const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
+          const emitSpy999 = jest.spyOn(subscriber999, 'emit')
+
           await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
 
-          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenCalledTimes(3)
-          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(1, 'community-1', '0x123', {
-            onlyOnline: true,
-            pagination: { limit: 100, offset: 0 }
+          expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
+            '0x456',
+            '0x789',
+            '0x999'
+          ])
+          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            communityId: 'community-1',
+            memberAddress: '0x456',
+            status
           })
-          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(2, 'community-1', '0x123', {
-            onlyOnline: true,
-            pagination: { limit: 100, offset: 100 }
+          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            communityId: 'community-1',
+            memberAddress: '0x789',
+            status
           })
-          expect(mockCommunityMembers.getCommunityMembers).toHaveBeenNthCalledWith(3, 'community-1', '0x123', {
-            onlyOnline: true,
-            pagination: { limit: 100, offset: 200 }
+          expect(emitSpy999).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+            communityId: 'community-1',
+            memberAddress: '0x999',
+            status
           })
-
-          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
-          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
         })
       })
     })
@@ -623,8 +579,12 @@ describe('Updates Handlers', () => {
       let error: Error
 
       beforeEach(() => {
-        error = new Error('Cannot get community members')
-        mockCommunityMembers.getCommunityMembers.mockRejectedValueOnce(error)
+        error = new Error('Cannot get online members from community')
+        // Mock the generator to throw an error
+        const mockGenerator = (async function* () {
+          throw error
+        })()
+        mockCommunityMembers.getOnlineMembersFromCommunity.mockReturnValue(mockGenerator)
       })
 
       it('should log an error and not emit any updates', async () => {

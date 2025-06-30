@@ -3,7 +3,6 @@ import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { VoiceChatStatus } from './voice/types'
-import { GetCommunityMembersOptions } from './community'
 import { IUpdateHandlerComponent } from '../types/components'
 
 type UpdateHandler<T extends keyof SubscriptionEventsEmitter> = (
@@ -78,9 +77,9 @@ export function createUpdateHandlerComponent(
 
     // Notify friends about connectivity change
     friends.forEach(({ address: friendAddress }) => {
-      const emitter = subscribersContext.getOrAddSubscriber(friendAddress)
-      if (emitter) {
-        emitter.emit('friendConnectivityUpdate', update)
+      const updateEmitter = subscribersContext.getOrAddSubscriber(friendAddress)
+      if (updateEmitter) {
+        updateEmitter.emit('friendConnectivityUpdate', update)
       } else {
         logger.warn('No emitter found for friend:', { friendAddress })
       }
@@ -93,9 +92,9 @@ export function createUpdateHandlerComponent(
 
     for await (const batch of batches) {
       batch.forEach(({ communityId, memberAddress }) => {
-        const emitter = subscribersContext.getOrAddSubscriber(memberAddress)
-        if (emitter) {
-          emitter.emit('communityMemberConnectivityUpdate', {
+        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('communityMemberConnectivityUpdate', {
             communityId,
             memberAddress: update.memberAddress,
             status: update.status
@@ -171,33 +170,25 @@ export function createUpdateHandlerComponent(
   })
 
   const communityMemberStatusHandler = handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
+    const { communityId, status } = update
+
     logger.info('Community member status update', { update: JSON.stringify(update) })
 
-    const PAGE_SIZE = 100
-    let offset = 0
-    let hasMoreMembers = true
+    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
 
-    while (hasMoreMembers) {
-      const options: GetCommunityMembersOptions = {
-        onlyOnline: true,
-        pagination: { limit: PAGE_SIZE, offset }
-      }
+    const batches = communityMembers.getOnlineMembersFromCommunity(communityId, onlineSubscribers)
 
-      const { members, totalMembers } = await communityMembers.getCommunityMembers(
-        update.communityId,
-        update.memberAddress,
-        options
-      )
-
-      members.forEach(({ memberAddress }) => {
+    for await (const batch of batches) {
+      batch.forEach(({ memberAddress }) => {
         const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
         if (updateEmitter) {
-          updateEmitter.emit('communityMemberConnectivityUpdate', update)
+          updateEmitter.emit('communityMemberConnectivityUpdate', {
+            communityId,
+            memberAddress,
+            status
+          })
         }
       })
-
-      offset += PAGE_SIZE
-      hasMoreMembers = offset < totalMembers
     }
   })
 

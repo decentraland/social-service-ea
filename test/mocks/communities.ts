@@ -89,7 +89,8 @@ export function createMockCommunityMembersComponent({
   leaveCommunity = jest.fn(),
   kickMember = jest.fn(),
   updateMemberRole = jest.fn(),
-  getOnlineMembersFromUserCommunities = jest.fn()
+  getOnlineMembersFromUserCommunities = jest.fn(),
+  getOnlineMembersFromCommunity = jest.fn()
 }: Partial<jest.Mocked<ICommunityMembersComponent>>): jest.Mocked<ICommunityMembersComponent> {
   return {
     getCommunityMembers,
@@ -98,7 +99,8 @@ export function createMockCommunityMembersComponent({
     leaveCommunity,
     kickMember,
     updateMemberRole,
-    getOnlineMembersFromUserCommunities
+    getOnlineMembersFromUserCommunities,
+    getOnlineMembersFromCommunity
   }
 }
 
