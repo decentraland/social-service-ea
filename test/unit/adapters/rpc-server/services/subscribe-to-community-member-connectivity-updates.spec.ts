@@ -143,13 +143,13 @@ describe('when subscribing to community member connectivity updates', () => {
       generator.next()
     })
 
-    it('should filter updates based on member address conditions', () => {
+    it('should not filter any updates', () => {
       // Extract the shouldHandleUpdate function from the handler call
       const shouldHandleUpdate = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].shouldHandleUpdate
 
       // Verify filtering logic
       expect(shouldHandleUpdate(mockUpdateFromOther)).toBe(true) // Should handle: from different address
-      expect(shouldHandleUpdate(mockUpdateFromSelf)).toBe(false) // Should not handle: from self
+      expect(shouldHandleUpdate(mockUpdateFromSelf)).toBe(true) // Should handle: from self
     })
   })
 

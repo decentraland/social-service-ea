@@ -40,8 +40,7 @@ export function subscribeToCommunityMemberConnectivityUpdatesService({
         eventName: 'communityMemberConnectivityUpdate',
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['communityMemberConnectivityUpdate']) =>
           update.memberAddress,
-        shouldHandleUpdate: (update: SubscriptionEventsEmitter['communityMemberConnectivityUpdate']) =>
-          update.memberAddress !== context.address,
+        shouldHandleUpdate: (_update: SubscriptionEventsEmitter['communityMemberConnectivityUpdate']) => true,
         parser: parseEmittedUpdateToCommunityMemberConnectivityUpdate
       })
     } catch (error: any) {

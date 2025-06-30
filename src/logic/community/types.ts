@@ -2,7 +2,7 @@ import {
   FriendProfile,
   FriendshipStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { CommunityRole, Action, Pagination } from '../../types/entities'
+import { CommunityRole, Action } from '../../types/entities'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export interface ICommunitiesComponent {
@@ -37,6 +37,11 @@ export interface ICommunityMembersComponent {
     id: string,
     options: GetCommunityMembersOptions
   ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
+  getOnlineMembersFromCommunity(
+    id: string,
+    onlineUsers: EthAddress[],
+    batchSize?: number
+  ): AsyncGenerator<Array<{ memberAddress: string }>>
   getOnlineMembersFromUserCommunities(
     userAddress: EthAddress,
     onlineUsers: EthAddress[],
