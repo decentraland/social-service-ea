@@ -88,10 +88,9 @@ describe('RewardComponent', () => {
           body: JSON.stringify(requestBody)
         })
 
-        expect(result.ok).toBe(true)
-        expect(result.data).toHaveLength(1)
+        expect(result).toHaveLength(1)
 
-        const rewardData = result.data[0]
+        const rewardData = result[0]
         expect(rewardData).toMatchObject({
           id: '550e8400-e29b-41d4-a716-446655440000',
           user: '0x1234567890123456789012345678901234567890',
@@ -122,58 +121,7 @@ describe('RewardComponent', () => {
             body: JSON.stringify(requestBody)
           })
         )
-        expect(result).toEqual({
-          ok: true,
-          data: []
-        })
-      })
-    })
-
-    describe('when the reward server URL ends with slash', () => {
-      beforeEach(async () => {
-        mockConfig.requireString.mockResolvedValue(mockRewardTestData.rewardUrlWithSlash)
-        mockFetcher.fetch.mockResolvedValue(createMockRewardEmptyResponse())
-
-        rewardComponent = await createRewardComponent({
-          fetcher: mockFetcher,
-          config: mockConfig
-        })
-      })
-
-      it('should handle URL with trailing slash correctly', async () => {
-        await rewardComponent.sendReward(campaignKey, beneficiary)
-
-        expect(mockFetcher.fetch).toHaveBeenCalledWith(
-          'https://rewards.decentraland.org/api/rewards',
-          expect.objectContaining({
-            method: 'POST',
-            body: JSON.stringify(requestBody)
-          })
-        )
-      })
-    })
-
-    describe('when the reward server URL does not end with slash', () => {
-      beforeEach(async () => {
-        mockConfig.requireString.mockResolvedValue(mockRewardTestData.rewardUrl)
-        mockFetcher.fetch.mockResolvedValue(createMockRewardEmptyResponse())
-
-        rewardComponent = await createRewardComponent({
-          fetcher: mockFetcher,
-          config: mockConfig
-        })
-      })
-
-      it('should add slash to URL correctly', async () => {
-        await rewardComponent.sendReward(campaignKey, beneficiary)
-
-        expect(mockFetcher.fetch).toHaveBeenCalledWith(
-          'https://rewards.decentraland.org/api/rewards',
-          expect.objectContaining({
-            method: 'POST',
-            body: JSON.stringify(requestBody)
-          })
-        )
+        expect(result).toEqual([])
       })
     })
 

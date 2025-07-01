@@ -335,5 +335,5 @@ export interface IUpdateHandlerComponent {
 }
 
 export type IRewardComponent = IBaseComponent & {
-  sendReward(campaignKey: string, beneficiary: string): Promise<{ ok: boolean; data: RewardAttributes[] }>
+  sendReward(campaignKey: string, beneficiary: string): Promise<RewardAttributes[]>
 }
