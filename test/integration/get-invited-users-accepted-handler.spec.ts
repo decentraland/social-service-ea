@@ -4,13 +4,14 @@ import { createTestIdentity, Identity } from './utils/auth'
 import { TestCleanup } from '../db-cleanup'
 import { ReferralProgressStatus } from '../../src/types/referral-db.type'
 import { makeAuthenticatedRequest } from './utils/auth'
+import { generateRandomWalletAddresses } from '../mocks/wallet'
 
 test('GET /v1/referral-progress', ({ components }) => {
   let cleanup: TestCleanup
   const endpoint = '/v1/referral-progress'
   let referrer: Identity
-  let invited_user: Identity
   let newReferrer: Identity
+  let invited_user: string
   const makeRequest = makeAuthenticatedRequest(components)
 
   beforeAll(() => {
@@ -18,23 +19,18 @@ test('GET /v1/referral-progress', ({ components }) => {
   })
 
   beforeEach(async () => {
-    ;[referrer, invited_user, newReferrer] = await Promise.all([
-      createTestIdentity(),
-      createTestIdentity(),
-      createTestIdentity()
-    ])
+    ;[referrer, newReferrer] = await Promise.all([createTestIdentity(), createTestIdentity()])
+
+    invited_user = generateRandomWalletAddresses(1)[0]
 
     await components.referralDb.createReferral({
       referrer: referrer.realAccount.address.toLowerCase(),
-      invitedUser: invited_user.realAccount.address.toLowerCase()
+      invitedUser: invited_user.toLowerCase()
     })
-    await components.referralDb.updateReferralProgress(
-      invited_user.realAccount.address.toLowerCase(),
-      ReferralProgressStatus.TIER_GRANTED
-    )
+    await components.referralDb.updateReferralProgress(invited_user.toLowerCase(), ReferralProgressStatus.TIER_GRANTED)
     cleanup.trackInsert('referral_progress', {
       referrer: referrer.realAccount.address.toLowerCase(),
-      invited_user: invited_user.realAccount.address.toLowerCase()
+      invited_user: invited_user.toLowerCase()
     })
   })
 
@@ -71,13 +67,10 @@ test('GET /v1/referral-progress', ({ components }) => {
     describe('when authentication fails', () => {
       it('should return 401 with invalid auth chain', async () => {
         const invalidIdentity: Identity = {
-          ...invited_user,
+          ...referrer,
           authChain: {
-            ...invited_user.authChain,
-            authChain: [
-              ...invited_user.authChain.authChain,
-              { type: AuthLinkType.SIGNER, payload: 'invalid-signature' }
-            ]
+            ...referrer.authChain,
+            authChain: [...referrer.authChain.authChain, { type: AuthLinkType.SIGNER, payload: 'invalid-signature' }]
           }
         }
         const response = await makeRequest(invalidIdentity, endpoint, 'GET')
@@ -106,28 +99,23 @@ test('GET /v1/referral-progress', ({ components }) => {
     })
 
     describe('when referrer has 5 invited users accepted and a reward assigned', () => {
-      let referrer: Identity
-      let invitedUsers: Identity[]
       let rewardImageUrl: string
 
       beforeEach(async () => {
-        referrer = await createTestIdentity()
         rewardImageUrl = 'https://rewards.decentraland.zone/reward5.png'
-        invitedUsers = []
-        for (let i = 0; i < 5; i++) {
-          const invited = await createTestIdentity()
-          invitedUsers.push(invited)
+        for (let i = 0; i < 4; i++) {
+          const invited_user = generateRandomWalletAddresses(1)[0]
           await components.referralDb.createReferral({
             referrer: referrer.realAccount.address.toLowerCase(),
-            invitedUser: invited.realAccount.address.toLowerCase()
+            invitedUser: invited_user.toLowerCase()
           })
           await components.referralDb.updateReferralProgress(
-            invited.realAccount.address.toLowerCase(),
+            invited_user.toLowerCase(),
             ReferralProgressStatus.TIER_GRANTED
           )
           cleanup.trackInsert('referral_progress', {
             referrer: referrer.realAccount.address.toLowerCase(),
-            invited_user: invited.realAccount.address.toLowerCase()
+            invited_user: invited_user.toLowerCase()
           })
         }
         await components.referralDb.setReferralRewardImage({
