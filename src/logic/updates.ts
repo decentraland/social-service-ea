@@ -80,8 +80,6 @@ export function createUpdateHandlerComponent(
       const updateEmitter = subscribersContext.getOrAddSubscriber(friendAddress)
       if (updateEmitter) {
         updateEmitter.emit('friendConnectivityUpdate', update)
-      } else {
-        logger.warn('No emitter found for friend:', { friendAddress })
       }
     })
   })
@@ -176,7 +174,10 @@ export function createUpdateHandlerComponent(
 
     const onlineSubscribers = subscribersContext.getSubscribersAddresses()
 
-    const batches = communityMembers.getOnlineMembersFromCommunity(communityId, onlineSubscribers)
+    const batches = communityMembers.getOnlineMembersFromCommunity(
+      communityId,
+      onlineSubscribers.filter((address) => address !== update.memberAddress)
+    )
 
     for await (const batch of batches) {
       batch.forEach(({ memberAddress }) => {
@@ -189,6 +190,14 @@ export function createUpdateHandlerComponent(
           })
         }
       })
+    }
+
+    // When a member leaves, is kicked, or banned from a community,
+    // we need to notify the affected member about their status change.
+    const affectedMember = onlineSubscribers.find((address) => address === update.memberAddress)
+    const updateEmitter = affectedMember ? subscribersContext.getOrAddSubscriber(affectedMember) : null
+    if (updateEmitter) {
+      updateEmitter.emit('communityMemberConnectivityUpdate', update)
     }
   })
 
