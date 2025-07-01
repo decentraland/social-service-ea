@@ -5,9 +5,9 @@ info:
   description: API documentation for the Social Service.
 
 servers:
-  # - url: https://social-service-ea.decentraland.org
-  # description: Production server
-  - url: https://social-service-ea.decentraland.zone
+  - url: https://social-api.decentraland.org
+    description: Production server
+  - url: https://social-api.decentraland.zone
     description: Development server
 
 components:
