@@ -55,7 +55,8 @@ test('GET /v1/referral-progress', ({ components }) => {
         const body = await response.json()
         expect(body).toEqual({
           invitedUsersAccepted: 1,
-          invitedUsersAcceptedViewed: 0
+          invitedUsersAcceptedViewed: 0,
+          rewardImages: []
         })
 
         const seen = await components.referralDb.getLastViewedProgressByReferrer(
@@ -91,7 +92,8 @@ test('GET /v1/referral-progress', ({ components }) => {
         const body = await response.json()
         expect(body).toEqual({
           invitedUsersAccepted: 0,
-          invitedUsersAcceptedViewed: 0
+          invitedUsersAcceptedViewed: 0,
+          rewardImages: []
         })
 
         const seen = await components.referralDb.getLastViewedProgressByReferrer(
