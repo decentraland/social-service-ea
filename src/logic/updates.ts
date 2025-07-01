@@ -174,7 +174,6 @@ export function createUpdateHandlerComponent(
     logger.info('Community member status update', { update: JSON.stringify(update) })
 
     const onlineSubscribers = subscribersContext.getSubscribersAddresses()
-
     const batches = communityMembers.getOnlineMembersFromCommunity(
       communityId,
       onlineSubscribers.filter((address) => address !== normalizedMemberAddress)
@@ -198,6 +197,9 @@ export function createUpdateHandlerComponent(
     const affectedMember = onlineSubscribers.find((address) => address === normalizedMemberAddress)
     const updateEmitter = affectedMember ? subscribersContext.getOrAddSubscriber(affectedMember) : null
     if (updateEmitter) {
+      logger.debug('Notifying affected member about their status change', {
+        update: JSON.stringify(update)
+      })
       updateEmitter.emit('communityMemberConnectivityUpdate', update)
     }
   })
