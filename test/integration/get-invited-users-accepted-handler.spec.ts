@@ -102,5 +102,49 @@ test('GET /v1/referral-progress', ({ components }) => {
         expect(seen).toBe(0)
       })
     })
+
+    describe('when referrer has 5 invited users accepted and a reward assigned', () => {
+      let referrer: Identity
+      let invitedUsers: Identity[]
+      let rewardImageUrl: string
+
+      beforeEach(async () => {
+        referrer = await createTestIdentity()
+        rewardImageUrl = 'https://rewards.decentraland.zone/reward5.png'
+        invitedUsers = []
+        for (let i = 0; i < 5; i++) {
+          const invited = await createTestIdentity()
+          invitedUsers.push(invited)
+          await components.referralDb.createReferral({
+            referrer: referrer.realAccount.address.toLowerCase(),
+            invitedUser: invited.realAccount.address.toLowerCase()
+          })
+          await components.referralDb.updateReferralProgress(
+            invited.realAccount.address.toLowerCase(),
+            ReferralProgressStatus.TIER_GRANTED
+          )
+          cleanup.trackInsert('referral_progress', {
+            referrer: referrer.realAccount.address.toLowerCase(),
+            invited_user: invited.realAccount.address.toLowerCase()
+          })
+        }
+        await components.referralDb.setReferralRewardImage({
+          referrer: referrer.realAccount.address.toLowerCase(),
+          rewardImageUrl,
+          tier: 5
+        })
+      })
+
+      it('should return 5 accepted, 0 viewed and rewardImages with tier 5', async () => {
+        const response = await makeRequest(referrer, endpoint, 'GET')
+        expect(response.status).toBe(200)
+        const body = await response.json()
+        expect(body).toEqual({
+          invitedUsersAccepted: 5,
+          invitedUsersAcceptedViewed: 0,
+          rewardImages: [{ tier: 5, url: rewardImageUrl }]
+        })
+      })
+    })
   })
 })

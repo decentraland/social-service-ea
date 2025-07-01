@@ -241,8 +241,8 @@ export async function createReferralComponent(
 
       const referralRewardImage = await referralDb.getReferralRewardImage(ref)
       const rewardImages =
-        referralRewardImage?.map((image, tier) => ({
-          tier,
+        referralRewardImage?.map((image) => ({
+          tier: image.tier,
           url: image.reward_image_url
         })) || []
 
