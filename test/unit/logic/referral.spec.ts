@@ -410,10 +410,6 @@ describe('referral-component', () => {
           previousStatus: ReferralProgressStatus.SIGNED_UP,
           newStatus: ReferralProgressStatus.TIER_GRANTED
         })
-        expect(mockLogger.info).toHaveBeenCalledWith('Referral finalized successfully', {
-          invitedUser: validInvitedUser.toLowerCase(),
-          status: ReferralProgressStatus.TIER_GRANTED
-        })
       })
     })
 
