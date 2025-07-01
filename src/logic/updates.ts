@@ -168,7 +168,8 @@ export function createUpdateHandlerComponent(
   })
 
   const communityMemberStatusHandler = handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
-    const { communityId, status } = update
+    const { communityId, status, memberAddress } = update
+    const normalizedMemberAddress = normalizeAddress(memberAddress)
 
     logger.info('Community member status update', { update: JSON.stringify(update) })
 
@@ -176,7 +177,7 @@ export function createUpdateHandlerComponent(
 
     const batches = communityMembers.getOnlineMembersFromCommunity(
       communityId,
-      onlineSubscribers.filter((address) => address !== update.memberAddress)
+      onlineSubscribers.filter((address) => address !== normalizedMemberAddress)
     )
 
     for await (const batch of batches) {
@@ -194,7 +195,7 @@ export function createUpdateHandlerComponent(
 
     // When a member leaves, is kicked, or banned from a community,
     // we need to notify the affected member about their status change.
-    const affectedMember = onlineSubscribers.find((address) => address === update.memberAddress)
+    const affectedMember = onlineSubscribers.find((address) => address === normalizedMemberAddress)
     const updateEmitter = affectedMember ? subscribersContext.getOrAddSubscriber(affectedMember) : null
     if (updateEmitter) {
       updateEmitter.emit('communityMemberConnectivityUpdate', update)
