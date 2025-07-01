@@ -438,15 +438,19 @@ describe('Updates Handlers', () => {
   describe('when handling community member status updates', () => {
     let subscriber456: Emitter<SubscriptionEventsEmitter>
     let subscriber789: Emitter<SubscriptionEventsEmitter>
+    let subscriber123: Emitter<SubscriptionEventsEmitter>
     let emitSpy456: jest.SpyInstance
     let emitSpy789: jest.SpyInstance
+    let emitSpy123: jest.SpyInstance
 
     beforeEach(() => {
       subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
       subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
+      subscriber123 = subscribersContext.getOrAddSubscriber('0x123')
 
       emitSpy456 = jest.spyOn(subscriber456, 'emit')
       emitSpy789 = jest.spyOn(subscriber789, 'emit')
+      emitSpy123 = jest.spyOn(subscriber123, 'emit')
     })
 
     describe.each([
@@ -462,21 +466,49 @@ describe('Updates Handlers', () => {
           mockCommunityMembers.getOnlineMembersFromCommunity.mockReturnValue(mockGenerator)
         })
 
-        it('should not emit any updates', async () => {
-          const update = {
-            communityId: 'community-1',
-            memberAddress: '0x123',
-            status
-          }
+        describe('and the affected member is subscribed', () => {
+          it('should not emit any updates to other members but notify the affected member', async () => {
+            const update = {
+              communityId: 'community-1',
+              memberAddress: '0x123',
+              status
+            }
 
-          await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
+            await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
 
-          expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
-            '0x456',
-            '0x789'
-          ])
-          expect(emitSpy456).not.toHaveBeenCalled()
-          expect(emitSpy789).not.toHaveBeenCalled()
+            expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
+              '0x456',
+              '0x789'
+            ])
+            expect(emitSpy456).not.toHaveBeenCalled()
+            expect(emitSpy789).not.toHaveBeenCalled()
+            expect(emitSpy123).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
+          })
+        })
+
+        describe('and the affected member is not subscribed', () => {
+          beforeEach(() => {
+            // Remove the affected member from subscribers
+            subscribersContext.removeSubscriber('0x123')
+          })
+
+          it('should not emit any updates to other members or the affected member', async () => {
+            const update = {
+              communityId: 'community-1',
+              memberAddress: '0x123',
+              status
+            }
+
+            await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
+
+            expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
+              '0x456',
+              '0x789'
+            ])
+            expect(emitSpy456).not.toHaveBeenCalled()
+            expect(emitSpy789).not.toHaveBeenCalled()
+            expect(emitSpy123).not.toHaveBeenCalled()
+          })
         })
       })
 
@@ -489,28 +521,36 @@ describe('Updates Handlers', () => {
           mockCommunityMembers.getOnlineMembersFromCommunity.mockReturnValue(mockGenerator)
         })
 
-        it('should emit connectivity update to all online members of the community', async () => {
-          const update = {
-            communityId: 'community-1',
-            memberAddress: '0x123',
-            status
-          }
-
-          await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
-
-          expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
-            '0x456',
-            '0x789'
-          ])
-          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
-            communityId: 'community-1',
-            memberAddress: '0x456',
-            status
+        describe('and the affected member is not subscribed', () => {
+          beforeEach(() => {
+            // Remove the affected member from subscribers
+            subscribersContext.removeSubscriber('0x123')
           })
-          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
-            communityId: 'community-1',
-            memberAddress: '0x789',
-            status
+
+          it('should emit connectivity update to all online members but not notify the affected member', async () => {
+            const update = {
+              communityId: 'community-1',
+              memberAddress: '0x123',
+              status
+            }
+
+            await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
+
+            expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
+              '0x456',
+              '0x789'
+            ])
+            expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+              communityId: 'community-1',
+              memberAddress: '0x456',
+              status
+            })
+            expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+              communityId: 'community-1',
+              memberAddress: '0x789',
+              status
+            })
+            expect(emitSpy123).not.toHaveBeenCalled()
           })
         })
       })
@@ -525,38 +565,84 @@ describe('Updates Handlers', () => {
           mockCommunityMembers.getOnlineMembersFromCommunity.mockReturnValue(mockGenerator)
         })
 
-        it('should emit connectivity update to all online members across multiple batches', async () => {
-          const update = {
-            communityId: 'community-1',
-            memberAddress: '0x123',
-            status
-          }
+        describe('and the affected member is subscribed', () => {
+          it('should emit connectivity update to all online members across multiple batches and notify the affected member', async () => {
+            const update = {
+              communityId: 'community-1',
+              memberAddress: '0x123',
+              status
+            }
 
-          // Add the third subscriber for the test
-          const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
-          const emitSpy999 = jest.spyOn(subscriber999, 'emit')
+            // Add the third subscriber for the test
+            const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
+            const emitSpy999 = jest.spyOn(subscriber999, 'emit')
 
-          await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
+            await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
 
-          expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
-            '0x456',
-            '0x789',
-            '0x999'
-          ])
-          expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
-            communityId: 'community-1',
-            memberAddress: '0x456',
-            status
+            expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
+              '0x456',
+              '0x789',
+              '0x999'
+            ])
+            expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+              communityId: 'community-1',
+              memberAddress: '0x456',
+              status
+            })
+            expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+              communityId: 'community-1',
+              memberAddress: '0x789',
+              status
+            })
+            expect(emitSpy999).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+              communityId: 'community-1',
+              memberAddress: '0x999',
+              status
+            })
+            expect(emitSpy123).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
           })
-          expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
-            communityId: 'community-1',
-            memberAddress: '0x789',
-            status
+        })
+
+        describe('and the affected member is not subscribed', () => {
+          beforeEach(() => {
+            // Remove the affected member from subscribers
+            subscribersContext.removeSubscriber('0x123')
           })
-          expect(emitSpy999).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
-            communityId: 'community-1',
-            memberAddress: '0x999',
-            status
+
+          it('should emit connectivity update to all online members across multiple batches but not notify the affected member', async () => {
+            const update = {
+              communityId: 'community-1',
+              memberAddress: '0x123',
+              status
+            }
+
+            // Add the third subscriber for the test
+            const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
+            const emitSpy999 = jest.spyOn(subscriber999, 'emit')
+
+            await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
+
+            expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith('community-1', [
+              '0x456',
+              '0x789',
+              '0x999'
+            ])
+            expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+              communityId: 'community-1',
+              memberAddress: '0x456',
+              status
+            })
+            expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+              communityId: 'community-1',
+              memberAddress: '0x789',
+              status
+            })
+            expect(emitSpy999).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+              communityId: 'community-1',
+              memberAddress: '0x999',
+              status
+            })
+            expect(emitSpy123).not.toHaveBeenCalled()
           })
         })
       })

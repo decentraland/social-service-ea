@@ -90,11 +90,6 @@ export const metricDeclarations = {
   ws_queue_vs_backpressure_ratio: {
     type: IMetricsComponent.GaugeType,
     help: 'Ratio of message queue size to uWebSocket buffered amount'
-  },
-  ws_circuit_breaker_events: {
-    type: IMetricsComponent.CounterType,
-    help: 'Number of circuit breaker events (opened/closed)',
-    labelNames: ['action']
   }
 }
 
