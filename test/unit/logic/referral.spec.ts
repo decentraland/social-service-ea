@@ -8,11 +8,14 @@ import {
   SelfReferralError
 } from '../../../src/logic/referral/errors'
 import { Events } from '@dcl/schemas'
+import { RewardStatus } from '../../../src/logic/referral/types'
 
 describe('referral-component', () => {
   let mockReferralDb: any
   let mockLogger: any
   let mockSns: any
+  let mockConfig: any
+  let mockRewards: any
   let referralComponent: IReferralComponent
 
   beforeEach(async () => {
@@ -23,7 +26,11 @@ describe('referral-component', () => {
       updateReferralProgress: jest.fn(),
       countAcceptedInvitesByReferrer: jest.fn(),
       getLastViewedProgressByReferrer: jest.fn(),
-      setLastViewedProgressByReferrer: jest.fn()
+      setLastViewedProgressByReferrer: jest.fn(),
+      setReferralEmail: jest.fn(),
+      getLastReferralEmailByReferrer: jest.fn(),
+      setReferralRewardImage: jest.fn(),
+      getReferralRewardImage: jest.fn()
     }
 
     mockLogger = {
@@ -36,10 +43,34 @@ describe('referral-component', () => {
       publishMessage: jest.fn().mockResolvedValue({ MessageId: 'mock-message-id' })
     }
 
+    mockConfig = {
+      requireString: jest.fn().mockImplementation((key: string) => {
+        const rewardKeys: Record<string, string> = {
+          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5',
+          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10',
+          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20',
+          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_25: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_25',
+          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_30: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_30',
+          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50',
+          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60',
+          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75',
+          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100',
+          PROFILE_URL: 'https://decentraland.org/profile'
+        }
+        return Promise.resolve(rewardKeys[key])
+      })
+    }
+
+    mockRewards = {
+      sendReward: jest.fn().mockResolvedValue([{ image: 'test-image.png', rarity: 'common' }])
+    }
+
     referralComponent = await createReferralComponent({
       referralDb: mockReferralDb,
       logs: { getLogger: () => mockLogger },
-      sns: mockSns
+      sns: mockSns,
+      config: mockConfig,
+      rewards: mockRewards
     })
   })
 
@@ -379,25 +410,21 @@ describe('referral-component', () => {
           previousStatus: ReferralProgressStatus.SIGNED_UP,
           newStatus: ReferralProgressStatus.TIER_GRANTED
         })
-        expect(mockLogger.info).toHaveBeenCalledWith('Referral finalized successfully', {
-          invitedUser: validInvitedUser.toLowerCase(),
-          status: ReferralProgressStatus.TIER_GRANTED
-        })
       })
     })
 
     describe('when referral reaches a tier milestone', () => {
       describe.each([
-        { invitedUsers: 5, tier: 1 },
-        { invitedUsers: 10, tier: 2 },
-        { invitedUsers: 20, tier: 3 },
-        { invitedUsers: 25, tier: 4 },
-        { invitedUsers: 30, tier: 5 },
-        { invitedUsers: 50, tier: 6 },
-        { invitedUsers: 60, tier: 7 },
-        { invitedUsers: 75, tier: 8 },
-        { invitedUsers: 100, tier: 9 }
-      ])('and the referral reaches tier $tier milestone', ({ invitedUsers, tier }) => {
+        { invitedUsers: 5, tier: 1, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5' },
+        { invitedUsers: 10, tier: 2, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10' },
+        { invitedUsers: 20, tier: 3, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20' },
+        { invitedUsers: 25, tier: 4, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_25' },
+        { invitedUsers: 30, tier: 5, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_30' },
+        { invitedUsers: 50, tier: 6, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50' },
+        { invitedUsers: 60, tier: 7, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60' },
+        { invitedUsers: 75, tier: 8, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75' },
+        { invitedUsers: 100, tier: 9, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100' }
+      ])('and the referral reaches tier $tier milestone', ({ invitedUsers, tier, rewardKey }) => {
         beforeEach(() => {
           mockReferralDb.findReferralProgress.mockResolvedValueOnce([
             {
@@ -408,16 +435,36 @@ describe('referral-component', () => {
           ])
           mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
+          mockRewards.sendReward.mockResolvedValueOnce([
+            {
+              id: '550e8400-e29b-41d4-a716-446655440000',
+              user: validInvitedUser,
+              status: RewardStatus.assigned,
+              chain_id: 137,
+              target: validInvitedUser,
+              value: '1000000000000000000',
+              token: 'MANA',
+              image: `https://rewards.decentraland.zone/reward${tier}.png`,
+              rarity: null
+            }
+          ])
         })
 
         it(`should send the notification with the correct tier for ${invitedUsers} invited users`, async () => {
           await referralComponent.finalizeReferral(validInvitedUser)
 
+          expect(mockRewards.sendReward).toHaveBeenCalledWith(rewardKey, validInvitedUser.toLowerCase())
+          expect(mockReferralDb.setReferralRewardImage).toHaveBeenCalledWith({
+            referrer: validReferrer.toLowerCase(),
+            rewardImageUrl: `https://rewards.decentraland.zone/reward${tier}.png`,
+            tier: invitedUsers
+          })
           expect(mockSns.publishMessage).toHaveBeenCalledWith(
             expect.objectContaining({
               metadata: expect.objectContaining({
                 tier,
-                invitedUsers
+                invitedUsers,
+                image: `https://rewards.decentraland.zone/reward${tier}.png`
               })
             })
           )
@@ -450,9 +497,11 @@ describe('referral-component', () => {
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
         })
 
-        it(`should send the notification with the correct tier for ${invitedUsers} invited users`, async () => {
+        it(`should send the notification with the correct tier for ${invitedUsers} invited users and not send reward`, async () => {
           await referralComponent.finalizeReferral(validInvitedUser)
 
+          expect(mockRewards.sendReward).not.toHaveBeenCalled()
+          expect(mockReferralDb.setReferralRewardImage).not.toHaveBeenCalled()
           expect(mockSns.publishMessage).toHaveBeenCalledWith(
             expect.objectContaining({
               metadata: expect.objectContaining({
@@ -581,12 +630,19 @@ describe('referral-component', () => {
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
         mockReferralDb.getLastViewedProgressByReferrer.mockResolvedValueOnce(3)
         mockReferralDb.setLastViewedProgressByReferrer.mockResolvedValueOnce(undefined)
+        mockReferralDb.getReferralRewardImage.mockResolvedValueOnce([
+          {
+            reward_image_url: 'https://rewards.decentraland.zone/reward5.png',
+            tier: 5
+          }
+        ])
 
         const result = await referralComponent.getInvitedUsersAcceptedStats(validReferrer)
 
         expect(mockReferralDb.countAcceptedInvitesByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase())
         expect(mockReferralDb.getLastViewedProgressByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase())
         expect(mockReferralDb.setLastViewedProgressByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase(), 5)
+        expect(mockReferralDb.getReferralRewardImage).toHaveBeenCalledWith(validReferrer.toLowerCase())
         expect(mockLogger.info).toHaveBeenCalledWith('Getting invited users accepted stats', {
           referrer: validReferrer.toLowerCase()
         })
@@ -597,7 +653,8 @@ describe('referral-component', () => {
         })
         expect(result).toEqual({
           invitedUsersAccepted: 5,
-          invitedUsersAcceptedViewed: 3
+          invitedUsersAcceptedViewed: 3,
+          rewardImages: [{ tier: 5, url: 'https://rewards.decentraland.zone/reward5.png' }]
         })
       })
 
@@ -605,6 +662,7 @@ describe('referral-component', () => {
         beforeEach(() => {
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(0)
           mockReferralDb.getLastViewedProgressByReferrer.mockResolvedValue(0)
+          mockReferralDb.getReferralRewardImage.mockResolvedValue(null)
         })
 
         it('should return 0 for both accepted and viewed', async () => {
@@ -612,7 +670,8 @@ describe('referral-component', () => {
 
           expect(result).toEqual({
             invitedUsersAccepted: 0,
-            invitedUsersAcceptedViewed: 0
+            invitedUsersAcceptedViewed: 0,
+            rewardImages: []
           })
           expect(mockReferralDb.setLastViewedProgressByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase(), 0)
         })
@@ -622,6 +681,7 @@ describe('referral-component', () => {
         beforeEach(() => {
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(5)
           mockReferralDb.getLastViewedProgressByReferrer.mockResolvedValue(null)
+          mockReferralDb.getReferralRewardImage.mockResolvedValue(null)
         })
 
         it('should return null for viewed', async () => {
@@ -629,7 +689,8 @@ describe('referral-component', () => {
 
           expect(result).toEqual({
             invitedUsersAccepted: 5,
-            invitedUsersAcceptedViewed: null
+            invitedUsersAcceptedViewed: null,
+            rewardImages: []
           })
           expect(mockReferralDb.setLastViewedProgressByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase(), 5)
         })

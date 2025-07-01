@@ -14,9 +14,11 @@ export interface IReferralComponent {
     status: ReferralProgressStatus.SIGNED_UP | ReferralProgressStatus.TIER_GRANTED
   ): Promise<void>
   finalizeReferral(invitedUser: string): Promise<void>
-  getInvitedUsersAcceptedStats(
-    referrer: string
-  ): Promise<{ invitedUsersAccepted: number; invitedUsersAcceptedViewed: number }>
+  getInvitedUsersAcceptedStats(referrer: string): Promise<{
+    invitedUsersAccepted: number
+    invitedUsersAcceptedViewed: number
+    rewardImages: { tier: number; url: string }[]
+  }>
   setReferralEmail(referralEmailInput: Pick<ReferralEmail, 'referrer' | 'email'>): Promise<ReferralEmail>
   setReferralRewardImage(referralRewardImageInput: SetReferralRewardImageInput): Promise<ReferralRewardImage>
 }
