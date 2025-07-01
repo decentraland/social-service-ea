@@ -191,30 +191,28 @@ export async function createReferralComponent(
       const event = createReferralInvitedUsersAcceptedEvent(referrer, invitedUser, acceptedInvites)
       await sns.publishMessage(event)
 
-      if (!TIERS.includes(acceptedInvites)) {
-        logger.info('Referral finalized successfully', {
+      if (TIERS.includes(acceptedInvites)) {
+        const rewardKey = rewardKeys[acceptedInvites as keyof typeof rewardKeys]
+        const rewardsSent = await rewards.sendReward(rewardKey, invitedUser)
+
+        const eventNewTierReached = createReferralNewTierReachedEvent(
+          referrer,
           invitedUser,
-          status: ReferralProgressStatus.TIER_GRANTED
-        })
+          acceptedInvites,
+          rewardsSent[0]
+        )
+
+        await Promise.all([
+          sns.publishMessage(eventNewTierReached),
+          referralDb.setReferralRewardImage({
+            referrer,
+            rewardImageUrl: rewardsSent[0].image,
+            tier: acceptedInvites
+          })
+        ])
+
         return
       }
-
-      const rewardKey = rewardKeys[acceptedInvites as keyof typeof rewardKeys]
-      const rewardsSent = await rewards.sendReward(rewardKey, invitedUser)
-
-      const eventNewTierReached = createReferralNewTierReachedEvent(
-        referrer,
-        invitedUser,
-        acceptedInvites,
-        rewardsSent[0]
-      )
-      await sns.publishMessage(eventNewTierReached)
-
-      await referralDb.setReferralRewardImage({
-        referrer,
-        rewardImageUrl: rewardsSent[0].image,
-        tier: acceptedInvites
-      })
 
       logger.info('Referral finalized successfully', {
         invitedUser,
@@ -226,9 +224,10 @@ export async function createReferralComponent(
       const ref = validateAddress(referrer, 'referrer')
       logger.info('Getting invited users accepted stats', { referrer: ref })
 
-      const [invitedUsersAccepted, invitedUsersAcceptedViewed] = await Promise.all([
+      const [invitedUsersAccepted, invitedUsersAcceptedViewed, referralRewardImage] = await Promise.all([
         referralDb.countAcceptedInvitesByReferrer(ref),
-        referralDb.getLastViewedProgressByReferrer(ref)
+        referralDb.getLastViewedProgressByReferrer(ref),
+        referralDb.getReferralRewardImage(ref)
       ])
 
       await referralDb.setLastViewedProgressByReferrer(ref, invitedUsersAccepted)
@@ -239,7 +238,6 @@ export async function createReferralComponent(
         invitedUsersAcceptedViewed
       })
 
-      const referralRewardImage = await referralDb.getReferralRewardImage(ref)
       const rewardImages =
         referralRewardImage?.map((image) => ({
           tier: image.tier,

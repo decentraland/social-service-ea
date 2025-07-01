@@ -18,9 +18,11 @@ test('GET /v1/referral-progress', ({ components }) => {
   })
 
   beforeEach(async () => {
-    referrer = await createTestIdentity()
-    invited_user = await createTestIdentity()
-    newReferrer = await createTestIdentity()
+    ;[referrer, invited_user, newReferrer] = await Promise.all([
+      createTestIdentity(),
+      createTestIdentity(),
+      createTestIdentity()
+    ])
 
     await components.referralDb.createReferral({
       referrer: referrer.realAccount.address.toLowerCase(),
