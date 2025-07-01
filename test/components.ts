@@ -57,6 +57,7 @@ import { createPeersStatsComponent } from '../src/logic/peers-stats'
 import { createStorageHelper } from './integration/utils/storage'
 import { createUpdateHandlerComponent } from '../src/logic/updates'
 import { AnalyticsEventPayload } from '../src/types/analytics'
+import { createRewardComponent } from '../src/adapters/rewards'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -198,6 +199,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const referral = await createReferralComponent({ referralDb, logs, sns })
 
+  const rewards = await createRewardComponent({ fetcher, config })
+
   const queue = createMemoryQueueAdapter()
 
   const messageProcessor = await createMessageProcessorComponent({
@@ -246,6 +249,7 @@ async function initComponents(): Promise<TestComponents> {
     redis,
     referral,
     referralDb,
+    rewards,
     rpcClient,
     rpcServer,
     settings,

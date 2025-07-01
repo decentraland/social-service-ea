@@ -24,8 +24,6 @@ export async function createMessageProcessorComponent({
 
     await referral.finalizeReferral(userAddress)
 
-    logger.info('Referral tier granted to user', { userAddress })
-
     return
   }
 

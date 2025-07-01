@@ -87,7 +87,6 @@ describe('message-processor', () => {
 
         expect(result).toBeUndefined()
         expect(mockReferral.finalizeReferral).toHaveBeenCalledWith('0x123')
-        expect(mockLogger.info).toHaveBeenCalledWith('Referral tier granted to user', { userAddress: '0x123' })
       })
     })
   })

@@ -49,6 +49,7 @@ import { createJobComponent } from './logic/job'
 import { createPlacesApiAdapter } from './adapters/places-api'
 import { createUpdateHandlerComponent } from './logic/updates'
 import { AnalyticsEventPayload } from './types/analytics'
+import { createRewardComponent } from './adapters/rewards'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -113,6 +114,8 @@ export async function initComponents(): Promise<AppComponents> {
   const referralDb = await createReferralDBComponent({ pg, logs })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
+
+  const rewards = await createRewardComponent({ fetcher, config })
   const referral = await createReferralComponent({ referralDb, logs, sns })
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
@@ -235,6 +238,7 @@ export async function initComponents(): Promise<AppComponents> {
     redis,
     referral,
     referralDb,
+    rewards,
     rpcServer,
     settings,
     sns,
