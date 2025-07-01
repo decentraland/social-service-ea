@@ -116,7 +116,7 @@ export async function initComponents(): Promise<AppComponents> {
   const sns = await createSnsComponent({ config })
 
   const rewards = await createRewardComponent({ fetcher, config })
-  const referral = await createReferralComponent({ referralDb, logs, sns })
+  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards })
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })

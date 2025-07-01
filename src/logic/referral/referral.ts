@@ -21,61 +21,97 @@ function validateAddress(value: string, field: string): string {
   return value.toLowerCase()
 }
 
-function createReferralInvitedUsersAcceptedEvent(
-  referrer: string,
-  invitedUser: string,
-  totalInvitedUsers: number
-): ReferralInvitedUsersAcceptedEvent {
-  return {
-    type: Events.Type.REFERRAL,
-    subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED,
-    key: `${Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED}-${referrer}-${invitedUser}-${Date.now()}`,
-    timestamp: Date.now(),
-    metadata: {
-      address: referrer,
-      title: 'Referral Completed!',
-      description: `Your friend jumped into Decentraland, so you're closer to unlocking your next reward!`,
-      tier: TIERS.findIndex((tier) => totalInvitedUsers <= tier) + 1,
-      url: `https://decentraland.org/profile/accounts/${referrer}/referral`,
-      image: 'https://assets-cdn.decentraland.org/referral/referral-invited-user-accepted-icon.png',
-      invitedUserAddress: invitedUser,
-      invitedUsers: totalInvitedUsers,
-      rarity: null
-    }
-  }
-}
-
-function createReferralNewTierReachedEvent(
-  referrer: string,
-  invitedUser: string,
-  totalInvitedUsers: number,
-  reward: RewardAttributes
-): ReferralNewTierReachedEvent {
-  return {
-    type: Events.Type.REFERRAL,
-    subType: Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED,
-    key: `${Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED}-${referrer}-${invitedUser}-${Date.now()}`,
-    timestamp: Date.now(),
-    metadata: {
-      address: referrer,
-      title: 'Referral Reward Unlocked!',
-      description: `Check the 'Referral Rewards' tab in your web profile to see your prize!`,
-      tier: TIERS.findIndex((tier) => totalInvitedUsers <= tier) + 1,
-      url: `https://decentraland.org/profile/accounts/${referrer}/referral`,
-      image: 'https://assets-cdn.decentraland.org/referral/referral-new-tier-reached-icon.png',
-      invitedUserAddress: invitedUser,
-      invitedUsers: totalInvitedUsers,
-      rarity: reward.rarity!
-    }
-  }
-}
-
 export async function createReferralComponent(
-  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns'>
+  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards'>
 ): Promise<IReferralComponent> {
-  const { referralDb, logs, sns } = components
+  const { referralDb, logs, sns, config, rewards } = components
 
   const logger = logs.getLogger('referral-component')
+
+  const [
+    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5,
+    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10,
+    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20,
+    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_25,
+    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_30,
+    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50,
+    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60,
+    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
+    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100,
+    PROFILE_URL
+  ] = await Promise.all([
+    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5'),
+    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10'),
+    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20'),
+    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_25'),
+    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_30'),
+    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50'),
+    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60'),
+    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75'),
+    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100'),
+    config.requireString('PROFILE_URL')
+  ])
+
+  const rewardKeys = {
+    5: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5,
+    10: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10,
+    20: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20,
+    25: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_25,
+    30: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_30,
+    50: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50,
+    60: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60,
+    75: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
+    100: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100
+  }
+
+  function createReferralInvitedUsersAcceptedEvent(
+    referrer: string,
+    invitedUser: string,
+    totalInvitedUsers: number
+  ): ReferralInvitedUsersAcceptedEvent {
+    return {
+      type: Events.Type.REFERRAL,
+      subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED,
+      key: `${Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED}-${referrer}-${invitedUser}-${Date.now()}`,
+      timestamp: Date.now(),
+      metadata: {
+        address: referrer,
+        title: 'Referral Completed!',
+        description: `Your friend jumped into Decentraland, so you're closer to unlocking your next reward!`,
+        tier: TIERS.findIndex((tier) => totalInvitedUsers <= tier) + 1,
+        url: `${PROFILE_URL}/accounts/${referrer}/referral`,
+        image: 'https://assets-cdn.decentraland.org/referral/referral-invited-user-accepted-icon.png',
+        invitedUserAddress: invitedUser,
+        invitedUsers: totalInvitedUsers,
+        rarity: null
+      }
+    }
+  }
+
+  function createReferralNewTierReachedEvent(
+    referrer: string,
+    invitedUser: string,
+    totalInvitedUsers: number,
+    reward: RewardAttributes
+  ): ReferralNewTierReachedEvent {
+    return {
+      type: Events.Type.REFERRAL,
+      subType: Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED,
+      key: `${Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED}-${referrer}-${invitedUser}-${Date.now()}`,
+      timestamp: Date.now(),
+      metadata: {
+        address: referrer,
+        title: 'Referral Reward Unlocked!',
+        description: `Check the 'Referral Rewards' tab in your web profile to see your prize!`,
+        tier: TIERS.findIndex((tier) => totalInvitedUsers <= tier) + 1,
+        url: `${PROFILE_URL}/accounts/${referrer}/referral`,
+        image: reward.image,
+        invitedUserAddress: invitedUser,
+        invitedUsers: totalInvitedUsers,
+        rarity: reward.rarity!
+      }
+    }
+  }
 
   return {
     create: async (referralInput: CreateReferralWithInvitedUser) => {
@@ -154,6 +190,25 @@ export async function createReferralComponent(
 
       const event = createReferralInvitedUsersAcceptedEvent(referrer, invitedUser, acceptedInvites)
       await sns.publishMessage(event)
+
+      if (!TIERS.includes(acceptedInvites)) {
+        logger.info('Referral finalized successfully', {
+          invitedUser,
+          status: ReferralProgressStatus.TIER_GRANTED
+        })
+        return
+      }
+
+      const rewardKey = rewardKeys[acceptedInvites as keyof typeof rewardKeys]
+      const rewardsSent = await rewards.sendReward(rewardKey, invitedUser)
+
+      const eventNewTierReached = createReferralNewTierReachedEvent(
+        referrer,
+        invitedUser,
+        acceptedInvites,
+        rewardsSent[0]
+      )
+      await sns.publishMessage(eventNewTierReached)
 
       logger.info('Referral finalized successfully', {
         invitedUser,
