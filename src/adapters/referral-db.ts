@@ -172,6 +172,14 @@ export async function createReferralDBComponent(
     return result.rows[0] || null
   }
 
+  async function getReferralRewardImage(referrer: string): Promise<ReferralRewardImage[] | null> {
+    logger.debug('Getting referral reward image by referrer', { referrer })
+    const result = await pg.query<ReferralRewardImage>(
+      SQL`SELECT * FROM referral_reward_images WHERE referrer = ${referrer.toLowerCase()}`
+    )
+    return result.rows || null
+  }
+
   return {
     createReferral,
     findReferralProgress,
@@ -183,6 +191,7 @@ export async function createReferralDBComponent(
     setLastViewedProgressByReferrer,
     setReferralEmail,
     setReferralRewardImage,
-    getLastReferralEmailByReferrer
+    getLastReferralEmailByReferrer,
+    getReferralRewardImage
   }
 }
