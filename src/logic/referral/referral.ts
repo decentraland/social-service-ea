@@ -210,6 +210,12 @@ export async function createReferralComponent(
       )
       await sns.publishMessage(eventNewTierReached)
 
+      await referralDb.setReferralRewardImage({
+        referrer,
+        rewardImageUrl: rewardsSent[0].image,
+        tier: acceptedInvites
+      })
+
       logger.info('Referral finalized successfully', {
         invitedUser,
         status: ReferralProgressStatus.TIER_GRANTED
