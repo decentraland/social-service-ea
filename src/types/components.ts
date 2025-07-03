@@ -195,6 +195,9 @@ export interface IVoiceDatabaseComponent {
 
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>
+  addToSet: (key: string, member: string) => Promise<number>
+  removeFromSet: (key: string, member: string) => Promise<number>
+  listSetMembers: (key: string) => Promise<string[]>
 }
 
 export interface ICacheComponent extends IBaseCacheComponent {
