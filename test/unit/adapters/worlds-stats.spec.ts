@@ -5,62 +5,79 @@ import { mockLogs, mockRedis } from '../../mocks/components'
 
 describe('WorldsStatsComponent', () => {
   let worldsStats: IWorldsStatsComponent
-  let mockRedisClient: jest.Mocked<any>
 
   beforeEach(async () => {
     worldsStats = await createWorldsStatsComponent({
       logs: mockLogs,
       redis: mockRedis
     })
-
-    mockRedisClient = mockRedis.client as jest.Mocked<any>
   })
 
-  describe('onPeerConnect', () => {
-    it('should add user to world set and set TTL', async () => {
-      const address = '0x123'
-      await worldsStats.onPeerConnect(address)
+  describe('when a peer connects', () => {
+    describe('and the connection succeeds', () => {
+      it('should add user to world set', async () => {
+        const address = '0x123'
+        await worldsStats.onPeerConnect(address)
 
-      expect(mockRedisClient.sAdd).toHaveBeenCalledWith(WORLD_PEERS_CACHE_KEY, address)
+        expect(mockRedis.addToSet).toHaveBeenCalledWith(WORLD_PEERS_CACHE_KEY, address)
+      })
     })
 
-    it('should handle errors', async () => {
-      const address = '0x123'
-      mockRedisClient.sAdd.mockRejectedValueOnce(new Error('Redis error'))
+    describe('and the connection fails', () => {
+      beforeEach(() => {
+        mockRedis.addToSet.mockRejectedValueOnce(new Error('Redis error'))
+      })
 
-      await expect(worldsStats.onPeerConnect(address)).rejects.toThrow('Redis error')
-    })
-  })
-
-  describe('onPeerDisconnect', () => {
-    it('should remove user from world set', async () => {
-      const address = '0x123'
-      await worldsStats.onPeerDisconnect(address)
-
-      expect(mockRedisClient.sRem).toHaveBeenCalledWith(WORLD_PEERS_CACHE_KEY, address)
-    })
-
-    it('should handle errors', async () => {
-      const address = '0x123'
-      mockRedisClient.sRem.mockRejectedValueOnce(new Error('Redis error'))
-
-      await expect(worldsStats.onPeerDisconnect(address)).rejects.toThrow('Redis error')
+      it('should handle errors', async () => {
+        const address = '0x123'
+        await expect(worldsStats.onPeerConnect(address)).rejects.toThrow('Redis error')
+      })
     })
   })
 
-  describe('getPeers', () => {
-    it('should return list of users in world', async () => {
-      const users = ['0x123', '0x456']
-      mockRedisClient.sMembers.mockResolvedValueOnce(users)
+  describe('when a peer disconnects', () => {
+    describe('and the disconnection succeeds', () => {
+      it('should remove user from world set', async () => {
+        const address = '0x123'
+        await worldsStats.onPeerDisconnect(address)
 
-      const result = await worldsStats.getPeers()
-      expect(result).toEqual(users)
+        expect(mockRedis.removeFromSet).toHaveBeenCalledWith(WORLD_PEERS_CACHE_KEY, address)
+      })
     })
 
-    it('should handle errors from redis', async () => {
-      mockRedisClient.sMembers.mockRejectedValueOnce(new Error('Redis error'))
+    describe('and the disconnection fails', () => {
+      beforeEach(() => {
+        mockRedis.removeFromSet.mockRejectedValueOnce(new Error('Redis error'))
+      })
 
-      await expect(worldsStats.getPeers()).rejects.toThrow('Redis error')
+      it('should handle errors', async () => {
+        const address = '0x123'
+        await expect(worldsStats.onPeerDisconnect(address)).rejects.toThrow('Redis error')
+      })
+    })
+  })
+
+  describe('when getting peers', () => {
+    describe('and the retrieval succeeds', () => {
+      beforeEach(() => {
+        const users = ['0x123', '0x456']
+        mockRedis.listSetMembers.mockResolvedValueOnce(users)
+      })
+
+      it('should return list of users in world', async () => {
+        const result = await worldsStats.getPeers()
+        expect(result).toEqual(['0x123', '0x456'])
+      })
+    })
+
+    describe('and the retrieval fails', () => {
+      beforeEach(() => {
+        mockRedis.listSetMembers.mockRejectedValueOnce(new Error('Redis error'))
+      })
+
+      it('should handle errors from redis', async () => {
+        await expect(worldsStats.getPeers()).rejects.toThrow('Redis error')
+      })
     })
   })
 })

@@ -11,7 +11,7 @@ export async function createWorldsStatsComponent({
   return {
     async onPeerConnect(address: string): Promise<void> {
       try {
-        await redis.client.sAdd(WORLD_PEERS_CACHE_KEY, normalizeAddress(address))
+        await redis.addToSet(WORLD_PEERS_CACHE_KEY, normalizeAddress(address))
       } catch (error: any) {
         logger.error('Error handling peer connection:', {
           error: error.message,
@@ -23,7 +23,7 @@ export async function createWorldsStatsComponent({
 
     async onPeerDisconnect(address: string): Promise<void> {
       try {
-        await redis.client.sRem(WORLD_PEERS_CACHE_KEY, normalizeAddress(address))
+        await redis.removeFromSet(WORLD_PEERS_CACHE_KEY, normalizeAddress(address))
       } catch (error: any) {
         logger.error('Error handling peer disconnection:', {
           error: error.message,
@@ -35,7 +35,7 @@ export async function createWorldsStatsComponent({
 
     async getPeers(): Promise<string[]> {
       try {
-        return await redis.client.sMembers(WORLD_PEERS_CACHE_KEY)
+        return await redis.listSetMembers(WORLD_PEERS_CACHE_KEY)
       } catch (error: any) {
         logger.error('Error getting world connected peers:', {
           error: error.message

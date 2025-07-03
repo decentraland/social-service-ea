@@ -1,6 +1,7 @@
 import { ICacheComponent, IRedisComponent } from '../../../src/types'
 import { createClient } from 'redis'
 
+// TODO: Remove this mock and use the createMockedRedisComponent instead
 jest.mock('redis', () => {
   const mockClient = {
     on: jest.fn(),
@@ -37,5 +38,25 @@ jest.mock('redis', () => {
 export const mockRedis: jest.Mocked<IRedisComponent & ICacheComponent> = {
   client: createClient(),
   get: jest.fn(),
-  put: jest.fn()
+  put: jest.fn(),
+  addToSet: jest.fn(),
+  removeFromSet: jest.fn(),
+  listSetMembers: jest.fn()
+}
+
+export const createMockedRedisComponent = ({
+  get = jest.fn(),
+  put = jest.fn(),
+  addToSet = jest.fn(),
+  removeFromSet = jest.fn(),
+  listSetMembers = jest.fn()
+}: Partial<jest.Mocked<IRedisComponent & ICacheComponent>>): jest.Mocked<IRedisComponent & ICacheComponent> => {
+  return {
+    client: createClient(),
+    get,
+    put,
+    addToSet,
+    removeFromSet,
+    listSetMembers
+  }
 }
