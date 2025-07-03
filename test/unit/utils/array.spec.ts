@@ -16,8 +16,6 @@ describe('shuffleArray', () => {
     const shuffledArray = shuffleArray([...originalArray])
 
     expect(shuffledArray).not.toEqual(originalArray)
-
-    jest.restoreAllMocks()
   })
 
   it('should not modify the original array', () => {

@@ -53,7 +53,6 @@ describe('ws-pool-component', () => {
 
   afterEach(() => {
     global.setInterval = originalSetInterval
-    jest.restoreAllMocks()
   })
 
   describe('when initializing the component', () => {

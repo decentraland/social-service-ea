@@ -7,7 +7,6 @@ describe('sleep', () => {
   })
 
   afterAll(() => {
-    jest.restoreAllMocks()
     jest.useRealTimers()
   })
 
