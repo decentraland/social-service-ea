@@ -438,10 +438,10 @@ describe('referral-component', () => {
           mockRewards.sendReward.mockResolvedValueOnce([
             {
               id: '550e8400-e29b-41d4-a716-446655440000',
-              user: validInvitedUser,
+              user: validReferrer,
               status: RewardStatus.assigned,
               chain_id: 137,
-              target: validInvitedUser,
+              target: validReferrer,
               value: '1000000000000000000',
               token: 'MANA',
               image: `https://rewards.decentraland.zone/reward${tier}.png`,
@@ -453,7 +453,7 @@ describe('referral-component', () => {
         it(`should send the notification with the correct tier for ${invitedUsers} invited users`, async () => {
           await referralComponent.finalizeReferral(validInvitedUser)
 
-          expect(mockRewards.sendReward).toHaveBeenCalledWith(rewardKey, validInvitedUser.toLowerCase())
+          expect(mockRewards.sendReward).toHaveBeenCalledWith(rewardKey, validReferrer.toLowerCase())
           expect(mockReferralDb.setReferralRewardImage).toHaveBeenCalledWith({
             referrer: validReferrer.toLowerCase(),
             rewardImageUrl: `https://rewards.decentraland.zone/reward${tier}.png`,

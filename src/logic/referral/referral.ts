@@ -199,7 +199,7 @@ export async function createReferralComponent(
 
       if (TIERS.includes(acceptedInvites)) {
         const rewardKey = rewardKeys[acceptedInvites as keyof typeof rewardKeys]
-        const rewardsSent = await rewards.sendReward(rewardKey, invitedUser)
+        const rewardsSent = await rewards.sendReward(rewardKey, referrer)
 
         const eventNewTierReached = createReferralNewTierReachedEvent(
           referrer,
