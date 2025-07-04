@@ -189,6 +189,12 @@ export async function createReferralComponent(
       const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
 
       const event = createReferralInvitedUsersAcceptedEvent(referrer, invitedUser, acceptedInvites)
+      logger.debug('Publishing event createReferralInvitedUsersAcceptedEvent', {
+        referrer,
+        invitedUser,
+        acceptedInvites,
+        event: JSON.stringify(event)
+      })
       await sns.publishMessage(event)
 
       if (TIERS.includes(acceptedInvites)) {
@@ -201,6 +207,12 @@ export async function createReferralComponent(
           acceptedInvites,
           rewardsSent[0]
         )
+        logger.debug('Publishing event createReferralNewTierReachedEvent', {
+          referrer,
+          invitedUser,
+          acceptedInvites,
+          event: JSON.stringify(eventNewTierReached)
+        })
 
         await Promise.all([
           sns.publishMessage(eventNewTierReached),
