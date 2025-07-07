@@ -57,6 +57,7 @@ import { createStorageHelper } from './integration/utils/storage'
 import { createUpdateHandlerComponent } from '../src/logic/updates'
 import { AnalyticsEventPayload } from '../src/types/analytics'
 import { createRewardComponent } from '../src/adapters/rewards'
+import { createWsPoolComponent } from '../src/logic/ws-pool'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -214,6 +215,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const storageHelper = await createStorageHelper({ config })
 
+  const wsPool = createWsPoolComponent({ logs, metrics })
+
   return {
     analytics,
     archipelagoStats,
@@ -261,6 +264,7 @@ async function initComponents(): Promise<TestComponents> {
     uwsServer,
     voice,
     voiceDb,
-    worldsStats
+    worldsStats,
+    wsPool
   }
 }

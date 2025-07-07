@@ -49,6 +49,7 @@ import { createPlacesApiAdapter } from './adapters/places-api'
 import { createUpdateHandlerComponent } from './logic/updates'
 import { AnalyticsEventPayload } from './types/analytics'
 import { createRewardComponent } from './adapters/rewards'
+import { createWsPoolComponent } from './logic/ws-pool'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -187,6 +188,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+  const wsPool = createWsPoolComponent({ logs, metrics })
 
   const expirePrivateVoiceChatJob = createJobComponent(
     { logs },
@@ -248,6 +250,7 @@ export async function initComponents(): Promise<AppComponents> {
     uwsServer,
     voice,
     voiceDb,
-    worldsStats
+    worldsStats,
+    wsPool
   }
 }

@@ -1,12 +1,12 @@
 import mitt from 'mitt'
+import { randomUUID } from 'crypto'
+import { WebSocket } from 'uWebSockets.js'
 import { onRequestEnd, onRequestStart } from '@well-known-components/uws-http-server'
 import { verify } from '@dcl/platform-crypto-middleware'
 import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
-import { randomUUID } from 'crypto'
-import { WebSocket } from 'uWebSockets.js'
 
 const textDecoder = new TextDecoder()
 
@@ -18,41 +18,18 @@ const getAddress = (data: WsUserData) => {
 }
 
 export async function registerWsHandler(
-  components: Pick<AppComponents, 'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing'>
+  components: Pick<
+    AppComponents,
+    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing' | 'wsPool'
+  >
 ) {
-  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing } = components
+  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool } = components
   const logger = logs.getLogger('ws-handler')
 
   const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_SECONDS')) ?? 180000 // 3 minutes in ms
-  const connections = new Map<string, WebSocket<WsUserData>>()
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
-  }
-
-  function registerConnection(ws: WebSocket<WsUserData>) {
-    const { wsConnectionId } = ws.getUserData()
-    connections.set(wsConnectionId, ws)
-    logger.debug('Registering connection', { wsConnectionId, totalConnections: connections.size })
-    metrics.observe('ws_active_connections', {}, connections.size)
-  }
-
-  function unregisterConnection(data: WsUserData) {
-    const { wsConnectionId, connectionStartTime } = data
-    connections.delete(wsConnectionId)
-    metrics.observe('ws_active_connections', {}, connections.size)
-
-    const duration = (Date.now() - connectionStartTime) / 1000
-
-    if (!isNaN(duration) && isFinite(duration)) {
-      metrics.observe('ws_connection_duration_seconds', {}, duration)
-    }
-
-    logger.debug('Unregistering connection', {
-      wsConnectionId,
-      totalConnections: connections.size,
-      durationSeconds: duration || 'N/A'
-    })
   }
 
   function cleanupConnection(data: WsUserData, code: number, messageText: string) {
@@ -82,7 +59,7 @@ export async function registerWsHandler(
       delete data.timeout
     }
 
-    unregisterConnection(data)
+    wsPool.unregisterConnection(data)
 
     changeStage(data, {
       auth: false,
@@ -225,7 +202,7 @@ export async function registerWsHandler(
       })
 
       try {
-        registerConnection(ws)
+        wsPool.registerConnection(ws)
 
         logger.debug('Connection acquired', {
           wsConnectionId: data.wsConnectionId,
