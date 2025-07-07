@@ -20,7 +20,6 @@ import {
   IPeerTrackingComponent,
   ICatalystClientComponent,
   IPublisherComponent,
-  IWSPoolComponent,
   ISubscribersContext,
   ITracingComponent,
   ICommsGatekeeperComponent,
@@ -97,7 +96,6 @@ export type BaseComponents = {
   updateHandler: IUpdateHandlerComponent
   uwsServer: IUWsComponent
   worldsStats: IWorldsStatsComponent
-  wsPool: IWSPoolComponent
   settings: ISettingsComponent
   voice: IVoiceComponent
   voiceDb: IVoiceDatabaseComponent

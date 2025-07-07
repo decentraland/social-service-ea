@@ -254,15 +254,6 @@ export type IPublisherComponent = {
   ): Promise<PublishCommandOutput>
 }
 
-export type IWSPoolComponent = {
-  acquireConnection(id: string): Promise<void>
-  releaseConnection(id: string): void
-  updateActivity(id: string): void
-  isConnectionAvailable(id: string): Promise<boolean>
-  getActiveConnections(): Promise<number>
-  cleanup(): void
-}
-
 export type ISubscribersContext = {
   getSubscribers: () => Subscribers
   getSubscribersAddresses: () => string[]

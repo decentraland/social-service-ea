@@ -18,18 +18,41 @@ const getAddress = (data: WsUserData) => {
 }
 
 export async function registerWsHandler(
-  components: Pick<
-    AppComponents,
-    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool' | 'tracing'
-  >
+  components: Pick<AppComponents, 'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing'>
 ) {
-  const { logs, uwsServer, metrics, fetcher, rpcServer, config, wsPool, tracing } = components
+  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing } = components
   const logger = logs.getLogger('ws-handler')
 
   const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_SECONDS')) ?? 180000 // 3 minutes in ms
+  const connections = new Map<string, WsUserData>()
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
+  }
+
+  function registerConnection(data: WsUserData) {
+    const { wsConnectionId } = data
+    connections.set(wsConnectionId, data)
+    logger.debug('Registering connection', { wsConnectionId, totalConnections: connections.size })
+    metrics.observe('ws_active_connections', {}, connections.size)
+  }
+
+  function unregisterConnection(data: WsUserData) {
+    const { wsConnectionId, connectionStartTime } = data
+    connections.delete(wsConnectionId)
+    metrics.observe('ws_active_connections', {}, connections.size)
+
+    const duration = (Date.now() - connectionStartTime) / 1000
+
+    if (!isNaN(duration) && isFinite(duration)) {
+      metrics.observe('ws_connection_duration_seconds', {}, duration)
+    }
+
+    logger.debug('Unregistering connection', {
+      wsConnectionId,
+      totalConnections: connections.size,
+      durationSeconds: duration || 'N/A'
+    })
   }
 
   function cleanupConnection(data: WsUserData, code: number, messageText: string) {
@@ -59,28 +82,12 @@ export async function registerWsHandler(
       delete data.timeout
     }
 
-    if (wsConnectionId) {
-      wsPool.releaseConnection(wsConnectionId)
-    }
+    unregisterConnection(data)
 
     changeStage(data, {
       auth: false,
       isConnected: false,
       authenticating: false
-    })
-  }
-
-  function trackConnectionDuration(data: WsUserData) {
-    const { wsConnectionId, connectionStartTime } = data
-    const duration = (Date.now() - connectionStartTime) / 1000
-
-    if (!isNaN(duration) && isFinite(duration)) {
-      metrics.observe('ws_connection_duration_seconds', {}, duration)
-    }
-
-    logger.debug('WebSocket connection tracked duration', {
-      wsConnectionId: wsConnectionId,
-      durationSeconds: duration || 'N/A'
     })
   }
 
@@ -122,10 +129,6 @@ export async function registerWsHandler(
         })
         rpcServer.detachUser(address)
       })
-
-      if (data.wsConnectionId) {
-        wsPool.updateActivity(data.wsConnectionId)
-      }
     } catch (error: any) {
       logger.error(`Error verifying auth chain: ${error.message}`, {
         wsConnectionId: data.wsConnectionId
@@ -158,10 +161,6 @@ export async function registerWsHandler(
 
       data.eventEmitter.emit('message', message)
       metrics.increment('ws_messages_sent')
-
-      if (data.wsConnectionId) {
-        wsPool.updateActivity(data.wsConnectionId)
-      }
     } catch (error: any) {
       logger.error('Error emitting message', {
         error,
@@ -226,7 +225,7 @@ export async function registerWsHandler(
       })
 
       try {
-        await wsPool.acquireConnection(data.wsConnectionId)
+        registerConnection(data)
 
         logger.debug('Connection acquired', {
           wsConnectionId: data.wsConnectionId,
@@ -301,20 +300,12 @@ export async function registerWsHandler(
 
       cleanupConnection(data, code, messageText)
 
-      trackConnectionDuration(data)
-
       logger.debug('WebSocket closed', {
         code,
         reason: messageText,
         wsConnectionId,
         ...(isAuthenticated(data) && { address: data.address })
       })
-    },
-    ping: (ws) => {
-      const data = ws.getUserData()
-      if (data.wsConnectionId) {
-        wsPool.updateActivity(data.wsConnectionId)
-      }
     }
   })
 }

@@ -26,7 +26,6 @@ import { createCatalystClient } from '../src/adapters/catalyst-client'
 import { createSnsComponent } from '../src/adapters/sns'
 import { createS3Adapter } from '../src/adapters/s3'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
-import { createWSPoolComponent } from '../src/adapters/ws-pool'
 import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
 import { createPeerTrackingComponent } from '../src/adapters/peer-tracking'
 import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-stats'
@@ -184,7 +183,6 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     updateHandler
   })
-  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
@@ -259,7 +257,6 @@ async function initComponents(): Promise<TestComponents> {
     uwsServer,
     voice,
     voiceDb,
-    worldsStats,
-    wsPool
+    worldsStats
   }
 }

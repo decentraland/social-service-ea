@@ -1,15 +1,7 @@
 import mitt from 'mitt'
 import { verify } from '@dcl/platform-crypto-middleware'
 import { registerWsHandler } from '../../../../src/controllers/handlers/uws/ws-handler'
-import {
-  mockLogs,
-  mockMetrics,
-  mockFetcher,
-  mockUWs,
-  mockConfig,
-  mockRpcServer,
-  mockWsPool
-} from '../../../mocks/components'
+import { mockLogs, mockMetrics, mockFetcher, mockUWs, mockConfig, mockRpcServer } from '../../../mocks/components'
 import { WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../../src/types'
 import { mockTracing } from '../../../mocks/components/tracing'
 
@@ -68,11 +60,15 @@ describe('ws-handler', () => {
       fetcher: mockFetcher,
       rpcServer: mockRpcServer,
       config: mockConfig,
-      wsPool: mockWsPool,
       tracing: mockTracing
     })
 
     wsHandlers = (mockUWs.app.ws as jest.Mock).mock.calls[0][1]
+  })
+
+  afterEach(async () => {
+    jest.clearAllMocks()
+    await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
   })
 
   describe('upgrade handler', () => {
@@ -97,15 +93,8 @@ describe('ws-handler', () => {
   describe('open handler', () => {
     it('should acquire connection and update state', async () => {
       await wsHandlers.open(mockWs)
-      expect(mockWsPool.acquireConnection).toHaveBeenCalledWith('test-client-id')
       expect(mockData.isConnected).toBe(true)
       expect(mockData.connectionStartTime).toBeDefined()
-    })
-
-    it('should handle connection acquisition failure', async () => {
-      mockWsPool.acquireConnection.mockRejectedValueOnce(new Error('Connection limit reached'))
-      await wsHandlers.open(mockWs)
-      expect(mockWs.end).toHaveBeenCalledWith(1013, 'Unable to acquire connection')
     })
 
     it('should set a timeout for non-authenticated connections', async () => {
@@ -152,12 +141,11 @@ describe('ws-handler', () => {
         mockWs.getUserData.mockReturnValue(authData)
       })
 
-      it('should process message and update activity', async () => {
+      it('should process the message', async () => {
         const testMessage = Buffer.from('test message')
         await wsHandlers.message(mockWs, testMessage)
 
         expect(authData.eventEmitter.emit).toHaveBeenCalledWith('message', testMessage)
-        expect(mockWsPool.updateActivity).toHaveBeenCalledWith('test-client-id')
       })
 
       it('should not process message when disconnected', async () => {
@@ -165,7 +153,6 @@ describe('ws-handler', () => {
         await wsHandlers.message(mockWs, Buffer.from('test message'))
 
         expect(authData.eventEmitter.emit).not.toHaveBeenCalled()
-        expect(mockWsPool.updateActivity).not.toHaveBeenCalled()
       })
 
       it('should handle message emission errors', async () => {
@@ -191,7 +178,6 @@ describe('ws-handler', () => {
         await wsHandlers.message(mockWs, testMessage)
 
         expect(authData.eventEmitter.emit).not.toHaveBeenCalled()
-        expect(mockWsPool.updateActivity).not.toHaveBeenCalled()
       })
     })
 
@@ -218,7 +204,6 @@ describe('ws-handler', () => {
           transport: expect.any(Object),
           address: '0x123'
         })
-        expect(mockWsPool.updateActivity).toHaveBeenCalledWith('test-client-id')
       })
 
       it('should handle authentication failure', async () => {
@@ -265,8 +250,8 @@ describe('ws-handler', () => {
 
       expect(authData.transport.close).toHaveBeenCalled()
       expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123')
-      expect(mockWsPool.releaseConnection).toHaveBeenCalledWith('test-client-id')
       expect(mockMetrics.observe).toHaveBeenCalledWith('ws_connection_duration_seconds', {}, expect.any(Number))
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', {}, 0)
       expect(authData.connectionStartTime).toBeDefined()
       expect(authData.isConnected).toBe(false)
       expect(authData.auth).toBe(false)
@@ -276,7 +261,7 @@ describe('ws-handler', () => {
     it('should cleanup non-authenticated connection', async () => {
       await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
 
-      expect(mockWsPool.releaseConnection).toHaveBeenCalledWith('test-client-id')
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', {}, 0)
       expect(mockData.isConnected).toBe(false)
       expect(mockData.auth).toBe(false)
       expect(mockData.authenticating).toBe(false)
@@ -301,7 +286,8 @@ describe('ws-handler', () => {
 
       await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
 
-      expect(mockWsPool.releaseConnection).toHaveBeenCalledWith('test-client-id')
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', {}, 0)
+      expect(mockMetrics.observe).toHaveBeenCalledWith('ws_connection_duration_seconds', {}, expect.any(Number))
       expect(authData.isConnected).toBe(false)
       expect(authData.auth).toBe(false)
       expect(authData.authenticating).toBe(false)
@@ -316,13 +302,6 @@ describe('ws-handler', () => {
 
       expect(mockWs.getUserData().timeout).toBeUndefined()
       clearTimeout(mockTimeout)
-    })
-  })
-
-  describe('ping handler', () => {
-    it('should update connection activity', async () => {
-      await wsHandlers.ping(mockWs)
-      expect(mockWsPool.updateActivity).toHaveBeenCalledWith('test-client-id')
     })
   })
 

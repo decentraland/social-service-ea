@@ -23,7 +23,6 @@ import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
 import { createSnsComponent } from './adapters/sns'
-import { createWSPoolComponent } from './adapters/ws-pool'
 import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
@@ -183,7 +182,6 @@ export async function initComponents(): Promise<AppComponents> {
     updateHandler
   })
 
-  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
@@ -246,7 +244,6 @@ export async function initComponents(): Promise<AppComponents> {
     uwsServer,
     voice,
     voiceDb,
-    worldsStats,
-    wsPool
+    worldsStats
   }
 }
