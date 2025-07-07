@@ -570,22 +570,14 @@ describe('referral-component', () => {
         ])
       })
 
-      it('should still process the referral and publish event', async () => {
+      it('should not process the referral and not publish event', async () => {
         mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
 
         await referralComponent.finalizeReferral(validInvitedUser)
 
-        expect(mockReferralDb.updateReferralProgress).toHaveBeenCalledWith(
-          validInvitedUser.toLowerCase(),
-          ReferralProgressStatus.TIER_GRANTED
-        )
-        expect(mockSns.publishMessage).toHaveBeenCalled()
-        expect(mockLogger.info).toHaveBeenCalledWith('Finalizing referral', {
-          invitedUser: validInvitedUser.toLowerCase(),
-          previousStatus: ReferralProgressStatus.TIER_GRANTED,
-          newStatus: ReferralProgressStatus.TIER_GRANTED
-        })
+        expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
       })
     })
 
