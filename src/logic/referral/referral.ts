@@ -172,7 +172,7 @@ export async function createReferralComponent(
       const invitedUser = validateAddress(invitedUserToFinalize, 'invitedUser')
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
-      if (!progress.length) {
+      if (!progress.length || progress[0].status !== ReferralProgressStatus.TIER_GRANTED) {
         return
       }
 
