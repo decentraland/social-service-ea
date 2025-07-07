@@ -8,8 +8,7 @@ export const metricDeclarations = {
   ...logsMetricsDeclarations,
   ws_active_connections: {
     type: IMetricsComponent.GaugeType,
-    help: 'Number of WebSocket active connections',
-    labelNames: ['type']
+    help: 'Number of WebSocket active connections'
   },
   ws_messages_received: {
     type: IMetricsComponent.CounterType,
@@ -22,6 +21,11 @@ export const metricDeclarations = {
   ws_errors: {
     type: IMetricsComponent.CounterType,
     help: 'Number of WebSocket errors'
+  },
+  ws_close_codes: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of WebSocket close codes',
+    labelNames: ['code']
   },
   ws_transport_errors: {
     type: IMetricsComponent.CounterType,

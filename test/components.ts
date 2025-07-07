@@ -26,7 +26,6 @@ import { createCatalystClient } from '../src/adapters/catalyst-client'
 import { createSnsComponent } from '../src/adapters/sns'
 import { createS3Adapter } from '../src/adapters/s3'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
-import { createWSPoolComponent } from '../src/adapters/ws-pool'
 import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
 import { createPeerTrackingComponent } from '../src/adapters/peer-tracking'
 import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-stats'
@@ -58,6 +57,7 @@ import { createStorageHelper } from './integration/utils/storage'
 import { createUpdateHandlerComponent } from '../src/logic/updates'
 import { AnalyticsEventPayload } from '../src/types/analytics'
 import { createRewardComponent } from '../src/adapters/rewards'
+import { createWsPoolComponent } from '../src/logic/ws-pool'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -185,7 +185,6 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     updateHandler
   })
-  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
@@ -215,6 +214,8 @@ async function initComponents(): Promise<TestComponents> {
   })
 
   const storageHelper = await createStorageHelper({ config })
+
+  const wsPool = createWsPoolComponent({ logs, metrics })
 
   return {
     analytics,

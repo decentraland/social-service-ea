@@ -23,7 +23,6 @@ import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
 import { createSnsComponent } from './adapters/sns'
-import { createWSPoolComponent } from './adapters/ws-pool'
 import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
@@ -50,6 +49,7 @@ import { createPlacesApiAdapter } from './adapters/places-api'
 import { createUpdateHandlerComponent } from './logic/updates'
 import { AnalyticsEventPayload } from './types/analytics'
 import { createRewardComponent } from './adapters/rewards'
+import { createWsPoolComponent } from './logic/ws-pool'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -186,9 +186,9 @@ export async function initComponents(): Promise<AppComponents> {
     updateHandler
   })
 
-  const wsPool = await createWSPoolComponent({ metrics, config, redis, logs })
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+  const wsPool = createWsPoolComponent({ logs, metrics })
 
   const expirePrivateVoiceChatJob = createJobComponent(
     { logs },

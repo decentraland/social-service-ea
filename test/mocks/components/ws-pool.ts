@@ -1,10 +1,13 @@
-import { IWSPoolComponent } from '../../../src/types'
+import { STOP_COMPONENT } from '@well-known-components/interfaces'
+import { IWsPoolComponent } from '../../../src/logic/ws-pool'
 
-export const mockWsPool: jest.Mocked<IWSPoolComponent> = {
-  acquireConnection: jest.fn().mockResolvedValue(undefined),
-  releaseConnection: jest.fn().mockResolvedValue(undefined),
-  updateActivity: jest.fn().mockResolvedValue(undefined),
-  isConnectionAvailable: jest.fn().mockResolvedValue(true),
-  getActiveConnections: jest.fn().mockResolvedValue(0),
-  cleanup: jest.fn().mockResolvedValue(undefined)
+export function createWsPoolMockedComponent(
+  overrides: Partial<jest.Mocked<IWsPoolComponent>> = {}
+): jest.Mocked<IWsPoolComponent> {
+  return {
+    registerConnection: jest.fn(),
+    unregisterConnection: jest.fn(),
+    [STOP_COMPONENT]: jest.fn(),
+    ...overrides
+  }
 }
