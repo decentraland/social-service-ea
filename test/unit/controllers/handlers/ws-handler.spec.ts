@@ -264,6 +264,7 @@ describe('ws-handler', () => {
 
       expect(authData.transport.close).toHaveBeenCalled()
       expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123')
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
       expect(unregisterConnection).toHaveBeenCalledWith(authData)
       expect(authData.connectionStartTime).toBeDefined()
       expect(authData.isConnected).toBe(false)
@@ -275,6 +276,7 @@ describe('ws-handler', () => {
       await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
 
       expect(unregisterConnection).toHaveBeenCalledWith(mockData)
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
       expect(mockData.isConnected).toBe(false)
       expect(mockData.auth).toBe(false)
       expect(mockData.authenticating).toBe(false)
@@ -300,6 +302,7 @@ describe('ws-handler', () => {
       await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
 
       expect(unregisterConnection).toHaveBeenCalledWith(authData)
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
       expect(authData.isConnected).toBe(false)
       expect(authData.auth).toBe(false)
       expect(authData.authenticating).toBe(false)
@@ -313,6 +316,7 @@ describe('ws-handler', () => {
       await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
 
       expect(mockWs.getUserData().timeout).toBeUndefined()
+      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
       clearTimeout(mockTimeout)
     })
   })

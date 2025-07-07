@@ -61,6 +61,8 @@ export async function registerWsHandler(
 
     wsPool.unregisterConnection(data)
 
+    metrics.increment('ws_close_codes', { code })
+
     changeStage(data, {
       auth: false,
       isConnected: false,
