@@ -24,15 +24,15 @@ export async function registerWsHandler(
   const logger = logs.getLogger('ws-handler')
 
   const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_SECONDS')) ?? 180000 // 3 minutes in ms
-  const connections = new Map<string, WsUserData>()
+  const connections = new Map<string, WebSocket<WsUserData>>()
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
   }
 
-  function registerConnection(data: WsUserData) {
-    const { wsConnectionId } = data
-    connections.set(wsConnectionId, data)
+  function registerConnection(ws: WebSocket<WsUserData>) {
+    const { wsConnectionId } = ws.getUserData()
+    connections.set(wsConnectionId, ws)
     logger.debug('Registering connection', { wsConnectionId, totalConnections: connections.size })
     metrics.observe('ws_active_connections', {}, connections.size)
   }
@@ -225,7 +225,7 @@ export async function registerWsHandler(
       })
 
       try {
-        registerConnection(data)
+        registerConnection(ws)
 
         logger.debug('Connection acquired', {
           wsConnectionId: data.wsConnectionId,
