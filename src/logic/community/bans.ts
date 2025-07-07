@@ -55,12 +55,6 @@ export async function createCommunityBansComponent(
       }
 
       await communitiesDb.unbanMemberFromCommunity(communityId, unbannerAddress, targetAddress)
-
-      await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-        communityId,
-        memberAddress: targetAddress,
-        status: ConnectivityStatus.ONLINE
-      })
     },
 
     getBannedMembers: async (

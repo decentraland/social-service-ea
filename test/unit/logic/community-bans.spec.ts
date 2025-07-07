@@ -171,11 +171,6 @@ describe('Community Bans Component', () => {
           unbannerAddress,
           targetAddress
         )
-        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-          communityId,
-          memberAddress: targetAddress,
-          status: ConnectivityStatus.ONLINE
-        })
       })
     })
 
@@ -195,7 +190,6 @@ describe('Community Bans Component', () => {
         )
         expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetAddress)
         expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
-        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
 
@@ -211,7 +205,6 @@ describe('Community Bans Component', () => {
         expect(mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
-        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
 
@@ -237,7 +230,6 @@ describe('Community Bans Component', () => {
         )
         expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
-        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
   })
