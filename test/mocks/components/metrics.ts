@@ -9,3 +9,12 @@ export const mockMetrics: jest.Mocked<IMetricsComponent<string>> = {
   resetAll: jest.fn(),
   getValue: jest.fn()
 }
+
+export function createMetricsMockedComponent(
+  overrides: Partial<jest.Mocked<IMetricsComponent<string>>>
+): jest.Mocked<IMetricsComponent<string>> {
+  return {
+    ...mockMetrics,
+    ...overrides
+  }
+}
