@@ -7,6 +7,7 @@ import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/U
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { randomUUID } from 'crypto'
 import { WebSocket } from 'uWebSockets.js'
+import { isErrorWithMessage } from '../../../utils/errors'
 
 const textDecoder = new TextDecoder()
 
@@ -121,6 +122,14 @@ export async function registerWsHandler(
           address
         })
         rpcServer.detachUser(address)
+      })
+
+      transport.on('error', (error: unknown) => {
+        metrics.increment('ws_transport_errors')
+        logger.error('[DEBUGGING CONNECTION] Transport error event received', {
+          address,
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+        })
       })
 
       if (data.wsConnectionId) {
