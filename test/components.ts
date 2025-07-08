@@ -43,7 +43,8 @@ import {
   createCommunityComponent,
   createCommunityMembersComponent,
   createCommunityPlacesComponent,
-  createCommunityRolesComponent
+  createCommunityRolesComponent,
+  createCommunityOwnersComponent
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
@@ -159,11 +160,13 @@ async function initComponents(): Promise<TestComponents> {
     catalystClient,
     pubsub
   })
+  const communityOwners = createCommunityOwnersComponent({ catalystClient, redis })
   const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
+    communityOwners,
     logs,
     storage,
     config
@@ -228,6 +231,7 @@ async function initComponents(): Promise<TestComponents> {
     communityBans,
     communityMembers,
     communityPlaces,
+    communityOwners,
     communityRoles,
     config,
     fetcher,
