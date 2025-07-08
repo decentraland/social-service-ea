@@ -12,7 +12,7 @@ import {
 import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput } from './types'
 import type { AppComponents } from '../../types/system'
 
-const TIERS = [5, 10, 20, 25, 30, 50, 60, 75, 100]
+const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -37,7 +37,6 @@ export async function createReferralComponent(
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50,
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60,
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
-    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100,
     PROFILE_URL
   ] = await Promise.all([
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5'),
@@ -48,7 +47,6 @@ export async function createReferralComponent(
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75'),
-    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100'),
     config.requireString('PROFILE_URL')
   ])
 
@@ -60,8 +58,7 @@ export async function createReferralComponent(
     30: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_30,
     50: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50,
     60: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60,
-    75: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
-    100: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100
+    75: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75
   }
 
   function createReferralInvitedUsersAcceptedEvent(
