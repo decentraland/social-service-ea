@@ -20,7 +20,6 @@ import {
   IPeerTrackingComponent,
   ICatalystClientComponent,
   IPublisherComponent,
-  IWSPoolComponent,
   ISubscribersContext,
   ITracingComponent,
   ICommsGatekeeperComponent,
@@ -52,6 +51,7 @@ import { IQueueComponent } from './sqs.type'
 import { IMessageProcessorComponent, IMessageConsumerComponent } from '../logic/sqs'
 import { IPeersStatsComponent } from '../logic/peers-stats'
 import { IJobComponent } from '../logic/job'
+import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
 
 export type GlobalContext = {
@@ -105,7 +105,7 @@ export type BaseComponents = {
   voice: IVoiceComponent
   voiceDb: IVoiceDatabaseComponent
   worldsStats: IWorldsStatsComponent
-  wsPool: IWSPoolComponent
+  wsPool: IWsPoolComponent
 }
 
 // components used in runtime

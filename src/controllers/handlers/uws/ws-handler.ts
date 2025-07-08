@@ -1,12 +1,12 @@
 import mitt from 'mitt'
+import { randomUUID } from 'crypto'
+import { WebSocket } from 'uWebSockets.js'
 import { onRequestEnd, onRequestStart } from '@well-known-components/uws-http-server'
 import { verify } from '@dcl/platform-crypto-middleware'
 import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
-import { randomUUID } from 'crypto'
-import { WebSocket } from 'uWebSockets.js'
 import { isErrorWithMessage } from '../../../utils/errors'
 
 const textDecoder = new TextDecoder()
@@ -21,10 +21,10 @@ const getAddress = (data: WsUserData) => {
 export async function registerWsHandler(
   components: Pick<
     AppComponents,
-    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'wsPool' | 'tracing'
+    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing' | 'wsPool'
   >
 ) {
-  const { logs, uwsServer, metrics, fetcher, rpcServer, config, wsPool, tracing } = components
+  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool } = components
   const logger = logs.getLogger('ws-handler')
 
   const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_SECONDS')) ?? 180000 // 3 minutes in ms
@@ -60,28 +60,14 @@ export async function registerWsHandler(
       delete data.timeout
     }
 
-    if (wsConnectionId) {
-      wsPool.releaseConnection(wsConnectionId)
-    }
+    wsPool.unregisterConnection(data)
+
+    metrics.increment('ws_close_codes', { code })
 
     changeStage(data, {
       auth: false,
       isConnected: false,
       authenticating: false
-    })
-  }
-
-  function trackConnectionDuration(data: WsUserData) {
-    const { wsConnectionId, connectionStartTime } = data
-    const duration = (Date.now() - connectionStartTime) / 1000
-
-    if (!isNaN(duration) && isFinite(duration)) {
-      metrics.observe('ws_connection_duration_seconds', {}, duration)
-    }
-
-    logger.debug('WebSocket connection tracked duration', {
-      wsConnectionId: wsConnectionId,
-      durationSeconds: duration || 'N/A'
     })
   }
 
@@ -131,10 +117,6 @@ export async function registerWsHandler(
           error: isErrorWithMessage(error) ? error.message : 'Unknown error'
         })
       })
-
-      if (data.wsConnectionId) {
-        wsPool.updateActivity(data.wsConnectionId)
-      }
     } catch (error: any) {
       logger.error(`Error verifying auth chain: ${error.message}`, {
         wsConnectionId: data.wsConnectionId
@@ -167,10 +149,6 @@ export async function registerWsHandler(
 
       data.eventEmitter.emit('message', message)
       metrics.increment('ws_messages_sent')
-
-      if (data.wsConnectionId) {
-        wsPool.updateActivity(data.wsConnectionId)
-      }
     } catch (error: any) {
       logger.error('Error emitting message', {
         error,
@@ -235,7 +213,7 @@ export async function registerWsHandler(
       })
 
       try {
-        await wsPool.acquireConnection(data.wsConnectionId)
+        wsPool.registerConnection(ws)
 
         logger.debug('Connection acquired', {
           wsConnectionId: data.wsConnectionId,
@@ -310,20 +288,12 @@ export async function registerWsHandler(
 
       cleanupConnection(data, code, messageText)
 
-      trackConnectionDuration(data)
-
       logger.debug('WebSocket closed', {
         code,
         reason: messageText,
         wsConnectionId,
         ...(isAuthenticated(data) && { address: data.address })
       })
-    },
-    ping: (ws) => {
-      const data = ws.getUserData()
-      if (data.wsConnectionId) {
-        wsPool.updateActivity(data.wsConnectionId)
-      }
     }
   })
 }
