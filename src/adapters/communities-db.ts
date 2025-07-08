@@ -431,7 +431,7 @@ export function createCommunitiesDBComponent(
     },
 
     async createCommunity(community: CommunityDB): Promise<Community> {
-      const id = community.id ?? randomUUID()
+      const id = randomUUID()
       const query = SQL`
         INSERT INTO communities (id, name, description, owner_address, private, active)
         VALUES (${id}, ${community.name}, ${community.description}, ${normalizeAddress(community.owner_address)}, ${community.private || false}, ${community.active || true})
