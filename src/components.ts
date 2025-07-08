@@ -34,7 +34,8 @@ import {
   createCommunityBansComponent,
   createCommunityComponent,
   createCommunityMembersComponent,
-  createCommunityRolesComponent
+  createCommunityRolesComponent,
+  createCommunityOwnersComponent
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
@@ -126,7 +127,7 @@ export async function initComponents(): Promise<AppComponents> {
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
-  const settings = await createSettingsComponent({ friendsDb })
+  const settings = createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
   const voice = await createVoiceComponent({
     logs,
@@ -158,14 +159,16 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     pubsub
   })
+  const communityOwners = createCommunityOwnersComponent({ catalystClient, redis })
   const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
-    logs,
+    communityOwners,
     storage,
-    config
+    config,
+    logs
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -215,6 +218,7 @@ export async function initComponents(): Promise<AppComponents> {
     communities,
     communitiesDb,
     communityBans,
+    communityOwners,
     communityMembers,
     communityPlaces,
     communityRoles,

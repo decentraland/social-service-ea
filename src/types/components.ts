@@ -141,12 +141,14 @@ export interface ICommunitiesDatabaseComponent {
   getCommunities(
     memberAddress: EthAddress,
     options: GetCommunitiesOptions
-  ): Promise<CommunityWithMembersCountAndFriends[]>
+  ): Promise<Omit<CommunityWithMembersCountAndFriends, 'ownerName'>[]>
   getCommunitiesCount(
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf'>
   ): Promise<number>
-  getCommunitiesPublicInformation(options: GetCommunitiesOptions): Promise<CommunityPublicInformation[]>
+  getCommunitiesPublicInformation(
+    options: GetCommunitiesOptions
+  ): Promise<Omit<CommunityPublicInformation, 'ownerName'>[]>
   getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>

@@ -10,7 +10,8 @@ import {
   CommunityWithMembersCount,
   MemberCommunity,
   Community,
-  CommunityUpdates
+  CommunityUpdates,
+  CommunityWithOwnerName
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { EthAddress } from '@dcl/schemas'
@@ -18,10 +19,18 @@ import { EthAddress } from '@dcl/schemas'
 export async function createCommunityComponent(
   components: Pick<
     AppComponents,
-    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'communityPlaces' | 'logs' | 'storage' | 'config'
+    | 'communitiesDb'
+    | 'catalystClient'
+    | 'communityRoles'
+    | 'communityPlaces'
+    | 'communityOwners'
+    | 'storage'
+    | 'config'
+    | 'logs'
   >
 ): Promise<ICommunitiesComponent> {
-  const { communitiesDb, catalystClient, communityRoles, communityPlaces, logs, storage, config } = components
+  const { communitiesDb, catalystClient, communityRoles, communityPlaces, communityOwners, storage, config, logs } =
+    components
 
   const logger = logs.getLogger('community-component')
   const CDN_URL = await config.requireString('CDN_URL')
@@ -59,7 +68,9 @@ export async function createCommunityComponent(
         }
       }
 
-      return toCommunityWithMembersCount(community, membersCount)
+      const ownerName = await communityOwners.getOwnerName(community.ownerAddress, community.id)
+
+      return toCommunityWithMembersCount({ ...community, ownerName }, membersCount)
     },
 
     getCommunities: async (
@@ -71,7 +82,7 @@ export async function createCommunityComponent(
         communitiesDb.getCommunitiesCount(userAddress, options)
       ])
 
-      const communitiesWithThumbnails = await Promise.all(
+      const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
         communities.map(async (community) => {
           const thumbnail = await getThumbnail(community.id)
 
@@ -81,14 +92,16 @@ export async function createCommunityComponent(
             }
           }
 
-          return community
+          const ownerName = await communityOwners.getOwnerName(community.ownerAddress, community.id)
+
+          return { ...community, ownerName }
         })
       )
 
       const friendsAddresses = Array.from(new Set(communities.flatMap((community) => community.friends)))
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
       return {
-        communities: toCommunityResults(communitiesWithThumbnails, friendsProfiles),
+        communities: toCommunityResults(communitiesWithThumbnailsAndOwnerNames, friendsProfiles),
         total
       }
     },
@@ -102,7 +115,7 @@ export async function createCommunityComponent(
         communitiesDb.getPublicCommunitiesCount({ search })
       ])
 
-      const communitiesWithThumbnails = await Promise.all(
+      const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
         communities.map(async (community) => {
           const thumbnail = await getThumbnail(community.id)
 
@@ -112,12 +125,14 @@ export async function createCommunityComponent(
             }
           }
 
-          return community
+          const ownerName = await communityOwners.getOwnerName(community.ownerAddress, community.id)
+
+          return { ...community, ownerName }
         })
       )
 
       return {
-        communities: communitiesWithThumbnails.map(toPublicCommunity),
+        communities: communitiesWithThumbnailsAndOwnerNames.map(toPublicCommunity),
         total
       }
     },
@@ -137,7 +152,7 @@ export async function createCommunityComponent(
       community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
       thumbnail?: Buffer,
       placeIds: string[] = []
-    ): Promise<Community> => {
+    ): Promise<CommunityWithOwnerName> => {
       const ownedNames = await catalystClient.getOwnedNames(community.ownerAddress, {
         pageSize: '1'
       })
@@ -145,6 +160,8 @@ export async function createCommunityComponent(
       if (ownedNames.length === 0) {
         throw new NotAuthorizedError(`The user ${community.ownerAddress} doesn't have any names`)
       }
+
+      const ownerName: string = await communityOwners.getOwnerName(community.ownerAddress)
 
       if (placeIds.length > 0) {
         await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
@@ -183,7 +200,10 @@ export async function createCommunityComponent(
         }
       }
 
-      return newCommunity
+      return {
+        ...newCommunity,
+        ownerName
+      }
     },
 
     deleteCommunity: async (id: string, userAddress: string): Promise<void> => {

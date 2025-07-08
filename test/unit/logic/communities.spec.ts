@@ -8,9 +8,10 @@ import { createCommunityComponent } from '../../../src/logic/community/communiti
 import {
   ICommunitiesComponent,
   ICommunityRolesComponent,
-  ICommunityPlacesComponent
+  ICommunityPlacesComponent,
+  ICommunityOwnersComponent
 } from '../../../src/logic/community/types'
-import { createMockCommunityRolesComponent, createMockCommunityPlacesComponent } from '../../mocks/communities'
+import { createMockCommunityRolesComponent, createMockCommunityPlacesComponent, createMockCommunityOwnersComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { Community } from '../../../src/logic/community/types'
 
@@ -18,6 +19,7 @@ describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
   let mockCommunityPlaces: jest.Mocked<ICommunityPlacesComponent>
+  let mockCommunityOwners: jest.Mocked<ICommunityOwnersComponent>
   let mockStorage: jest.Mocked<ReturnType<typeof createS3ComponentMock>>
   let mockUserAddress: string
   const communityId = 'test-community'
@@ -36,6 +38,7 @@ describe('Community Component', () => {
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockCommunityRoles = createMockCommunityRolesComponent({})
     mockCommunityPlaces = createMockCommunityPlacesComponent({})
+    mockCommunityOwners = createMockCommunityOwnersComponent({})
     mockStorage = createS3ComponentMock() as jest.Mocked<ReturnType<typeof createS3ComponentMock>>
     mockConfig.requireString.mockResolvedValue(cdnUrl)
     communityComponent = await createCommunityComponent({
@@ -43,6 +46,7 @@ describe('Community Component', () => {
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
       communityPlaces: mockCommunityPlaces,
+      communityOwners: mockCommunityOwners,
       logs: mockLogs,
       storage: mockStorage,
       config: mockConfig
