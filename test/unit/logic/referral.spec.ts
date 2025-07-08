@@ -54,7 +54,6 @@ describe('referral-component', () => {
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75',
-          REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100',
           PROFILE_URL: 'https://decentraland.org/profile'
         }
         return Promise.resolve(rewardKeys[key])
@@ -422,8 +421,7 @@ describe('referral-component', () => {
         { invitedUsers: 30, tier: 5, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_30' },
         { invitedUsers: 50, tier: 6, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50' },
         { invitedUsers: 60, tier: 7, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60' },
-        { invitedUsers: 75, tier: 8, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75' },
-        { invitedUsers: 100, tier: 9, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100' }
+        { invitedUsers: 75, tier: 8, rewardKey: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75' }
       ])('and the referral reaches tier $tier milestone', ({ invitedUsers, tier, rewardKey }) => {
         beforeEach(() => {
           mockReferralDb.findReferralProgress.mockResolvedValueOnce([
@@ -482,8 +480,7 @@ describe('referral-component', () => {
         { invitedUsers: 28, tier: 5 },
         { invitedUsers: 45, tier: 6 },
         { invitedUsers: 55, tier: 7 },
-        { invitedUsers: 70, tier: 8 },
-        { invitedUsers: 95, tier: 9 }
+        { invitedUsers: 70, tier: 8 }
       ])('and the referral has $invitedUsers invited users', ({ invitedUsers, tier }) => {
         beforeEach(() => {
           mockReferralDb.findReferralProgress.mockResolvedValueOnce([
