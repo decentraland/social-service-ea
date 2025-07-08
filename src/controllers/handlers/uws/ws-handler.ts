@@ -7,6 +7,7 @@ import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsU
 import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
+import { isErrorWithMessage } from '../../../utils/errors'
 
 const textDecoder = new TextDecoder()
 
@@ -107,6 +108,14 @@ export async function registerWsHandler(
           address
         })
         rpcServer.detachUser(address)
+      })
+
+      transport.on('error', (error: unknown) => {
+        metrics.increment('ws_transport_errors')
+        logger.error('[DEBUGGING CONNECTION] Transport error event received', {
+          address,
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+        })
       })
     } catch (error: any) {
       logger.error(`Error verifying auth chain: ${error.message}`, {
