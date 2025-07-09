@@ -50,6 +50,7 @@ import { createUpdateHandlerComponent } from './logic/updates'
 import { AnalyticsEventPayload } from './types/analytics'
 import { createRewardComponent } from './adapters/rewards'
 import { createWsPoolComponent } from './logic/ws-pool'
+import { createCdnCacheInvalidatorComponent } from './adapters/cdn-cache-invalidator'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -207,6 +208,8 @@ export async function initComponents(): Promise<AppComponents> {
     messageProcessor
   })
 
+  const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
+
   return {
     analytics,
     archipelagoStats,
@@ -251,6 +254,7 @@ export async function initComponents(): Promise<AppComponents> {
     voice,
     voiceDb,
     worldsStats,
-    wsPool
+    wsPool,
+    cdnCacheInvalidator
   }
 }
