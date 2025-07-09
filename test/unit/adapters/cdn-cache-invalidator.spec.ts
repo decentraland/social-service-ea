@@ -200,7 +200,7 @@ describe('CDN Cache Invalidator Component', () => {
       })
 
       describe('and API returns error responses', () => {
-        it('should throw an error for 500 internal server error', async () => {
+        it('should handle 500 internal server error gracefully', async () => {
           const communityId = 'test-community-id'
           mockFetcher.fetch.mockResolvedValueOnce({
             ok: false,
@@ -208,10 +208,11 @@ describe('CDN Cache Invalidator Component', () => {
             statusText: 'Internal Server Error'
           } as any)
 
-          await expect(cdnCacheInvalidator.invalidateThumbnail(communityId)).rejects.toThrow()
+          // Should not throw error, CDN invalidation is best effort
+          await expect(cdnCacheInvalidator.invalidateThumbnail(communityId)).resolves.toBeUndefined()
         })
 
-        it('should throw an error for 401 unauthorized error', async () => {
+        it('should handle 401 unauthorized error gracefully', async () => {
           const communityId = 'test-community-id'
           mockFetcher.fetch.mockResolvedValueOnce({
             ok: false,
@@ -219,7 +220,8 @@ describe('CDN Cache Invalidator Component', () => {
             statusText: 'Unauthorized'
           } as any)
 
-          await expect(cdnCacheInvalidator.invalidateThumbnail(communityId)).rejects.toThrow()
+          // Should not throw error, CDN invalidation is best effort
+          await expect(cdnCacheInvalidator.invalidateThumbnail(communityId)).resolves.toBeUndefined()
         })
       })
     })
