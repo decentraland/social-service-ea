@@ -13,7 +13,13 @@ import {
   CommunityUpdates,
   CommunityWithOwnerName
 } from './types'
-import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
+import {
+  isOwner,
+  toCommunityWithMembersCount,
+  toCommunityResults,
+  toPublicCommunity,
+  getCommunityThumbnailPath
+} from './utils'
 import { EthAddress } from '@dcl/schemas'
 
 export async function createCommunityComponent(
@@ -23,20 +29,30 @@ export async function createCommunityComponent(
     | 'catalystClient'
     | 'communityRoles'
     | 'communityPlaces'
+    | 'cdnCacheInvalidator'
     | 'communityOwners'
     | 'storage'
     | 'config'
     | 'logs'
   >
 ): Promise<ICommunitiesComponent> {
-  const { communitiesDb, catalystClient, communityRoles, communityPlaces, communityOwners, storage, config, logs } =
-    components
+  const {
+    communitiesDb,
+    catalystClient,
+    communityRoles,
+    communityPlaces,
+    communityOwners,
+    cdnCacheInvalidator,
+    storage,
+    config,
+    logs
+  } = components
 
   const logger = logs.getLogger('community-component')
   const CDN_URL = await config.requireString('CDN_URL')
 
   const buildThumbnailUrl = (communityId: string) => {
-    return `${CDN_URL}/social/communities/${communityId}/raw-thumbnail.png`
+    return `${CDN_URL}${getCommunityThumbnailPath(communityId)}`
   }
 
   const getThumbnail = async (communityId: string): Promise<string | undefined> => {
@@ -271,6 +287,7 @@ export async function createCommunityComponent(
 
       if (thumbnailBuffer) {
         const thumbnailUrl = await storage.storeFile(thumbnailBuffer, `communities/${communityId}/raw-thumbnail.png`)
+        await cdnCacheInvalidator.invalidateThumbnail(communityId)
 
         logger.info('Thumbnail updated', {
           thumbnailUrl,

@@ -34,7 +34,8 @@ import {
   IStorageHelperComponent,
   IPlacesApiComponent,
   IUpdateHandlerComponent,
-  IRewardComponent
+  IRewardComponent,
+  ICdnCacheInvalidatorComponent
 } from './components'
 import {
   ICommunitiesComponent,
@@ -108,6 +109,7 @@ export type BaseComponents = {
   voiceDb: IVoiceDatabaseComponent
   worldsStats: IWorldsStatsComponent
   wsPool: IWsPoolComponent
+  cdnCacheInvalidator: ICdnCacheInvalidatorComponent
 }
 
 // components used in runtime

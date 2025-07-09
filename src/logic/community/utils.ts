@@ -111,3 +111,7 @@ export const mapMembersWithProfiles = <
     })
     .filter((member): member is T & R => member !== undefined)
 }
+
+export const getCommunityThumbnailPath = (communityId: string) => {
+  return `/social/communities/${communityId}/raw-thumbnail.png`
+}
