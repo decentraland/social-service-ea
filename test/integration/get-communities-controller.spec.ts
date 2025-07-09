@@ -25,11 +25,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
       identity = await createTestIdentity()
       address = identity.realAccount.address.toLowerCase()
 
+      spyComponents.catalystClient.getProfile.mockResolvedValue(createMockProfile(address))
       spyComponents.catalystClient.getProfiles.mockResolvedValue([
         createMockProfile(friendAddress1),
         createMockProfile(friendAddress2)
       ])
-
       const result1 = await components.communitiesDb.createCommunity(
         mockCommunity({
           name: 'Test Community 1',
