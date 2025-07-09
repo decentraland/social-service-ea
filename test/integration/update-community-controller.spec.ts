@@ -249,23 +249,33 @@ test('Update Community Controller', async function ({ components, stubComponents
         })
 
         describe('when updating with thumbnail', () => {
-          it('should update the community with new thumbnail', async () => {
-            const response = await makeMultipartRequest(
-              identity,
-              `/v1/communities/${communityId}`,
-              {
-                name: 'Thumbnail Updated',
-                thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
-              },
-              'PUT'
-            )
+          describe('and the CDN cache was correctly invalidated', () => {
+            beforeEach(async () => {
+              stubComponents.fetcher.fetch.onFirstCall().resolves({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve({})
+              } as any)
+            })
 
-            expect(response.status).toBe(200)
-            const body = await response.json()
-            expect(body.data.name).toBe('Thumbnail Updated')
-            expect(body.data.thumbnails).toBeDefined()
-            expect(body.data.thumbnails.raw).toContain('social/communities/')
-            expect(body.message).toBe('Community updated successfully')
+            it('should update the community with new thumbnail and return 200 OK', async () => {
+              const response = await makeMultipartRequest(
+                identity,
+                `/v1/communities/${communityId}`,
+                {
+                  name: 'Thumbnail Updated',
+                  thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+                },
+                'PUT'
+              )
+
+              expect(response.status).toBe(200)
+              const body = await response.json()
+              expect(body.data.name).toBe('Thumbnail Updated')
+              expect(body.data.thumbnails).toBeDefined()
+              expect(body.data.thumbnails.raw).toContain('social/communities/')
+              expect(body.message).toBe('Community updated successfully')
+            })
           })
         })
 

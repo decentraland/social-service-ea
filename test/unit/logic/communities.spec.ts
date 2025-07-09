@@ -2,7 +2,7 @@ import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, mockCatalystClient, mockConfig } from '../../mocks/components'
+import { mockLogs, mockCatalystClient, mockConfig, mockCdnCacheInvalidator } from '../../mocks/components'
 import { createS3ComponentMock } from '../../mocks/components/s3'
 import { createCommunityComponent } from '../../../src/logic/community/communities'
 import {
@@ -47,6 +47,7 @@ describe('Community Component', () => {
       communityRoles: mockCommunityRoles,
       communityPlaces: mockCommunityPlaces,
       communityOwners: mockCommunityOwners,
+      cdnCacheInvalidator: mockCdnCacheInvalidator,
       logs: mockLogs,
       storage: mockStorage,
       config: mockConfig
@@ -681,6 +682,7 @@ describe('Community Component', () => {
                 )
                 expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutThumbnail)
                 expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                expect(mockCdnCacheInvalidator.invalidateThumbnail).not.toHaveBeenCalled()
                 expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
                   communityId,
                   userAddress,
@@ -734,6 +736,7 @@ describe('Community Component', () => {
                     )
                     expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutThumbnail)
                     expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                    expect(mockCdnCacheInvalidator.invalidateThumbnail).not.toHaveBeenCalled()
                     expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
                       communityId,
                       userAddress,
@@ -769,6 +772,7 @@ describe('Community Component', () => {
                       updates.thumbnailBuffer,
                       `communities/${communityId}/raw-thumbnail.png`
                     )
+                    expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
                     expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
                       communityId,
                       userAddress,
@@ -838,6 +842,7 @@ describe('Community Component', () => {
                   expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
                   expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithEmptyPlaces)
                   expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                  expect(mockCdnCacheInvalidator.invalidateThumbnail).not.toHaveBeenCalled()
                   expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, [])
                 })
               })
@@ -874,6 +879,7 @@ describe('Community Component', () => {
                   expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
                   expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutPlaces)
                   expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                  expect(mockCdnCacheInvalidator.invalidateThumbnail).not.toHaveBeenCalled()
                   expect(mockCommunityPlaces.updatePlaces).not.toHaveBeenCalled()
                 })
               })
@@ -931,6 +937,7 @@ describe('Community Component', () => {
                     updatesWithMixedPlaces.thumbnailBuffer,
                     `communities/${communityId}/raw-thumbnail.png`
                   )
+                  expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
                   expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, newPlaceIds)
                 })
               })
@@ -978,6 +985,7 @@ describe('Community Component', () => {
                     updatesWithExistingPlaces.thumbnailBuffer,
                     `communities/${communityId}/raw-thumbnail.png`
                   )
+                  expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
                   expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, [
                     'place-1',
                     'place-2'
@@ -1033,6 +1041,7 @@ describe('Community Component', () => {
                     updatesWithDuplicates.thumbnailBuffer,
                     `communities/${communityId}/raw-thumbnail.png`
                   )
+                  expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
                   expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
                     communityId,
                     userAddress,
