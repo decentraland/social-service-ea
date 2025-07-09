@@ -13,7 +13,7 @@ describe('CDN Cache Invalidator Component', () => {
 
   const mockConfigValues = {
     CDN_CACHE_INVALIDATOR_API_URL: 'https://cdn-cache-invalidator.example.com',
-    CDN_CACHE_INVALIDATOR_API_KEY: 'test-api-key',
+    CDN_CACHE_INVALIDATOR_API_TOKEN: 'test-api-key',
     CDN_URL: 'https://cdn.example.com'
   }
 
@@ -26,7 +26,7 @@ describe('CDN Cache Invalidator Component', () => {
       beforeEach(() => {
         mockConfig.requireString
           .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL)
-          .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_KEY)
+          .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_TOKEN)
           .mockResolvedValueOnce(mockConfigValues.CDN_URL)
       })
 
@@ -37,7 +37,7 @@ describe('CDN Cache Invalidator Component', () => {
         })
 
         expect(mockConfig.requireString).toHaveBeenCalledWith('CDN_CACHE_INVALIDATOR_API_URL')
-        expect(mockConfig.requireString).toHaveBeenCalledWith('CDN_CACHE_INVALIDATOR_API_KEY')
+        expect(mockConfig.requireString).toHaveBeenCalledWith('CDN_CACHE_INVALIDATOR_API_TOKEN')
         expect(mockConfig.requireString).toHaveBeenCalledWith('CDN_URL')
         expect(cdnCacheInvalidator).toHaveProperty('invalidateThumbnail')
       })
@@ -58,11 +58,11 @@ describe('CDN Cache Invalidator Component', () => {
       })
     })
 
-    describe('when CDN_CACHE_INVALIDATOR_API_KEY is missing', () => {
+    describe('when CDN_CACHE_INVALIDATOR_API_TOKEN is missing', () => {
       beforeEach(() => {
         mockConfig.requireString
           .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL)
-          .mockRejectedValueOnce(new Error('Missing CDN_CACHE_INVALIDATOR_API_KEY'))
+          .mockRejectedValueOnce(new Error('Missing CDN_CACHE_INVALIDATOR_API_TOKEN'))
       })
 
       it('should throw an error', async () => {
@@ -71,7 +71,7 @@ describe('CDN Cache Invalidator Component', () => {
             config: mockConfig,
             fetcher: mockFetcher
           })
-        ).rejects.toThrow('Missing CDN_CACHE_INVALIDATOR_API_KEY')
+        ).rejects.toThrow('Missing CDN_CACHE_INVALIDATOR_API_TOKEN')
       })
     })
 
@@ -79,7 +79,7 @@ describe('CDN Cache Invalidator Component', () => {
       beforeEach(() => {
         mockConfig.requireString
           .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL)
-          .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_KEY)
+          .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_TOKEN)
           .mockRejectedValueOnce(new Error('Missing CDN_URL'))
       })
 
@@ -99,7 +99,7 @@ describe('CDN Cache Invalidator Component', () => {
       beforeEach(async () => {
         mockConfig.requireString
           .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL)
-          .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_KEY)
+          .mockResolvedValueOnce(mockConfigValues.CDN_CACHE_INVALIDATOR_API_TOKEN)
           .mockResolvedValueOnce(mockConfigValues.CDN_URL)
 
         cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({
@@ -134,7 +134,7 @@ describe('CDN Cache Invalidator Component', () => {
                 cfDomain: mockConfigValues.CDN_URL
               }),
               headers: {
-                Authorization: `Bearer ${mockConfigValues.CDN_CACHE_INVALIDATOR_API_KEY}`
+                Authorization: `Bearer ${mockConfigValues.CDN_CACHE_INVALIDATOR_API_TOKEN}`
               }
             }
           )
@@ -157,7 +157,7 @@ describe('CDN Cache Invalidator Component', () => {
                 cfDomain: mockConfigValues.CDN_URL
               }),
               headers: {
-                Authorization: `Bearer ${mockConfigValues.CDN_CACHE_INVALIDATOR_API_KEY}`
+                Authorization: `Bearer ${mockConfigValues.CDN_CACHE_INVALIDATOR_API_TOKEN}`
               }
             }
           )
@@ -176,7 +176,7 @@ describe('CDN Cache Invalidator Component', () => {
           expect(url).toBe(`${mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL}/purge-cache`)
           expect(options.method).toBe('POST')
           expect(options.headers).toEqual({
-            Authorization: `Bearer ${mockConfigValues.CDN_CACHE_INVALIDATOR_API_KEY}`
+            Authorization: `Bearer ${mockConfigValues.CDN_CACHE_INVALIDATOR_API_TOKEN}`
           })
 
           const body = JSON.parse(options.body as string)
