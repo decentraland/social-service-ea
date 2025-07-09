@@ -7,7 +7,7 @@ export async function createCdnCacheInvalidatorComponent(
   const { config, fetcher } = components
 
   const CDN_CACHE_INVALIDATOR_API_URL = await config.requireString('CDN_CACHE_INVALIDATOR_API_URL')
-  const CDN_CACHE_INVALIDATOR_API_KEY = await config.requireString('CDN_CACHE_INVALIDATOR_API_KEY')
+  const CDN_CACHE_INVALIDATOR_API_TOKEN = await config.requireString('CDN_CACHE_INVALIDATOR_API_TOKEN')
   const CDN_URL = await config.requireString('CDN_URL')
 
   async function invalidateThumbnail(communityId: string): Promise<void> {
@@ -19,7 +19,7 @@ export async function createCdnCacheInvalidatorComponent(
         cfDomain: CDN_URL
       }),
       headers: {
-        Authorization: `Bearer ${CDN_CACHE_INVALIDATOR_API_KEY}`
+        Authorization: `Bearer ${CDN_CACHE_INVALIDATOR_API_TOKEN}`
       }
     })
   }

@@ -59,6 +59,7 @@ import { createUpdateHandlerComponent } from '../src/logic/updates'
 import { AnalyticsEventPayload } from '../src/types/analytics'
 import { createRewardComponent } from '../src/adapters/rewards'
 import { createWsPoolComponent } from '../src/logic/ws-pool'
+import { createCdnCacheInvalidatorComponent } from '../src/adapters/cdn-cache-invalidator'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -125,6 +126,7 @@ async function initComponents(): Promise<TestComponents> {
   const catalystClient = await createCatalystClient({ config, fetcher, redis })
   const sns = await createSnsComponent({ config })
   const storage = await createS3Adapter({ config })
+  const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
   const subscribersContext = createSubscribersContext()
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
@@ -167,6 +169,7 @@ async function initComponents(): Promise<TestComponents> {
     communityRoles,
     communityPlaces,
     communityOwners,
+    cdnCacheInvalidator,
     logs,
     storage,
     config
@@ -269,6 +272,7 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     voiceDb,
     worldsStats,
-    wsPool
+    wsPool,
+    cdnCacheInvalidator
   }
 }
