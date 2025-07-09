@@ -127,6 +127,7 @@ export async function initComponents(): Promise<AppComponents> {
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
+  const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
   const voice = await createVoiceComponent({
@@ -164,6 +165,7 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     communityRoles,
     communityPlaces,
+    cdnCacheInvalidator,
     logs,
     storage,
     config
@@ -207,8 +209,6 @@ export async function initComponents(): Promise<AppComponents> {
     queue,
     messageProcessor
   })
-
-  const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
 
   return {
     analytics,
