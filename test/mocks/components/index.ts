@@ -1,5 +1,6 @@
 export * from './archipelago-stats'
 export * from './catalyst-client'
+export * from './cdn-cache-invalidator'
 export * from './config'
 export * from './fetcher'
 export * from './friends-db'
