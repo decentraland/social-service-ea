@@ -12,6 +12,7 @@ export function createCommunityOwnersComponent(
   async function getOwnerName(ownerAddress: EthAddress, communityId: string = 'N/A'): Promise<string> {
     const ownerProfile = await catalystClient.getProfile(ownerAddress)
 
+    // TODO: Prevent breaking communities retrieval flow when owner profile is not found
     if (!ownerProfile) {
       throw new CommunityOwnerNotFoundError(communityId, ownerAddress)
     }
