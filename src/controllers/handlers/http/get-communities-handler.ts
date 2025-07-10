@@ -2,7 +2,11 @@ import { getPaginationParams } from '@dcl/platform-server-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
-import { CommunityWithUserInformation, CommunityPublicInformation } from '../../../logic/community'
+import {
+  CommunityWithUserInformation,
+  CommunityPublicInformation,
+  CommunityOwnerNotFoundError
+} from '../../../logic/community'
 
 export async function getCommunitiesHandler(
   context: Pick<
@@ -44,6 +48,11 @@ export async function getCommunitiesHandler(
   } catch (error) {
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting communities: ${message}`)
+
+    if (error instanceof CommunityOwnerNotFoundError) {
+      throw error
+    }
+
     return {
       status: 500,
       body: {

@@ -40,6 +40,7 @@ import {
   ICommunitiesComponent,
   ICommunityBansComponent,
   ICommunityMembersComponent,
+  ICommunityOwnersComponent,
   ICommunityPlacesComponent,
   ICommunityRolesComponent
 } from '../logic/community'
@@ -69,6 +70,7 @@ export type BaseComponents = {
   communities: ICommunitiesComponent
   communitiesDb: ICommunitiesDatabaseComponent
   communityBans: ICommunityBansComponent
+  communityOwners: ICommunityOwnersComponent
   communityMembers: ICommunityMembersComponent
   communityPlaces: ICommunityPlacesComponent
   communityRoles: ICommunityRolesComponent

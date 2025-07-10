@@ -3,6 +3,7 @@ import {
   ICommunitiesComponent,
   ICommunityBansComponent,
   ICommunityMembersComponent,
+  ICommunityOwnersComponent,
   ICommunityPlacesComponent,
   ICommunityRolesComponent
 } from '../../src/logic/community'
@@ -61,6 +62,14 @@ export function createMockCommunityRolesComponent({
     validatePermissionToDeleteCommunity,
     validatePermissionToUpdatePlaces,
     validatePermissionToLeaveCommunity
+  }
+}
+
+export function createMockCommunityOwnersComponent({
+  getOwnerName = jest.fn()
+}: Partial<jest.Mocked<ICommunityOwnersComponent>>): jest.Mocked<ICommunityOwnersComponent> {
+  return {
+    getOwnerName
   }
 }
 

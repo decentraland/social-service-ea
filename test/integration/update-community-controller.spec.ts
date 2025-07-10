@@ -30,6 +30,10 @@ test('Update Community Controller', async function ({ components, stubComponents
         }
       ])
 
+      stubComponents.catalystClient.getProfile.onFirstCall().resolves({
+        avatars: [{ name: 'Owner Test Name' }]
+      })
+
       const createForm = new FormData()
       createForm.append('name', 'Original Community')
       createForm.append('description', 'Original Description')
