@@ -64,6 +64,7 @@ describe('Community Component', () => {
         })
         mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(10)
         mockStorage.exists.mockResolvedValue(false)
+        mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
       })
 
       it('should return community with members count', async () => {
@@ -86,6 +87,13 @@ describe('Community Component', () => {
         expect(mockStorage.exists).toHaveBeenCalledWith(`communities/${communityId}/raw-thumbnail.png`)
       })
 
+      it('should include owner name', async () => {
+        const result = await communityComponent.getCommunity(communityId, userAddress)
+
+        expect(result.ownerName).toBe('Test Owner Name')
+        expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
+      })
+
       describe('when the community has a thumbnail', () => {
         beforeEach(() => {
           mockStorage.exists.mockResolvedValueOnce(true)
@@ -97,6 +105,13 @@ describe('Community Component', () => {
           expect(result.thumbnails).toEqual({
             raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
           })
+        })
+
+        it('should also include owner name', async () => {
+          const result = await communityComponent.getCommunity(communityId, userAddress)
+
+          expect(result.ownerName).toBe('Test Owner Name')
+          expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
         })
       })
     })
@@ -112,8 +127,8 @@ describe('Community Component', () => {
           new CommunityNotFoundError(communityId)
         )
 
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
         // Both calls happen in parallel, so both will be called
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
         expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
       })
     })
@@ -137,6 +152,7 @@ describe('Community Component', () => {
       mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
       mockStorage.exists.mockResolvedValue(false)
       mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+      mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
 
     it('should return communities with total count', async () => {
@@ -149,6 +165,7 @@ describe('Community Component', () => {
             name: mockCommunity.name,
             description: mockCommunity.description,
             ownerAddress: mockCommunity.ownerAddress,
+            ownerName: 'Test Owner Name',
             privacy: mockCommunity.privacy,
             active: mockCommunity.active,
             friends: expect.arrayContaining([
@@ -205,10 +222,12 @@ describe('Community Component', () => {
         isLive: false
       }
     ]
+
     beforeEach(() => {
       mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunities)
       mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(1)
       mockStorage.exists.mockResolvedValue(false)
+      mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
 
     it('should return public communities with total count', async () => {
@@ -232,6 +251,15 @@ describe('Community Component', () => {
 
       expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
       expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
+    })
+
+    it('should include owner names', async () => {
+      const result = await communityComponent.getCommunitiesPublicInformation(options)
+
+      result.communities.forEach((community) => {
+        expect(community.ownerName).toBe('Test Owner Name')
+      })
+      expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
     })
 
     describe('and the communities have a thumbnail', () => {
@@ -309,6 +337,7 @@ describe('Community Component', () => {
       mockCommunitiesDB.addCommunityMember.mockResolvedValue()
       mockCommunityPlaces.addPlaces.mockResolvedValue()
       mockStorage.storeFile.mockResolvedValue('https://cdn.decentraland.org/thumbnail.png')
+      mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
 
     describe('and the user has owned names', () => {
@@ -352,6 +381,13 @@ describe('Community Component', () => {
             expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
             expect(mockStorage.storeFile).not.toHaveBeenCalled()
           })
+
+          it('should include owner name', async () => {
+            const result = await communityComponent.createCommunity(communityData)
+
+            expect(result.ownerName).toBe('Test Owner Name')
+            expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
+          })
         })
 
         describe('and a thumbnail is provided', () => {
@@ -386,6 +422,13 @@ describe('Community Component', () => {
               thumbnail,
               `communities/${newCommunityId}/raw-thumbnail.png`
             )
+          })
+
+          it('should also include owner name', async () => {
+            const result = await communityComponent.createCommunity(communityData, thumbnail)
+
+            expect(result.ownerName).toBe('Test Owner Name')
+            expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
           })
         })
       })
@@ -460,6 +503,13 @@ describe('Community Component', () => {
                 thumbnail,
                 `communities/${newCommunityId}/raw-thumbnail.png`
               )
+            })
+
+            it('should also include owner name', async () => {
+              const result = await communityComponent.createCommunity(communityData, thumbnail, placeIds)
+
+              expect(result.ownerName).toBe('Test Owner Name')
+              expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
             })
           })
         })
