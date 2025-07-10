@@ -9,7 +9,7 @@ import {
 import { randomUUID } from 'crypto'
 import FormData from 'form-data'
 
-test('Update Community Controller', async function ({ components, stubComponents }) {
+test('Update Community Controller', async function ({ components, stubComponents, spyComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
   const makeRequest = makeAuthenticatedRequest(components)
 
@@ -275,6 +275,7 @@ test('Update Community Controller', async function ({ components, stubComponents
               expect(body.data.thumbnails).toBeDefined()
               expect(body.data.thumbnails.raw).toContain('social/communities/')
               expect(body.message).toBe('Community updated successfully')
+              expect(spyComponents.cdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
             })
           })
         })
