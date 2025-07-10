@@ -25,6 +25,7 @@ import {
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
+import { communitiesErrorsHandler } from '../middlewares/communities-errors'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -43,6 +44,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
       })
     })
 
+  router.use(communitiesErrorsHandler)
   router.use(errorHandler)
 
   router.get('/v1/communities/:id', signedFetchMiddleware(), getCommunityHandler)
