@@ -60,15 +60,16 @@ export async function createCommunityComponent(
         throw new CommunityNotFoundError(id)
       }
 
-      const thumbnail = await getThumbnail(community.id)
+      const [thumbnail, ownerName] = await Promise.all([
+        getThumbnail(community.id),
+        communityOwners.getOwnerName(community.ownerAddress, community.id)
+      ])
 
       if (thumbnail) {
         community.thumbnails = {
           raw: thumbnail
         }
       }
-
-      const ownerName = await communityOwners.getOwnerName(community.ownerAddress, community.id)
 
       return toCommunityWithMembersCount({ ...community, ownerName }, membersCount)
     },
@@ -120,17 +121,20 @@ export async function createCommunityComponent(
 
       const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
         communities.map(async (community) => {
-          const thumbnail = await getThumbnail(community.id)
+          const [thumbnail, ownerName] = await Promise.all([
+            getThumbnail(community.id),
+            communityOwners.getOwnerName(community.ownerAddress, community.id)
+          ])
+
+          const result = { ...community, ownerName }
 
           if (thumbnail) {
-            community.thumbnails = {
+            result.thumbnails = {
               raw: thumbnail
             }
           }
 
-          const ownerName = await communityOwners.getOwnerName(community.ownerAddress, community.id)
-
-          return { ...community, ownerName }
+          return result
         })
       )
 
