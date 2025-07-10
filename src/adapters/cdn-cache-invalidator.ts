@@ -11,7 +11,7 @@ export async function createCdnCacheInvalidatorComponent(
   const CDN_URL = await config.requireString('CDN_URL')
 
   async function invalidateThumbnail(communityId: string): Promise<void> {
-    const url = `${CDN_CACHE_INVALIDATOR_API_URL}/purge-cache`
+    const url = `${CDN_CACHE_INVALIDATOR_API_URL}/invalidate`
     await fetcher.fetch(url, {
       method: 'POST',
       body: JSON.stringify({
