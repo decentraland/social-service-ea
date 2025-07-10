@@ -1,33 +1,33 @@
 import { EthAddress } from '@dcl/schemas'
 
-export class CommunityNotFoundError {
-  public readonly message: string
+export class CommunityNotFoundError extends Error {
   constructor(public readonly id: string) {
-    this.message = `Community not found: ${id}`
+    super(`Community not found: ${id}`)
+    this.name = 'CommunityNotFoundError'
   }
 }
 
 // TODO: also use the errors below in community.ts
-export class CommunityMemberNotFoundError {
-  public readonly message: string
+export class CommunityMemberNotFoundError extends Error {
   constructor(public readonly id: string) {
-    this.message = `Community member not found: ${id}`
+    super(`Community member not found: ${id}`)
+    this.name = 'CommunityMemberNotFoundError'
   }
 }
 
-export class CommunityOwnerNotFoundError {
-  public readonly message: string
+export class CommunityOwnerNotFoundError extends Error {
   constructor(
     public readonly id: string,
     public readonly ownerAddress: EthAddress
   ) {
-    this.message = `Community owner not found: ${id} - ${ownerAddress}`
+    super(`Community owner not found: ${id} - ${ownerAddress}`)
+    this.name = 'CommunityOwnerNotFoundError'
   }
 }
 
-export class CommunityPlaceNotFoundError {
-  public readonly message: string
+export class CommunityPlaceNotFoundError extends Error {
   constructor(public readonly id: string) {
-    this.message = `Community place not found: ${id}`
+    super(`Community place not found: ${id}`)
+    this.name = 'CommunityPlaceNotFoundError'
   }
 }

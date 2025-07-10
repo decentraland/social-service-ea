@@ -5,18 +5,11 @@ import { CommunityOwnerNotFoundError } from './errors'
 import { getProfileName } from '../profiles'
 
 export function createCommunityOwnersComponent(
-  components: Pick<AppComponents, 'catalystClient' | 'redis'>
+  components: Pick<AppComponents, 'catalystClient'>
 ): ICommunityOwnersComponent {
-  const { catalystClient, redis } = components
+  const { catalystClient } = components
 
   async function getOwnerName(ownerAddress: EthAddress, communityId: string = 'N/A'): Promise<string> {
-    const cacheKey: string = `catalyst:profile:name:${ownerAddress}`
-    const cachedName: string | null = await redis.get(cacheKey)
-
-    if (cachedName) {
-      return cachedName
-    }
-
     const ownerProfile = await catalystClient.getProfile(ownerAddress)
 
     if (!ownerProfile) {
@@ -24,10 +17,6 @@ export function createCommunityOwnersComponent(
     }
 
     const fetchedName: string = getProfileName(ownerProfile)
-
-    await redis.put(cacheKey, fetchedName, {
-      EX: 60 * 10 // 10 minutes
-    })
 
     return fetchedName
   }
