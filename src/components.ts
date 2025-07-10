@@ -50,6 +50,7 @@ import { createUpdateHandlerComponent } from './logic/updates'
 import { AnalyticsEventPayload } from './types/analytics'
 import { createRewardComponent } from './adapters/rewards'
 import { createWsPoolComponent } from './logic/ws-pool'
+import { createCdnCacheInvalidatorComponent } from './adapters/cdn-cache-invalidator'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -126,6 +127,7 @@ export async function initComponents(): Promise<AppComponents> {
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const catalystClient = await createCatalystClient({ config, fetcher, logs })
+  const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
   const voice = await createVoiceComponent({
@@ -163,6 +165,7 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     communityRoles,
     communityPlaces,
+    cdnCacheInvalidator,
     logs,
     storage,
     config
@@ -251,6 +254,7 @@ export async function initComponents(): Promise<AppComponents> {
     voice,
     voiceDb,
     worldsStats,
-    wsPool
+    wsPool,
+    cdnCacheInvalidator
   }
 }
