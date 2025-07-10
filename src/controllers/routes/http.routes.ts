@@ -44,8 +44,8 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
       })
     })
 
-  router.use(communitiesErrorsHandler)
   router.use(errorHandler)
+  router.use(communitiesErrorsHandler)
 
   router.get('/v1/communities/:id', signedFetchMiddleware(), getCommunityHandler)
   router.get('/v1/communities', signedFetchMiddleware({ optional: true }), getCommunitiesHandler)

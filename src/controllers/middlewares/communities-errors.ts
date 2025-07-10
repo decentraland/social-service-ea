@@ -8,7 +8,7 @@ import {
 import { ComponentsWithLogger } from '@dcl/platform-server-commons/dist/types'
 
 export async function communitiesErrorsHandler(
-  ctx: IHttpServerComponent.DefaultContext<ComponentsWithLogger>,
+  _ctx: IHttpServerComponent.DefaultContext<ComponentsWithLogger>,
   next: () => Promise<IHttpServerComponent.IResponse>
 ): Promise<IHttpServerComponent.IResponse> {
   try {
@@ -29,6 +29,7 @@ export async function communitiesErrorsHandler(
       }
     }
 
+    // let next generic middleware handle the error
     throw error
   }
 }
