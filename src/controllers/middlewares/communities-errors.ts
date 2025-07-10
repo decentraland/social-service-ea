@@ -23,7 +23,7 @@ export async function communitiesErrorsHandler(
       return {
         status: 404,
         body: {
-          error: 'Not found',
+          error: 'Not Found',
           message: error.message
         }
       }

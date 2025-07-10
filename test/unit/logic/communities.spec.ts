@@ -67,7 +67,7 @@ describe('Community Component', () => {
         mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
       })
 
-      it('should return community with members count', async () => {
+      it('should return community with members count and owner name', async () => {
         const result = await communityComponent.getCommunity(communityId, userAddress)
 
         expect(result).toEqual({
@@ -79,18 +79,13 @@ describe('Community Component', () => {
           active: mockCommunity.active,
           thumbnails: undefined,
           role: CommunityRole.Member,
-          membersCount: 10
+          membersCount: 10,
+          ownerName: 'Test Owner Name'
         })
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
         expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
         expect(mockStorage.exists).toHaveBeenCalledWith(`communities/${communityId}/raw-thumbnail.png`)
-      })
-
-      it('should include owner name', async () => {
-        const result = await communityComponent.getCommunity(communityId, userAddress)
-
-        expect(result.ownerName).toBe('Test Owner Name')
         expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
       })
 
@@ -107,12 +102,7 @@ describe('Community Component', () => {
           })
         })
 
-        it('should also include owner name', async () => {
-          const result = await communityComponent.getCommunity(communityId, userAddress)
 
-          expect(result.ownerName).toBe('Test Owner Name')
-          expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
-        })
       })
     })
 
@@ -155,7 +145,7 @@ describe('Community Component', () => {
       mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
 
-    it('should return communities with total count', async () => {
+    it('should return communities with total count and owner names', async () => {
       const result = await communityComponent.getCommunities(userAddress, options)
 
       expect(result).toEqual({
@@ -188,6 +178,7 @@ describe('Community Component', () => {
       expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, options)
       expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, options)
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
+      expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
     })
 
     describe('and the communities have a thumbnail', () => {
@@ -204,6 +195,8 @@ describe('Community Component', () => {
           raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
       })
+
+
     })
   })
 
@@ -230,7 +223,7 @@ describe('Community Component', () => {
       mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
 
-    it('should return public communities with total count', async () => {
+    it('should return public communities with total count and owner names', async () => {
       const result = await communityComponent.getCommunitiesPublicInformation(options)
 
       expect(result).toEqual({
@@ -243,7 +236,8 @@ describe('Community Component', () => {
             privacy: 'public',
             active: mockCommunity.active,
             membersCount: 10,
-            isLive: false
+            isLive: false,
+            ownerName: 'Test Owner Name'
           })
         ]),
         total: 1
@@ -251,14 +245,6 @@ describe('Community Component', () => {
 
       expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
       expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
-    })
-
-    it('should include owner names', async () => {
-      const result = await communityComponent.getCommunitiesPublicInformation(options)
-
-      result.communities.forEach((community) => {
-        expect(community.ownerName).toBe('Test Owner Name')
-      })
       expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
     })
 
@@ -276,6 +262,8 @@ describe('Community Component', () => {
           raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
       })
+
+
     })
   })
 
@@ -362,10 +350,12 @@ describe('Community Component', () => {
             expect(result).toEqual({
               ...mockCommunity,
               ...communityData,
-              id: 'new-community-id'
+              id: 'new-community-id',
+              ownerName: 'Test Owner Name'
             })
 
             expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
+            expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
             expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
               ...communityData,
@@ -381,13 +371,6 @@ describe('Community Component', () => {
             expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
             expect(mockStorage.storeFile).not.toHaveBeenCalled()
           })
-
-          it('should include owner name', async () => {
-            const result = await communityComponent.createCommunity(communityData)
-
-            expect(result.ownerName).toBe('Test Owner Name')
-            expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
-          })
         })
 
         describe('and a thumbnail is provided', () => {
@@ -399,12 +382,14 @@ describe('Community Component', () => {
               ...mockCommunity,
               ...communityData,
               id: newCommunityId,
+              ownerName: 'Test Owner Name',
               thumbnails: {
                 raw: `https://cdn.decentraland.org/social/communities/${newCommunityId}/raw-thumbnail.png`
               }
             })
 
             expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
+            expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
             expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
               ...communityData,
@@ -422,13 +407,6 @@ describe('Community Component', () => {
               thumbnail,
               `communities/${newCommunityId}/raw-thumbnail.png`
             )
-          })
-
-          it('should also include owner name', async () => {
-            const result = await communityComponent.createCommunity(communityData, thumbnail)
-
-            expect(result.ownerName).toBe('Test Owner Name')
-            expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
           })
         })
       })
@@ -450,10 +428,12 @@ describe('Community Component', () => {
               expect(result).toEqual({
                 ...mockCommunity,
                 ...communityData,
-                id: 'new-community-id'
+                id: 'new-community-id',
+                ownerName: 'Test Owner Name'
               })
 
               expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
+              expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
               expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
               expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
                 ...communityData,
@@ -480,12 +460,14 @@ describe('Community Component', () => {
                 ...mockCommunity,
                 ...communityData,
                 id: newCommunityId,
+                ownerName: 'Test Owner Name',
                 thumbnails: {
                   raw: `https://cdn.decentraland.org/social/communities/${newCommunityId}/raw-thumbnail.png`
                 }
               })
 
               expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
+              expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
               expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
               expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
                 ...communityData,
@@ -503,13 +485,6 @@ describe('Community Component', () => {
                 thumbnail,
                 `communities/${newCommunityId}/raw-thumbnail.png`
               )
-            })
-
-            it('should also include owner name', async () => {
-              const result = await communityComponent.createCommunity(communityData, thumbnail, placeIds)
-
-              expect(result.ownerName).toBe('Test Owner Name')
-              expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
             })
           })
         })
