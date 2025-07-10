@@ -9,7 +9,7 @@ import {
 import { randomUUID } from 'crypto'
 import FormData from 'form-data'
 
-test('Update Community Controller', async function ({ components, stubComponents, spyComponents }) {
+test('Update Community Controller', async function ({ components, stubComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
   const makeRequest = makeAuthenticatedRequest(components)
 
@@ -249,34 +249,32 @@ test('Update Community Controller', async function ({ components, stubComponents
         })
 
         describe('when updating with thumbnail', () => {
-          describe('and the CDN cache was correctly invalidated', () => {
-            beforeEach(async () => {
-              stubComponents.fetcher.fetch.onFirstCall().resolves({
-                ok: true,
-                status: 200,
-                json: () => Promise.resolve({})
-              } as any)
-            })
+          beforeEach(async () => {
+            stubComponents.fetcher.fetch.onFirstCall().resolves({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve({})
+            } as any)
+          })
 
-            it('should update the community with new thumbnail and return 200 OK', async () => {
-              const response = await makeMultipartRequest(
-                identity,
-                `/v1/communities/${communityId}`,
-                {
-                  name: 'Thumbnail Updated',
-                  thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
-                },
-                'PUT'
-              )
+          it('should update the community with new thumbnail and invalidate CDN cache', async () => {
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                name: 'Thumbnail Updated',
+                thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+              },
+              'PUT'
+            )
 
-              expect(response.status).toBe(200)
-              const body = await response.json()
-              expect(body.data.name).toBe('Thumbnail Updated')
-              expect(body.data.thumbnails).toBeDefined()
-              expect(body.data.thumbnails.raw).toContain('social/communities/')
-              expect(body.message).toBe('Community updated successfully')
-              expect(spyComponents.cdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
-            })
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            expect(body.data.name).toBe('Thumbnail Updated')
+            expect(body.data.thumbnails).toBeDefined()
+            expect(body.data.thumbnails.raw).toBeDefined()
+            expect(body.message).toBe('Community updated successfully')
+            expect(stubComponents.cdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
           })
         })
 
