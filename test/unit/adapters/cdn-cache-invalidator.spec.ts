@@ -126,7 +126,7 @@ describe('CDN Cache Invalidator Component', () => {
 
           expect(mockGetCommunityThumbnailPath).toHaveBeenCalledWith(communityId)
           expect(mockFetcher.fetch).toHaveBeenCalledWith(
-            `${mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL}/purge-cache`,
+            `${mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL}/invalidate`,
             {
               method: 'POST',
               body: JSON.stringify({
@@ -149,7 +149,7 @@ describe('CDN Cache Invalidator Component', () => {
 
           expect(mockGetCommunityThumbnailPath).toHaveBeenCalledWith(communityId)
           expect(mockFetcher.fetch).toHaveBeenCalledWith(
-            `${mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL}/purge-cache`,
+            `${mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL}/invalidate`,
             {
               method: 'POST',
               body: JSON.stringify({
@@ -173,7 +173,7 @@ describe('CDN Cache Invalidator Component', () => {
           const fetchCall = mockFetcher.fetch.mock.calls[0]
           const [url, options] = fetchCall
 
-          expect(url).toBe(`${mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL}/purge-cache`)
+          expect(url).toBe(`${mockConfigValues.CDN_CACHE_INVALIDATOR_API_URL}/invalidate`)
           expect(options.method).toBe('POST')
           expect(options.headers).toEqual({
             Authorization: `Bearer ${mockConfigValues.CDN_CACHE_INVALIDATOR_API_TOKEN}`
