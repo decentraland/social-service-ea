@@ -296,7 +296,7 @@ export async function createReferralComponent(
       await emailComponent.sendEmail(
         MARKETING_EMAIL,
         '[Action Needed] IRL Swag Referral Tier Unlocked',
-        `A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}`
+        `<p>A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}</p>`
       )
 
       logger.info('Referral email set successfully', {
