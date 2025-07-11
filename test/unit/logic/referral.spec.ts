@@ -16,6 +16,7 @@ describe('referral-component', () => {
   let mockSns: any
   let mockConfig: any
   let mockRewards: any
+  let mockEmail: any
   let referralComponent: IReferralComponent
 
   beforeEach(async () => {
@@ -64,12 +65,17 @@ describe('referral-component', () => {
       sendReward: jest.fn().mockResolvedValue([{ image: 'test-image.png', rarity: 'common' }])
     }
 
+    mockEmail = {
+      sendEmail: jest.fn().mockResolvedValue(undefined)
+    }
+
     referralComponent = await createReferralComponent({
       referralDb: mockReferralDb,
       logs: { getLogger: () => mockLogger },
       sns: mockSns,
       config: mockConfig,
-      rewards: mockRewards
+      rewards: mockRewards,
+      email: mockEmail
     })
   })
 

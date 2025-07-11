@@ -5,7 +5,7 @@ export async function createEmailComponent(
 ): Promise<IEmailComponent> {
   const { fetcher, config } = components
 
-  const notificationUrl = new URL(await config.requireString('NOTIFICATION_SERVICE_URL'))
+  const notificationUrl = await config.requireString('NOTIFICATION_SERVICE_URL')
   const internalApiKey = await config.requireString('INTERNAL_API_KEY')
 
   async function sendEmail(email: string, subject: string, body: string): Promise<void> {
