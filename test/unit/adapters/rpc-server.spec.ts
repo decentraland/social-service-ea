@@ -13,6 +13,7 @@ import {
 import { createVoiceMockedComponent } from '../../mocks/components/voice'
 import { setupRpcRoutes } from '../../../src/controllers/routes/rpc.routes'
 import { createMockUpdateHandlerComponent } from '../../mocks/components/updates'
+import { ICommunityVoiceComponent } from '../../../src/logic/community-voice'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -29,6 +30,7 @@ describe('createRpcServerComponent', () => {
   let subscribersContext: ISubscribersContext
   let endIncomingOrOutgoingPrivateVoiceChatForUserMock: jest.Mock
   let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
+  let mockCommunityVoice: jest.Mocked<ICommunityVoiceComponent>
 
   beforeEach(async () => {
     endIncomingOrOutgoingPrivateVoiceChatForUserMock = jest.fn()
@@ -61,7 +63,8 @@ describe('createRpcServerComponent', () => {
       subscribersContext,
       metrics: mockMetrics,
       voice: mockVoice,
-      updateHandler: mockUpdateHandler
+      updateHandler: mockUpdateHandler,
+      communityVoice: mockCommunityVoice
     })
   })
 

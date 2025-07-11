@@ -1,6 +1,8 @@
+import { ILoggerComponent } from '@well-known-components/interfaces'
+import { IAnalyticsComponent } from '@dcl/analytics-component'
 import { createCommunityVoiceComponent } from '../../../src/logic/community-voice'
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
-import { CommunityRole } from '../../../src/types'
+import { CommunityRole, ICommsGatekeeperComponent, IPubSubComponent, ICommunitiesDatabaseComponent } from '../../../src/types'
 import {
   CommunityVoiceChatNotFoundError,
   CommunityVoiceChatAlreadyActiveError,
@@ -8,20 +10,21 @@ import {
   CommunityVoiceChatPermissionError,
   CommunityVoiceChatCreationError
 } from '../../../src/logic/community-voice/errors'
-import { AnalyticsEvent } from '../../../src/types/analytics'
+import { AnalyticsEvent, AnalyticsEventPayload } from '../../../src/types/analytics'
+import { ICommunityVoiceComponent } from '../../../src/logic/community-voice'
 
 describe('Community Voice Logic', () => {
-  let mockLogs: any
-  let mockConfig: any
-  let mockCommsGatekeeper: any
-  let mockCommunitiesDb: any
-  let mockPubsub: any
-  let mockAnalytics: any
-  let communityVoice: any
-  let logger: any
+  let mockLogs: jest.Mocked<ILoggerComponent>
+  let mockCommsGatekeeper: jest.Mocked<ICommsGatekeeperComponent>
+  let mockCommunitiesDb: Partial<jest.Mocked<ICommunitiesDatabaseComponent>>
+  let mockPubsub: jest.Mocked<IPubSubComponent>
+  let mockAnalytics: jest.Mocked<IAnalyticsComponent<AnalyticsEventPayload>>
+  let communityVoice: ICommunityVoiceComponent
+  let logger: jest.Mocked<ReturnType<ILoggerComponent['getLogger']>>
 
   beforeEach(async () => {
     logger = {
+      log: jest.fn(),
       info: jest.fn(),
       error: jest.fn(),
       warn: jest.fn(),
@@ -30,15 +33,18 @@ describe('Community Voice Logic', () => {
 
     mockLogs = {
       getLogger: jest.fn().mockReturnValue(logger)
-    }
-
-    mockConfig = {}
+    } as jest.Mocked<ILoggerComponent>
 
     mockCommsGatekeeper = {
       getCommunityVoiceChatStatus: jest.fn(),
       createCommunityVoiceChatRoom: jest.fn(),
-      getCommunityVoiceChatCredentials: jest.fn()
-    }
+      getCommunityVoiceChatCredentials: jest.fn(),
+      isUserInAVoiceChat: jest.fn(),
+      updateUserPrivateMessagePrivacyMetadata: jest.fn(),
+      getPrivateVoiceChatCredentials: jest.fn(),
+      endPrivateVoiceChat: jest.fn(),
+      updateUserMetadataInCommunityVoiceChat: jest.fn()
+    } as jest.Mocked<ICommsGatekeeperComponent>
 
     mockCommunitiesDb = {
       getCommunityMemberRole: jest.fn(),
@@ -46,17 +52,21 @@ describe('Community Voice Logic', () => {
     }
 
     mockPubsub = {
-      publishInChannel: jest.fn()
-    }
+      publishInChannel: jest.fn(),
+      subscribeToChannel: jest.fn(),
+      start: jest.fn(),
+      stop: jest.fn()
+    } as jest.Mocked<IPubSubComponent>
 
     mockAnalytics = {
-      fireEvent: jest.fn()
-    }
+      fireEvent: jest.fn(),
+      sendEvent: jest.fn()
+    } as jest.Mocked<IAnalyticsComponent<AnalyticsEventPayload>>
 
     communityVoice = await createCommunityVoiceComponent({
       logs: mockLogs,
       commsGatekeeper: mockCommsGatekeeper,
-      communitiesDb: mockCommunitiesDb,
+      communitiesDb: mockCommunitiesDb as ICommunitiesDatabaseComponent,
       pubsub: mockPubsub,
       analytics: mockAnalytics
     })
@@ -68,8 +78,12 @@ describe('Community Voice Logic', () => {
 
     it('should successfully start a community voice chat for an owner', async () => {
       // Arrange
-      mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: false, 
+        participantCount: 0, 
+        moderatorCount: 0 
+      })
       mockCommsGatekeeper.createCommunityVoiceChatRoom.mockResolvedValue({
         connectionUrl: 'test-connection-url'
       })
@@ -84,6 +98,7 @@ describe('Community Voice Logic', () => {
       expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, creatorAddress)
       expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId,
+        voiceChatId: communityId,
         status: 'started'
       })
       expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_CALL, {
@@ -94,8 +109,12 @@ describe('Community Voice Logic', () => {
 
     it('should successfully start a community voice chat for a moderator', async () => {
       // Arrange
-      mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Moderator)
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: false, 
+        participantCount: 0, 
+        moderatorCount: 0 
+      })
       mockCommsGatekeeper.createCommunityVoiceChatRoom.mockResolvedValue({
         connectionUrl: 'test-connection-url'
       })
@@ -109,7 +128,7 @@ describe('Community Voice Logic', () => {
 
     it('should throw UserNotCommunityMemberError when user is not a member', async () => {
       // Arrange
-      mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.None)
 
       // Act & Assert
       await expect(communityVoice.startCommunityVoiceChat(communityId, creatorAddress)).rejects.toThrow(
@@ -119,7 +138,7 @@ describe('Community Voice Logic', () => {
 
     it('should throw CommunityVoiceChatPermissionError when user is only a member', async () => {
       // Arrange
-      mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
 
       // Act & Assert
       await expect(communityVoice.startCommunityVoiceChat(communityId, creatorAddress)).rejects.toThrow(
@@ -129,8 +148,12 @@ describe('Community Voice Logic', () => {
 
     it('should throw CommunityVoiceChatAlreadyActiveError when voice chat is already active', async () => {
       // Arrange
-      mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: true })
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: true, 
+        participantCount: 1, 
+        moderatorCount: 1 
+      })
 
       // Act & Assert
       await expect(communityVoice.startCommunityVoiceChat(communityId, creatorAddress)).rejects.toThrow(
@@ -140,8 +163,12 @@ describe('Community Voice Logic', () => {
 
     it('should throw CommunityVoiceChatCreationError when creation fails', async () => {
       // Arrange
-      mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: false, 
+        participantCount: 0, 
+        moderatorCount: 0 
+      })
       mockCommsGatekeeper.createCommunityVoiceChatRoom.mockRejectedValue(new Error('Creation failed'))
 
       // Act & Assert
@@ -159,10 +186,19 @@ describe('Community Voice Logic', () => {
       // Arrange
       mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
         isActive: true,
-        participantCount: 5
+        participantCount: 5,
+        moderatorCount: 1
       })
-      mockCommunitiesDb.getCommunity.mockResolvedValue({ id: communityId })
-      mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      mockCommunitiesDb.getCommunity!.mockResolvedValue({ 
+        id: communityId,
+        name: 'Test Community',
+        description: 'Test Description',
+        ownerAddress: '0x123',
+        privacy: 'public',
+        active: true,
+        role: CommunityRole.Member
+      })
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
       mockCommsGatekeeper.getCommunityVoiceChatCredentials.mockResolvedValue({
         connectionUrl: 'test-connection-url'
       })
@@ -181,7 +217,11 @@ describe('Community Voice Logic', () => {
 
     it('should throw CommunityVoiceChatNotFoundError when voice chat is not active', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: false, 
+        participantCount: 0, 
+        moderatorCount: 0 
+      })
 
       // Act & Assert
       await expect(communityVoice.joinCommunityVoiceChat(communityId, userAddress)).rejects.toThrow(
@@ -191,8 +231,12 @@ describe('Community Voice Logic', () => {
 
     it('should throw UserNotCommunityMemberError when user is not a member', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: true })
-      mockCommunitiesDb.getCommunity.mockResolvedValue(null)
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: true, 
+        participantCount: 1, 
+        moderatorCount: 1 
+      })
+      mockCommunitiesDb.getCommunity!.mockResolvedValue(null)
 
       // Act & Assert
       await expect(communityVoice.joinCommunityVoiceChat(communityId, userAddress)).rejects.toThrow(
@@ -207,8 +251,12 @@ describe('Community Voice Logic', () => {
 
     it('should successfully end community voice chat for an owner', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: true })
-      mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: true, 
+        participantCount: 1, 
+        moderatorCount: 1 
+      })
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
 
       // Act
       await communityVoice.endCommunityVoiceChat(voiceChatId, userAddress)
@@ -224,7 +272,11 @@ describe('Community Voice Logic', () => {
 
     it('should throw CommunityVoiceChatNotFoundError when voice chat is not active', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: false, 
+        participantCount: 0, 
+        moderatorCount: 0 
+      })
 
       // Act & Assert
       await expect(communityVoice.endCommunityVoiceChat(voiceChatId, userAddress)).rejects.toThrow(
@@ -234,8 +286,12 @@ describe('Community Voice Logic', () => {
 
     it('should throw CommunityVoiceChatPermissionError when user is only a member', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: true })
-      mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: true, 
+        participantCount: 1, 
+        moderatorCount: 1 
+      })
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
 
       // Act & Assert
       await expect(communityVoice.endCommunityVoiceChat(voiceChatId, userAddress)).rejects.toThrow(
@@ -252,7 +308,8 @@ describe('Community Voice Logic', () => {
       // Arrange
       mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
         isActive: true,
-        participantCount: 3
+        participantCount: 3,
+        moderatorCount: 1
       })
 
       // Act
@@ -265,7 +322,11 @@ describe('Community Voice Logic', () => {
 
     it('should throw CommunityVoiceChatNotFoundError when voice chat is not active', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: false, 
+        participantCount: 0, 
+        moderatorCount: 0 
+      })
 
       // Act & Assert
       await expect(communityVoice.leaveCommunityVoiceChat(voiceChatId, userAddress)).rejects.toThrow(
@@ -279,7 +340,11 @@ describe('Community Voice Logic', () => {
 
     it('should return community voice chat when active', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: true })
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: true, 
+        participantCount: 1, 
+        moderatorCount: 1 
+      })
 
       // Act
       const result = await communityVoice.getCommunityVoiceChat(communityId)
@@ -294,7 +359,11 @@ describe('Community Voice Logic', () => {
 
     it('should return null when voice chat is not active', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
+        isActive: false, 
+        participantCount: 0, 
+        moderatorCount: 0 
+      })
 
       // Act
       const result = await communityVoice.getCommunityVoiceChat(communityId)
