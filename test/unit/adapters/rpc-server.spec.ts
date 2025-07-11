@@ -8,7 +8,8 @@ import {
   COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
   FRIEND_STATUS_UPDATES_CHANNEL,
   FRIENDSHIP_UPDATES_CHANNEL,
-  PRIVATE_VOICE_CHAT_UPDATES_CHANNEL
+  PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
+  COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL
 } from '../../../src/adapters/pubsub'
 import { createVoiceMockedComponent } from '../../mocks/components/voice'
 import { setupRpcRoutes } from '../../../src/controllers/routes/rpc.routes'
@@ -118,6 +119,10 @@ describe('createRpcServerComponent', () => {
           PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
           expect.any(Function)
         )
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(
+          COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
+          expect.any(Function)
+        )
       })
 
       it('should wire the updateHandler component to pubsub channels', async () => {
@@ -137,6 +142,10 @@ describe('createRpcServerComponent', () => {
           {
             channel: COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
             handler: mockUpdateHandler.communityMemberStatusHandler
+          },
+          {
+            channel: COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
+            handler: mockUpdateHandler.communityVoiceChatUpdateHandler
           }
         ]
 
