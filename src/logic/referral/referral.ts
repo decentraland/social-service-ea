@@ -13,6 +13,7 @@ import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput 
 import type { AppComponents } from '../../types/system'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
+const MARKETING_EMAIL = 'marketing@decentraland.org'
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -22,9 +23,9 @@ function validateAddress(value: string, field: string): string {
 }
 
 export async function createReferralComponent(
-  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards'>
+  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email'>
 ): Promise<IReferralComponent> {
-  const { referralDb, logs, sns, config, rewards } = components
+  const { referralDb, logs, sns, config, rewards, email: emailComponent } = components
 
   const logger = logs.getLogger('referral-component')
 
@@ -291,6 +292,12 @@ export async function createReferralComponent(
       })
 
       const referralEmail = await referralDb.setReferralEmail({ referrer, email })
+
+      await emailComponent.sendEmail(
+        MARKETING_EMAIL,
+        '[Action Needed] IRL Swag Referral Tier Unlocked',
+        `A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}`
+      )
 
       logger.info('Referral email set successfully', {
         referrer,
