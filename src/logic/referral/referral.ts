@@ -293,16 +293,28 @@ export async function createReferralComponent(
 
       const referralEmail = await referralDb.setReferralEmail({ referrer, email })
 
-      await emailComponent.sendEmail(
-        MARKETING_EMAIL,
-        '[Action Needed] IRL Swag Referral Tier Unlocked',
-        `<p>A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}</p>`
-      )
-
       logger.info('Referral email set successfully', {
         referrer,
         email
       })
+
+      try {
+        await emailComponent.sendEmail(
+          MARKETING_EMAIL,
+          '[Action Needed] IRL Swag Referral Tier Unlocked',
+          `<p>A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}</p>`
+        )
+        logger.info('Marketing email sent successfully', {
+          referrer,
+          email
+        })
+      } catch (error) {
+        logger.warn('Failed to send marketing email, but referral email was saved', {
+          referrer,
+          email,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
 
       return referralEmail
     },
