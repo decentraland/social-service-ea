@@ -58,6 +58,7 @@ import { createUpdateHandlerComponent } from '../src/logic/updates'
 import { AnalyticsEventPayload } from '../src/types/analytics'
 import { createRewardComponent } from '../src/adapters/rewards'
 import { createWsPoolComponent } from '../src/logic/ws-pool'
+import { createEmailComponent } from '../src/adapters/email'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -198,7 +199,9 @@ async function initComponents(): Promise<TestComponents> {
 
   const rewards = await createRewardComponent({ fetcher, config })
 
-  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards })
+  const email = await createEmailComponent({ fetcher, config })
+
+  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email })
 
   const queue = createMemoryQueueAdapter()
 
@@ -230,6 +233,7 @@ async function initComponents(): Promise<TestComponents> {
     communityPlaces,
     communityRoles,
     config,
+    email,
     fetcher,
     friendsDb,
     httpServer,
