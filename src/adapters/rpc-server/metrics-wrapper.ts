@@ -26,7 +26,8 @@ export enum StreamEvent {
   FRIEND_CONNECTIVITY_UPDATES = 'friend_connectivity_updates',
   BLOCK_UPDATES = 'block_updates',
   PRIVATE_VOICE_CHAT_UPDATES = 'private_voice_chat_updates',
-  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES = 'community_member_connectivity_updates'
+  COMMUNITY_MEMBER_CONNECTIVITY_UPDATES = 'community_member_connectivity_updates',
+  COMMUNITY_VOICE_CHAT_UPDATES = 'community_voice_chat_updates'
 }
 
 type RpcCallMethod<TParams, TResult extends SocialServiceResponse, TContext> = (

@@ -279,6 +279,14 @@ export type ICommsGatekeeperComponent = {
     privateMessagesPrivacy: PrivateMessagesPrivacy
   ) => Promise<void>
   endPrivateVoiceChat: (callId: string, address: string) => Promise<string[]>
+  getCommunityVoiceChatCredentials: (communityId: string, userAddress: string) => Promise<{ connectionUrl: string }>
+  createCommunityVoiceChatRoom: (communityId: string, moderatorAddress: string) => Promise<{ connectionUrl: string }>
+  updateUserMetadataInCommunityVoiceChat: (communityId: string, userAddress: string, metadata: any) => Promise<void>
+  getCommunityVoiceChatStatus: (communityId: string) => Promise<{
+    isActive: boolean
+    participantCount: number
+    moderatorCount: number
+  } | null>
 }
 
 export type IWebSocketComponent = IBaseComponent & {
@@ -322,6 +330,7 @@ export interface IUpdateHandlerComponent {
   blockUpdateHandler: UpdatesMessageHandler
   privateVoiceChatUpdateHandler: UpdatesMessageHandler
   communityMemberStatusHandler: UpdatesMessageHandler
+  communityVoiceChatUpdateHandler: UpdatesMessageHandler
   handleSubscriptionUpdates: <T, U>(params: SubscriptionHandlerParams<T, U>) => AsyncGenerator<T>
 }
 

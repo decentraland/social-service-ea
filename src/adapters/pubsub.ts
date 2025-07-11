@@ -6,6 +6,7 @@ export const COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL = 'community.member.c
 export const COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL = 'community.member.status.updates'
 export const BLOCK_UPDATES_CHANNEL = 'block.updates'
 export const PRIVATE_VOICE_CHAT_UPDATES_CHANNEL = 'privateVoiceChat.updates'
+export const COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL = 'communityVoiceChat.updates'
 
 export function createPubSubComponent(components: Pick<AppComponents, 'logs' | 'redis'>): IPubSubComponent {
   const { logs, redis } = components
