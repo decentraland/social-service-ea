@@ -34,7 +34,8 @@ import {
   IStorageHelperComponent,
   IPlacesApiComponent,
   IUpdateHandlerComponent,
-  IRewardComponent
+  IRewardComponent,
+  IEmailComponent
 } from './components'
 import {
   ICommunitiesComponent,
@@ -73,6 +74,7 @@ export type BaseComponents = {
   communityPlaces: ICommunityPlacesComponent
   communityRoles: ICommunityRolesComponent
   config: IConfigComponent
+  email: IEmailComponent
   expirePrivateVoiceChatJob?: IJobComponent
   fetcher: IFetchComponent
   friendsDb: IFriendsDatabaseComponent
