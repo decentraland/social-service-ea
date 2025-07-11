@@ -15,7 +15,7 @@ import {
   removeSocialSettings
 } from './utils/friendships'
 import { parseProfileToBlockedUser } from '../../src/logic/blocks'
-import { PrivateMessagesPrivacy, User } from '../../src/types'
+import { PrivateMessagesPrivacy, User, CommunityRole } from '../../src/types'
 
 test('RPC Server Controller', function ({ components, stubComponents }) {
   beforeAll(async () => {
@@ -495,6 +495,180 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         })
 
         assertInvalidRequestCase(result, 'Too many user addresses: 51')
+      })
+    })
+  })
+
+  describe('Community Voice Chat RPC', () => {
+    let testCommunity: any
+    let communityId: string
+
+    beforeEach(async () => {
+      const { rpcClient, communitiesDb } = components
+      
+      // Create test community
+      testCommunity = {
+        name: 'Test Community Voice Chat',
+        description: 'A test community for voice chat RPC testing',
+        owner_address: rpcClient.authAddress.toLowerCase(),
+        private: false,
+        active: true
+      }
+
+      const community = await communitiesDb.createCommunity(testCommunity)
+      communityId = community.id
+
+      // Add the RPC client user as a member of the community (owner should be automatically added)
+      await communitiesDb.addCommunityMember({
+        communityId: community.id,
+        memberAddress: rpcClient.authAddress.toLowerCase(),
+        role: CommunityRole.Owner
+      })
+
+      // Setup common mocks for comms gatekeeper
+      stubComponents.commsGatekeeper.createCommunityVoiceChatRoom.resolves({
+        connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+      })
+      stubComponents.commsGatekeeper.getCommunityVoiceChatCredentials.resolves({
+        connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+      })
+      stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
+        isActive: false,
+        participantCount: 0,
+        moderatorCount: 0
+      })
+      stubComponents.commsGatekeeper.updateUserMetadataInCommunityVoiceChat.resolves()
+      stubComponents.analytics.sendEvent.resolves()
+    })
+
+    afterEach(async () => {
+      const { communitiesDbHelper } = components
+      // Clean up community data
+      if (communityId) {
+        await communitiesDbHelper.forceCommunityRemoval(communityId)
+      }
+    })
+
+    describe('startCommunityVoiceChat', () => {
+      it('should successfully start a community voice chat when user is community owner', async () => {
+        const { rpcClient } = components
+        
+        const result = await rpcClient.client.startCommunityVoiceChat({
+          communityId
+        })
+
+        expect(result.response?.$case).toBe('ok')
+
+        if (result.response?.$case === 'ok') {
+          expect(result.response.ok.credentials?.connectionUrl).toBe(
+            'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+          )
+        }
+      })
+
+      it('should fail with conflict error when community voice chat is already active', async () => {
+        const { rpcClient } = components
+        
+        stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
+          isActive: true,
+          participantCount: 1,
+          moderatorCount: 1
+        })
+
+        const result = await rpcClient.client.startCommunityVoiceChat({
+          communityId
+        })
+
+        expect(result.response?.$case).toBe('conflictingError')
+      })
+
+      it('should fail when community does not exist', async () => {
+        const { rpcClient } = components
+        const nonExistentCommunityId = '00000000-0000-0000-0000-000000000000'
+
+        const result = await rpcClient.client.startCommunityVoiceChat({
+          communityId: nonExistentCommunityId
+        })
+
+        // Should fail with either notFoundError or forbiddenError (both are valid for non-existent communities)
+        expect(['notFoundError', 'forbiddenError']).toContain(result.response?.$case)
+      })
+
+      it('should handle service errors gracefully when comms gatekeeper fails', async () => {
+        const { rpcClient } = components
+        
+        stubComponents.commsGatekeeper.createCommunityVoiceChatRoom.rejects(new Error('Service unavailable'))
+
+        const result = await rpcClient.client.startCommunityVoiceChat({
+          communityId
+        })
+
+        expect(result.response?.$case).toBe('internalServerError')
+      })
+
+      it('should fail with invalid request when community id is empty', async () => {
+        const { rpcClient } = components
+
+        const result = await rpcClient.client.startCommunityVoiceChat({
+          communityId: ''
+        })
+
+        expect(result.response?.$case).toBe('invalidRequest')
+      })
+    })
+
+    describe('joinCommunityVoiceChat', () => {
+      beforeEach(() => {
+        // Mock active voice chat for join tests
+        stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
+          isActive: true,
+          participantCount: 1,
+          moderatorCount: 1
+        })
+      })
+
+      it('should successfully join the community voice chat when user is community member', async () => {
+        const { rpcClient } = components
+
+        const result = await rpcClient.client.joinCommunityVoiceChat({
+          communityId
+        })
+
+        expect(result.response?.$case).toBe('ok')
+
+        if (result.response?.$case === 'ok') {
+          expect(result.response.ok.credentials?.connectionUrl).toBe(
+            'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+          )
+        }
+      })
+
+      it('should fail when community voice chat is not active', async () => {
+        const { rpcClient } = components
+        
+        stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
+          isActive: false,
+          participantCount: 0,
+          moderatorCount: 0
+        })
+
+        const result = await rpcClient.client.joinCommunityVoiceChat({
+          communityId
+        })
+
+        expect(result.response?.$case).toBe('notFoundError')
+      })
+
+      it('should fail when community does not exist', async () => {
+        const { rpcClient } = components
+        const nonExistentCommunityId = '00000000-0000-0000-0000-000000000000'
+
+        const result = await rpcClient.client.joinCommunityVoiceChat({
+          communityId: nonExistentCommunityId
+        })
+
+        // Should fail with either notFoundError or forbiddenError (both are valid for non-existent communities)
+        expect(['notFoundError', 'forbiddenError']).toContain(result.response?.$case)
       })
     })
   })
