@@ -9,7 +9,7 @@ export async function createEmailComponent(
   const internalApiKey = await config.requireString('NOTIFICATION_SERVICE_TOKEN')
 
   async function sendEmail(email: string, subject: string, body: string): Promise<void> {
-    const url = new URL('/send-common-email', notificationUrl).toString()
+    const url = new URL('/notifications/email', notificationUrl).toString()
     const response = await fetcher.fetch(url, {
       method: 'POST',
       headers: {
