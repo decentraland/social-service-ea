@@ -206,12 +206,14 @@ export type CommunityWithMembersCount = CommunityWithOwnerName & {
   membersCount: number
 }
 
+export type CommunityVoiceChatStatus = {
+  isActive: boolean
+  participantCount: number
+  moderatorCount: number
+}
+
 export type CommunityWithMembersCountAndVoiceChatStatus = CommunityWithMembersCount & {
-  voiceChatStatus: {
-    isActive: boolean
-    participantCount: number
-    moderatorCount: number
-  } | null
+  voiceChatStatus: CommunityVoiceChatStatus | null
 }
 
 export type CommunityVoiceChatStatus = {
