@@ -49,8 +49,8 @@ describe('EmailComponent', () => {
         await emailComponent.sendEmail(email, subject, body)
 
         expect(mockConfig.requireString).toHaveBeenCalledWith('NOTIFICATION_SERVICE_URL')
-        expect(mockConfig.requireString).toHaveBeenCalledWith('INTERNAL_API_KEY')
-        expect(mockFetcher.fetch).toHaveBeenCalledWith(`${mockNotificationUrl}/send-common-email`, {
+        expect(mockConfig.requireString).toHaveBeenCalledWith('NOTIFICATION_SERVICE_TOKEN')
+        expect(mockFetcher.fetch).toHaveBeenCalledWith(`${mockNotificationUrl}/notifications/email`, {
           method: 'POST',
           headers: {
             Accept: 'application/json',
@@ -78,7 +78,7 @@ describe('EmailComponent', () => {
 
       it('should throw an error with response details', async () => {
         await expect(emailComponent.sendEmail(email, subject, body)).rejects.toThrow(
-          'Failed to fetch https://notification-service.decentraland.org/send-common-email: 400 {"error":"Invalid email format"}'
+          'Failed to fetch https://notification-service.decentraland.org/notifications-email: 400 {"error":"Invalid email format"}'
         )
       })
     })
