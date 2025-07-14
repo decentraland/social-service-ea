@@ -14,6 +14,7 @@ import type { AppComponents } from '../../types/system'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const MARKETING_EMAIL = 'marketing@decentraland.org'
+export const MAX_IP_MATCHES = 3
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -115,6 +116,7 @@ export async function createReferralComponent(
     create: async (referralInput: CreateReferralWithInvitedUser) => {
       const referrer = validateAddress(referralInput.referrer, 'referrer')
       const invitedUser = validateAddress(referralInput.invitedUser, 'invitedUser')
+      const invitedUserIP = referralInput.invitedUserIP
 
       if (referrer === invitedUser) {
         throw new SelfReferralError(invitedUser)
@@ -127,10 +129,23 @@ export async function createReferralComponent(
 
       logger.info('Creating referral', {
         referrer,
-        invitedUser
+        invitedUser,
+        invitedUserIP
       })
 
-      const referral = await referralDb.createReferral({ referrer, invitedUser })
+      const matchingIPs = await referralDb.countMatchingIPs(invitedUser)
+      if (matchingIPs > MAX_IP_MATCHES) {
+        await referralDb.createReferralRejectedIPMatch({
+          referrer,
+          invitedUser,
+          invitedUserIP
+        })
+        throw new ReferralInvalidInputError(
+          `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${invitedUserIP}`
+        )
+      }
+
+      const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
 
       logger.info(`Referral from ${referrer} to ${invitedUser} created successfully`)
 

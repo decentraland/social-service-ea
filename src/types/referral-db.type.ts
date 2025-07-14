@@ -1,5 +1,14 @@
 export interface IReferralDatabaseComponent {
-  createReferral(referralInput: { referrer: string; invitedUser: string }): Promise<ReferralProgress>
+  createReferral(referralInput: {
+    referrer: string
+    invitedUser: string
+    invitedUserIP: string
+  }): Promise<ReferralProgress>
+  createReferralRejectedIPMatch(referralInput: {
+    referrer: string
+    invitedUser: string
+    invitedUserIP: string
+  }): Promise<ReferralProgress>
   findReferralProgress(filter: ReferralProgressFilter): Promise<ReferralProgress[]>
   updateReferralProgress(
     invitedUser: string,
@@ -18,12 +27,14 @@ export interface IReferralDatabaseComponent {
   }): Promise<ReferralRewardImage>
   getLastReferralEmailByReferrer(referrer: string): Promise<ReferralEmail | null>
   getReferralRewardImage(referrer: string): Promise<ReferralRewardImage[] | null>
+  countMatchingIPs(invitedUser: string): Promise<number>
 }
 
 export enum ReferralProgressStatus {
   PENDING = 'pending',
   SIGNED_UP = 'signed_up',
-  TIER_GRANTED = 'tier_granted'
+  TIER_GRANTED = 'tier_granted',
+  REJECTED_IP_MATCH = 'rejected_ip_match'
 }
 
 export type ReferralProgressFilter = Partial<{

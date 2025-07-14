@@ -21,13 +21,33 @@ export async function createReferralDBComponent(
   const createReferral = async (referralInput: {
     referrer: string
     invitedUser: string
+    invitedUserIP: string
   }): Promise<ReferralProgress> => {
     logger.debug(`Creating referral_progress for ${referralInput.referrer} and ${referralInput.invitedUser}`)
     const now = Date.now()
     const result = await pg.query<ReferralProgress>(
-      SQL`INSERT INTO referral_progress (id, referrer, invited_user, status, created_at, updated_at)
-          VALUES (${randomUUID()}, ${referralInput.referrer.toLowerCase()}, ${referralInput.invitedUser.toLowerCase()}, ${
+      SQL`INSERT INTO referral_progress (id, referrer, invited_user, invited_user_ip, status, created_at, updated_at)
+          VALUES (${randomUUID()}, ${referralInput.referrer.toLowerCase()}, ${referralInput.invitedUser.toLowerCase()}, ${referralInput.invitedUserIP}, ${
             ReferralProgressStatus.PENDING
+          }, ${now}, ${now})
+          RETURNING *`
+    )
+    return result.rows[0]
+  }
+
+  const createReferralRejectedIPMatch = async (referralInput: {
+    referrer: string
+    invitedUser: string
+    invitedUserIP: string
+  }): Promise<ReferralProgress> => {
+    logger.debug(
+      `Creating referral_progress for ${referralInput.referrer} and ${referralInput.invitedUser} with status ${ReferralProgressStatus.REJECTED_IP_MATCH}`
+    )
+    const now = Date.now()
+    const result = await pg.query<ReferralProgress>(
+      SQL`INSERT INTO referral_progress (id, referrer, invited_user, invited_user_ip, status, created_at, updated_at)
+          VALUES (${randomUUID()}, ${referralInput.referrer.toLowerCase()}, ${referralInput.invitedUser.toLowerCase()}, ${referralInput.invitedUserIP}, ${
+            ReferralProgressStatus.REJECTED_IP_MATCH
           }, ${now}, ${now})
           RETURNING *`
     )
@@ -180,8 +200,22 @@ export async function createReferralDBComponent(
     return result.rows || null
   }
 
+  async function countMatchingIPs(invitedUser: string): Promise<number> {
+    logger.debug(`Counting matching IPs for invited user: ${invitedUser}`)
+
+    const query = SQL`SELECT COUNT(*) FROM referral_progress WHERE invited_user_ip = (
+        SELECT invited_user_ip FROM referral_progress 
+        WHERE invited_user = ${invitedUser} AND invited_user_ip IS NOT NULL 
+        LIMIT 1
+      )`
+
+    const result = await pg.query<{ count: string }>(query)
+    return parseInt(result.rows[0]?.count || '0')
+  }
+
   return {
     createReferral,
+    createReferralRejectedIPMatch,
     findReferralProgress,
     updateReferralProgress,
     hasReferralProgress,
@@ -192,6 +226,7 @@ export async function createReferralDBComponent(
     setReferralEmail,
     setReferralRewardImage,
     getLastReferralEmailByReferrer,
-    getReferralRewardImage
+    getReferralRewardImage,
+    countMatchingIPs
   }
 }

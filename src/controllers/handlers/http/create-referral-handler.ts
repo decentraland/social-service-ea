@@ -35,9 +35,27 @@ export async function createReferralHandler(
     throw new InvalidRequestError('Missing required field: referrer')
   }
 
+  const forwardedFor = request.headers.get('x-forwarded-for')
+  const realIp = request.headers.get('x-real-ip')
+  let parsedUrl: URL | undefined
+  try {
+    parsedUrl = new URL(request.url)
+  } catch {
+    parsedUrl = undefined
+  }
+  const ip = forwardedFor?.split(',')[0]?.trim() || realIp || parsedUrl?.hostname || 'unknown'
+
+  const invitedUserIP = ip || rawBody.invitedUserIP
+  if (!invitedUserIP) {
+    throw new InvalidRequestError('Missing required field: ip')
+  }
+
+  logger.info(`Referral request from IP: ${invitedUserIP}`)
+
   const body: CreateReferralWithInvitedUser = {
     ...rawBody,
-    invitedUser: verification.auth
+    invitedUser: verification.auth,
+    invitedUserIP
   }
 
   try {
