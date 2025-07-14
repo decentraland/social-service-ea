@@ -247,6 +247,10 @@ export type ICatalystClientComponent = {
   ): Promise<OwnedName[]>
 }
 
+export interface ICdnCacheInvalidatorComponent {
+  invalidateThumbnail(communityId: string): Promise<void>
+}
+
 export type IPublisherComponent = {
   publishMessage(
     event:

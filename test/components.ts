@@ -34,7 +34,7 @@ import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
-import { mockPeersSynchronizer } from './mocks/components'
+import { mockPeersSynchronizer, mockCdnCacheInvalidator } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
@@ -167,6 +167,7 @@ async function initComponents(): Promise<TestComponents> {
     communityRoles,
     communityPlaces,
     communityOwners,
+    cdnCacheInvalidator: mockCdnCacheInvalidator,
     logs,
     storage,
     config
@@ -269,6 +270,7 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     voiceDb,
     worldsStats,
-    wsPool
+    wsPool,
+    cdnCacheInvalidator: mockCdnCacheInvalidator
   }
 }
