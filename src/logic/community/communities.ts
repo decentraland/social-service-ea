@@ -18,10 +18,18 @@ import { EthAddress } from '@dcl/schemas'
 export async function createCommunityComponent(
   components: Pick<
     AppComponents,
-    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'communityPlaces' | 'logs' | 'storage' | 'config' | 'commsGatekeeper'
+    | 'communitiesDb'
+    | 'catalystClient'
+    | 'communityRoles'
+    | 'communityPlaces'
+    | 'logs'
+    | 'storage'
+    | 'config'
+    | 'commsGatekeeper'
   >
 ): Promise<ICommunitiesComponent> {
-  const { communitiesDb, catalystClient, communityRoles, communityPlaces, logs, storage, config, commsGatekeeper } = components
+  const { communitiesDb, catalystClient, communityRoles, communityPlaces, logs, storage, config, commsGatekeeper } =
+    components
 
   const logger = logs.getLogger('community-component')
   const CDN_URL = await config.requireString('CDN_URL')
