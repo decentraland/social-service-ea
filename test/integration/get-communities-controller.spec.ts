@@ -5,6 +5,7 @@ import { createMockProfile } from '../mocks/profile'
 import { parseExpectedFriends } from '../mocks/friend'
 import { mockCommunity } from '../mocks/communities'
 import { createOrUpsertActiveFriendship, removeFriendship } from './utils/friendships'
+import { CommunityOwnerNotFoundError } from '../../src/logic/community'
 
 test('Get Communities Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -25,10 +26,19 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
       identity = await createTestIdentity()
       address = identity.realAccount.address.toLowerCase()
 
+      spyComponents.catalystClient.getProfile.mockResolvedValue(createMockProfile(address))
       spyComponents.catalystClient.getProfiles.mockResolvedValue([
         createMockProfile(friendAddress1),
         createMockProfile(friendAddress2)
       ])
+      
+      // Mock the communityOwners.getOwnerName to return owner names
+      spyComponents.communityOwners.getOwnerName.mockImplementation(async (ownerAddress: string) => {
+        if (ownerAddress === address) {
+          return 'Test Owner'
+        }
+        return `Owner ${ownerAddress}`
+      })
 
       const result1 = await components.communitiesDb.createCommunity(
         mockCommunity({
@@ -80,7 +90,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
     })
 
     describe('and the request is not signed', () => {
-      it('should respond with a 200 status code and the public communities', async () => {
+      it('should respond with a 200 status code and the public communities with owner names', async () => {
         const { localHttpFetch } = components
         const response = await localHttpFetch.fetch('/v1/communities?limit=10&offset=0&search=test')
         const body = await response.json()
@@ -94,6 +104,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                 name: 'Test Community 1',
                 description: 'Test Description 1',
                 ownerAddress: address,
+                ownerName: 'Test Owner',
                 privacy: 'public',
                 active: true,
                 membersCount: 2,
@@ -104,6 +115,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                 name: 'Test Community 2',
                 description: 'Test Description 2',
                 ownerAddress: address,
+                ownerName: 'Test Owner',
                 privacy: 'public',
                 active: true,
                 membersCount: 1,
@@ -121,7 +133,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
 
     describe('and the request is signed', () => {
       describe('when getting all communities', () => {
-        it('should return all communities with correct role and friends information', async () => {
+        it('should return all communities with correct role, friends information, and owner names', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&search=test')
           const body = await response.json()
 
@@ -137,6 +149,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                   name: 'Test Community 1',
                   description: 'Test Description 1',
                   ownerAddress: address,
+                  ownerName: 'Test Owner',
                   privacy: 'public',
                   active: true,
                   role: CommunityRole.None,
@@ -149,6 +162,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                   name: 'Test Community 2',
                   description: 'Test Description 2',
                   ownerAddress: address,
+                  ownerName: 'Test Owner',
                   privacy: 'public',
                   active: true,
                   role: CommunityRole.None,
@@ -199,7 +213,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           await components.communitiesDbHelper.forceCommunityRemoval(communityId3)
         })
 
-        it('should return only member communities sorted by role when onlyMemberOf=true', async () => {
+        it('should return only member communities sorted by role with owner names when onlyMemberOf=true', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyMemberOf=true')
           const body = await response.json()
 
@@ -209,6 +223,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             expect.objectContaining({
               id: communityId3,
               name: 'Test Community 3',
+              ownerName: 'Test Owner',
               role: CommunityRole.Moderator
             })
           )
@@ -216,18 +231,20 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             expect.objectContaining({
               id: communityId1,
               name: 'Test Community 1',
+              ownerName: 'Test Owner',
               role: CommunityRole.Member
             })
           )
           expect(body.data.total).toBe(2)
         })
 
-        it('should return all communities sorted by membersCount when onlyMemberOf=false', async () => {
+        it('should return all communities sorted by membersCount with owner names when onlyMemberOf=false', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyMemberOf=false')
           const body = await response.json()
 
           expect(response.status).toBe(200)
           expect(body.data.results).toHaveLength(3)
+          expect(body.data.results.every(community => community.ownerName === 'Test Owner')).toBe(true)
           expect(body.data.total).toBe(3)
         })
       })
@@ -254,15 +271,79 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           await components.storageHelper.removeFile(`communities/${communityId2}/raw-thumbnail.png`)
         })
 
-        it('should return the thumbnail raw url in the response', async () => {
+        it('should return the thumbnail raw url and owner names in the response', async () => {
           const response = await makeRequest(identity, '/v1/communities')
           const body = await response.json()
           expect(body.data.results[0].thumbnails.raw).toBe(
             `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId1}/raw-thumbnail.png`
           )
+          expect(body.data.results[0].ownerName).toBe('Test Owner')
           expect(body.data.results[1].thumbnails.raw).toBe(
             `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId2}/raw-thumbnail.png`
           )
+          expect(body.data.results[1].ownerName).toBe('Test Owner')
+        })
+      })
+
+      describe('and owner profile retrieval fails', () => {
+        beforeEach(() => {
+          spyComponents.communityOwners.getOwnerName.mockRejectedValue(
+            new CommunityOwnerNotFoundError(communityId1, address)
+          )
+        })
+
+        it('should respond with a 404 status code when owner profile is not found', async () => {
+          const response = await makeRequest(identity, '/v1/communities')
+          expect(response.status).toBe(404)
+        })
+      })
+
+      describe('and different owners have different profile names', () => {
+        const differentOwnerAddress = '0x9999999999999999999999999999999999999999'
+        let communityId4: string
+
+        beforeEach(async () => {
+          // Mock different owner name for the new community
+          spyComponents.communityOwners.getOwnerName.mockImplementation(async (ownerAddress: string) => {
+            if (ownerAddress === address) {
+              return 'Test Owner'
+            }
+            if (ownerAddress === differentOwnerAddress) {
+              return 'Different Owner'
+            }
+            return `Owner ${ownerAddress}`
+          })
+
+          const result4 = await components.communitiesDb.createCommunity(
+            mockCommunity({
+              name: 'Test Community 4',
+              description: 'Test Description 4',
+              owner_address: differentOwnerAddress
+            })
+          )
+          communityId4 = result4.id
+        })
+
+        afterEach(async () => {
+          await components.communitiesDbHelper.forceCommunityRemoval(communityId4)
+        })
+
+        it('should return communities with correct owner names for each owner', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(3)
+          
+          const originalOwnerCommunities = body.data.results.filter(
+            (community: any) => community.ownerAddress === address
+          )
+          const differentOwnerCommunities = body.data.results.filter(
+            (community: any) => community.ownerAddress === differentOwnerAddress
+          )
+
+          expect(originalOwnerCommunities.every((community: any) => community.ownerName === 'Test Owner')).toBe(true)
+          expect(differentOwnerCommunities.every((community: any) => community.ownerName === 'Different Owner')).toBe(true)
         })
       })
     })
