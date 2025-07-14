@@ -78,7 +78,7 @@ describe('EmailComponent', () => {
 
       it('should throw an error with response details', async () => {
         await expect(emailComponent.sendEmail(email, subject, body)).rejects.toThrow(
-          'Failed to fetch https://notification-service.decentraland.org/notifications-email: 400 {"error":"Invalid email format"}'
+          'Failed to fetch https://notification-service.decentraland.org/notifications/email: 400 {"error":"Invalid email format"}'
         )
       })
     })
