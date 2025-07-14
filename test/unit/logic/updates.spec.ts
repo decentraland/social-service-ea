@@ -542,12 +542,12 @@ describe('Updates Handlers', () => {
             ])
             expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
               communityId: 'community-1',
-              memberAddress: '0x456',
+              memberAddress: '0x123',
               status
             })
             expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
               communityId: 'community-1',
-              memberAddress: '0x789',
+              memberAddress: '0x123',
               status
             })
             expect(emitSpy123).not.toHaveBeenCalled()
@@ -586,17 +586,17 @@ describe('Updates Handlers', () => {
             ])
             expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
               communityId: 'community-1',
-              memberAddress: '0x456',
+              memberAddress: '0x123',
               status
             })
             expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
               communityId: 'community-1',
-              memberAddress: '0x789',
+              memberAddress: '0x123',
               status
             })
             expect(emitSpy999).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
               communityId: 'community-1',
-              memberAddress: '0x999',
+              memberAddress: '0x123',
               status
             })
             expect(emitSpy123).toHaveBeenCalledWith('communityMemberConnectivityUpdate', update)
@@ -629,17 +629,17 @@ describe('Updates Handlers', () => {
             ])
             expect(emitSpy456).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
               communityId: 'community-1',
-              memberAddress: '0x456',
+              memberAddress: '0x123',
               status
             })
             expect(emitSpy789).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
               communityId: 'community-1',
-              memberAddress: '0x789',
+              memberAddress: '0x123',
               status
             })
             expect(emitSpy999).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
               communityId: 'community-1',
-              memberAddress: '0x999',
+              memberAddress: '0x123',
               status
             })
             expect(emitSpy123).not.toHaveBeenCalled()
