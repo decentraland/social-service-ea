@@ -49,7 +49,7 @@ describe('EmailComponent', () => {
         await emailComponent.sendEmail(email, subject, body)
 
         expect(mockConfig.requireString).toHaveBeenCalledWith('NOTIFICATION_SERVICE_URL')
-        expect(mockConfig.requireString).toHaveBeenCalledWith('INTERNAL_API_KEY')
+        expect(mockConfig.requireString).toHaveBeenCalledWith('NOTIFICATION_SERVICE_TOKEN')
         expect(mockFetcher.fetch).toHaveBeenCalledWith(`${mockNotificationUrl}/send-common-email`, {
           method: 'POST',
           headers: {

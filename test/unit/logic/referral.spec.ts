@@ -706,94 +706,92 @@ describe('referral-component', () => {
     const validReferrer = '0x1234567890123456789012345678901234567890'
     const validEmail = 'test@example.com'
 
-    describe('with valid data', () => {
-      beforeEach(() => {
-        mockReferralDb.getLastReferralEmailByReferrer.mockResolvedValueOnce(null)
-        mockReferralDb.setReferralEmail.mockResolvedValueOnce({
-          id: 'test-id',
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail,
-          created_at: Date.now(),
-          updated_at: Date.now()
-        })
-      })
-
-      it('should set referral email successfully', async () => {
-        const result = await referralComponent.setReferralEmail({
-          referrer: validReferrer,
-          email: validEmail
-        })
-
-        expect(mockReferralDb.getLastReferralEmailByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase())
-        expect(mockReferralDb.setReferralEmail).toHaveBeenCalledWith({
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail
-        })
-        expect(mockEmail.sendEmail).toHaveBeenCalledWith(
-          'marketing@decentraland.org',
-          '[Action Needed] IRL Swag Referral Tier Unlocked',
-          `<p>A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${validEmail}</p>`
-        )
-        expect(mockLogger.info).toHaveBeenCalledWith('Setting referral email', {
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail
-        })
-        expect(mockLogger.info).toHaveBeenCalledWith('Marketing email sent successfully', {
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail
-        })
-        expect(mockLogger.info).toHaveBeenCalledWith('Referral email set successfully', {
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail
-        })
-        expect(result).toEqual({
-          id: 'test-id',
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail,
-          created_at: expect.any(Number),
-          updated_at: expect.any(Number)
-        })
+    beforeEach(() => {
+      mockReferralDb.getLastReferralEmailByReferrer.mockResolvedValue(null)
+      mockReferralDb.setReferralEmail.mockResolvedValue({
+        id: 'test-id',
+        referrer: validReferrer.toLowerCase(),
+        email: validEmail,
+        created_at: Date.now(),
+        updated_at: Date.now()
       })
     })
 
-    describe('when email sending fails', () => {
-      beforeEach(() => {
-        mockReferralDb.getLastReferralEmailByReferrer.mockResolvedValueOnce(null)
-        mockReferralDb.setReferralEmail.mockResolvedValueOnce({
-          id: 'test-id',
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail,
-          created_at: Date.now(),
-          updated_at: Date.now()
+    describe('with valid data', () => {
+      describe('when email sending is successful', () => {
+        beforeEach(() => {
+          mockEmail.sendEmail.mockResolvedValue(undefined)
         })
-        mockEmail.sendEmail.mockRejectedValueOnce(new Error('Email service unavailable'))
+
+        it('should set referral email successfully', async () => {
+          const result = await referralComponent.setReferralEmail({
+            referrer: validReferrer,
+            email: validEmail
+          })
+
+          expect(mockReferralDb.getLastReferralEmailByReferrer).toHaveBeenCalledWith(validReferrer.toLowerCase())
+          expect(mockReferralDb.setReferralEmail).toHaveBeenCalledWith({
+            referrer: validReferrer.toLowerCase(),
+            email: validEmail
+          })
+          expect(mockEmail.sendEmail).toHaveBeenCalledWith(
+            'marketing@decentraland.org',
+            '[Action Needed] IRL Swag Referral Tier Unlocked',
+            `<p>A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${validEmail}</p>`
+          )
+          expect(mockLogger.info).toHaveBeenCalledWith('Setting referral email', {
+            referrer: validReferrer.toLowerCase(),
+            email: validEmail
+          })
+          expect(mockLogger.info).toHaveBeenCalledWith('Marketing email sent successfully', {
+            referrer: validReferrer.toLowerCase(),
+            email: validEmail
+          })
+          expect(mockLogger.info).toHaveBeenCalledWith('Referral email set successfully', {
+            referrer: validReferrer.toLowerCase(),
+            email: validEmail
+          })
+          expect(result).toEqual({
+            id: 'test-id',
+            referrer: validReferrer.toLowerCase(),
+            email: validEmail,
+            created_at: expect.any(Number),
+            updated_at: expect.any(Number)
+          })
+        })
       })
 
-      it('should still save referral email and log warning', async () => {
-        const result = await referralComponent.setReferralEmail({
-          referrer: validReferrer,
-          email: validEmail
+      describe('when email sending fails', () => {
+        beforeEach(() => {
+          mockEmail.sendEmail.mockRejectedValue(new Error('Email service unavailable'))
         })
 
-        expect(mockReferralDb.setReferralEmail).toHaveBeenCalledWith({
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail
-        })
-        expect(mockLogger.warn).toHaveBeenCalledWith('Failed to send marketing email, but referral email was saved', {
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail,
-          error: 'Email service unavailable'
-        })
-        expect(mockLogger.info).toHaveBeenCalledWith('Referral email set successfully', {
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail
-        })
-        expect(result).toEqual({
-          id: 'test-id',
-          referrer: validReferrer.toLowerCase(),
-          email: validEmail,
-          created_at: expect.any(Number),
-          updated_at: expect.any(Number)
+        it('should still save referral email and log warning', async () => {
+          const result = await referralComponent.setReferralEmail({
+            referrer: validReferrer,
+            email: validEmail
+          })
+
+          expect(mockReferralDb.setReferralEmail).toHaveBeenCalledWith({
+            referrer: validReferrer.toLowerCase(),
+            email: validEmail
+          })
+          expect(mockLogger.warn).toHaveBeenCalledWith('Failed to send marketing email, but referral email was saved', {
+            referrer: validReferrer.toLowerCase(),
+            email: validEmail,
+            error: 'Email service unavailable'
+          })
+          expect(mockLogger.info).toHaveBeenCalledWith('Referral email set successfully', {
+            referrer: validReferrer.toLowerCase(),
+            email: validEmail
+          })
+          expect(result).toEqual({
+            id: 'test-id',
+            referrer: validReferrer.toLowerCase(),
+            email: validEmail,
+            created_at: expect.any(Number),
+            updated_at: expect.any(Number)
+          })
         })
       })
     })
