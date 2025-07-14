@@ -34,7 +34,8 @@ import {
   createCommunityBansComponent,
   createCommunityComponent,
   createCommunityMembersComponent,
-  createCommunityRolesComponent
+  createCommunityRolesComponent,
+  createCommunityOwnersComponent
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
@@ -50,6 +51,7 @@ import { createUpdateHandlerComponent } from './logic/updates'
 import { AnalyticsEventPayload } from './types/analytics'
 import { createRewardComponent } from './adapters/rewards'
 import { createWsPoolComponent } from './logic/ws-pool'
+import { createCdnCacheInvalidatorComponent } from './adapters/cdn-cache-invalidator'
 import { createEmailComponent } from './adapters/email'
 
 // Initialize all the components of the app
@@ -127,7 +129,8 @@ export async function initComponents(): Promise<AppComponents> {
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
-  const catalystClient = await createCatalystClient({ config, fetcher, logs })
+  const catalystClient = await createCatalystClient({ config, fetcher, redis })
+  const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
   const voice = await createVoiceComponent({
@@ -160,11 +163,14 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     pubsub
   })
+  const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
+    communityOwners,
+    cdnCacheInvalidator,
     logs,
     storage,
     config
@@ -217,6 +223,7 @@ export async function initComponents(): Promise<AppComponents> {
     communities,
     communitiesDb,
     communityBans,
+    communityOwners,
     communityMembers,
     communityPlaces,
     communityRoles,
@@ -254,6 +261,7 @@ export async function initComponents(): Promise<AppComponents> {
     voice,
     voiceDb,
     worldsStats,
-    wsPool
+    wsPool,
+    cdnCacheInvalidator
   }
 }

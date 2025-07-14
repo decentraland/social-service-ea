@@ -7,7 +7,8 @@ import {
   CommunityWithUserInformation,
   CommunityWithMembersCount,
   CommunityWithMembersCountAndFriends,
-  CommunityPublicInformation
+  CommunityPublicInformation,
+  CommunityWithOwnerName
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friendships'
@@ -32,12 +33,11 @@ const toBaseCommunity = <T extends { membersCount: number | string }>(community:
 }
 
 export const toCommunityWithMembersCount = (
-  community: Community & { role: CommunityRole },
+  community: CommunityWithOwnerName & { role: CommunityRole },
   membersCount: number
 ): CommunityWithMembersCount => {
   return withMembersCount({
     ...community,
-    ownerAddress: community.ownerAddress,
     membersCount
   })
 }
@@ -110,4 +110,8 @@ export const mapMembersWithProfiles = <
       }
     })
     .filter((member): member is T & R => member !== undefined)
+}
+
+export const getCommunityThumbnailPath = (communityId: string) => {
+  return `/social/communities/${communityId}/raw-thumbnail.png`
 }

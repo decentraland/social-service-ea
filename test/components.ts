@@ -34,7 +34,7 @@ import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
-import { mockPeersSynchronizer } from './mocks/components'
+import { mockPeersSynchronizer, mockCdnCacheInvalidator } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
@@ -43,7 +43,8 @@ import {
   createCommunityComponent,
   createCommunityMembersComponent,
   createCommunityPlacesComponent,
-  createCommunityRolesComponent
+  createCommunityRolesComponent,
+  createCommunityOwnersComponent
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
@@ -122,7 +123,7 @@ async function initComponents(): Promise<TestComponents> {
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
-  const catalystClient = await createCatalystClient({ config, fetcher, logs })
+  const catalystClient = await createCatalystClient({ config, fetcher, redis })
   const sns = await createSnsComponent({ config })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
@@ -160,11 +161,14 @@ async function initComponents(): Promise<TestComponents> {
     catalystClient,
     pubsub
   })
+  const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
+    communityOwners,
+    cdnCacheInvalidator: mockCdnCacheInvalidator,
     logs,
     storage,
     config
@@ -231,6 +235,7 @@ async function initComponents(): Promise<TestComponents> {
     communityBans,
     communityMembers,
     communityPlaces,
+    communityOwners,
     communityRoles,
     config,
     email,
@@ -269,6 +274,7 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     voiceDb,
     worldsStats,
-    wsPool
+    wsPool,
+    cdnCacheInvalidator: mockCdnCacheInvalidator
   }
 }
