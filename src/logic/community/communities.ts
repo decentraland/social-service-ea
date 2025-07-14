@@ -7,10 +7,10 @@ import {
   GetCommunitiesWithTotal,
   ICommunitiesComponent,
   CommunityPublicInformation,
-  CommunityWithMembersCount,
   MemberCommunity,
   Community,
-  CommunityUpdates
+  CommunityUpdates,
+  CommunityWithMembersCountAndVoiceChatStatus
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { EthAddress } from '@dcl/schemas'
@@ -49,7 +49,7 @@ export async function createCommunityComponent(
   }
 
   return {
-    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount> => {
+    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCountAndVoiceChatStatus> => {
       const [community, membersCount, voiceChatStatus] = await Promise.all([
         communitiesDb.getCommunity(id, userAddress),
         communitiesDb.getCommunityMembersCount(id),
