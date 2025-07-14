@@ -12,6 +12,7 @@ test('GET /v1/referral-progress', ({ components }) => {
   let referrer: Identity
   let newReferrer: Identity
   let invited_user: string
+  let invitedUserIP: string
   const makeRequest = makeAuthenticatedRequest(components)
 
   beforeAll(() => {
@@ -19,13 +20,15 @@ test('GET /v1/referral-progress', ({ components }) => {
   })
 
   beforeEach(async () => {
+    invitedUserIP = '192.168.1.1'
     ;[referrer, newReferrer] = await Promise.all([createTestIdentity(), createTestIdentity()])
 
     invited_user = generateRandomWalletAddresses(1)[0]
 
     await components.referralDb.createReferral({
       referrer: referrer.realAccount.address.toLowerCase(),
-      invitedUser: invited_user.toLowerCase()
+      invitedUser: invited_user.toLowerCase(),
+      invitedUserIP
     })
     await components.referralDb.updateReferralProgress(invited_user.toLowerCase(), ReferralProgressStatus.TIER_GRANTED)
     cleanup.trackInsert('referral_progress', {
@@ -107,7 +110,8 @@ test('GET /v1/referral-progress', ({ components }) => {
           const invited_user = generateRandomWalletAddresses(1)[0]
           await components.referralDb.createReferral({
             referrer: referrer.realAccount.address.toLowerCase(),
-            invitedUser: invited_user.toLowerCase()
+            invitedUser: invited_user.toLowerCase(),
+            invitedUserIP
           })
           await components.referralDb.updateReferralProgress(
             invited_user.toLowerCase(),
