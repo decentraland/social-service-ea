@@ -173,7 +173,8 @@ export async function initComponents(): Promise<AppComponents> {
     communityPlaces,
     logs,
     storage,
-    config
+    config,
+    commsGatekeeper
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,

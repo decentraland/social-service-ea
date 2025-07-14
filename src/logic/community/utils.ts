@@ -33,12 +33,18 @@ const toBaseCommunity = <T extends { membersCount: number | string }>(community:
 
 export const toCommunityWithMembersCount = (
   community: Community & { role: CommunityRole },
-  membersCount: number
+  membersCount: number,
+  voiceChatStatus: {
+    isActive: boolean
+    participantCount: number
+    moderatorCount: number
+  } | null
 ): CommunityWithMembersCount => {
   return withMembersCount({
     ...community,
     ownerAddress: community.ownerAddress,
-    membersCount
+    membersCount,
+    voiceChatStatus
   })
 }
 

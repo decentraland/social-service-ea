@@ -167,7 +167,8 @@ async function initComponents(): Promise<TestComponents> {
     communityPlaces,
     logs,
     storage,
-    config
+    config,
+    commsGatekeeper
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,

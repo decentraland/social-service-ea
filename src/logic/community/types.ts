@@ -185,6 +185,11 @@ export type BannedMemberProfile = BannedMember & {
 export type CommunityWithMembersCount = Community & {
   role: CommunityRole
   membersCount: number
+  voiceChatStatus: {
+    isActive: boolean
+    participantCount: number
+    moderatorCount: number
+  } | null
 }
 
 export type CommunityWithMembersCountAndFriends = CommunityWithMembersCount & {
