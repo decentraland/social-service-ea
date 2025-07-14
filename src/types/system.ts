@@ -35,12 +35,14 @@ import {
   IPlacesApiComponent,
   IUpdateHandlerComponent,
   IRewardComponent,
-  IEmailComponent
+  IEmailComponent,
+  ICdnCacheInvalidatorComponent
 } from './components'
 import {
   ICommunitiesComponent,
   ICommunityBansComponent,
   ICommunityMembersComponent,
+  ICommunityOwnersComponent,
   ICommunityPlacesComponent,
   ICommunityRolesComponent
 } from '../logic/community'
@@ -70,6 +72,7 @@ export type BaseComponents = {
   communities: ICommunitiesComponent
   communitiesDb: ICommunitiesDatabaseComponent
   communityBans: ICommunityBansComponent
+  communityOwners: ICommunityOwnersComponent
   communityMembers: ICommunityMembersComponent
   communityPlaces: ICommunityPlacesComponent
   communityRoles: ICommunityRolesComponent
@@ -108,6 +111,7 @@ export type BaseComponents = {
   voiceDb: IVoiceDatabaseComponent
   worldsStats: IWorldsStatsComponent
   wsPool: IWsPoolComponent
+  cdnCacheInvalidator: ICdnCacheInvalidatorComponent
 }
 
 // components used in runtime

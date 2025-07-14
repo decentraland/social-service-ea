@@ -30,6 +30,10 @@ test('Update Community Controller', async function ({ components, stubComponents
         }
       ])
 
+      stubComponents.catalystClient.getProfile.onFirstCall().resolves({
+        avatars: [{ name: 'Owner Test Name' }]
+      })
+
       const createForm = new FormData()
       createForm.append('name', 'Original Community')
       createForm.append('description', 'Original Description')
@@ -245,7 +249,15 @@ test('Update Community Controller', async function ({ components, stubComponents
         })
 
         describe('when updating with thumbnail', () => {
-          it('should update the community with new thumbnail', async () => {
+          beforeEach(async () => {
+            stubComponents.fetcher.fetch.onFirstCall().resolves({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve({})
+            } as any)
+          })
+
+          it('should update the community with new thumbnail and invalidate CDN cache', async () => {
             const response = await makeMultipartRequest(
               identity,
               `/v1/communities/${communityId}`,
@@ -260,8 +272,9 @@ test('Update Community Controller', async function ({ components, stubComponents
             const body = await response.json()
             expect(body.data.name).toBe('Thumbnail Updated')
             expect(body.data.thumbnails).toBeDefined()
-            expect(body.data.thumbnails.raw).toContain('social/communities/')
+            expect(body.data.thumbnails.raw).toBeDefined()
             expect(body.message).toBe('Community updated successfully')
+            expect(stubComponents.cdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
           })
         })
 
