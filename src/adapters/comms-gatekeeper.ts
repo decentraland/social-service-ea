@@ -223,24 +223,22 @@ export const createCommsGatekeeperComponent = async ({
   }
 
   /**
-   * Updates user metadata in a community voice chat (e.g., request to speak status).
+   * Sends a request to speak in a community voice chat.
    * @param communityId - The ID of the community
-   * @param userAddress - The address of the user
-   * @param metadata - The metadata to update
+   * @param userAddress - The address of the user requesting to speak
    */
-  async function updateUserMetadataInCommunityVoiceChat(
-    communityId: string,
-    userAddress: string,
-    metadata: { isRequestingToSpeak?: boolean; canPublishTracks?: boolean }
-  ): Promise<void> {
+  async function requestToSpeakInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/metadata`, {
-        method: 'PATCH',
+      const response = await fetch(`${commsUrl}/community-voice-chat/request-to-speak`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${commsGateKeeperToken}`
         },
-        body: JSON.stringify(metadata)
+        body: JSON.stringify({
+          community_id: communityId,
+          user_address: userAddress
+        })
       })
 
       if (!response.ok) {
@@ -248,10 +246,93 @@ export const createCommsGatekeeperComponent = async ({
       }
     } catch (error) {
       logger.error(
-        `Failed to update user metadata in community voice chat for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+        `Failed to request to speak for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
       )
       throw error
     }
+  }
+
+  /**
+   * Promotes a user to speaker in a community voice chat.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user to promote
+   */
+  async function promoteSpeakerInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/promote-speaker`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        },
+        body: JSON.stringify({
+          community_id: communityId,
+          user_address: userAddress
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to promote speaker for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Demotes a user to listener in a community voice chat.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user to demote
+   */
+  async function demoteSpeakerInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/demote-speaker`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        },
+        body: JSON.stringify({
+          community_id: communityId,
+          user_address: userAddress
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to demote speaker for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Updates user metadata in a community voice chat (legacy method for backward compatibility).
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user to update
+   * @param metadata - The metadata to update
+   */
+  async function updateUserMetadataInCommunityVoiceChat(
+    communityId: string,
+    userAddress: string,
+    metadata: { isRequestingToSpeak?: boolean; canPublishTracks?: boolean }
+  ): Promise<void> {
+    // Use the specific methods based on metadata
+    if (metadata.isRequestingToSpeak === true) {
+      return requestToSpeakInCommunityVoiceChat(communityId, userAddress)
+    } else if (metadata.canPublishTracks === true && metadata.isRequestingToSpeak === false) {
+      return promoteSpeakerInCommunityVoiceChat(communityId, userAddress)
+    } else if (metadata.canPublishTracks === false && metadata.isRequestingToSpeak === false) {
+      return demoteSpeakerInCommunityVoiceChat(communityId, userAddress)
+    }
+    
+    throw new Error('Unsupported metadata combination')
   }
 
   /**
@@ -295,6 +376,36 @@ export const createCommsGatekeeperComponent = async ({
     }
   }
 
+  /**
+   * Kicks a user from a community voice chat.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user to kick
+   */
+  async function kickUserFromCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/kick-player`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        },
+        body: JSON.stringify({
+          community_id: communityId,
+          user_address: userAddress
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to kick user from community voice chat for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
   return {
     endPrivateVoiceChat,
     updateUserPrivateMessagePrivacyMetadata,
@@ -303,6 +414,10 @@ export const createCommsGatekeeperComponent = async ({
     getCommunityVoiceChatCredentials,
     createCommunityVoiceChatRoom,
     updateUserMetadataInCommunityVoiceChat,
-    getCommunityVoiceChatStatus
+    requestToSpeakInCommunityVoiceChat,
+    promoteSpeakerInCommunityVoiceChat,
+    demoteSpeakerInCommunityVoiceChat,
+    getCommunityVoiceChatStatus,
+    kickUserFromCommunityVoiceChat
   }
 }

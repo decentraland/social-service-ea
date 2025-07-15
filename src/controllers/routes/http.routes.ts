@@ -21,7 +21,11 @@ import {
   addCommunityPlacesHandler,
   removeCommunityPlaceHandler,
   updateCommunityHandler,
-  addReferralEmailHandler
+  addReferralEmailHandler,
+  requestToSpeakHandler,
+  promoteSpeakerHandler,
+  demoteSpeakerHandler,
+  kickPlayerHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
@@ -73,6 +77,12 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.patch('/v1/referral-progress', signedFetchMiddleware(), updateReferralSignedUpHandler)
   router.get('/v1/referral-progress', signedFetchMiddleware(), getInvitedUsersAcceptedHandler)
   router.post('/v1/referral-email', signedFetchMiddleware(), addReferralEmailHandler)
+
+  // Community voice chat actions
+  router.post('/v1/communities/:id/voice-chat/request-to-speak', signedFetchMiddleware(), requestToSpeakHandler)
+  router.post('/v1/communities/:id/voice-chat/promote-speaker', signedFetchMiddleware(), promoteSpeakerHandler)
+  router.post('/v1/communities/:id/voice-chat/demote-speaker', signedFetchMiddleware(), demoteSpeakerHandler)
+  router.post('/v1/communities/:id/voice-chat/kick-player', signedFetchMiddleware(), kickPlayerHandler)
 
   return router
 }

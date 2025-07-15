@@ -288,11 +288,15 @@ export type ICommsGatekeeperComponent = {
   getCommunityVoiceChatCredentials: (communityId: string, userAddress: string) => Promise<{ connectionUrl: string }>
   createCommunityVoiceChatRoom: (communityId: string, moderatorAddress: string) => Promise<{ connectionUrl: string }>
   updateUserMetadataInCommunityVoiceChat: (communityId: string, userAddress: string, metadata: any) => Promise<void>
+  requestToSpeakInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
+  promoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
+  demoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   getCommunityVoiceChatStatus: (communityId: string) => Promise<{
     isActive: boolean
     participantCount: number
     moderatorCount: number
   } | null>
+  kickUserFromCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
 }
 
 export type IWebSocketComponent = IBaseComponent & {
