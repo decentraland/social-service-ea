@@ -26,14 +26,14 @@ describe('EmailComponent', () => {
   describe('when sending an email', () => {
     let email: string
     let subject: string
-    let body: string
-    let requestBody: { subject: string; body: string; email: string }
+    let content: string
+    let requestBody: { subject: string; content: string; email: string }
 
     beforeEach(() => {
       email = 'test@example.com'
       subject = 'Test Subject'
-      body = 'Test email body content'
-      requestBody = { subject, body, email }
+      content = 'Test email body content'
+      requestBody = { subject, content: content, email }
     })
 
     describe('with valid data and successful response', () => {
@@ -46,7 +46,7 @@ describe('EmailComponent', () => {
       })
 
       it('should make the POST request successfully', async () => {
-        await emailComponent.sendEmail(email, subject, body)
+        await emailComponent.sendEmail(email, subject, content)
 
         expect(mockConfig.requireString).toHaveBeenCalledWith('NOTIFICATION_SERVICE_URL')
         expect(mockConfig.requireString).toHaveBeenCalledWith('NOTIFICATION_SERVICE_TOKEN')
@@ -77,7 +77,7 @@ describe('EmailComponent', () => {
       })
 
       it('should throw an error with response details', async () => {
-        await expect(emailComponent.sendEmail(email, subject, body)).rejects.toThrow(
+        await expect(emailComponent.sendEmail(email, subject, content)).rejects.toThrow(
           'Failed to fetch https://notification-service.decentraland.org/notifications/email: 400 {"error":"Invalid email format"}'
         )
       })
@@ -89,7 +89,7 @@ describe('EmailComponent', () => {
       })
 
       it('should throw the network error', async () => {
-        await expect(emailComponent.sendEmail(email, subject, body)).rejects.toThrow('Network error')
+        await expect(emailComponent.sendEmail(email, subject, content)).rejects.toThrow('Network error')
       })
     })
 
@@ -104,7 +104,7 @@ describe('EmailComponent', () => {
       })
 
       it('should throw the text reading error', async () => {
-        await expect(emailComponent.sendEmail(email, subject, body)).rejects.toThrow('Cannot read response')
+        await expect(emailComponent.sendEmail(email, subject, content)).rejects.toThrow('Cannot read response')
       })
     })
   })
