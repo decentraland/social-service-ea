@@ -52,6 +52,7 @@ import { AnalyticsEventPayload } from './types/analytics'
 import { createRewardComponent } from './adapters/rewards'
 import { createWsPoolComponent } from './logic/ws-pool'
 import { createCdnCacheInvalidatorComponent } from './adapters/cdn-cache-invalidator'
+import { createEmailComponent } from './adapters/email'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -117,8 +118,9 @@ export async function initComponents(): Promise<AppComponents> {
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
 
+  const email = await createEmailComponent({ fetcher, config })
   const rewards = await createRewardComponent({ fetcher, config })
-  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards })
+  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email })
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
@@ -226,6 +228,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityPlaces,
     communityRoles,
     config,
+    email,
     expirePrivateVoiceChatJob,
     fetcher,
     friendsDb,
