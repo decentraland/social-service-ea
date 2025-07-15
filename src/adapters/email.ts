@@ -8,7 +8,7 @@ export async function createEmailComponent(
   const notificationUrl = await config.requireString('NOTIFICATION_SERVICE_URL')
   const internalApiKey = await config.requireString('NOTIFICATION_SERVICE_TOKEN')
 
-  async function sendEmail(email: string, subject: string, body: string): Promise<void> {
+  async function sendEmail(email: string, subject: string, content: string): Promise<void> {
     const url = new URL('/notifications/email', notificationUrl).toString()
     const response = await fetcher.fetch(url, {
       method: 'POST',
@@ -17,7 +17,7 @@ export async function createEmailComponent(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${internalApiKey}`
       },
-      body: JSON.stringify({ subject, body, email })
+      body: JSON.stringify({ subject, content, email })
     })
 
     if (response.ok) {
