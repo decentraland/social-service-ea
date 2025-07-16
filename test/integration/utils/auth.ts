@@ -46,6 +46,9 @@ export function makeAuthenticatedRequest(components: Pick<TestComponents, 'local
       method,
       headers: {
         'Content-Type': 'application/json',
+        'cf-connecting-ip': '192.168.1.100',
+        'x-forwarded-for': '192.168.1.100',
+        'x-real-ip': '192.168.1.100',
         ...createAuthHeaders(method, path, {}, identity)
       },
       body: body ? JSON.stringify(body) : undefined
@@ -63,12 +66,12 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
       thumbnailPath,
       thumbnailBuffer,
       placeIds
-    }: { 
-      name?: string; 
-      description?: string; 
-      thumbnailPath?: string; 
-      thumbnailBuffer?: Buffer; 
-      placeIds?: string[];
+    }: {
+      name?: string
+      description?: string
+      thumbnailPath?: string
+      thumbnailBuffer?: Buffer
+      placeIds?: string[]
     },
     method: string = 'POST'
   ) => {
@@ -96,6 +99,9 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
     }
 
     const headers = {
+      'cf-connecting-ip': '192.168.1.100',
+      'x-forwarded-for': '192.168.1.100',
+      'x-real-ip': '192.168.1.100',
       ...createAuthHeaders(method, path, {}, identity)
     }
 
