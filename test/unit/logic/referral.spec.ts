@@ -32,9 +32,7 @@ describe('referral-component', () => {
       setReferralEmail: jest.fn(),
       getLastReferralEmailByReferrer: jest.fn(),
       setReferralRewardImage: jest.fn(),
-      getReferralRewardImage: jest.fn(),
-      countMatchingIPs: jest.fn(),
-      createReferralRejectedIPMatch: jest.fn()
+      getReferralRewardImage: jest.fn()
     }
 
     mockLogger = {
@@ -115,7 +113,6 @@ describe('referral-component', () => {
     describe('with a valid referral input', () => {
       it('should create referral successfully', async () => {
         mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
-        mockReferralDb.countMatchingIPs.mockResolvedValueOnce(0)
         mockReferralDb.createReferral.mockResolvedValueOnce({
           referrer: validReferrer,
           invited_user: validInvitedUser,
@@ -287,7 +284,6 @@ describe('referral-component', () => {
     describe('when referral already exists', () => {
       beforeEach(() => {
         mockReferralDb.hasReferralProgress.mockResolvedValueOnce(true)
-        mockReferralDb.countMatchingIPs.mockResolvedValueOnce(0)
       })
 
       it('should throw ReferralAlreadyExistsError', async () => {
@@ -301,8 +297,11 @@ describe('referral-component', () => {
       describe(`and the invited user has exceeded maximum IP matches of ${MAX_IP_MATCHES}`, () => {
         beforeEach(() => {
           mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
-          mockReferralDb.countMatchingIPs.mockResolvedValueOnce(MAX_IP_MATCHES + 1)
-          mockReferralDb.createReferralRejectedIPMatch.mockResolvedValueOnce(undefined)
+          mockReferralDb.createReferral.mockResolvedValueOnce({
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.REJECTED_IP_MATCH
+          })
         })
 
         it('should throw ReferralInvalidInputError and create rejected IP match record', async () => {
@@ -312,8 +311,7 @@ describe('referral-component', () => {
             )
           )
 
-          expect(mockReferralDb.countMatchingIPs).toHaveBeenCalledWith(validInvitedUser.toLowerCase())
-          expect(mockReferralDb.createReferralRejectedIPMatch).toHaveBeenCalledWith({
+          expect(mockReferralDb.createReferral).toHaveBeenCalledWith({
             referrer: validReferrer.toLowerCase(),
             invitedUser: validInvitedUser.toLowerCase(),
             invitedUserIP: validIP
@@ -324,7 +322,6 @@ describe('referral-component', () => {
       describe('and the invited user has exactly maximum IP matches', () => {
         beforeEach(() => {
           mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
-          mockReferralDb.countMatchingIPs.mockResolvedValueOnce(MAX_IP_MATCHES)
           mockReferralDb.createReferral.mockResolvedValueOnce({
             referrer: validReferrer,
             invited_user: validInvitedUser,
@@ -335,7 +332,6 @@ describe('referral-component', () => {
         it('should create referral successfully when IP matches equals maximum', async () => {
           const result = await referralComponent.create(validInput)
 
-          expect(mockReferralDb.countMatchingIPs).toHaveBeenCalledWith(validInvitedUser.toLowerCase())
           expect(mockReferralDb.createReferral).toHaveBeenCalledWith({
             referrer: validReferrer.toLowerCase(),
             invitedUser: validInvitedUser.toLowerCase(),
