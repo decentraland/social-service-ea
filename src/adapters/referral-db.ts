@@ -33,7 +33,6 @@ export async function createReferralDBComponent(
         FROM referral_progress 
         WHERE invited_user_ip = ${referralInput.invitedUserIP} 
         AND referrer = ${referralInput.referrer.toLowerCase()}
-        AND status = ${ReferralProgressStatus.PENDING}
       )
       INSERT INTO referral_progress 
         (

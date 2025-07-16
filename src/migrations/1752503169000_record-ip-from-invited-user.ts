@@ -1,7 +1,7 @@
 import { MigrationBuilder, ColumnDefinitions } from 'node-pg-migrate'
 
 export const ReferralProgressColumns: ColumnDefinitions = {
-  invited_user_ip: { type: 'text', notNull: true }
+  invited_user_ip: { type: 'text' }
 }
 
 export async function up(pgm: MigrationBuilder): Promise<void> {

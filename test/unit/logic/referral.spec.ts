@@ -294,7 +294,7 @@ describe('referral-component', () => {
     })
 
     describe('when IP validation fails', () => {
-      describe(`and the invited user has exceeded maximum IP matches of ${MAX_IP_MATCHES}`, () => {
+      describe('and the invited user has been created with the rejected ip match status', () => {
         beforeEach(() => {
           mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
           mockReferralDb.createReferral.mockResolvedValueOnce({
@@ -319,7 +319,7 @@ describe('referral-component', () => {
         })
       })
 
-      describe('and the invited user has exactly maximum IP matches', () => {
+      describe('and the invited user has been created with a non rejected status', () => {
         beforeEach(() => {
           mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
           mockReferralDb.createReferral.mockResolvedValueOnce({
