@@ -133,19 +133,12 @@ export async function createReferralComponent(
         invitedUserIP
       })
 
-      const matchingIPs = await referralDb.countMatchingIPs(invitedUser)
-      if (matchingIPs > MAX_IP_MATCHES) {
-        await referralDb.createReferralRejectedIPMatch({
-          referrer,
-          invitedUser,
-          invitedUserIP
-        })
+      const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
+      if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
         throw new ReferralInvalidInputError(
           `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${invitedUserIP}`
         )
       }
-
-      const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
 
       logger.info(`Referral from ${referrer} to ${invitedUser} created successfully`)
 
