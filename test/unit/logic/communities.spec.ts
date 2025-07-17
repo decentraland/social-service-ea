@@ -13,12 +13,14 @@ import {
 import { createMockCommunityRolesComponent, createMockCommunityPlacesComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { Community } from '../../../src/logic/community/types'
+import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
   let mockCommunityPlaces: jest.Mocked<ICommunityPlacesComponent>
   let mockStorage: jest.Mocked<ReturnType<typeof createS3ComponentMock>>
+  let mockCommsGatekeeper: jest.Mocked<ReturnType<typeof createCommsGatekeeperMockedComponent>>
   let mockUserAddress: string
   const communityId = 'test-community'
   const cdnUrl = 'https://cdn.decentraland.org'
@@ -37,6 +39,7 @@ describe('Community Component', () => {
     mockCommunityRoles = createMockCommunityRolesComponent({})
     mockCommunityPlaces = createMockCommunityPlacesComponent({})
     mockStorage = createS3ComponentMock() as jest.Mocked<ReturnType<typeof createS3ComponentMock>>
+    mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
     mockConfig.requireString.mockResolvedValue(cdnUrl)
     communityComponent = await createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
@@ -45,7 +48,8 @@ describe('Community Component', () => {
       communityPlaces: mockCommunityPlaces,
       logs: mockLogs,
       storage: mockStorage,
-      config: mockConfig
+      config: mockConfig,
+      commsGatekeeper: mockCommsGatekeeper
     })
   })
 
@@ -53,6 +57,12 @@ describe('Community Component', () => {
     const userAddress = '0x1234567890123456789012345678901234567890'
 
     describe('and the community exists', () => {
+      const mockVoiceChatStatus = {
+        isActive: true,
+        participantCount: 5,
+        moderatorCount: 2
+      }
+
       beforeEach(() => {
         mockCommunitiesDB.getCommunity.mockResolvedValue({
           ...mockCommunity,
@@ -60,9 +70,10 @@ describe('Community Component', () => {
         })
         mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(10)
         mockStorage.exists.mockResolvedValue(false)
+        mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(mockVoiceChatStatus)
       })
 
-      it('should return community with members count', async () => {
+      it('should return community with members count and voice chat status', async () => {
         const result = await communityComponent.getCommunity(communityId, userAddress)
 
         expect(result).toEqual({
@@ -74,11 +85,13 @@ describe('Community Component', () => {
           active: mockCommunity.active,
           thumbnails: undefined,
           role: CommunityRole.Member,
-          membersCount: 10
+          membersCount: 10,
+          voiceChatStatus: mockVoiceChatStatus
         })
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
         expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
         expect(mockStorage.exists).toHaveBeenCalledWith(`communities/${communityId}/raw-thumbnail.png`)
       })
 
@@ -95,12 +108,25 @@ describe('Community Component', () => {
           })
         })
       })
+
+      describe('when the community has no active voice chat', () => {
+        beforeEach(() => {
+          mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
+        })
+
+        it('should return null for voice chat status', async () => {
+          const result = await communityComponent.getCommunity(communityId, userAddress)
+
+          expect(result.voiceChatStatus).toBeNull()
+        })
+      })
     })
 
     describe('and the community does not exist', () => {
       beforeEach(() => {
         mockCommunitiesDB.getCommunity.mockResolvedValue(null)
         mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(0)
+        mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
       })
 
       it('should throw CommunityNotFoundError', async () => {
@@ -109,8 +135,9 @@ describe('Community Component', () => {
         )
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        // Both calls happen in parallel, so both will be called
+        // All calls happen in parallel, so all will be called
         expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
       })
     })
   })
@@ -123,7 +150,12 @@ describe('Community Component', () => {
         ...mockCommunity,
         role: CommunityRole.Member,
         membersCount: 10,
-        friends: ['0xfriend1', '0xfriend2']
+        friends: ['0xfriend1', '0xfriend2'],
+        voiceChatStatus: {
+          isActive: true,
+          participantCount: 3,
+          moderatorCount: 1
+        }
       }
     ]
     const mockProfiles = [createMockProfile('0xfriend1'), createMockProfile('0xfriend2')]
@@ -198,7 +230,12 @@ describe('Community Component', () => {
         active: true,
         role: CommunityRole.Member,
         membersCount: 10,
-        isLive: false
+        isLive: false,
+        voiceChatStatus: {
+          isActive: false,
+          participantCount: 0,
+          moderatorCount: 0
+        }
       }
     ]
     beforeEach(() => {

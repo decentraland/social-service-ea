@@ -7,10 +7,10 @@ import {
   GetCommunitiesWithTotal,
   ICommunitiesComponent,
   CommunityPublicInformation,
-  CommunityWithMembersCount,
   MemberCommunity,
   Community,
-  CommunityUpdates
+  CommunityUpdates,
+  CommunityWithMembersCountAndVoiceChatStatus
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { EthAddress } from '@dcl/schemas'
@@ -18,10 +18,18 @@ import { EthAddress } from '@dcl/schemas'
 export async function createCommunityComponent(
   components: Pick<
     AppComponents,
-    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'communityPlaces' | 'logs' | 'storage' | 'config'
+    | 'communitiesDb'
+    | 'catalystClient'
+    | 'communityRoles'
+    | 'communityPlaces'
+    | 'logs'
+    | 'storage'
+    | 'config'
+    | 'commsGatekeeper'
   >
 ): Promise<ICommunitiesComponent> {
-  const { communitiesDb, catalystClient, communityRoles, communityPlaces, logs, storage, config } = components
+  const { communitiesDb, catalystClient, communityRoles, communityPlaces, logs, storage, config, commsGatekeeper } =
+    components
 
   const logger = logs.getLogger('community-component')
   const CDN_URL = await config.requireString('CDN_URL')
@@ -41,10 +49,11 @@ export async function createCommunityComponent(
   }
 
   return {
-    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount> => {
-      const [community, membersCount] = await Promise.all([
+    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCountAndVoiceChatStatus> => {
+      const [community, membersCount, voiceChatStatus] = await Promise.all([
         communitiesDb.getCommunity(id, userAddress),
-        communitiesDb.getCommunityMembersCount(id)
+        communitiesDb.getCommunityMembersCount(id),
+        commsGatekeeper.getCommunityVoiceChatStatus(id)
       ])
 
       if (!community) {
@@ -59,7 +68,7 @@ export async function createCommunityComponent(
         }
       }
 
-      return toCommunityWithMembersCount(community, membersCount)
+      return toCommunityWithMembersCount(community, membersCount, voiceChatStatus)
     },
 
     getCommunities: async (
