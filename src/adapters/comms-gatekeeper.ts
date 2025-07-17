@@ -161,7 +161,12 @@ export const createCommsGatekeeperComponent = async ({
     profileData?: { name: string; hasClaimedName: boolean; profilePictureUrl: string } | null
   ): Promise<{ connectionUrl: string }> {
     try {
-      const requestBody: any = {
+      const requestBody: {
+        community_id: string
+        user_address: string
+        action: CommunityVoiceChatAction
+        profile_data?: { name: string; hasClaimedName: boolean; profilePictureUrl: string }
+      } = {
         community_id: communityId,
         user_address: userAddress,
         action: CommunityVoiceChatAction.JOIN
