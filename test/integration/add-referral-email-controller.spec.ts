@@ -60,7 +60,12 @@ test('POST /v1/referral-email', function ({ components }) {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: '  test@example.com  '
           })
-          expect(response.status).toBe(204)
+          expect(response.status).toBe(400)
+          const body = await response.json()
+          expect(body).toEqual({
+            error: 'Bad request',
+            message: 'email is required and must be a string'
+          })
         })
       })
 
@@ -113,7 +118,7 @@ test('POST /v1/referral-email', function ({ components }) {
           const body = await response.json()
           expect(body).toEqual({
             error: 'Bad request',
-            message: 'Email is required'
+            message: 'email is required and must be a string'
           })
         })
       })
@@ -133,7 +138,76 @@ test('POST /v1/referral-email', function ({ components }) {
           const body = await response.json()
           expect(body).toEqual({
             error: 'Bad request',
-            message: 'Invalid email format'
+            message: 'email is required and must be a string'
+          })
+        })
+
+        describe('and the email has dangerous characters', () => {
+          it('should return 400 for email with script tags', async () => {
+            const maliciousEmail = 'foo`\'"</title/</script/--!><script/src=//pwn.gs></script>@bar.com'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: maliciousEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'email is required and must be a string'
+            })
+          })
+
+          it('should return 400 for email with SQL injection patterns', async () => {
+            const maliciousEmail = 'foo@bar.com\'"'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: maliciousEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'email is required and must be a string'
+            })
+          })
+
+          it('should return 400 for email with HTML entities', async () => {
+            const maliciousEmail = 'foo&lt;script&gt;@bar.com'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: maliciousEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'email is required and must be a string'
+            })
+          })
+
+          it('should return 400 for email with JavaScript events', async () => {
+            const maliciousEmail = 'foo"onload="alert(1)"@bar.com'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: maliciousEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'email is required and must be a string'
+            })
+          })
+        })
+
+        describe('and the email is too long', () => {
+          it('should return 400', async () => {
+            const longEmail = 'a'.repeat(250) + '@example.com'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: longEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'Email is too long'
+            })
           })
         })
       })
