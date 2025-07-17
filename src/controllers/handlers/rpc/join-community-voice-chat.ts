@@ -4,6 +4,7 @@ import {
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
 import { CommunityVoiceChatNotFoundError, UserNotCommunityMemberError } from '../../../logic/community-voice/errors'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { isErrorWithMessage } from '../../../utils/errors'
 
 export function joinCommunityVoiceChatService({
@@ -63,6 +64,15 @@ export function joinCommunityVoiceChatService({
       }
 
       if (error instanceof UserNotCommunityMemberError) {
+        return {
+          response: {
+            $case: 'forbiddenError',
+            forbiddenError: { message: error.message }
+          }
+        }
+      }
+
+      if (error instanceof NotAuthorizedError) {
         return {
           response: {
             $case: 'forbiddenError',

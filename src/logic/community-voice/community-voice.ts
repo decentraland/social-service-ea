@@ -8,6 +8,7 @@ import {
 } from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage } from '../../utils/errors'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import {
   CommunityVoiceChatNotFoundError,
   CommunityVoiceChatAlreadyActiveError,
@@ -154,6 +155,12 @@ export async function createCommunityVoiceComponent({
       if (userRole === CommunityRole.None) {
         throw new UserNotCommunityMemberError(userAddress, communityId)
       }
+    }
+
+    // Check if user is banned from the community (applies to both public and private communities)
+    const isBanned = await communitiesDb.isMemberBanned(communityId, userAddress)
+    if (isBanned) {
+      throw new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
     }
 
     // Fetch user profile data using helper function
