@@ -22,7 +22,7 @@ export interface ICommunitiesComponent {
     community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
     thumbnail?: Buffer,
     placeIds?: string[]
-  ): Promise<Community>
+  ): Promise<CommunityWithOwnerName>
   updateCommunity(communityId: string, userAddress: EthAddress, updates: CommunityUpdates): Promise<Community>
   deleteCommunity(id: string, userAddress: string): Promise<void>
 }
@@ -121,6 +121,21 @@ export interface ICommunityBansComponent {
   unbanMember: (communityId: string, unbannerAddress: EthAddress, targetAddress: EthAddress) => Promise<void>
 }
 
+export interface ICommunityOwnersComponent {
+  /**
+   * Fetches the profile from Catalyst and extracts the name.
+   * The name is cached in Redis for 10 minutes.
+   * Throws an error if the profile is not found or the name is not available.
+   *
+   * @param ownerAddress - The address of the owner of the community.
+   * @param communityId - The id of the community.
+   * @returns The name of the owner of the community.
+   *
+   * @memberof ICommunityOwnersComponent
+   */
+  getOwnerName: (ownerAddress: EthAddress, communityId?: string) => Promise<string>
+}
+
 export type CommunityDB = {
   id?: string
   name: string
@@ -147,6 +162,10 @@ export type Community = {
   ownerAddress: string
   privacy: 'public' | 'private'
   active: boolean
+}
+
+export type CommunityWithOwnerName = Community & {
+  ownerName: string
 }
 
 type FriendshipAction = {
@@ -182,7 +201,7 @@ export type BannedMemberProfile = BannedMember & {
   friendshipStatus: FriendshipStatus
 }
 
-export type CommunityWithMembersCount = Community & {
+export type CommunityWithMembersCount = CommunityWithOwnerName & {
   role: CommunityRole
   membersCount: number
 }

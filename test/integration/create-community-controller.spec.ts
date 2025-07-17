@@ -1,4 +1,5 @@
 import { test } from '../components'
+import { createMockProfile } from '../mocks/profile'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { makeAuthenticatedMultipartRequest } from './utils/auth'
 import { randomUUID } from 'crypto'
@@ -93,6 +94,7 @@ test('Create Community Controller', async function ({ components, stubComponents
                 tokenId: '1'
               }
             ])
+            stubComponents.catalystClient.getProfile.onFirstCall().resolves(createMockProfile(identity.realAccount.address.toLowerCase()))
           })
 
           describe('and places are provided', () => {

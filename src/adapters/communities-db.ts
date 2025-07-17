@@ -350,7 +350,7 @@ export function createCommunitiesDBComponent(
 
       const query = withSearchAndPagination(baseQuery, options)
 
-      const result = await pg.query<CommunityPublicInformation>(query)
+      const result = await pg.query<Omit<CommunityPublicInformation, 'ownerName'>>(query)
       return result.rows
     },
 

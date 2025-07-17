@@ -14,6 +14,7 @@ test('PATCH /v1/referral-progress', ({ components }) => {
   let referrerAddress: string
   let nonExistentUserIdentity: Identity
   let nonExistentUserAddress: string
+  let invitedUserIP: string
   const makeRequest = makeAuthenticatedRequest(components)
 
   beforeAll(async () => {
@@ -27,9 +28,11 @@ test('PATCH /v1/referral-progress', ({ components }) => {
   })
 
   beforeEach(async () => {
+    invitedUserIP = '192.168.1.1'
     await components.referralDb.createReferral({
       referrer: referrerAddress,
-      invitedUser: invitedUserAddress
+      invitedUser: invitedUserAddress,
+      invitedUserIP
     })
     cleanup.trackInsert('referral_progress', {
       referrer: referrerAddress,

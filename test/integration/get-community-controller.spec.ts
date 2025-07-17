@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
+import { CommunityOwnerNotFoundError } from '../../src/logic/community'
 
 test('Get Community Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -14,7 +15,6 @@ test('Get Community Controller', function ({ components, spyComponents }) {
     beforeEach(async () => {
       identity = await createTestIdentity()
       address = identity.realAccount.address.toLowerCase()
-      
       // Mock the comms gatekeeper to return a default voice chat status
       spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
         isActive: true,
@@ -35,8 +35,8 @@ test('Get Community Controller', function ({ components, spyComponents }) {
       describe('and the community does not exist', () => {
         it('should respond with a 404 status code', async () => {
           const nonExistentId = randomUUID()
-          spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
           const response = await makeRequest(identity, `/v1/communities/${nonExistentId}`)
+          spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
           expect(response.status).toBe(404)
         })
       })
@@ -54,59 +54,116 @@ test('Get Community Controller', function ({ components, spyComponents }) {
         })
 
         describe('and the community is active', () => {
-          it('should respond with a 200 status code and the community', async () => {
-            const response = await makeRequest(identity, `/v1/communities/${communityId}`)
-            const body = await response.json()
+          describe('but the owner has no profile', () => {
+            beforeEach(async () => {
+              spyComponents.communityOwners.getOwnerName.mockRejectedValue(
+                new CommunityOwnerNotFoundError(communityId, address)
+              )
+            })
 
-            expect(response.status).toBe(200)
-            expect(body).toEqual({
-              data: {
-                id: communityId,
-                name: 'Test Community',
-                description: 'Test Description',
-                ownerAddress: address,
-                privacy: 'public',
-                active: true,
-                role: CommunityRole.None,
-                membersCount: 0,
-                voiceChatStatus: {
-                  isActive: true,
-                  participantCount: 2,
-                  moderatorCount: 1
-                }
-              }
+            it('should response with a 404 status code', async () => {
+              const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+              expect(response.status).toBe(404)
             })
           })
 
-          describe('and the community has no active voice chat', () => {
+          describe('and the owner has a profile with a name', () => {
             beforeEach(async () => {
-              spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
+              spyComponents.catalystClient.getProfile.mockResolvedValue({
+                avatars: [{ name: 'Test Owner' }]
+              })
             })
 
-            it('should return null for voice chat status', async () => {
+            it('should respond with a 200 status code and the community', async () => {
               const response = await makeRequest(identity, `/v1/communities/${communityId}`)
               const body = await response.json()
 
               expect(response.status).toBe(200)
-              expect(body.data.voiceChatStatus).toBeNull()
+              expect(body).toEqual({
+                data: {
+                  id: communityId,
+                  name: 'Test Community',
+                  description: 'Test Description',
+                  ownerAddress: address,
+                  ownerName: 'Test Owner',
+                  privacy: 'public',
+                  active: true,
+                  role: CommunityRole.None,
+                  membersCount: 0,
+                  voiceChatStatus: {
+                    isActive: true,
+                    participantCount: 2,
+                    moderatorCount: 1
+                  }
+                }
+              })
+            })
+
+            describe('and the community has no active voice chat', () => {
+              beforeEach(async () => {
+                spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
+              })
+
+              it('should return null for voice chat status', async () => {
+                const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+                const body = await response.json()
+
+                expect(response.status).toBe(200)
+                expect(body.data.voiceChatStatus).toBeNull()
+              })
+            })
+
+            describe('and the community has a thumbnail', () => {
+              let expectedCdn: string
+              beforeEach(async () => {
+                expectedCdn = await components.config.requireString('CDN_URL')
+                await components.storage.storeFile(Buffer.from('test'), `communities/${communityId}/raw-thumbnail.png`)
+              })
+
+              afterEach(async () => {
+                await components.storageHelper.removeFile(`communities/${communityId}/raw-thumbnail.png`)
+              })
+
+              it('should return the thumbnail raw url in the response', async () => {
+                const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+                const body = await response.json()
+                expect(body.data.thumbnails.raw).toBe(
+                  `${expectedCdn}/social/communities/${communityId}/raw-thumbnail.png`
+                )
+              })
             })
           })
 
-          describe('and the community has a thumbnail', () => {
-            let expectedCdn: string
+          describe('and the owner has a profile with an unclaimed name', () => {
             beforeEach(async () => {
-              expectedCdn = await components.config.requireString('CDN_URL')
-              await components.storage.storeFile(Buffer.from('test'), `communities/${communityId}/raw-thumbnail.png`)
+              spyComponents.catalystClient.getProfile.mockResolvedValue({
+                avatars: [{ unclaimedName: 'Test Owner Unclaimed' }]
+              })
             })
 
-            afterEach(async () => {
-              await components.storageHelper.removeFile(`communities/${communityId}/raw-thumbnail.png`)
-            })
-
-            it('should return the thumbnail raw url in the response', async () => {
+            it('should respond with a 200 status code and the community', async () => {
               const response = await makeRequest(identity, `/v1/communities/${communityId}`)
               const body = await response.json()
-              expect(body.data.thumbnails.raw).toBe(`${expectedCdn}/social/communities/${communityId}/raw-thumbnail.png`)
+
+              expect(response.status).toBe(200)
+              expect(body).toEqual({
+                data: {
+                  id: communityId,
+                  name: 'Test Community',
+                  description: 'Test Description',
+                  ownerAddress: address,
+                  ownerName: 'Test Owner Unclaimed',
+                  privacy: 'public',
+                  active: true,
+                  role: CommunityRole.None,
+                  membersCount: 0,
+                  voiceChatStatus: {
+                    isActive: true,
+                    participantCount: 2,
+                    moderatorCount: 1
+                  }
+                }
+              })
             })
           })
         })

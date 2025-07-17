@@ -35,9 +35,21 @@ export async function createReferralHandler(
     throw new InvalidRequestError('Missing required field: referrer')
   }
 
+  const cfConnectingIp = request.headers.get('cf-connecting-ip')
+  const forwardedFor = request.headers.get('x-forwarded-for')
+  const realIp = request.headers.get('x-real-ip')
+
+  const invitedUserIP = cfConnectingIp || forwardedFor?.split(',')[0]?.trim() || realIp
+
+  if (!invitedUserIP) {
+    logger.error('Unable to determine client IP address from connection headers')
+    throw new InvalidRequestError('Unable to determine client IP address from connection headers')
+  }
+
   const body: CreateReferralWithInvitedUser = {
     ...rawBody,
-    invitedUser: verification.auth
+    invitedUser: verification.auth,
+    invitedUserIP
   }
 
   try {

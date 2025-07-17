@@ -141,12 +141,14 @@ export interface ICommunitiesDatabaseComponent {
   getCommunities(
     memberAddress: EthAddress,
     options: GetCommunitiesOptions
-  ): Promise<CommunityWithMembersCountAndFriends[]>
+  ): Promise<Omit<CommunityWithMembersCountAndFriends, 'ownerName'>[]>
   getCommunitiesCount(
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf'>
   ): Promise<number>
-  getCommunitiesPublicInformation(options: GetCommunitiesOptions): Promise<CommunityPublicInformation[]>
+  getCommunitiesPublicInformation(
+    options: GetCommunitiesOptions
+  ): Promise<Omit<CommunityPublicInformation, 'ownerName'>[]>
   getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
@@ -245,6 +247,10 @@ export type ICatalystClientComponent = {
   ): Promise<OwnedName[]>
 }
 
+export interface ICdnCacheInvalidatorComponent {
+  invalidateThumbnail(communityId: string): Promise<void>
+}
+
 export type IPublisherComponent = {
   publishMessage(
     event:
@@ -336,4 +342,8 @@ export interface IUpdateHandlerComponent {
 
 export type IRewardComponent = IBaseComponent & {
   sendReward(campaignKey: string, beneficiary: string): Promise<RewardAttributes[]>
+}
+
+export type IEmailComponent = IBaseComponent & {
+  sendEmail(email: string, subject: string, content: string): Promise<void>
 }

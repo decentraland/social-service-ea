@@ -1,6 +1,10 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { CommunityNotFoundError, CommunityWithMembersCount } from '../../../logic/community'
+import {
+  CommunityNotFoundError,
+  CommunityOwnerNotFoundError,
+  CommunityWithMembersCount
+} from '../../../logic/community'
 
 export async function getCommunityHandler(
   context: Pick<
@@ -30,7 +34,7 @@ export async function getCommunityHandler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting community: ${id}, error: ${message}`)
 
-    if (error instanceof CommunityNotFoundError) {
+    if (error instanceof CommunityNotFoundError || error instanceof CommunityOwnerNotFoundError) {
       throw error
     }
 

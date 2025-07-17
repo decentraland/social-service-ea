@@ -12,7 +12,9 @@ import {
 import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput } from './types'
 import type { AppComponents } from '../../types/system'
 
-const TIERS = [5, 10, 20, 25, 30, 50, 60, 75, 100]
+const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
+const MARKETING_EMAIL = 'marketing@decentraland.org'
+export const MAX_IP_MATCHES = 3
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -22,9 +24,9 @@ function validateAddress(value: string, field: string): string {
 }
 
 export async function createReferralComponent(
-  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards'>
+  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email'>
 ): Promise<IReferralComponent> {
-  const { referralDb, logs, sns, config, rewards } = components
+  const { referralDb, logs, sns, config, rewards, email: emailComponent } = components
 
   const logger = logs.getLogger('referral-component')
 
@@ -37,7 +39,6 @@ export async function createReferralComponent(
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50,
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60,
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
-    REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100,
     PROFILE_URL
   ] = await Promise.all([
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5'),
@@ -48,7 +49,6 @@ export async function createReferralComponent(
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75'),
-    config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100'),
     config.requireString('PROFILE_URL')
   ])
 
@@ -60,8 +60,7 @@ export async function createReferralComponent(
     30: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_30,
     50: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50,
     60: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60,
-    75: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
-    100: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_100
+    75: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75
   }
 
   function createReferralInvitedUsersAcceptedEvent(
@@ -117,6 +116,7 @@ export async function createReferralComponent(
     create: async (referralInput: CreateReferralWithInvitedUser) => {
       const referrer = validateAddress(referralInput.referrer, 'referrer')
       const invitedUser = validateAddress(referralInput.invitedUser, 'invitedUser')
+      const invitedUserIP = referralInput.invitedUserIP
 
       if (referrer === invitedUser) {
         throw new SelfReferralError(invitedUser)
@@ -129,10 +129,16 @@ export async function createReferralComponent(
 
       logger.info('Creating referral', {
         referrer,
-        invitedUser
+        invitedUser,
+        invitedUserIP
       })
 
-      const referral = await referralDb.createReferral({ referrer, invitedUser })
+      const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
+      if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
+        throw new ReferralInvalidInputError(
+          `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${invitedUserIP}`
+        )
+      }
 
       logger.info(`Referral from ${referrer} to ${invitedUser} created successfully`)
 
@@ -299,6 +305,24 @@ export async function createReferralComponent(
         referrer,
         email
       })
+
+      try {
+        await emailComponent.sendEmail(
+          MARKETING_EMAIL,
+          '[Action Needed] IRL Swag Referral Tier Unlocked',
+          `<p>A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}</p>`
+        )
+        logger.info('Marketing email sent successfully', {
+          referrer,
+          email
+        })
+      } catch (error) {
+        logger.warn('Failed to send marketing email, but referral email was saved', {
+          referrer,
+          email,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
 
       return referralEmail
     },

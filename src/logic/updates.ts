@@ -185,7 +185,7 @@ export function createUpdateHandlerComponent(
         if (updateEmitter) {
           updateEmitter.emit('communityMemberConnectivityUpdate', {
             communityId,
-            memberAddress,
+            memberAddress: update.memberAddress,
             status
           })
         }
