@@ -141,7 +141,80 @@ test('POST /v1/referral-email', function ({ components }) {
             message: 'email is required and must be a string'
           })
         })
+      })
 
+      describe('and the user has insufficient accepted invites', () => {
+        let mockReferralDb: any
+        let userAddress: string
+        let testEmail: string
+
+        beforeEach(() => {
+          mockReferralDb = components.referralDb as any
+          userAddress = identity.realAccount.address.toLowerCase()
+          testEmail = 'test@example.com'
+        })
+
+        afterEach(() => {
+          jest.resetAllMocks()
+        })
+
+        describe('when user has less than 100 accepted invites', () => {
+          beforeEach(() => {
+            mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(50)
+          })
+
+          it('should respond with a 400 status and insufficient invites error message', async () => {
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: testEmail
+            })
+
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'You must have at least 100 accepted invites to set an email'
+            })
+
+            expect(mockReferralDb.countAcceptedInvitesByReferrer).toHaveBeenCalledWith(userAddress)
+          })
+        })
+
+        describe('when user has exactly 100 accepted invites', () => {
+          beforeEach(() => {
+            mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(100)
+            mockReferralDb.getLastReferralEmailByReferrer.mockResolvedValue(null) // No previous email
+            mockReferralDb.setReferralEmail.mockResolvedValue({ referrer: userAddress, email: testEmail })
+          })
+
+          it('should respond with a 204 status and successfully set the email', async () => {
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: testEmail
+            })
+
+            expect(response.status).toBe(204)
+            expect(mockReferralDb.countAcceptedInvitesByReferrer).toHaveBeenCalledWith(userAddress)
+          })
+        })
+
+        describe('when user has more than 100 accepted invites', () => {
+          beforeEach(() => {
+            mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(150)
+            mockReferralDb.getLastReferralEmailByReferrer.mockResolvedValue(null) // No previous email
+            mockReferralDb.setReferralEmail.mockResolvedValue({ referrer: userAddress, email: testEmail })
+          })
+
+          it('should respond with a 204 status and successfully set the email', async () => {
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: testEmail
+            })
+
+            expect(response.status).toBe(204)
+            expect(mockReferralDb.countAcceptedInvitesByReferrer).toHaveBeenCalledWith(userAddress)
+          })
+        })
+      })
+
+      describe('and the email validation fails in business logic', () => {
         describe('and the email has dangerous characters', () => {
           it('should return 400 for email with script tags', async () => {
             const maliciousEmail = 'foo`\'"</title/</script/--!><script/src=//pwn.gs></script>@bar.com'

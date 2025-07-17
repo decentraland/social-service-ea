@@ -798,7 +798,7 @@ describe('referral-component', () => {
           expect(mockEmail.sendEmail).toHaveBeenCalledWith(
             'marketing@decentraland.org',
             '[Action Needed] IRL Swag Referral Tier Unlocked',
-            `<p>A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${validEmail}</p>`
+            `A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${validEmail}`
           )
           expect(mockLogger.info).toHaveBeenCalledWith('Setting referral email', {
             referrer: validReferrer.toLowerCase(),
