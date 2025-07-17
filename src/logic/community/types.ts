@@ -216,16 +216,6 @@ export type CommunityWithMembersCountAndVoiceChatStatus = CommunityWithMembersCo
   voiceChatStatus: CommunityVoiceChatStatus | null
 }
 
-export type CommunityVoiceChatStatus = {
-  isActive: boolean
-  participantCount: number
-  moderatorCount: number
-}
-
-export type CommunityWithMembersCountAndVoiceChatStatus = CommunityWithMembersCount & {
-  voiceChatStatus: CommunityVoiceChatStatus | null
-}
-
 export type CommunityWithMembersCountAndFriends = CommunityWithMembersCount & {
   friends: string[]
 }
