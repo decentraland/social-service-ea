@@ -168,4 +168,4 @@ describe('when demoting speaker in community voice chat', () => {
       expect(result.response?.$case).toBe('internalServerError')
     })
   })
-}) 
+})
