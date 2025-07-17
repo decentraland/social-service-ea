@@ -7,10 +7,10 @@ import {
   GetCommunitiesWithTotal,
   ICommunitiesComponent,
   CommunityPublicInformation,
-  CommunityWithMembersCount,
   MemberCommunity,
   Community,
   CommunityUpdates,
+  CommunityWithMembersCountAndVoiceChatStatus,
   CommunityWithOwnerName
 } from './types'
 import {
@@ -34,6 +34,7 @@ export async function createCommunityComponent(
     | 'storage'
     | 'config'
     | 'logs'
+    | 'commsGatekeeper'
   >
 ): Promise<ICommunitiesComponent> {
   const {
@@ -45,7 +46,8 @@ export async function createCommunityComponent(
     cdnCacheInvalidator,
     storage,
     config,
-    logs
+    logs,
+    commsGatekeeper
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -66,10 +68,11 @@ export async function createCommunityComponent(
   }
 
   return {
-    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCount> => {
-      const [community, membersCount] = await Promise.all([
+    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCountAndVoiceChatStatus> => {
+      const [community, membersCount, voiceChatStatus] = await Promise.all([
         communitiesDb.getCommunity(id, userAddress),
-        communitiesDb.getCommunityMembersCount(id)
+        communitiesDb.getCommunityMembersCount(id),
+        commsGatekeeper.getCommunityVoiceChatStatus(id)
       ])
 
       if (!community) {
@@ -87,7 +90,7 @@ export async function createCommunityComponent(
         }
       }
 
-      return toCommunityWithMembersCount({ ...community, ownerName }, membersCount)
+      return toCommunityWithMembersCount({ ...community, ownerName }, membersCount, voiceChatStatus)
     },
 
     getCommunities: async (

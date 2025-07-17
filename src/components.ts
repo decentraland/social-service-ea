@@ -27,6 +27,7 @@ import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
 import { createVoiceComponent } from './logic/voice'
+import { createCommunityVoiceComponent } from './logic/community-voice'
 import { createSettingsComponent } from './logic/settings'
 import { createCommunitiesDBComponent } from './adapters/communities-db'
 import { createVoiceDBComponent } from './adapters/voice-db'
@@ -143,6 +144,13 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     analytics
   })
+  const communityVoice = await createCommunityVoiceComponent({
+    logs,
+    commsGatekeeper,
+    communitiesDb,
+    pubsub,
+    analytics
+  })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
@@ -173,7 +181,8 @@ export async function initComponents(): Promise<AppComponents> {
     cdnCacheInvalidator,
     logs,
     storage,
-    config
+    config,
+    commsGatekeeper
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -191,6 +200,7 @@ export async function initComponents(): Promise<AppComponents> {
     subscribersContext,
     metrics,
     voice,
+    communityVoice,
     updateHandler
   })
 
@@ -227,6 +237,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityMembers,
     communityPlaces,
     communityRoles,
+    communityVoice,
     config,
     email,
     expirePrivateVoiceChatJob,

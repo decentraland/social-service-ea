@@ -204,6 +204,23 @@ export function createUpdateHandlerComponent(
     }
   })
 
+  const communityVoiceChatUpdateHandler = handleUpdate<'communityVoiceChatUpdate'>(async (update) => {
+    logger.info('Community voice chat update', { update: JSON.stringify(update) })
+
+    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    const batches = communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)
+
+    // Notify all online members of the community about the voice chat update
+    for await (const batch of batches) {
+      batch.forEach(({ memberAddress }) => {
+        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('communityVoiceChatUpdate', update)
+        }
+      })
+    }
+  })
+
   async function* handleSubscriptionUpdates<T, U>({
     rpcContext,
     eventName,
@@ -262,6 +279,7 @@ export function createUpdateHandlerComponent(
     blockUpdateHandler,
     privateVoiceChatUpdateHandler,
     communityMemberStatusHandler,
+    communityVoiceChatUpdateHandler,
     handleSubscriptionUpdates
   }
 }
