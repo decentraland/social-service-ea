@@ -68,7 +68,7 @@ export async function createCommunityVoiceComponent({
       })
 
       // Analytics event
-      analytics.fireEvent(AnalyticsEvent.START_CALL, {
+      analytics.fireEvent(AnalyticsEvent.START_COMMUNITY_CALL, {
         call_id: communityId,
         user_id: creatorAddress
       })
