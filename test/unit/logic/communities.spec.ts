@@ -11,7 +11,11 @@ import {
   ICommunityPlacesComponent,
   ICommunityOwnersComponent
 } from '../../../src/logic/community/types'
-import { createMockCommunityRolesComponent, createMockCommunityPlacesComponent, createMockCommunityOwnersComponent } from '../../mocks/communities'
+import {
+  createMockCommunityRolesComponent,
+  createMockCommunityPlacesComponent,
+  createMockCommunityOwnersComponent
+} from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { Community } from '../../../src/logic/community/types'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
@@ -77,6 +81,7 @@ describe('Community Component', () => {
         mockStorage.exists.mockResolvedValue(false)
         mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(mockVoiceChatStatus)
         mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+      })
 
       it('should return community with members count and owner name and voice chat status', async () => {
         const result = await communityComponent.getCommunity(communityId, userAddress)
@@ -114,8 +119,6 @@ describe('Community Component', () => {
             raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
           })
         })
-
-
       })
 
       describe('when the community has no active voice chat', () => {
@@ -227,8 +230,6 @@ describe('Community Component', () => {
           raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
       })
-
-
     })
   })
 
@@ -299,8 +300,6 @@ describe('Community Component', () => {
           raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
       })
-
-
     })
   })
 
