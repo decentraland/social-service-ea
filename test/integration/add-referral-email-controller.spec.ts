@@ -1,6 +1,7 @@
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { TestCleanup } from '../db-cleanup'
+import { ReferralProgressStatus } from '../../src/types/referral-db.type'
 
 test('POST /v1/referral-email', function ({ components }) {
   let cleanup: TestCleanup
@@ -43,8 +44,19 @@ test('POST /v1/referral-email', function ({ components }) {
       describe('and the email is valid', () => {
         let validEmail: string
 
-        beforeEach(() => {
+        beforeEach(async () => {
           validEmail = 'test@example.com'
+
+          // Setup: Create enough accepted invites for the user to be able to set email
+          for (let i = 0; i < 100; i++) {
+            const invitedUser = `0x${i.toString().padStart(40, '0')}`
+            await components.referralDb.createReferral({
+              referrer: userAddress,
+              invitedUser,
+              invitedUserIP: '127.0.0.1'
+            })
+            await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+          }
         })
 
         it('should return 204', async () => {
@@ -144,25 +156,13 @@ test('POST /v1/referral-email', function ({ components }) {
       })
 
       describe('and the user has insufficient accepted invites', () => {
-        let mockReferralDb: any
-        let userAddress: string
         let testEmail: string
 
         beforeEach(() => {
-          mockReferralDb = components.referralDb as any
-          userAddress = identity.realAccount.address.toLowerCase()
           testEmail = 'test@example.com'
         })
 
-        afterEach(() => {
-          jest.resetAllMocks()
-        })
-
         describe('when user has less than 100 accepted invites', () => {
-          beforeEach(() => {
-            mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(50)
-          })
-
           it('should respond with a 400 status and insufficient invites error message', async () => {
             const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
               email: testEmail
@@ -174,42 +174,6 @@ test('POST /v1/referral-email', function ({ components }) {
               error: 'Bad request',
               message: 'You must have at least 100 accepted invites to set an email'
             })
-
-            expect(mockReferralDb.countAcceptedInvitesByReferrer).toHaveBeenCalledWith(userAddress)
-          })
-        })
-
-        describe('when user has exactly 100 accepted invites', () => {
-          beforeEach(() => {
-            mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(100)
-            mockReferralDb.getLastReferralEmailByReferrer.mockResolvedValue(null) // No previous email
-            mockReferralDb.setReferralEmail.mockResolvedValue({ referrer: userAddress, email: testEmail })
-          })
-
-          it('should respond with a 204 status and successfully set the email', async () => {
-            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
-              email: testEmail
-            })
-
-            expect(response.status).toBe(204)
-            expect(mockReferralDb.countAcceptedInvitesByReferrer).toHaveBeenCalledWith(userAddress)
-          })
-        })
-
-        describe('when user has more than 100 accepted invites', () => {
-          beforeEach(() => {
-            mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(150)
-            mockReferralDb.getLastReferralEmailByReferrer.mockResolvedValue(null) // No previous email
-            mockReferralDb.setReferralEmail.mockResolvedValue({ referrer: userAddress, email: testEmail })
-          })
-
-          it('should respond with a 204 status and successfully set the email', async () => {
-            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
-              email: testEmail
-            })
-
-            expect(response.status).toBe(204)
-            expect(mockReferralDb.countAcceptedInvitesByReferrer).toHaveBeenCalledWith(userAddress)
           })
         })
       })
@@ -270,6 +234,19 @@ test('POST /v1/referral-email', function ({ components }) {
         })
 
         describe('and the email is too long', () => {
+          beforeEach(async () => {
+            // Setup: Create enough accepted invites for the user to be able to set email
+            for (let i = 0; i < 100; i++) {
+              const invitedUser = `0x${i.toString().padStart(40, '0')}`
+              await components.referralDb.createReferral({
+                referrer: userAddress,
+                invitedUser,
+                invitedUserIP: '127.0.0.1'
+              })
+              await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+            }
+          })
+
           it('should return 400', async () => {
             const longEmail = 'a'.repeat(250) + '@example.com'
             const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
@@ -316,8 +293,19 @@ test('POST /v1/referral-email', function ({ components }) {
       describe('and the same email is set multiple times', () => {
         let validEmail: string
 
-        beforeEach(() => {
+        beforeEach(async () => {
           validEmail = 'test@example.com'
+
+          // Setup: Create enough accepted invites for the user to be able to set email
+          for (let i = 0; i < 100; i++) {
+            const invitedUser = `0x${i.toString().padStart(40, '0')}`
+            await components.referralDb.createReferral({
+              referrer: userAddress,
+              invitedUser,
+              invitedUserIP: '127.0.0.1'
+            })
+            await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+          }
         })
 
         describe('and trying to update email within 24 hours', () => {
@@ -340,9 +328,26 @@ test('POST /v1/referral-email', function ({ components }) {
         })
 
         describe('and setting the same email for different users', () => {
-          it('should return 204 for both users', async () => {
-            const identity2 = await createTestIdentity()
+          let identity2: Identity
+          let userAddress2: string
 
+          beforeEach(async () => {
+            identity2 = await createTestIdentity()
+            userAddress2 = identity2.realAccount.address.toLowerCase()
+
+            // Setup: Create enough accepted invites for the second user
+            for (let i = 100; i < 200; i++) {
+              const invitedUser = `0x${i.toString().padStart(40, '0')}`
+              await components.referralDb.createReferral({
+                referrer: userAddress2,
+                invitedUser,
+                invitedUserIP: '127.0.0.1'
+              })
+              await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+            }
+          })
+
+          it('should return 204 for both users', async () => {
             const response1 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
               email: validEmail
             })
@@ -359,16 +364,39 @@ test('POST /v1/referral-email', function ({ components }) {
       describe('and different users set emails', () => {
         let validEmail: string
         let email2: string
+        let identity2: Identity
+        let userAddress2: string
 
-        beforeEach(() => {
+        beforeEach(async () => {
           validEmail = 'test@example.com'
           email2 = 'user2@example.com'
+          identity2 = await createTestIdentity()
+          userAddress2 = identity2.realAccount.address.toLowerCase()
+
+          // Setup: Create enough accepted invites for the user to be able to set email
+          for (let i = 0; i < 100; i++) {
+            const invitedUser = `0x${i.toString().padStart(40, '0')}`
+            await components.referralDb.createReferral({
+              referrer: userAddress,
+              invitedUser,
+              invitedUserIP: '127.0.0.1'
+            })
+            await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+          }
+
+          // Setup: Create enough accepted invites for the second user
+          for (let i = 200; i < 300; i++) {
+            const invitedUser = `0x${i.toString().padStart(40, '0')}`
+            await components.referralDb.createReferral({
+              referrer: userAddress2,
+              invitedUser,
+              invitedUserIP: '127.0.0.1'
+            })
+            await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+          }
         })
 
         it('should return 204 for both users', async () => {
-          const identity2 = await createTestIdentity()
-          const userAddress2 = identity2.realAccount.address.toLowerCase()
-
           const response1 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: validEmail
           })
