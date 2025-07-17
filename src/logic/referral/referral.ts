@@ -13,6 +13,7 @@ import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput 
 import type { AppComponents } from '../../types/system'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
+const TIERS_IRL_SWAG = 100
 const MARKETING_EMAIL = 'marketing@decentraland.org'
 export const MAX_IP_MATCHES = 3
 
@@ -271,6 +272,12 @@ export async function createReferralComponent(
 
     setReferralEmail: async (referralEmailInput: Pick<ReferralEmail, 'referrer' | 'email'>) => {
       const referrer = validateAddress(referralEmailInput.referrer, 'referrer')
+
+      const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
+
+      if (acceptedInvites < TIERS_IRL_SWAG) {
+        throw new ReferralInvalidInputError(`You must have at least ${TIERS_IRL_SWAG} accepted invites to set an email`)
+      }
 
       if (!referralEmailInput.email || !referralEmailInput.email.trim()) {
         throw new ReferralInvalidInputError('Email is required')
