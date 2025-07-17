@@ -1,5 +1,5 @@
 import { ReferralEmail, ReferralProgressStatus } from '../../types/referral-db.type'
-import { EthAddress, Events, ReferralInvitedUsersAcceptedEvent, ReferralNewTierReachedEvent } from '@dcl/schemas'
+import { EthAddress, Events, ReferralInvitedUsersAcceptedEvent, ReferralNewTierReachedEvent, Email } from '@dcl/schemas'
 import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 import {
   ReferralNotFoundError,
@@ -277,8 +277,20 @@ export async function createReferralComponent(
       }
 
       const email = referralEmailInput.email.trim().toLowerCase()
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email)) {
+
+      // Security validations
+      if (email.length > 254) {
+        throw new ReferralInvalidInputError('Email is too long')
+      }
+
+      // Check for dangerous characters that could be used in XSS attacks
+      const dangerousChars = /<|>|"|'|`|&|;|\(|\)|{|}|\[|\]|\\|script|javascript|vbscript|onload|onerror|onclick/i
+      if (dangerousChars.test(email)) {
+        throw new ReferralInvalidInputError('Email contains invalid characters')
+      }
+
+      // Email format validation using Email.validate()
+      if (!Email.validate(email)) {
         throw new ReferralInvalidInputError('Invalid email format')
       }
 
@@ -310,7 +322,7 @@ export async function createReferralComponent(
         await emailComponent.sendEmail(
           MARKETING_EMAIL,
           '[Action Needed] IRL Swag Referral Tier Unlocked',
-          `<p>A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}</p>`
+          `A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}`
         )
         logger.info('Marketing email sent successfully', {
           referrer,

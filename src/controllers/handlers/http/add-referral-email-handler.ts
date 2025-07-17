@@ -1,5 +1,6 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { Email } from '@dcl/schemas'
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { ReferralEmailUpdateTooSoonError, ReferralInvalidInputError } from '../../../logic/referral/errors'
@@ -24,7 +25,7 @@ export async function addReferralEmailHandler(
     const body: AddReferralEmailRequest = await request.json()
     const { email } = body
 
-    if (!email || typeof email !== 'string') {
+    if (!email || typeof email !== 'string' || !Email.validate(email)) {
       throw new InvalidRequestError('email is required and must be a string')
     }
 
