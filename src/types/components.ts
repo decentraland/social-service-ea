@@ -285,8 +285,16 @@ export type ICommsGatekeeperComponent = {
     privateMessagesPrivacy: PrivateMessagesPrivacy
   ) => Promise<void>
   endPrivateVoiceChat: (callId: string, address: string) => Promise<string[]>
-  getCommunityVoiceChatCredentials: (communityId: string, userAddress: string) => Promise<{ connectionUrl: string }>
-  createCommunityVoiceChatRoom: (communityId: string, moderatorAddress: string) => Promise<{ connectionUrl: string }>
+  getCommunityVoiceChatCredentials: (
+    communityId: string,
+    userAddress: string,
+    profileData?: { name: string; hasClaimedName: boolean; profilePictureUrl: string } | null
+  ) => Promise<{ connectionUrl: string }>
+  createCommunityVoiceChatRoom: (
+    communityId: string,
+    moderatorAddress: string,
+    profileData?: { name: string; hasClaimedName: boolean; profilePictureUrl: string } | null
+  ) => Promise<{ connectionUrl: string }>
   updateUserMetadataInCommunityVoiceChat: (communityId: string, userAddress: string, metadata: any) => Promise<void>
   requestToSpeakInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   promoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>

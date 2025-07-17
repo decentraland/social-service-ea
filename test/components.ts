@@ -187,7 +187,8 @@ async function initComponents(): Promise<TestComponents> {
     commsGatekeeper,
     pubsub,
     analytics,
-    communitiesDb
+    communitiesDb,
+    catalystClient
   })
   const rpcServer = await createRpcServerComponent({
     logs,

@@ -149,7 +149,8 @@ export async function initComponents(): Promise<AppComponents> {
     commsGatekeeper,
     communitiesDb,
     pubsub,
-    analytics
+    analytics,
+    catalystClient
   })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()

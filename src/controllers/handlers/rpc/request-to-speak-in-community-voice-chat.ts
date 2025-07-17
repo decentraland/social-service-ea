@@ -1,22 +1,22 @@
 import {
-  JoinCommunityVoiceChatPayload,
-  JoinCommunityVoiceChatResponse
+  RequestToSpeakInCommunityVoiceChatPayload,
+  RequestToSpeakInCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
-import { CommunityVoiceChatNotFoundError, UserNotCommunityMemberError } from '../../../logic/community-voice/errors'
+import { UserNotCommunityMemberError, CommunityVoiceChatNotFoundError } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
 
-export function joinCommunityVoiceChatService({
-  components: { logs, communityVoice }
-}: RPCServiceContext<'logs' | 'communityVoice'>) {
-  const logger = logs.getLogger('join-community-voice-chat-rpc')
+export function requestToSpeakInCommunityVoiceChatService({
+  components: { logs, commsGatekeeper }
+}: RPCServiceContext<'logs' | 'commsGatekeeper'>) {
+  const logger = logs.getLogger('request-to-speak-in-community-voice-chat-rpc')
 
   return async function (
-    request: JoinCommunityVoiceChatPayload,
+    request: RequestToSpeakInCommunityVoiceChatPayload,
     context: RpcServerContext
-  ): Promise<JoinCommunityVoiceChatResponse> {
+  ): Promise<RequestToSpeakInCommunityVoiceChatResponse> {
     try {
-      logger.info('Joining community voice chat', {
+      logger.info('Requesting to speak in community voice chat', {
         communityId: request.communityId,
         userAddress: context.address
       })
@@ -26,9 +26,9 @@ export function joinCommunityVoiceChatService({
         throw new Error('Community ID is required')
       }
 
-      const { connectionUrl } = await communityVoice.joinCommunityVoiceChat(request.communityId, context.address)
+      await commsGatekeeper.requestToSpeakInCommunityVoiceChat(request.communityId, context.address)
 
-      logger.info('Community voice chat joined successfully', {
+      logger.info('Request to speak sent successfully', {
         communityId: request.communityId,
         userAddress: context.address
       })
@@ -37,36 +37,33 @@ export function joinCommunityVoiceChatService({
         response: {
           $case: 'ok',
           ok: {
-            voiceChatId: request.communityId,
-            credentials: {
-              connectionUrl
-            }
+            message: 'Request to speak sent successfully'
           }
         }
       }
     } catch (error) {
       const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown'
-      logger.error('Failed to join community voice chat:', {
+      logger.error('Failed to request to speak in community voice chat:', {
         errorMessage: errorMessage,
         communityId: request.communityId,
         userAddress: context.address
       })
 
       // Handle specific error types
-      if (error instanceof CommunityVoiceChatNotFoundError) {
-        return {
-          response: {
-            $case: 'notFoundError',
-            notFoundError: { message: error.message }
-          }
-        }
-      }
-
       if (error instanceof UserNotCommunityMemberError) {
         return {
           response: {
             $case: 'forbiddenError',
             forbiddenError: { message: error.message }
+          }
+        }
+      }
+
+      if (error instanceof CommunityVoiceChatNotFoundError) {
+        return {
+          response: {
+            $case: 'notFoundError',
+            notFoundError: { message: error.message }
           }
         }
       }
@@ -84,7 +81,7 @@ export function joinCommunityVoiceChatService({
       return {
         response: {
           $case: 'internalServerError',
-          internalServerError: { message: 'Failed to join community voice chat' }
+          internalServerError: { message: 'Failed to request to speak in community voice chat' }
         }
       }
     }

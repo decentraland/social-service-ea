@@ -10,18 +10,14 @@ import {
 
 function createCommunityVoiceMockedComponent({
   startCommunityVoiceChat = jest.fn(),
-  endCommunityVoiceChat = jest.fn(),
   joinCommunityVoiceChat = jest.fn(),
-  leaveCommunityVoiceChat = jest.fn(),
   getCommunityVoiceChat = jest.fn(),
   getCommunityVoiceChatParticipants = jest.fn(),
   getActiveCommunityVoiceChats = jest.fn()
 }: Partial<jest.Mocked<ICommunityVoiceComponent>>): jest.Mocked<ICommunityVoiceComponent> {
   return {
     startCommunityVoiceChat,
-    endCommunityVoiceChat,
     joinCommunityVoiceChat,
-    leaveCommunityVoiceChat,
     getCommunityVoiceChat,
     getCommunityVoiceChatParticipants,
     getActiveCommunityVoiceChats

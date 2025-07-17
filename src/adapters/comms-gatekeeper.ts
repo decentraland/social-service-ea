@@ -1,5 +1,6 @@
-import { AppComponents, ICommsGatekeeperComponent, PrivateMessagesPrivacy, CommunityVoiceChatRole } from '../types'
+import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy } from '../types'
 import { isErrorWithMessage } from '../utils/errors'
+import { CommunityVoiceChatAction } from '../types/community-voice'
 
 export class PrivateVoiceChatNotFoundError extends Error {
   constructor(callId: string) {
@@ -151,24 +152,32 @@ export const createCommsGatekeeperComponent = async ({
    * Gets credentials for a community voice chat.
    * @param communityId - The ID of the community
    * @param userAddress - The address of the user joining
-   * @param userRole - The role of the user (speaker or listener)
+   * @param profileData - Optional profile data (name, hasClaimedName, profilePictureUrl)
    * @returns Connection credentials for the user
    */
   async function getCommunityVoiceChatCredentials(
     communityId: string,
-    userAddress: string
+    userAddress: string,
+    profileData?: { name: string; hasClaimedName: boolean; profilePictureUrl: string } | null
   ): Promise<{ connectionUrl: string }> {
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/join`, {
+      const requestBody: any = {
+        community_id: communityId,
+        user_address: userAddress,
+        action: CommunityVoiceChatAction.JOIN
+      }
+
+      if (profileData) {
+        requestBody.profile_data = profileData
+      }
+
+      const response = await fetch(`${commsUrl}/community-voice-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${commsGateKeeperToken}`
         },
-        body: JSON.stringify({
-          community_id: communityId,
-          member_address: userAddress
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
@@ -189,23 +198,37 @@ export const createCommsGatekeeperComponent = async ({
    * Creates a community voice chat room.
    * @param communityId - The ID of the community
    * @param createdBy - The address of the moderator creating the voice chat
+   * @param profileData - Optional profile data for the creator
    * @returns The connection URL for the moderator
    */
   async function createCommunityVoiceChatRoom(
     communityId: string,
-    createdBy: string
+    createdBy: string,
+    profileData?: { name: string; hasClaimedName: boolean; profilePictureUrl: string } | null
   ): Promise<{ connectionUrl: string }> {
     try {
+      const requestBody: {
+        community_id: string
+        user_address: string
+        action: CommunityVoiceChatAction
+        profile_data?: { name: string; hasClaimedName: boolean; profilePictureUrl: string }
+      } = {
+        community_id: communityId,
+        user_address: createdBy,
+        action: CommunityVoiceChatAction.CREATE
+      }
+
+      if (profileData) {
+        requestBody.profile_data = profileData
+      }
+
       const response = await fetch(`${commsUrl}/community-voice-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${commsGateKeeperToken}`
         },
-        body: JSON.stringify({
-          community_id: communityId,
-          moderator_address: createdBy
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
@@ -229,17 +252,16 @@ export const createCommsGatekeeperComponent = async ({
    */
   async function requestToSpeakInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/request-to-speak`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          community_id: communityId,
-          user_address: userAddress
-        })
-      })
+      const response = await fetch(
+        `${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speak-request`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          }
+        }
+      )
 
       if (!response.ok) {
         throw new Error(`Server responded with status ${response.status}`)
@@ -259,16 +281,12 @@ export const createCommsGatekeeperComponent = async ({
    */
   async function promoteSpeakerInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/promote-speaker`, {
+      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speaker`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          community_id: communityId,
-          user_address: userAddress
-        })
+        }
       })
 
       if (!response.ok) {
@@ -289,16 +307,12 @@ export const createCommsGatekeeperComponent = async ({
    */
   async function demoteSpeakerInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/demote-speaker`, {
-        method: 'POST',
+      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speaker`, {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          community_id: communityId,
-          user_address: userAddress
-        })
+        }
       })
 
       if (!response.ok) {
@@ -331,7 +345,7 @@ export const createCommsGatekeeperComponent = async ({
     } else if (metadata.canPublishTracks === false && metadata.isRequestingToSpeak === false) {
       return demoteSpeakerInCommunityVoiceChat(communityId, userAddress)
     }
-    
+
     throw new Error('Unsupported metadata combination')
   }
 
@@ -383,16 +397,12 @@ export const createCommsGatekeeperComponent = async ({
    */
   async function kickUserFromCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
     try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/kick-player`, {
-        method: 'POST',
+      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}`, {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          community_id: communityId,
-          user_address: userAddress
-        })
+        }
       })
 
       if (!response.ok) {

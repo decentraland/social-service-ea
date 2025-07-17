@@ -8,6 +8,7 @@ import {
   CommunityVoiceChatPermissionError,
   CommunityVoiceChatAlreadyActiveError
 } from '../../../logic/community-voice/errors'
+import { isErrorWithMessage } from '../../../utils/errors'
 
 export function startCommunityVoiceChatService({
   components: { logs, communityVoice }
@@ -26,12 +27,7 @@ export function startCommunityVoiceChatService({
 
       if (!request.communityId) {
         logger.warn('Missing community ID in request')
-        return {
-          response: {
-            $case: 'invalidRequest',
-            invalidRequest: { message: 'Community ID is required' }
-          }
-        }
+        throw new Error('Community ID is required')
       }
 
       const { connectionUrl } = await communityVoice.startCommunityVoiceChat(request.communityId, context.address)
@@ -51,9 +47,10 @@ export function startCommunityVoiceChatService({
           }
         }
       }
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown'
       logger.error('Failed to start community voice chat:', {
-        errorMessage: error.message,
+        errorMessage: errorMessage,
         communityId: request.communityId,
         userAddress: context.address
       })
@@ -73,6 +70,16 @@ export function startCommunityVoiceChatService({
           response: {
             $case: 'conflictingError',
             conflictingError: { message: error.message }
+          }
+        }
+      }
+
+      // Handle validation errors
+      if (errorMessage === 'Community ID is required') {
+        return {
+          response: {
+            $case: 'invalidRequest',
+            invalidRequest: { message: errorMessage }
           }
         }
       }

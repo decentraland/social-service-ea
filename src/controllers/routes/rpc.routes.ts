@@ -25,6 +25,10 @@ import {
   subscribeToPrivateVoiceChatUpdatesService,
   startCommunityVoiceChatService,
   joinCommunityVoiceChatService,
+  requestToSpeakInCommunityVoiceChatService,
+  promoteSpeakerInCommunityVoiceChatService,
+  demoteSpeakerInCommunityVoiceChatService,
+  kickPlayerFromCommunityVoiceChatService,
   subscribeToCommunityVoiceChatUpdatesService
 } from '../handlers/rpc'
 import { ServiceType, StreamEvent } from '../../adapters/rpc-server/metrics-wrapper'
@@ -142,6 +146,22 @@ export async function setupRpcRoutes(components: AppComponents): Promise<RpcServ
     },
     joinCommunityVoiceChat: {
       creator: joinCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    requestToSpeakInCommunityVoiceChat: {
+      creator: requestToSpeakInCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    promoteSpeakerInCommunityVoiceChat: {
+      creator: promoteSpeakerInCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    demoteSpeakerInCommunityVoiceChat: {
+      creator: demoteSpeakerInCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    kickPlayerFromCommunityVoiceChat: {
+      creator: kickPlayerFromCommunityVoiceChatService({ components }),
       type: ServiceType.CALL
     },
     subscribeToCommunityVoiceChatUpdates: {
