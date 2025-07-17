@@ -1,5 +1,5 @@
 import { ReferralEmail, ReferralProgressStatus } from '../../types/referral-db.type'
-import { EthAddress, Events, ReferralInvitedUsersAcceptedEvent, ReferralNewTierReachedEvent } from '@dcl/schemas'
+import { EthAddress, Events, ReferralInvitedUsersAcceptedEvent, ReferralNewTierReachedEvent, Email } from '@dcl/schemas'
 import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 import {
   ReferralNotFoundError,
@@ -13,6 +13,7 @@ import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput 
 import type { AppComponents } from '../../types/system'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
+const TIERS_IRL_SWAG = 100
 const MARKETING_EMAIL = 'marketing@decentraland.org'
 export const MAX_IP_MATCHES = 3
 
@@ -272,13 +273,31 @@ export async function createReferralComponent(
     setReferralEmail: async (referralEmailInput: Pick<ReferralEmail, 'referrer' | 'email'>) => {
       const referrer = validateAddress(referralEmailInput.referrer, 'referrer')
 
+      const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
+
+      if (acceptedInvites < TIERS_IRL_SWAG) {
+        throw new ReferralInvalidInputError(`You must have at least ${TIERS_IRL_SWAG} accepted invites to set an email`)
+      }
+
       if (!referralEmailInput.email || !referralEmailInput.email.trim()) {
         throw new ReferralInvalidInputError('Email is required')
       }
 
       const email = referralEmailInput.email.trim().toLowerCase()
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email)) {
+
+      // Security validations
+      if (email.length > 254) {
+        throw new ReferralInvalidInputError('Email is too long')
+      }
+
+      // Check for dangerous characters that could be used in XSS attacks
+      const dangerousChars = /<|>|"|'|`|&|;|\(|\)|{|}|\[|\]|\\|script|javascript|vbscript|onload|onerror|onclick/i
+      if (dangerousChars.test(email)) {
+        throw new ReferralInvalidInputError('Email contains invalid characters')
+      }
+
+      // Email format validation using Email.validate()
+      if (!Email.validate(email)) {
         throw new ReferralInvalidInputError('Invalid email format')
       }
 
@@ -310,7 +329,7 @@ export async function createReferralComponent(
         await emailComponent.sendEmail(
           MARKETING_EMAIL,
           '[Action Needed] IRL Swag Referral Tier Unlocked',
-          `<p>A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}</p>`
+          `A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}`
         )
         logger.info('Marketing email sent successfully', {
           referrer,

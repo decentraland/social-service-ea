@@ -1,6 +1,7 @@
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { TestCleanup } from '../db-cleanup'
+import { ReferralProgressStatus } from '../../src/types/referral-db.type'
 
 test('POST /v1/referral-email', function ({ components }) {
   let cleanup: TestCleanup
@@ -43,8 +44,19 @@ test('POST /v1/referral-email', function ({ components }) {
       describe('and the email is valid', () => {
         let validEmail: string
 
-        beforeEach(() => {
+        beforeEach(async () => {
           validEmail = 'test@example.com'
+
+          // Setup: Create enough accepted invites for the user to be able to set email
+          for (let i = 0; i < 100; i++) {
+            const invitedUser = `0x${i.toString().padStart(40, '0')}`
+            await components.referralDb.createReferral({
+              referrer: userAddress,
+              invitedUser,
+              invitedUserIP: '127.0.0.1'
+            })
+            await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+          }
         })
 
         it('should return 204', async () => {
@@ -60,7 +72,12 @@ test('POST /v1/referral-email', function ({ components }) {
           const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: '  test@example.com  '
           })
-          expect(response.status).toBe(204)
+          expect(response.status).toBe(400)
+          const body = await response.json()
+          expect(body).toEqual({
+            error: 'Bad request',
+            message: 'email is required and must be a string'
+          })
         })
       })
 
@@ -113,7 +130,7 @@ test('POST /v1/referral-email', function ({ components }) {
           const body = await response.json()
           expect(body).toEqual({
             error: 'Bad request',
-            message: 'Email is required'
+            message: 'email is required and must be a string'
           })
         })
       })
@@ -133,7 +150,114 @@ test('POST /v1/referral-email', function ({ components }) {
           const body = await response.json()
           expect(body).toEqual({
             error: 'Bad request',
-            message: 'Invalid email format'
+            message: 'email is required and must be a string'
+          })
+        })
+      })
+
+      describe('and the user has insufficient accepted invites', () => {
+        let testEmail: string
+
+        beforeEach(() => {
+          testEmail = 'test@example.com'
+        })
+
+        describe('when user has less than 100 accepted invites', () => {
+          it('should respond with a 400 status and insufficient invites error message', async () => {
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: testEmail
+            })
+
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'You must have at least 100 accepted invites to set an email'
+            })
+          })
+        })
+      })
+
+      describe('and the email validation fails in business logic', () => {
+        describe('and the email has dangerous characters', () => {
+          it('should return 400 for email with script tags', async () => {
+            const maliciousEmail = 'foo`\'"</title/</script/--!><script/src=//pwn.gs></script>@bar.com'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: maliciousEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'email is required and must be a string'
+            })
+          })
+
+          it('should return 400 for email with SQL injection patterns', async () => {
+            const maliciousEmail = 'foo@bar.com\'"'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: maliciousEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'email is required and must be a string'
+            })
+          })
+
+          it('should return 400 for email with HTML entities', async () => {
+            const maliciousEmail = 'foo&lt;script&gt;@bar.com'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: maliciousEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'email is required and must be a string'
+            })
+          })
+
+          it('should return 400 for email with JavaScript events', async () => {
+            const maliciousEmail = 'foo"onload="alert(1)"@bar.com'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: maliciousEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'email is required and must be a string'
+            })
+          })
+        })
+
+        describe('and the email is too long', () => {
+          beforeEach(async () => {
+            // Setup: Create enough accepted invites for the user to be able to set email
+            for (let i = 0; i < 100; i++) {
+              const invitedUser = `0x${i.toString().padStart(40, '0')}`
+              await components.referralDb.createReferral({
+                referrer: userAddress,
+                invitedUser,
+                invitedUserIP: '127.0.0.1'
+              })
+              await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+            }
+          })
+
+          it('should return 400', async () => {
+            const longEmail = 'a'.repeat(250) + '@example.com'
+            const response = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
+              email: longEmail
+            })
+            expect(response.status).toBe(400)
+            const body = await response.json()
+            expect(body).toEqual({
+              error: 'Bad request',
+              message: 'Email is too long'
+            })
           })
         })
       })
@@ -169,8 +293,19 @@ test('POST /v1/referral-email', function ({ components }) {
       describe('and the same email is set multiple times', () => {
         let validEmail: string
 
-        beforeEach(() => {
+        beforeEach(async () => {
           validEmail = 'test@example.com'
+
+          // Setup: Create enough accepted invites for the user to be able to set email
+          for (let i = 0; i < 100; i++) {
+            const invitedUser = `0x${i.toString().padStart(40, '0')}`
+            await components.referralDb.createReferral({
+              referrer: userAddress,
+              invitedUser,
+              invitedUserIP: '127.0.0.1'
+            })
+            await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+          }
         })
 
         describe('and trying to update email within 24 hours', () => {
@@ -193,9 +328,26 @@ test('POST /v1/referral-email', function ({ components }) {
         })
 
         describe('and setting the same email for different users', () => {
-          it('should return 204 for both users', async () => {
-            const identity2 = await createTestIdentity()
+          let identity2: Identity
+          let userAddress2: string
 
+          beforeEach(async () => {
+            identity2 = await createTestIdentity()
+            userAddress2 = identity2.realAccount.address.toLowerCase()
+
+            // Setup: Create enough accepted invites for the second user
+            for (let i = 100; i < 200; i++) {
+              const invitedUser = `0x${i.toString().padStart(40, '0')}`
+              await components.referralDb.createReferral({
+                referrer: userAddress2,
+                invitedUser,
+                invitedUserIP: '127.0.0.1'
+              })
+              await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+            }
+          })
+
+          it('should return 204 for both users', async () => {
             const response1 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
               email: validEmail
             })
@@ -212,16 +364,39 @@ test('POST /v1/referral-email', function ({ components }) {
       describe('and different users set emails', () => {
         let validEmail: string
         let email2: string
+        let identity2: Identity
+        let userAddress2: string
 
-        beforeEach(() => {
+        beforeEach(async () => {
           validEmail = 'test@example.com'
           email2 = 'user2@example.com'
+          identity2 = await createTestIdentity()
+          userAddress2 = identity2.realAccount.address.toLowerCase()
+
+          // Setup: Create enough accepted invites for the user to be able to set email
+          for (let i = 0; i < 100; i++) {
+            const invitedUser = `0x${i.toString().padStart(40, '0')}`
+            await components.referralDb.createReferral({
+              referrer: userAddress,
+              invitedUser,
+              invitedUserIP: '127.0.0.1'
+            })
+            await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+          }
+
+          // Setup: Create enough accepted invites for the second user
+          for (let i = 200; i < 300; i++) {
+            const invitedUser = `0x${i.toString().padStart(40, '0')}`
+            await components.referralDb.createReferral({
+              referrer: userAddress2,
+              invitedUser,
+              invitedUserIP: '127.0.0.1'
+            })
+            await components.referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+          }
         })
 
         it('should return 204 for both users', async () => {
-          const identity2 = await createTestIdentity()
-          const userAddress2 = identity2.realAccount.address.toLowerCase()
-
           const response1 = await makeAuthenticatedRequest(components)(identity, '/v1/referral-email', 'POST', {
             email: validEmail
           })
