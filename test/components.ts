@@ -198,8 +198,7 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     metrics,
     voice,
-    updateHandler,
-    communityVoice
+    updateHandler
   })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
