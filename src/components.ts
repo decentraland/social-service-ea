@@ -201,7 +201,6 @@ export async function initComponents(): Promise<AppComponents> {
     subscribersContext,
     metrics,
     voice,
-    communityVoice,
     updateHandler
   })
 
