@@ -182,15 +182,6 @@ export async function createCommunityVoiceComponent({
     }
   }
 
-  async function getCommunityVoiceChatParticipants(communityId: string): Promise<CommunityVoiceChatParticipant[]> {
-    const status = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
-    if (!status?.isActive) {
-      return []
-    }
-    // TODO: check if we need this
-    return []
-  }
-
   async function getActiveCommunityVoiceChats(): Promise<CommunityVoiceChat[]> {
     // Note: This method would require the gatekeeper to have an endpoint to list all active community voice chats
     // For now, we'll return an empty array as this method might not be used frequently
@@ -202,7 +193,6 @@ export async function createCommunityVoiceComponent({
     startCommunityVoiceChat,
     joinCommunityVoiceChat,
     getCommunityVoiceChat,
-    getCommunityVoiceChatParticipants,
     getActiveCommunityVoiceChats
   }
 }
