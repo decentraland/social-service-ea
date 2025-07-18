@@ -1,23 +1,31 @@
 import { ICommsGatekeeperComponent } from '../../../src/types'
 
 export function createCommsGatekeeperMockedComponent({
+  getPrivateVoiceChatCredentials = jest.fn(),
   isUserInAVoiceChat = jest.fn(),
   updateUserPrivateMessagePrivacyMetadata = jest.fn(),
-  getPrivateVoiceChatCredentials = jest.fn(),
   endPrivateVoiceChat = jest.fn(),
-  createCommunityVoiceChatRoom = jest.fn(),
   getCommunityVoiceChatCredentials = jest.fn(),
+  createCommunityVoiceChatRoom = jest.fn(),
+  updateUserMetadataInCommunityVoiceChat = jest.fn(),
+  requestToSpeakInCommunityVoiceChat = jest.fn(),
+  promoteSpeakerInCommunityVoiceChat = jest.fn(),
+  demoteSpeakerInCommunityVoiceChat = jest.fn(),
   getCommunityVoiceChatStatus = jest.fn(),
-  updateUserMetadataInCommunityVoiceChat = jest.fn()
+  kickUserFromCommunityVoiceChat = jest.fn()
 }: Partial<jest.Mocked<ICommsGatekeeperComponent>>): jest.Mocked<ICommsGatekeeperComponent> {
   return {
     getPrivateVoiceChatCredentials,
     isUserInAVoiceChat,
     updateUserPrivateMessagePrivacyMetadata,
     endPrivateVoiceChat,
-    createCommunityVoiceChatRoom,
     getCommunityVoiceChatCredentials,
+    createCommunityVoiceChatRoom,
+    updateUserMetadataInCommunityVoiceChat,
+    requestToSpeakInCommunityVoiceChat,
+    promoteSpeakerInCommunityVoiceChat,
+    demoteSpeakerInCommunityVoiceChat,
     getCommunityVoiceChatStatus,
-    updateUserMetadataInCommunityVoiceChat
+    kickUserFromCommunityVoiceChat
   }
 }

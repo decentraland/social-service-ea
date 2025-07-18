@@ -187,7 +187,8 @@ async function initComponents(): Promise<TestComponents> {
     commsGatekeeper,
     pubsub,
     analytics,
-    communitiesDb
+    communitiesDb,
+    catalystClient
   })
   const rpcServer = await createRpcServerComponent({
     logs,
@@ -197,8 +198,7 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     metrics,
     voice,
-    updateHandler,
-    communityVoice
+    updateHandler
   })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 

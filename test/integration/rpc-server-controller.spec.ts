@@ -16,11 +16,28 @@ import {
 } from './utils/friendships'
 import { parseProfileToBlockedUser } from '../../src/logic/blocks'
 import { PrivateMessagesPrivacy, User, CommunityRole } from '../../src/types'
+import { CommunityVoiceChatAlreadyActiveError, UserNotCommunityMemberError, CommunityVoiceChatNotFoundError } from '../../src/logic/community-voice/errors'
 
 test('RPC Server Controller', function ({ components, stubComponents }) {
+  let commsGatekeeperSpy: any = {}
+  let analyticsSpy: any = {}
+
   beforeAll(async () => {
     await components.rpcClient.connect()
     stubComponents.peersSynchronizer.syncPeers.resolves()
+    
+    // Set up spies for real components
+    commsGatekeeperSpy.createCommunityVoiceChatRoom = jest.spyOn(components.commsGatekeeper, 'createCommunityVoiceChatRoom')
+    commsGatekeeperSpy.getCommunityVoiceChatCredentials = jest.spyOn(components.commsGatekeeper, 'getCommunityVoiceChatCredentials')  
+    commsGatekeeperSpy.getCommunityVoiceChatStatus = jest.spyOn(components.commsGatekeeper, 'getCommunityVoiceChatStatus')
+    
+    analyticsSpy.fireEvent = jest.spyOn(components.analytics, 'fireEvent')
+  })
+
+  afterAll(() => {
+    // Clean up spies
+    Object.values(commsGatekeeperSpy).forEach(spy => (spy as jest.SpyInstance).mockRestore?.())
+    Object.values(analyticsSpy).forEach(spy => (spy as jest.SpyInstance).mockRestore?.())
   })
 
   describe('GetFriends handler', function () {
@@ -525,20 +542,41 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         role: CommunityRole.Owner
       })
 
-      // Setup common mocks for comms gatekeeper
-      stubComponents.commsGatekeeper.createCommunityVoiceChatRoom.resolves({
+      // Setup common mocks using spies
+      commsGatekeeperSpy.createCommunityVoiceChatRoom.mockResolvedValue({
         connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
       })
-      stubComponents.commsGatekeeper.getCommunityVoiceChatCredentials.resolves({
+      commsGatekeeperSpy.getCommunityVoiceChatCredentials.mockResolvedValue({
         connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
       })
-      stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
+      commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
         isActive: false,
         participantCount: 0,
         moderatorCount: 0
       })
-      stubComponents.commsGatekeeper.updateUserMetadataInCommunityVoiceChat.resolves()
-      stubComponents.analytics.sendEvent.resolves()
+      
+      // Setup mocks for communityVoice component
+      stubComponents.communityVoice.startCommunityVoiceChat.resolves({
+        connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+      })
+      stubComponents.communityVoice.joinCommunityVoiceChat.resolves({
+        connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+      })
+      
+      // Mock catalystClient for community voice chat
+      stubComponents.catalystClient.getProfile.resolves({
+        avatars: [{
+          name: 'testuser',
+          hasClaimedName: true,
+          avatar: {
+            snapshots: {
+              face256: 'https://test.com/face.png'
+            }
+          }
+        }]
+      })
+      
+      analyticsSpy.fireEvent.mockResolvedValue(undefined)
     })
 
     afterEach(async () => {
@@ -569,11 +607,16 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       it('should fail with conflict error when community voice chat is already active', async () => {
         const { rpcClient } = components
         
-        stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
+        commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
           isActive: true,
           participantCount: 1,
           moderatorCount: 1
         })
+        
+        // Mock the community voice component to throw the appropriate error
+        stubComponents.communityVoice.startCommunityVoiceChat.rejects(
+          new CommunityVoiceChatAlreadyActiveError(communityId)
+        )
 
         const result = await rpcClient.client.startCommunityVoiceChat({
           communityId
@@ -585,6 +628,11 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       it('should fail when community does not exist', async () => {
         const { rpcClient } = components
         const nonExistentCommunityId = '00000000-0000-0000-0000-000000000000'
+        
+        // Mock the community voice component to throw an error for non-existent community
+        stubComponents.communityVoice.startCommunityVoiceChat.rejects(
+          new UserNotCommunityMemberError('test-address', nonExistentCommunityId)
+        )
 
         const result = await rpcClient.client.startCommunityVoiceChat({
           communityId: nonExistentCommunityId
@@ -597,7 +645,10 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       it('should handle service errors gracefully when comms gatekeeper fails', async () => {
         const { rpcClient } = components
         
-        stubComponents.commsGatekeeper.createCommunityVoiceChatRoom.rejects(new Error('Service unavailable'))
+        commsGatekeeperSpy.createCommunityVoiceChatRoom.mockRejectedValue(new Error('Service unavailable'))
+        
+        // Mock the community voice component to also fail
+        stubComponents.communityVoice.startCommunityVoiceChat.rejects(new Error('Service unavailable'))
 
         const result = await rpcClient.client.startCommunityVoiceChat({
           communityId
@@ -620,10 +671,15 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     describe('joinCommunityVoiceChat', () => {
       beforeEach(() => {
         // Mock active voice chat for join tests
-        stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
+        commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
           isActive: true,
           participantCount: 1,
           moderatorCount: 1
+        })
+        
+        // Reset community voice mock to successful join
+        stubComponents.communityVoice.joinCommunityVoiceChat.resolves({
+          connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
         })
       })
 
@@ -646,11 +702,16 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       it('should fail when community voice chat is not active', async () => {
         const { rpcClient } = components
         
-        stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
+        commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
           isActive: false,
           participantCount: 0,
           moderatorCount: 0
         })
+        
+        // Mock the community voice component to throw the appropriate error
+        stubComponents.communityVoice.joinCommunityVoiceChat.rejects(
+          new CommunityVoiceChatNotFoundError(communityId)
+        )
 
         const result = await rpcClient.client.joinCommunityVoiceChat({
           communityId
@@ -662,6 +723,11 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       it('should fail when community does not exist', async () => {
         const { rpcClient } = components
         const nonExistentCommunityId = '00000000-0000-0000-0000-000000000000'
+        
+        // Mock the community voice component to throw an error for non-existent community
+        stubComponents.communityVoice.joinCommunityVoiceChat.rejects(
+          new UserNotCommunityMemberError('test-address', nonExistentCommunityId)
+        )
 
         const result = await rpcClient.client.joinCommunityVoiceChat({
           communityId: nonExistentCommunityId
