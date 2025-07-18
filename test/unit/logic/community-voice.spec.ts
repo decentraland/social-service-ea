@@ -1,3 +1,4 @@
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { IAnalyticsComponent } from '@dcl/analytics-component'
 import { createCommunityVoiceComponent } from '../../../src/logic/community-voice'
@@ -53,7 +54,8 @@ describe('Community Voice Logic', () => {
 
     mockCommunitiesDb = {
       getCommunityMemberRole: jest.fn(),
-      getCommunity: jest.fn()
+      getCommunity: jest.fn(),
+      isMemberBanned: jest.fn()
     }
 
     mockPubsub = {
@@ -276,6 +278,7 @@ describe('Community Voice Logic', () => {
         role: CommunityRole.Member
       })
       mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
+      mockCommunitiesDb.isMemberBanned!.mockResolvedValue(false) // User is not banned
       mockCatalystClient.getProfile.mockResolvedValue({
         avatars: [{
           name: 'MemberUser',
@@ -328,6 +331,7 @@ describe('Community Voice Logic', () => {
         active: true,
         role: CommunityRole.None // User is not a member but can still join
       })
+      mockCommunitiesDb.isMemberBanned!.mockResolvedValue(false) // User is not banned
       mockCatalystClient.getProfile.mockResolvedValue({
         avatars: [{
           unclaimedName: 'PublicUser#0456',
@@ -436,6 +440,7 @@ describe('Community Voice Logic', () => {
         active: true,
         role: CommunityRole.None // User is not a member
       })
+      mockCommunitiesDb.isMemberBanned!.mockResolvedValue(false) // User is not banned
       mockCatalystClient.getProfile.mockResolvedValue({
         avatars: [{
           name: 'TestUser',
@@ -493,6 +498,64 @@ describe('Community Voice Logic', () => {
         UserNotCommunityMemberError
       )
       expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
+    })
+
+    it('should throw NotAuthorizedError when user is banned from community', async () => {
+      // Arrange
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: true,
+        participantCount: 5,
+        moderatorCount: 1
+      })
+      mockCommunitiesDb.getCommunity!.mockResolvedValue({
+        id: communityId,
+        name: 'Test Community',
+        description: 'Test Description',
+        ownerAddress: '0x123',
+        privacy: 'public', // Public community so membership check passes
+        active: true,
+        role: CommunityRole.None
+      })
+      mockCommunitiesDb.isMemberBanned!.mockResolvedValue(true) // User is banned
+
+      // Act & Assert
+      await expect(communityVoice.joinCommunityVoiceChat(communityId, userAddress)).rejects.toThrow(
+        new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
+      )
+      expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+      expect(mockCommunitiesDb.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+      expect(mockCommunitiesDb.isMemberBanned).toHaveBeenCalledWith(communityId, userAddress)
+      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).not.toHaveBeenCalled()
+    })
+
+    it('should throw NotAuthorizedError when banned user tries to join private community', async () => {
+      // Arrange
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: true,
+        participantCount: 5,
+        moderatorCount: 1
+      })
+      mockCommunitiesDb.getCommunity!.mockResolvedValue({
+        id: communityId,
+        name: 'Private Test Community',
+        description: 'Test Description',
+        ownerAddress: '0x123',
+        privacy: 'private',
+        active: true,
+        role: CommunityRole.Member
+      })
+      mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member) // User is a member
+      mockCommunitiesDb.isMemberBanned!.mockResolvedValue(true) // But is banned
+
+      // Act & Assert
+      await expect(communityVoice.joinCommunityVoiceChat(communityId, userAddress)).rejects.toThrow(
+        new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
+      )
+      expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+      expect(mockCommunitiesDb.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+      expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
+      expect(mockCommunitiesDb.isMemberBanned).toHaveBeenCalledWith(communityId, userAddress)
+      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).not.toHaveBeenCalled()
     })
 
     it('should allow members to join private community with profile data', async () => {

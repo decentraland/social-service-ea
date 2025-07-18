@@ -1,5 +1,6 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { JoinCommunityVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { joinCommunityVoiceChatService } from '../../../../../src/controllers/handlers/rpc/join-community-voice-chat'
 import { ICommunityVoiceComponent } from '../../../../../src/logic/community-voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
@@ -134,6 +135,33 @@ describe('when joining a community voice chat', () => {
       if (result.response?.$case === 'forbiddenError') {
         expect(result.response.forbiddenError.message).toBe(
           `User ${userAddress} is not a member of community ${communityId}`
+        )
+      }
+    })
+  })
+
+  describe('and joining a community voice chat fails because user is banned', () => {
+    beforeEach(() => {
+      joinCommunityVoiceChatMock.mockRejectedValue(
+        new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
+      )
+    })
+
+    it('should resolve with a forbidden error response', async () => {
+      const result = await service(
+        JoinCommunityVoiceChatPayload.create({
+          communityId
+        }),
+        {
+          address: userAddress,
+          subscribersContext: undefined
+        }
+      )
+
+      expect(result.response?.$case).toBe('forbiddenError')
+      if (result.response?.$case === 'forbiddenError') {
+        expect(result.response.forbiddenError.message).toBe(
+          `The user ${userAddress} is banned from community ${communityId}`
         )
       }
     })
