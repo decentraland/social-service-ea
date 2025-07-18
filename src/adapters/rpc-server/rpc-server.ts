@@ -22,19 +22,10 @@ export async function createRpcServerComponent({
   subscribersContext,
   metrics,
   voice,
-  communityVoice,
   updateHandler
 }: Pick<
   AppComponents,
-  | 'logs'
-  | 'pubsub'
-  | 'config'
-  | 'uwsServer'
-  | 'subscribersContext'
-  | 'metrics'
-  | 'voice'
-  | 'communityVoice'
-  | 'updateHandler'
+  'logs' | 'pubsub' | 'config' | 'uwsServer' | 'subscribersContext' | 'metrics' | 'voice' | 'updateHandler'
 >): Promise<IRPCServerComponent> {
   const logger = logs.getLogger('rpc-server-handler')
 
@@ -66,43 +57,16 @@ export async function createRpcServerComponent({
 
   return {
     setServiceCreators(creators: RpcServiceCreators) {
-      logger.info('[RPC DEBUG] Setting service creators...', {
-        numberOfServices: Object.keys(creators).length,
-        serviceNames: Object.keys(creators).join(', ')
-      })
-
       serviceCreators = creators
       const servicesWithMetrics = withMetrics(creators)
 
-      logger.info('[RPC DEBUG] Services with metrics created, available protocol methods:', {
-        protocolMethods: SocialServiceDefinition.methods
-          ? Object.keys(SocialServiceDefinition.methods).join(', ')
-          : 'no methods found'
-      })
-
       rpcServer.setHandler(async function handler(port) {
-        console.log('handler', handler)
-        logger.info('[RPC DEBUG] Registering service with protocol definition...', {
-          protocolName: SocialServiceDefinition.name,
-          protocolFullName: SocialServiceDefinition.fullName
-        })
-
         try {
-          console.log('registerService', registerService)
           const result = registerService(port, SocialServiceDefinition, async () => {
-            logger.info('[RPC DEBUG] Service factory called, returning services:', {
-              serviceMethods: Object.keys(servicesWithMetrics).join(', ')
-            })
             return servicesWithMetrics as any
           })
-          logger.info('[RPC DEBUG] Service registration successful')
           return result
         } catch (error: any) {
-          console.log('error', error)
-          logger.error('[RPC DEBUG] Service registration failed:', {
-            errorMessage: error.message,
-            errorStack: error.stack
-          })
           throw error
         }
       })
@@ -123,15 +87,7 @@ export async function createRpcServerComponent({
       )
     },
     attachUser({ transport, address }) {
-      logger.debug('[DEBUGGING CONNECTION] Attaching user to RPC', {
-        address,
-        transportConnected: String(transport.isConnected)
-      })
-
       transport.on('close', () => {
-        logger.debug('[DEBUGGING CONNECTION] Transport closed, removing subscriber', {
-          address
-        })
         subscribersContext.removeSubscriber(address)
       })
 
@@ -143,9 +99,6 @@ export async function createRpcServerComponent({
       })
     },
     detachUser(address) {
-      logger.debug('[DEBUGGING CONNECTION] Detaching user from RPC', {
-        address
-      })
       // End all calls that the user is involved in
       voice.endIncomingOrOutgoingPrivateVoiceChatForUser(address).catch((_) => {
         // Do nothing
