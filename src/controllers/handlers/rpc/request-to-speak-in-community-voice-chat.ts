@@ -3,7 +3,11 @@ import {
   RequestToSpeakInCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
-import { UserNotCommunityMemberError, CommunityVoiceChatNotFoundError } from '../../../logic/community-voice/errors'
+import {
+  UserNotCommunityMemberError,
+  CommunityVoiceChatNotFoundError,
+  InvalidCommunityIdError
+} from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
 
 export function requestToSpeakInCommunityVoiceChatService({
@@ -21,9 +25,9 @@ export function requestToSpeakInCommunityVoiceChatService({
         userAddress: context.address
       })
 
-      if (!request.communityId) {
-        logger.warn('Missing community ID in request')
-        throw new Error('Community ID is required')
+      if (!request.communityId || request.communityId.trim() === '') {
+        logger.warn('Missing or empty community ID in request')
+        throw new InvalidCommunityIdError()
       }
 
       await commsGatekeeper.requestToSpeakInCommunityVoiceChat(request.communityId, context.address)
@@ -68,12 +72,11 @@ export function requestToSpeakInCommunityVoiceChatService({
         }
       }
 
-      // Handle validation errors
-      if (errorMessage === 'Community ID is required') {
+      if (error instanceof InvalidCommunityIdError) {
         return {
           response: {
             $case: 'invalidRequest',
-            invalidRequest: { message: errorMessage }
+            invalidRequest: { message: error.message }
           }
         }
       }

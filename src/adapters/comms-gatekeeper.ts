@@ -1,6 +1,6 @@
 import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy } from '../types'
+import { CommunityVoiceChatAction, CommunityVoiceChatProfileData } from '../logic/community-voice/types'
 import { isErrorWithMessage } from '../utils/errors'
-import { CommunityVoiceChatAction } from '../types/community-voice'
 
 export class PrivateVoiceChatNotFoundError extends Error {
   constructor(callId: string) {
@@ -152,20 +152,20 @@ export const createCommsGatekeeperComponent = async ({
    * Gets credentials for a community voice chat.
    * @param communityId - The ID of the community
    * @param userAddress - The address of the user joining
-   * @param profileData - Optional profile data (name, hasClaimedName, profilePictureUrl)
+   * @param profileData - Optional profile data (name, has_claimed_name, profile_picture_url)
    * @returns Connection credentials for the user
    */
   async function getCommunityVoiceChatCredentials(
     communityId: string,
     userAddress: string,
-    profileData?: { name: string; hasClaimedName: boolean; profilePictureUrl: string } | null
+    profileData?: CommunityVoiceChatProfileData | null
   ): Promise<{ connectionUrl: string }> {
     try {
       const requestBody: {
         community_id: string
         user_address: string
         action: CommunityVoiceChatAction
-        profile_data?: { name: string; hasClaimedName: boolean; profilePictureUrl: string }
+        profile_data?: CommunityVoiceChatProfileData
       } = {
         community_id: communityId,
         user_address: userAddress,
@@ -209,14 +209,14 @@ export const createCommsGatekeeperComponent = async ({
   async function createCommunityVoiceChatRoom(
     communityId: string,
     createdBy: string,
-    profileData?: { name: string; hasClaimedName: boolean; profilePictureUrl: string } | null
+    profileData?: CommunityVoiceChatProfileData | null
   ): Promise<{ connectionUrl: string }> {
     try {
       const requestBody: {
         community_id: string
         user_address: string
         action: CommunityVoiceChatAction
-        profile_data?: { name: string; hasClaimedName: boolean; profilePictureUrl: string }
+        profile_data?: CommunityVoiceChatProfileData
       } = {
         community_id: communityId,
         user_address: createdBy,

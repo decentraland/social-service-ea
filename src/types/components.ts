@@ -49,6 +49,7 @@ import { RpcServiceCreators } from '../controllers/routes/rpc.routes'
 import { SubscriptionHandlerParams, UpdatesMessageHandler } from '../logic/updates'
 import { PlacesApiResponse } from '../adapters/places-api'
 import { RewardAttributes } from '../logic/referral/types'
+import { CommunityVoiceChatProfileData } from '../logic/community-voice/types'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -288,12 +289,12 @@ export type ICommsGatekeeperComponent = {
   getCommunityVoiceChatCredentials: (
     communityId: string,
     userAddress: string,
-    profileData?: { name: string; hasClaimedName: boolean; profilePictureUrl: string } | null
+    profileData?: CommunityVoiceChatProfileData | null
   ) => Promise<{ connectionUrl: string }>
   createCommunityVoiceChatRoom: (
     communityId: string,
     moderatorAddress: string,
-    profileData?: { name: string; hasClaimedName: boolean; profilePictureUrl: string } | null
+    profileData?: CommunityVoiceChatProfileData | null
   ) => Promise<{ connectionUrl: string }>
   updateUserMetadataInCommunityVoiceChat: (communityId: string, userAddress: string, metadata: any) => Promise<void>
   requestToSpeakInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>

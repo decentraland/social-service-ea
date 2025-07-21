@@ -328,4 +328,172 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
     })
   })
+
+  describe('when requesting to speak in community voice chat', () => {
+    describe('and the request is successful', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({})
+        })
+      })
+
+      it('should request to speak successfully', async () => {
+        await commsGatekeeper.requestToSpeakInCommunityVoiceChat(testCommunityId, testUserAddress)
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          `${gatekeeperUrl}/community-voice-chat/${testCommunityId}/users/${testUserAddress}/speak-request`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${gatekeeperToken}`
+            }
+          }
+        )
+      })
+    })
+
+    describe('and the request fails', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: false,
+          status: 403,
+          text: () => Promise.resolve('Forbidden')
+        })
+      })
+
+      it('should throw an error', async () => {
+        await expect(
+          commsGatekeeper.requestToSpeakInCommunityVoiceChat(testCommunityId, testUserAddress)
+        ).rejects.toThrow('Server responded with status 403')
+      })
+    })
+  })
+
+  describe('when promoting speaker in community voice chat', () => {
+    describe('and the request is successful', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({})
+        })
+      })
+
+      it('should promote speaker successfully', async () => {
+        await commsGatekeeper.promoteSpeakerInCommunityVoiceChat(testCommunityId, testUserAddress)
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          `${gatekeeperUrl}/community-voice-chat/${testCommunityId}/users/${testUserAddress}/speaker`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${gatekeeperToken}`
+            }
+          }
+        )
+      })
+    })
+
+    describe('and the request fails', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: false,
+          status: 404,
+          text: () => Promise.resolve('User not found in voice chat')
+        })
+      })
+
+      it('should throw an error', async () => {
+        await expect(
+          commsGatekeeper.promoteSpeakerInCommunityVoiceChat(testCommunityId, testUserAddress)
+        ).rejects.toThrow('Server responded with status 404')
+      })
+    })
+  })
+
+  describe('when demoting speaker in community voice chat', () => {
+    describe('and the request is successful', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({})
+        })
+      })
+
+      it('should demote speaker successfully', async () => {
+        await commsGatekeeper.demoteSpeakerInCommunityVoiceChat(testCommunityId, testUserAddress)
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          `${gatekeeperUrl}/community-voice-chat/${testCommunityId}/users/${testUserAddress}/speaker`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${gatekeeperToken}`
+            }
+          }
+        )
+      })
+    })
+
+    describe('and the request fails', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: false,
+          status: 404,
+          text: () => Promise.resolve('User not found in voice chat')
+        })
+      })
+
+      it('should throw an error', async () => {
+        await expect(
+          commsGatekeeper.demoteSpeakerInCommunityVoiceChat(testCommunityId, testUserAddress)
+        ).rejects.toThrow('Server responded with status 404')
+      })
+    })
+  })
+
+  describe('when kicking user from community voice chat', () => {
+    describe('and the request is successful', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({})
+        })
+      })
+
+      it('should kick user successfully', async () => {
+        await commsGatekeeper.kickUserFromCommunityVoiceChat(testCommunityId, testUserAddress)
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          `${gatekeeperUrl}/community-voice-chat/${testCommunityId}/users/${testUserAddress}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${gatekeeperToken}`
+            }
+          }
+        )
+      })
+    })
+
+    describe('and the request fails', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: false,
+          status: 403,
+          text: () => Promise.resolve('Forbidden')
+        })
+      })
+
+      it('should throw an error', async () => {
+        await expect(
+          commsGatekeeper.kickUserFromCommunityVoiceChat(testCommunityId, testUserAddress)
+        ).rejects.toThrow('Server responded with status 403')
+      })
+    })
+  })
 })

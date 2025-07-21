@@ -11,3 +11,24 @@ export interface ICommunityVoiceComponent {
   getCommunityVoiceChat(communityId: string): Promise<CommunityVoiceChat | null>
   getActiveCommunityVoiceChats(): Promise<CommunityVoiceChat[]>
 }
+
+export enum CommunityVoiceChatAction {
+  CREATE = 'create',
+  JOIN = 'join'
+}
+
+export interface CommunityVoiceChatProfileData {
+  name: string
+  has_claimed_name: boolean
+  profile_picture_url: string
+}
+
+export interface CommunityVoiceChatRequest {
+  community_id: string
+  user_address: string
+  action: CommunityVoiceChatAction
+}
+
+export interface CommunityVoiceChatResponse {
+  connection_url: string
+}

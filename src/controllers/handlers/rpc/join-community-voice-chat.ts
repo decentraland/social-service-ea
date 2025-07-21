@@ -3,8 +3,12 @@ import {
   JoinCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
-import { CommunityVoiceChatNotFoundError, UserNotCommunityMemberError } from '../../../logic/community-voice/errors'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import {
+  CommunityVoiceChatNotFoundError,
+  UserNotCommunityMemberError,
+  InvalidCommunityIdError
+} from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
 
 export function joinCommunityVoiceChatService({
@@ -22,9 +26,9 @@ export function joinCommunityVoiceChatService({
         userAddress: context.address
       })
 
-      if (!request.communityId) {
-        logger.warn('Missing community ID in request')
-        throw new Error('Community ID is required')
+      if (!request.communityId || request.communityId.trim() === '') {
+        logger.warn('Missing or empty community ID in request')
+        throw new InvalidCommunityIdError()
       }
 
       const { connectionUrl } = await communityVoice.joinCommunityVoiceChat(request.communityId, context.address)
@@ -82,11 +86,11 @@ export function joinCommunityVoiceChatService({
       }
 
       // Handle validation errors
-      if (errorMessage === 'Community ID is required') {
+      if (error instanceof InvalidCommunityIdError) {
         return {
           response: {
             $case: 'invalidRequest',
-            invalidRequest: { message: errorMessage }
+            invalidRequest: { message: error.message }
           }
         }
       }

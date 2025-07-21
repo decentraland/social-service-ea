@@ -16,14 +16,8 @@ import {
   UserNotCommunityMemberError,
   CommunityVoiceChatCreationError
 } from './errors'
-import { ICommunityVoiceComponent } from './types'
+import { CommunityVoiceChatProfileData, ICommunityVoiceComponent } from './types'
 import { getProfileInfo } from '../profiles'
-
-interface ProfileData {
-  name: string
-  hasClaimedName: boolean
-  profilePictureUrl: string
-}
 
 export async function createCommunityVoiceComponent({
   logs,
@@ -43,7 +37,7 @@ export async function createCommunityVoiceComponent({
    * @param userAddress - The address of the user to fetch profile for
    * @returns Profile data or null if fetch/extraction fails
    */
-  async function getUserProfileData(userAddress: string): Promise<ProfileData | null> {
+  async function getUserProfileData(userAddress: string): Promise<CommunityVoiceChatProfileData | null> {
     try {
       const userProfile = await catalystClient.getProfile(userAddress)
       if (!userProfile) {
@@ -55,8 +49,8 @@ export async function createCommunityVoiceComponent({
         const { name, hasClaimedName, profilePictureUrl } = getProfileInfo(userProfile)
         return {
           name,
-          hasClaimedName,
-          profilePictureUrl
+          has_claimed_name: hasClaimedName,
+          profile_picture_url: profilePictureUrl
         }
       } catch (error) {
         logger.warn(

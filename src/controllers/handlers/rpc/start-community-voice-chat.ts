@@ -6,7 +6,8 @@ import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
 import {
   UserNotCommunityMemberError,
   CommunityVoiceChatPermissionError,
-  CommunityVoiceChatAlreadyActiveError
+  CommunityVoiceChatAlreadyActiveError,
+  InvalidCommunityIdError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
 
@@ -25,9 +26,9 @@ export function startCommunityVoiceChatService({
         userAddress: context.address
       })
 
-      if (!request.communityId) {
-        logger.warn('Missing community ID in request')
-        throw new Error('Community ID is required')
+      if (!request.communityId || request.communityId.trim() === '') {
+        logger.warn('Missing or empty community ID in request')
+        throw new InvalidCommunityIdError()
       }
 
       const { connectionUrl } = await communityVoice.startCommunityVoiceChat(request.communityId, context.address)
@@ -74,12 +75,11 @@ export function startCommunityVoiceChatService({
         }
       }
 
-      // Handle validation errors
-      if (errorMessage === 'Community ID is required') {
+      if (error instanceof InvalidCommunityIdError) {
         return {
           response: {
             $case: 'invalidRequest',
-            invalidRequest: { message: errorMessage }
+            invalidRequest: { message: error.message }
           }
         }
       }

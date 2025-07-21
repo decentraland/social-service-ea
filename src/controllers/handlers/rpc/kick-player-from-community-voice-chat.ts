@@ -3,7 +3,12 @@ import {
   KickPlayerFromCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
-import { UserNotCommunityMemberError, CommunityVoiceChatNotFoundError } from '../../../logic/community-voice/errors'
+import {
+  UserNotCommunityMemberError,
+  CommunityVoiceChatNotFoundError,
+  InvalidCommunityIdError,
+  InvalidUserAddressError
+} from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
 
 export function kickPlayerFromCommunityVoiceChatService({
@@ -22,14 +27,14 @@ export function kickPlayerFromCommunityVoiceChatService({
         moderatorAddress: context.address
       })
 
-      if (!request.communityId) {
-        logger.warn('Missing community ID in request')
-        throw new Error('Community ID is required')
+      if (!request.communityId || request.communityId.trim() === '') {
+        logger.warn('Missing or empty community ID in request')
+        throw new InvalidCommunityIdError()
       }
 
-      if (!request.userAddress) {
-        logger.warn('Missing user address in request')
-        throw new Error('User address is required')
+      if (!request.userAddress || request.userAddress.trim() === '') {
+        logger.warn('Missing or empty user address in request')
+        throw new InvalidUserAddressError()
       }
 
       await commsGatekeeper.kickUserFromCommunityVoiceChat(request.communityId, request.userAddress)
@@ -76,12 +81,11 @@ export function kickPlayerFromCommunityVoiceChatService({
         }
       }
 
-      // Handle validation errors
-      if (errorMessage === 'Community ID is required' || errorMessage === 'User address is required') {
+      if (error instanceof InvalidCommunityIdError || error instanceof InvalidUserAddressError) {
         return {
           response: {
             $case: 'invalidRequest',
-            invalidRequest: { message: errorMessage }
+            invalidRequest: { message: error.message }
           }
         }
       }
