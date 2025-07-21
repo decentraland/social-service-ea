@@ -8,7 +8,7 @@ import {
   validateNewFriendshipAction,
   getNewFriendshipStatus,
   parseFriendshipRequestToFriendshipRequestResponse
-} from '../../../logic/friendships'
+} from '../../../logic/friends'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../../adapters/pubsub'
 import { sendNotification, shouldNotify } from '../../../logic/notifications'
 import { getProfileUserId } from '../../../logic/profiles'

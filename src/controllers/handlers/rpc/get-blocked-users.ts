@@ -1,4 +1,4 @@
-import { parseProfilesToBlockedUsers } from '../../../logic/blocks'
+import { parseProfilesToBlockedUsers } from '../../../logic/friends'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { getPage } from '../../../utils/pagination'
 import { FRIENDSHIPS_PER_PAGE } from '../../../adapters/rpc-server/constants'

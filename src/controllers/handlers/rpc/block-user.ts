@@ -4,7 +4,7 @@ import {
   BlockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../adapters/pubsub'
-import { parseProfileToBlockedUser } from '../../../logic/blocks'
+import { parseProfileToBlockedUser } from '../../../logic/friends'
 import { EthAddress } from '@dcl/schemas'
 
 export function blockUserService({

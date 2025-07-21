@@ -53,6 +53,7 @@ import { createRewardComponent } from './adapters/rewards'
 import { createWsPoolComponent } from './logic/ws-pool'
 import { createCdnCacheInvalidatorComponent } from './adapters/cdn-cache-invalidator'
 import { createEmailComponent } from './adapters/email'
+import { createFriendsComponent } from './logic/friends'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -175,6 +176,8 @@ export async function initComponents(): Promise<AppComponents> {
     storage,
     config
   })
+
+  const friends = await createFriendsComponent({ friendsDb, catalystClient })
   const updateHandler = createUpdateHandlerComponent({
     logs,
     subscribersContext,
@@ -262,6 +265,7 @@ export async function initComponents(): Promise<AppComponents> {
     voiceDb,
     worldsStats,
     wsPool,
-    cdnCacheInvalidator
+    cdnCacheInvalidator,
+    friends
   }
 }

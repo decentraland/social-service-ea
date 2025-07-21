@@ -11,7 +11,7 @@ import {
   CommunityWithOwnerName
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { getFriendshipRequestStatus } from '../friendships'
+import { getFriendshipRequestStatus } from '../friends'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export const isOwner = (community: Community, userAddress: string) => {

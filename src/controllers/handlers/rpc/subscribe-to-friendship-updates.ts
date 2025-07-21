@@ -1,7 +1,7 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import { FriendshipUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { parseEmittedUpdateToFriendshipUpdate } from '../../../logic/friendships'
+import { parseEmittedUpdateToFriendshipUpdate } from '../../../logic/friends'
 
 export function subscribeToFriendshipUpdatesService({
   components: { logs, updateHandler }

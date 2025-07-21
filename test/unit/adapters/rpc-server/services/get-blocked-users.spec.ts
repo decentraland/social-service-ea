@@ -3,7 +3,7 @@ import { getBlockedUsersService } from '../../../../../src/controllers/handlers/
 import { GetBlockedUsersPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
-import { parseProfilesToBlockedUsers } from '../../../../../src/logic/blocks'
+import { parseProfilesToBlockedUsers } from '../../../../../src/logic/friends'
 
 describe('getBlockedUsersService', () => {
   let getBlockedUsers: ReturnType<typeof getBlockedUsersService>

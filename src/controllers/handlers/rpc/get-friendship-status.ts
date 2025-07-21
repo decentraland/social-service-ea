@@ -1,4 +1,4 @@
-import { getFriendshipRequestStatus } from '../../../logic/friendships'
+import { getFriendshipRequestStatus } from '../../../logic/friends'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   GetFriendshipStatusPayload,
