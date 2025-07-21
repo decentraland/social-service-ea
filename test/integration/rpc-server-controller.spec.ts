@@ -606,7 +606,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       }
     })
 
-    describe('startCommunityVoiceChat', () => {
+    describe('when starting a community voice chat', () => {
       describe('when user is community owner and voice chat is not active', () => {
         beforeEach(() => {
           // Mock successful external service responses
@@ -794,7 +794,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       })
     })
 
-    describe('joinCommunityVoiceChat', () => {
+    describe('when joining a community voice chat', () => {
       describe('when voice chat is active and user is community member', () => {
         beforeEach(() => {
           // Override mocks for this specific scenario
