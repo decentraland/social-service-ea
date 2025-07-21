@@ -85,7 +85,7 @@ describe('when joining a community voice chat', () => {
 
       expect(result.response?.$case).toBe('invalidRequest')
       if (result.response?.$case === 'invalidRequest') {
-        expect(result.response.invalidRequest.message).toBe('Community ID is required')
+        expect(result.response.invalidRequest.message).toBe('Community ID is required and cannot be empty')
       }
     })
   })

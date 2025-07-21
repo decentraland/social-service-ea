@@ -3,7 +3,13 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 import { IAnalyticsComponent } from '@dcl/analytics-component'
 import { createCommunityVoiceComponent } from '../../../src/logic/community-voice'
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
-import { CommunityRole, ICommsGatekeeperComponent, IPubSubComponent, ICommunitiesDatabaseComponent, ICatalystClientComponent } from '../../../src/types'
+import {
+  CommunityRole,
+  ICommsGatekeeperComponent,
+  IPubSubComponent,
+  ICommunitiesDatabaseComponent,
+  ICatalystClientComponent
+} from '../../../src/types'
 import {
   CommunityVoiceChatNotFoundError,
   CommunityVoiceChatAlreadyActiveError,
@@ -86,29 +92,31 @@ describe('Community Voice Logic', () => {
     })
   })
 
-  describe('startCommunityVoiceChat', () => {
+  describe('when starting a community voice chat', () => {
     const communityId = 'test-community-id'
     const creatorAddress = '0x123'
 
     it('should successfully start a community voice chat for an owner', async () => {
       // Arrange
       mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
-        isActive: false, 
-        participantCount: 0, 
-        moderatorCount: 0 
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: false,
+        participantCount: 0,
+        moderatorCount: 0
       })
       mockCatalystClient.getProfile.mockResolvedValue({
-        avatars: [{
-          name: 'CreatorUser',
-          hasClaimedName: true,
-          userId: creatorAddress,
-          avatar: {
-            snapshots: {
-              face256: 'https://example.com/creator-face.png'
+        avatars: [
+          {
+            name: 'CreatorUser',
+            hasClaimedName: true,
+            userId: creatorAddress,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/creator-face.png'
+              }
             }
           }
-        }]
+        ]
       } as any)
       mockCommsGatekeeper.createCommunityVoiceChatRoom.mockResolvedValue({
         connectionUrl: 'test-connection-url'
@@ -121,15 +129,11 @@ describe('Community Voice Logic', () => {
       expect(result).toEqual({ connectionUrl: 'test-connection-url' })
       expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, creatorAddress)
       expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
-      expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
-        communityId,
-        creatorAddress,
-        {
-          name: 'CreatorUser',
-          hasClaimedName: true,
-          profilePictureUrl: 'https://example.com/creator-face.png'
-        }
-      )
+      expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, creatorAddress, {
+        name: 'CreatorUser',
+        has_claimed_name: true,
+        profile_picture_url: 'https://example.com/creator-face.png'
+      })
       expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId,
         status: 'started'
@@ -143,22 +147,24 @@ describe('Community Voice Logic', () => {
     it('should successfully start a community voice chat for a moderator', async () => {
       // Arrange
       mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Moderator)
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
-        isActive: false, 
-        participantCount: 0, 
-        moderatorCount: 0 
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: false,
+        participantCount: 0,
+        moderatorCount: 0
       })
       mockCatalystClient.getProfile.mockResolvedValue({
-        avatars: [{
-          name: 'ModeratorUser',
-          hasClaimedName: false,
-          userId: creatorAddress,
-          avatar: {
-            snapshots: {
-              face256: 'https://example.com/moderator-face.png'
+        avatars: [
+          {
+            name: 'ModeratorUser',
+            hasClaimedName: false,
+            userId: creatorAddress,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/moderator-face.png'
+              }
             }
           }
-        }]
+        ]
       } as any)
       mockCommsGatekeeper.createCommunityVoiceChatRoom.mockResolvedValue({
         connectionUrl: 'test-connection-url'
@@ -169,24 +175,20 @@ describe('Community Voice Logic', () => {
 
       // Assert
       expect(result).toEqual({ connectionUrl: 'test-connection-url' })
-      expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
-        communityId,
-        creatorAddress,
-        {
-          name: 'ModeratorUser',
-          hasClaimedName: false,
-          profilePictureUrl: 'https://example.com/moderator-face.png'
-        }
-      )
+      expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, creatorAddress, {
+        name: 'ModeratorUser',
+        has_claimed_name: false,
+        profile_picture_url: 'https://example.com/moderator-face.png'
+      })
     })
 
     it('should handle profile fetch failure gracefully when starting voice chat', async () => {
       // Arrange
       mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
-        isActive: false, 
-        participantCount: 0, 
-        moderatorCount: 0 
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: false,
+        participantCount: 0,
+        moderatorCount: 0
       })
       mockCatalystClient.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
       mockCommsGatekeeper.createCommunityVoiceChatRoom.mockResolvedValue({
@@ -198,11 +200,7 @@ describe('Community Voice Logic', () => {
 
       // Assert
       expect(result).toEqual({ connectionUrl: 'test-connection-url' })
-      expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
-        communityId,
-        creatorAddress,
-        null
-      )
+      expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, creatorAddress, null)
     })
 
     it('should throw UserNotCommunityMemberError when user is not a member', async () => {
@@ -228,10 +226,10 @@ describe('Community Voice Logic', () => {
     it('should throw CommunityVoiceChatAlreadyActiveError when voice chat is already active', async () => {
       // Arrange
       mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
-        isActive: true, 
-        participantCount: 1, 
-        moderatorCount: 1 
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: true,
+        participantCount: 1,
+        moderatorCount: 1
       })
 
       // Act & Assert
@@ -243,10 +241,10 @@ describe('Community Voice Logic', () => {
     it('should throw CommunityVoiceChatCreationError when creation fails', async () => {
       // Arrange
       mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
-        isActive: false, 
-        participantCount: 0, 
-        moderatorCount: 0 
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: false,
+        participantCount: 0,
+        moderatorCount: 0
       })
       mockCommsGatekeeper.createCommunityVoiceChatRoom.mockRejectedValue(new Error('Creation failed'))
 
@@ -268,7 +266,7 @@ describe('Community Voice Logic', () => {
         participantCount: 5,
         moderatorCount: 1
       })
-      mockCommunitiesDb.getCommunity!.mockResolvedValue({ 
+      mockCommunitiesDb.getCommunity!.mockResolvedValue({
         id: communityId,
         name: 'Test Community',
         description: 'Test Description',
@@ -280,16 +278,18 @@ describe('Community Voice Logic', () => {
       mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
       mockCommunitiesDb.isMemberBanned!.mockResolvedValue(false) // User is not banned
       mockCatalystClient.getProfile.mockResolvedValue({
-        avatars: [{
-          name: 'MemberUser',
-          hasClaimedName: true,
-          userId: userAddress,
-          avatar: {
-            snapshots: {
-              face256: 'https://example.com/member-face.png'
+        avatars: [
+          {
+            name: 'MemberUser',
+            hasClaimedName: true,
+            userId: userAddress,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/member-face.png'
+              }
             }
           }
-        }]
+        ]
       } as any)
       mockCommsGatekeeper.getCommunityVoiceChatCredentials.mockResolvedValue({
         connectionUrl: 'test-connection-url'
@@ -303,15 +303,11 @@ describe('Community Voice Logic', () => {
       expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
       expect(mockCommunitiesDb.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
       expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
-      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
-        communityId, 
-        userAddress,
-        {
-          name: 'MemberUser',
-          hasClaimedName: true,
-          profilePictureUrl: 'https://example.com/member-face.png'
-        }
-      )
+      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(communityId, userAddress, {
+        name: 'MemberUser',
+        has_claimed_name: true,
+        profile_picture_url: 'https://example.com/member-face.png'
+      })
       // No longer expecting publishInChannel for join events
     })
 
@@ -322,7 +318,7 @@ describe('Community Voice Logic', () => {
         participantCount: 3,
         moderatorCount: 1
       })
-      mockCommunitiesDb.getCommunity!.mockResolvedValue({ 
+      mockCommunitiesDb.getCommunity!.mockResolvedValue({
         id: communityId,
         name: 'Public Test Community',
         description: 'Public community for testing',
@@ -333,16 +329,18 @@ describe('Community Voice Logic', () => {
       })
       mockCommunitiesDb.isMemberBanned!.mockResolvedValue(false) // User is not banned
       mockCatalystClient.getProfile.mockResolvedValue({
-        avatars: [{
-          unclaimedName: 'PublicUser#0456',
-          hasClaimedName: false,
-          userId: userAddress,
-          avatar: {
-            snapshots: {
-              face256: 'https://example.com/public-face.png'
+        avatars: [
+          {
+            unclaimedName: 'PublicUser#0456',
+            hasClaimedName: false,
+            userId: userAddress,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/public-face.png'
+              }
             }
           }
-        }]
+        ]
       } as any)
       mockCommsGatekeeper.getCommunityVoiceChatCredentials.mockResolvedValue({
         connectionUrl: 'test-public-connection-url'
@@ -356,15 +354,11 @@ describe('Community Voice Logic', () => {
       expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
       expect(mockCommunitiesDb.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
       expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled() // Should not check membership for public communities
-      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
-        communityId, 
-        userAddress,
-                 {
-           name: 'PublicUser#0456', // Should include suffix for unclaimed name
-           hasClaimedName: false,
-           profilePictureUrl: 'https://example.com/public-face.png'
-         }
-      )
+      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(communityId, userAddress, {
+        name: 'PublicUser#0456', // Should include suffix for unclaimed name
+        has_claimed_name: false,
+        profile_picture_url: 'https://example.com/public-face.png'
+      })
     })
 
     it('should throw UserNotCommunityMemberError when non-member tries to join private community', async () => {
@@ -374,7 +368,7 @@ describe('Community Voice Logic', () => {
         participantCount: 2,
         moderatorCount: 1
       })
-      mockCommunitiesDb.getCommunity!.mockResolvedValue({ 
+      mockCommunitiesDb.getCommunity!.mockResolvedValue({
         id: communityId,
         name: 'Private Test Community',
         description: 'Private community for testing',
@@ -397,10 +391,10 @@ describe('Community Voice Logic', () => {
 
     it('should throw CommunityVoiceChatNotFoundError when voice chat is not active', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
-        isActive: false, 
-        participantCount: 0, 
-        moderatorCount: 0 
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: false,
+        participantCount: 0,
+        moderatorCount: 0
       })
 
       // Act & Assert
@@ -411,10 +405,10 @@ describe('Community Voice Logic', () => {
 
     it('should throw CommunityVoiceChatNotFoundError when community is not found', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
-        isActive: true, 
-        participantCount: 1, 
-        moderatorCount: 1 
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: true,
+        participantCount: 1,
+        moderatorCount: 1
       })
       mockCommunitiesDb.getCommunity!.mockResolvedValue(null)
 
@@ -442,16 +436,18 @@ describe('Community Voice Logic', () => {
       })
       mockCommunitiesDb.isMemberBanned!.mockResolvedValue(false) // User is not banned
       mockCatalystClient.getProfile.mockResolvedValue({
-        avatars: [{
-          name: 'TestUser',
-          hasClaimedName: true,
-          userId: userAddress,
-          avatar: {
-            snapshots: {
-              face256: 'https://example.com/face.png'
+        avatars: [
+          {
+            name: 'TestUser',
+            hasClaimedName: true,
+            userId: userAddress,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/face.png'
+              }
             }
           }
-        }]
+        ]
       } as any)
       mockCommsGatekeeper.getCommunityVoiceChatCredentials.mockResolvedValue({
         connectionUrl: 'test-connection-url'
@@ -462,15 +458,11 @@ describe('Community Voice Logic', () => {
 
       // Assert
       expect(result).toEqual({ connectionUrl: 'test-connection-url' })
-      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
-        communityId,
-        userAddress,
-        {
-          name: 'TestUser',
-          hasClaimedName: true,
-          profilePictureUrl: 'https://example.com/face.png'
-        }
-      )
+      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(communityId, userAddress, {
+        name: 'TestUser',
+        has_claimed_name: true,
+        profile_picture_url: 'https://example.com/face.png'
+      })
       // Should not check membership role for public communities
       expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
     })
@@ -576,16 +568,18 @@ describe('Community Voice Logic', () => {
       })
       mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
       mockCatalystClient.getProfile.mockResolvedValue({
-        avatars: [{
-          name: 'MemberUser',
-          hasClaimedName: false,
-          userId: userAddress,
-          avatar: {
-            snapshots: {
-              face256: 'https://example.com/member-face.png'
+        avatars: [
+          {
+            name: 'MemberUser',
+            hasClaimedName: false,
+            userId: userAddress,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/member-face.png'
+              }
             }
           }
-        }]
+        ]
       } as any)
       mockCommsGatekeeper.getCommunityVoiceChatCredentials.mockResolvedValue({
         connectionUrl: 'test-connection-url'
@@ -596,15 +590,11 @@ describe('Community Voice Logic', () => {
 
       // Assert
       expect(result).toEqual({ connectionUrl: 'test-connection-url' })
-      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
-        communityId,
-        userAddress,
-        {
-          name: 'MemberUser',
-          hasClaimedName: false,
-          profilePictureUrl: 'https://example.com/member-face.png'
-        }
-      )
+      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(communityId, userAddress, {
+        name: 'MemberUser',
+        has_claimed_name: false,
+        profile_picture_url: 'https://example.com/member-face.png'
+      })
     })
 
     it('should handle profile data fetch failure gracefully', async () => {
@@ -633,27 +623,19 @@ describe('Community Voice Logic', () => {
 
       // Assert
       expect(result).toEqual({ connectionUrl: 'test-connection-url' })
-      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
-        communityId,
-        userAddress,
-        null
-      )
+      expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(communityId, userAddress, null)
     })
   })
 
-
-
-
-
-  describe('getCommunityVoiceChat', () => {
+  describe('when getting a community voice chat', () => {
     const communityId = 'test-community-id'
 
     it('should return community voice chat when active', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
-        isActive: true, 
-        participantCount: 1, 
-        moderatorCount: 1 
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: true,
+        participantCount: 1,
+        moderatorCount: 1
       })
 
       // Act
@@ -669,10 +651,10 @@ describe('Community Voice Logic', () => {
 
     it('should return null when voice chat is not active', async () => {
       // Arrange
-      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({ 
-        isActive: false, 
-        participantCount: 0, 
-        moderatorCount: 0 
+      mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: false,
+        participantCount: 0,
+        moderatorCount: 0
       })
 
       // Act
