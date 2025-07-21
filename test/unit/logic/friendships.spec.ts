@@ -9,7 +9,7 @@ import {
   parseFriendshipRequestToFriendshipRequestResponse,
   parseUpsertFriendshipRequest,
   validateNewFriendshipAction
-} from '../../../src/logic/friendships'
+} from '../../../src/logic/friends'
 import { Action, FriendshipStatus } from '../../../src/types'
 import {
   ConnectivityStatus,

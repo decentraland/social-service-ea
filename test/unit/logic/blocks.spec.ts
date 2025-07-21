@@ -1,4 +1,8 @@
-import { parseEmittedUpdateToBlockUpdate, parseProfilesToBlockedUsers, parseProfileToBlockedUser } from '../../../src/logic/blocks'
+import {
+  parseEmittedUpdateToBlockUpdate,
+  parseProfilesToBlockedUsers,
+  parseProfileToBlockedUser
+} from '../../../src/logic/friends'
 import { mockProfile } from '../../mocks/profile'
 
 describe('parseProfileToBlockedUser', () => {

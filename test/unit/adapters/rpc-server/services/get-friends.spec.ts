@@ -1,11 +1,13 @@
-import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../../../mocks/components'
+import { mockLogs, createFriendsMockedComponent } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/controllers/handlers/rpc/get-friends'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { createMockFriend, parseExpectedFriends } from '../../../../mocks/friend'
+import { IFriendsComponent } from '../../../../../src/logic/friends'
 
 describe('getFriendsService', () => {
   let getFriends: ReturnType<typeof getFriendsService>
+  let friends: jest.Mocked<IFriendsComponent>
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
@@ -13,8 +15,9 @@ describe('getFriendsService', () => {
   }
 
   beforeEach(() => {
+    friends = createFriendsMockedComponent()
     getFriends = getFriendsService({
-      components: { friendsDb: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
+      components: { friends, logs: mockLogs }
     })
   })
 
@@ -24,9 +27,7 @@ describe('getFriendsService', () => {
     const mockProfiles = addresses.map(createMockProfile)
     const totalFriends = 2
 
-    mockFriendsDB.getFriends.mockResolvedValueOnce(mockFriends)
-    mockFriendsDB.getFriendsCount.mockResolvedValueOnce(totalFriends)
-    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
+    friends.getFriendsProfiles.mockResolvedValueOnce({ friendsProfiles: mockProfiles, total: totalFriends })
 
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
@@ -40,8 +41,7 @@ describe('getFriendsService', () => {
   })
 
   it('should return an empty list if no friends are found', async () => {
-    mockFriendsDB.getFriends.mockResolvedValueOnce([])
-    mockFriendsDB.getFriendsCount.mockResolvedValueOnce(0)
+    friends.getFriendsProfiles.mockResolvedValueOnce({ friendsProfiles: [], total: 0 })
 
     const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
@@ -55,7 +55,7 @@ describe('getFriendsService', () => {
   })
 
   it('should handle errors from the database gracefully', async () => {
-    mockFriendsDB.getFriends.mockImplementationOnce(() => {
+    friends.getFriendsProfiles.mockImplementationOnce(() => {
       throw new Error('Database error')
     })
 
@@ -71,7 +71,7 @@ describe('getFriendsService', () => {
   })
 
   it('should handle errors from the catalyst gracefully', async () => {
-    mockCatalystClient.getProfiles.mockImplementationOnce(() => {
+    friends.getFriendsProfiles.mockImplementationOnce(() => {
       throw new Error('Catalyst error')
     })
 

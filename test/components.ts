@@ -60,6 +60,7 @@ import { AnalyticsEventPayload } from '../src/types/analytics'
 import { createRewardComponent } from '../src/adapters/rewards'
 import { createWsPoolComponent } from '../src/logic/ws-pool'
 import { createEmailComponent } from '../src/adapters/email'
+import { createFriendsComponent } from '../src/logic/friends'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -224,6 +225,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const wsPool = createWsPoolComponent({ logs, metrics })
 
+  const friends = await createFriendsComponent({ friendsDb, catalystClient })
+
   return {
     analytics,
     archipelagoStats,
@@ -275,6 +278,7 @@ async function initComponents(): Promise<TestComponents> {
     voiceDb,
     worldsStats,
     wsPool,
-    cdnCacheInvalidator: mockCdnCacheInvalidator
+    cdnCacheInvalidator: mockCdnCacheInvalidator,
+    friends
   }
 }
