@@ -1,22 +1,35 @@
+import { PoolClient } from 'pg'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createFriendsComponent } from '../../../src/logic/friends/component'
 import { IFriendsComponent } from '../../../src/logic/friends/types'
 import { createFriendsDBMockedComponent } from '../../mocks/components/friends-db'
 import { mockCatalystClient } from '../../mocks/components/catalyst-client'
-import { createMockProfile } from '../../mocks/profile'
-import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { createMockProfile, mockProfile } from '../../mocks/profile'
+import { createMockedPubSubComponent, mockPg } from '../../mocks/components'
+import { EthAddress } from '@dcl/schemas'
+import { Action, Friendship } from '../../../src/types'
+import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 
 describe('Friends Component', () => {
   let friendsComponent: IFriendsComponent
   let mockFriendsDB: jest.Mocked<ReturnType<typeof createFriendsDBMockedComponent>>
+  let mockPubSub: jest.Mocked<ReturnType<typeof createMockedPubSubComponent>>
+  let mockPublishInChannel: jest.MockedFunction<typeof mockPubSub.publishInChannel>
   let mockUserAddress: string
 
   beforeEach(async () => {
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockFriendsDB = createFriendsDBMockedComponent({})
+    mockPublishInChannel = jest.fn()
+    mockPubSub = createMockedPubSubComponent({
+      publishInChannel: mockPublishInChannel
+    })
 
     friendsComponent = await createFriendsComponent({
       friendsDb: mockFriendsDB,
-      catalystClient: mockCatalystClient
+      catalystClient: mockCatalystClient,
+      pubsub: mockPubSub
     })
   })
 
@@ -279,5 +292,180 @@ describe('Friends Component', () => {
         expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1'])
       })
     })
+  })
+
+  describe('when blocking a user', () => {
+    let mockProfile: Profile
+    let mockClient: jest.Mocked<PoolClient>
+    let blockedAddress: EthAddress
+    let blockedAt: Date
+
+    beforeEach(() => {
+      mockClient = {} as jest.Mocked<PoolClient>
+      mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
+      blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+      mockProfile = createMockProfile(blockedAddress)
+      blockedAt = new Date()
+    })
+
+    describe('and the profile is not found', () => {
+      beforeEach(() => {
+        mockCatalystClient.getProfile.mockResolvedValueOnce(null)
+      })
+
+      it('should reject with a profileNotFound error', async () => {
+        await expect(friendsComponent.blockUser(mockUserAddress, blockedAddress)).rejects.toThrow(
+          `Profile not found for address ${blockedAddress}`
+        )
+      })
+    })
+
+    describe('and the user is friends with the blocked user', () => {
+      beforeEach(() => {
+        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+        mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
+        mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+      })
+
+      it('should block the user successfully, update the friendship status, and record the friendship action', async () => {
+        await friendsComponent.blockUser(mockUserAddress, blockedAddress)
+
+        expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(mockUserAddress, blockedAddress, mockClient)
+        expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([mockUserAddress, blockedAddress], mockClient)
+        expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(expect.any(String), false, mockClient)
+        expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
+          'friendship-id',
+          mockUserAddress,
+          Action.BLOCK,
+          null,
+          mockClient
+        )
+      })
+
+      it('should publish a friendship update event', async () => {
+        await friendsComponent.blockUser(mockUserAddress, blockedAddress)
+
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
+          id: 'action-id',
+          from: mockUserAddress,
+          to: blockedAddress,
+          action: Action.BLOCK,
+          timestamp: blockedAt.getTime()
+        })
+      })
+
+      it('should publish a block update event', async () => {
+        await friendsComponent.blockUser(mockUserAddress, blockedAddress)
+
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
+          blockerAddress: mockUserAddress,
+          blockedAddress,
+          isBlocked: true
+        })
+      })
+
+      it('should resolve with the blocked user profile and the time it was blocked', async () => {
+        const result = await friendsComponent.blockUser(mockUserAddress, blockedAddress)
+
+        expect(result).toEqual({
+          profile: mockProfile,
+          blockedAt: blockedAt
+        })
+      })
+    })
+
+    // it('should block a user successfully, update friendship status, and record friendship action if it exists', async () => {
+    //   const request: BlockUserPayload = {
+    //     user: { address: blockedAddress }
+    //   }
+
+    //   mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+    //   mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    //   mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+
+    //   const response = await blockUser(request, rpcContext)
+
+    //   expect(response).toEqual({
+    //     response: {
+    //       $case: 'ok',
+    //       ok: {
+    //         profile: parseProfileToBlockedUser(mockProfile, blockedAt)
+    //       }
+    //     }
+    //   })
+    //   expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
+    //   expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
+    //   expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(expect.any(String), false, mockClient)
+    //   expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
+    //     expect.any(String),
+    //     rpcContext.address,
+    //     Action.BLOCK,
+    //     null,
+    //     mockClient
+    //   )
+    // })
+
+    // it('should block a user successfully and do nothing else if friendship does not exist', async () => {
+    //   const request: BlockUserPayload = {
+    //     user: { address: blockedAddress }
+    //   }
+
+    //   mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+    //   mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+    //   mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+
+    //   const response = await blockUser(request, rpcContext)
+
+    //   expect(response).toEqual({
+    //     response: {
+    //       $case: 'ok',
+    //       ok: { profile: parseProfileToBlockedUser(mockProfile, blockedAt) }
+    //     }
+    //   })
+
+    //   expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
+    //   expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
+    //   expect(mockFriendsDB.updateFriendshipStatus).not.toHaveBeenCalled()
+    //   expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
+    // })
+
+    // it('should publish a friendship update event after blocking a user if friendship exists', async () => {
+    //   const request: BlockUserPayload = {
+    //     user: { address: blockedAddress }
+    //   }
+
+    //   mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+    //   mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    //   mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+    //   mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
+
+    //   await blockUser(request, rpcContext)
+
+    //   expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
+    //     id: 'action-id',
+    //     from: rpcContext.address,
+    //     to: blockedAddress,
+    //     action: Action.BLOCK,
+    //     timestamp: blockedAt.getTime()
+    //   })
+    // })
+
+    // it('should publish a block update event after blocking a user', async () => {
+    //   const request: BlockUserPayload = {
+    //     user: { address: blockedAddress }
+    //   }
+
+    //   mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+    //   mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+    //   mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+    //   await blockUser(request, rpcContext)
+
+    //   expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
+    //     blockerAddress: rpcContext.address,
+    //     blockedAddress,
+    //     isBlocked: true
+    //   })
+    // })
   })
 })

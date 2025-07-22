@@ -1,9 +1,11 @@
 import { IFriendsComponent } from '../../../src/logic/friends'
 
 export function createFriendsMockedComponent({
-  getFriendsProfiles = jest.fn()
+  getFriendsProfiles = jest.fn(),
+  blockUser = jest.fn()
 }: Partial<jest.Mocked<IFriendsComponent>> = {}): jest.Mocked<IFriendsComponent> {
   return {
-    getFriendsProfiles
+    getFriendsProfiles,
+    blockUser
   }
 }
