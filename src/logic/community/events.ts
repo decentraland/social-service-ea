@@ -69,18 +69,9 @@ export async function createCommunityEventsComponent(
   const EVENTS_API_URL = await config.requireString('EVENTS_API_URL')
 
   const logger = logs.getLogger('community-events-component')
-  console.log(logger)
 
-  async function isCurrentlyHostingEvents(communityId: string): Promise<boolean> {
-    const cacheKey = `community:${communityId}:live-event`
-
+  async function fetchLiveEvents(communityId: string): Promise<boolean> {
     try {
-      const cachedValue = await redis.get<string>(cacheKey)
-
-      if (cachedValue) {
-        return cachedValue === 'true'
-      }
-
       // Query for live events (events that are currently happening) with limit 3
       const url = `${EVENTS_API_URL}/api/events?communityId=${communityId}&limit=3&offset=0&list=live`
 
@@ -113,12 +104,30 @@ export async function createCommunityEventsComponent(
         }
       }
 
+      const cacheKey = `community:${communityId}:live-event`
       await redis.put(cacheKey, hasLiveEvents ? 'true' : 'false', { EX: ttlInSeconds })
 
       return hasLiveEvents
     } catch (error) {
-      logger.error('Error checking if community is hosting events', { communityId, error: String(error) })
+      logger.error('Error fetching live events', { communityId, error: String(error) })
       return false
+    }
+  }
+
+  async function isCurrentlyHostingEvents(communityId: string): Promise<boolean> {
+    try {
+      const cacheKey = `community:${communityId}:live-event`
+      const cachedValue = await redis.get<string>(cacheKey)
+
+      if (cachedValue) {
+        return cachedValue === 'true'
+      }
+
+      return await fetchLiveEvents(communityId)
+    } catch (error) {
+      logger.error('Error checking if community is hosting events', { communityId, error: String(error) })
+      // Continue with API call even if Redis fails
+      return await fetchLiveEvents(communityId)
     }
   }
 

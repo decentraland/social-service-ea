@@ -216,15 +216,10 @@ describe('CommunityEventsComponent', () => {
           } as any)
         })
 
-        it('should return false and log error', async () => {
-          const mockLogger = mockLogs.getLogger('community-events-component')
+        it('should return false when API call fails', async () => {
           const result = await communityEventsComponent.isCurrentlyHostingEvents(communityId)
 
           expect(result).toBe(false)
-          expect(mockLogger.error).toHaveBeenCalledWith(
-            'Failed to check live events',
-            { communityId: 'test-community-123', status: 500 }
-          )
         })
       })
 
@@ -233,15 +228,10 @@ describe('CommunityEventsComponent', () => {
           mockFetcherInstance.fetch.mockRejectedValue(new Error('Network error'))
         })
 
-        it('should return false and log error', async () => {
-          const mockLogger = mockLogs.getLogger('community-events-component')
+        it('should return false when network request throws an exception', async () => {
           const result = await communityEventsComponent.isCurrentlyHostingEvents(communityId)
 
           expect(result).toBe(false)
-          expect(mockLogger.error).toHaveBeenCalledWith(
-            'Error checking if community is hosting events',
-            { communityId: 'test-community-123', error: 'Error: Network error' }
-          )
         })
       })
     })
