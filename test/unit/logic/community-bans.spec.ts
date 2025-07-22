@@ -9,6 +9,9 @@ import { createMockCommunityRolesComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import { mockSns } from '../../mocks/components/sns'
+import { Events } from '@dcl/schemas'
+import { CommunityRole } from '../../../src/types'
 
 describe('Community Bans Component', () => {
   let communityBansComponent: ICommunityBansComponent
@@ -42,7 +45,8 @@ describe('Community Bans Component', () => {
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
       logs: mockLogs,
-      pubsub: mockPubSub
+      pubsub: mockPubSub,
+      sns: mockSns
     })
   })
 
@@ -50,98 +54,167 @@ describe('Community Bans Component', () => {
     const bannerAddress = '0x9876543210987654321098765432109876543210'
     const targetAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 
-    describe('when all validations pass', () => {
-      it('should ban a member who belongs to the community', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        mockCommunityRoles.validatePermissionToBanMemberFromCommunity.mockResolvedValueOnce(undefined)
-        mockCommunitiesDB.isMemberOfCommunity.mockResolvedValueOnce(true)
-        mockCommunitiesDB.kickMemberFromCommunity.mockResolvedValueOnce()
-        mockCommunitiesDB.banMemberFromCommunity.mockResolvedValueOnce()
-
-        await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
-
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-        expect(mockCommunityRoles.validatePermissionToBanMemberFromCommunity).toHaveBeenCalledWith(
-          communityId,
-          bannerAddress,
-          targetAddress
-        )
-        expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
-        expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
-        expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(communityId, bannerAddress, targetAddress)
-        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-          communityId,
-          memberAddress: targetAddress,
-          status: ConnectivityStatus.OFFLINE
+    describe('when the community exists', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          active: true,
+          ownerAddress: bannerAddress,
+          privacy: 'public',
+          role: CommunityRole.Owner
         })
       })
 
-      it('should ban a non-member without kicking them', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        mockCommunityRoles.validatePermissionToBanMemberFromCommunity.mockResolvedValueOnce(undefined)
-        mockCommunitiesDB.isMemberOfCommunity.mockResolvedValueOnce(false)
-        mockCommunitiesDB.banMemberFromCommunity.mockResolvedValueOnce()
+      describe('and the user has permission to ban', () => {
+        beforeEach(() => {
+          mockCommunityRoles.validatePermissionToBanMemberFromCommunity.mockResolvedValue()
+        })
 
-        await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
+        describe('and the target is a member of the community', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(true)
+            mockCommunitiesDB.kickMemberFromCommunity.mockResolvedValue()
+            mockCommunitiesDB.banMemberFromCommunity.mockResolvedValue()
+          })
 
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-        expect(mockCommunityRoles.validatePermissionToBanMemberFromCommunity).toHaveBeenCalledWith(
-          communityId,
-          bannerAddress,
-          targetAddress
-        )
-        expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
-        expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(communityId, bannerAddress, targetAddress)
-        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-          communityId,
-          memberAddress: targetAddress,
-          status: ConnectivityStatus.OFFLINE
+          it('should kick and ban the member from the community', async () => {
+            await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
+
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+            expect(mockCommunityRoles.validatePermissionToBanMemberFromCommunity).toHaveBeenCalledWith(
+              communityId,
+              bannerAddress,
+              targetAddress
+            )
+            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
+            expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
+            expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(communityId, bannerAddress, targetAddress)
+          })
+
+          it('should publish member status update to pubsub', async () => {
+            await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
+
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId,
+              memberAddress: targetAddress,
+              status: ConnectivityStatus.OFFLINE
+            })
+          })
+
+          it('should publish SNS event for member ban', async () => {
+            await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
+
+            expect(mockSns.publishMessage).toHaveBeenCalledWith({
+              type: Events.Type.COMMUNITY,
+              subType: Events.SubType.Community.MEMBER_BANNED,
+              key: expect.stringContaining(`${communityId}-${targetAddress}-`),
+              timestamp: expect.any(Number),
+              metadata: {
+                id: communityId,
+                name: 'Test Community',
+                memberAddress: targetAddress
+              }
+            })
+          })
+        })
+
+        describe('and the target is not a member of the community', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(false)
+            mockCommunitiesDB.banMemberFromCommunity.mockResolvedValue()
+          })
+
+          it('should ban the non-member without kicking them', async () => {
+            await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
+
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+            expect(mockCommunityRoles.validatePermissionToBanMemberFromCommunity).toHaveBeenCalledWith(
+              communityId,
+              bannerAddress,
+              targetAddress
+            )
+            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
+            expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(communityId, bannerAddress, targetAddress)
+          })
+
+          it('should publish member status update to pubsub', async () => {
+            await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
+
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId,
+              memberAddress: targetAddress,
+              status: ConnectivityStatus.OFFLINE
+            })
+          })
+
+          it('should publish SNS event for member ban', async () => {
+            await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
+
+            expect(mockSns.publishMessage).toHaveBeenCalledWith({
+              type: Events.Type.COMMUNITY,
+              subType: Events.SubType.Community.MEMBER_BANNED,
+              key: expect.stringContaining(`${communityId}-${targetAddress}-`),
+              timestamp: expect.any(Number),
+              metadata: {
+                id: communityId,
+                name: 'Test Community',
+                memberAddress: targetAddress
+              }
+            })
+          })
+        })
+      })
+
+      describe('and the user does not have permission to ban', () => {
+        beforeEach(() => {
+          const permissionError = new NotAuthorizedError(
+            `The user ${bannerAddress} doesn't have permission to ban ${targetAddress} from community ${communityId}`
+          )
+          mockCommunityRoles.validatePermissionToBanMemberFromCommunity.mockRejectedValue(permissionError)
+        })
+
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityBansComponent.banMember(communityId, bannerAddress, targetAddress)).rejects.toThrow(
+            new NotAuthorizedError(
+              `The user ${bannerAddress} doesn't have permission to ban ${targetAddress} from community ${communityId}`
+            )
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+          expect(mockCommunityRoles.validatePermissionToBanMemberFromCommunity).toHaveBeenCalledWith(
+            communityId,
+            bannerAddress,
+            targetAddress
+          )
+          expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.banMemberFromCommunity).not.toHaveBeenCalled()
+          expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
+          expect(mockSns.publishMessage).not.toHaveBeenCalled()
         })
       })
     })
 
     describe('when the community does not exist', () => {
-      it('should throw CommunityNotFoundError', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(false)
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
+      })
 
+      it('should throw CommunityNotFoundError', async () => {
         await expect(communityBansComponent.banMember(communityId, bannerAddress, targetAddress)).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
 
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
         expect(mockCommunityRoles.validatePermissionToBanMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.banMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('when the user does not have permission', () => {
-      it('should throw NotAuthorizedError', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        const permissionError = new NotAuthorizedError(
-          `The user ${bannerAddress} doesn't have permission to ban ${targetAddress} from community ${communityId}`
-        )
-        mockCommunityRoles.validatePermissionToBanMemberFromCommunity.mockRejectedValue(permissionError)
-
-        await expect(communityBansComponent.banMember(communityId, bannerAddress, targetAddress)).rejects.toThrow(
-          new NotAuthorizedError(
-            `The user ${bannerAddress} doesn't have permission to ban ${targetAddress} from community ${communityId}`
-          )
-        )
-
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-        expect(mockCommunityRoles.validatePermissionToBanMemberFromCommunity).toHaveBeenCalledWith(
-          communityId,
-          bannerAddress,
-          targetAddress
-        )
-        expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.banMemberFromCommunity).not.toHaveBeenCalled()
-        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
       })
     })
   })
@@ -150,84 +223,99 @@ describe('Community Bans Component', () => {
     const unbannerAddress = '0x9876543210987654321098765432109876543210'
     const targetAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 
-    describe('when all validations pass and member is banned', () => {
-      it('should unban the member', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity.mockResolvedValueOnce(undefined)
-        mockCommunitiesDB.isMemberBanned.mockResolvedValueOnce(true)
-        mockCommunitiesDB.unbanMemberFromCommunity.mockResolvedValueOnce()
-
-        await communityBansComponent.unbanMember(communityId, unbannerAddress, targetAddress)
-
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-        expect(mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity).toHaveBeenCalledWith(
-          communityId,
-          unbannerAddress,
-          targetAddress
-        )
-        expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetAddress)
-        expect(mockCommunitiesDB.unbanMemberFromCommunity).toHaveBeenCalledWith(
-          communityId,
-          unbannerAddress,
-          targetAddress
-        )
+    describe('when the community exists', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(true)
       })
-    })
 
-    describe('when the member is not banned', () => {
-      it('should return without unbanning', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity.mockResolvedValueOnce(undefined)
-        mockCommunitiesDB.isMemberBanned.mockResolvedValueOnce(false)
+      describe('and the user has permission to unban', () => {
+        beforeEach(() => {
+          mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity.mockResolvedValue()
+        })
 
-        await communityBansComponent.unbanMember(communityId, unbannerAddress, targetAddress)
+        describe('and the member is banned', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.isMemberBanned.mockResolvedValue(true)
+            mockCommunitiesDB.unbanMemberFromCommunity.mockResolvedValue()
+          })
 
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-        expect(mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity).toHaveBeenCalledWith(
-          communityId,
-          unbannerAddress,
-          targetAddress
-        )
-        expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetAddress)
-        expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
+          it('should unban the member', async () => {
+            await communityBansComponent.unbanMember(communityId, unbannerAddress, targetAddress)
+
+            expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+            expect(mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity).toHaveBeenCalledWith(
+              communityId,
+              unbannerAddress,
+              targetAddress
+            )
+            expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetAddress)
+            expect(mockCommunitiesDB.unbanMemberFromCommunity).toHaveBeenCalledWith(
+              communityId,
+              unbannerAddress,
+              targetAddress
+            )
+          })
+        })
+
+        describe('and the member is not banned', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.isMemberBanned.mockResolvedValue(false)
+          })
+
+          it('should return without unbanning', async () => {
+            await communityBansComponent.unbanMember(communityId, unbannerAddress, targetAddress)
+
+            expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+            expect(mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity).toHaveBeenCalledWith(
+              communityId,
+              unbannerAddress,
+              targetAddress
+            )
+            expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetAddress)
+            expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
+          })
+        })
+      })
+
+      describe('and the user does not have permission to unban', () => {
+        beforeEach(() => {
+          const permissionError = new NotAuthorizedError(
+            `The user ${unbannerAddress} doesn't have permission to unban ${targetAddress} from community ${communityId}`
+          )
+          mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity.mockRejectedValue(permissionError)
+        })
+
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityBansComponent.unbanMember(communityId, unbannerAddress, targetAddress)).rejects.toThrow(
+            new NotAuthorizedError(
+              `The user ${unbannerAddress} doesn't have permission to unban ${targetAddress} from community ${communityId}`
+            )
+          )
+
+          expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+          expect(mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity).toHaveBeenCalledWith(
+            communityId,
+            unbannerAddress,
+            targetAddress
+          )
+          expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
+        })
       })
     })
 
     describe('when the community does not exist', () => {
-      it('should throw CommunityNotFoundError', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(false)
+      beforeEach(() => {
+        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+      })
 
+      it('should throw CommunityNotFoundError', async () => {
         await expect(communityBansComponent.unbanMember(communityId, unbannerAddress, targetAddress)).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
 
         expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
         expect(mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('when the user does not have permission', () => {
-      it('should throw NotAuthorizedError', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        const permissionError = new NotAuthorizedError(
-          `The user ${unbannerAddress} doesn't have permission to unban ${targetAddress} from community ${communityId}`
-        )
-        mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity.mockRejectedValue(permissionError)
-
-        await expect(communityBansComponent.unbanMember(communityId, unbannerAddress, targetAddress)).rejects.toThrow(
-          new NotAuthorizedError(
-            `The user ${unbannerAddress} doesn't have permission to unban ${targetAddress} from community ${communityId}`
-          )
-        )
-
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-        expect(mockCommunityRoles.validatePermissionToUnbanMemberFromCommunity).toHaveBeenCalledWith(
-          communityId,
-          unbannerAddress,
-          targetAddress
-        )
         expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.unbanMemberFromCommunity).not.toHaveBeenCalled()
       })
@@ -242,110 +330,133 @@ describe('Community Bans Component', () => {
       createMockProfile('0xabcdefabcdefabcdefabcdefabcdefabcdefabcd')
     ]
 
-    describe('when all validations pass', () => {
-      it('should return banned members with profiles', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        mockCommunityRoles.validatePermissionToGetBannedMembers.mockResolvedValueOnce(undefined)
-        mockCommunitiesDB.getBannedMembers.mockResolvedValueOnce(mockBannedMembers)
-        mockCommunitiesDB.getBannedMembersCount.mockResolvedValueOnce(2)
-        mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
+    describe('when the community exists', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          active: true,
+          ownerAddress: userAddress,
+          privacy: 'public',
+          role: CommunityRole.Owner
+        })
+      })
 
-        const result = await communityBansComponent.getBannedMembers(communityId, userAddress, pagination)
+      describe('and the user has permission to get banned members', () => {
+        beforeEach(() => {
+          mockCommunityRoles.validatePermissionToGetBannedMembers.mockResolvedValue()
+        })
 
-        expect(result).toEqual({
-          members: expect.arrayContaining([
-            expect.objectContaining({
-              memberAddress: mockBannedMembers[0].memberAddress,
-              bannedBy: mockBannedMembers[0].bannedBy,
-              bannedAt: mockBannedMembers[0].bannedAt,
-              name: 'Profile name 0x1234567890123456789012345678901234567890',
-              hasClaimedName: true,
-              profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
-            }),
-            expect.objectContaining({
-              memberAddress: mockBannedMembers[1].memberAddress,
-              bannedBy: mockBannedMembers[1].bannedBy,
-              bannedAt: mockBannedMembers[1].bannedAt,
-              name: 'Profile name 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-              hasClaimedName: true,
-              profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
+        describe('and there are banned members', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.getBannedMembers.mockResolvedValue(mockBannedMembers)
+            mockCommunitiesDB.getBannedMembersCount.mockResolvedValue(2)
+            mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+          })
+
+          it('should return banned members with profiles', async () => {
+            const result = await communityBansComponent.getBannedMembers(communityId, userAddress, pagination)
+
+            expect(result).toEqual({
+              members: expect.arrayContaining([
+                expect.objectContaining({
+                  memberAddress: mockBannedMembers[0].memberAddress,
+                  bannedBy: mockBannedMembers[0].bannedBy,
+                  bannedAt: mockBannedMembers[0].bannedAt,
+                  name: 'Profile name 0x1234567890123456789012345678901234567890',
+                  hasClaimedName: true,
+                  profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
+                }),
+                expect.objectContaining({
+                  memberAddress: mockBannedMembers[1].memberAddress,
+                  bannedBy: mockBannedMembers[1].bannedBy,
+                  bannedAt: mockBannedMembers[1].bannedAt,
+                  name: 'Profile name 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+                  hasClaimedName: true,
+                  profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org')
+                })
+              ]),
+              totalMembers: 2
             })
-          ]),
-          totalMembers: 2
+
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+            expect(mockCommunityRoles.validatePermissionToGetBannedMembers).toHaveBeenCalledWith(communityId, userAddress)
+            expect(mockCommunitiesDB.getBannedMembers).toHaveBeenCalledWith(communityId, userAddress, pagination)
+            expect(mockCommunitiesDB.getBannedMembersCount).toHaveBeenCalledWith(communityId)
+            expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(
+              mockBannedMembers.map((member) => member.memberAddress)
+            )
+          })
+
+          it('should handle pagination correctly', async () => {
+            const customPagination = { limit: 5, offset: 10 }
+            mockCommunitiesDB.getBannedMembers.mockResolvedValue(mockBannedMembers.slice(0, 1))
+            mockCommunitiesDB.getBannedMembersCount.mockResolvedValue(1)
+            mockCatalystClient.getProfiles.mockResolvedValue([mockProfiles[0]])
+
+            await communityBansComponent.getBannedMembers(communityId, userAddress, customPagination)
+
+            expect(mockCommunitiesDB.getBannedMembers).toHaveBeenCalledWith(communityId, userAddress, customPagination)
+          })
         })
 
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-        expect(mockCommunityRoles.validatePermissionToGetBannedMembers).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunitiesDB.getBannedMembers).toHaveBeenCalledWith(communityId, userAddress, pagination)
-        expect(mockCommunitiesDB.getBannedMembersCount).toHaveBeenCalledWith(communityId)
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(
-          mockBannedMembers.map((member) => member.memberAddress)
-        )
+        describe('and there are no banned members', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.getBannedMembers.mockResolvedValue([])
+            mockCommunitiesDB.getBannedMembersCount.mockResolvedValue(0)
+            mockCatalystClient.getProfiles.mockResolvedValue([])
+          })
+
+          it('should return empty list', async () => {
+            const result = await communityBansComponent.getBannedMembers(communityId, userAddress, pagination)
+
+            expect(result).toEqual({
+              members: [],
+              totalMembers: 0
+            })
+
+            expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+          })
+        })
       })
 
-      it('should handle pagination correctly', async () => {
-        const customPagination = { limit: 5, offset: 10 }
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        mockCommunityRoles.validatePermissionToGetBannedMembers.mockResolvedValueOnce(undefined)
-        mockCommunitiesDB.getBannedMembers.mockResolvedValueOnce(mockBannedMembers.slice(0, 1))
-        mockCommunitiesDB.getBannedMembersCount.mockResolvedValueOnce(1)
-        mockCatalystClient.getProfiles.mockResolvedValueOnce([mockProfiles[0]])
-
-        await communityBansComponent.getBannedMembers(communityId, userAddress, customPagination)
-
-        expect(mockCommunitiesDB.getBannedMembers).toHaveBeenCalledWith(communityId, userAddress, customPagination)
-      })
-
-      it('should handle empty banned members list', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        mockCommunityRoles.validatePermissionToGetBannedMembers.mockResolvedValueOnce(undefined)
-        mockCommunitiesDB.getBannedMembers.mockResolvedValueOnce([])
-        mockCommunitiesDB.getBannedMembersCount.mockResolvedValueOnce(0)
-        mockCatalystClient.getProfiles.mockResolvedValueOnce([])
-
-        const result = await communityBansComponent.getBannedMembers(communityId, userAddress, pagination)
-
-        expect(result).toEqual({
-          members: [],
-          totalMembers: 0
+      describe('and the user does not have permission to get banned members', () => {
+        beforeEach(() => {
+          const permissionError = new NotAuthorizedError(
+            `The user ${userAddress} doesn't have permission to get banned members from the community`
+          )
+          mockCommunityRoles.validatePermissionToGetBannedMembers.mockRejectedValue(permissionError)
         })
 
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityBansComponent.getBannedMembers(communityId, userAddress, pagination)).rejects.toThrow(
+            new NotAuthorizedError(
+              `The user ${userAddress} doesn't have permission to get banned members from the community`
+            )
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+          expect(mockCommunityRoles.validatePermissionToGetBannedMembers).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.getBannedMembers).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getBannedMembersCount).not.toHaveBeenCalled()
+          expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        })
       })
     })
 
     describe('when the community does not exist', () => {
-      it('should throw CommunityNotFoundError', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(false)
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
+      })
 
+      it('should throw CommunityNotFoundError', async () => {
         await expect(communityBansComponent.getBannedMembers(communityId, userAddress, pagination)).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
 
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
         expect(mockCommunityRoles.validatePermissionToGetBannedMembers).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.getBannedMembers).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.getBannedMembersCount).not.toHaveBeenCalled()
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('when the user does not have permission', () => {
-      it('should throw NotAuthorizedError', async () => {
-        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
-        const permissionError = new NotAuthorizedError(
-          `The user ${userAddress} doesn't have permission to get banned members from the community`
-        )
-        mockCommunityRoles.validatePermissionToGetBannedMembers.mockRejectedValue(permissionError)
-
-        await expect(communityBansComponent.getBannedMembers(communityId, userAddress, pagination)).rejects.toThrow(
-          new NotAuthorizedError(
-            `The user ${userAddress} doesn't have permission to get banned members from the community`
-          )
-        )
-
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-        expect(mockCommunityRoles.validatePermissionToGetBannedMembers).toHaveBeenCalledWith(communityId, userAddress)
         expect(mockCommunitiesDB.getBannedMembers).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.getBannedMembersCount).not.toHaveBeenCalled()
         expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()

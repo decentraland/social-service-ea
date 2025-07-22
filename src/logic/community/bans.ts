@@ -75,9 +75,9 @@ export async function createCommunityBansComponent(
       userAddress: EthAddress,
       pagination: Required<PaginatedParameters>
     ): Promise<{ members: BannedMemberProfile[]; totalMembers: number }> => {
-      const communityExists = await communitiesDb.communityExists(id)
+      const community = await communitiesDb.getCommunity(id)
 
-      if (!communityExists) {
+      if (!community) {
         throw new CommunityNotFoundError(id)
       }
 
