@@ -217,8 +217,7 @@ export async function initComponents(): Promise<AppComponents> {
     subscribersContext,
     metrics,
     voice,
-    updateHandler,
-    communityVoice
+    updateHandler
   })
 
   const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
