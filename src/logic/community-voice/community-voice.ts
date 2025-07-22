@@ -1,11 +1,5 @@
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
-import {
-  AppComponents,
-  CommunityVoiceChat,
-  CommunityVoiceChatParticipant,
-  CommunityRole,
-  CommunityVoiceChatStatus
-} from '../../types'
+import { AppComponents, CommunityVoiceChat, CommunityRole, CommunityVoiceChatStatus } from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage } from '../../utils/errors'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
