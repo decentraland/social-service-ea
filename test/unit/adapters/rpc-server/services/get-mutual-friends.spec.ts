@@ -9,7 +9,7 @@ import { IFriendsComponent } from '../../../../../src/logic/friends'
 describe('Get Mutual Friends Service', () => {
   let getMutualFriends: ReturnType<typeof getMutualFriendsService>
   let friendsComponent: IFriendsComponent
-  let getMutualFriendsMethod: jest.MockedFunction<typeof friendsComponent.getMutualFriends>
+  let getMutualFriendsMethod: jest.MockedFunction<typeof friendsComponent.getMutualFriendsProfiles>
 
   const rpcContext: RpcServerContext = {
     address: '0x1234567890123456789012345678901234567890',
@@ -24,7 +24,7 @@ describe('Get Mutual Friends Service', () => {
   beforeEach(() => {
     getMutualFriendsMethod = jest.fn()
     friendsComponent = createFriendsMockedComponent({
-      getMutualFriends: getMutualFriendsMethod
+      getMutualFriendsProfiles: getMutualFriendsMethod
     })
 
     getMutualFriends = getMutualFriendsService({
