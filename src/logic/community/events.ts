@@ -1,4 +1,5 @@
 import { AppComponents } from '../../types'
+import { ICommunityEventsComponent } from './types'
 
 export interface Event {
   id: string
@@ -57,13 +58,9 @@ export interface EventsResponse {
   total?: number
 }
 
-export interface CommunityEventsComponent {
-  isCurrentlyHostingEvents: (communityId: string) => Promise<boolean>
-}
-
 export async function createCommunityEventsComponent(
   components: Pick<AppComponents, 'config' | 'logs' | 'fetcher' | 'redis'>
-): Promise<CommunityEventsComponent> {
+): Promise<ICommunityEventsComponent> {
   const { config, logs, fetcher, redis } = components
 
   const EVENTS_API_URL = await config.requireString('EVENTS_API_URL')

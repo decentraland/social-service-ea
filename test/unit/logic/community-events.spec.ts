@@ -1,8 +1,9 @@
-import { createCommunityEventsComponent, CommunityEventsComponent } from '../../../src/logic/community/events'
+import { createCommunityEventsComponent } from '../../../src/logic/community/events'
+import { ICommunityEventsComponent } from '../../../src/logic/community/types'
 import { mockConfig, mockLogs, mockFetcher, mockRedis } from '../../mocks/components'
 
 describe('CommunityEventsComponent', () => {
-  let communityEventsComponent: CommunityEventsComponent
+  let communityEventsComponent: ICommunityEventsComponent
   let mockFetcherInstance: jest.Mocked<typeof mockFetcher>
   let mockRedisInstance: jest.Mocked<typeof mockRedis>
 
