@@ -3,13 +3,13 @@ import { getMutualFriendsService } from '../../../../../src/controllers/handlers
 import { GetMutualFriendsPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
-import { createMockFriend, parseExpectedFriends } from '../../../../mocks/friend'
+import { parseExpectedFriends } from '../../../../mocks/friend'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
 describe('Get Mutual Friends Service', () => {
   let getMutualFriends: ReturnType<typeof getMutualFriendsService>
   let friendsComponent: IFriendsComponent
-  let getMutualFriendsMethod: jest.MockedFunction<typeof friendsComponent.getMutualFriends>
+  let getMutualFriendsProfilesMethod: jest.MockedFunction<typeof friendsComponent.getMutualFriendsProfiles>
 
   const rpcContext: RpcServerContext = {
     address: '0x1234567890123456789012345678901234567890',
@@ -22,9 +22,9 @@ describe('Get Mutual Friends Service', () => {
   }
 
   beforeEach(() => {
-    getMutualFriendsMethod = jest.fn()
+    getMutualFriendsProfilesMethod = jest.fn()
     friendsComponent = createFriendsMockedComponent({
-      getMutualFriends: getMutualFriendsMethod
+      getMutualFriendsProfiles: getMutualFriendsProfilesMethod
     })
 
     getMutualFriends = getMutualFriendsService({
@@ -34,7 +34,7 @@ describe('Get Mutual Friends Service', () => {
 
   describe('when getting the users mutual friends fails', () => {
     beforeEach(() => {
-      getMutualFriendsMethod.mockRejectedValue(new Error('Database error'))
+      getMutualFriendsProfilesMethod.mockRejectedValue(new Error('Database error'))
     })
 
     it('should return an empty list', async () => {
@@ -61,7 +61,7 @@ describe('Get Mutual Friends Service', () => {
         friendsProfiles: [],
         total: 0
       }
-      getMutualFriendsMethod.mockResolvedValue(mutualFriendsData)
+      getMutualFriendsProfilesMethod.mockResolvedValue(mutualFriendsData)
     })
 
     describe('and there are no mutual friends', () => {
@@ -73,7 +73,7 @@ describe('Get Mutual Friends Service', () => {
       it('should return an empty list', async () => {
         const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
 
-        expect(getMutualFriendsMethod).toHaveBeenCalledWith(
+        expect(getMutualFriendsProfilesMethod).toHaveBeenCalledWith(
           rpcContext.address,
           '0x4567890123456789012345678901234567890123',
           { limit: 10, offset: 0 }
@@ -99,7 +99,7 @@ describe('Get Mutual Friends Service', () => {
       it('should return the list of mutual friends with the pagination data for the page', async () => {
         const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
 
-        expect(getMutualFriendsMethod).toHaveBeenCalledWith(
+        expect(getMutualFriendsProfilesMethod).toHaveBeenCalledWith(
           rpcContext.address,
           '0x4567890123456789012345678901234567890123',
           { limit: 10, offset: 0 }
@@ -124,7 +124,7 @@ describe('Get Mutual Friends Service', () => {
     it('should return an empty list', async () => {
       const response = await getMutualFriends(requestWithoutAddress, rpcContext)
 
-      expect(getMutualFriendsMethod).not.toHaveBeenCalled()
+      expect(getMutualFriendsProfilesMethod).not.toHaveBeenCalled()
       expect(response).toEqual({
         friends: [],
         paginationData: {
@@ -144,7 +144,7 @@ describe('Get Mutual Friends Service', () => {
     it('should return an empty list', async () => {
       const response = await getMutualFriends(requestWithInvalidAddress, rpcContext)
 
-      expect(getMutualFriendsMethod).not.toHaveBeenCalled()
+      expect(getMutualFriendsProfilesMethod).not.toHaveBeenCalled()
       expect(response).toEqual({
         friends: [],
         paginationData: {
