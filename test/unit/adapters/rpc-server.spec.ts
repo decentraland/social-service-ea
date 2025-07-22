@@ -64,7 +64,8 @@ describe('createRpcServerComponent', () => {
       subscribersContext,
       metrics: mockMetrics,
       voice: mockVoice,
-      updateHandler: mockUpdateHandler
+      updateHandler: mockUpdateHandler,
+      communityVoice: mockCommunityVoice
     })
   })
 

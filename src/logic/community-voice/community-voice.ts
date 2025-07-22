@@ -1,11 +1,5 @@
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
-import {
-  AppComponents,
-  CommunityVoiceChat,
-  CommunityVoiceChatParticipant,
-  CommunityRole,
-  CommunityVoiceChatStatus
-} from '../../types'
+import { AppComponents, CommunityVoiceChat, CommunityRole, CommunityVoiceChatStatus } from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage } from '../../utils/errors'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
@@ -18,6 +12,7 @@ import {
 } from './errors'
 import { CommunityVoiceChatProfileData, ICommunityVoiceComponent } from './types'
 import { getProfileInfo } from '../profiles'
+import { ICommunityVoiceChatCacheComponent } from './community-voice-cache'
 
 export async function createCommunityVoiceComponent({
   logs,
@@ -25,11 +20,11 @@ export async function createCommunityVoiceComponent({
   communitiesDb,
   pubsub,
   analytics,
-  catalystClient
-}: Pick<
-  AppComponents,
-  'logs' | 'commsGatekeeper' | 'communitiesDb' | 'pubsub' | 'analytics' | 'catalystClient'
->): Promise<ICommunityVoiceComponent> {
+  catalystClient,
+  communityVoiceChatCache
+}: Pick<AppComponents, 'logs' | 'commsGatekeeper' | 'communitiesDb' | 'pubsub' | 'analytics' | 'catalystClient'> & {
+  communityVoiceChatCache: ICommunityVoiceChatCacheComponent
+}): Promise<ICommunityVoiceComponent> {
   const logger = logs.getLogger('community-voice-logic')
 
   /**
@@ -85,6 +80,7 @@ export async function createCommunityVoiceComponent({
     }
 
     // Check if community already has an active voice chat
+    console.log('Checking if community already has an active voice chat')
     const existingVoiceChat = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
 
     if (existingVoiceChat?.isActive) {
@@ -98,6 +94,9 @@ export async function createCommunityVoiceComponent({
       // Create room in comms-gatekeeper and get credentials directly
       const credentials = await commsGatekeeper.createCommunityVoiceChatRoom(communityId, creatorAddress, profileData)
       logger.info(`Community voice chat room created for community ${communityId}`)
+
+      // Add to cache as active
+      await communityVoiceChatCache.setCommunityVoiceChat(communityId, true, Date.now())
 
       // Publish start event
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
