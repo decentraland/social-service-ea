@@ -555,6 +555,56 @@ describe('Friends Component', () => {
     })
   })
 
+  describe('when getting friendship status', () => {
+    describe('and there is a friendship action', () => {
+      const mockFriendshipAction = {
+        id: 'action-id',
+        friendship_id: 'friendship-id',
+        acting_user: '0x123',
+        action: 'REQUEST' as any,
+        timestamp: new Date().toISOString()
+      }
+
+      beforeEach(() => {
+        mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(mockFriendshipAction)
+      })
+
+      it('should return the friendship status for the latest action', async () => {
+        const result = await friendsComponent.getFriendshipStatus('0x123', '0x456')
+
+        expect(result).toBeDefined()
+        expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
+      })
+    })
+
+    describe('and there is no friendship action', () => {
+      beforeEach(() => {
+        mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(null)
+      })
+
+      it('should return NONE status', async () => {
+        const result = await friendsComponent.getFriendshipStatus('0x123', '0x456')
+
+        expect(result).toBeDefined()
+        expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
+      })
+    })
+
+    describe('and the database returns an error', () => {
+      beforeEach(() => {
+        mockFriendsDB.getLastFriendshipActionByUsers.mockRejectedValue(new Error('Database connection failed'))
+      })
+
+      it('should propagate the error', async () => {
+        await expect(friendsComponent.getFriendshipStatus('0x123', '0x456')).rejects.toThrow(
+          'Database connection failed'
+        )
+
+        expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
+      })
+    })
+  })
+
   describe('when blocking a user', () => {
     let mockProfile: Profile
     let mockClient: jest.Mocked<PoolClient>
