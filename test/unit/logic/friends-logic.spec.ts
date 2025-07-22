@@ -423,4 +423,128 @@ describe('Friends Component', () => {
       })
     })
   })
+
+  describe('when unblocking a user', () => {
+    let mockProfile: Profile
+    let mockClient: jest.Mocked<PoolClient>
+    let blockedAddress: EthAddress
+    let blockedAt: Date
+
+    beforeEach(() => {
+      mockClient = {} as jest.Mocked<PoolClient>
+      mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
+      blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+      mockProfile = createMockProfile(blockedAddress)
+      blockedAt = new Date()
+    })
+
+    describe('and the profile is not found', () => {
+      beforeEach(() => {
+        mockCatalystClient.getProfile.mockResolvedValueOnce(null)
+      })
+
+      it('should reject with a profileNotFound error', async () => {
+        await expect(friendsComponent.unblockUser(mockUserAddress, blockedAddress)).rejects.toThrow(
+          `Profile not found for address ${blockedAddress}`
+        )
+      })
+    })
+
+    describe('and there is an error unblocking the user', () => {
+      beforeEach(() => {
+        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockFriendsDB.unblockUser.mockRejectedValueOnce(new Error('Error unblocking user'))
+      })
+
+      it('should reject with the error', async () => {
+        await expect(friendsComponent.unblockUser(mockUserAddress, blockedAddress)).rejects.toThrow(
+          'Error unblocking user'
+        )
+      })
+    })
+
+    describe('and the user is friends with the blocked user', () => {
+      beforeEach(() => {
+        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
+        mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
+      })
+
+      it('should unblock the user successfully and record the friendship action', async () => {
+        await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
+
+        expect(mockFriendsDB.unblockUser).toHaveBeenCalledWith(mockUserAddress, blockedAddress, mockClient)
+        expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([mockUserAddress, blockedAddress], mockClient)
+        expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
+          'friendship-id',
+          mockUserAddress,
+          Action.DELETE,
+          null,
+          mockClient
+        )
+      })
+
+      it('should publish a friendship update event', async () => {
+        await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
+
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
+          id: 'action-id',
+          from: mockUserAddress,
+          to: blockedAddress,
+          action: Action.DELETE,
+          timestamp: blockedAt.getTime()
+        })
+      })
+
+      it('should publish a block update event', async () => {
+        await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
+
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
+          blockerAddress: mockUserAddress,
+          blockedAddress,
+          isBlocked: false
+        })
+      })
+
+      it('should resolve with the unblocked user profile', async () => {
+        const result = await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
+
+        expect(result).toEqual(mockProfile)
+      })
+    })
+
+    describe('and the user is not friends with the blocked user', () => {
+      beforeEach(() => {
+        mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+      })
+
+      it('should unblock the user successfully and not record the friendship action', async () => {
+        await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
+
+        expect(mockFriendsDB.unblockUser).toHaveBeenCalledWith(mockUserAddress, blockedAddress, mockClient)
+        expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([mockUserAddress, blockedAddress], mockClient)
+        expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
+      })
+
+      it('should publish only the block update event', async () => {
+        await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
+
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
+          blockerAddress: mockUserAddress,
+          blockedAddress,
+          isBlocked: false
+        })
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, expect.any(Object))
+      })
+
+      it('should resolve with the unblocked user profile', async () => {
+        const result = await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
+
+        expect(result).toEqual(mockProfile)
+      })
+    })
+  })
 })
