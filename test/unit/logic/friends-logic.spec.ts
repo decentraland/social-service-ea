@@ -625,7 +625,7 @@ describe('Friends Component', () => {
       })
 
       it('should return mutual friends profiles with total count', async () => {
-        const result = await friendsComponent.getMutualFriends(requesterAddress, requestedAddress, pagination)
+        const result = await friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
 
         expect(result).toEqual({
           friendsProfiles: mockProfiles,
@@ -646,7 +646,7 @@ describe('Friends Component', () => {
       })
 
       it('should return empty profiles array with zero total', async () => {
-        const result = await friendsComponent.getMutualFriends(requesterAddress, requestedAddress, pagination)
+        const result = await friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
 
         expect(result).toEqual({
           friendsProfiles: [],
@@ -670,7 +670,7 @@ describe('Friends Component', () => {
       })
 
       it('should work without pagination', async () => {
-        const result = await friendsComponent.getMutualFriends(requesterAddress, requestedAddress)
+        const result = await friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress)
 
         expect(result).toEqual({
           friendsProfiles: mockProfiles,
@@ -690,9 +690,9 @@ describe('Friends Component', () => {
       })
 
       it('should propagate the error', async () => {
-        await expect(friendsComponent.getMutualFriends(requesterAddress, requestedAddress, pagination)).rejects.toThrow(
-          'Database connection failed'
-        )
+        await expect(
+          friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
+        ).rejects.toThrow('Database connection failed')
 
         expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
@@ -709,9 +709,9 @@ describe('Friends Component', () => {
       })
 
       it('should propagate the error', async () => {
-        await expect(friendsComponent.getMutualFriends(requesterAddress, requestedAddress, pagination)).rejects.toThrow(
-          'Count query failed'
-        )
+        await expect(
+          friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
+        ).rejects.toThrow('Count query failed')
 
         expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
@@ -729,9 +729,9 @@ describe('Friends Component', () => {
       })
 
       it('should propagate the error', async () => {
-        await expect(friendsComponent.getMutualFriends(requesterAddress, requestedAddress, pagination)).rejects.toThrow(
-          'Catalyst service unavailable'
-        )
+        await expect(
+          friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
+        ).rejects.toThrow('Catalyst service unavailable')
 
         expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
