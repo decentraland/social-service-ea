@@ -17,4 +17,5 @@ export interface IFriendsComponent {
   getBlockedUsers(
     userAddress: string
   ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }>
+  getBlockingStatus(userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }>
 }

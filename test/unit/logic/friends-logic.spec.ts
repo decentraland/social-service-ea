@@ -433,6 +433,128 @@ describe('Friends Component', () => {
     })
   })
 
+  describe('when getting blocking status', () => {
+    describe('and the user has blocked users and is blocked by users', () => {
+      const mockBlockedUsers = [
+        { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
+        { address: '0xblocked2', blocked_at: new Date('2023-01-02') }
+      ]
+      const mockBlockedByUsers = [
+        { address: '0xblocker1', blocked_at: new Date('2023-01-03') },
+        { address: '0xblocker2', blocked_at: new Date('2023-01-04') }
+      ]
+
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
+        mockFriendsDB.getBlockedByUsers.mockResolvedValue(mockBlockedByUsers)
+      })
+
+      it('should return blocked users and blocked by users addresses', async () => {
+        const result = await friendsComponent.getBlockingStatus(mockUserAddress)
+
+        expect(result).toEqual({
+          blockedUsers: ['0xblocked1', '0xblocked2'],
+          blockedByUsers: ['0xblocker1', '0xblocker2']
+        })
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+      })
+    })
+
+    describe('and the user has no blocked users and is not blocked by anyone', () => {
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue([])
+        mockFriendsDB.getBlockedByUsers.mockResolvedValue([])
+      })
+
+      it('should return empty arrays', async () => {
+        const result = await friendsComponent.getBlockingStatus(mockUserAddress)
+
+        expect(result).toEqual({
+          blockedUsers: [],
+          blockedByUsers: []
+        })
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+      })
+    })
+
+    describe('and the user has only blocked users but is not blocked by anyone', () => {
+      const mockBlockedUsers = [{ address: '0xblocked1', blocked_at: new Date('2023-01-01') }]
+
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
+        mockFriendsDB.getBlockedByUsers.mockResolvedValue([])
+      })
+
+      it('should return blocked users addresses and empty blocked by users array', async () => {
+        const result = await friendsComponent.getBlockingStatus(mockUserAddress)
+
+        expect(result).toEqual({
+          blockedUsers: ['0xblocked1'],
+          blockedByUsers: []
+        })
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+      })
+    })
+
+    describe('and the user has no blocked users but is blocked by others', () => {
+      const mockBlockedByUsers = [
+        { address: '0xblocker1', blocked_at: new Date('2023-01-01') },
+        { address: '0xblocker2', blocked_at: new Date('2023-01-02') }
+      ]
+
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue([])
+        mockFriendsDB.getBlockedByUsers.mockResolvedValue(mockBlockedByUsers)
+      })
+
+      it('should return empty blocked users array and blocked by users addresses', async () => {
+        const result = await friendsComponent.getBlockingStatus(mockUserAddress)
+
+        expect(result).toEqual({
+          blockedUsers: [],
+          blockedByUsers: ['0xblocker1', '0xblocker2']
+        })
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+      })
+    })
+
+    describe('and the getBlockedUsers database call fails', () => {
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockRejectedValue(new Error('Database connection failed'))
+        mockFriendsDB.getBlockedByUsers.mockResolvedValue([])
+      })
+
+      it('should propagate the error', async () => {
+        await expect(friendsComponent.getBlockingStatus(mockUserAddress)).rejects.toThrow('Database connection failed')
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+      })
+    })
+
+    describe('and the getBlockedByUsers database call fails', () => {
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue([])
+        mockFriendsDB.getBlockedByUsers.mockRejectedValue(new Error('Database connection failed'))
+      })
+
+      it('should propagate the error', async () => {
+        await expect(friendsComponent.getBlockingStatus(mockUserAddress)).rejects.toThrow('Database connection failed')
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+      })
+    })
+  })
+
   describe('when blocking a user', () => {
     let mockProfile: Profile
     let mockClient: jest.Mocked<PoolClient>

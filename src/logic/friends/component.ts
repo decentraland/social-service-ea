@@ -80,6 +80,20 @@ export async function createFriendsComponent(
         blockedProfiles: profiles,
         total: blockedAddresses.length
       }
+    },
+    getBlockingStatus: async (userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }> => {
+      const [blockedUsers, blockedByUsers] = await Promise.all([
+        friendsDb.getBlockedUsers(userAddress),
+        friendsDb.getBlockedByUsers(userAddress)
+      ])
+
+      const blockedAddresses = blockedUsers.map((user) => user.address)
+      const blockedByAddresses = blockedByUsers.map((user) => user.address)
+
+      return {
+        blockedUsers: blockedAddresses,
+        blockedByUsers: blockedByAddresses
+      }
     }
   }
 }
