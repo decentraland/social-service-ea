@@ -99,6 +99,23 @@ export async function createFriendsComponent(
     getFriendshipStatus: async (loggedUserAddress: string, userAddress: string): Promise<FriendshipStatus> => {
       const lastFriendshipAction = await friendsDb.getLastFriendshipActionByUsers(loggedUserAddress, userAddress)
       return getFriendshipRequestStatus(lastFriendshipAction, loggedUserAddress)
+    },
+    getMutualFriendsProfiles: async (
+      requesterAddress: string,
+      requestedAddress: string,
+      pagination?: Pagination
+    ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
+      const [mutualFriends, total] = await Promise.all([
+        friendsDb.getMutualFriends(requesterAddress, requestedAddress, pagination),
+        friendsDb.getMutualFriendsCount(requesterAddress, requestedAddress)
+      ])
+
+      const profiles = await catalystClient.getProfiles(mutualFriends.map((friend) => friend.address))
+
+      return {
+        friendsProfiles: profiles,
+        total
+      }
     }
   }
 }

@@ -20,4 +20,9 @@ export interface IFriendsComponent {
   ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }>
   getBlockingStatus(userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }>
   getFriendshipStatus(loggedUserAddress: string, userAddress: string): Promise<FriendshipStatus>
+  getMutualFriendsProfiles(
+    requesterAddress: string,
+    requestedAddress: string,
+    pagination?: Pagination
+  ): Promise<{ friendsProfiles: Profile[]; total: number }>
 }
