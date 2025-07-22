@@ -177,7 +177,7 @@ export async function initComponents(): Promise<AppComponents> {
     config
   })
 
-  const friends = await createFriendsComponent({ friendsDb, catalystClient })
+  const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub })
   const updateHandler = createUpdateHandlerComponent({
     logs,
     subscribersContext,
