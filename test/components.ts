@@ -166,14 +166,16 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     catalystClient,
     peersStats,
-    pubsub
+    pubsub,
+    sns
   })
   const communityBans = await createCommunityBansComponent({
     communitiesDb,
     communityRoles,
     logs,
     catalystClient,
-    pubsub
+    pubsub,
+    sns
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
@@ -188,7 +190,8 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     storage,
     config,
-    commsGatekeeper
+    commsGatekeeper,
+    sns
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,
