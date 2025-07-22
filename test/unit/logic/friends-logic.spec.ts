@@ -464,7 +464,11 @@ describe('Friends Component', () => {
     })
 
     describe('and the user is friends with the blocked user', () => {
+      let now: number
+
       beforeEach(() => {
+        now = Date.now()
+        jest.spyOn(Date, 'now').mockReturnValueOnce(now)
         mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
         mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
         mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
@@ -493,7 +497,7 @@ describe('Friends Component', () => {
           from: mockUserAddress,
           to: blockedAddress,
           action: Action.DELETE,
-          timestamp: blockedAt.getTime()
+          timestamp: now
         })
       })
 
