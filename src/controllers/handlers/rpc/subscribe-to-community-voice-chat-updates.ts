@@ -1,6 +1,7 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import { CommunityVoiceChatUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { isErrorWithMessage } from '../../../utils/errors'
 
 /**
  * Converts the emitted update to the community voice chat update.
@@ -37,8 +38,9 @@ export function subscribeToCommunityVoiceChatUpdatesService({
         parser: parseEmittedUpdateToCommunityVoiceChatUpdate,
         shouldHandleUpdate: () => true // Handle all community voice chat updates for now
       })
-    } catch (error: any) {
-      logger.error(`Error in community voice chat updates subscription: ${error.message}`)
+    } catch (error) {
+      const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown error'
+      logger.error(`Error in community voice chat updates subscription: ${errorMessage}`)
       throw error
     } finally {
       logger.info('Closing community voice chat updates subscription')

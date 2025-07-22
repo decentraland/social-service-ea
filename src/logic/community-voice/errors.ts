@@ -33,3 +33,15 @@ export class CommunityVoiceChatCreationError extends Error {
     super(message)
   }
 }
+
+export class InvalidCommunityIdError extends Error {
+  constructor() {
+    super('Community ID is required and cannot be empty')
+  }
+}
+
+export class InvalidUserAddressError extends Error {
+  constructor() {
+    super('User address is required and cannot be empty')
+  }
+}

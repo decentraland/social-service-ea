@@ -1,5 +1,6 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { JoinCommunityVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { joinCommunityVoiceChatService } from '../../../../../src/controllers/handlers/rpc/join-community-voice-chat'
 import { ICommunityVoiceComponent } from '../../../../../src/logic/community-voice'
 import { createLogsMockedComponent } from '../../../../mocks/components'
@@ -10,20 +11,14 @@ import {
 
 function createCommunityVoiceMockedComponent({
   startCommunityVoiceChat = jest.fn(),
-  endCommunityVoiceChat = jest.fn(),
   joinCommunityVoiceChat = jest.fn(),
-  leaveCommunityVoiceChat = jest.fn(),
   getCommunityVoiceChat = jest.fn(),
-  getCommunityVoiceChatParticipants = jest.fn(),
   getActiveCommunityVoiceChats = jest.fn()
 }: Partial<jest.Mocked<ICommunityVoiceComponent>>): jest.Mocked<ICommunityVoiceComponent> {
   return {
     startCommunityVoiceChat,
-    endCommunityVoiceChat,
     joinCommunityVoiceChat,
-    leaveCommunityVoiceChat,
     getCommunityVoiceChat,
-    getCommunityVoiceChatParticipants,
     getActiveCommunityVoiceChats
   }
 }
@@ -90,7 +85,7 @@ describe('when joining a community voice chat', () => {
 
       expect(result.response?.$case).toBe('invalidRequest')
       if (result.response?.$case === 'invalidRequest') {
-        expect(result.response.invalidRequest.message).toBe('Community ID is required')
+        expect(result.response.invalidRequest.message).toBe('Community ID is required and cannot be empty')
       }
     })
   })
@@ -140,6 +135,33 @@ describe('when joining a community voice chat', () => {
       if (result.response?.$case === 'forbiddenError') {
         expect(result.response.forbiddenError.message).toBe(
           `User ${userAddress} is not a member of community ${communityId}`
+        )
+      }
+    })
+  })
+
+  describe('and joining a community voice chat fails because user is banned', () => {
+    beforeEach(() => {
+      joinCommunityVoiceChatMock.mockRejectedValue(
+        new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
+      )
+    })
+
+    it('should resolve with a forbidden error response', async () => {
+      const result = await service(
+        JoinCommunityVoiceChatPayload.create({
+          communityId
+        }),
+        {
+          address: userAddress,
+          subscribersContext: undefined
+        }
+      )
+
+      expect(result.response?.$case).toBe('forbiddenError')
+      if (result.response?.$case === 'forbiddenError') {
+        expect(result.response.forbiddenError.message).toBe(
+          `The user ${userAddress} is banned from community ${communityId}`
         )
       }
     })

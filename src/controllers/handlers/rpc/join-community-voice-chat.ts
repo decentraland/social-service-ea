@@ -3,7 +3,13 @@ import {
   JoinCommunityVoiceChatResponse
 } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
 import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
-import { CommunityVoiceChatNotFoundError, UserNotCommunityMemberError } from '../../../logic/community-voice/errors'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import {
+  CommunityVoiceChatNotFoundError,
+  UserNotCommunityMemberError,
+  InvalidCommunityIdError
+} from '../../../logic/community-voice/errors'
+import { isErrorWithMessage } from '../../../utils/errors'
 
 export function joinCommunityVoiceChatService({
   components: { logs, communityVoice }
@@ -20,14 +26,9 @@ export function joinCommunityVoiceChatService({
         userAddress: context.address
       })
 
-      if (!request.communityId) {
-        logger.warn('Missing community ID in request')
-        return {
-          response: {
-            $case: 'invalidRequest',
-            invalidRequest: { message: 'Community ID is required' }
-          }
-        }
+      if (!request.communityId || request.communityId.trim() === '') {
+        logger.warn('Missing or empty community ID in request')
+        throw new InvalidCommunityIdError()
       }
 
       const { connectionUrl } = await communityVoice.joinCommunityVoiceChat(request.communityId, context.address)
@@ -48,9 +49,10 @@ export function joinCommunityVoiceChatService({
           }
         }
       }
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown'
       logger.error('Failed to join community voice chat:', {
-        errorMessage: error.message,
+        errorMessage: errorMessage,
         communityId: request.communityId,
         userAddress: context.address
       })
@@ -70,6 +72,25 @@ export function joinCommunityVoiceChatService({
           response: {
             $case: 'forbiddenError',
             forbiddenError: { message: error.message }
+          }
+        }
+      }
+
+      if (error instanceof NotAuthorizedError) {
+        return {
+          response: {
+            $case: 'forbiddenError',
+            forbiddenError: { message: error.message }
+          }
+        }
+      }
+
+      // Handle validation errors
+      if (error instanceof InvalidCommunityIdError) {
+        return {
+          response: {
+            $case: 'invalidRequest',
+            invalidRequest: { message: error.message }
           }
         }
       }

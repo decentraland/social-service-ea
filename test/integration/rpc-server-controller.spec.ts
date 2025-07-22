@@ -291,31 +291,22 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
   describe('blockUser', function () {
     const blockedAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
 
-    it('should block a user successfully', async () => {
-      const { rpcClient } = components
-      const mockBlockedProfile = createMockProfile(blockedAddress)
+    describe('when blocking a user', () => {
+      let mockBlockedProfile: any
 
-      stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
-
-      const result = await rpcClient.client.blockUser({
-        user: {
-          address: blockedAddress
-        }
+      beforeEach(() => {
+        mockBlockedProfile = createMockProfile(blockedAddress)
+        stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
       })
 
-      assertSuccessBlockingUnblocking(result, parseProfileToBlockedUser(mockBlockedProfile), expect.any(Number))
+      afterEach(async () => {
+        // Clean up: unblock the user after test
+        await components.friendsDb.unblockUser(components.rpcClient.authAddress, blockedAddress)
+      })
 
-      await components.friendsDb.unblockUser(rpcClient.authAddress, blockedAddress)
-    })
+      it('should block a user successfully', async () => {
+        const { rpcClient } = components
 
-    it('should block a user successfully when the user is already blocked', async () => {
-      const { rpcClient } = components
-      const blockedAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
-      const mockBlockedProfile = createMockProfile(blockedAddress)
-
-      stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
-
-      new Array(2).forEach(async (_, _index) => {
         const result = await rpcClient.client.blockUser({
           user: {
             address: blockedAddress
@@ -325,27 +316,48 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         assertSuccessBlockingUnblocking(result, parseProfileToBlockedUser(mockBlockedProfile), expect.any(Number))
       })
 
-      await components.friendsDb.unblockUser(rpcClient.authAddress, blockedAddress)
+      it('should block a user successfully when the user is already blocked', async () => {
+        const { rpcClient } = components
+
+        // Block the user twice
+        for (let i = 0; i < 2; i++) {
+          const result = await rpcClient.client.blockUser({
+            user: {
+              address: blockedAddress
+            }
+          })
+
+          assertSuccessBlockingUnblocking(result, parseProfileToBlockedUser(mockBlockedProfile), expect.any(Number))
+        }
+      })
     })
   })
 
   describe('unblockUser', function () {
-    it('should unblock a user successfully', async () => {
-      const { rpcClient } = components
-      const blockedAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
-      const mockBlockedProfile = createMockProfile(blockedAddress)
+    const blockedAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
 
-      stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
+    describe('when unblocking a user', () => {
+      let mockBlockedProfile: any
 
-      await components.friendsDb.blockUser(rpcClient.authAddress, blockedAddress)
+      beforeEach(async () => {
+        mockBlockedProfile = createMockProfile(blockedAddress)
+        stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
 
-      const result = await rpcClient.client.unblockUser({
-        user: {
-          address: blockedAddress
-        }
+        // Setup: block the user first
+        await components.friendsDb.blockUser(components.rpcClient.authAddress, blockedAddress)
       })
 
-      assertSuccessBlockingUnblocking(result, parseProfileToBlockedUser(mockBlockedProfile))
+      it('should unblock a user successfully', async () => {
+        const { rpcClient } = components
+
+        const result = await rpcClient.client.unblockUser({
+          user: {
+            address: blockedAddress
+          }
+        })
+
+        assertSuccessBlockingUnblocking(result, parseProfileToBlockedUser(mockBlockedProfile))
+      })
     })
   })
 
@@ -502,10 +514,30 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
   describe('Community Voice Chat RPC', () => {
     let testCommunity: any
     let communityId: string
+    let communitiesDbSpy: any = {}
+    let commsGatekeeperSpy: any = {}
+    let analyticsSpy: any = {}
+    let catalystClientSpy: any = {}
 
     beforeEach(async () => {
       const { rpcClient, communitiesDb } = components
-      
+
+      // Set up spies for real components (only for community voice tests)
+      commsGatekeeperSpy.createCommunityVoiceChatRoom = jest.spyOn(
+        components.commsGatekeeper,
+        'createCommunityVoiceChatRoom'
+      )
+      commsGatekeeperSpy.getCommunityVoiceChatCredentials = jest.spyOn(
+        components.commsGatekeeper,
+        'getCommunityVoiceChatCredentials'
+      )
+      commsGatekeeperSpy.getCommunityVoiceChatStatus = jest.spyOn(
+        components.commsGatekeeper,
+        'getCommunityVoiceChatStatus'
+      )
+      catalystClientSpy.getProfile = jest.spyOn(components.catalystClient, 'getProfile')
+      analyticsSpy.fireEvent = jest.spyOn(components.analytics, 'fireEvent')
+
       // Create test community
       testCommunity = {
         name: 'Test Community Voice Chat',
@@ -525,150 +557,347 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         role: CommunityRole.Owner
       })
 
-      // Setup common mocks for comms gatekeeper
-      stubComponents.commsGatekeeper.createCommunityVoiceChatRoom.resolves({
+      // Setup spies for DB methods to verify interactions
+      communitiesDbSpy.getCommunityMemberRole = jest.spyOn(communitiesDb, 'getCommunityMemberRole')
+      communitiesDbSpy.getCommunity = jest.spyOn(communitiesDb, 'getCommunity')
+      communitiesDbSpy.isMemberBanned = jest.spyOn(communitiesDb, 'isMemberBanned')
+
+      // Set default mocks (will be overridden in specific test scenarios)
+      commsGatekeeperSpy.createCommunityVoiceChatRoom.mockResolvedValue({
         connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
       })
-      stubComponents.commsGatekeeper.getCommunityVoiceChatCredentials.resolves({
+      commsGatekeeperSpy.getCommunityVoiceChatCredentials.mockResolvedValue({
         connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
       })
-      stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
+      commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
         isActive: false,
         participantCount: 0,
         moderatorCount: 0
       })
-      stubComponents.commsGatekeeper.updateUserMetadataInCommunityVoiceChat.resolves()
-      stubComponents.analytics.sendEvent.resolves()
+      catalystClientSpy.getProfile.mockResolvedValue({
+        avatars: [
+          {
+            name: 'testuser',
+            userId: rpcClient.authAddress.toLowerCase(),
+            hasClaimedName: true,
+            avatar: {
+              snapshots: {
+                face256: 'https://test.com/face.png'
+              }
+            }
+          }
+        ]
+      })
+      analyticsSpy.fireEvent.mockResolvedValue(undefined)
     })
 
     afterEach(async () => {
       const { communitiesDbHelper } = components
+
+      // Clean up spies
+      Object.values(communitiesDbSpy).forEach((spy) => (spy as jest.SpyInstance).mockRestore?.())
+      Object.values(commsGatekeeperSpy).forEach((spy) => (spy as jest.SpyInstance).mockRestore?.())
+      Object.values(analyticsSpy).forEach((spy) => (spy as jest.SpyInstance).mockRestore?.())
+      Object.values(catalystClientSpy).forEach((spy) => (spy as jest.SpyInstance).mockRestore?.())
+
       // Clean up community data
       if (communityId) {
         await communitiesDbHelper.forceCommunityRemoval(communityId)
       }
     })
 
-    describe('startCommunityVoiceChat', () => {
-      it('should successfully start a community voice chat when user is community owner', async () => {
-        const { rpcClient } = components
-        
-        const result = await rpcClient.client.startCommunityVoiceChat({
-          communityId
+    describe('when starting a community voice chat', () => {
+      describe('when user is community owner and voice chat is not active', () => {
+        beforeEach(() => {
+          // Mock successful external service responses
+          commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          })
+          commsGatekeeperSpy.createCommunityVoiceChatRoom.mockResolvedValue({
+            connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+          })
+          catalystClientSpy.getProfile.mockResolvedValue({
+            avatars: [
+              {
+                name: 'testuser',
+                userId: components.rpcClient.authAddress.toLowerCase(),
+                hasClaimedName: true,
+                avatar: {
+                  snapshots: {
+                    face256: 'https://test.com/face.png'
+                  }
+                }
+              }
+            ]
+          })
+          analyticsSpy.fireEvent.mockResolvedValue(undefined)
         })
 
-        expect(result.response?.$case).toBe('ok')
+        it('should successfully start a community voice chat', async () => {
+          const { rpcClient } = components
 
-        if (result.response?.$case === 'ok') {
-          expect(result.response.ok.credentials?.connectionUrl).toBe(
-            'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+          const result = await rpcClient.client.startCommunityVoiceChat({
+            communityId
+          })
+
+          // Verify DB interactions occurred
+          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(
+            communityId,
+            rpcClient.authAddress.toLowerCase()
           )
-        }
+
+          // Verify external service calls
+          expect(commsGatekeeperSpy.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+          expect(commsGatekeeperSpy.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
+            communityId,
+            rpcClient.authAddress.toLowerCase(),
+            expect.objectContaining({
+              name: 'testuser',
+              has_claimed_name: true,
+              profile_picture_url: 'https://test.com/face.png'
+            })
+          )
+
+          // Verify successful response
+          expect(result.response?.$case).toBe('ok')
+          if (result.response?.$case === 'ok') {
+            expect(result.response.ok.credentials?.connectionUrl).toBe(
+              'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+            )
+          }
+        })
       })
 
-      it('should fail with conflict error when community voice chat is already active', async () => {
-        const { rpcClient } = components
-        
-        stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
-          isActive: true,
-          participantCount: 1,
-          moderatorCount: 1
+      describe('when community voice chat is already active', () => {
+        beforeEach(() => {
+          // Override mock for this specific scenario
+          commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
+            isActive: true,
+            participantCount: 1,
+            moderatorCount: 1
+          })
         })
 
-        const result = await rpcClient.client.startCommunityVoiceChat({
-          communityId
-        })
+        it('should fail with conflict error', async () => {
+          const { rpcClient } = components
 
-        expect(result.response?.$case).toBe('conflictingError')
+          const result = await rpcClient.client.startCommunityVoiceChat({
+            communityId
+          })
+
+          // Verify DB call was made to check user role
+          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(
+            communityId,
+            rpcClient.authAddress.toLowerCase()
+          )
+
+          // Verify the status check was made
+          expect(commsGatekeeperSpy.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+
+          // Should NOT try to create room since voice chat is already active
+          expect(commsGatekeeperSpy.createCommunityVoiceChatRoom).not.toHaveBeenCalled()
+
+          expect(result.response?.$case).toBe('conflictingError')
+        })
       })
 
-      it('should fail when community does not exist', async () => {
-        const { rpcClient } = components
-        const nonExistentCommunityId = '00000000-0000-0000-0000-000000000000'
-
-        const result = await rpcClient.client.startCommunityVoiceChat({
-          communityId: nonExistentCommunityId
+      describe('when community does not exist', () => {
+        beforeEach(() => {
+          // Clear and re-mock for this specific scenario
+          commsGatekeeperSpy.getCommunityVoiceChatStatus.mockClear()
+          commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          })
+          catalystClientSpy.getProfile.mockClear()
+          catalystClientSpy.getProfile.mockResolvedValue({
+            avatars: [
+              {
+                name: 'testuser',
+                userId: components.rpcClient.authAddress.toLowerCase(),
+                hasClaimedName: true,
+                avatar: {
+                  snapshots: {
+                    face256: 'https://test.com/face.png'
+                  }
+                }
+              }
+            ]
+          })
         })
 
-        // Should fail with either notFoundError or forbiddenError (both are valid for non-existent communities)
-        expect(['notFoundError', 'forbiddenError']).toContain(result.response?.$case)
+        it('should fail with forbidden or not found error', async () => {
+          const { rpcClient } = components
+          const nonExistentCommunityId = '00000000-0000-0000-0000-000000000000'
+
+          const result = await rpcClient.client.startCommunityVoiceChat({
+            communityId: nonExistentCommunityId
+          })
+
+          // Verify DB call was attempted to check user role (this should return CommunityRole.None for non-existent community)
+          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(
+            nonExistentCommunityId,
+            rpcClient.authAddress.toLowerCase()
+          )
+
+          // Should fail with either notFoundError or forbiddenError (both are valid for non-existent communities)
+          expect(['notFoundError', 'forbiddenError']).toContain(result.response?.$case)
+        })
       })
 
-      it('should handle service errors gracefully when comms gatekeeper fails', async () => {
-        const { rpcClient } = components
-        
-        stubComponents.commsGatekeeper.createCommunityVoiceChatRoom.rejects(new Error('Service unavailable'))
-
-        const result = await rpcClient.client.startCommunityVoiceChat({
-          communityId
+      describe('when external services fail', () => {
+        beforeEach(() => {
+          // Override mocks for this specific scenario
+          commsGatekeeperSpy.createCommunityVoiceChatRoom.mockRejectedValue(new Error('Service unavailable'))
         })
 
-        expect(result.response?.$case).toBe('internalServerError')
+        it('should handle service errors gracefully', async () => {
+          const { rpcClient } = components
+
+          const result = await rpcClient.client.startCommunityVoiceChat({
+            communityId
+          })
+
+          // Verify the DB calls were made successfully before the external service failed
+          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(
+            communityId,
+            rpcClient.authAddress.toLowerCase()
+          )
+          expect(commsGatekeeperSpy.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+          expect(commsGatekeeperSpy.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
+            communityId,
+            rpcClient.authAddress.toLowerCase(),
+            expect.objectContaining({
+              name: 'testuser',
+              has_claimed_name: true,
+              profile_picture_url: 'https://test.com/face.png'
+            })
+          )
+
+          expect(result.response?.$case).toBe('internalServerError')
+        })
       })
 
-      it('should fail with invalid request when community id is empty', async () => {
-        const { rpcClient } = components
+      describe('when community id is invalid', () => {
+        it('should fail with invalid request', async () => {
+          const { rpcClient } = components
 
-        const result = await rpcClient.client.startCommunityVoiceChat({
-          communityId: ''
+          const result = await rpcClient.client.startCommunityVoiceChat({
+            communityId: ''
+          })
+
+          expect(result.response?.$case).toBe('invalidRequest')
         })
-
-        expect(result.response?.$case).toBe('invalidRequest')
       })
     })
 
-    describe('joinCommunityVoiceChat', () => {
-      beforeEach(() => {
-        // Mock active voice chat for join tests
-        stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
-          isActive: true,
-          participantCount: 1,
-          moderatorCount: 1
-        })
-      })
-
-      it('should successfully join the community voice chat when user is community member', async () => {
-        const { rpcClient } = components
-
-        const result = await rpcClient.client.joinCommunityVoiceChat({
-          communityId
+    describe('when joining a community voice chat', () => {
+      describe('when voice chat is active and user is community member', () => {
+        beforeEach(() => {
+          // Override mocks for this specific scenario
+          commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
+            isActive: true,
+            participantCount: 1,
+            moderatorCount: 1
+          })
         })
 
-        expect(result.response?.$case).toBe('ok')
+        it('should successfully join the community voice chat', async () => {
+          const { rpcClient } = components
 
-        if (result.response?.$case === 'ok') {
-          expect(result.response.ok.credentials?.connectionUrl).toBe(
-            'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+          const result = await rpcClient.client.joinCommunityVoiceChat({
+            communityId
+          })
+
+          // Verify DB interactions occurred in correct order
+          expect(commsGatekeeperSpy.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+          expect(communitiesDbSpy.getCommunity).toHaveBeenCalledWith(communityId, rpcClient.authAddress.toLowerCase())
+
+          // For public communities, role check should happen when the community is private
+          // Since our test community is public (private: false), the isMemberBanned check should be called
+          expect(communitiesDbSpy.isMemberBanned).toHaveBeenCalledWith(communityId, rpcClient.authAddress.toLowerCase())
+
+          // Verify external service calls
+          expect(commsGatekeeperSpy.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
+            communityId,
+            rpcClient.authAddress.toLowerCase(),
+            expect.objectContaining({
+              name: 'testuser',
+              has_claimed_name: true,
+              profile_picture_url: 'https://test.com/face.png'
+            })
           )
-        }
+
+          expect(result.response?.$case).toBe('ok')
+          if (result.response?.$case === 'ok') {
+            expect(result.response.ok.credentials?.connectionUrl).toBe(
+              'livekit:wss://voice.test.decentraland.org?access_token=test-token'
+            )
+          }
+        })
       })
 
-      it('should fail when community voice chat is not active', async () => {
-        const { rpcClient } = components
-        
-        stubComponents.commsGatekeeper.getCommunityVoiceChatStatus.resolves({
-          isActive: false,
-          participantCount: 0,
-          moderatorCount: 0
+      describe('when community voice chat is not active', () => {
+        beforeEach(() => {
+          // Override mock for this specific scenario (default is already false, but being explicit)
+          commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          })
         })
 
-        const result = await rpcClient.client.joinCommunityVoiceChat({
-          communityId
-        })
+        it('should fail with not found error', async () => {
+          const { rpcClient } = components
 
-        expect(result.response?.$case).toBe('notFoundError')
+          const result = await rpcClient.client.joinCommunityVoiceChat({
+            communityId
+          })
+
+          // Verify the voice chat status was checked
+          expect(commsGatekeeperSpy.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+
+          // Should not proceed to other checks if voice chat is not active
+          expect(commsGatekeeperSpy.getCommunityVoiceChatCredentials).not.toHaveBeenCalled()
+
+          expect(result.response?.$case).toBe('notFoundError')
+        })
       })
 
-      it('should fail when community does not exist', async () => {
-        const { rpcClient } = components
-        const nonExistentCommunityId = '00000000-0000-0000-0000-000000000000'
-
-        const result = await rpcClient.client.joinCommunityVoiceChat({
-          communityId: nonExistentCommunityId
+      describe('when community does not exist', () => {
+        beforeEach(() => {
+          // Override mock for this specific scenario
+          commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
+            isActive: true,
+            participantCount: 1,
+            moderatorCount: 1
+          })
         })
 
-        // Should fail with either notFoundError or forbiddenError (both are valid for non-existent communities)
-        expect(['notFoundError', 'forbiddenError']).toContain(result.response?.$case)
+        it('should fail with not found or forbidden error', async () => {
+          const { rpcClient } = components
+          const nonExistentCommunityId = '00000000-0000-0000-0000-000000000000'
+
+          const result = await rpcClient.client.joinCommunityVoiceChat({
+            communityId: nonExistentCommunityId
+          })
+
+          // Verify the voice chat status was checked first
+          expect(commsGatekeeperSpy.getCommunityVoiceChatStatus).toHaveBeenCalledWith(nonExistentCommunityId)
+
+          // If voice chat is active, it will proceed to check the community
+          // The getCommunity call should return null for non-existent community
+          expect(communitiesDbSpy.getCommunity).toHaveBeenCalledWith(
+            nonExistentCommunityId,
+            rpcClient.authAddress.toLowerCase()
+          )
+
+          // Should fail with either notFoundError or forbiddenError (both are valid for non-existent communities)
+          expect(['notFoundError', 'forbiddenError']).toContain(result.response?.$case)
+        })
       })
     })
   })

@@ -3,12 +3,12 @@ import {
   AppComponents,
   CommunityVoiceChat,
   CommunityVoiceChatParticipant,
-  CommunityVoiceChatRole,
   CommunityRole,
   CommunityVoiceChatStatus
 } from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage } from '../../utils/errors'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import {
   CommunityVoiceChatNotFoundError,
   CommunityVoiceChatAlreadyActiveError,
@@ -16,19 +16,55 @@ import {
   UserNotCommunityMemberError,
   CommunityVoiceChatCreationError
 } from './errors'
-import { ICommunityVoiceComponent } from './types'
+import { CommunityVoiceChatProfileData, ICommunityVoiceComponent } from './types'
+import { getProfileInfo } from '../profiles'
 
 export async function createCommunityVoiceComponent({
   logs,
   commsGatekeeper,
   communitiesDb,
   pubsub,
-  analytics
+  analytics,
+  catalystClient
 }: Pick<
   AppComponents,
-  'logs' | 'commsGatekeeper' | 'communitiesDb' | 'pubsub' | 'analytics'
+  'logs' | 'commsGatekeeper' | 'communitiesDb' | 'pubsub' | 'analytics' | 'catalystClient'
 >): Promise<ICommunityVoiceComponent> {
   const logger = logs.getLogger('community-voice-logic')
+
+  /**
+   * Helper function to fetch and extract user profile data
+   * @param userAddress - The address of the user to fetch profile for
+   * @returns Profile data or null if fetch/extraction fails
+   */
+  async function getUserProfileData(userAddress: string): Promise<CommunityVoiceChatProfileData | null> {
+    try {
+      const userProfile = await catalystClient.getProfile(userAddress)
+      if (!userProfile) {
+        logger.warn(`No profile found for user ${userAddress}`)
+        return null
+      }
+
+      try {
+        const { name, hasClaimedName, profilePictureUrl } = getProfileInfo(userProfile)
+        return {
+          name,
+          has_claimed_name: hasClaimedName,
+          profile_picture_url: profilePictureUrl
+        }
+      } catch (error) {
+        logger.warn(
+          `Failed to extract profile info for user ${userAddress}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+        )
+        return null
+      }
+    } catch (error) {
+      logger.warn(
+        `Failed to fetch profile for user ${userAddress}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      return null
+    }
+  }
 
   async function startCommunityVoiceChat(
     communityId: string,
@@ -56,19 +92,21 @@ export async function createCommunityVoiceComponent({
     }
 
     try {
+      // Fetch user profile data using helper function
+      const profileData = await getUserProfileData(creatorAddress)
+
       // Create room in comms-gatekeeper and get credentials directly
-      const credentials = await commsGatekeeper.createCommunityVoiceChatRoom(communityId, creatorAddress)
+      const credentials = await commsGatekeeper.createCommunityVoiceChatRoom(communityId, creatorAddress, profileData)
       logger.info(`Community voice chat room created for community ${communityId}`)
 
       // Publish start event
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId,
-        voiceChatId: communityId,
         status: 'started'
       })
 
       // Analytics event
-      analytics.fireEvent(AnalyticsEvent.START_CALL, {
+      analytics.fireEvent(AnalyticsEvent.START_COMMUNITY_CALL, {
         call_id: communityId,
         user_id: creatorAddress
       })
@@ -90,35 +128,6 @@ export async function createCommunityVoiceComponent({
     }
   }
 
-  async function endCommunityVoiceChat(voiceChatId: string, userAddress: string): Promise<void> {
-    logger.info(`Ending community voice chat ${voiceChatId} by ${userAddress}`)
-
-    // In our new architecture, voiceChatId is the same as communityId
-    const communityId = voiceChatId
-
-    // Get current voice chat status
-    const voiceChatStatus = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
-    if (!voiceChatStatus?.isActive) {
-      throw new CommunityVoiceChatNotFoundError(voiceChatId)
-    }
-
-    // Check if user has permission to end the voice chat
-    const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-    const canEnd = userRole === CommunityRole.Owner || userRole === CommunityRole.Moderator
-
-    if (!canEnd) {
-      throw new CommunityVoiceChatPermissionError('Only community owners or moderators can end voice chats')
-    }
-
-    // Note: Ending community voice chat is now handled directly by the client via LiveKit
-    // We don't need to call the comms-gatekeeper here
-
-    // Analytics event
-    analytics.fireEvent(AnalyticsEvent.END_CALL, {
-      call_id: voiceChatId
-    })
-  }
-
   async function joinCommunityVoiceChat(communityId: string, userAddress: string): Promise<{ connectionUrl: string }> {
     logger.info(`User ${userAddress} joining community voice chat for community ${communityId}`)
 
@@ -128,41 +137,33 @@ export async function createCommunityVoiceComponent({
       throw new CommunityVoiceChatNotFoundError(communityId)
     }
 
-    // Check if user is member of the community (or if community is public)
+    // Get community information to check privacy setting
     const community = await communitiesDb.getCommunity(communityId, userAddress)
     if (!community) {
-      throw new UserNotCommunityMemberError(userAddress, communityId)
+      throw new CommunityVoiceChatNotFoundError(communityId)
     }
 
-    // Determine user role (listener by default for members, speaker for moderators/owners)
-    const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-    const voiceChatRole =
-      userRole === CommunityRole.Owner || userRole === CommunityRole.Moderator
-        ? CommunityVoiceChatRole.SPEAKER
-        : CommunityVoiceChatRole.LISTENER
+    // For private communities, check if user is a member
+    if (community.privacy === 'private') {
+      const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
+      if (userRole === CommunityRole.None) {
+        throw new UserNotCommunityMemberError(userAddress, communityId)
+      }
+    }
 
-    // Get credentials from comms-gatekeeper
-    const credentials = await commsGatekeeper.getCommunityVoiceChatCredentials(communityId, userAddress)
+    // Check if user is banned from the community (applies to both public and private communities)
+    const isBanned = await communitiesDb.isMemberBanned(communityId, userAddress)
+    if (isBanned) {
+      throw new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
+    }
+
+    // Fetch user profile data using helper function
+    const profileData = await getUserProfileData(userAddress)
+
+    // Get credentials from comms-gatekeeper with profile data
+    const credentials = await commsGatekeeper.getCommunityVoiceChatCredentials(communityId, userAddress, profileData)
 
     return credentials
-  }
-
-  async function leaveCommunityVoiceChat(voiceChatId: string, userAddress: string): Promise<void> {
-    logger.info(`User ${userAddress} leaving community voice chat ${voiceChatId}`)
-
-    // In our new architecture, voiceChatId is the same as communityId
-    const communityId = voiceChatId
-
-    // Get current voice chat status
-    const voiceChatStatus = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
-    if (!voiceChatStatus?.isActive) {
-      throw new CommunityVoiceChatNotFoundError(voiceChatId)
-    }
-
-    // Note: We delegate the participant check to the comms-gatekeeper
-    // The gatekeeper will handle whether the user is actually in the voice chat
-
-    // Note: No longer publishing leave events - only 'started' events are published
   }
 
   async function getCommunityVoiceChat(communityId: string): Promise<CommunityVoiceChat | null> {
@@ -182,18 +183,6 @@ export async function createCommunityVoiceComponent({
     }
   }
 
-  async function getCommunityVoiceChatParticipants(voiceChatId: string): Promise<CommunityVoiceChatParticipant[]> {
-    // In our new architecture, voiceChatId is the same as communityId
-    const communityId = voiceChatId
-
-    const status = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
-    if (!status?.isActive) {
-      return []
-    }
-    // TODO: check if we need this
-    return []
-  }
-
   async function getActiveCommunityVoiceChats(): Promise<CommunityVoiceChat[]> {
     // Note: This method would require the gatekeeper to have an endpoint to list all active community voice chats
     // For now, we'll return an empty array as this method might not be used frequently
@@ -203,11 +192,8 @@ export async function createCommunityVoiceComponent({
 
   return {
     startCommunityVoiceChat,
-    endCommunityVoiceChat,
     joinCommunityVoiceChat,
-    leaveCommunityVoiceChat,
     getCommunityVoiceChat,
-    getCommunityVoiceChatParticipants,
     getActiveCommunityVoiceChats
   }
 }

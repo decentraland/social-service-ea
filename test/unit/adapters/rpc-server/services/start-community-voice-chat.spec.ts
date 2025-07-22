@@ -10,20 +10,14 @@ import {
 
 function createCommunityVoiceMockedComponent({
   startCommunityVoiceChat = jest.fn(),
-  endCommunityVoiceChat = jest.fn(),
   joinCommunityVoiceChat = jest.fn(),
-  leaveCommunityVoiceChat = jest.fn(),
   getCommunityVoiceChat = jest.fn(),
-  getCommunityVoiceChatParticipants = jest.fn(),
   getActiveCommunityVoiceChats = jest.fn()
 }: Partial<jest.Mocked<ICommunityVoiceComponent>>): jest.Mocked<ICommunityVoiceComponent> {
   return {
     startCommunityVoiceChat,
-    endCommunityVoiceChat,
     joinCommunityVoiceChat,
-    leaveCommunityVoiceChat,
     getCommunityVoiceChat,
-    getCommunityVoiceChatParticipants,
     getActiveCommunityVoiceChats
   }
 }
@@ -89,7 +83,7 @@ describe('when starting a community voice chat', () => {
 
       expect(result.response?.$case).toBe('invalidRequest')
       if (result.response?.$case === 'invalidRequest') {
-        expect(result.response.invalidRequest.message).toBe('Community ID is required')
+        expect(result.response.invalidRequest.message).toBe('Community ID is required and cannot be empty')
       }
     })
   })
