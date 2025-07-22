@@ -3,21 +3,21 @@ import { AppComponents } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import { BannedMemberProfile, BannedMember, ICommunityBansComponent } from './types'
 import { mapMembersWithProfiles } from './utils'
-import { EthAddress, PaginatedParameters } from '@dcl/schemas'
+import { EthAddress, Events, PaginatedParameters } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
 
 export async function createCommunityBansComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'pubsub'>
+  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'pubsub' | 'sns'>
 ): Promise<ICommunityBansComponent> {
-  const { communitiesDb, catalystClient, communityRoles, logs, pubsub } = components
+  const { communitiesDb, catalystClient, communityRoles, logs, pubsub, sns } = components
 
   const logger = logs.getLogger('community-bans-component')
 
   return {
     banMember: async (communityId: string, bannerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
-      const communityExists = await communitiesDb.communityExists(communityId)
+      const community = await communitiesDb.getCommunity(communityId)
 
-      if (!communityExists) {
+      if (!community) {
         throw new CommunityNotFoundError(communityId)
       }
 
@@ -35,6 +35,19 @@ export async function createCommunityBansComponent(
         communityId,
         memberAddress: targetAddress,
         status: ConnectivityStatus.OFFLINE
+      })
+
+      const timestamp = Date.now()
+      await sns.publishMessage({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.MEMBER_BANNED,
+        key: `${communityId}-${targetAddress}-${timestamp}`,
+        timestamp,
+        metadata: {
+          id: communityId,
+          name: community.name,
+          memberAddress: targetAddress
+        }
       })
     },
 

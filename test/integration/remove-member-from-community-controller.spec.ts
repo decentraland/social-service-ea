@@ -3,6 +3,7 @@ import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { mockCommunity } from '../mocks/communities'
 import { randomUUID } from 'crypto'
+import { Events } from '@dcl/schemas'
 
 test('Remove Member from Community Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -224,6 +225,26 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
               expect(response.status).toBe(204)
             })
 
+            it('should publish event to notify member kick', async () => {
+              await makeRequest(
+                identity,
+                `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+                'DELETE'
+              )
+
+              expect(spyComponents.sns.publishMessage).toHaveBeenCalledWith({
+                type: Events.Type.COMMUNITY,
+                subType: Events.SubType.Community.MEMBER_REMOVED,
+                key: `${communityId}-${targetMemberAddress}-${Date.now()}`,
+                timestamp: expect.any(Number),
+                metadata: {
+                  id: communityId,
+                  name: expect.any(String),
+                  memberAddress: targetMemberAddress
+                }
+              })
+            })
+
             it('should respond with a 401 status code when trying to kick another moderator', async () => {
               const response = await makeRequest(
                 identity,
@@ -269,6 +290,26 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
                 'DELETE'
               )
               expect(response.status).toBe(204)
+            })
+
+            it('should publish event to notify member kick', async () => {
+              await makeRequest(
+                identity,
+                `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+                'DELETE'
+              )
+
+              expect(spyComponents.sns.publishMessage).toHaveBeenCalledWith({
+                type: Events.Type.COMMUNITY,
+                subType: Events.SubType.Community.MEMBER_REMOVED,
+                key: `${communityId}-${targetMemberAddress}-${Date.now()}`,
+                timestamp: expect.any(Number),
+                metadata: {
+                  id: communityId,
+                  name: expect.any(String),
+                  memberAddress: targetMemberAddress
+                }
+              })
             })
 
             it('should respond with a 204 status code when kicking a moderator', async () => {

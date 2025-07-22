@@ -178,14 +178,16 @@ export async function initComponents(): Promise<AppComponents> {
     logs,
     catalystClient,
     peersStats,
-    pubsub
+    pubsub,
+    sns
   })
   const communityBans = await createCommunityBansComponent({
     communitiesDb,
     communityRoles,
     logs,
     catalystClient,
-    pubsub
+    pubsub,
+    sns
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
@@ -197,10 +199,11 @@ export async function initComponents(): Promise<AppComponents> {
     communityOwners,
     communityEvents,
     cdnCacheInvalidator,
+    commsGatekeeper,
+    sns,
     logs,
     storage,
-    config,
-    commsGatekeeper
+    config
   })
 
   const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })

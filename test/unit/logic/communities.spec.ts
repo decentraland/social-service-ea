@@ -21,6 +21,8 @@ import {
 import { createMockProfile } from '../../mocks/profile'
 import { Community } from '../../../src/logic/community/types'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
+import { mockSns } from '../../mocks/components/sns'
+import { Events } from '@dcl/schemas'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -60,10 +62,11 @@ describe('Community Component', () => {
       communityOwners: mockCommunityOwners,
       communityEvents: mockCommunityEvents,
       cdnCacheInvalidator: mockCdnCacheInvalidator,
+      commsGatekeeper: mockCommsGatekeeper,
+      sns: mockSns,
       logs: mockLogs,
       storage: mockStorage,
-      config: mockConfig,
-      commsGatekeeper: mockCommsGatekeeper
+      config: mockConfig
     })
   })
 
@@ -749,6 +752,21 @@ describe('Community Component', () => {
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommunitiesDB.deleteCommunity).toHaveBeenCalledWith(communityId)
         })
+
+        it('should publish a community deleted event', async () => {
+          await communityComponent.deleteCommunity(communityId, userAddress)
+
+          expect(mockSns.publishMessage).toHaveBeenCalledWith({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED,
+            key: communityId,
+            timestamp: expect.any(Number),
+            metadata: {
+              id: communityId,
+              name: community.name
+            }
+          })
+        })
       })
 
       describe('and the user is not the owner', () => {
@@ -882,6 +900,18 @@ describe('Community Component', () => {
                   userAddress,
                   updatesWithoutThumbnail.placeIds
                 )
+
+                expect(mockSns.publishMessage).toHaveBeenCalledWith({
+                  type: Events.Type.COMMUNITY,
+                  subType: Events.SubType.Community.RENAMED,
+                  key: `${communityId}-${updatesWithoutThumbnail.name.trim().toLowerCase().replace(/ /g, '-')}-${community.name.trim().toLowerCase().replace(/ /g, '-')}`,
+                  timestamp: expect.any(Number),
+                  metadata: {
+                    id: communityId,
+                    oldName: community.name,
+                    newName: updatesWithoutThumbnail.name
+                  }
+                })
               })
             })
 
