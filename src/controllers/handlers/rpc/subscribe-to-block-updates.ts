@@ -1,7 +1,7 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { RpcServerContext, RPCServiceContext, SubscriptionEventsEmitter } from '../../../types'
 import { BlockUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { parseEmittedUpdateToBlockUpdate } from '../../../logic/blocks'
+import { parseEmittedUpdateToBlockUpdate } from '../../../logic/friends'
 
 export function subscribeToBlockUpdatesService({
   components: { logs, updateHandler }

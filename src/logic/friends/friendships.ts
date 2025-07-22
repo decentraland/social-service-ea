@@ -5,10 +5,10 @@ import {
   FriendConnectivityUpdate,
   FriendshipRequestResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Action, FriendshipAction, FriendshipRequest, FriendshipStatus, SubscriptionEventsEmitter } from '../types'
-import { normalizeAddress } from '../utils/address'
-import { parseProfileToFriend } from './friends'
-import { getProfileUserId } from './profiles'
+import { Action, FriendshipAction, FriendshipRequest, FriendshipStatus, SubscriptionEventsEmitter } from '../../types'
+import { normalizeAddress } from '../../utils/address'
+import { parseProfileToFriend } from '.'
+import { getProfileUserId } from '../profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 // [to]: [from]

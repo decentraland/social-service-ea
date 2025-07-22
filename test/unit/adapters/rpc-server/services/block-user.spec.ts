@@ -5,7 +5,7 @@ import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { PoolClient } from 'pg'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
-import { parseProfileToBlockedUser } from '../../../../../src/logic/blocks'
+import { parseProfileToBlockedUser } from '../../../../../src/logic/friends'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { EthAddress } from '@dcl/schemas'
 describe('blockUserService', () => {

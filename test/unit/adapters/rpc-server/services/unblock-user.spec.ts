@@ -4,7 +4,7 @@ import { UnblockUserPayload } from '@dcl/protocol/out-js/decentraland/social_ser
 import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { PoolClient } from 'pg'
-import { parseProfileToBlockedUser } from '../../../../../src/logic/blocks'
+import { parseProfileToBlockedUser } from '../../../../../src/logic/friends'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
 import { EthAddress } from '@dcl/schemas'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'

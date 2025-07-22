@@ -7,9 +7,7 @@ import {
   PaginatedFriendsProfilesResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
-export function getFriendsService({
-  components: { logs, friendsDb, catalystClient }
-}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient'>) {
+export function getFriendsService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('get-friends-service')
 
   return async function (
@@ -20,15 +18,10 @@ export function getFriendsService({
     const { address: loggedUserAddress } = context
 
     try {
-      const [friends, total] = await Promise.all([
-        friendsDb.getFriends(loggedUserAddress, { pagination, onlyActive: true }),
-        friendsDb.getFriendsCount(loggedUserAddress, { onlyActive: true })
-      ])
-
-      const profiles = await catalystClient.getProfiles(friends.map((friend) => friend.address))
+      const { friendsProfiles, total } = await friends.getFriendsProfiles(loggedUserAddress, pagination)
 
       return {
-        friends: parseProfilesToFriends(profiles),
+        friends: parseProfilesToFriends(friendsProfiles),
         paginationData: {
           total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)

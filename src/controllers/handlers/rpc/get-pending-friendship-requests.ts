@@ -1,4 +1,4 @@
-import { parseFriendshipRequestsToFriendshipRequestResponses } from '../../../logic/friendships'
+import { parseFriendshipRequestsToFriendshipRequestResponses } from '../../../logic/friends'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   PaginatedFriendshipRequestsResponse,

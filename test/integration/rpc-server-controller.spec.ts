@@ -14,8 +14,8 @@ import {
   removeFriendship,
   removeSocialSettings
 } from './utils/friendships'
-import { parseProfileToBlockedUser } from '../../src/logic/blocks'
 import { PrivateMessagesPrivacy, User, CommunityRole } from '../../src/types'
+import { parseProfileToBlockedUser } from '../../src/logic/friends'
 
 test('RPC Server Controller', function ({ components, stubComponents }) {
   beforeAll(async () => {

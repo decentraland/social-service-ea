@@ -1,7 +1,7 @@
 import { mockCatalystClient, mockFriendsDB, mockLogs, mockPubSub } from '../../../../mocks/components'
 import { upsertFriendshipService } from '../../../../../src/controllers/handlers/rpc/upsert-friendship'
 import { Action, FriendshipStatus, RpcServerContext } from '../../../../../src/types'
-import * as FriendshipsLogic from '../../../../../src/logic/friendships'
+import * as FriendshipsLogic from '../../../../../src/logic/friends'
 import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse
@@ -9,13 +9,13 @@ import {
 import {
   ParsedUpsertFriendshipRequest,
   parseFriendshipRequestToFriendshipRequestResponse
-} from '../../../../../src/logic/friendships'
+} from '../../../../../src/logic/friends'
 import { FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
 import { createMockProfile } from '../../../../mocks/profile'
 import { mockSns } from '../../../../mocks/components/sns'
 import * as Notifications from '../../../../../src/logic/notifications'
 
-jest.mock('../../../../../src/logic/friendships')
+jest.mock('../../../../../src/logic/friends')
 
 describe('upsertFriendshipService', () => {
   let upsertFriendship: ReturnType<typeof upsertFriendshipService>

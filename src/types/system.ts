@@ -57,6 +57,7 @@ import { IPeersStatsComponent } from '../logic/peers-stats'
 import { IJobComponent } from '../logic/job'
 import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
+import { IFriendsComponent } from '../logic/friends'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -114,6 +115,7 @@ export type BaseComponents = {
   worldsStats: IWorldsStatsComponent
   wsPool: IWsPoolComponent
   cdnCacheInvalidator: ICdnCacheInvalidatorComponent
+  friends: IFriendsComponent
 }
 
 // components used in runtime

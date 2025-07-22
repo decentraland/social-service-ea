@@ -1,88 +1,103 @@
-import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../../../mocks/components'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getFriendsService } from '../../../../../src/controllers/handlers/rpc/get-friends'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
-import { createMockFriend, parseExpectedFriends } from '../../../../mocks/friend'
+import { parseExpectedFriends } from '../../../../mocks/friend'
+import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('getFriendsService', () => {
+describe('Get Friends Service', () => {
   let getFriends: ReturnType<typeof getFriendsService>
+  const parseFriend = parseExpectedFriends()
+  let friendsComponent: IFriendsComponent
+  let getFriendsProfiles: jest.MockedFunction<typeof friendsComponent.getFriendsProfiles>
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
     subscribersContext: undefined
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    getFriendsProfiles = jest.fn()
+    friendsComponent = createFriendsMockedComponent({
+      getFriendsProfiles
+    })
+
     getFriends = getFriendsService({
-      components: { friendsDb: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
+      components: { friends: friendsComponent, logs: mockLogs }
     })
   })
 
-  it('should return the correct list of friends with pagination data', async () => {
-    const addresses = ['0x456', '0x789', '0x987']
-    const mockFriends = addresses.map(createMockFriend)
-    const mockProfiles = addresses.map(createMockProfile)
-    const totalFriends = 2
+  describe('when getting the users friends fails', () => {
+    beforeEach(() => {
+      getFriendsProfiles.mockRejectedValue(new Error('Database error'))
+    })
 
-    mockFriendsDB.getFriends.mockResolvedValueOnce(mockFriends)
-    mockFriendsDB.getFriendsCount.mockResolvedValueOnce(totalFriends)
-    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
+    it('should return an empty list', async () => {
+      const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
-    const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
-
-    expect(response).toEqual({
-      friends: mockProfiles.map(parseExpectedFriends()),
-      paginationData: {
-        total: totalFriends,
-        page: 1
-      }
+      expect(response).toEqual({
+        friends: [],
+        paginationData: {
+          total: 0,
+          page: 1
+        }
+      })
     })
   })
 
-  it('should return an empty list if no friends are found', async () => {
-    mockFriendsDB.getFriends.mockResolvedValueOnce([])
-    mockFriendsDB.getFriendsCount.mockResolvedValueOnce(0)
+  describe('when getting the users friends succeeds', () => {
+    let friendsData: {
+      friendsProfiles: Profile[]
+      total: number
+    }
 
-    const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
-
-    expect(response).toEqual({
-      friends: [],
-      paginationData: {
-        total: 0,
-        page: 1
+    beforeEach(() => {
+      friendsData = {
+        friendsProfiles: [],
+        total: 0
       }
-    })
-  })
-
-  it('should handle errors from the database gracefully', async () => {
-    mockFriendsDB.getFriends.mockImplementationOnce(() => {
-      throw new Error('Database error')
+      getFriendsProfiles.mockResolvedValue(friendsData)
     })
 
-    const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
+    describe('and there are no friends', () => {
+      beforeEach(() => {
+        friendsData.friendsProfiles = []
+        friendsData.total = 0
+      })
 
-    expect(response).toEqual({
-      friends: [],
-      paginationData: {
-        total: 0,
-        page: 1
-      }
+      it('should return an empty list', async () => {
+        const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
+
+        expect(getFriendsProfiles).toHaveBeenCalledWith(rpcContext.address, { limit: 10, offset: 0 })
+        expect(response).toEqual({
+          friends: [],
+          paginationData: {
+            total: 0,
+            page: 1
+          }
+        })
+      })
     })
-  })
 
-  it('should handle errors from the catalyst gracefully', async () => {
-    mockCatalystClient.getProfiles.mockImplementationOnce(() => {
-      throw new Error('Catalyst error')
-    })
+    describe(`and there are multiple friends`, () => {
+      beforeEach(() => {
+        friendsData.friendsProfiles = [createMockProfile('0x123'), createMockProfile('0x456')]
+        friendsData.total = 2
+      })
 
-    const response = await getFriends({ pagination: { limit: 10, offset: 0 } }, rpcContext)
+      it('should return the list of friends with the pagination data for the page', async () => {
+        const response = await getFriends({ pagination: { limit: 2, offset: 0 } }, rpcContext)
 
-    expect(response).toEqual({
-      friends: [],
-      paginationData: {
-        total: 0,
-        page: 1
-      }
+        expect(getFriendsProfiles).toHaveBeenCalledWith(rpcContext.address, { limit: 2, offset: 0 })
+        expect(response).toEqual({
+          friends: [parseFriend(friendsData.friendsProfiles[0]), parseFriend(friendsData.friendsProfiles[1])],
+          paginationData: {
+            total: friendsData.total,
+            page: 1
+          }
+        })
+      })
     })
   })
 })
