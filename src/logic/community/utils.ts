@@ -5,9 +5,9 @@ import { getProfileUserId, getProfileInfo } from '../profiles'
 import {
   Community,
   CommunityWithUserInformation,
-  CommunityWithMembersCount,
   CommunityWithMembersCountAndFriends,
   CommunityPublicInformation,
+  CommunityWithMembersCountAndVoiceChatStatus,
   CommunityWithOwnerName
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
@@ -34,11 +34,18 @@ const toBaseCommunity = <T extends { membersCount: number | string }>(community:
 
 export const toCommunityWithMembersCount = (
   community: CommunityWithOwnerName & { role: CommunityRole },
-  membersCount: number
-): CommunityWithMembersCount => {
+  membersCount: number,
+  voiceChatStatus: {
+    isActive: boolean
+    participantCount: number
+    moderatorCount: number
+  } | null
+): CommunityWithMembersCountAndVoiceChatStatus => {
   return withMembersCount({
     ...community,
-    membersCount
+    ownerAddress: community.ownerAddress,
+    membersCount,
+    voiceChatStatus
   })
 }
 

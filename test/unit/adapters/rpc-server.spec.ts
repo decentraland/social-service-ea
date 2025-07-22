@@ -8,11 +8,13 @@ import {
   COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
   FRIEND_STATUS_UPDATES_CHANNEL,
   FRIENDSHIP_UPDATES_CHANNEL,
-  PRIVATE_VOICE_CHAT_UPDATES_CHANNEL
+  PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
+  COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL
 } from '../../../src/adapters/pubsub'
 import { createVoiceMockedComponent } from '../../mocks/components/voice'
 import { setupRpcRoutes } from '../../../src/controllers/routes/rpc.routes'
 import { createMockUpdateHandlerComponent } from '../../mocks/components/updates'
+import { ICommunityVoiceComponent } from '../../../src/logic/community-voice'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -29,6 +31,7 @@ describe('createRpcServerComponent', () => {
   let subscribersContext: ISubscribersContext
   let endIncomingOrOutgoingPrivateVoiceChatForUserMock: jest.Mock
   let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
+  let mockCommunityVoice: jest.Mocked<ICommunityVoiceComponent>
 
   beforeEach(async () => {
     endIncomingOrOutgoingPrivateVoiceChatForUserMock = jest.fn()
@@ -115,6 +118,10 @@ describe('createRpcServerComponent', () => {
           PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
           expect.any(Function)
         )
+        expect(mockPubSub.subscribeToChannel).toHaveBeenCalledWith(
+          COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
+          expect.any(Function)
+        )
       })
 
       it('should wire the updateHandler component to pubsub channels', async () => {
@@ -134,6 +141,10 @@ describe('createRpcServerComponent', () => {
           {
             channel: COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
             handler: mockUpdateHandler.communityMemberStatusHandler
+          },
+          {
+            channel: COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
+            handler: mockUpdateHandler.communityVoiceChatUpdateHandler
           }
         ]
 

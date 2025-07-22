@@ -8,7 +8,8 @@ export function createMockUpdateHandlerComponent({
   blockUpdateHandler = jest.fn(),
   privateVoiceChatUpdateHandler = jest.fn(),
   communityMemberStatusHandler = jest.fn(),
-  handleSubscriptionUpdates = jest.fn()
+  handleSubscriptionUpdates = jest.fn(),
+  communityVoiceChatUpdateHandler = jest.fn()
 }: Partial<jest.Mocked<IUpdateHandlerComponent>>): jest.Mocked<IUpdateHandlerComponent> {
   return {
     friendshipUpdateHandler,
@@ -18,6 +19,7 @@ export function createMockUpdateHandlerComponent({
     blockUpdateHandler,
     privateVoiceChatUpdateHandler,
     communityMemberStatusHandler,
-    handleSubscriptionUpdates
+    handleSubscriptionUpdates,
+    communityVoiceChatUpdateHandler
   }
 }

@@ -15,6 +15,12 @@ test('Get Community Controller', function ({ components, spyComponents }) {
     beforeEach(async () => {
       identity = await createTestIdentity()
       address = identity.realAccount.address.toLowerCase()
+      // Mock the comms gatekeeper to return a default voice chat status
+      spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+        isActive: true,
+        participantCount: 2,
+        moderatorCount: 1
+      })
     })
 
     describe('and the request is not signed', () => {
@@ -30,6 +36,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
         it('should respond with a 404 status code', async () => {
           const nonExistentId = randomUUID()
           const response = await makeRequest(identity, `/v1/communities/${nonExistentId}`)
+          spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
           expect(response.status).toBe(404)
         })
       })
@@ -82,8 +89,27 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                   privacy: 'public',
                   active: true,
                   role: CommunityRole.None,
-                  membersCount: 0
+                  membersCount: 0,
+                  voiceChatStatus: {
+                    isActive: true,
+                    participantCount: 2,
+                    moderatorCount: 1
+                  }
                 }
+              })
+            })
+
+            describe('and the community has no active voice chat', () => {
+              beforeEach(async () => {
+                spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
+              })
+
+              it('should return null for voice chat status', async () => {
+                const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+                const body = await response.json()
+
+                expect(response.status).toBe(200)
+                expect(body.data.voiceChatStatus).toBeNull()
               })
             })
 
@@ -130,7 +156,12 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                   privacy: 'public',
                   active: true,
                   role: CommunityRole.None,
-                  membersCount: 0
+                  membersCount: 0,
+                  voiceChatStatus: {
+                    isActive: true,
+                    participantCount: 2,
+                    moderatorCount: 1
+                  }
                 }
               })
             })
