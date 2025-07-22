@@ -34,7 +34,7 @@ export type User = {
   address: string
 }
 
-export type BlockUserWithDate = User & {
+export type BlockedUserWithDate = User & {
   blocked_at: Date
 }
 

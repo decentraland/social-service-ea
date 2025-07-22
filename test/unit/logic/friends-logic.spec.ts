@@ -294,6 +294,145 @@ describe('Friends Component', () => {
     })
   })
 
+  describe('when getting blocked users', () => {
+    describe('and the user has blocked users', () => {
+      const mockBlockedUsers = [
+        { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
+        { address: '0xblocked2', blocked_at: new Date('2023-01-02') },
+        { address: '0xblocked3', blocked_at: new Date('2023-01-03') }
+      ]
+      const mockProfiles = [
+        createMockProfile('0xblocked1'),
+        createMockProfile('0xblocked2'),
+        createMockProfile('0xblocked3')
+      ]
+
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
+        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+      })
+
+      it('should return blocked users with profiles and total count', async () => {
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+
+        expect(result).toEqual({
+          blockedUsers: mockBlockedUsers,
+          blockedProfiles: mockProfiles,
+          total: 3
+        })
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
+      })
+    })
+
+    describe('and the user has no blocked users', () => {
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue([])
+        mockCatalystClient.getProfiles.mockResolvedValue([])
+      })
+
+      it('should return empty arrays with zero total', async () => {
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+
+        expect(result).toEqual({
+          blockedUsers: [],
+          blockedProfiles: [],
+          total: 0
+        })
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+      })
+    })
+
+    describe('and the database returns an error', () => {
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockRejectedValue(new Error('Database connection failed'))
+      })
+
+      it('should propagate the error', async () => {
+        await expect(friendsComponent.getBlockedUsers(mockUserAddress)).rejects.toThrow('Database connection failed')
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the catalyst client returns an error', () => {
+      const mockBlockedUsers = [
+        { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
+        { address: '0xblocked2', blocked_at: new Date('2023-01-02') }
+      ]
+
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
+        mockCatalystClient.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
+      })
+
+      it('should propagate the error', async () => {
+        await expect(friendsComponent.getBlockedUsers(mockUserAddress)).rejects.toThrow('Catalyst service unavailable')
+
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2'])
+      })
+    })
+
+    describe('and the catalyst client returns fewer profiles than expected', () => {
+      const mockBlockedUsers = [
+        { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
+        { address: '0xblocked2', blocked_at: new Date('2023-01-02') },
+        { address: '0xblocked3', blocked_at: new Date('2023-01-03') }
+      ]
+
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
+        // Catalyst returns only 2 profiles instead of 3
+        mockCatalystClient.getProfiles.mockResolvedValue([
+          createMockProfile('0xblocked1'),
+          createMockProfile('0xblocked2')
+        ])
+      })
+
+      it('should return the profiles that were successfully retrieved', async () => {
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+
+        expect(result).toEqual({
+          blockedUsers: mockBlockedUsers,
+          blockedProfiles: [createMockProfile('0xblocked1'), createMockProfile('0xblocked2')],
+          total: 3
+        })
+
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
+      })
+    })
+
+    describe('and the catalyst client returns more profiles than expected', () => {
+      const mockBlockedUsers = [{ address: '0xblocked1', blocked_at: new Date('2023-01-01') }]
+
+      beforeEach(() => {
+        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
+        // Catalyst returns 2 profiles instead of 1
+        mockCatalystClient.getProfiles.mockResolvedValue([
+          createMockProfile('0xblocked1'),
+          createMockProfile('0xblocked2')
+        ])
+      })
+
+      it('should return all profiles from catalyst', async () => {
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+
+        expect(result).toEqual({
+          blockedUsers: mockBlockedUsers,
+          blockedProfiles: [createMockProfile('0xblocked1'), createMockProfile('0xblocked2')],
+          total: 1
+        })
+
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1'])
+      })
+    })
+  })
+
   describe('when blocking a user', () => {
     let mockProfile: Profile
     let mockClient: jest.Mocked<PoolClient>

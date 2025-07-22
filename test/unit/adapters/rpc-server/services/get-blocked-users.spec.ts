@@ -1,12 +1,14 @@
-import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../../../mocks/components'
+import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getBlockedUsersService } from '../../../../../src/controllers/handlers/rpc/get-blocked-users'
-import { GetBlockedUsersPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfilesToBlockedUsers } from '../../../../../src/logic/friends'
+import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('getBlockedUsersService', () => {
+describe('Get Blocked Users Service', () => {
   let getBlockedUsers: ReturnType<typeof getBlockedUsersService>
+  let friendsComponent: IFriendsComponent
+  let getBlockedUsersMethod: jest.MockedFunction<typeof friendsComponent.getBlockedUsers>
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
@@ -14,65 +16,94 @@ describe('getBlockedUsersService', () => {
   }
 
   beforeEach(() => {
+    getBlockedUsersMethod = jest.fn()
+    friendsComponent = createFriendsMockedComponent({
+      getBlockedUsers: getBlockedUsersMethod
+    })
+
     getBlockedUsers = getBlockedUsersService({
-      components: { friendsDb: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient }
+      components: { friends: friendsComponent, logs: mockLogs }
     })
   })
 
-  it('should return blocked users with profiles and pagination', async () => {
-    const blockedUsers = [
-      { address: '0x456', blocked_at: new Date() },
-      { address: '0x789', blocked_at: new Date() }
-    ]
-    const mockProfiles = blockedUsers.map((user) => createMockProfile(user.address))
-    const request: GetBlockedUsersPayload = {
-      pagination: { limit: 10, offset: 0 }
+  describe('when getting the users blocked users fails', () => {
+    beforeEach(() => {
+      getBlockedUsersMethod.mockRejectedValue(new Error('Database error'))
+    })
+
+    it('should return an empty list', async () => {
+      const response = await getBlockedUsers({ pagination: { limit: 10, offset: 0 } }, rpcContext)
+
+      expect(response).toEqual({
+        profiles: [],
+        paginationData: {
+          total: 0,
+          page: 1
+        }
+      })
+    })
+  })
+
+  describe('when getting the users blocked users succeeds', () => {
+    let blockedUsersData: {
+      blockedUsers: Array<{ address: string; blocked_at: Date }>
+      blockedProfiles: any[]
+      total: number
     }
 
-    mockFriendsDB.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
-    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
-
-    const response = await getBlockedUsers(request, rpcContext)
-
-    expect(response).toEqual({
-      profiles: parseProfilesToBlockedUsers(mockProfiles, blockedUsers),
-      paginationData: {
-        total: blockedUsers.length,
-        page: 1
+    beforeEach(() => {
+      blockedUsersData = {
+        blockedUsers: [],
+        blockedProfiles: [],
+        total: 0
       }
+      getBlockedUsersMethod.mockResolvedValue(blockedUsersData)
     })
-    expect(mockLogs.getLogger('get-blocked-users-service')).toBeDefined()
-  })
 
-  it('should use default pagination when not provided', async () => {
-    const blockedUsers = [{ address: '0x456', blocked_at: new Date() }]
-    const mockProfiles = blockedUsers.map((user) => createMockProfile(user.address))
-    const request: GetBlockedUsersPayload = {}
+    describe('and there are no blocked users', () => {
+      beforeEach(() => {
+        blockedUsersData.blockedUsers = []
+        blockedUsersData.blockedProfiles = []
+        blockedUsersData.total = 0
+      })
 
-    mockFriendsDB.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
-    mockCatalystClient.getProfiles.mockResolvedValueOnce(mockProfiles)
+      it('should return an empty list', async () => {
+        const response = await getBlockedUsers({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
-    const response = await getBlockedUsers(request, rpcContext)
-
-    expect(response.paginationData.page).toBe(1)
-    expect(response.profiles).toEqual(parseProfilesToBlockedUsers(mockProfiles, blockedUsers))
-  })
-
-  it('should handle errors gracefully', async () => {
-    const error = new Error('Database error')
-    const request: GetBlockedUsersPayload = {}
-
-    mockFriendsDB.getBlockedUsers.mockRejectedValueOnce(error)
-
-    const response = await getBlockedUsers(request, rpcContext)
-
-    expect(response).toEqual({
-      profiles: [],
-      paginationData: {
-        total: 0,
-        page: 1
-      }
+        expect(getBlockedUsersMethod).toHaveBeenCalledWith(rpcContext.address)
+        expect(response).toEqual({
+          profiles: [],
+          paginationData: {
+            total: 0,
+            page: 1
+          }
+        })
+      })
     })
-    expect(mockLogs.getLogger('get-blocked-users-service')).toBeDefined()
+
+    describe('and there are multiple blocked users', () => {
+      beforeEach(() => {
+        const mockProfiles = [createMockProfile('0x456'), createMockProfile('0x789')]
+        blockedUsersData.blockedUsers = [
+          { address: '0x456', blocked_at: new Date() },
+          { address: '0x789', blocked_at: new Date() }
+        ]
+        blockedUsersData.blockedProfiles = mockProfiles
+        blockedUsersData.total = 2
+      })
+
+      it('should return the list of blocked users with the pagination data for the page', async () => {
+        const response = await getBlockedUsers({ pagination: { limit: 2, offset: 0 } }, rpcContext)
+
+        expect(getBlockedUsersMethod).toHaveBeenCalledWith(rpcContext.address)
+        expect(response).toEqual({
+          profiles: parseProfilesToBlockedUsers(blockedUsersData.blockedProfiles, blockedUsersData.blockedUsers),
+          paginationData: {
+            total: blockedUsersData.total,
+            page: 1
+          }
+        })
+      })
+    })
   })
 })

@@ -1,5 +1,5 @@
 import { EthAddress } from '@dcl/schemas'
-import { Action, AppComponents } from '../../types'
+import { Action, AppComponents, BlockedUserWithDate } from '../../types'
 import { BlockedUser, IFriendsComponent } from './types'
 import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
@@ -67,6 +67,19 @@ export async function createFriendsComponent(
       ])
 
       return { profile, blockedAt }
+    },
+    getBlockedUsers: async (
+      userAddress: string
+    ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }> => {
+      const blockedUsers = await friendsDb.getBlockedUsers(userAddress)
+      const blockedAddresses = blockedUsers.map((user) => user.address)
+      const profiles = await catalystClient.getProfiles(blockedAddresses)
+
+      return {
+        blockedUsers,
+        blockedProfiles: profiles,
+        total: blockedAddresses.length
+      }
     }
   }
 }

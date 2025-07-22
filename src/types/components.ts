@@ -21,7 +21,7 @@ import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-t
 import { SQLStatement } from 'sql-template-strings'
 import {
   Action,
-  BlockUserWithDate,
+  BlockedUserWithDate,
   CommunityRole,
   Friendship,
   FriendshipAction,
@@ -120,8 +120,8 @@ export interface IFriendsDatabaseComponent {
   unblockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<void>
   blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
-  getBlockedUsers(blockerAddress: string): Promise<BlockUserWithDate[]>
-  getBlockedByUsers(blockedAddress: string): Promise<BlockUserWithDate[]>
+  getBlockedUsers(blockerAddress: string): Promise<BlockedUserWithDate[]>
+  getBlockedByUsers(blockedAddress: string): Promise<BlockedUserWithDate[]>
   isFriendshipBlocked(blockerAddress: string, blockedAddress: string): Promise<boolean>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
 }
