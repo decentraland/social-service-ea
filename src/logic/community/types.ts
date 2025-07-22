@@ -6,7 +6,7 @@ import { CommunityRole, Action } from '../../types/entities'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export interface ICommunitiesComponent {
-  getCommunity(id: string, userAddress: EthAddress): Promise<CommunityWithMembersCountAndVoiceChatStatus>
+  getCommunity(id: string, userAddress: EthAddress): Promise<AggregatedCommunityWithMemberAndVoiceChatData>
   getCommunities(
     userAddress: string,
     options: GetCommunitiesOptions
@@ -210,7 +210,7 @@ export type BannedMemberProfile = BannedMember & {
   friendshipStatus: FriendshipStatus
 }
 
-export type AggregatedCommunityWithMembersData = AggregatedCommunity & {
+export type AggregatedCommunityWithMemberData = AggregatedCommunity & {
   role: CommunityRole
   membersCount: number
 }
@@ -221,11 +221,11 @@ export type CommunityVoiceChatStatus = {
   moderatorCount: number
 }
 
-export type CommunityWithMembersCountAndVoiceChatStatus = AggregatedCommunityWithMembersData & {
+export type AggregatedCommunityWithMemberAndVoiceChatData = AggregatedCommunityWithMemberData & {
   voiceChatStatus: CommunityVoiceChatStatus | null
 }
 
-export type AggregatedCommunityWithMembersAndFriendsData = AggregatedCommunityWithMembersData & {
+export type AggregatedCommunityWithMemberAndFriendsData = AggregatedCommunityWithMemberData & {
   friends: string[]
 }
 
@@ -242,7 +242,7 @@ export type GetCommunityMembersOptions = {
   onlyOnline?: boolean
 }
 
-export type CommunityWithUserInformation = AggregatedCommunityWithMembersData & {
+export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
   friends: FriendProfile[]
   isLive: boolean
 }

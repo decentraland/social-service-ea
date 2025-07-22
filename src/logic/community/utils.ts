@@ -5,8 +5,8 @@ import { getProfileUserId, getProfileInfo } from '../profiles'
 import {
   Community,
   CommunityWithUserInformation,
-  CommunityWithMembersCountAndVoiceChatStatus,
-  AggregatedCommunityWithMembersAndFriendsData,
+  AggregatedCommunityWithMemberAndVoiceChatData,
+  AggregatedCommunityWithMemberAndFriendsData,
   CommunityPublicInformation,
   AggregatedCommunity
 } from './types'
@@ -40,7 +40,7 @@ export const toCommunityWithMembersCount = (
     participantCount: number
     moderatorCount: number
   } | null
-): CommunityWithMembersCountAndVoiceChatStatus => {
+): AggregatedCommunityWithMemberAndVoiceChatData => {
   return withMembersCount({
     ...community,
     ownerAddress: community.ownerAddress,
@@ -50,7 +50,7 @@ export const toCommunityWithMembersCount = (
 }
 
 export const toCommunityWithUserInformation = (
-  community: AggregatedCommunityWithMembersAndFriendsData,
+  community: AggregatedCommunityWithMemberAndFriendsData,
   profilesMap: Map<string, Profile>
 ): CommunityWithUserInformation => {
   const friendsProfiles = community.friends.map((friend) => profilesMap.get(friend)).filter(Boolean) as Profile[]
@@ -63,7 +63,7 @@ export const toCommunityWithUserInformation = (
 }
 
 export const toCommunityResults = (
-  communities: AggregatedCommunityWithMembersAndFriendsData[],
+  communities: AggregatedCommunityWithMemberAndFriendsData[],
   friendsProfiles: Profile[]
 ): CommunityWithUserInformation[] => {
   const profilesMap = new Map(friendsProfiles.map((profile) => [getProfileUserId(profile), profile]))

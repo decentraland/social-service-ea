@@ -1,7 +1,7 @@
 import { AppComponents } from '../../types'
 import { ICommunityEventsComponent } from './types'
 
-export interface Event {
+type Event = {
   id: string
   name: string
   image?: string
@@ -52,7 +52,7 @@ export interface Event {
   place_id?: string
 }
 
-export interface EventsResponse {
+type EventsResponse = {
   ok: boolean
   data: Event[]
   total?: number
@@ -79,7 +79,7 @@ export async function createCommunityEventsComponent(
         return false
       }
 
-      const result = await response.json()
+      const result: EventsResponse = await response.json()
       const hasLiveEvents = result.ok && result.data && result.data.length > 0
 
       let ttlInSeconds = 60 * 10 // Default TTL: 10 minutes

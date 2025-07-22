@@ -36,7 +36,7 @@ import {
   Community,
   CommunityDB,
   CommunityMember,
-  AggregatedCommunityWithMembersAndFriendsData,
+  AggregatedCommunityWithMemberAndFriendsData,
   GetCommunitiesOptions,
   CommunityPublicInformation,
   MemberCommunity,
@@ -142,7 +142,7 @@ export interface ICommunitiesDatabaseComponent {
   getCommunities(
     memberAddress: EthAddress,
     options: GetCommunitiesOptions
-  ): Promise<Omit<AggregatedCommunityWithMembersAndFriendsData, 'ownerName'>[]>
+  ): Promise<Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>[]>
   getCommunitiesCount(
     memberAddress: EthAddress,
     options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf'>
