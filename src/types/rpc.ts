@@ -54,6 +54,11 @@ export type SubscriptionEventsEmitter = {
     memberAddress: EthAddress
     status: ConnectivityStatus
   }
+  communityVoiceChatUpdate: {
+    communityId: string
+    voiceChatId: string
+    status: 'started'
+  }
 }
 
 export enum CommunityLeaveReason {

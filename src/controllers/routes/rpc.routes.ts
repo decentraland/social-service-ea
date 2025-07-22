@@ -22,7 +22,14 @@ import {
   subscribeToCommunityMemberConnectivityUpdatesService,
   subscribeToFriendConnectivityUpdatesService,
   subscribeToBlockUpdatesService,
-  subscribeToPrivateVoiceChatUpdatesService
+  subscribeToPrivateVoiceChatUpdatesService,
+  startCommunityVoiceChatService,
+  joinCommunityVoiceChatService,
+  requestToSpeakInCommunityVoiceChatService,
+  promoteSpeakerInCommunityVoiceChatService,
+  demoteSpeakerInCommunityVoiceChatService,
+  kickPlayerFromCommunityVoiceChatService,
+  subscribeToCommunityVoiceChatUpdatesService
 } from '../handlers/rpc'
 import { ServiceType, StreamEvent } from '../../adapters/rpc-server/metrics-wrapper'
 
@@ -132,6 +139,35 @@ export async function setupRpcRoutes(components: AppComponents): Promise<RpcServ
       creator: subscribeToCommunityMemberConnectivityUpdatesService({ components }),
       type: ServiceType.COMMUNITIES,
       event: StreamEvent.COMMUNITY_MEMBER_CONNECTIVITY_UPDATES
+    },
+    startCommunityVoiceChat: {
+      creator: startCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    joinCommunityVoiceChat: {
+      creator: joinCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    requestToSpeakInCommunityVoiceChat: {
+      creator: requestToSpeakInCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    promoteSpeakerInCommunityVoiceChat: {
+      creator: promoteSpeakerInCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    demoteSpeakerInCommunityVoiceChat: {
+      creator: demoteSpeakerInCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    kickPlayerFromCommunityVoiceChat: {
+      creator: kickPlayerFromCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    subscribeToCommunityVoiceChatUpdates: {
+      creator: subscribeToCommunityVoiceChatUpdatesService({ components }),
+      type: ServiceType.STREAM,
+      event: StreamEvent.COMMUNITY_VOICE_CHAT_UPDATES
     }
   }
 }

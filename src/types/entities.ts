@@ -100,3 +100,41 @@ export type OwnedName = {
   contractAddress: string
   tokenId: string
 }
+
+// Community Voice Chat Types
+export type CommunityVoiceChat = {
+  id: string
+  community_id: string
+  created_by: string
+  status: CommunityVoiceChatStatus
+  created_at: Date
+  ended_at?: Date
+}
+
+export type CommunityVoiceChatParticipant = {
+  voice_chat_id: string
+  user_address: string
+  role: CommunityVoiceChatRole
+  joined_at: Date
+  left_at?: Date
+  is_requesting_to_speak: boolean
+}
+
+export enum CommunityVoiceChatStatus {
+  ACTIVE = 'active',
+  ENDED = 'ended'
+}
+
+export enum CommunityVoiceChatRole {
+  SPEAKER = 'speaker',
+  LISTENER = 'listener'
+}
+
+export enum CommunityVoiceChatUpdateStatus {
+  STARTED = 'started'
+}
+
+export type CommunityVoiceChatUpdate = {
+  communityId: string
+  status: CommunityVoiceChatUpdateStatus
+}

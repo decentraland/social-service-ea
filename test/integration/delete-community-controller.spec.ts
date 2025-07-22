@@ -44,6 +44,7 @@ test('Delete Community Controller', function ({ components, spyComponents }) {
             active: true
           })
           communityId = id
+          spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
         })
 
         describe('and the user is not the owner', () => {

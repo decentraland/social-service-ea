@@ -1,4 +1,5 @@
-import { AppComponents, ICommsGatekeeperComponent, PrivateMessagesPrivacy } from '../types'
+import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy } from '../types'
+import { CommunityVoiceChatAction, CommunityVoiceChatProfileData } from '../logic/community-voice/types'
 import { isErrorWithMessage } from '../utils/errors'
 
 export class PrivateVoiceChatNotFoundError extends Error {
@@ -147,10 +148,291 @@ export const createCommsGatekeeperComponent = async ({
     return usersInVoiceChat
   }
 
+  /**
+   * Gets credentials for a community voice chat.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user joining
+   * @param profileData - Optional profile data (name, has_claimed_name, profile_picture_url)
+   * @returns Connection credentials for the user
+   */
+  async function getCommunityVoiceChatCredentials(
+    communityId: string,
+    userAddress: string,
+    profileData?: CommunityVoiceChatProfileData | null
+  ): Promise<{ connectionUrl: string }> {
+    try {
+      const requestBody: {
+        community_id: string
+        user_address: string
+        action: CommunityVoiceChatAction
+        profile_data?: CommunityVoiceChatProfileData
+      } = {
+        community_id: communityId,
+        user_address: userAddress,
+        action: CommunityVoiceChatAction.JOIN
+      }
+
+      if (profileData) {
+        requestBody.profile_data = profileData
+      }
+
+      const response = await fetch(`${commsUrl}/community-voice-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+
+      const data = await response.json()
+      return { connectionUrl: data.connection_url }
+    } catch (error) {
+      logger.error(
+        `Failed to get community voice chat credentials for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Creates a community voice chat room.
+   * @param communityId - The ID of the community
+   * @param createdBy - The address of the moderator creating the voice chat
+   * @param profileData - Optional profile data for the creator
+   * @returns The connection URL for the moderator
+   */
+  async function createCommunityVoiceChatRoom(
+    communityId: string,
+    createdBy: string,
+    profileData?: CommunityVoiceChatProfileData | null
+  ): Promise<{ connectionUrl: string }> {
+    try {
+      const requestBody: {
+        community_id: string
+        user_address: string
+        action: CommunityVoiceChatAction
+        profile_data?: CommunityVoiceChatProfileData
+      } = {
+        community_id: communityId,
+        user_address: createdBy,
+        action: CommunityVoiceChatAction.CREATE
+      }
+
+      if (profileData) {
+        requestBody.profile_data = profileData
+      }
+
+      const response = await fetch(`${commsUrl}/community-voice-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+
+      const data = await response.json()
+      return { connectionUrl: data.connection_url }
+    } catch (error) {
+      logger.error(
+        `Failed to create community voice chat room for community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Sends a request to speak in a community voice chat.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user requesting to speak
+   */
+  async function requestToSpeakInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    try {
+      const response = await fetch(
+        `${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speak-request`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to request to speak for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Promotes a user to speaker in a community voice chat.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user to promote
+   */
+  async function promoteSpeakerInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speaker`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to promote speaker for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Demotes a user to listener in a community voice chat.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user to demote
+   */
+  async function demoteSpeakerInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speaker`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to demote speaker for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Updates user metadata in a community voice chat (legacy method for backward compatibility).
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user to update
+   * @param metadata - The metadata to update
+   */
+  async function updateUserMetadataInCommunityVoiceChat(
+    communityId: string,
+    userAddress: string,
+    metadata: { isRequestingToSpeak?: boolean; canPublishTracks?: boolean }
+  ): Promise<void> {
+    // Use the specific methods based on metadata
+    if (metadata.isRequestingToSpeak === true) {
+      return requestToSpeakInCommunityVoiceChat(communityId, userAddress)
+    } else if (metadata.canPublishTracks === true && metadata.isRequestingToSpeak === false) {
+      return promoteSpeakerInCommunityVoiceChat(communityId, userAddress)
+    } else if (metadata.canPublishTracks === false && metadata.isRequestingToSpeak === false) {
+      return demoteSpeakerInCommunityVoiceChat(communityId, userAddress)
+    }
+
+    throw new Error('Unsupported metadata combination')
+  }
+
+  /**
+   * Gets the status of a community voice chat.
+   * @param communityId - The ID of the community
+   * @returns The community voice chat status or null if not active
+   */
+  async function getCommunityVoiceChatStatus(communityId: string): Promise<{
+    isActive: boolean
+    participantCount: number
+    moderatorCount: number
+  } | null> {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/status`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        }
+      })
+
+      if (response.status === 404) {
+        return null
+      }
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+
+      const data = await response.json()
+      return {
+        isActive: data.active,
+        participantCount: data.participant_count,
+        moderatorCount: data.moderator_count
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to get community voice chat status for community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Kicks a user from a community voice chat.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user to kick
+   */
+  async function kickUserFromCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to kick user from community voice chat for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
   return {
     endPrivateVoiceChat,
     updateUserPrivateMessagePrivacyMetadata,
     isUserInAVoiceChat,
-    getPrivateVoiceChatCredentials
+    getPrivateVoiceChatCredentials,
+    getCommunityVoiceChatCredentials,
+    createCommunityVoiceChatRoom,
+    updateUserMetadataInCommunityVoiceChat,
+    requestToSpeakInCommunityVoiceChat,
+    promoteSpeakerInCommunityVoiceChat,
+    demoteSpeakerInCommunityVoiceChat,
+    getCommunityVoiceChatStatus,
+    kickUserFromCommunityVoiceChat
   }
 }
