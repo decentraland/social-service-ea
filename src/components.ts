@@ -37,6 +37,7 @@ import {
   createCommunityMembersComponent,
   createCommunityRolesComponent,
   createCommunityOwnersComponent,
+  createCommunityPlacesComponent,
   createCommunityEventsComponent
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
@@ -46,7 +47,6 @@ import { createSqsAdapter } from './adapters/sqs'
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
-import { createCommunityPlacesComponent } from './logic/community'
 import { createJobComponent } from './logic/job'
 import { createPlacesApiAdapter } from './adapters/places-api'
 import { createUpdateHandlerComponent } from './logic/updates'
