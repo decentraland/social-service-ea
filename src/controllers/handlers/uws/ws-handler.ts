@@ -100,8 +100,6 @@ export async function registerWsHandler(
         delete data.timeout
       }
 
-      rpcServer.attachUser({ transport, address })
-
       transport.on('close', () => {
         logger.debug('[DEBUGGING CONNECTION] Transport close event received', {
           wsConnectionId: data.wsConnectionId,
@@ -117,6 +115,8 @@ export async function registerWsHandler(
           error: isErrorWithMessage(error) ? error.message : 'Unknown error'
         })
       })
+
+      rpcServer.attachUser({ transport, address })
     } catch (error: any) {
       logger.error(`Error verifying auth chain: ${error.message}`, {
         wsConnectionId: data.wsConnectionId
@@ -293,6 +293,20 @@ export async function registerWsHandler(
         reason: messageText,
         wsConnectionId,
         ...(isAuthenticated(data) && { address: data.address })
+      })
+    },
+    pong: (ws) => {
+      const data = ws.getUserData()
+      logger.debug('Pong received', {
+        wsConnectionId: data.wsConnectionId,
+        address: getAddress(data)
+      })
+    },
+    ping: (ws) => {
+      const data = ws.getUserData()
+      logger.debug('Ping received', {
+        wsConnectionId: data.wsConnectionId,
+        address: getAddress(data)
       })
     }
   })

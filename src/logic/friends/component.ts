@@ -1,5 +1,6 @@
 import { EthAddress } from '@dcl/schemas'
-import { Action, AppComponents, BlockedUserWithDate, FriendshipRequest } from '../../types'
+import { Action, BlockedUserWithDate, FriendshipRequest } from '../../types'
+import { IFriendsDatabaseComponent, ICatalystClientComponent, IPubSubComponent } from '../../types'
 import { BlockedUser, IFriendsComponent } from './types'
 import { FriendshipStatus, Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
@@ -7,9 +8,11 @@ import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapter
 import { ProfileNotFoundError } from './errors'
 import { getFriendshipRequestStatus } from './friendships'
 
-export async function createFriendsComponent(
-  components: Pick<AppComponents, 'friendsDb' | 'catalystClient' | 'pubsub'>
-): Promise<IFriendsComponent> {
+export async function createFriendsComponent(components: {
+  friendsDb: IFriendsDatabaseComponent
+  catalystClient: ICatalystClientComponent
+  pubsub: IPubSubComponent
+}): Promise<IFriendsComponent> {
   const { friendsDb, catalystClient, pubsub } = components
 
   return {
