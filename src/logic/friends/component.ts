@@ -1,14 +1,20 @@
 import { EthAddress } from '@dcl/schemas'
-import { BlockedUserError, ProfileNotFoundError } from './errors'
-import { getNewFriendshipStatus } from './friendships'
+import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import {
+  Action,
+  AppComponents,
+  BlockedUserWithDate,
+  FriendshipAction,
+  FriendshipRequest,
+  FriendshipStatus
+} from '../../types'
+import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { getProfileUserId } from '../profiles'
 import { sendNotification, shouldNotify } from '../notifications'
-import { Action, AppComponents, BlockedUserWithDate, FriendshipRequest } from '../../types'
+import { BlockedUserError, ProfileNotFoundError } from './errors'
+import { getNewFriendshipStatus } from './friendships'
 import { BlockedUser, IFriendsComponent } from './types'
-import { FriendshipStatus, Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapters/pubsub'
-import { getFriendshipRequestStatus } from './friendships'
 
 export async function createFriendsComponent(
   components: Pick<AppComponents, 'friendsDb' | 'catalystClient' | 'pubsub' | 'sns' | 'logs'>
@@ -100,9 +106,12 @@ export async function createFriendsComponent(
         blockedByUsers: blockedByAddresses
       }
     },
-    getFriendshipStatus: async (loggedUserAddress: string, userAddress: string): Promise<FriendshipStatus> => {
+    getFriendshipStatus: async (
+      loggedUserAddress: string,
+      userAddress: string
+    ): Promise<FriendshipAction | undefined> => {
       const lastFriendshipAction = await friendsDb.getLastFriendshipActionByUsers(loggedUserAddress, userAddress)
-      return getFriendshipRequestStatus(lastFriendshipAction, loggedUserAddress)
+      return lastFriendshipAction
     },
     getMutualFriendsProfiles: async (
       requesterAddress: string,
@@ -208,7 +217,7 @@ export async function createFriendsComponent(
       const lastAction = await friendsDb.getLastFriendshipActionByUsers(userAddress, friendAddress)
 
       const friendshipStatus = getNewFriendshipStatus(action)
-      const isActive = friendshipStatus === FriendshipStatus.ACCEPTED
+      const isActive = friendshipStatus === FriendshipStatus.Friends
 
       const { id, actionId, createdAt } = await friendsDb.executeTx(async (tx) => {
         let id: string, createdAt: Date

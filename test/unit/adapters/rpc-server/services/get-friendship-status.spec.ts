@@ -1,10 +1,10 @@
-import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
-import { getFriendshipStatusService } from '../../../../../src/controllers/handlers/rpc/get-friendship-status'
-import { RpcServerContext } from '../../../../../src/types'
 import {
   FriendshipStatus,
   GetFriendshipStatusPayload
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
+import { getFriendshipStatusService } from '../../../../../src/controllers/handlers/rpc/get-friendship-status'
+import { RpcServerContext, Action } from '../../../../../src/types'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
 describe('when getting friendship status', () => {
@@ -56,7 +56,13 @@ describe('when getting friendship status', () => {
 
   describe('and getting the users friendship status succeeds', () => {
     beforeEach(() => {
-      getFriendshipStatusMethod.mockResolvedValue(FriendshipStatus.REQUEST_SENT)
+      getFriendshipStatusMethod.mockResolvedValue({
+        id: '1',
+        friendship_id: '1',
+        action: Action.REQUEST,
+        acting_user: '0x1234567890123456789012345678901234567890',
+        timestamp: '2021-01-01T00:00:00.000Z'
+      })
     })
 
     it('should return the friendship status', async () => {
@@ -116,7 +122,7 @@ describe('when getting friendship status', () => {
 
   describe('and there is no friendship action', () => {
     beforeEach(() => {
-      getFriendshipStatusMethod.mockResolvedValue(FriendshipStatus.NONE)
+      getFriendshipStatusMethod.mockResolvedValue(undefined)
     })
 
     it('should return NONE status', async () => {
@@ -136,7 +142,7 @@ describe('when getting friendship status', () => {
 
   describe('and there is an unknown action', () => {
     beforeEach(() => {
-      getFriendshipStatusMethod.mockResolvedValue(FriendshipStatus.UNRECOGNIZED)
+      getFriendshipStatusMethod.mockResolvedValue('unknown-action' as any)
     })
 
     it('should return UNRECOGNIZED status', async () => {
