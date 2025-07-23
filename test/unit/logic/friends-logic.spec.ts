@@ -1,3 +1,4 @@
+import { EthAddress } from '@dcl/schemas'
 import { PoolClient } from 'pg'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -5,16 +6,17 @@ import { createFriendsComponent } from '../../../src/logic/friends/component'
 import { IFriendsComponent } from '../../../src/logic/friends/types'
 import { createFriendsDBMockedComponent } from '../../mocks/components/friends-db'
 import { mockCatalystClient } from '../../mocks/components/catalyst-client'
-import { createMockProfile, mockProfile } from '../../mocks/profile'
-import { createMockedPubSubComponent, mockPg } from '../../mocks/components'
-import { EthAddress } from '@dcl/schemas'
+import { createMockProfile } from '../../mocks/profile'
+import { createLogsMockedComponent, createMockedPubSubComponent } from '../../mocks/components'
 import { Action, Friendship } from '../../../src/types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import { createSNSMockedComponent } from '../../mocks/components/sns'
 
 describe('Friends Component', () => {
   let friendsComponent: IFriendsComponent
   let mockFriendsDB: jest.Mocked<ReturnType<typeof createFriendsDBMockedComponent>>
   let mockPubSub: jest.Mocked<ReturnType<typeof createMockedPubSubComponent>>
+  let mockSNS: jest.Mocked<ReturnType<typeof createSNSMockedComponent>>
   let mockPublishInChannel: jest.MockedFunction<typeof mockPubSub.publishInChannel>
   let mockUserAddress: string
 
@@ -25,11 +27,15 @@ describe('Friends Component', () => {
     mockPubSub = createMockedPubSubComponent({
       publishInChannel: mockPublishInChannel
     })
+    mockSNS = createSNSMockedComponent({})
+    const logs = createLogsMockedComponent()
 
     friendsComponent = await createFriendsComponent({
       friendsDb: mockFriendsDB,
       catalystClient: mockCatalystClient,
-      pubsub: mockPubSub
+      pubsub: mockPubSub,
+      sns: mockSNS,
+      logs
     })
   })
 
