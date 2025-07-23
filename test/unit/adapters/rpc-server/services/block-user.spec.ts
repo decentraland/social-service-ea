@@ -1,214 +1,95 @@
-import { mockCatalystClient, mockFriendsDB, mockLogs, mockPg, mockPubSub } from '../../../../mocks/components'
-import { blockUserService } from '../../../../../src/controllers/handlers/rpc/block-user'
-import { BlockUserPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Action, Friendship, RpcServerContext } from '../../../../../src/types'
-import { createMockProfile } from '../../../../mocks/profile'
-import { PoolClient } from 'pg'
-import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../../../src/adapters/pubsub'
-import { parseProfileToBlockedUser } from '../../../../../src/logic/friends'
-import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { EthAddress } from '@dcl/schemas'
-describe('blockUserService', () => {
-  let blockUser: ReturnType<typeof blockUserService>
-  let mockClient: jest.Mocked<PoolClient>
-  let blockedAddress: EthAddress
-  let blockedAt: Date
-  let mockProfile: Profile
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
+import { blockUserService } from '../../../../../src/controllers/handlers/rpc/block-user'
+import { RpcServerContext } from '../../../../../src/types'
+import { createMockProfile } from '../../../../mocks/profile'
+import { parseProfileToBlockedUser } from '../../../../../src/logic/friends'
+import { ProfileNotFoundError } from '../../../../../src/logic/friends/errors'
 
-  const rpcContext: RpcServerContext = {
-    address: '0x123',
-    subscribersContext: undefined
-  }
+describe('when blocking a user', () => {
+  let blockUser: ReturnType<typeof blockUserService>
+  let mockFriendsComponent: jest.Mocked<ReturnType<typeof createFriendsMockedComponent>>
+  let mockBlockUser: jest.MockedFunction<typeof mockFriendsComponent.blockUser>
+  let blockedAddress: EthAddress
+  let userAddress: EthAddress
+
+  let rpcContext: RpcServerContext
 
   beforeEach(async () => {
-    blockUser = blockUserService({
-      components: { friendsDb: mockFriendsDB, logs: mockLogs, catalystClient: mockCatalystClient, pubsub: mockPubSub }
-    })
-
-    mockClient = (await mockPg.getPool().connect()) as jest.Mocked<PoolClient>
-    mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
-
+    userAddress = '0x123'
     blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
-    mockProfile = createMockProfile(blockedAddress)
-    blockedAt = new Date()
+    rpcContext = {
+      address: userAddress,
+      subscribersContext: undefined
+    }
+    mockBlockUser = jest.fn()
+    mockFriendsComponent = createFriendsMockedComponent({
+      blockUser: mockBlockUser
+    })
+    blockUser = blockUserService({
+      components: { friends: mockFriendsComponent, logs: mockLogs }
+    })
   })
 
-  it('should block a user successfully, update friendship status, and record friendship action if it exists', async () => {
-    const request: BlockUserPayload = {
-      user: { address: blockedAddress }
-    }
+  describe('and blocking the user fails with a ProfileNotFoundError', () => {
+    beforeEach(() => {
+      mockBlockUser.mockRejectedValue(new ProfileNotFoundError(blockedAddress))
+    })
 
-    mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+    it('should return a profileNotFound error', async () => {
+      const result = await blockUser({ user: { address: blockedAddress } }, rpcContext)
 
-    const response = await blockUser(request, rpcContext)
-
-    expect(response).toEqual({
-      response: {
-        $case: 'ok',
-        ok: {
-          profile: parseProfileToBlockedUser(mockProfile, blockedAt)
+      expect(result).toEqual({
+        response: {
+          $case: 'profileNotFound',
+          profileNotFound: {
+            message: `Profile not found for address ${blockedAddress}`
+          }
         }
-      }
-    })
-    expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
-    expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
-    expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(expect.any(String), false, mockClient)
-    expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
-      expect.any(String),
-      rpcContext.address,
-      Action.BLOCK,
-      null,
-      mockClient
-    )
-  })
-
-  it('should block a user successfully and do nothing else if friendship does not exist', async () => {
-    const request: BlockUserPayload = {
-      user: { address: blockedAddress }
-    }
-
-    mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
-    mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
-
-    const response = await blockUser(request, rpcContext)
-
-    expect(response).toEqual({
-      response: {
-        $case: 'ok',
-        ok: { profile: parseProfileToBlockedUser(mockProfile, blockedAt) }
-      }
-    })
-
-    expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
-    expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
-    expect(mockFriendsDB.updateFriendshipStatus).not.toHaveBeenCalled()
-    expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
-  })
-
-  it('should publish a friendship update event after blocking a user if friendship exists', async () => {
-    const request: BlockUserPayload = {
-      user: { address: blockedAddress }
-    }
-
-    mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
-    mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
-
-    await blockUser(request, rpcContext)
-
-    expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
-      id: 'action-id',
-      from: rpcContext.address,
-      to: blockedAddress,
-      action: Action.BLOCK,
-      timestamp: blockedAt.getTime()
+      })
     })
   })
 
-  it('should publish a block update event after blocking a user', async () => {
-    const request: BlockUserPayload = {
-      user: { address: blockedAddress }
-    }
+  describe('and the user is the same as the blocked user', () => {
+    it('should return an invalidRequest error', async () => {
+      const result = await blockUser({ user: { address: userAddress } }, rpcContext)
 
-    mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
-    await blockUser(request, rpcContext)
-
-    expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
-      blockerAddress: rpcContext.address,
-      blockedAddress,
-      isBlocked: true
+      expect(result).toEqual({
+        response: { $case: 'invalidRequest', invalidRequest: { message: 'Cannot block yourself' } }
+      })
     })
   })
 
-  it('should return invalidRequest when user is trying to block himself', async () => {
-    const request: BlockUserPayload = {
-      user: { address: rpcContext.address }
-    }
+  describe('and the user to block is not a valid address', () => {
+    it('should return an invalidRequest error', async () => {
+      const result = await blockUser({ user: { address: 'an-invalid-address' } }, rpcContext)
 
-    const response = await blockUser(request, rpcContext)
-
-    expect(response).toEqual({
-      response: {
-        $case: 'invalidRequest',
-        invalidRequest: { message: 'Cannot block yourself' }
-      }
+      expect(result).toEqual({
+        response: {
+          $case: 'invalidRequest',
+          invalidRequest: { message: 'Invalid user address in the request payload' }
+        }
+      })
     })
-    expect(mockFriendsDB.blockUser).not.toHaveBeenCalled()
   })
 
-  it('should return invalidRequest when user address is missing', async () => {
-    const request: BlockUserPayload = {
-      user: { address: '' }
-    }
+  describe('and blocking the user succeeds', () => {
+    let mockedProfile: Profile
+    let blockedAt: Date
 
-    const response = await blockUser(request, rpcContext)
-
-    expect(response).toEqual({
-      response: {
-        $case: 'invalidRequest',
-        invalidRequest: { message: 'Invalid user address in the request payload' }
-      }
+    beforeEach(() => {
+      mockedProfile = createMockProfile(blockedAddress)
+      blockedAt = new Date()
+      mockBlockUser.mockResolvedValue({ profile: mockedProfile, blockedAt })
     })
-    expect(mockFriendsDB.blockUser).not.toHaveBeenCalled()
-  })
 
-  it('should return invalidRequest when user address is invalid', async () => {
-    const request: BlockUserPayload = {
-      user: { address: 'invalid-address' }
-    }
+    it('should return an ok response with the blocked user profile and the blockedAt date', async () => {
+      const result = await blockUser({ user: { address: blockedAddress } }, rpcContext)
 
-    const response = await blockUser(request, rpcContext)
-
-    expect(response).toEqual({
-      response: {
-        $case: 'invalidRequest',
-        invalidRequest: { message: 'Invalid user address in the request payload' }
-      }
+      expect(result).toEqual({
+        response: { $case: 'ok', ok: { profile: parseProfileToBlockedUser(mockedProfile, blockedAt) } }
+      })
     })
-    expect(mockFriendsDB.blockUser).not.toHaveBeenCalled()
-  })
-
-  it('should return profileNotFound when profile is not found', async () => {
-    const request: BlockUserPayload = {
-      user: { address: blockedAddress }
-    }
-
-    mockCatalystClient.getProfile.mockResolvedValueOnce(null)
-
-    const response = await blockUser(request, rpcContext)
-
-    expect(response).toEqual({
-      response: {
-        $case: 'profileNotFound',
-        profileNotFound: { message: `Profile not found for address ${blockedAddress}` }
-      }
-    })
-    expect(mockFriendsDB.blockUser).not.toHaveBeenCalled()
-  })
-
-  it('should handle database errors', async () => {
-    const request: BlockUserPayload = {
-      user: { address: blockedAddress }
-    }
-    const error = new Error('Database error')
-
-    mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    mockFriendsDB.blockUser.mockRejectedValueOnce(error)
-
-    const response = await blockUser(request, rpcContext)
-
-    expect(response).toEqual({
-      response: {
-        $case: 'internalServerError',
-        internalServerError: { message: error.message }
-      }
-    })
-    expect(mockLogs.getLogger('block-user-service')).toBeDefined()
   })
 })

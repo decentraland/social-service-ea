@@ -1,107 +1,156 @@
+import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getFriendshipStatusService } from '../../../../../src/controllers/handlers/rpc/get-friendship-status'
-import { Action, RpcServerContext, AppComponents } from '../../../../../src/types'
+import { RpcServerContext } from '../../../../../src/types'
 import {
   FriendshipStatus,
-  GetFriendshipStatusPayload,
-  GetFriendshipStatusResponse
+  GetFriendshipStatusPayload
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { mockFriendsDB, mockLogs } from '../../../../mocks/components'
+import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('getFriendshipStatusService', () => {
-  let components: jest.Mocked<Pick<AppComponents, 'friendsDb' | 'logs'>>
+describe('when getting friendship status', () => {
   let getFriendshipStatus: ReturnType<typeof getFriendshipStatusService>
+  let friendsComponent: IFriendsComponent
+  let getFriendshipStatusMethod: jest.MockedFunction<typeof friendsComponent.getFriendshipStatus>
 
   const rpcContext: RpcServerContext = {
-    address: '0x123',
+    address: '0x1234567890123456789012345678901234567890',
     subscribersContext: undefined
   }
 
-  const userAddress = '0x456'
+  const userAddress = '0x4564567890123456789012345678901234567890'
 
   const mockRequest: GetFriendshipStatusPayload = {
     user: { address: userAddress }
   }
 
   beforeEach(() => {
-    components = { friendsDb: mockFriendsDB, logs: mockLogs }
-    getFriendshipStatus = getFriendshipStatusService({ components })
+    getFriendshipStatusMethod = jest.fn()
+    friendsComponent = createFriendsMockedComponent({
+      getFriendshipStatus: getFriendshipStatusMethod
+    })
+
+    getFriendshipStatus = getFriendshipStatusService({
+      components: { friends: friendsComponent, logs: mockLogs }
+    })
   })
 
-  it('should return the friendship status for the latest action', async () => {
-    const lastFriendshipAction = {
-      id: 'action-id',
-      friendship_id: 'friendship-id',
-      acting_user: rpcContext.address,
-      action: Action.REQUEST,
-      timestamp: new Date().toISOString()
+  describe('and getting the users friendship status fails', () => {
+    beforeEach(() => {
+      getFriendshipStatusMethod.mockRejectedValue(new Error('Database error'))
+    })
+
+    it('should return internal server error', async () => {
+      const response = await getFriendshipStatus(mockRequest, rpcContext)
+
+      expect(getFriendshipStatusMethod).toHaveBeenCalledWith(rpcContext.address, userAddress)
+      expect(response).toEqual({
+        response: {
+          $case: 'internalServerError',
+          internalServerError: {
+            message: 'Database error'
+          }
+        }
+      })
+    })
+  })
+
+  describe('and getting the users friendship status succeeds', () => {
+    beforeEach(() => {
+      getFriendshipStatusMethod.mockResolvedValue(FriendshipStatus.REQUEST_SENT)
+    })
+
+    it('should return the friendship status', async () => {
+      const response = await getFriendshipStatus(mockRequest, rpcContext)
+
+      expect(getFriendshipStatusMethod).toHaveBeenCalledWith(rpcContext.address, userAddress)
+      expect(response).toEqual({
+        response: {
+          $case: 'accepted',
+          accepted: {
+            status: FriendshipStatus.REQUEST_SENT
+          }
+        }
+      })
+    })
+  })
+
+  describe('and the user address is missing', () => {
+    const requestWithoutAddress: GetFriendshipStatusPayload = {
+      user: undefined
     }
 
-    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    it('should return internal server error', async () => {
+      const response = await getFriendshipStatus(requestWithoutAddress, rpcContext)
 
-    const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
-
-    expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
-    expect(result).toEqual({
-      response: {
-        $case: 'accepted',
-        accepted: {
-          status: FriendshipStatus.REQUEST_SENT
+      expect(getFriendshipStatusMethod).not.toHaveBeenCalled()
+      expect(response).toEqual({
+        response: {
+          $case: 'internalServerError',
+          internalServerError: {
+            message: 'User address is missing in the request payload'
+          }
         }
-      }
+      })
     })
   })
 
-  it('should return none if no friendship action is found', async () => {
-    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(null)
-
-    const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
-
-    expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
-    expect(result).toEqual({
-      response: {
-        $case: 'accepted',
-        accepted: {
-          status: FriendshipStatus.NONE
-        }
-      }
-    })
-  })
-
-  it('should handle unknown actions gracefully', async () => {
-    const lastFriendshipAction = {
-      id: 'action-id',
-      friendship_id: 'friendship-id',
-      acting_user: rpcContext.address,
-      action: 'UNKNOWN_ACTION' as Action,
-      timestamp: new Date().toISOString()
+  describe('and the user address is invalid', () => {
+    const requestWithInvalidAddress: GetFriendshipStatusPayload = {
+      user: { address: 'invalid-address' }
     }
 
-    mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValueOnce(lastFriendshipAction)
+    it('should return internal server error', async () => {
+      const response = await getFriendshipStatus(requestWithInvalidAddress, rpcContext)
 
-    const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
-
-    expect(result).toEqual({
-      response: {
-        $case: 'accepted',
-        accepted: {
-          status: FriendshipStatus.UNRECOGNIZED
+      expect(getFriendshipStatusMethod).not.toHaveBeenCalled()
+      expect(response).toEqual({
+        response: {
+          $case: 'internalServerError',
+          internalServerError: {
+            message: 'Invalid user address in the request payload'
+          }
         }
-      }
+      })
     })
   })
 
-  it('should return internalServerError if an error occurs', async () => {
-    mockFriendsDB.getLastFriendshipActionByUsers.mockImplementationOnce(() => {
-      throw new Error('Database error')
+  describe('and there is no friendship action', () => {
+    beforeEach(() => {
+      getFriendshipStatusMethod.mockResolvedValue(FriendshipStatus.NONE)
     })
 
-    const result: GetFriendshipStatusResponse = await getFriendshipStatus(mockRequest, rpcContext)
+    it('should return NONE status', async () => {
+      const response = await getFriendshipStatus(mockRequest, rpcContext)
 
-    expect(result).toEqual({
-      response: {
-        $case: 'internalServerError',
-        internalServerError: {}
-      }
+      expect(getFriendshipStatusMethod).toHaveBeenCalledWith(rpcContext.address, userAddress)
+      expect(response).toEqual({
+        response: {
+          $case: 'accepted',
+          accepted: {
+            status: FriendshipStatus.NONE
+          }
+        }
+      })
+    })
+  })
+
+  describe('and there is an unknown action', () => {
+    beforeEach(() => {
+      getFriendshipStatusMethod.mockResolvedValue(FriendshipStatus.UNRECOGNIZED)
+    })
+
+    it('should return UNRECOGNIZED status', async () => {
+      const response = await getFriendshipStatus(mockRequest, rpcContext)
+
+      expect(getFriendshipStatusMethod).toHaveBeenCalledWith(rpcContext.address, userAddress)
+      expect(response).toEqual({
+        response: {
+          $case: 'accepted',
+          accepted: {
+            status: FriendshipStatus.UNRECOGNIZED
+          }
+        }
+      })
     })
   })
 })

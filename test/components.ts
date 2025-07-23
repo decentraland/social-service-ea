@@ -235,7 +235,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const wsPool = createWsPoolComponent({ logs, metrics })
 
-  const friends = await createFriendsComponent({ friendsDb, catalystClient })
+  const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub })
 
   return {
     analytics,
