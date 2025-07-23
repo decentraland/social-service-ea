@@ -80,7 +80,6 @@ export async function createCommunityVoiceComponent({
     }
 
     // Check if community already has an active voice chat
-    console.log('Checking if community already has an active voice chat')
     const existingVoiceChat = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
 
     if (existingVoiceChat?.isActive) {
@@ -147,6 +146,12 @@ export async function createCommunityVoiceComponent({
       throw new CommunityVoiceChatNotFoundError(communityId)
     }
 
+    // Check if user is banned from the community (applies to both public and private communities)
+    const isBanned = await communitiesDb.isMemberBanned(communityId, userAddress)
+    if (isBanned) {
+      throw new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
+    }
+
     // Get the user's role in the community for both public and private communities
     const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
 
@@ -155,12 +160,6 @@ export async function createCommunityVoiceComponent({
       if (userRole === CommunityRole.None) {
         throw new UserNotCommunityMemberError(userAddress, communityId)
       }
-    }
-
-    // Check if user is banned from the community (applies to both public and private communities)
-    const isBanned = await communitiesDb.isMemberBanned(communityId, userAddress)
-    if (isBanned) {
-      throw new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
     }
 
     // Fetch user profile data using helper function

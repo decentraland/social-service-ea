@@ -653,6 +653,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           expect(commsGatekeeperSpy.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
             communityId,
             rpcClient.authAddress.toLowerCase(),
+            CommunityRole.Owner,
             expect.objectContaining({
               name: 'testuser',
               has_claimed_name: true,
@@ -770,6 +771,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           expect(commsGatekeeperSpy.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
             communityId,
             rpcClient.authAddress.toLowerCase(),
+            CommunityRole.Owner,
             expect.objectContaining({
               name: 'testuser',
               has_claimed_name: true,
@@ -824,6 +826,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           expect(commsGatekeeperSpy.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
             communityId,
             rpcClient.authAddress.toLowerCase(),
+            CommunityRole.Owner,
             expect.objectContaining({
               name: 'testuser',
               has_claimed_name: true,
