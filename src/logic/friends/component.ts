@@ -152,6 +152,7 @@ export async function createFriendsComponent(
         profiles: sentRequestedProfiles,
         total: sentRequestsCount
       }
+    },
     unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile> => {
       const profile = await catalystClient.getProfile(blockedAddress)
 
