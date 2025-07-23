@@ -1,5 +1,5 @@
+import { ICommsGatekeeperComponent, CommunityRole } from '../../../src/types'
 import { createCommsGatekeeperComponent } from '../../../src/adapters/comms-gatekeeper'
-import { ICommsGatekeeperComponent } from '../../../src/types'
 import { createMockConfigComponent } from '../../mocks/components/config'
 import { mockLogs } from '../../mocks/components'
 import nock from 'nock'
@@ -45,7 +45,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should return connection URL', async () => {
-        const result = await commsGatekeeper.getCommunityVoiceChatCredentials(testCommunityId, testUserAddress)
+        const result = await commsGatekeeper.getCommunityVoiceChatCredentials(testCommunityId, testUserAddress, CommunityRole.Member)
 
         expect(result).toEqual({
           connectionUrl: 'wss://livekit.test/room?token=abc123'
@@ -59,7 +59,8 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
           body: JSON.stringify({
             community_id: testCommunityId,
             user_address: testUserAddress,
-            action: 'join'
+            action: 'join',
+            user_role: CommunityRole.Member
           })
         })
       })
@@ -76,7 +77,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
 
       it('should throw an error', async () => {
         await expect(
-          commsGatekeeper.getCommunityVoiceChatCredentials(testCommunityId, testUserAddress)
+          commsGatekeeper.getCommunityVoiceChatCredentials(testCommunityId, testUserAddress, CommunityRole.Member)
         ).rejects.toThrow('Server responded with status 404')
       })
     })
@@ -95,7 +96,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should create room successfully and return connection URL', async () => {
-        const result = await commsGatekeeper.createCommunityVoiceChatRoom(testCommunityId, testUserAddress)
+        const result = await commsGatekeeper.createCommunityVoiceChatRoom(testCommunityId, testUserAddress, CommunityRole.Owner)
 
         expect(result).toEqual({
           connectionUrl: 'wss://livekit.test/room?token=abc123'
@@ -109,7 +110,8 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
           body: JSON.stringify({
             community_id: testCommunityId,
             user_address: testUserAddress,
-            action: 'create'
+            action: 'create',
+            user_role: CommunityRole.Owner
           })
         })
       })
@@ -125,7 +127,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should throw an error', async () => {
-        await expect(commsGatekeeper.createCommunityVoiceChatRoom(testCommunityId, testUserAddress)).rejects.toThrow(
+        await expect(commsGatekeeper.createCommunityVoiceChatRoom(testCommunityId, testUserAddress, CommunityRole.Owner)).rejects.toThrow(
           'Server responded with status 409'
         )
       })

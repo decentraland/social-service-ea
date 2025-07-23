@@ -92,7 +92,12 @@ export async function createCommunityVoiceComponent({
       const profileData = await getUserProfileData(creatorAddress)
 
       // Create room in comms-gatekeeper and get credentials directly
-      const credentials = await commsGatekeeper.createCommunityVoiceChatRoom(communityId, creatorAddress, profileData)
+      const credentials = await commsGatekeeper.createCommunityVoiceChatRoom(
+        communityId,
+        creatorAddress,
+        userRole,
+        profileData
+      )
       logger.info(`Community voice chat room created for community ${communityId}`)
 
       // Add to cache as active
@@ -142,9 +147,11 @@ export async function createCommunityVoiceComponent({
       throw new CommunityVoiceChatNotFoundError(communityId)
     }
 
+    // Get the user's role in the community for both public and private communities
+    const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
+
     // For private communities, check if user is a member
     if (community.privacy === 'private') {
-      const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
       if (userRole === CommunityRole.None) {
         throw new UserNotCommunityMemberError(userAddress, communityId)
       }
@@ -159,8 +166,13 @@ export async function createCommunityVoiceComponent({
     // Fetch user profile data using helper function
     const profileData = await getUserProfileData(userAddress)
 
-    // Get credentials from comms-gatekeeper with profile data
-    const credentials = await commsGatekeeper.getCommunityVoiceChatCredentials(communityId, userAddress, profileData)
+    // Get credentials from comms-gatekeeper with profile data and user role
+    const credentials = await commsGatekeeper.getCommunityVoiceChatCredentials(
+      communityId,
+      userAddress,
+      userRole,
+      profileData
+    )
 
     return credentials
   }
