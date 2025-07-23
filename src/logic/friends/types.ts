@@ -13,4 +13,5 @@ export interface IFriendsComponent {
     pagination?: Pagination
   ): Promise<{ friendsProfiles: Profile[]; total: number }>
   blockUser(blockerAddress: string, blockedAddress: string): Promise<BlockedUser>
+  unblockUser(blockerAddress: string, blockedAddress: string): Promise<Profile>
 }
