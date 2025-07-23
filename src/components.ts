@@ -36,7 +36,9 @@ import {
   createCommunityComponent,
   createCommunityMembersComponent,
   createCommunityRolesComponent,
-  createCommunityOwnersComponent
+  createCommunityOwnersComponent,
+  createCommunityPlacesComponent,
+  createCommunityEventsComponent
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
@@ -45,7 +47,6 @@ import { createSqsAdapter } from './adapters/sqs'
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
-import { createCommunityPlacesComponent } from './logic/community'
 import { createJobComponent } from './logic/job'
 import { createPlacesApiAdapter } from './adapters/places-api'
 import { createUpdateHandlerComponent } from './logic/updates'
@@ -174,12 +175,14 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
+  const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
   const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
     communityOwners,
+    communityEvents,
     cdnCacheInvalidator,
     logs,
     storage,
@@ -241,6 +244,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityPlaces,
     communityRoles,
     communityVoice,
+    communityEvents,
     config,
     email,
     expirePrivateVoiceChatJob,

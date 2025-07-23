@@ -2,6 +2,7 @@ import {
   CommunityDB,
   ICommunitiesComponent,
   ICommunityBansComponent,
+  ICommunityEventsComponent,
   ICommunityMembersComponent,
   ICommunityOwnersComponent,
   ICommunityPlacesComponent,
@@ -70,6 +71,14 @@ export function createMockCommunityOwnersComponent({
 }: Partial<jest.Mocked<ICommunityOwnersComponent>>): jest.Mocked<ICommunityOwnersComponent> {
   return {
     getOwnerName
+  }
+}
+
+export function createMockCommunityEventsComponent({
+  isCurrentlyHostingEvents = jest.fn()
+}: Partial<jest.Mocked<ICommunityEventsComponent>>): jest.Mocked<ICommunityEventsComponent> {
+  return {
+    isCurrentlyHostingEvents
   }
 }
 

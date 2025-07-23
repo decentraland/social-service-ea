@@ -7,11 +7,11 @@ import {
   GetCommunitiesWithTotal,
   ICommunitiesComponent,
   CommunityPublicInformation,
+  AggregatedCommunityWithMemberAndVoiceChatData,
   MemberCommunity,
   Community,
   CommunityUpdates,
-  CommunityWithMembersCountAndVoiceChatStatus,
-  CommunityWithOwnerName
+  AggregatedCommunity
 } from './types'
 import {
   isOwner,
@@ -29,6 +29,7 @@ export async function createCommunityComponent(
     | 'catalystClient'
     | 'communityRoles'
     | 'communityPlaces'
+    | 'communityEvents'
     | 'cdnCacheInvalidator'
     | 'communityOwners'
     | 'storage'
@@ -42,6 +43,7 @@ export async function createCommunityComponent(
     catalystClient,
     communityRoles,
     communityPlaces,
+    communityEvents,
     communityOwners,
     cdnCacheInvalidator,
     storage,
@@ -68,7 +70,10 @@ export async function createCommunityComponent(
   }
 
   return {
-    getCommunity: async (id: string, userAddress: EthAddress): Promise<CommunityWithMembersCountAndVoiceChatStatus> => {
+    getCommunity: async (
+      id: string,
+      userAddress: EthAddress
+    ): Promise<AggregatedCommunityWithMemberAndVoiceChatData> => {
       const [community, membersCount, voiceChatStatus] = await Promise.all([
         communitiesDb.getCommunity(id, userAddress),
         communitiesDb.getCommunityMembersCount(id),
@@ -79,9 +84,10 @@ export async function createCommunityComponent(
         throw new CommunityNotFoundError(id)
       }
 
-      const [thumbnail, ownerName] = await Promise.all([
+      const [thumbnail, ownerName, isHostingLiveEvent] = await Promise.all([
         getThumbnail(community.id),
-        communityOwners.getOwnerName(community.ownerAddress, community.id)
+        communityOwners.getOwnerName(community.ownerAddress, community.id),
+        communityEvents.isCurrentlyHostingEvents(community.id)
       ])
 
       if (thumbnail) {
@@ -90,7 +96,7 @@ export async function createCommunityComponent(
         }
       }
 
-      return toCommunityWithMembersCount({ ...community, ownerName }, membersCount, voiceChatStatus)
+      return toCommunityWithMembersCount({ ...community, ownerName, isHostingLiveEvent }, membersCount, voiceChatStatus)
     },
 
     getCommunities: async (
@@ -178,7 +184,7 @@ export async function createCommunityComponent(
       community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
       thumbnail?: Buffer,
       placeIds: string[] = []
-    ): Promise<CommunityWithOwnerName> => {
+    ): Promise<AggregatedCommunity> => {
       const ownedNames = await catalystClient.getOwnedNames(community.ownerAddress, {
         pageSize: '1'
       })
@@ -228,6 +234,7 @@ export async function createCommunityComponent(
 
       return {
         ...newCommunity,
+        isHostingLiveEvent: false,
         ownerName
       }
     },

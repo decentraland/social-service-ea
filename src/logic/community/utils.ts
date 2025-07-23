@@ -5,10 +5,10 @@ import { getProfileUserId, getProfileInfo } from '../profiles'
 import {
   Community,
   CommunityWithUserInformation,
-  CommunityWithMembersCountAndFriends,
+  AggregatedCommunityWithMemberAndVoiceChatData,
+  AggregatedCommunityWithMemberAndFriendsData,
   CommunityPublicInformation,
-  CommunityWithMembersCountAndVoiceChatStatus,
-  CommunityWithOwnerName
+  AggregatedCommunity
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friends'
@@ -33,14 +33,14 @@ const toBaseCommunity = <T extends { membersCount: number | string }>(community:
 }
 
 export const toCommunityWithMembersCount = (
-  community: CommunityWithOwnerName & { role: CommunityRole },
+  community: AggregatedCommunity & { role: CommunityRole },
   membersCount: number,
   voiceChatStatus: {
     isActive: boolean
     participantCount: number
     moderatorCount: number
   } | null
-): CommunityWithMembersCountAndVoiceChatStatus => {
+): AggregatedCommunityWithMemberAndVoiceChatData => {
   return withMembersCount({
     ...community,
     ownerAddress: community.ownerAddress,
@@ -50,7 +50,7 @@ export const toCommunityWithMembersCount = (
 }
 
 export const toCommunityWithUserInformation = (
-  community: CommunityWithMembersCountAndFriends,
+  community: AggregatedCommunityWithMemberAndFriendsData,
   profilesMap: Map<string, Profile>
 ): CommunityWithUserInformation => {
   const friendsProfiles = community.friends.map((friend) => profilesMap.get(friend)).filter(Boolean) as Profile[]
@@ -63,7 +63,7 @@ export const toCommunityWithUserInformation = (
 }
 
 export const toCommunityResults = (
-  communities: CommunityWithMembersCountAndFriends[],
+  communities: AggregatedCommunityWithMemberAndFriendsData[],
   friendsProfiles: Profile[]
 ): CommunityWithUserInformation[] => {
   const profilesMap = new Map(friendsProfiles.map((profile) => [getProfileUserId(profile), profile]))
