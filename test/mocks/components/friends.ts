@@ -6,7 +6,9 @@ export function createFriendsMockedComponent({
   getBlockedUsers = jest.fn(),
   getBlockingStatus = jest.fn(),
   getFriendshipStatus = jest.fn(),
-  getMutualFriendsProfiles = jest.fn()
+  getMutualFriendsProfiles = jest.fn(),
+  getPendingFriendshipRequests = jest.fn(),
+  getSentFriendshipRequests = jest.fn()
 }: Partial<jest.Mocked<IFriendsComponent>> = {}): jest.Mocked<IFriendsComponent> {
   return {
     getFriendsProfiles,
@@ -14,6 +16,8 @@ export function createFriendsMockedComponent({
     getBlockedUsers,
     getBlockingStatus,
     getFriendshipStatus,
-    getMutualFriendsProfiles
+    getMutualFriendsProfiles,
+    getPendingFriendshipRequests,
+    getSentFriendshipRequests
   }
 }
