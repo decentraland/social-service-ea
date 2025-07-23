@@ -1,35 +1,38 @@
-import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
+import { EthAddress } from '@dcl/schemas/dist/misc'
+import { InvalidRequestError } from '@dcl/platform-server-commons'
 import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
 import { parseUpsertFriendshipRequest, parseFriendshipRequestToFriendshipRequestResponse } from '../../../logic/friends'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
 import { InvalidFriendshipActionError } from '../../errors/rpc.errors'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { BlockedUserError } from '../../../logic/friends/errors'
 
-export function upsertFriendshipService({
-  components: { logs, friends }
-}: RPCServiceContext<'logs' | 'friends' | 'friendsDb' | 'pubsub' | 'catalystClient' | 'sns'>) {
+export function upsertFriendshipService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('upsert-friendship-service')
 
   return async function (
     request: UpsertFriendshipPayload,
     context: RpcServerContext
   ): Promise<UpsertFriendshipResponse> {
-    const parsedRequest = parseUpsertFriendshipRequest(request)
-
-    if (!parsedRequest) {
-      logger.error('upsert friendship received unknown message: ', request as any)
-      throw new InvalidRequestError('Unknown message')
-    }
-
-    if (parsedRequest.action === Action.REQUEST && parsedRequest.user === context.address) {
-      throw new InvalidFriendshipActionError('You cannot send a friendship request to yourself')
-    }
-
     try {
+      const parsedRequest = parseUpsertFriendshipRequest(request)
+
+      if (!parsedRequest) {
+        logger.error('upsert friendship received unknown message: ', request as any)
+        throw new InvalidRequestError('Unknown message')
+      }
+
+      if (parsedRequest.action === Action.REQUEST && parsedRequest.user === context.address) {
+        throw new InvalidFriendshipActionError('You cannot send a friendship request to yourself')
+      }
+
+      if (!EthAddress.validate(parsedRequest.user)) {
+        throw new InvalidRequestError('Invalid user address in the request payload')
+      }
+
       const { friendshipRequest, receiverProfile } = await friends.upsertFriendship(
         context.address,
         parsedRequest.user,
@@ -58,7 +61,9 @@ export function upsertFriendshipService({
       return {
         response: {
           $case: 'internalServerError',
-          internalServerError: {}
+          internalServerError: {
+            message: isErrorWithMessage(error) ? error.message : 'Unknown error'
+          }
         }
       }
     }
