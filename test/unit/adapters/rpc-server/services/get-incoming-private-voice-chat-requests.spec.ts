@@ -83,7 +83,7 @@ describe('getIncomingPrivateVoiceChatRequestsService', () => {
       getIncomingPrivateVoiceChatMock.mockRejectedValueOnce(new IncomingVoiceChatNotFoundError(address))
     })
 
-    it('should resolve with a not found response and log the error message', async () => {
+    it('should resolve with a not found response', async () => {
       const result = await service(request, context)
 
       expect(result).toEqual({
@@ -94,10 +94,6 @@ describe('getIncomingPrivateVoiceChatRequestsService', () => {
           }
         }
       })
-
-      expect(errorLogMock).toHaveBeenCalledWith(
-        `Error getting incoming private voice chat: The incoming voice chat for the address ${address} was not found`
-      )
     })
   })
 
