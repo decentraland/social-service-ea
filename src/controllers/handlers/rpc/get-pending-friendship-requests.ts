@@ -1,14 +1,14 @@
-import { parseFriendshipRequestsToFriendshipRequestResponses } from '../../../logic/friends'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   PaginatedFriendshipRequestsResponse,
   GetFriendshipRequestsPayload
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getPage } from '../../../utils/pagination'
+import { parseFriendshipRequestsToFriendshipRequestResponses } from '../../../logic/friends/friendships'
 
 export function getPendingFriendshipRequestsService({
-  components: { logs, friendsDb, catalystClient }
-}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient'>) {
+  components: { logs, friends }
+}: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('get-pending-friendship-requests-service')
 
   return async function (
@@ -17,29 +17,30 @@ export function getPendingFriendshipRequestsService({
   ): Promise<PaginatedFriendshipRequestsResponse> {
     try {
       const { limit, offset } = request.pagination || {}
-      const [pendingRequests, pendingRequestsCount] = await Promise.all([
-        friendsDb.getReceivedFriendshipRequests(context.address, request.pagination),
-        friendsDb.getReceivedFriendshipRequestsCount(context.address)
-      ])
-      const pendingRequestsAddresses = pendingRequests.map(({ address }) => address)
-      const pendingRequesterProfiles = await catalystClient.getProfiles(pendingRequestsAddresses)
+      const { requests, profiles, total } = await friends.getPendingFriendshipRequests(
+        context.address,
+        request.pagination
+      )
 
-      const requests = parseFriendshipRequestsToFriendshipRequestResponses(pendingRequests, pendingRequesterProfiles)
+      const parsedRequests = parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles)
 
       return {
         response: {
           $case: 'requests',
           requests: {
-            requests
+            requests: parsedRequests
           }
         },
         paginationData: {
-          total: pendingRequestsCount,
-          page: getPage(limit ?? pendingRequestsCount, offset)
+          total,
+          page: getPage(limit ?? total, offset)
         }
       }
     } catch (error: any) {
-      logger.error(`Error getting pending friendship requests: ${error.message}`)
+      logger.error(`Error getting pending friendship requests: ${error.message}`, {
+        error: error.message,
+        stack: error.stack
+      })
       return {
         response: {
           $case: 'internalServerError',

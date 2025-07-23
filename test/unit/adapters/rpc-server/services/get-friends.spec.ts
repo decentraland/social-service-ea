@@ -6,7 +6,7 @@ import { createMockProfile } from '../../../../mocks/profile'
 import { parseExpectedFriends } from '../../../../mocks/friend'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('Get Friends Service', () => {
+describe('when getting friends', () => {
   let getFriends: ReturnType<typeof getFriendsService>
   const parseFriend = parseExpectedFriends()
   let friendsComponent: IFriendsComponent
@@ -28,7 +28,7 @@ describe('Get Friends Service', () => {
     })
   })
 
-  describe('when getting the users friends fails', () => {
+  describe('and getting the users friends fails', () => {
     beforeEach(() => {
       getFriendsProfiles.mockRejectedValue(new Error('Database error'))
     })
@@ -46,7 +46,7 @@ describe('Get Friends Service', () => {
     })
   })
 
-  describe('when getting the users friends succeeds', () => {
+  describe('and getting the users friends succeeds', () => {
     let friendsData: {
       friendsProfiles: Profile[]
       total: number
@@ -80,7 +80,7 @@ describe('Get Friends Service', () => {
       })
     })
 
-    describe(`and there are multiple friends`, () => {
+    describe('and there are multiple friends', () => {
       beforeEach(() => {
         friendsData.friendsProfiles = [createMockProfile('0x123'), createMockProfile('0x456')]
         friendsData.total = 2
