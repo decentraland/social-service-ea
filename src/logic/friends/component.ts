@@ -1,7 +1,7 @@
 import { EthAddress } from '@dcl/schemas'
 import { Action, AppComponents, BlockedUserWithDate, FriendshipRequest } from '../../types'
 import { BlockedUser, IFriendsComponent } from './types'
-import { Pagination, FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { FriendshipStatus, Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { ProfileNotFoundError } from './errors'
