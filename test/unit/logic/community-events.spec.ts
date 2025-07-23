@@ -140,11 +140,11 @@ describe('CommunityEventsComponent', () => {
           } as any)
         })
 
-        it('should fetch live events with correct URL and limit 3', async () => {
+        it('should fetch live events with correct URL', async () => {
           await communityEventsComponent.isCurrentlyHostingEvents(communityId)
 
           expect(mockFetcherInstance.fetch).toHaveBeenCalledWith(
-            'https://events.decentraland.zone/api/events?communityId=test-community-123&limit=3&offset=0&list=live'
+            'https://events.decentraland.zone/api/events?communityId=test-community-123&list=live'
           )
         })
 

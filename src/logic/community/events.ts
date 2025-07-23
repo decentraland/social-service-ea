@@ -58,6 +58,8 @@ type EventsResponse = {
   total?: number
 }
 
+const TEN_MINUTES_IN_SECONDS = 60 * 10
+
 export async function createCommunityEventsComponent(
   components: Pick<AppComponents, 'config' | 'logs' | 'fetcher' | 'redis'>
 ): Promise<ICommunityEventsComponent> {
@@ -69,8 +71,7 @@ export async function createCommunityEventsComponent(
 
   async function fetchLiveEvents(communityId: string): Promise<boolean> {
     try {
-      // Query for live events (events that are currently happening) with limit 3
-      const url = `${EVENTS_API_URL}/api/events?communityId=${communityId}&limit=3&offset=0&list=live`
+      const url = `${EVENTS_API_URL}/api/events?communityId=${communityId}&list=live`
 
       const response = await fetcher.fetch(url)
 
@@ -82,7 +83,7 @@ export async function createCommunityEventsComponent(
       const result: EventsResponse = await response.json()
       const hasLiveEvents = result.ok && result.data && result.data.length > 0
 
-      let ttlInSeconds = 60 * 10 // Default TTL: 10 minutes
+      let ttlInSeconds = TEN_MINUTES_IN_SECONDS // Default TTL: 10 minutes
 
       if (hasLiveEvents && result.data.length > 0) {
         // Find the event with the latest finish_at time
