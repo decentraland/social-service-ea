@@ -7,9 +7,7 @@ import {
   GetBlockedUsersResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
-export function getBlockedUsersService({
-  components: { logs, friendsDb, catalystClient }
-}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient'>) {
+export function getBlockedUsersService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('get-blocked-users-service')
 
   return async function (request: GetBlockedUsersPayload, context: RpcServerContext): Promise<GetBlockedUsersResponse> {
@@ -17,14 +15,12 @@ export function getBlockedUsersService({
     const { address: loggedUserAddress } = context
 
     try {
-      const blockedUsers = await friendsDb.getBlockedUsers(loggedUserAddress)
-      const blockedAddresses = blockedUsers.map((user) => user.address)
-      const profiles = await catalystClient.getProfiles(blockedAddresses)
+      const { blockedUsers, blockedProfiles, total } = await friends.getBlockedUsers(loggedUserAddress)
 
       return {
-        profiles: parseProfilesToBlockedUsers(profiles, blockedUsers),
+        profiles: parseProfilesToBlockedUsers(blockedProfiles, blockedUsers),
         paginationData: {
-          total: blockedAddresses.length,
+          total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)
         }
       }

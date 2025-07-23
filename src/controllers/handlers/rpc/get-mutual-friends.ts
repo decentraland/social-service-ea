@@ -1,3 +1,4 @@
+import { EthAddress } from '@dcl/schemas'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { FRIENDSHIPS_PER_PAGE } from '../../../adapters/rpc-server/constants'
 import {
@@ -7,10 +8,9 @@ import {
 import { normalizeAddress } from '../../../utils/address'
 import { getPage } from '../../../utils/pagination'
 import { parseProfilesToFriends } from '../../../logic/friends'
+import { InvalidRequestError } from '../../errors/rpc.errors'
 
-export function getMutualFriendsService({
-  components: { logs, friendsDb, catalystClient }
-}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient'>) {
+export function getMutualFriendsService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('get-mutual-friends-service')
 
   return async function (
@@ -20,24 +20,31 @@ export function getMutualFriendsService({
     try {
       const { address: requester } = context
       const { pagination, user } = request
-      const requested = normalizeAddress(user!.address)
 
-      const [mutualFriends, total] = await Promise.all([
-        friendsDb.getMutualFriends(requester, requested, pagination),
-        friendsDb.getMutualFriendsCount(requester, requested)
-      ])
+      if (!user?.address) {
+        throw new InvalidRequestError('User address is missing in the request payload')
+      }
 
-      const profiles = await catalystClient.getProfiles(mutualFriends.map((friend) => friend.address))
+      const requested = normalizeAddress(user.address)
+
+      if (!EthAddress.validate(requested)) {
+        throw new InvalidRequestError('Invalid user address in the request payload')
+      }
+
+      const { friendsProfiles, total } = await friends.getMutualFriendsProfiles(requester, requested, pagination)
 
       return {
-        friends: parseProfilesToFriends(profiles),
+        friends: parseProfilesToFriends(friendsProfiles),
         paginationData: {
           total,
           page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)
         }
       }
     } catch (error: any) {
-      logger.error(`Error getting mutual friends: ${error.message}`)
+      logger.error(`Error getting mutual friends: ${error.message}`, {
+        error: error.message,
+        stack: error.stack
+      })
       return {
         friends: [],
         paginationData: {
