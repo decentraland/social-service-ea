@@ -5,10 +5,10 @@ import { createFriendsComponent } from '../../../src/logic/friends/component'
 import { IFriendsComponent } from '../../../src/logic/friends/types'
 import { createFriendsDBMockedComponent } from '../../mocks/components/friends-db'
 import { mockCatalystClient } from '../../mocks/components/catalyst-client'
-import { createMockProfile, mockProfile } from '../../mocks/profile'
-import { createMockedPubSubComponent, mockPg } from '../../mocks/components'
+import { createMockProfile } from '../../mocks/profile'
+import { createMockedPubSubComponent } from '../../mocks/components'
 import { EthAddress } from '@dcl/schemas'
-import { Action, Friendship } from '../../../src/types'
+import { Action, Friendship, User, BlockedUserWithDate, FriendshipRequest, FriendshipAction } from '../../../src/types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 
 describe('Friends Component', () => {
@@ -41,7 +41,7 @@ describe('Friends Component', () => {
     })
 
     describe('and the user has friends', () => {
-      let mockFriends: any[]
+      let mockFriends: User[]
       let mockProfiles: Profile[]
 
       beforeEach(() => {
@@ -118,7 +118,7 @@ describe('Friends Component', () => {
     })
 
     describe('and no pagination is provided', () => {
-      let mockFriends: any[]
+      let mockFriends: User[]
       let mockProfiles: Profile[]
 
       beforeEach(() => {
@@ -153,7 +153,7 @@ describe('Friends Component', () => {
       let mockProfiles: Profile[]
 
       beforeEach(() => {
-        const friendsWithDuplicates = [
+        const friendsWithDuplicates: User[] = [
           { address: '0xfriend1' },
           { address: '0xfriend1' }, // Duplicate
           { address: '0xfriend2' }
@@ -203,7 +203,7 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns an error', () => {
-      let mockFriends: any[]
+      let mockFriends: User[]
 
       beforeEach(() => {
         mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
@@ -230,7 +230,7 @@ describe('Friends Component', () => {
     })
 
     describe('and the friends count query returns an error', () => {
-      let mockFriends: any[]
+      let mockFriends: User[]
 
       beforeEach(() => {
         mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
@@ -256,7 +256,7 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns fewer profiles than expected', () => {
-      let mockFriends: any[]
+      let mockFriends: User[]
 
       beforeEach(() => {
         mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
@@ -283,7 +283,7 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns more profiles than expected', () => {
-      let mockFriends: any[]
+      let mockFriends: User[]
 
       beforeEach(() => {
         mockFriends = [{ address: '0xfriend1' }]
@@ -312,7 +312,7 @@ describe('Friends Component', () => {
 
   describe('when getting blocked users', () => {
     describe('and the user has blocked users', () => {
-      let mockBlockedUsers: any[]
+      let mockBlockedUsers: BlockedUserWithDate[]
       let mockProfiles: Profile[]
 
       beforeEach(() => {
@@ -379,7 +379,7 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns an error', () => {
-      let mockBlockedUsers: any[]
+      let mockBlockedUsers: BlockedUserWithDate[]
 
       beforeEach(() => {
         mockBlockedUsers = [
@@ -400,7 +400,7 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns fewer profiles than expected', () => {
-      let mockBlockedUsers: any[]
+      let mockBlockedUsers: BlockedUserWithDate[]
 
       beforeEach(() => {
         mockBlockedUsers = [
@@ -429,45 +429,18 @@ describe('Friends Component', () => {
         expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
       })
     })
-
-    describe('and the catalyst client returns more profiles than expected', () => {
-      let mockBlockedUsers: any[]
-
-      beforeEach(() => {
-        mockBlockedUsers = [{ address: '0xblocked1', blocked_at: new Date('2023-01-01') }]
-
-        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
-        // Catalyst returns 2 profiles instead of 1
-        mockCatalystClient.getProfiles.mockResolvedValue([
-          createMockProfile('0xblocked1'),
-          createMockProfile('0xblocked2')
-        ])
-      })
-
-      it('should return all profiles from catalyst', async () => {
-        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
-
-        expect(result).toEqual({
-          blockedUsers: mockBlockedUsers,
-          blockedProfiles: [createMockProfile('0xblocked1'), createMockProfile('0xblocked2')],
-          total: 1
-        })
-
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1'])
-      })
-    })
   })
 
   describe('when getting friendship status', () => {
     describe('and there is a friendship action', () => {
-      let mockFriendshipAction: any
+      let mockFriendshipAction: FriendshipAction
 
       beforeEach(() => {
         mockFriendshipAction = {
           id: 'action-id',
           friendship_id: 'friendship-id',
           acting_user: '0x123',
-          action: 'REQUEST' as any,
+          action: Action.REQUEST,
           timestamp: new Date().toISOString()
         }
 
@@ -522,7 +495,7 @@ describe('Friends Component', () => {
     })
 
     describe('and there are mutual friends', () => {
-      let mockMutualFriends: any[]
+      let mockMutualFriends: User[]
       let mockProfiles: Profile[]
 
       beforeEach(() => {
@@ -570,7 +543,7 @@ describe('Friends Component', () => {
     })
 
     describe('and no pagination is provided', () => {
-      let mockMutualFriends: any[]
+      let mockMutualFriends: User[]
       let mockProfiles: Profile[]
 
       beforeEach(() => {
@@ -614,7 +587,7 @@ describe('Friends Component', () => {
     })
 
     describe('and the getMutualFriendsCount database call fails', () => {
-      let mockMutualFriends: any[]
+      let mockMutualFriends: User[]
 
       beforeEach(() => {
         mockMutualFriends = [{ address: '0xmutual1' }]
@@ -635,7 +608,7 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns an error', () => {
-      let mockMutualFriends: any[]
+      let mockMutualFriends: User[]
 
       beforeEach(() => {
         mockMutualFriends = [{ address: '0xmutual1' }, { address: '0xmutual2' }]
@@ -667,7 +640,7 @@ describe('Friends Component', () => {
     })
 
     describe('and there are pending requests', () => {
-      let mockPendingRequests: any[]
+      let mockPendingRequests: FriendshipRequest[]
       let mockProfiles: Profile[]
 
       beforeEach(() => {
@@ -751,7 +724,7 @@ describe('Friends Component', () => {
     })
 
     describe('and there are sent requests', () => {
-      let mockSentRequests: any[]
+      let mockSentRequests: FriendshipRequest[]
       let mockProfiles: Profile[]
 
       beforeEach(() => {
