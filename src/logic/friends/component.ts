@@ -1,10 +1,11 @@
 import { EthAddress } from '@dcl/schemas'
-import { Action, AppComponents, BlockedUserWithDate } from '../../types'
+import { Action, AppComponents, BlockedUserWithDate, FriendshipRequest } from '../../types'
 import { BlockedUser, IFriendsComponent } from './types'
-import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { FriendshipStatus, Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { ProfileNotFoundError } from './errors'
+import { getFriendshipRequestStatus } from './friendships'
 
 export async function createFriendsComponent(
   components: Pick<AppComponents, 'friendsDb' | 'catalystClient' | 'pubsub'>
@@ -79,6 +80,77 @@ export async function createFriendsComponent(
         blockedUsers,
         blockedProfiles: profiles,
         total: blockedAddresses.length
+      }
+    },
+    getBlockingStatus: async (userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }> => {
+      const [blockedUsers, blockedByUsers] = await Promise.all([
+        friendsDb.getBlockedUsers(userAddress),
+        friendsDb.getBlockedByUsers(userAddress)
+      ])
+
+      const blockedAddresses = blockedUsers.map((user) => user.address)
+      const blockedByAddresses = blockedByUsers.map((user) => user.address)
+
+      return {
+        blockedUsers: blockedAddresses,
+        blockedByUsers: blockedByAddresses
+      }
+    },
+    getFriendshipStatus: async (loggedUserAddress: string, userAddress: string): Promise<FriendshipStatus> => {
+      const lastFriendshipAction = await friendsDb.getLastFriendshipActionByUsers(loggedUserAddress, userAddress)
+      return getFriendshipRequestStatus(lastFriendshipAction, loggedUserAddress)
+    },
+    getMutualFriendsProfiles: async (
+      requesterAddress: string,
+      requestedAddress: string,
+      pagination?: Pagination
+    ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
+      const [mutualFriends, total] = await Promise.all([
+        friendsDb.getMutualFriends(requesterAddress, requestedAddress, pagination),
+        friendsDb.getMutualFriendsCount(requesterAddress, requestedAddress)
+      ])
+
+      const profiles = await catalystClient.getProfiles(mutualFriends.map((friend) => friend.address))
+
+      return {
+        friendsProfiles: profiles,
+        total
+      }
+    },
+    getPendingFriendshipRequests: async (
+      userAddress: string,
+      pagination?: Pagination
+    ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }> => {
+      const [pendingRequests, pendingRequestsCount] = await Promise.all([
+        friendsDb.getReceivedFriendshipRequests(userAddress, pagination),
+        friendsDb.getReceivedFriendshipRequestsCount(userAddress)
+      ])
+
+      const pendingRequestsAddresses = pendingRequests.map(({ address }) => address)
+      const pendingRequesterProfiles = await catalystClient.getProfiles(pendingRequestsAddresses)
+
+      return {
+        requests: pendingRequests,
+        profiles: pendingRequesterProfiles,
+        total: pendingRequestsCount
+      }
+    },
+    getSentFriendshipRequests: async (
+      userAddress: string,
+      pagination?: Pagination
+    ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }> => {
+      const [sentRequests, sentRequestsCount] = await Promise.all([
+        friendsDb.getSentFriendshipRequests(userAddress, pagination),
+        friendsDb.getSentFriendshipRequestsCount(userAddress)
+      ])
+
+      const sentRequestsAddresses = sentRequests.map(({ address }) => address)
+      const sentRequestedProfiles = await catalystClient.getProfiles(sentRequestsAddresses)
+
+      return {
+        requests: sentRequests,
+        profiles: sentRequestedProfiles,
+        total: sentRequestsCount
       }
     }
   }

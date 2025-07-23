@@ -1,9 +1,12 @@
-import { mockFriendsDB, mockLogs } from '../../../../mocks/components'
-import { RpcServerContext } from '../../../../../src/types'
+import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
 import { getBlockingStatusService } from '../../../../../src/controllers/handlers/rpc/get-blocking-status'
+import { RpcServerContext } from '../../../../../src/types'
+import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('getBlockingStatusService', () => {
+describe('Get Blocking Status Service', () => {
   let getBlockingStatus: ReturnType<typeof getBlockingStatusService>
+  let friendsComponent: IFriendsComponent
+  let getBlockingStatusMethod: jest.MockedFunction<typeof friendsComponent.getBlockingStatus>
 
   const rpcContext: RpcServerContext = {
     address: '0x123',
@@ -11,54 +14,111 @@ describe('getBlockingStatusService', () => {
   }
 
   beforeEach(() => {
+    getBlockingStatusMethod = jest.fn()
+    friendsComponent = createFriendsMockedComponent({
+      getBlockingStatus: getBlockingStatusMethod
+    })
+
     getBlockingStatus = getBlockingStatusService({
-      components: { friendsDb: mockFriendsDB, logs: mockLogs }
+      components: { friends: friendsComponent, logs: mockLogs }
     })
   })
 
-  it('should return blocked users and blocked by users addresses', async () => {
-    const blockedUsers = [
-      { address: '0x456', blocked_at: new Date() },
-      { address: '0x789', blocked_at: new Date() }
-    ]
-    const blockedByUsers = [
-      { address: '0x123', blocked_at: new Date() },
-      { address: '0x456', blocked_at: new Date() }
-    ]
+  describe('when getting the users blocking status fails', () => {
+    beforeEach(() => {
+      getBlockingStatusMethod.mockRejectedValue(new Error('Database error'))
+    })
 
-    mockFriendsDB.getBlockedUsers.mockResolvedValueOnce(blockedUsers)
-    mockFriendsDB.getBlockedByUsers.mockResolvedValueOnce(blockedByUsers)
-    const response = await getBlockingStatus({}, rpcContext)
+    it('should return empty arrays', async () => {
+      const response = await getBlockingStatus({}, rpcContext)
 
-    expect(response).toEqual({
-      blockedUsers: blockedUsers.map((user) => user.address),
-      blockedByUsers: blockedByUsers.map((user) => user.address)
+      expect(response).toEqual({
+        blockedUsers: [],
+        blockedByUsers: []
+      })
     })
   })
 
-  it('should handle errors in the getBlockedUsers db call gracefully', async () => {
-    const error = new Error('Database error')
+  describe('when getting the users blocking status succeeds', () => {
+    let blockingStatusData: {
+      blockedUsers: string[]
+      blockedByUsers: string[]
+    }
 
-    mockFriendsDB.getBlockedUsers.mockRejectedValueOnce(error)
-
-    const response = await getBlockingStatus({}, rpcContext)
-
-    expect(response).toEqual({
-      blockedUsers: [],
-      blockedByUsers: []
+    beforeEach(() => {
+      blockingStatusData = {
+        blockedUsers: [],
+        blockedByUsers: []
+      }
+      getBlockingStatusMethod.mockResolvedValue(blockingStatusData)
     })
-  })
 
-  it('should handle errors in the getBlockedByUsers db call gracefully', async () => {
-    const error = new Error('Database error')
+    describe('and there are no blocked users and no blocked by users', () => {
+      beforeEach(() => {
+        blockingStatusData.blockedUsers = []
+        blockingStatusData.blockedByUsers = []
+      })
 
-    mockFriendsDB.getBlockedByUsers.mockRejectedValueOnce(error)
+      it('should return empty arrays', async () => {
+        const response = await getBlockingStatus({}, rpcContext)
 
-    const response = await getBlockingStatus({}, rpcContext)
+        expect(getBlockingStatusMethod).toHaveBeenCalledWith(rpcContext.address)
+        expect(response).toEqual({
+          blockedUsers: [],
+          blockedByUsers: []
+        })
+      })
+    })
 
-    expect(response).toEqual({
-      blockedUsers: [],
-      blockedByUsers: []
+    describe('and there are blocked users and blocked by users', () => {
+      beforeEach(() => {
+        blockingStatusData.blockedUsers = ['0x456', '0x789']
+        blockingStatusData.blockedByUsers = ['0x123', '0x456']
+      })
+
+      it('should return the blocking status data', async () => {
+        const response = await getBlockingStatus({}, rpcContext)
+
+        expect(getBlockingStatusMethod).toHaveBeenCalledWith(rpcContext.address)
+        expect(response).toEqual({
+          blockedUsers: ['0x456', '0x789'],
+          blockedByUsers: ['0x123', '0x456']
+        })
+      })
+    })
+
+    describe('and there are only blocked users', () => {
+      beforeEach(() => {
+        blockingStatusData.blockedUsers = ['0x456', '0x789']
+        blockingStatusData.blockedByUsers = []
+      })
+
+      it('should return blocked users and empty blocked by users array', async () => {
+        const response = await getBlockingStatus({}, rpcContext)
+
+        expect(getBlockingStatusMethod).toHaveBeenCalledWith(rpcContext.address)
+        expect(response).toEqual({
+          blockedUsers: ['0x456', '0x789'],
+          blockedByUsers: []
+        })
+      })
+    })
+
+    describe('and there are only blocked by users', () => {
+      beforeEach(() => {
+        blockingStatusData.blockedUsers = []
+        blockingStatusData.blockedByUsers = ['0x123', '0x456']
+      })
+
+      it('should return empty blocked users array and blocked by users', async () => {
+        const response = await getBlockingStatus({}, rpcContext)
+
+        expect(getBlockingStatusMethod).toHaveBeenCalledWith(rpcContext.address)
+        expect(response).toEqual({
+          blockedUsers: [],
+          blockedByUsers: ['0x123', '0x456']
+        })
+      })
     })
   })
 })
