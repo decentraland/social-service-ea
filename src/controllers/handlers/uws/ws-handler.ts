@@ -294,20 +294,6 @@ export async function registerWsHandler(
         wsConnectionId,
         ...(isAuthenticated(data) && { address: data.address })
       })
-    },
-    pong: (ws) => {
-      const data = ws.getUserData()
-      logger.debug('Pong received', {
-        wsConnectionId: data.wsConnectionId,
-        address: getAddress(data)
-      })
-    },
-    ping: (ws) => {
-      const data = ws.getUserData()
-      logger.debug('Ping received', {
-        wsConnectionId: data.wsConnectionId,
-        address: getAddress(data)
-      })
     }
   })
 }
