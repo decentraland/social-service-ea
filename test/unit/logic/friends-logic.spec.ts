@@ -5,10 +5,10 @@ import { createFriendsComponent } from '../../../src/logic/friends/component'
 import { IFriendsComponent } from '../../../src/logic/friends/types'
 import { createFriendsDBMockedComponent } from '../../mocks/components/friends-db'
 import { mockCatalystClient } from '../../mocks/components/catalyst-client'
-import { createMockProfile, mockProfile } from '../../mocks/profile'
-import { createMockedPubSubComponent, mockPg } from '../../mocks/components'
+import { createMockProfile } from '../../mocks/profile'
+import { createMockedPubSubComponent } from '../../mocks/components'
 import { EthAddress } from '@dcl/schemas'
-import { Action, Friendship } from '../../../src/types'
+import { Action, Friendship, User, BlockedUserWithDate, FriendshipRequest, FriendshipAction } from '../../../src/types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 
 describe('Friends Component', () => {
@@ -34,17 +34,20 @@ describe('Friends Component', () => {
   })
 
   describe('when getting friends profiles', () => {
-    const pagination: Pagination = { limit: 10, offset: 0 }
+    let pagination: Pagination
+
+    beforeEach(() => {
+      pagination = { limit: 10, offset: 0 }
+    })
 
     describe('and the user has friends', () => {
-      const mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
-      const mockProfiles = [
-        createMockProfile('0xfriend1'),
-        createMockProfile('0xfriend2'),
-        createMockProfile('0xfriend3')
-      ]
+      let mockFriends: User[]
+      let mockProfiles: Profile[]
 
       beforeEach(() => {
+        mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
+        mockProfiles = [createMockProfile('0xfriend1'), createMockProfile('0xfriend2'), createMockProfile('0xfriend3')]
+
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(3)
         mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
@@ -115,10 +118,13 @@ describe('Friends Component', () => {
     })
 
     describe('and no pagination is provided', () => {
-      const mockFriends = [{ address: '0xfriend1' }]
-      const mockProfiles = [createMockProfile('0xfriend1')]
+      let mockFriends: User[]
+      let mockProfiles: Profile[]
 
       beforeEach(() => {
+        mockFriends = [{ address: '0xfriend1' }]
+        mockProfiles = [createMockProfile('0xfriend1')]
+
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(1)
         mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
@@ -144,14 +150,16 @@ describe('Friends Component', () => {
     })
 
     describe('and there are duplicate friend addresses', () => {
-      const mockProfiles = [createMockProfile('0xfriend1'), createMockProfile('0xfriend2')]
+      let mockProfiles: Profile[]
 
       beforeEach(() => {
-        const friendsWithDuplicates = [
+        const friendsWithDuplicates: User[] = [
           { address: '0xfriend1' },
           { address: '0xfriend1' }, // Duplicate
           { address: '0xfriend2' }
         ]
+        mockProfiles = [createMockProfile('0xfriend1'), createMockProfile('0xfriend2')]
+
         mockFriendsDB.getFriends.mockResolvedValue(friendsWithDuplicates)
         mockFriendsDB.getFriendsCount.mockResolvedValue(3)
         mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
@@ -195,9 +203,11 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns an error', () => {
-      const mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
+      let mockFriends: User[]
 
       beforeEach(() => {
+        mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
+
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(3)
         mockCatalystClient.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
@@ -220,9 +230,11 @@ describe('Friends Component', () => {
     })
 
     describe('and the friends count query returns an error', () => {
-      const mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
+      let mockFriends: User[]
 
       beforeEach(() => {
+        mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
+
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockRejectedValue(new Error('Count query failed'))
       })
@@ -244,9 +256,11 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns fewer profiles than expected', () => {
-      const mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
+      let mockFriends: User[]
 
       beforeEach(() => {
+        mockFriends = [{ address: '0xfriend1' }, { address: '0xfriend2' }, { address: '0xfriend3' }]
+
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(3)
         // Catalyst returns only 2 profiles instead of 3
@@ -269,9 +283,11 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns more profiles than expected', () => {
-      const mockFriends = [{ address: '0xfriend1' }]
+      let mockFriends: User[]
 
       beforeEach(() => {
+        mockFriends = [{ address: '0xfriend1' }]
+
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(1)
         // Catalyst returns 2 profiles instead of 1
@@ -296,18 +312,21 @@ describe('Friends Component', () => {
 
   describe('when getting blocked users', () => {
     describe('and the user has blocked users', () => {
-      const mockBlockedUsers = [
-        { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
-        { address: '0xblocked2', blocked_at: new Date('2023-01-02') },
-        { address: '0xblocked3', blocked_at: new Date('2023-01-03') }
-      ]
-      const mockProfiles = [
-        createMockProfile('0xblocked1'),
-        createMockProfile('0xblocked2'),
-        createMockProfile('0xblocked3')
-      ]
+      let mockBlockedUsers: BlockedUserWithDate[]
+      let mockProfiles: Profile[]
 
       beforeEach(() => {
+        mockBlockedUsers = [
+          { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
+          { address: '0xblocked2', blocked_at: new Date('2023-01-02') },
+          { address: '0xblocked3', blocked_at: new Date('2023-01-03') }
+        ]
+        mockProfiles = [
+          createMockProfile('0xblocked1'),
+          createMockProfile('0xblocked2'),
+          createMockProfile('0xblocked3')
+        ]
+
         mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
         mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
       })
@@ -360,12 +379,14 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns an error', () => {
-      const mockBlockedUsers = [
-        { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
-        { address: '0xblocked2', blocked_at: new Date('2023-01-02') }
-      ]
+      let mockBlockedUsers: BlockedUserWithDate[]
 
       beforeEach(() => {
+        mockBlockedUsers = [
+          { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
+          { address: '0xblocked2', blocked_at: new Date('2023-01-02') }
+        ]
+
         mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
         mockCatalystClient.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
       })
@@ -379,13 +400,15 @@ describe('Friends Component', () => {
     })
 
     describe('and the catalyst client returns fewer profiles than expected', () => {
-      const mockBlockedUsers = [
-        { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
-        { address: '0xblocked2', blocked_at: new Date('2023-01-02') },
-        { address: '0xblocked3', blocked_at: new Date('2023-01-03') }
-      ]
+      let mockBlockedUsers: BlockedUserWithDate[]
 
       beforeEach(() => {
+        mockBlockedUsers = [
+          { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
+          { address: '0xblocked2', blocked_at: new Date('2023-01-02') },
+          { address: '0xblocked3', blocked_at: new Date('2023-01-03') }
+        ]
+
         mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
         // Catalyst returns only 2 profiles instead of 3
         mockCatalystClient.getProfiles.mockResolvedValue([
@@ -406,151 +429,371 @@ describe('Friends Component', () => {
         expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
       })
     })
+  })
 
-    describe('and the catalyst client returns more profiles than expected', () => {
-      const mockBlockedUsers = [{ address: '0xblocked1', blocked_at: new Date('2023-01-01') }]
+  describe('when getting friendship status', () => {
+    describe('and there is a friendship action', () => {
+      let mockFriendshipAction: FriendshipAction
 
       beforeEach(() => {
-        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
-        // Catalyst returns 2 profiles instead of 1
-        mockCatalystClient.getProfiles.mockResolvedValue([
-          createMockProfile('0xblocked1'),
-          createMockProfile('0xblocked2')
-        ])
+        mockFriendshipAction = {
+          id: 'action-id',
+          friendship_id: 'friendship-id',
+          acting_user: '0x123',
+          action: Action.REQUEST,
+          timestamp: new Date().toISOString()
+        }
+
+        mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(mockFriendshipAction)
       })
 
-      it('should return all profiles from catalyst', async () => {
-        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+      it('should return the friendship status for the latest action', async () => {
+        const result = await friendsComponent.getFriendshipStatus('0x123', '0x456')
 
-        expect(result).toEqual({
-          blockedUsers: mockBlockedUsers,
-          blockedProfiles: [createMockProfile('0xblocked1'), createMockProfile('0xblocked2')],
-          total: 1
-        })
+        expect(result).toBeDefined()
+        expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
+      })
+    })
 
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xblocked1'])
+    describe('and there is no friendship action', () => {
+      beforeEach(() => {
+        mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(null)
+      })
+
+      it('should return NONE status', async () => {
+        const result = await friendsComponent.getFriendshipStatus('0x123', '0x456')
+
+        expect(result).toBeDefined()
+        expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
+      })
+    })
+
+    describe('and the database returns an error', () => {
+      beforeEach(() => {
+        mockFriendsDB.getLastFriendshipActionByUsers.mockRejectedValue(new Error('Database connection failed'))
+      })
+
+      it('should propagate the error', async () => {
+        await expect(friendsComponent.getFriendshipStatus('0x123', '0x456')).rejects.toThrow(
+          'Database connection failed'
+        )
+
+        expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith('0x123', '0x456')
       })
     })
   })
 
-  describe('when getting blocking status', () => {
-    describe('and the user has blocked users and is blocked by users', () => {
-      const mockBlockedUsers = [
-        { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
-        { address: '0xblocked2', blocked_at: new Date('2023-01-02') }
-      ]
-      const mockBlockedByUsers = [
-        { address: '0xblocker1', blocked_at: new Date('2023-01-03') },
-        { address: '0xblocker2', blocked_at: new Date('2023-01-04') }
-      ]
+  describe('when getting mutual friends', () => {
+    let pagination: Pagination
+    let requesterAddress: string
+    let requestedAddress: string
+
+    beforeEach(() => {
+      pagination = { limit: 10, offset: 0 }
+      requesterAddress = '0x123'
+      requestedAddress = '0x456'
+    })
+
+    describe('and there are mutual friends', () => {
+      let mockMutualFriends: User[]
+      let mockProfiles: Profile[]
 
       beforeEach(() => {
-        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
-        mockFriendsDB.getBlockedByUsers.mockResolvedValue(mockBlockedByUsers)
+        mockMutualFriends = [{ address: '0xmutual1' }, { address: '0xmutual2' }, { address: '0xmutual3' }]
+        mockProfiles = [createMockProfile('0xmutual1'), createMockProfile('0xmutual2'), createMockProfile('0xmutual3')]
+
+        mockFriendsDB.getMutualFriends.mockResolvedValue(mockMutualFriends)
+        mockFriendsDB.getMutualFriendsCount.mockResolvedValue(3)
+        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
       })
 
-      it('should return blocked users and blocked by users addresses', async () => {
-        const result = await friendsComponent.getBlockingStatus(mockUserAddress)
+      it('should return mutual friends profiles with total count', async () => {
+        const result = await friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
 
         expect(result).toEqual({
-          blockedUsers: ['0xblocked1', '0xblocked2'],
-          blockedByUsers: ['0xblocker1', '0xblocker2']
+          friendsProfiles: mockProfiles,
+          total: 3
         })
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
+        expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xmutual1', '0xmutual2', '0xmutual3'])
       })
     })
 
-    describe('and the user has no blocked users and is not blocked by anyone', () => {
+    describe('and there are no mutual friends', () => {
       beforeEach(() => {
-        mockFriendsDB.getBlockedUsers.mockResolvedValue([])
-        mockFriendsDB.getBlockedByUsers.mockResolvedValue([])
+        mockFriendsDB.getMutualFriends.mockResolvedValue([])
+        mockFriendsDB.getMutualFriendsCount.mockResolvedValue(0)
+        mockCatalystClient.getProfiles.mockResolvedValue([])
       })
 
-      it('should return empty arrays', async () => {
-        const result = await friendsComponent.getBlockingStatus(mockUserAddress)
+      it('should return empty profiles array with zero total', async () => {
+        const result = await friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
 
         expect(result).toEqual({
-          blockedUsers: [],
-          blockedByUsers: []
+          friendsProfiles: [],
+          total: 0
         })
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
+        expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
       })
     })
 
-    describe('and the user has only blocked users but is not blocked by anyone', () => {
-      const mockBlockedUsers = [{ address: '0xblocked1', blocked_at: new Date('2023-01-01') }]
+    describe('and no pagination is provided', () => {
+      let mockMutualFriends: User[]
+      let mockProfiles: Profile[]
 
       beforeEach(() => {
-        mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
-        mockFriendsDB.getBlockedByUsers.mockResolvedValue([])
+        mockMutualFriends = [{ address: '0xmutual1' }]
+        mockProfiles = [createMockProfile('0xmutual1')]
+
+        mockFriendsDB.getMutualFriends.mockResolvedValue(mockMutualFriends)
+        mockFriendsDB.getMutualFriendsCount.mockResolvedValue(1)
+        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
       })
 
-      it('should return blocked users addresses and empty blocked by users array', async () => {
-        const result = await friendsComponent.getBlockingStatus(mockUserAddress)
+      it('should work without pagination', async () => {
+        const result = await friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress)
 
         expect(result).toEqual({
-          blockedUsers: ['0xblocked1'],
-          blockedByUsers: []
+          friendsProfiles: mockProfiles,
+          total: 1
         })
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, undefined)
+        expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xmutual1'])
       })
     })
 
-    describe('and the user has no blocked users but is blocked by others', () => {
-      const mockBlockedByUsers = [
-        { address: '0xblocker1', blocked_at: new Date('2023-01-01') },
-        { address: '0xblocker2', blocked_at: new Date('2023-01-02') }
-      ]
-
+    describe('and the getMutualFriends database call fails', () => {
       beforeEach(() => {
-        mockFriendsDB.getBlockedUsers.mockResolvedValue([])
-        mockFriendsDB.getBlockedByUsers.mockResolvedValue(mockBlockedByUsers)
-      })
-
-      it('should return empty blocked users array and blocked by users addresses', async () => {
-        const result = await friendsComponent.getBlockingStatus(mockUserAddress)
-
-        expect(result).toEqual({
-          blockedUsers: [],
-          blockedByUsers: ['0xblocker1', '0xblocker2']
-        })
-
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
-      })
-    })
-
-    describe('and the getBlockedUsers database call fails', () => {
-      beforeEach(() => {
-        mockFriendsDB.getBlockedUsers.mockRejectedValue(new Error('Database connection failed'))
-        mockFriendsDB.getBlockedByUsers.mockResolvedValue([])
+        mockFriendsDB.getMutualFriends.mockRejectedValue(new Error('Database connection failed'))
+        mockFriendsDB.getMutualFriendsCount.mockResolvedValue(0)
       })
 
       it('should propagate the error', async () => {
-        await expect(friendsComponent.getBlockingStatus(mockUserAddress)).rejects.toThrow('Database connection failed')
+        await expect(
+          friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
+        ).rejects.toThrow('Database connection failed')
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
+        expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
+        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
       })
     })
 
-    describe('and the getBlockedByUsers database call fails', () => {
+    describe('and the getMutualFriendsCount database call fails', () => {
+      let mockMutualFriends: User[]
+
       beforeEach(() => {
-        mockFriendsDB.getBlockedUsers.mockResolvedValue([])
-        mockFriendsDB.getBlockedByUsers.mockRejectedValue(new Error('Database connection failed'))
+        mockMutualFriends = [{ address: '0xmutual1' }]
+
+        mockFriendsDB.getMutualFriends.mockResolvedValue(mockMutualFriends)
+        mockFriendsDB.getMutualFriendsCount.mockRejectedValue(new Error('Count query failed'))
       })
 
       it('should propagate the error', async () => {
-        await expect(friendsComponent.getBlockingStatus(mockUserAddress)).rejects.toThrow('Database connection failed')
+        await expect(
+          friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
+        ).rejects.toThrow('Count query failed')
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
-        expect(mockFriendsDB.getBlockedByUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
+        expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
+        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the catalyst client returns an error', () => {
+      let mockMutualFriends: User[]
+
+      beforeEach(() => {
+        mockMutualFriends = [{ address: '0xmutual1' }, { address: '0xmutual2' }]
+
+        mockFriendsDB.getMutualFriends.mockResolvedValue(mockMutualFriends)
+        mockFriendsDB.getMutualFriendsCount.mockResolvedValue(2)
+        mockCatalystClient.getProfiles.mockRejectedValue(new Error('Catalyst service unavailable'))
+      })
+
+      it('should propagate the error', async () => {
+        await expect(
+          friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
+        ).rejects.toThrow('Catalyst service unavailable')
+
+        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, pagination)
+        expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xmutual1', '0xmutual2'])
+      })
+    })
+  })
+
+  describe('when getting pending friendship requests', () => {
+    let pagination: Pagination
+    let userAddress: string
+
+    beforeEach(() => {
+      pagination = { limit: 10, offset: 0 }
+      userAddress = '0x1234567890123456789012345678901234567890'
+    })
+
+    describe('and there are pending requests', () => {
+      let mockPendingRequests: FriendshipRequest[]
+      let mockProfiles: Profile[]
+
+      beforeEach(() => {
+        mockPendingRequests = [
+          { id: 'req1', address: '0xrequester1', timestamp: new Date().toISOString(), metadata: { message: 'Hello' } },
+          {
+            id: 'req2',
+            address: '0xrequester2',
+            timestamp: new Date().toISOString(),
+            metadata: { message: 'Hi there' }
+          }
+        ]
+        mockProfiles = [createMockProfile('0xrequester1'), createMockProfile('0xrequester2')]
+
+        mockFriendsDB.getReceivedFriendshipRequests.mockResolvedValue(mockPendingRequests)
+        mockFriendsDB.getReceivedFriendshipRequestsCount.mockResolvedValue(2)
+        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+      })
+
+      it('should return pending requests with total count', async () => {
+        const result = await friendsComponent.getPendingFriendshipRequests(userAddress, pagination)
+
+        expect(result).toEqual({
+          requests: expect.any(Array),
+          profiles: expect.any(Array),
+          total: 2
+        })
+
+        expect(mockFriendsDB.getReceivedFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
+        expect(mockFriendsDB.getReceivedFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xrequester1', '0xrequester2'])
+      })
+    })
+
+    describe('and there are no pending requests', () => {
+      beforeEach(() => {
+        mockFriendsDB.getReceivedFriendshipRequests.mockResolvedValue([])
+        mockFriendsDB.getReceivedFriendshipRequestsCount.mockResolvedValue(0)
+        mockCatalystClient.getProfiles.mockResolvedValue([])
+      })
+
+      it('should return empty requests array with zero total', async () => {
+        const result = await friendsComponent.getPendingFriendshipRequests(userAddress, pagination)
+
+        expect(result).toEqual({
+          requests: [],
+          profiles: [],
+          total: 0
+        })
+
+        expect(mockFriendsDB.getReceivedFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
+        expect(mockFriendsDB.getReceivedFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+      })
+    })
+
+    describe('and the database returns an error', () => {
+      beforeEach(() => {
+        mockFriendsDB.getReceivedFriendshipRequests.mockRejectedValue(new Error('Database connection failed'))
+      })
+
+      it('should propagate the error', async () => {
+        await expect(friendsComponent.getPendingFriendshipRequests(userAddress, pagination)).rejects.toThrow(
+          'Database connection failed'
+        )
+
+        expect(mockFriendsDB.getReceivedFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
+        expect(mockFriendsDB.getReceivedFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
+        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when getting sent friendship requests', () => {
+    let pagination: Pagination
+    let userAddress: string
+
+    beforeEach(() => {
+      pagination = { limit: 10, offset: 0 }
+      userAddress = '0x1234567890123456789012345678901234567890'
+    })
+
+    describe('and there are sent requests', () => {
+      let mockSentRequests: FriendshipRequest[]
+      let mockProfiles: Profile[]
+
+      beforeEach(() => {
+        mockSentRequests = [
+          { id: 'req1', address: '0xrequested1', timestamp: new Date().toISOString(), metadata: { message: 'Hello' } },
+          {
+            id: 'req2',
+            address: '0xrequested2',
+            timestamp: new Date().toISOString(),
+            metadata: { message: 'Hi there' }
+          }
+        ]
+        mockProfiles = [createMockProfile('0xrequested1'), createMockProfile('0xrequested2')]
+
+        mockFriendsDB.getSentFriendshipRequests.mockResolvedValue(mockSentRequests)
+        mockFriendsDB.getSentFriendshipRequestsCount.mockResolvedValue(2)
+        mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+      })
+
+      it('should return sent requests with total count', async () => {
+        const result = await friendsComponent.getSentFriendshipRequests(userAddress, pagination)
+
+        expect(result).toEqual({
+          requests: expect.any(Array),
+          profiles: expect.any(Array),
+          total: 2
+        })
+
+        expect(mockFriendsDB.getSentFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
+        expect(mockFriendsDB.getSentFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xrequested1', '0xrequested2'])
+      })
+    })
+
+    describe('and there are no sent requests', () => {
+      beforeEach(() => {
+        mockFriendsDB.getSentFriendshipRequests.mockResolvedValue([])
+        mockFriendsDB.getSentFriendshipRequestsCount.mockResolvedValue(0)
+        mockCatalystClient.getProfiles.mockResolvedValue([])
+      })
+
+      it('should return empty requests array with zero total', async () => {
+        const result = await friendsComponent.getSentFriendshipRequests(userAddress, pagination)
+
+        expect(result).toEqual({
+          requests: [],
+          profiles: [],
+          total: 0
+        })
+
+        expect(mockFriendsDB.getSentFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
+        expect(mockFriendsDB.getSentFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+      })
+    })
+
+    describe('and the database returns an error', () => {
+      beforeEach(() => {
+        mockFriendsDB.getSentFriendshipRequests.mockRejectedValue(new Error('Database connection failed'))
+      })
+
+      it('should propagate the error', async () => {
+        await expect(friendsComponent.getSentFriendshipRequests(userAddress, pagination)).rejects.toThrow(
+          'Database connection failed'
+        )
+
+        expect(mockFriendsDB.getSentFriendshipRequests).toHaveBeenCalledWith(userAddress, pagination)
+        expect(mockFriendsDB.getSentFriendshipRequestsCount).toHaveBeenCalledWith(userAddress)
+        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
       })
     })
   })
@@ -685,98 +928,5 @@ describe('Friends Component', () => {
         })
       })
     })
-
-    // it('should block a user successfully, update friendship status, and record friendship action if it exists', async () => {
-    //   const request: BlockUserPayload = {
-    //     user: { address: blockedAddress }
-    //   }
-
-    //   mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    //   mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    //   mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
-
-    //   const response = await blockUser(request, rpcContext)
-
-    //   expect(response).toEqual({
-    //     response: {
-    //       $case: 'ok',
-    //       ok: {
-    //         profile: parseProfileToBlockedUser(mockProfile, blockedAt)
-    //       }
-    //     }
-    //   })
-    //   expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
-    //   expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
-    //   expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(expect.any(String), false, mockClient)
-    //   expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
-    //     expect.any(String),
-    //     rpcContext.address,
-    //     Action.BLOCK,
-    //     null,
-    //     mockClient
-    //   )
-    // })
-
-    // it('should block a user successfully and do nothing else if friendship does not exist', async () => {
-    //   const request: BlockUserPayload = {
-    //     user: { address: blockedAddress }
-    //   }
-
-    //   mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    //   mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
-    //   mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
-
-    //   const response = await blockUser(request, rpcContext)
-
-    //   expect(response).toEqual({
-    //     response: {
-    //       $case: 'ok',
-    //       ok: { profile: parseProfileToBlockedUser(mockProfile, blockedAt) }
-    //     }
-    //   })
-
-    //   expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(rpcContext.address, blockedAddress, mockClient)
-    //   expect(mockFriendsDB.getFriendship).toHaveBeenCalledWith([rpcContext.address, blockedAddress], mockClient)
-    //   expect(mockFriendsDB.updateFriendshipStatus).not.toHaveBeenCalled()
-    //   expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
-    // })
-
-    // it('should publish a friendship update event after blocking a user if friendship exists', async () => {
-    //   const request: BlockUserPayload = {
-    //     user: { address: blockedAddress }
-    //   }
-
-    //   mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    //   mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    //   mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
-    //   mockFriendsDB.recordFriendshipAction.mockResolvedValueOnce('action-id')
-
-    //   await blockUser(request, rpcContext)
-
-    //   expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
-    //     id: 'action-id',
-    //     from: rpcContext.address,
-    //     to: blockedAddress,
-    //     action: Action.BLOCK,
-    //     timestamp: blockedAt.getTime()
-    //   })
-    // })
-
-    // it('should publish a block update event after blocking a user', async () => {
-    //   const request: BlockUserPayload = {
-    //     user: { address: blockedAddress }
-    //   }
-
-    //   mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
-    //   mockFriendsDB.getFriendship.mockResolvedValueOnce({ id: 'friendship-id' } as Friendship)
-    //   mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
-    //   await blockUser(request, rpcContext)
-
-    //   expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
-    //     blockerAddress: rpcContext.address,
-    //     blockedAddress,
-    //     isBlocked: true
-    //   })
-    // })
   })
 })
