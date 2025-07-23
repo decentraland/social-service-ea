@@ -3,7 +3,7 @@ import { getBlockingStatusService } from '../../../../../src/controllers/handler
 import { RpcServerContext } from '../../../../../src/types'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('Get Blocking Status Service', () => {
+describe('when getting blocking status', () => {
   let getBlockingStatus: ReturnType<typeof getBlockingStatusService>
   let friendsComponent: IFriendsComponent
   let getBlockingStatusMethod: jest.MockedFunction<typeof friendsComponent.getBlockingStatus>
@@ -24,7 +24,7 @@ describe('Get Blocking Status Service', () => {
     })
   })
 
-  describe('when getting the users blocking status fails', () => {
+  describe('and getting the users blocking status fails', () => {
     beforeEach(() => {
       getBlockingStatusMethod.mockRejectedValue(new Error('Database error'))
     })
@@ -39,7 +39,7 @@ describe('Get Blocking Status Service', () => {
     })
   })
 
-  describe('when getting the users blocking status succeeds', () => {
+  describe('and getting the users blocking status succeeds', () => {
     let blockingStatusData: {
       blockedUsers: string[]
       blockedByUsers: string[]

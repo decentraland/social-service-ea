@@ -7,7 +7,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('Get Friendship Status Service', () => {
+describe('when getting friendship status', () => {
   let getFriendshipStatus: ReturnType<typeof getFriendshipStatusService>
   let friendsComponent: IFriendsComponent
   let getFriendshipStatusMethod: jest.MockedFunction<typeof friendsComponent.getFriendshipStatus>
@@ -34,7 +34,7 @@ describe('Get Friendship Status Service', () => {
     })
   })
 
-  describe('when getting the users friendship status fails', () => {
+  describe('and getting the users friendship status fails', () => {
     beforeEach(() => {
       getFriendshipStatusMethod.mockRejectedValue(new Error('Database error'))
     })
@@ -54,7 +54,7 @@ describe('Get Friendship Status Service', () => {
     })
   })
 
-  describe('when getting the users friendship status succeeds', () => {
+  describe('and getting the users friendship status succeeds', () => {
     beforeEach(() => {
       getFriendshipStatusMethod.mockResolvedValue(FriendshipStatus.REQUEST_SENT)
     })
@@ -74,7 +74,7 @@ describe('Get Friendship Status Service', () => {
     })
   })
 
-  describe('when the user address is missing', () => {
+  describe('and the user address is missing', () => {
     const requestWithoutAddress: GetFriendshipStatusPayload = {
       user: undefined
     }
@@ -94,7 +94,7 @@ describe('Get Friendship Status Service', () => {
     })
   })
 
-  describe('when the user address is invalid', () => {
+  describe('and the user address is invalid', () => {
     const requestWithInvalidAddress: GetFriendshipStatusPayload = {
       user: { address: 'invalid-address' }
     }
@@ -114,7 +114,7 @@ describe('Get Friendship Status Service', () => {
     })
   })
 
-  describe('when there is no friendship action', () => {
+  describe('and there is no friendship action', () => {
     beforeEach(() => {
       getFriendshipStatusMethod.mockResolvedValue(FriendshipStatus.NONE)
     })
@@ -134,7 +134,7 @@ describe('Get Friendship Status Service', () => {
     })
   })
 
-  describe('when there is an unknown action', () => {
+  describe('and there is an unknown action', () => {
     beforeEach(() => {
       getFriendshipStatusMethod.mockResolvedValue(FriendshipStatus.UNRECOGNIZED)
     })

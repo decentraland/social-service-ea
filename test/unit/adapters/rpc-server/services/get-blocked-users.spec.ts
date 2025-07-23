@@ -5,7 +5,7 @@ import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfilesToBlockedUsers } from '../../../../../src/logic/friends'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('Get Blocked Users Service', () => {
+describe('when getting blocked users', () => {
   let getBlockedUsers: ReturnType<typeof getBlockedUsersService>
   let friendsComponent: IFriendsComponent
   let getBlockedUsersMethod: jest.MockedFunction<typeof friendsComponent.getBlockedUsers>
@@ -26,7 +26,7 @@ describe('Get Blocked Users Service', () => {
     })
   })
 
-  describe('when getting the users blocked users fails', () => {
+  describe('and getting the users blocked users fails', () => {
     beforeEach(() => {
       getBlockedUsersMethod.mockRejectedValue(new Error('Database error'))
     })
@@ -44,7 +44,7 @@ describe('Get Blocked Users Service', () => {
     })
   })
 
-  describe('when getting the users blocked users succeeds', () => {
+  describe('and getting the users blocked users succeeds', () => {
     let blockedUsersData: {
       blockedUsers: Array<{ address: string; blocked_at: Date }>
       blockedProfiles: any[]

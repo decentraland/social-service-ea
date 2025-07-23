@@ -8,7 +8,7 @@ import { createMockProfile } from '../../../../mocks/profile'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 import { FriendshipRequest } from '../../../../../src/types'
 
-describe('Get Pending Friendship Requests Service', () => {
+describe('when getting pending friendship requests', () => {
   let getPendingRequests: ReturnType<typeof getPendingFriendshipRequestsService>
   let friendsComponent: IFriendsComponent
   let getPendingFriendshipRequestsMethod: jest.MockedFunction<typeof friendsComponent.getPendingFriendshipRequests>
@@ -29,7 +29,7 @@ describe('Get Pending Friendship Requests Service', () => {
     })
   })
 
-  describe('when getting the users pending friendship requests fails', () => {
+  describe('and getting the users pending friendship requests fails', () => {
     beforeEach(() => {
       getPendingFriendshipRequestsMethod.mockRejectedValue(new Error('Database error'))
     })
@@ -46,7 +46,7 @@ describe('Get Pending Friendship Requests Service', () => {
     })
   })
 
-  describe('when getting the users pending friendship requests succeeds', () => {
+  describe('and getting the users pending friendship requests succeeds', () => {
     let pendingRequestsData: {
       requests: FriendshipRequest[]
       profiles: any[]
