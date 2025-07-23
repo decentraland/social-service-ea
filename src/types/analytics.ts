@@ -3,7 +3,8 @@ export enum AnalyticsEvent {
   REJECT_CALL = 'REJECT_CALL',
   ACCEPT_CALL = 'ACCEPT_CALL',
   END_CALL = 'END_CALL',
-  EXPIRE_CALL = 'EXPIRE_CALL'
+  EXPIRE_CALL = 'EXPIRE_CALL',
+  START_COMMUNITY_CALL = 'START_COMMUNITY_CALL'
 }
 
 export type AnalyticsEventPayload = {
@@ -11,6 +12,10 @@ export type AnalyticsEventPayload = {
     call_id: string
     user_id: string
     receiver_id: string
+  }
+  [AnalyticsEvent.START_COMMUNITY_CALL]: {
+    call_id: string
+    user_id: string
   }
   [AnalyticsEvent.END_CALL]: {
     call_id: string

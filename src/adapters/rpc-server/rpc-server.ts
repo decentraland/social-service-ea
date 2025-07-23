@@ -8,7 +8,8 @@ import {
   FRIENDSHIP_UPDATES_CHANNEL,
   PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
-  COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL
+  COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+  COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL
 } from '../pubsub'
 import { createRpcServerMetricsWrapper } from './metrics-wrapper'
 import { RpcServiceCreators } from '../../controllers/routes/rpc.routes'
@@ -37,6 +38,7 @@ export async function createRpcServerComponent({
   })
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
+  console.log('rpcServerPort', rpcServerPort)
 
   const subscriptionsMap = {
     [FRIENDSHIP_UPDATES_CHANNEL]: [
@@ -47,7 +49,8 @@ export async function createRpcServerComponent({
     [COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL]: [updateHandler.communityMemberConnectivityUpdateHandler],
     [COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL]: [updateHandler.communityMemberStatusHandler],
     [BLOCK_UPDATES_CHANNEL]: [updateHandler.blockUpdateHandler],
-    [PRIVATE_VOICE_CHAT_UPDATES_CHANNEL]: [updateHandler.privateVoiceChatUpdateHandler]
+    [PRIVATE_VOICE_CHAT_UPDATES_CHANNEL]: [updateHandler.privateVoiceChatUpdateHandler],
+    [COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL]: [updateHandler.communityVoiceChatUpdateHandler]
   }
 
   let serviceCreators: RpcServiceCreators | null = null
@@ -58,7 +61,14 @@ export async function createRpcServerComponent({
       const servicesWithMetrics = withMetrics(creators)
 
       rpcServer.setHandler(async function handler(port) {
-        registerService(port, SocialServiceDefinition, async () => servicesWithMetrics as any)
+        try {
+          const result = registerService(port, SocialServiceDefinition, async () => {
+            return servicesWithMetrics as any
+          })
+          return result
+        } catch (error: any) {
+          throw error
+        }
       })
     },
     async start() {
@@ -77,15 +87,7 @@ export async function createRpcServerComponent({
       )
     },
     attachUser({ transport, address }) {
-      logger.debug('[DEBUGGING CONNECTION] Attaching user to RPC', {
-        address,
-        transportConnected: String(transport.isConnected)
-      })
-
       transport.on('close', () => {
-        logger.debug('[DEBUGGING CONNECTION] Transport closed, removing subscriber', {
-          address
-        })
         subscribersContext.removeSubscriber(address)
       })
 
@@ -97,9 +99,6 @@ export async function createRpcServerComponent({
       })
     },
     detachUser(address) {
-      logger.debug('[DEBUGGING CONNECTION] Detaching user from RPC', {
-        address
-      })
       // End all calls that the user is involved in
       voice.endIncomingOrOutgoingPrivateVoiceChatForUser(address).catch((_) => {
         // Do nothing

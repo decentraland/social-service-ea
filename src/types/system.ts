@@ -48,6 +48,7 @@ import {
 } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
+import { ICommunityVoiceComponent } from '../logic/community-voice'
 import { IReferralComponent } from '../logic/referral'
 import { IReferralDatabaseComponent } from './referral-db.type'
 import { IQueueComponent } from './sqs.type'
@@ -77,6 +78,7 @@ export type BaseComponents = {
   communityMembers: ICommunityMembersComponent
   communityPlaces: ICommunityPlacesComponent
   communityRoles: ICommunityRolesComponent
+  communityVoice: ICommunityVoiceComponent
   config: IConfigComponent
   email: IEmailComponent
   expirePrivateVoiceChatJob?: IJobComponent

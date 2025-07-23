@@ -21,3 +21,12 @@ export * from './subscribe-to-private-voice-chat-updates'
 export * from './unblock-user'
 export * from './upsert-friendship'
 export * from './upsert-social-settings'
+
+// Community voice chat handlers
+export * from './start-community-voice-chat'
+export * from './join-community-voice-chat'
+export * from './request-to-speak-in-community-voice-chat'
+export * from './promote-speaker-in-community-voice-chat'
+export * from './demote-speaker-in-community-voice-chat'
+export * from './kick-player-from-community-voice-chat'
+export * from './subscribe-to-community-voice-chat-updates'

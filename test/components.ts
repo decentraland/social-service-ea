@@ -48,6 +48,7 @@ import {
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
+import { createCommunityVoiceComponent } from '../src/logic/community-voice'
 import { createSettingsComponent } from '../src/logic/settings'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from '../src/logic/sqs'
 import { createReferralDBComponent } from '../src/adapters/referral-db'
@@ -172,13 +173,22 @@ async function initComponents(): Promise<TestComponents> {
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     logs,
     storage,
-    config
+    config,
+    commsGatekeeper
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,
     subscribersContext,
     friendsDb,
     communityMembers,
+    catalystClient
+  })
+  const communityVoice = await createCommunityVoiceComponent({
+    logs,
+    commsGatekeeper,
+    pubsub,
+    analytics,
+    communitiesDb,
     catalystClient
   })
   const rpcServer = await createRpcServerComponent({
@@ -276,6 +286,7 @@ async function initComponents(): Promise<TestComponents> {
     uwsServer,
     voice,
     voiceDb,
+    communityVoice,
     worldsStats,
     wsPool,
     cdnCacheInvalidator: mockCdnCacheInvalidator,

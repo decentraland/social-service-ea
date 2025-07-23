@@ -10,15 +10,15 @@ export type BlockedUser = {
 }
 
 export interface IFriendsComponent {
-  getFriendsProfiles(
-    userAddress: EthAddress,
-    pagination?: Pagination
-  ): Promise<{ friendsProfiles: Profile[]; total: number }>
   blockUser(blockerAddress: string, blockedAddress: string): Promise<BlockedUser>
   getBlockedUsers(
     userAddress: string
   ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }>
   getBlockingStatus(userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }>
+  getFriendsProfiles(
+    userAddress: EthAddress,
+    pagination?: Pagination
+  ): Promise<{ friendsProfiles: Profile[]; total: number }>
   getFriendshipStatus(loggedUserAddress: string, userAddress: string): Promise<FriendshipStatus>
   getMutualFriendsProfiles(
     requesterAddress: string,
@@ -33,4 +33,5 @@ export interface IFriendsComponent {
     userAddress: string,
     pagination?: Pagination
   ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }>
+  unblockUser(blockerAddress: string, blockedAddress: string): Promise<Profile>
 }

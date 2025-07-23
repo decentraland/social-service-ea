@@ -152,6 +152,41 @@ export async function createFriendsComponent(
         profiles: sentRequestedProfiles,
         total: sentRequestsCount
       }
+    unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile> => {
+      const profile = await catalystClient.getProfile(blockedAddress)
+
+      if (!profile) {
+        throw new ProfileNotFoundError(blockedAddress)
+      }
+
+      const actionId = await friendsDb.executeTx(async (tx) => {
+        await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
+
+        const friendship = await friendsDb.getFriendship([blockerAddress, blockedAddress], tx)
+        if (!friendship) return
+
+        const actionId = await friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
+        return actionId
+      })
+
+      await Promise.all([
+        actionId
+          ? pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
+              id: actionId,
+              from: blockerAddress,
+              to: blockedAddress,
+              action: Action.DELETE,
+              timestamp: Date.now()
+            })
+          : Promise.resolve(),
+        pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
+          blockerAddress,
+          blockedAddress,
+          isBlocked: false
+        })
+      ])
+
+      return profile
     }
   }
 }

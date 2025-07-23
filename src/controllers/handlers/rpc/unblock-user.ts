@@ -1,14 +1,14 @@
-import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
+import { EthAddress } from '@dcl/schemas'
 import {
   UnblockUserPayload,
   UnblockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../adapters/pubsub'
+import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { parseProfileToBlockedUser } from '../../../logic/friends'
-import { EthAddress } from '@dcl/schemas'
-export function unblockUserService({
-  components: { logs, friendsDb, catalystClient, pubsub }
-}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient' | 'pubsub'>) {
+import { InvalidRequestError } from '../../errors/rpc.errors'
+import { ProfileNotFoundError } from '../../../logic/friends/errors'
+
+export function unblockUserService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('unblock-user-service')
 
   return async function (request: UnblockUserPayload, context: RpcServerContext): Promise<UnblockUserResponse> {
@@ -17,65 +17,20 @@ export function unblockUserService({
       const blockedAddress = request.user?.address
 
       if (blockerAddress === blockedAddress) {
-        return {
-          response: {
-            $case: 'invalidRequest',
-            invalidRequest: { message: 'Cannot unblock yourself' }
-          }
-        }
+        throw new InvalidRequestError('Cannot unblock yourself')
       }
 
       if (!EthAddress.validate(blockedAddress)) {
-        return {
-          response: {
-            $case: 'invalidRequest',
-            invalidRequest: { message: 'Invalid user address in the request payload' }
-          }
-        }
+        throw new InvalidRequestError('Invalid user address in the request payload')
       }
 
-      const profile = await catalystClient.getProfile(blockedAddress)
-
-      if (!profile) {
-        return {
-          response: {
-            $case: 'profileNotFound',
-            profileNotFound: { message: `Profile not found for address ${blockedAddress}` }
-          }
-        }
-      }
-
-      const actionId = await friendsDb.executeTx(async (tx) => {
-        await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
-
-        const friendship = await friendsDb.getFriendship([blockerAddress, blockedAddress], tx)
-        if (!friendship) return
-
-        const actionId = await friendsDb.recordFriendshipAction(friendship.id, blockerAddress, Action.DELETE, null, tx)
-        return actionId
-      })
-
-      if (actionId) {
-        await pubsub.publishInChannel(FRIENDSHIP_UPDATES_CHANNEL, {
-          id: actionId,
-          from: blockerAddress,
-          to: blockedAddress,
-          action: Action.DELETE,
-          timestamp: Date.now()
-        })
-      }
-
-      await pubsub.publishInChannel(BLOCK_UPDATES_CHANNEL, {
-        blockerAddress,
-        blockedAddress,
-        isBlocked: false
-      })
+      const unblockedUserProfile = await friends.unblockUser(blockerAddress, blockedAddress)
 
       return {
         response: {
           $case: 'ok',
           ok: {
-            profile: parseProfileToBlockedUser(profile)
+            profile: parseProfileToBlockedUser(unblockedUserProfile)
           }
         }
       }
@@ -84,6 +39,24 @@ export function unblockUserService({
         error: error.message,
         stack: error.stack
       })
+
+      if (error instanceof ProfileNotFoundError) {
+        return {
+          response: {
+            $case: 'profileNotFound',
+            profileNotFound: {
+              message: error.message
+            }
+          }
+        }
+      } else if (error instanceof InvalidRequestError) {
+        return {
+          response: {
+            $case: 'invalidRequest',
+            invalidRequest: { message: error.message }
+          }
+        }
+      }
 
       return {
         response: {
