@@ -70,7 +70,10 @@ export async function createCommunityComponent(
   }
 
   return {
-    getCommunity: async (id: string, userAddress: EthAddress): Promise<AggregatedCommunityWithMemberAndVoiceChatData> => {
+    getCommunity: async (
+      id: string,
+      userAddress: EthAddress
+    ): Promise<AggregatedCommunityWithMemberAndVoiceChatData> => {
       const [community, membersCount, voiceChatStatus] = await Promise.all([
         communitiesDb.getCommunity(id, userAddress),
         communitiesDb.getCommunityMembersCount(id),
