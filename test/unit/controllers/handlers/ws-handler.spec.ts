@@ -9,7 +9,7 @@ import { IWsPoolComponent } from '../../../../src/logic/ws-pool'
 
 jest.mock('@dcl/platform-crypto-middleware')
 
-const WS_AUTH_TIMEOUT_IN_SECONDS = 180000
+const WS_AUTH_TIMEOUT_IN_MS = 30000
 
 describe('ws-handler', () => {
   let wsHandlers: any
@@ -61,7 +61,7 @@ describe('ws-handler', () => {
     mockConfig.getNumber.mockImplementation(
       async (key) =>
         ({
-          WS_AUTH_TIMEOUT_IN_SECONDS
+          WS_AUTH_TIMEOUT_IN_MS
         })[key] || null
     )
 
@@ -118,7 +118,7 @@ describe('ws-handler', () => {
 
       expect(mockWs.getUserData().timeout).toBeDefined()
 
-      jest.advanceTimersByTime(WS_AUTH_TIMEOUT_IN_SECONDS)
+      jest.advanceTimersByTime(WS_AUTH_TIMEOUT_IN_MS)
       expect(mockWs.end).toHaveBeenCalled()
       jest.useRealTimers()
     })
