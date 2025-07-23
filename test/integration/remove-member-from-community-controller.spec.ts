@@ -12,6 +12,7 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
     let identity: Identity
     let kickerAddress: string
     let communityId: string
+    const communityName = 'Test Community'
     let targetMemberAddress: string
     let targetModeratorAddress: string
     let targetOwnerAddress: string
@@ -27,7 +28,7 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
 
       const result = await components.communitiesDb.createCommunity(
         mockCommunity({
-          name: 'Test Community',
+          name: communityName,
           description: 'Test Description',
           owner_address: targetOwnerAddress
         })
@@ -235,11 +236,11 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
               expect(spyComponents.sns.publishMessage).toHaveBeenCalledWith({
                 type: Events.Type.COMMUNITY,
                 subType: Events.SubType.Community.MEMBER_REMOVED,
-                key: `${communityId}-${targetMemberAddress}-${Date.now()}`,
+                key: expect.stringContaining(`${communityId}-${targetMemberAddress}-`),
                 timestamp: expect.any(Number),
                 metadata: {
                   id: communityId,
-                  name: expect.any(String),
+                  name: communityName,
                   memberAddress: targetMemberAddress
                 }
               })
@@ -302,11 +303,11 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
               expect(spyComponents.sns.publishMessage).toHaveBeenCalledWith({
                 type: Events.Type.COMMUNITY,
                 subType: Events.SubType.Community.MEMBER_REMOVED,
-                key: `${communityId}-${targetMemberAddress}-${Date.now()}`,
+                key: expect.stringContaining(`${communityId}-${targetMemberAddress}-`),
                 timestamp: expect.any(Number),
                 metadata: {
                   id: communityId,
-                  name: expect.any(String),
+                  name: communityName,
                   memberAddress: targetMemberAddress
                 }
               })
