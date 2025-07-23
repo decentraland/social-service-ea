@@ -189,11 +189,11 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
             expect(spyComponents.sns.publishMessage).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_BANNED,
-              key: `${communityId}-${targetMemberAddress}-${Date.now()}`,
+              key: expect.stringContaining(`${communityId}-${targetMemberAddress}-`),
               timestamp: expect.any(Number),
               metadata: {
                 id: communityId,
-                name: expect.any(String),
+                name: "Test Community",
                 memberAddress: targetMemberAddress
               }
             })
