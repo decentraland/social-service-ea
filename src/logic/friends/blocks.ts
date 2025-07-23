@@ -4,7 +4,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { getProfileInfo, getProfileUserId } from '../profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { BlockUserWithDate, SubscriptionEventsEmitter } from '../../types'
+import { BlockedUserWithDate, SubscriptionEventsEmitter } from '../../types'
 
 export function parseProfileToBlockedUser(profile: Profile, blockedAt?: Date): BlockedUserProfile {
   const { name, userId, hasClaimedName, profilePictureUrl } = getProfileInfo(profile)
@@ -20,7 +20,7 @@ export function parseProfileToBlockedUser(profile: Profile, blockedAt?: Date): B
 
 export function parseProfilesToBlockedUsers(
   profiles: Profile[],
-  blockedUsers: BlockUserWithDate[]
+  blockedUsers: BlockedUserWithDate[]
 ): BlockedUserProfile[] {
   const blockedAtByAddress = new Map(blockedUsers.map((user) => [user.address, user.blocked_at]))
   return profiles.map((profile) => {

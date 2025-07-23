@@ -10,7 +10,7 @@ import {
   User,
   Pagination,
   SocialSettings,
-  BlockUserWithDate
+  BlockedUserWithDate
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
@@ -262,14 +262,14 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       const query = SQL`
         SELECT blocked_address as address, blocked_at FROM blocks WHERE blocker_address = ${normalizeAddress(blockerAddress)}
       `
-      const result = await pg.query<BlockUserWithDate>(query)
+      const result = await pg.query<BlockedUserWithDate>(query)
       return result.rows
     },
     async getBlockedByUsers(blockedAddress) {
       const query = SQL`
         SELECT blocker_address as address, blocked_at FROM blocks WHERE blocked_address = ${normalizeAddress(blockedAddress)}
       `
-      const result = await pg.query<BlockUserWithDate>(query)
+      const result = await pg.query<BlockedUserWithDate>(query)
       return result.rows
     },
     async isFriendshipBlocked(loggedUserAddress, anotherUserAddress) {

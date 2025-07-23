@@ -1,7 +1,7 @@
 import { PaginatedParameters } from '@dcl/schemas'
 
 export function getPage(limit: number, offset: number = 0) {
-  return Math.ceil(offset / limit) + 1
+  return limit ? Math.ceil(offset / limit) + 1 : 1
 }
 
 export function getPages(total: number, limit: number): number {
