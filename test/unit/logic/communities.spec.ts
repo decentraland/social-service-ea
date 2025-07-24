@@ -248,6 +248,62 @@ describe('Community Component', () => {
         })
       })
     })
+
+    describe('when filtering by active voice chat', () => {
+      const optionsWithVoiceChat = { ...options, onlyWithActiveVoiceChat: true }
+      const mockCommunitiesWithVoiceChat = [
+        {
+          ...mockCommunities[0],
+          id: 'community-with-voice-chat'
+        },
+        {
+          ...mockCommunities[0],
+          id: 'community-without-voice-chat'
+        }
+      ]
+
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunitiesWithVoiceChat)
+        mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(2)
+        mockStorage.exists.mockResolvedValue(false)
+        mockCatalystClient.getProfiles.mockResolvedValue([])
+        mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+        
+        // Mock voice chat status - first community has active voice chat, second doesn't
+        mockCommsGatekeeper.getCommunityVoiceChatStatus
+          .mockResolvedValueOnce({ isActive: true, participantCount: 3, moderatorCount: 1 })
+          .mockResolvedValueOnce({ isActive: false, participantCount: 0, moderatorCount: 0 })
+      })
+
+      it('should return only communities with active voice chat when onlyWithActiveVoiceChat is true', async () => {
+        const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+        expect(result.communities).toHaveLength(1)
+        expect(result.communities[0].id).toBe('community-with-voice-chat')
+        expect(result.total).toBe(1)
+
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith('community-with-voice-chat')
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith('community-without-voice-chat')
+      })
+
+      describe('when voice chat status check fails', () => {
+        beforeEach(() => {
+          // Reset the mock to simulate one success and one failure
+          mockCommsGatekeeper.getCommunityVoiceChatStatus.mockReset()
+          mockCommsGatekeeper.getCommunityVoiceChatStatus
+            .mockResolvedValueOnce({ isActive: true, participantCount: 3, moderatorCount: 1 })
+            .mockRejectedValueOnce(new Error('Voice chat service unavailable'))
+        })
+
+        it('should exclude communities where status check fails', async () => {
+          const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+          expect(result.communities).toHaveLength(1)
+          expect(result.communities[0].id).toBe('community-with-voice-chat')
+          expect(result.total).toBe(1)
+        })
+      })
+    })
   })
 
   describe('when getting public communities', () => {
@@ -316,6 +372,61 @@ describe('Community Component', () => {
 
         expect(result.communities[0].thumbnails).toEqual({
           raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+        })
+      })
+    })
+
+    describe('when filtering by active voice chat', () => {
+      const optionsWithVoiceChat = { ...options, onlyWithActiveVoiceChat: true }
+      const mockCommunitiesWithVoiceChat = [
+        {
+          ...mockCommunities[0],
+          id: 'public-community-with-voice-chat'
+        },
+        {
+          ...mockCommunities[0],
+          id: 'public-community-without-voice-chat'
+        }
+      ]
+
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunitiesWithVoiceChat)
+        mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(2)
+        mockStorage.exists.mockResolvedValue(false)
+        mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+        
+        // Mock voice chat status - first community has active voice chat, second doesn't
+        mockCommsGatekeeper.getCommunityVoiceChatStatus
+          .mockResolvedValueOnce({ isActive: true, participantCount: 5, moderatorCount: 2 })
+          .mockResolvedValueOnce({ isActive: false, participantCount: 0, moderatorCount: 0 })
+      })
+
+      it('should return only public communities with active voice chat when onlyWithActiveVoiceChat is true', async () => {
+        const result = await communityComponent.getCommunitiesPublicInformation(optionsWithVoiceChat)
+
+        expect(result.communities).toHaveLength(1)
+        expect(result.communities[0].id).toBe('public-community-with-voice-chat')
+        expect(result.total).toBe(1)
+
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith('public-community-with-voice-chat')
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith('public-community-without-voice-chat')
+      })
+
+      describe('when voice chat status check fails', () => {
+        beforeEach(() => {
+          // Reset the mock to simulate one success and one failure
+          mockCommsGatekeeper.getCommunityVoiceChatStatus.mockReset()
+          mockCommsGatekeeper.getCommunityVoiceChatStatus
+            .mockResolvedValueOnce({ isActive: true, participantCount: 5, moderatorCount: 2 })
+            .mockRejectedValueOnce(new Error('Voice chat service unavailable'))
+        })
+
+        it('should exclude public communities where status check fails', async () => {
+          const result = await communityComponent.getCommunitiesPublicInformation(optionsWithVoiceChat)
+
+          expect(result.communities).toHaveLength(1)
+          expect(result.communities[0].id).toBe('public-community-with-voice-chat')
+          expect(result.total).toBe(1)
         })
       })
     })

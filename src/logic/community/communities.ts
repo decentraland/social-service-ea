@@ -21,6 +21,7 @@ import {
   getCommunityThumbnailPath
 } from './utils'
 import { EthAddress } from '@dcl/schemas'
+import { isErrorWithMessage } from '../../utils/errors'
 
 export async function createCommunityComponent(
   components: Pick<
@@ -127,11 +128,39 @@ export async function createCommunityComponent(
         })
       )
 
-      const friendsAddresses = Array.from(new Set(communities.flatMap((community) => community.friends)))
+      // Filter by active voice chat if requested
+      let filteredCommunities = communitiesWithThumbnailsAndOwnerNames
+      if (options.onlyWithActiveVoiceChat) {
+        const voiceChatStatuses = await Promise.all(
+          communitiesWithThumbnailsAndOwnerNames.map(async (community) => {
+            try {
+              const status = await commsGatekeeper.getCommunityVoiceChatStatus(community.id)
+              return { communityId: community.id, isActive: status?.isActive ?? false }
+            } catch (error) {
+              // If we can't get the status, assume it's not active
+              logger.warn(`Could not get voice chat status for community ${community.id}`, {
+                error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+              })
+              return { communityId: community.id, isActive: false }
+            }
+          })
+        )
+
+        const activeVoiceChatCommunityIds = new Set(
+          voiceChatStatuses.filter((status) => status.isActive).map((status) => status.communityId)
+        )
+
+        filteredCommunities = communitiesWithThumbnailsAndOwnerNames.filter((community) =>
+          activeVoiceChatCommunityIds.has(community.id)
+        )
+      }
+
+      const friendsAddresses = Array.from(new Set(filteredCommunities.flatMap((community) => community.friends)))
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
+
       return {
-        communities: toCommunityResults(communitiesWithThumbnailsAndOwnerNames, friendsProfiles),
-        total
+        communities: toCommunityResults(filteredCommunities, friendsProfiles),
+        total: options.onlyWithActiveVoiceChat ? filteredCommunities.length : total
       }
     },
 
@@ -163,9 +192,36 @@ export async function createCommunityComponent(
         })
       )
 
+      // Filter by active voice chat if requested
+      let filteredCommunities = communitiesWithThumbnailsAndOwnerNames
+      if (options.onlyWithActiveVoiceChat) {
+        const voiceChatStatuses = await Promise.all(
+          communitiesWithThumbnailsAndOwnerNames.map(async (community) => {
+            try {
+              const status = await commsGatekeeper.getCommunityVoiceChatStatus(community.id)
+              return { communityId: community.id, isActive: status?.isActive ?? false }
+            } catch (error) {
+              // If we can't get the status, assume it's not active
+              logger.warn(`Could not get voice chat status for community ${community.id}`, {
+                error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+              })
+              return { communityId: community.id, isActive: false }
+            }
+          })
+        )
+
+        const activeVoiceChatCommunityIds = new Set(
+          voiceChatStatuses.filter((status) => status.isActive).map((status) => status.communityId)
+        )
+
+        filteredCommunities = communitiesWithThumbnailsAndOwnerNames.filter((community) =>
+          activeVoiceChatCommunityIds.has(community.id)
+        )
+      }
+
       return {
-        communities: communitiesWithThumbnailsAndOwnerNames.map(toPublicCommunity),
-        total
+        communities: filteredCommunities.map(toPublicCommunity),
+        total: options.onlyWithActiveVoiceChat ? filteredCommunities.length : total
       }
     },
 

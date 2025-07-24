@@ -249,6 +249,78 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         })
       })
 
+      describe('when filtering by active voice chat', () => {
+        beforeEach(() => {
+          // Mock voice chat status for the communities
+          spyComponents.commsGatekeeper.getCommunityVoiceChatStatus
+            .mockImplementation(async (communityId: string) => {
+              if (communityId === communityId1) {
+                return { isActive: true, participantCount: 5, moderatorCount: 2 }
+              } else if (communityId === communityId2) {
+                return { isActive: false, participantCount: 0, moderatorCount: 0 }
+              }
+              return null
+            })
+        })
+
+        it('should return only communities with active voice chat when onlyWithActiveVoiceChat=true', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=true')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(1)
+          expect(body.data.results[0].id).toBe(communityId1)
+          expect(body.data.total).toBe(1)
+
+          // Verify that the comms gatekeeper was called to check voice chat status
+          expect(spyComponents.commsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId1)
+          expect(spyComponents.commsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId2)
+        })
+
+        it('should return all communities when onlyWithActiveVoiceChat=false', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=false')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(2)
+          expect(body.data.total).toBe(2)
+        })
+
+        it('should return all communities when onlyWithActiveVoiceChat is not provided', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(2)
+          expect(body.data.total).toBe(2)
+        })
+
+        describe('when voice chat status check fails', () => {
+          beforeEach(() => {
+            // Mock one success and one failure
+            spyComponents.commsGatekeeper.getCommunityVoiceChatStatus
+              .mockImplementation(async (communityId: string) => {
+                if (communityId === communityId1) {
+                  return { isActive: true, participantCount: 5, moderatorCount: 2 }
+                } else if (communityId === communityId2) {
+                  throw new Error('Voice chat service unavailable')
+                }
+                return null
+              })
+          })
+
+          it('should exclude communities where status check fails', async () => {
+            const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=true')
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+            expect(body.data.results).toHaveLength(1)
+            expect(body.data.results[0].id).toBe(communityId1)
+            expect(body.data.total).toBe(1)
+          })
+        })
+      })
+
       describe('and the query fails', () => {
         beforeEach(() => {
           spyComponents.communitiesDb.getCommunities.mockRejectedValue(new Error('Unable to get communities'))
