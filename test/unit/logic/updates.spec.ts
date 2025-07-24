@@ -963,6 +963,7 @@ describe('Updates Handlers', () => {
         const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
+          shouldRetrieveProfile: true,
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
           parser
@@ -983,6 +984,7 @@ describe('Updates Handlers', () => {
         const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
+          shouldRetrieveProfile: true,
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
           parser
@@ -1000,6 +1002,7 @@ describe('Updates Handlers', () => {
         const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
+          shouldRetrieveProfile: true,
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
           parser
@@ -1022,6 +1025,7 @@ describe('Updates Handlers', () => {
         const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
+          shouldRetrieveProfile: true,
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from === '0x123',
           parser
@@ -1045,6 +1049,7 @@ describe('Updates Handlers', () => {
         const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
+          shouldRetrieveProfile: true,
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: () => false,
           parser
@@ -1067,6 +1072,7 @@ describe('Updates Handlers', () => {
         const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
           eventName: 'friendshipUpdate',
+          shouldRetrieveProfile: true,
           getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
           shouldHandleUpdate: () => true,
           parser

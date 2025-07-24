@@ -20,7 +20,7 @@ export function subscribeToFriendshipUpdatesService({
         eventName: 'friendshipUpdate',
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
         parser: parseEmittedUpdateToFriendshipUpdate,
-        shouldRetrieveProfile: false,
+        shouldRetrieveProfile: true,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) =>
           update.from !== context.address && update.to === context.address
       })

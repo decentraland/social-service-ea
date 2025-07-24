@@ -225,7 +225,7 @@ export function createUpdateHandlerComponent(
   async function* handleSubscriptionUpdates<T, U>({
     rpcContext,
     eventName,
-    shouldRetrieveProfile = true,
+    shouldRetrieveProfile = false,
     getAddressFromUpdate,
     shouldHandleUpdate,
     parser,
