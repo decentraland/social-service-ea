@@ -60,6 +60,29 @@ export async function createCommunityComponent(
     return `${CDN_URL}${getCommunityThumbnailPath(communityId)}`
   }
 
+  /**
+   * Helper function to filter communities with active voice chat using batch API
+   * @param communities - Array of communities to filter
+   * @returns Promise<T[]> - Filtered array containing only communities with active voice chat
+   */
+  async function filterCommunitiesWithActiveVoiceChat<T extends { id: string }>(communities: T[]): Promise<T[]> {
+    if (communities.length === 0) {
+      return communities
+    }
+
+    try {
+      const communityIds = communities.map((c) => c.id)
+      const voiceChatStatuses = await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)
+
+      return communities.filter((community) => voiceChatStatuses[community.id]?.isActive ?? false)
+    } catch (error) {
+      logger.warn('Error filtering communities by voice chat status', {
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      return [] // If batch call fails, return empty array for safety
+    }
+  }
+
   const getThumbnail = async (communityId: string): Promise<string | undefined> => {
     const thumbnailExists = await storage.exists(`communities/${communityId}/raw-thumbnail.png`)
 
@@ -129,31 +152,9 @@ export async function createCommunityComponent(
       )
 
       // Filter by active voice chat if requested
-      let filteredCommunities = communitiesWithThumbnailsAndOwnerNames
-      if (options.onlyWithActiveVoiceChat) {
-        const voiceChatStatuses = await Promise.all(
-          communitiesWithThumbnailsAndOwnerNames.map(async (community) => {
-            try {
-              const status = await commsGatekeeper.getCommunityVoiceChatStatus(community.id)
-              return { communityId: community.id, isActive: status?.isActive ?? false }
-            } catch (error) {
-              // If we can't get the status, assume it's not active
-              logger.warn(`Could not get voice chat status for community ${community.id}`, {
-                error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-              })
-              return { communityId: community.id, isActive: false }
-            }
-          })
-        )
-
-        const activeVoiceChatCommunityIds = new Set(
-          voiceChatStatuses.filter((status) => status.isActive).map((status) => status.communityId)
-        )
-
-        filteredCommunities = communitiesWithThumbnailsAndOwnerNames.filter((community) =>
-          activeVoiceChatCommunityIds.has(community.id)
-        )
-      }
+      const filteredCommunities = options.onlyWithActiveVoiceChat
+        ? await filterCommunitiesWithActiveVoiceChat(communitiesWithThumbnailsAndOwnerNames)
+        : communitiesWithThumbnailsAndOwnerNames
 
       const friendsAddresses = Array.from(new Set(filteredCommunities.flatMap((community) => community.friends)))
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
@@ -193,31 +194,9 @@ export async function createCommunityComponent(
       )
 
       // Filter by active voice chat if requested
-      let filteredCommunities = communitiesWithThumbnailsAndOwnerNames
-      if (options.onlyWithActiveVoiceChat) {
-        const voiceChatStatuses = await Promise.all(
-          communitiesWithThumbnailsAndOwnerNames.map(async (community) => {
-            try {
-              const status = await commsGatekeeper.getCommunityVoiceChatStatus(community.id)
-              return { communityId: community.id, isActive: status?.isActive ?? false }
-            } catch (error) {
-              // If we can't get the status, assume it's not active
-              logger.warn(`Could not get voice chat status for community ${community.id}`, {
-                error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-              })
-              return { communityId: community.id, isActive: false }
-            }
-          })
-        )
-
-        const activeVoiceChatCommunityIds = new Set(
-          voiceChatStatuses.filter((status) => status.isActive).map((status) => status.communityId)
-        )
-
-        filteredCommunities = communitiesWithThumbnailsAndOwnerNames.filter((community) =>
-          activeVoiceChatCommunityIds.has(community.id)
-        )
-      }
+      const filteredCommunities = options.onlyWithActiveVoiceChat
+        ? await filterCommunitiesWithActiveVoiceChat(communitiesWithThumbnailsAndOwnerNames)
+        : communitiesWithThumbnailsAndOwnerNames
 
       return {
         communities: filteredCommunities.map(toPublicCommunity),
