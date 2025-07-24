@@ -7,36 +7,7 @@ import {
   UserNotCommunityMemberError,
   CommunityVoiceChatNotFoundError
 } from '../../../../../src/logic/community-voice/errors'
-
-function createCommsGatekeeperMockedComponent({
-  requestToSpeakInCommunityVoiceChat = jest.fn(),
-  createCommunityVoiceChatRoom = jest.fn(),
-  getCommunityVoiceChatCredentials = jest.fn(),
-  getCommunityVoiceChatStatus = jest.fn(),
-  isUserInAVoiceChat = jest.fn(),
-  getPrivateVoiceChatCredentials = jest.fn(),
-  endPrivateVoiceChat = jest.fn(),
-  updateUserPrivateMessagePrivacyMetadata = jest.fn(),
-  updateUserMetadataInCommunityVoiceChat = jest.fn(),
-  promoteSpeakerInCommunityVoiceChat = jest.fn(),
-  demoteSpeakerInCommunityVoiceChat = jest.fn(),
-  kickUserFromCommunityVoiceChat = jest.fn()
-}: Partial<jest.Mocked<ICommsGatekeeperComponent>>): jest.Mocked<ICommsGatekeeperComponent> {
-  return {
-    requestToSpeakInCommunityVoiceChat,
-    createCommunityVoiceChatRoom,
-    getCommunityVoiceChatCredentials,
-    getCommunityVoiceChatStatus,
-    isUserInAVoiceChat,
-    getPrivateVoiceChatCredentials,
-    endPrivateVoiceChat,
-    updateUserPrivateMessagePrivacyMetadata,
-    updateUserMetadataInCommunityVoiceChat,
-    promoteSpeakerInCommunityVoiceChat,
-    demoteSpeakerInCommunityVoiceChat,
-    kickUserFromCommunityVoiceChat
-  }
-}
+import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 
 describe('when requesting to speak in community voice chat', () => {
   let requestToSpeakMock: jest.MockedFn<ICommsGatekeeperComponent['requestToSpeakInCommunityVoiceChat']>
@@ -155,4 +126,4 @@ describe('when requesting to speak in community voice chat', () => {
       expect(result.response?.$case).toBe('internalServerError')
     })
   })
-}) 
+})

@@ -261,6 +261,22 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               }
               return null
             })
+
+          // Mock batch voice chat status method  
+          spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus
+            .mockImplementation(async (communityIds: string[]) => {
+              const result: Record<string, any> = {}
+              communityIds.forEach(communityId => {
+                if (communityId === communityId1) {
+                  result[communityId] = { isActive: true, participantCount: 5, moderatorCount: 2 }
+                } else if (communityId === communityId2) {
+                  result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+                } else {
+                  result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+                }
+              })
+              return result
+            })
         })
 
         it('should return only communities with active voice chat when onlyWithActiveVoiceChat=true', async () => {
@@ -306,6 +322,23 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                   throw new Error('Voice chat service unavailable')
                 }
                 return null
+              })
+
+            // Mock batch method to simulate one success and one failure
+            spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus
+              .mockImplementation(async (communityIds: string[]) => {
+                const result: Record<string, any> = {}
+                communityIds.forEach(communityId => {
+                  if (communityId === communityId1) {
+                    result[communityId] = { isActive: true, participantCount: 5, moderatorCount: 2 }
+                  } else if (communityId === communityId2) {
+                    // When community2 fails, it gets marked as inactive in our batch implementation
+                    result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+                  } else {
+                    result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+                  }
+                })
+                return result
               })
           })
 

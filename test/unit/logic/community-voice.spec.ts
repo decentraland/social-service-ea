@@ -21,6 +21,7 @@ import { CommunityRole } from '../../../src/types'
 import { AnalyticsEvent, AnalyticsEventPayload } from '../../../src/types/analytics'
 import { ICommunityVoiceComponent } from '../../../src/logic/community-voice'
 import { ICommunityVoiceChatCacheComponent } from '../../../src/logic/community-voice/community-voice-cache'
+import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 
 describe('Community Voice Logic', () => {
   let mockLogs: jest.Mocked<ILoggerComponent>
@@ -46,20 +47,7 @@ describe('Community Voice Logic', () => {
       getLogger: jest.fn().mockReturnValue(logger)
     } as jest.Mocked<ILoggerComponent>
 
-    mockCommsGatekeeper = {
-      getCommunityVoiceChatStatus: jest.fn(),
-      createCommunityVoiceChatRoom: jest.fn(),
-      getCommunityVoiceChatCredentials: jest.fn(),
-      isUserInAVoiceChat: jest.fn(),
-      updateUserPrivateMessagePrivacyMetadata: jest.fn(),
-      getPrivateVoiceChatCredentials: jest.fn(),
-      endPrivateVoiceChat: jest.fn(),
-      updateUserMetadataInCommunityVoiceChat: jest.fn(),
-      requestToSpeakInCommunityVoiceChat: jest.fn(),
-      promoteSpeakerInCommunityVoiceChat: jest.fn(),
-      demoteSpeakerInCommunityVoiceChat: jest.fn(),
-      kickUserFromCommunityVoiceChat: jest.fn()
-    } as jest.Mocked<ICommsGatekeeperComponent>
+    mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
 
     mockCommunitiesDb = {
       getCommunityMemberRole: jest.fn(),

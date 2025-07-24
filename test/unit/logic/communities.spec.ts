@@ -273,6 +273,19 @@ describe('Community Component', () => {
         mockCommsGatekeeper.getCommunityVoiceChatStatus
           .mockResolvedValueOnce({ isActive: true, participantCount: 3, moderatorCount: 1 })
           .mockResolvedValueOnce({ isActive: false, participantCount: 0, moderatorCount: 0 })
+
+        // Mock batch voice chat status method
+        mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockImplementation(async (communityIds: string[]) => {
+          const result: Record<string, any> = {}
+          communityIds.forEach(communityId => {
+            if (communityId === 'community-with-voice-chat') {
+              result[communityId] = { isActive: true, participantCount: 3, moderatorCount: 1 }
+            } else {
+              result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+            }
+          })
+          return result
+        })
       })
 
       it('should return only communities with active voice chat when onlyWithActiveVoiceChat is true', async () => {
