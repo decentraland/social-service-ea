@@ -8,29 +8,9 @@ import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
  */
 export interface ICommunityVoiceChatPollingComponent {
   /**
-   * Starts polling for community voice chat status changes
-   */
-  start(): Promise<void>
-
-  /**
-   * Stops polling
-   */
-  stop(): Promise<void>
-
-  /**
    * Manually checks all active voice chats for status changes
    */
   checkAllVoiceChats(): Promise<void>
-
-  /**
-   * Gets polling statistics
-   */
-  getStats(): {
-    totalChecks: number
-    endedDetected: number
-    errors: number
-    lastCheck: number | null
-  }
 }
 
 /**
@@ -47,21 +27,11 @@ export function createCommunityVoiceChatPollingComponent({
 }): ICommunityVoiceChatPollingComponent {
   const logger = logs.getLogger('community-voice-chat-polling')
 
-  // Polling statistics
-  let totalChecks = 0
-  let endedDetected = 0
-  let errors = 0
-  let lastCheck: number | null = null
-  let isRunning = false
-
   /**
    * Checks all active voice chats in the cache for status changes
    */
   async function checkAllVoiceChats(): Promise<void> {
     try {
-      totalChecks++
-      lastCheck = Date.now()
-
       const activeChats = await communityVoiceChatCache.getActiveCommunityVoiceChats()
 
       if (activeChats.length === 0) {
@@ -72,53 +42,46 @@ export function createCommunityVoiceChatPollingComponent({
       logger.debug(`Polling ${activeChats.length} active community voice chats for status changes`)
 
       // Check each active voice chat for status changes
-      const checkPromises = activeChats.map(async (cachedChat) => {
+      const checkPromises = activeChats.map(async (cachedChat): Promise<boolean> => {
         try {
           // Get current status from comms-gatekeeper
           const currentStatus = await commsGatekeeper.getCommunityVoiceChatStatus(cachedChat.communityId)
 
           // Update cache and detect changes
-          const change = await communityVoiceChatCache.updateAndDetectChange(
+          const justEnded = await communityVoiceChatCache.updateAndDetectChange(
             cachedChat.communityId,
             currentStatus?.isActive ?? null
           )
 
           // If voice chat just ended, send notification
-          if (change.justEnded && change.cachedChat) {
-            await sendEndedNotification(change.cachedChat)
-            endedDetected++
+          if (justEnded) {
+            await sendEndedNotification(cachedChat)
           }
 
-          return { success: true, communityId: cachedChat.communityId }
+          return true
         } catch (error) {
-          console.log('error3', error)
           logger.warn(`Error checking voice chat status for community ${cachedChat.communityId}`, {
             error: isErrorWithMessage(error) ? error.message : 'Unknown error'
           })
 
-          // If we get 404 or null response, treat it as the voice chat ended
-          if (
-            (error && (error as any).message?.includes('404')) ||
-            (error && (error as any).message?.includes('not found'))
-          ) {
-            const change = await communityVoiceChatCache.updateAndDetectChange(cachedChat.communityId, null)
-            if (change.justEnded && change.cachedChat) {
-              await sendEndedNotification(change.cachedChat)
-              endedDetected++
+          // If we get 404 or not found error, treat it as the voice chat ended
+          if (isErrorWithMessage(error) && (error.message.includes('404') || error.message.includes('not found'))) {
+            const justEnded = await communityVoiceChatCache.updateAndDetectChange(cachedChat.communityId, null)
+            if (justEnded) {
+              await sendEndedNotification(cachedChat)
             }
           }
 
-          return { success: false, communityId: cachedChat.communityId, error }
+          return false
         }
       })
 
       const results = await Promise.all(checkPromises)
 
-      const successful = results.filter((r) => r.success).length
-      const failed = results.filter((r) => !r.success).length
+      const successful = results.filter((success) => success).length
+      const failed = results.filter((success) => !success).length
 
       if (failed > 0) {
-        errors += failed
         logger.warn(`Polling completed with ${failed} errors out of ${activeChats.length} checks`, {
           successful,
           failed,
@@ -128,8 +91,6 @@ export function createCommunityVoiceChatPollingComponent({
         logger.debug(`Polling completed successfully for ${successful} active voice chats`)
       }
     } catch (error) {
-      console.log('error2', error)
-      errors++
       logger.error('Error during community voice chat polling', {
         error: isErrorWithMessage(error) ? error.message : 'Unknown error'
       })
@@ -159,7 +120,6 @@ export function createCommunityVoiceChatPollingComponent({
 
       logger.debug(`Community voice chat ended notification sent successfully for community ${cachedChat.communityId}`)
     } catch (error) {
-      console.log('error', error)
       logger.error(`Failed to send ended notification for community ${cachedChat.communityId}`, {
         error: isErrorWithMessage(error) ? error.message : 'Unknown error'
       })
@@ -167,56 +127,7 @@ export function createCommunityVoiceChatPollingComponent({
     }
   }
 
-  /**
-   * Starts the polling process
-   */
-  async function start(): Promise<void> {
-    if (isRunning) {
-      logger.warn('Community voice chat polling is already running')
-      return
-    }
-
-    isRunning = true
-    logger.info('Started community voice chat polling')
-
-    // Initial check
-    await checkAllVoiceChats()
-  }
-
-  /**
-   * Stops the polling process
-   */
-  async function stop(): Promise<void> {
-    if (!isRunning) {
-      logger.warn('Community voice chat polling is not running')
-      return
-    }
-
-    isRunning = false
-    logger.info('Stopped community voice chat polling')
-  }
-
-  /**
-   * Gets polling statistics
-   */
-  function getStats(): {
-    totalChecks: number
-    endedDetected: number
-    errors: number
-    lastCheck: number | null
-  } {
-    return {
-      totalChecks,
-      endedDetected,
-      errors,
-      lastCheck
-    }
-  }
-
   return {
-    start,
-    stop,
-    checkAllVoiceChats,
-    getStats
+    checkAllVoiceChats
   }
 }

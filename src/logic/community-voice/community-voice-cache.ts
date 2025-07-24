@@ -46,28 +46,9 @@ export interface ICommunityVoiceChatCacheComponent {
    * Updates the status of a community voice chat and detects if it changed from active to inactive
    * @param communityId - The community ID
    * @param isActive - The new active status (null means not found/error)
-   * @returns Object indicating if the voice chat ended and the previous state
+   * @returns Whether the voice chat just ended
    */
-  updateAndDetectChange(
-    communityId: string,
-    isActive: boolean | null
-  ): Promise<{
-    wasActive: boolean
-    isNowActive: boolean
-    justEnded: boolean
-    cachedChat: CachedCommunityVoiceChat | null
-  }>
-
-  /**
-   * Clears old entries from the cache (older than maxAge milliseconds)
-   * @param maxAge - Maximum age in milliseconds (default: 24 hours)
-   */
-  cleanup(maxAge?: number): Promise<void>
-
-  /**
-   * Gets the number of cached entries
-   */
-  size(): Promise<number>
+  updateAndDetectChange(communityId: string, isActive: boolean | null): Promise<boolean>
 }
 
 /**
@@ -91,6 +72,12 @@ export function createCommunityVoiceChatCacheComponent({
     isActive: boolean,
     createdAt: number = Date.now()
   ): Promise<void> {
+    if (!isActive) {
+      // Remove inactive communities from cache instead of storing them
+      await removeCommunityVoiceChat(communityId)
+      return
+    }
+
     const now = Date.now()
     const existing = await getCommunityVoiceChat(communityId)
 
@@ -137,7 +124,8 @@ export function createCommunityVoiceChatCacheComponent({
       const activeChats: CachedCommunityVoiceChat[] = []
 
       for (const key of keys) {
-        const chat = await redis.get<CachedCommunityVoiceChat>(key)
+        const communityId = key.replace(CACHE_PREFIX, '')
+        const chat = await getCommunityVoiceChat(communityId)
         if (chat && chat.isActive) {
           activeChats.push(chat)
         }
@@ -152,15 +140,7 @@ export function createCommunityVoiceChatCacheComponent({
     }
   }
 
-  async function updateAndDetectChange(
-    communityId: string,
-    isActive: boolean | null
-  ): Promise<{
-    wasActive: boolean
-    isNowActive: boolean
-    justEnded: boolean
-    cachedChat: CachedCommunityVoiceChat | null
-  }> {
+  async function updateAndDetectChange(communityId: string, isActive: boolean | null): Promise<boolean> {
     const existing = await getCommunityVoiceChat(communityId)
     const wasActive = existing?.isActive ?? false
     const isNowActive = isActive ?? false
@@ -178,13 +158,6 @@ export function createCommunityVoiceChatCacheComponent({
       await setCommunityVoiceChat(communityId, false, existing.createdAt)
     }
 
-    const result = {
-      wasActive,
-      isNowActive,
-      justEnded,
-      cachedChat: existing || null
-    }
-
     if (justEnded) {
       logger.info(`Detected community voice chat ended for community ${communityId}`, {
         wasActive: wasActive.toString(),
@@ -192,46 +165,7 @@ export function createCommunityVoiceChatCacheComponent({
       })
     }
 
-    return result
-  }
-
-  async function cleanup(maxAge: number = 24 * 60 * 60 * 1000): Promise<void> {
-    // Default: 24 hours
-    try {
-      const now = Date.now()
-      const keys = await redis.client.keys(`${CACHE_PREFIX}*`)
-      const toRemove: string[] = []
-
-      for (const key of keys) {
-        const chat = await redis.get<CachedCommunityVoiceChat>(key)
-        if (chat && now - chat.lastChecked > maxAge) {
-          toRemove.push(key)
-        }
-      }
-
-      if (toRemove.length > 0) {
-        for (const key of toRemove) {
-          await redis.client.del(key)
-        }
-        logger.debug(`Cleaned up ${toRemove.length} old cache entries`)
-      }
-    } catch (error) {
-      logger.error('Error during cache cleanup', {
-        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-      })
-    }
-  }
-
-  async function size(): Promise<number> {
-    try {
-      const keys = await redis.client.keys(`${CACHE_PREFIX}*`)
-      return keys.length
-    } catch (error) {
-      logger.error('Error getting cache size', {
-        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-      })
-      return 0
-    }
+    return justEnded
   }
 
   return {
@@ -239,8 +173,6 @@ export function createCommunityVoiceChatCacheComponent({
     getCommunityVoiceChat,
     removeCommunityVoiceChat,
     getActiveCommunityVoiceChats,
-    updateAndDetectChange,
-    cleanup,
-    size
+    updateAndDetectChange
   }
 }

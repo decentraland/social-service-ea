@@ -70,10 +70,8 @@ describe('Community Voice Chat Polling Component', () => {
       it('should handle empty active voice chats list', async () => {
         await polling.checkAllVoiceChats()
 
-        const stats = polling.getStats()
-        expect(stats.totalChecks).toBe(1)
-        expect(stats.endedDetected).toBe(0)
-        expect(stats.errors).toBe(0)
+        expect(mockGetActiveCommunityVoiceChats).toHaveBeenCalled()
+        expect(mockLogger.debug).toHaveBeenCalledWith('No active community voice chats to check')
       })
     })
 
@@ -90,12 +88,7 @@ describe('Community Voice Chat Polling Component', () => {
 
         mockGetActiveCommunityVoiceChats.mockResolvedValue([activeChat])
         mockGetCommunityVoiceChatStatus.mockResolvedValue({ isActive: true })
-        mockUpdateAndDetectChange.mockResolvedValue({
-          wasActive: true,
-          isNowActive: true,
-          justEnded: false,
-          cachedChat: activeChat
-        })
+        mockUpdateAndDetectChange.mockResolvedValue(false) // No change detected
       })
 
       it('should check status of active voice chats and detect no changes', async () => {
@@ -106,10 +99,6 @@ describe('Community Voice Chat Polling Component', () => {
         expect(mockGetCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
         expect(mockUpdateAndDetectChange).toHaveBeenCalledWith(communityId, true)
         expect(mockPublishInChannel).not.toHaveBeenCalled()
-
-        const stats = polling.getStats()
-        expect(stats.totalChecks).toBe(1)
-        expect(stats.endedDetected).toBe(0)
       })
     })
 
@@ -126,12 +115,7 @@ describe('Community Voice Chat Polling Component', () => {
 
         mockGetActiveCommunityVoiceChats.mockResolvedValue([activeChat])
         mockGetCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
-        mockUpdateAndDetectChange.mockResolvedValue({
-          wasActive: true,
-          isNowActive: false,
-          justEnded: true,
-          cachedChat: activeChat
-        })
+        mockUpdateAndDetectChange.mockResolvedValue(true) // Change detected (ended)
         mockPublishInChannel.mockResolvedValue(undefined)
       })
 
@@ -145,9 +129,6 @@ describe('Community Voice Chat Polling Component', () => {
           status: 'ended',
           ended_at: expect.any(Number)
         })
-
-        const stats = polling.getStats()
-        expect(stats.endedDetected).toBe(1)
       })
     })
 
@@ -164,12 +145,7 @@ describe('Community Voice Chat Polling Component', () => {
 
         mockGetActiveCommunityVoiceChats.mockResolvedValue([activeChat])
         mockGetCommunityVoiceChatStatus.mockRejectedValue(new Error('404 not found'))
-        mockUpdateAndDetectChange.mockResolvedValue({
-          wasActive: true,
-          isNowActive: false,
-          justEnded: true,
-          cachedChat: activeChat
-        })
+        mockUpdateAndDetectChange.mockResolvedValue(true) // Change detected (ended)
         mockPublishInChannel.mockResolvedValue(undefined)
       })
 
@@ -186,10 +162,6 @@ describe('Community Voice Chat Polling Component', () => {
             status: 'ended'
           })
         )
-
-        const stats = polling.getStats()
-        expect(stats.endedDetected).toBe(1)
-        expect(stats.errors).toBe(1)
       })
     })
 
@@ -215,18 +187,8 @@ describe('Community Voice Chat Polling Component', () => {
           .mockResolvedValueOnce({ isActive: false })
         
         mockUpdateAndDetectChange
-          .mockResolvedValueOnce({
-            wasActive: true,
-            isNowActive: true,
-            justEnded: false,
-            cachedChat: activeChat1
-          })
-          .mockResolvedValueOnce({
-            wasActive: true,
-            isNowActive: false,
-            justEnded: true,
-            cachedChat: activeChat2
-          })
+          .mockResolvedValueOnce(false) // No change for community-1
+          .mockResolvedValueOnce(true)  // Change detected for community-2 (ended)
         
         mockPublishInChannel.mockResolvedValue(undefined)
       })
@@ -242,10 +204,6 @@ describe('Community Voice Chat Polling Component', () => {
             status: 'ended'
           })
         )
-
-        const stats = polling.getStats()
-        expect(stats.endedDetected).toBe(1)
-        expect(stats.errors).toBe(0)
       })
     })
 
@@ -266,108 +224,12 @@ describe('Community Voice Chat Polling Component', () => {
         await polling.checkAllVoiceChats()
 
         expect(mockPublishInChannel).not.toHaveBeenCalled()
-
-        const stats = polling.getStats()
-        expect(stats.endedDetected).toBe(0)
-        expect(stats.errors).toBe(1)
-      })
-    })
-  })
-
-  describe('when starting the polling service', () => {
-    describe('when starting for the first time', () => {
-      beforeEach(() => {
-        mockGetActiveCommunityVoiceChats.mockResolvedValue([])
-      })
-
-      it('should start polling and perform initial check', async () => {
-        await polling.start()
-
-        const stats = polling.getStats()
-        expect(stats.totalChecks).toBe(1)
-      })
-    })
-
-    describe('when already running', () => {
-      beforeEach(() => {
-        mockGetActiveCommunityVoiceChats.mockResolvedValue([])
-      })
-
-      it('should not start if already running', async () => {
-        await polling.start()
-        await polling.start()
-
-        const stats = polling.getStats()
-        expect(stats.totalChecks).toBe(1)
-      })
-    })
-  })
-
-  describe('when stopping the polling service', () => {
-    describe('when stopping after starting', () => {
-      beforeEach(() => {
-        mockGetActiveCommunityVoiceChats.mockResolvedValue([])
-      })
-
-      it('should stop polling without errors', async () => {
-        await polling.start()
-        await polling.stop()
-
-        await expect(polling.stop()).resolves.not.toThrow()
-      })
-    })
-
-    describe('when stopping without starting', () => {
-      it('should handle stopping non-running polling gracefully', async () => {
-        await polling.stop()
-
-        await expect(polling.stop()).resolves.not.toThrow()
-      })
-    })
-  })
-
-  describe('when retrieving polling statistics', () => {
-    describe('when getting initial stats', () => {
-      it('should return correct initial stats', () => {
-        const stats = polling.getStats()
-
-        expect(stats).toEqual({
-          totalChecks: 0,
-          endedDetected: 0,
-          errors: 0,
-          lastCheck: null
-        })
-      })
-    })
-
-    describe('when tracking stats after operations', () => {
-      beforeEach(() => {
-        const activeChat = {
-          communityId: 'community-1',
-          isActive: true,
-          lastChecked: Date.now() - 5000,
-          createdAt: Date.now() - 10000
-        }
-
-        mockGetActiveCommunityVoiceChats.mockResolvedValue([activeChat])
-        mockGetCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
-        mockUpdateAndDetectChange.mockResolvedValue({
-          wasActive: true,
-          isNowActive: false,
-          justEnded: true,
-          cachedChat: activeChat
-        })
-        mockPublishInChannel.mockResolvedValue(undefined)
-      })
-
-      it('should track stats correctly after operations', async () => {
-        await polling.checkAllVoiceChats()
-
-        const stats = polling.getStats()
-        expect(stats.totalChecks).toBe(1)
-        expect(stats.endedDetected).toBe(1)
-        expect(stats.errors).toBe(0)
-        expect(stats.lastCheck).toBeGreaterThan(0)
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Error checking voice chat status for community community-1'),
+          expect.objectContaining({
+            error: 'Connection timeout'
+          })
+        )
       })
     })
   })
@@ -381,9 +243,12 @@ describe('Community Voice Chat Polling Component', () => {
       it('should handle cache errors gracefully', async () => {
         await polling.checkAllVoiceChats()
 
-        const stats = polling.getStats()
-        expect(stats.totalChecks).toBe(1)
-        expect(stats.errors).toBe(1)
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          'Error during community voice chat polling',
+          expect.objectContaining({
+            error: 'Cache error'
+          })
+        )
       })
     })
 
@@ -398,12 +263,7 @@ describe('Community Voice Chat Polling Component', () => {
 
         mockGetActiveCommunityVoiceChats.mockResolvedValue([activeChat])
         mockGetCommunityVoiceChatStatus.mockResolvedValue({ isActive: false })
-        mockUpdateAndDetectChange.mockResolvedValue({
-          wasActive: true,
-          isNowActive: false,
-          justEnded: true,
-          cachedChat: activeChat
-        })
+        mockUpdateAndDetectChange.mockResolvedValue(true) // Change detected (ended)
         mockPublishInChannel.mockRejectedValue(new Error('Pubsub error'))
       })
 
@@ -416,10 +276,6 @@ describe('Community Voice Chat Polling Component', () => {
             error: 'Pubsub error'
           })
         )
-
-        const stats = polling.getStats()
-        expect(stats.errors).toBeGreaterThan(0)
-        expect(stats.totalChecks).toBeGreaterThan(0)
       })
     })
   })

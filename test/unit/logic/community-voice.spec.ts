@@ -9,6 +9,7 @@ import {
   ICommunitiesDatabaseComponent,
   ICatalystClientComponent
 } from '../../../src/types'
+import { createMockProfile } from '../../mocks/profile'
 import {
   CommunityVoiceChatAlreadyActiveError,
   CommunityVoiceChatCreationError,
@@ -129,20 +130,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockResolvedValue({
-              avatars: [
-                {
-                  name: 'CreatorUser',
-                  hasClaimedName: true,
-                  userId: creatorAddress,
-                  avatar: {
-                    snapshots: {
-                      face256: 'https://example.com/creator-face.png'
-                    }
-                  }
-                }
-              ]
-            } as any)
+            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
           })
 
           it('should successfully start a community voice chat with profile data', async () => {
@@ -156,10 +144,15 @@ describe('Community Voice Logic', () => {
               creatorAddress,
               CommunityRole.Owner,
               {
-                name: 'CreatorUser',
+                name: `Profile name ${creatorAddress}`,
                 has_claimed_name: true,
-                profile_picture_url: 'https://example.com/creator-face.png'
+                profile_picture_url: 'https://profile-images.decentraland.org/entities/bafybeiasdfqwer/face.png'
               }
+            )
+            expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
+              communityId,
+              true,
+              expect.any(Number)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
@@ -188,6 +181,11 @@ describe('Community Voice Logic', () => {
               creatorAddress,
               CommunityRole.Owner,
               null
+            )
+            expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
+              communityId,
+              true,
+              expect.any(Number)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
@@ -208,23 +206,10 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockResolvedValue({
-              avatars: [
-                {
-                  name: 'ModeratorUser',
-                  hasClaimedName: false,
-                  userId: creatorAddress,
-                  avatar: {
-                    snapshots: {
-                      face256: 'https://example.com/moderator-face.png'
-                    }
-                  }
-                }
-              ]
-            } as any)
+            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
           })
 
-          it('should successfully start a community voice chat with profile data', async () => {
+          it('should successfully start a community voice chat with profile data for moderator', async () => {
             const result = await communityVoice.startCommunityVoiceChat(communityId, creatorAddress)
 
             expect(result).toEqual({ connectionUrl: 'test-connection-url' })
@@ -235,10 +220,15 @@ describe('Community Voice Logic', () => {
               creatorAddress,
               CommunityRole.Moderator,
               {
-                name: 'ModeratorUser',
-                has_claimed_name: false,
-                profile_picture_url: 'https://example.com/moderator-face.png'
+                name: `Profile name ${creatorAddress}`,
+                has_claimed_name: true,
+                profile_picture_url: 'https://profile-images.decentraland.org/entities/bafybeiasdfqwer/face.png'
               }
+            )
+            expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
+              communityId,
+              true,
+              expect.any(Number)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
@@ -267,6 +257,11 @@ describe('Community Voice Logic', () => {
               creatorAddress,
               CommunityRole.Moderator,
               null
+            )
+            expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
+              communityId,
+              true,
+              expect.any(Number)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
@@ -376,20 +371,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockResolvedValue({
-              avatars: [
-                {
-                  name: 'MemberUser',
-                  hasClaimedName: true,
-                  userId: userAddress,
-                  avatar: {
-                    snapshots: {
-                      face256: 'https://example.com/member-face.png'
-                    }
-                  }
-                }
-              ]
-            } as any)
+            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(userAddress))
           })
 
           it('should successfully join community voice chat with profile data', async () => {
@@ -404,9 +386,9 @@ describe('Community Voice Logic', () => {
               userAddress,
               CommunityRole.Member,
               {
-                name: 'MemberUser',
+                name: `Profile name ${userAddress}`,
                 has_claimed_name: true,
-                profile_picture_url: 'https://example.com/member-face.png'
+                profile_picture_url: 'https://profile-images.decentraland.org/entities/bafybeiasdfqwer/face.png'
               }
             )
           })
@@ -468,6 +450,7 @@ describe('Community Voice Logic', () => {
                 }
               ]
             } as any)
+            mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
           })
 
           it('should successfully join without membership check with profile data', async () => {
@@ -493,6 +476,7 @@ describe('Community Voice Logic', () => {
         describe('when profile data is not available', () => {
           beforeEach(() => {
             mockCatalystClient.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
+            mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
           })
 
           it('should successfully join without membership check and without profile data', async () => {
@@ -583,7 +567,6 @@ describe('Community Voice Logic', () => {
             active: true,
             role: CommunityRole.Member
           })
-          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
           mockCommunitiesDb.isMemberBanned!.mockResolvedValue(true)
         })
 
@@ -593,7 +576,6 @@ describe('Community Voice Logic', () => {
           )
           expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
           expect(mockCommunitiesDb.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-          expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommunitiesDb.isMemberBanned).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).not.toHaveBeenCalled()
         })
