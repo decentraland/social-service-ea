@@ -58,6 +58,7 @@ import { createEmailComponent } from './adapters/email'
 import { createFriendsComponent } from './logic/friends'
 import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/community-voice-cache'
 import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
+import { createCommunityBroadcasterComponent } from './logic/community/broadcaster'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -170,6 +171,7 @@ export async function initComponents(): Promise<AppComponents> {
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
+  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
   const communityMembers = await createCommunityMembersComponent({
@@ -199,8 +201,8 @@ export async function initComponents(): Promise<AppComponents> {
     communityOwners,
     communityEvents,
     cdnCacheInvalidator,
+    communityBroadcaster,
     commsGatekeeper,
-    sns,
     logs,
     storage,
     config
@@ -269,6 +271,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityRoles,
     communityVoice,
     communityEvents,
+    communityBroadcaster,
     config,
     email,
     expirePrivateVoiceChatJob,

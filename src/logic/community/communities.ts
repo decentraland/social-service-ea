@@ -33,8 +33,8 @@ export async function createCommunityComponent(
     | 'communityEvents'
     | 'cdnCacheInvalidator'
     | 'communityOwners'
+    | 'communityBroadcaster'
     | 'commsGatekeeper'
-    | 'sns'
     | 'storage'
     | 'config'
     | 'logs'
@@ -48,8 +48,8 @@ export async function createCommunityComponent(
     communityEvents,
     communityOwners,
     cdnCacheInvalidator,
+    communityBroadcaster,
     commsGatekeeper,
-    sns,
     storage,
     config,
     logs
@@ -289,15 +289,18 @@ export async function createCommunityComponent(
 
       await communitiesDb.deleteCommunity(id)
 
-      await sns.publishMessage({
-        type: Events.Type.COMMUNITY,
-        subType: Events.SubType.Community.DELETED,
-        key: id,
-        timestamp: Date.now(),
-        metadata: {
-          id,
-          name: community.name
-        }
+      setImmediate(async () => {
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.DELETED,
+          key: id,
+          timestamp: Date.now(),
+          metadata: {
+            id,
+            name: community.name,
+            thumbnailUrl: (await getThumbnail(id)) || 'N/A'
+          }
+        })
       })
     },
 
@@ -343,21 +346,25 @@ export async function createCommunityComponent(
 
       const updatedCommunity = await communitiesDb.updateCommunity(communityId, updates)
 
-      if (updates.name) {
-        const eventKeySuffix =
-          updates.name.trim().toLowerCase().replace(/ /g, '-') +
-          '-' +
-          community.name.trim().toLowerCase().replace(/ /g, '-')
-        await sns.publishMessage({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.RENAMED,
-          key: `${communityId}-${eventKeySuffix}`,
-          timestamp: Date.now(),
-          metadata: {
-            id: communityId,
-            oldName: community.name,
-            newName: updates.name
-          }
+      if (!!updates.name) {
+        setImmediate(async () => {
+          const eventKeySuffix =
+            updates.name!.trim().toLowerCase().replace(/ /g, '-') +
+            '-' +
+            community.name.trim().toLowerCase().replace(/ /g, '-')
+
+          await communityBroadcaster.broadcast({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.RENAMED,
+            key: `${communityId}-${eventKeySuffix}`,
+            timestamp: Date.now(),
+            metadata: {
+              id: communityId,
+              oldName: community.name,
+              newName: updates.name!,
+              thumbnailUrl: (await getThumbnail(communityId)) || 'N/A'
+            }
+          })
         })
       }
 

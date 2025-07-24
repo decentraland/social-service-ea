@@ -43,6 +43,7 @@ import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/co
 import {
   ICommunitiesComponent,
   ICommunityBansComponent,
+  ICommunityBroadcasterComponent,
   ICommunityMembersComponent,
   ICommunityOwnersComponent,
   ICommunityPlacesComponent,
@@ -83,6 +84,7 @@ export type BaseComponents = {
   communityRoles: ICommunityRolesComponent
   communityVoice: ICommunityVoiceComponent
   communityEvents: ICommunityEventsComponent
+  communityBroadcaster: ICommunityBroadcasterComponent
   config: IConfigComponent
   email: IEmailComponent
   expirePrivateVoiceChatJob?: IJobComponent

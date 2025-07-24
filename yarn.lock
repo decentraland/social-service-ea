@@ -1276,6 +1276,15 @@
     ajv-keywords "^5.1.0"
     mitt "^3.0.1"
 
+"@dcl/schemas@https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-events/dcl-schemas-17.0.1-16501786857.commit-4e5e84c.tgz":
+  version "17.0.1-16501786857.commit-4e5e84c"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-events/dcl-schemas-17.0.1-16501786857.commit-4e5e84c.tgz#a27da837266b6be4cc40d8dd180f53eee3fd2748"
+  dependencies:
+    ajv "^8.11.0"
+    ajv-errors "^3.0.0"
+    ajv-keywords "^5.1.0"
+    mitt "^3.0.1"
+
 "@dcl/ts-proto@1.154.0":
   version "1.154.0"
   resolved "https://registry.yarnpkg.com/@dcl/ts-proto/-/ts-proto-1.154.0.tgz#25cc76d90b148500bf95c7bffde86702fcde3329"
