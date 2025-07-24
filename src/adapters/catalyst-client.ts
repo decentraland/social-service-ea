@@ -80,7 +80,6 @@ export async function createCatalystClient({
       )
       response = await retry(executeClientRequest, retries, waitTime)
 
-      // Create a Set for O(1) lookup performance
       const foundedIdsSet = new Set(response.map((profile) => getProfileUserId(profile)))
       const idsNotFound = idsToFetch.filter((id) => !foundedIdsSet.has(id))
       defaultProfiles = idsNotFound.map((id) => createDefaultProfile(id))
