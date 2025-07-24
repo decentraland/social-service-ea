@@ -10,19 +10,24 @@ import {
   ICommunityRolesComponent,
   ICommunityPlacesComponent,
   ICommunityOwnersComponent,
-  ICommunityEventsComponent
+  ICommunityEventsComponent,
+  ICommunityThumbnailComponent,
+  ICommunityBroadcasterComponent
 } from '../../../src/logic/community/types'
 import {
   createMockCommunityRolesComponent,
   createMockCommunityPlacesComponent,
   createMockCommunityOwnersComponent,
-  createMockCommunityEventsComponent
+  createMockCommunityEventsComponent,
+  createMockCommunityBroadcasterComponent,
+  createMockCommunityThumbnailComponent
 } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { Community } from '../../../src/logic/community/types'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { mockSns } from '../../mocks/components/sns'
 import { Events } from '@dcl/schemas'
+import { createCommunityThumbnailComponent } from '../../../src/logic/community'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -31,6 +36,8 @@ describe('Community Component', () => {
   let mockCommunityOwners: jest.Mocked<ICommunityOwnersComponent>
   let mockCommunityEvents: jest.Mocked<ICommunityEventsComponent>
   let mockStorage: jest.Mocked<ReturnType<typeof createS3ComponentMock>>
+  let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
+  let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
   let mockCommsGatekeeper: jest.Mocked<ReturnType<typeof createCommsGatekeeperMockedComponent>>
   let mockUserAddress: string
   const communityId = 'test-community'
@@ -52,9 +59,12 @@ describe('Community Component', () => {
     mockCommunityOwners = createMockCommunityOwnersComponent({})
     mockCommunityEvents = createMockCommunityEventsComponent({})
     mockStorage = createS3ComponentMock() as jest.Mocked<ReturnType<typeof createS3ComponentMock>>
+    mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
+    mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
     mockConfig.requireString.mockResolvedValue(cdnUrl)
-    communityComponent = await createCommunityComponent({
+    mockCommunityThumbnail.buildThumbnailUrl.mockImplementation((communityId: string) => `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`)
+    communityComponent = createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
@@ -63,10 +73,9 @@ describe('Community Component', () => {
       communityEvents: mockCommunityEvents,
       cdnCacheInvalidator: mockCdnCacheInvalidator,
       commsGatekeeper: mockCommsGatekeeper,
-      sns: mockSns,
       logs: mockLogs,
-      storage: mockStorage,
-      config: mockConfig
+      communityBroadcaster: mockCommunityBroadcaster,
+      communityThumbnail: mockCommunityThumbnail
     })
   })
 
@@ -86,7 +95,6 @@ describe('Community Component', () => {
           role: CommunityRole.Member
         })
         mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(10)
-        mockStorage.exists.mockResolvedValue(false)
         mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(mockVoiceChatStatus)
         mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
         mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValue(false)
@@ -113,14 +121,13 @@ describe('Community Component', () => {
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
         expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
         expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
-        expect(mockStorage.exists).toHaveBeenCalledWith(`communities/${communityId}/raw-thumbnail.png`)
         expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
         expect(mockCommunityEvents.isCurrentlyHostingEvents).toHaveBeenCalledWith(communityId)
       })
 
       describe('when the community has a thumbnail', () => {
         beforeEach(() => {
-          mockStorage.exists.mockResolvedValueOnce(true)
+          mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(`${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`)
         })
 
         it('should include thumbnail when it exists', async () => {
@@ -200,7 +207,6 @@ describe('Community Component', () => {
     beforeEach(() => {
       mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunities)
       mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
-      mockStorage.exists.mockResolvedValue(false)
       mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
       mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
@@ -244,7 +250,7 @@ describe('Community Component', () => {
     describe('and the communities have a thumbnail', () => {
       beforeEach(() => {
         mockCommunities.forEach(() => {
-          mockStorage.exists.mockResolvedValueOnce(true)
+          mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(`${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`)
         })
       })
 
@@ -357,7 +363,6 @@ describe('Community Component', () => {
     beforeEach(() => {
       mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunities)
       mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(1)
-      mockStorage.exists.mockResolvedValue(false)
       mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
 
@@ -389,7 +394,7 @@ describe('Community Component', () => {
     describe('and the communities have a thumbnail', () => {
       beforeEach(() => {
         mockCommunities.forEach(() => {
-          mockStorage.exists.mockResolvedValueOnce(true)
+          mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(`${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`)
         })
       })
 
@@ -518,7 +523,7 @@ describe('Community Component', () => {
       mockCommunitiesDB.createCommunity.mockResolvedValue(createdCommunity)
       mockCommunitiesDB.addCommunityMember.mockResolvedValue()
       mockCommunityPlaces.addPlaces.mockResolvedValue()
-      mockStorage.storeFile.mockResolvedValue('https://cdn.decentraland.org/thumbnail.png')
+      mockCommunityThumbnail.uploadThumbnail.mockResolvedValue(`${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`)
       mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
 
@@ -564,7 +569,7 @@ describe('Community Component', () => {
               role: CommunityRole.Owner
             })
             expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
-            expect(mockStorage.storeFile).not.toHaveBeenCalled()
+            expect(mockCommunityThumbnail.uploadThumbnail).not.toHaveBeenCalled()
           })
         })
 
@@ -599,10 +604,7 @@ describe('Community Component', () => {
               role: CommunityRole.Owner
             })
             expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
-            expect(mockStorage.storeFile).toHaveBeenCalledWith(
-              thumbnail,
-              `communities/${newCommunityId}/raw-thumbnail.png`
-            )
+            expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(newCommunityId, thumbnail)
           })
         })
       })
@@ -644,7 +646,7 @@ describe('Community Component', () => {
                 role: CommunityRole.Owner
               })
               expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith('new-community-id', ownerAddress, placeIds)
-              expect(mockStorage.storeFile).not.toHaveBeenCalled()
+              expect(mockCommunityThumbnail.uploadThumbnail).not.toHaveBeenCalled()
             })
           })
 
@@ -679,10 +681,7 @@ describe('Community Component', () => {
                 role: CommunityRole.Owner
               })
               expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith(newCommunityId, ownerAddress, placeIds)
-              expect(mockStorage.storeFile).toHaveBeenCalledWith(
-                thumbnail,
-                `communities/${newCommunityId}/raw-thumbnail.png`
-              )
+              expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(newCommunityId, thumbnail)
             })
           })
         })
@@ -744,6 +743,7 @@ describe('Community Component', () => {
         beforeEach(() => {
           community.role = CommunityRole.Owner
           community.ownerAddress = userAddress
+          mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(`${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`)
         })
 
         it('should delete the community', async () => {
@@ -756,14 +756,17 @@ describe('Community Component', () => {
         it('should publish a community deleted event', async () => {
           await communityComponent.deleteCommunity(communityId, userAddress)
 
-          expect(mockSns.publishMessage).toHaveBeenCalledWith({
+          // Wait for setImmediate callback to execute
+          await new Promise(resolve => setImmediate(resolve))
+          expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
             type: Events.Type.COMMUNITY,
             subType: Events.SubType.Community.DELETED,
             key: communityId,
             timestamp: expect.any(Number),
             metadata: {
               id: communityId,
-              name: community.name
+              name: community.name,
+              thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
             }
           })
         })
@@ -841,7 +844,7 @@ describe('Community Component', () => {
         ownedPlaces: updates.placeIds,
         notOwnedPlaces: []
       })
-      mockStorage.storeFile.mockResolvedValue('https://cdn.decentraland.org/thumbnail.png')
+      mockCommunityThumbnail.uploadThumbnail.mockResolvedValue(`${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`)
       mockCommunityPlaces.updatePlaces.mockResolvedValue()
       mockCommunitiesDB.getCommunityPlaces.mockResolvedValue([])
     })
@@ -869,6 +872,7 @@ describe('Community Component', () => {
               beforeEach(() => {
                 updatedCommunity = { ...mockCommunity, ...updatesWithoutThumbnail }
                 mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+                mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(`${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`)
               })
 
               it('should update the community with places', async () => {
@@ -893,7 +897,7 @@ describe('Community Component', () => {
                   userAddress
                 )
                 expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutThumbnail)
-                expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                expect(mockCommunityThumbnail.uploadThumbnail).not.toHaveBeenCalled()
                 expect(mockCdnCacheInvalidator.invalidateThumbnail).not.toHaveBeenCalled()
                 expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
                   communityId,
@@ -901,7 +905,9 @@ describe('Community Component', () => {
                   updatesWithoutThumbnail.placeIds
                 )
 
-                expect(mockSns.publishMessage).toHaveBeenCalledWith({
+                // Wait for setImmediate callback to execute
+                await new Promise(resolve => setImmediate(resolve))
+                expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
                   type: Events.Type.COMMUNITY,
                   subType: Events.SubType.Community.RENAMED,
                   key: `${communityId}-${updatesWithoutThumbnail.name.trim().toLowerCase().replace(/ /g, '-')}-${community.name.trim().toLowerCase().replace(/ /g, '-')}`,
@@ -909,7 +915,8 @@ describe('Community Component', () => {
                   metadata: {
                     id: communityId,
                     oldName: community.name,
-                    newName: updatesWithoutThumbnail.name
+                    newName: updatesWithoutThumbnail.name,
+                    thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
                   }
                 })
               })
@@ -959,7 +966,7 @@ describe('Community Component', () => {
                       userAddress
                     )
                     expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutThumbnail)
-                    expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                    expect(mockCommunityThumbnail.uploadThumbnail).not.toHaveBeenCalled()
                     expect(mockCdnCacheInvalidator.invalidateThumbnail).not.toHaveBeenCalled()
                     expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
                       communityId,
@@ -992,10 +999,7 @@ describe('Community Component', () => {
                     )
                     expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
                     expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updates)
-                    expect(mockStorage.storeFile).toHaveBeenCalledWith(
-                      updates.thumbnailBuffer,
-                      `communities/${communityId}/raw-thumbnail.png`
-                    )
+                    expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(communityId, updates.thumbnailBuffer)
                     expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
                     expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
                       communityId,
@@ -1065,7 +1069,7 @@ describe('Community Component', () => {
                   )
                   expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
                   expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithEmptyPlaces)
-                  expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                  expect(mockCommunityThumbnail.uploadThumbnail).not.toHaveBeenCalled()
                   expect(mockCdnCacheInvalidator.invalidateThumbnail).not.toHaveBeenCalled()
                   expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, [])
                 })
@@ -1102,7 +1106,7 @@ describe('Community Component', () => {
                   )
                   expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
                   expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutPlaces)
-                  expect(mockStorage.storeFile).not.toHaveBeenCalled()
+                  expect(mockCommunityThumbnail.uploadThumbnail).not.toHaveBeenCalled()
                   expect(mockCdnCacheInvalidator.invalidateThumbnail).not.toHaveBeenCalled()
                   expect(mockCommunityPlaces.updatePlaces).not.toHaveBeenCalled()
                 })
@@ -1157,10 +1161,7 @@ describe('Community Component', () => {
                     userAddress
                   )
                   expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithMixedPlaces)
-                  expect(mockStorage.storeFile).toHaveBeenCalledWith(
-                    updatesWithMixedPlaces.thumbnailBuffer,
-                    `communities/${communityId}/raw-thumbnail.png`
-                  )
+                  expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(communityId, updatesWithMixedPlaces.thumbnailBuffer)
                   expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
                   expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, newPlaceIds)
                 })
@@ -1205,10 +1206,7 @@ describe('Community Component', () => {
                   // Should not validate ownership since all places already exist
                   expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith([], userAddress)
                   expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithExistingPlaces)
-                  expect(mockStorage.storeFile).toHaveBeenCalledWith(
-                    updatesWithExistingPlaces.thumbnailBuffer,
-                    `communities/${communityId}/raw-thumbnail.png`
-                  )
+                  expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(communityId, updatesWithExistingPlaces.thumbnailBuffer)
                   expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
                   expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, [
                     'place-1',
@@ -1261,10 +1259,7 @@ describe('Community Component', () => {
                   // Should only validate ownership for place-2 (new unique place)
                   expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(['place-2'], userAddress)
                   expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithDuplicates)
-                  expect(mockStorage.storeFile).toHaveBeenCalledWith(
-                    updatesWithDuplicates.thumbnailBuffer,
-                    `communities/${communityId}/raw-thumbnail.png`
-                  )
+                  expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(communityId, updatesWithDuplicates.thumbnailBuffer)
                   expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
                   expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
                     communityId,
