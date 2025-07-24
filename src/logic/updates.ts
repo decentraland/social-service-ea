@@ -1,7 +1,8 @@
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { VoiceChatStatus } from './voice/types'
 import { IUpdateHandlerComponent } from '../types/components'
 
@@ -242,11 +243,17 @@ export function createUpdateHandlerComponent(
           continue
         }
 
-        const profile = shouldRetrieveProfile
-          ? await catalystClient.getProfile(getAddressFromUpdate(update as U))
-          : null
-        const parsedUpdate = await parser(update as U, profile, ...parseArgs)
+        let profile: Profile | null = null
 
+        try {
+          profile = shouldRetrieveProfile ? await catalystClient.getProfile(getAddressFromUpdate(update as U)) : null
+        } catch (_) {
+          // If the profile is not found, skip the update
+          logger.warn(`Unable to retrieve profile for ${getAddressFromUpdate(update as U)} in ${eventNameString}`)
+          continue
+        }
+
+        const parsedUpdate = await parser(update as U, profile, ...parseArgs)
         if (parsedUpdate) {
           yield parsedUpdate
         } else {

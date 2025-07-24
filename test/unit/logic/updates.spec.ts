@@ -1,5 +1,6 @@
-import { createUpdateHandlerComponent } from '../../../src/logic/updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { createUpdateHandlerComponent } from '../../../src/logic/updates'
 import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../mocks/components'
 import mitt, { Emitter } from 'mitt'
 import {
@@ -10,7 +11,7 @@ import {
   RpcServerContext
 } from '../../../src/types'
 import { sleep } from '../../../src/utils/timer'
-import { mockProfile } from '../../mocks/profile'
+import { createMockProfile, mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
 import { VoiceChatStatus } from '../../../src/logic/voice/types'
 import { ICommunityMembersComponent } from '../../../src/logic/community/types'
@@ -28,6 +29,7 @@ describe('Updates Handlers', () => {
     subscribersContext.addSubscriber('0x789', mitt<SubscriptionEventsEmitter>())
 
     mockCommunityMembers = createMockCommunityMembersComponent({})
+    mockCatalystClient.getProfile.mockResolvedValue(createMockProfile('0x456'))
 
     updateHandler = createUpdateHandlerComponent({
       logs: mockLogs,
@@ -935,15 +937,16 @@ describe('Updates Handlers', () => {
     let parser: jest.Mock
     let rpcContext: RpcServerContext
     let subscribersContext: ISubscribersContext
-
-    const friendshipUpdate = { id: '1', to: '0x456', from: '0x123', action: Action.REQUEST, timestamp: Date.now() }
-    const blockUpdate = { blockerAddress: '0x456', blockedAddress: '0x123', isBlocked: true }
+    let blockUpdate: SubscriptionEventsEmitter['blockUpdate']
+    let friendshipUpdate: SubscriptionEventsEmitter['friendshipUpdate']
 
     beforeEach(() => {
+      friendshipUpdate = { id: '1', to: '0x456', from: '0x123', action: Action.REQUEST, timestamp: Date.now() }
+      blockUpdate = { blockerAddress: '0x456', blockedAddress: '0x123', isBlocked: true }
       eventEmitter = mitt<SubscriptionEventsEmitter>()
       parser = jest.fn()
-      mockCatalystClient.getProfile.mockResolvedValue(mockProfile)
 
+      mockCatalystClient.getProfile.mockResolvedValue(mockProfile)
       subscribersContext = createSubscribersContext()
       subscribersContext.addSubscriber('0x123', eventEmitter)
 
@@ -1098,9 +1101,54 @@ describe('Updates Handlers', () => {
         rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('blockUpdate', blockUpdate)
 
         const result = await resultPromise
+        console.log(result)
         expect(result.value).toEqual({ parsed: true })
         expect(parser).toHaveBeenCalledWith(blockUpdate, null)
         expect(mockCatalystClient.getProfile).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the profile should be retrieved but is not found', () => {
+      let blockUpdateWithoutProfile: SubscriptionEventsEmitter['blockUpdate']
+      let blockUpdateWithProfile: SubscriptionEventsEmitter['blockUpdate']
+      let mockedProfile: Profile
+      let mockedProfileAddress: string
+
+      beforeEach(() => {
+        mockedProfile = createMockProfile('0x789')
+        mockedProfileAddress = mockedProfile.avatars[0].userId
+        mockCatalystClient.getProfile
+          .mockReset()
+          .mockRejectedValueOnce(new Error('Profile not found'))
+          .mockResolvedValueOnce(mockedProfile)
+        blockUpdateWithoutProfile = blockUpdate
+        blockUpdateWithProfile = {
+          ...blockUpdate,
+          blockerAddress: mockedProfileAddress
+        }
+      })
+
+      it('should skip the update', async () => {
+        parser.mockResolvedValueOnce({ parsed: true })
+        const generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext,
+          eventName: 'blockUpdate',
+          shouldRetrieveProfile: true,
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.blockerAddress,
+          shouldHandleUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.blockedAddress === '0x123',
+          parser
+        })
+
+        const resultPromise = generator.next()
+
+        // Emit the update twice to test the skip logic
+        const subscriber = rpcContext.subscribersContext.getOrAddSubscriber('0x123')
+        subscriber.emit('blockUpdate', blockUpdateWithoutProfile)
+        subscriber.emit('blockUpdate', blockUpdateWithProfile)
+
+        const result = await resultPromise
+        expect(result.value).toEqual({ parsed: true })
+        expect(parser).toHaveBeenCalledWith(blockUpdateWithProfile, mockedProfile)
       })
     })
   })
