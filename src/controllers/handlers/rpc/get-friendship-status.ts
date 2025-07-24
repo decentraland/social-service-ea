@@ -1,9 +1,10 @@
 import { EthAddress } from '@dcl/schemas'
-import { RpcServerContext, RPCServiceContext } from '../../../types'
 import {
   GetFriendshipStatusPayload,
   GetFriendshipStatusResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { getFriendshipRequestStatus } from '../../../logic/friends'
+import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { InvalidRequestError } from '../../errors/rpc.errors'
 
 export function getFriendshipStatusService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
@@ -25,13 +26,13 @@ export function getFriendshipStatusService({ components: { logs, friends } }: RP
         throw new InvalidRequestError('Invalid user address in the request payload')
       }
 
-      const status = await friends.getFriendshipStatus(loggedUserAddress, userAddress)
+      const lastFriendshipAction = await friends.getFriendshipStatus(loggedUserAddress, userAddress)
 
       return {
         response: {
           $case: 'accepted',
           accepted: {
-            status
+            status: getFriendshipRequestStatus(lastFriendshipAction, loggedUserAddress)
           }
         }
       }
