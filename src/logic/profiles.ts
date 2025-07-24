@@ -1,6 +1,5 @@
 import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { normalizeAddress } from '../utils/address'
-import { EthAddress } from '@dcl/schemas'
 
 export function getProfileAvatarItem(profile: Pick<Profile, 'avatars'>): ProfileAvatarsItem {
   const [avatar] = profile.avatars ?? []
