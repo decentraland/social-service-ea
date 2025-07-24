@@ -74,16 +74,22 @@ export enum RpcResponseCode {
   INVALID_REQUEST = 'INVALID_REQUEST',
   PROFILE_NOT_FOUND = 'PROFILE_NOT_FOUND',
   INVALID_FRIENDSHIP_ACTION = 'INVALID_FRIENDSHIP_ACTION',
-  UNKNOWN = 'UNKNOWN'
+  UNKNOWN = 'UNKNOWN',
+  NOT_FOUND = 'NOT_FOUND',
+  FORBIDDEN_ERROR = 'FORBIDDEN_ERROR',
+  CONFLICTING_ERROR = 'CONFLICTING_ERROR'
 }
 
 const responseCaseToCodeMap: Record<string, RpcResponseCode> = {
   ok: RpcResponseCode.OK,
   accepted: RpcResponseCode.OK,
   requests: RpcResponseCode.OK,
+  notFound: RpcResponseCode.NOT_FOUND,
   internalServerError: RpcResponseCode.INTERNAL_SERVER_ERROR,
   invalidRequest: RpcResponseCode.INVALID_REQUEST,
   profileNotFound: RpcResponseCode.PROFILE_NOT_FOUND,
+  forbiddenError: RpcResponseCode.FORBIDDEN_ERROR,
+  conflictingError: RpcResponseCode.CONFLICTING_ERROR,
   invalidFriendshipAction: RpcResponseCode.INVALID_FRIENDSHIP_ACTION,
   unknown: RpcResponseCode.UNKNOWN
 }

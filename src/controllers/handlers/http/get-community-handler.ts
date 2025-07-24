@@ -3,7 +3,7 @@ import { errorMessageOrDefault } from '../../../utils/errors'
 import {
   CommunityNotFoundError,
   CommunityOwnerNotFoundError,
-  CommunityWithMembersCount
+  AggregatedCommunityWithMemberData
 } from '../../../logic/community'
 
 export async function getCommunityHandler(
@@ -11,7 +11,7 @@ export async function getCommunityHandler(
     HandlerContextWithPath<'logs' | 'communities', '/v1/communities/:id'>,
     'url' | 'components' | 'params' | 'verification'
   >
-): Promise<HTTPResponse<CommunityWithMembersCount>> {
+): Promise<HTTPResponse<AggregatedCommunityWithMemberData>> {
   const {
     components: { communities, logs },
     params: { id },

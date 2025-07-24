@@ -6,7 +6,7 @@ import { CommunityRole, Action } from '../../types/entities'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export interface ICommunitiesComponent {
-  getCommunity(id: string, userAddress: EthAddress): Promise<CommunityWithMembersCountAndVoiceChatStatus>
+  getCommunity(id: string, userAddress: EthAddress): Promise<AggregatedCommunityWithMemberAndVoiceChatData>
   getCommunities(
     userAddress: string,
     options: GetCommunitiesOptions
@@ -22,7 +22,7 @@ export interface ICommunitiesComponent {
     community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
     thumbnail?: Buffer,
     placeIds?: string[]
-  ): Promise<CommunityWithOwnerName>
+  ): Promise<AggregatedCommunity>
   updateCommunity(communityId: string, userAddress: EthAddress, updates: CommunityUpdates): Promise<Community>
   deleteCommunity(id: string, userAddress: string): Promise<void>
 }
@@ -58,7 +58,7 @@ export interface ICommunityMembersComponent {
   ): Promise<void>
 }
 
-export type ICommunityRolesComponent = {
+export interface ICommunityRolesComponent {
   validatePermissionToKickMemberFromCommunity: (
     communityId: string,
     kickerAddress: string,
@@ -87,6 +87,10 @@ export type ICommunityRolesComponent = {
   validatePermissionToEditCommunity: (communityId: string, editorAddress: string) => Promise<void>
   validatePermissionToDeleteCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToLeaveCommunity: (communityId: string, memberAddress: string) => Promise<void>
+}
+
+export interface ICommunityEventsComponent {
+  isCurrentlyHostingEvents: (communityId: string) => Promise<boolean>
 }
 
 export interface ICommunityPlacesComponent {
@@ -164,8 +168,13 @@ export type Community = {
   active: boolean
 }
 
-export type CommunityWithOwnerName = Community & {
+/*
+  AggregatedCommunity is a community with additional information that is not stored in the database.
+  This additional information is fetched from external sources.
+*/
+export type AggregatedCommunity = Community & {
   ownerName: string
+  isHostingLiveEvent: boolean
 }
 
 type FriendshipAction = {
@@ -201,7 +210,7 @@ export type BannedMemberProfile = BannedMember & {
   friendshipStatus: FriendshipStatus
 }
 
-export type CommunityWithMembersCount = CommunityWithOwnerName & {
+export type AggregatedCommunityWithMemberData = AggregatedCommunity & {
   role: CommunityRole
   membersCount: number
 }
@@ -212,11 +221,11 @@ export type CommunityVoiceChatStatus = {
   moderatorCount: number
 }
 
-export type CommunityWithMembersCountAndVoiceChatStatus = CommunityWithMembersCount & {
+export type AggregatedCommunityWithMemberAndVoiceChatData = AggregatedCommunityWithMemberData & {
   voiceChatStatus: CommunityVoiceChatStatus | null
 }
 
-export type CommunityWithMembersCountAndFriends = CommunityWithMembersCount & {
+export type AggregatedCommunityWithMemberAndFriendsData = AggregatedCommunityWithMemberData & {
   friends: string[]
 }
 
@@ -233,7 +242,7 @@ export type GetCommunityMembersOptions = {
   onlyOnline?: boolean
 }
 
-export type CommunityWithUserInformation = CommunityWithMembersCount & {
+export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
   friends: FriendProfile[]
   isLive: boolean
 }

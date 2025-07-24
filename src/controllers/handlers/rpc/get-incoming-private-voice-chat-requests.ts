@@ -29,8 +29,6 @@ export function getIncomingPrivateVoiceChatRequestsService({
       }
     } catch (error) {
       const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown error'
-      logger.error(`Error getting incoming private voice chat: ${errorMessage}`)
-
       if (error instanceof IncomingVoiceChatNotFoundError) {
         return {
           response: {
@@ -41,6 +39,8 @@ export function getIncomingPrivateVoiceChatRequestsService({
           }
         }
       }
+
+      logger.error(`Error getting incoming private voice chat: ${errorMessage}`)
 
       return {
         response: {

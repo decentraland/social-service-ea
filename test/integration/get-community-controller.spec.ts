@@ -88,6 +88,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                   ownerName: 'Test Owner',
                   privacy: 'public',
                   active: true,
+                  isHostingLiveEvent: false,
                   role: CommunityRole.None,
                   membersCount: 0,
                   voiceChatStatus: {
@@ -110,6 +111,34 @@ test('Get Community Controller', function ({ components, spyComponents }) {
 
                 expect(response.status).toBe(200)
                 expect(body.data.voiceChatStatus).toBeNull()
+              })
+            })
+
+            describe('and the community is hosting live events', () => {
+              beforeEach(async () => {
+                spyComponents.communityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(true)
+              })
+
+              it('should respond with isHostingLiveEvent as true', async () => {
+                const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+                const body = await response.json()
+
+                expect(response.status).toBe(200)
+                expect(body.data.isHostingLiveEvent).toBe(true)
+              })
+            })
+
+            describe('and the community is not hosting live events', () => {
+              beforeEach(async () => {
+                spyComponents.communityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(false)
+              })
+
+              it('should respond with isHostingLiveEvent as false', async () => {
+                const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+                const body = await response.json()
+
+                expect(response.status).toBe(200)
+                expect(body.data.isHostingLiveEvent).toBe(false)
               })
             })
 
@@ -155,6 +184,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                   ownerName: 'Test Owner Unclaimed',
                   privacy: 'public',
                   active: true,
+                  isHostingLiveEvent: false,
                   role: CommunityRole.None,
                   membersCount: 0,
                   voiceChatStatus: {
@@ -163,6 +193,34 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                     moderatorCount: 1
                   }
                 }
+              })
+            })
+
+            describe('and the community is hosting live events', () => {
+              beforeEach(async () => {
+                spyComponents.communityEvents.isCurrentlyHostingEvents.mockResolvedValue(true)
+              })
+
+              it('should respond with isHostingLiveEvent as true', async () => {
+                const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+                const body = await response.json()
+
+                expect(response.status).toBe(200)
+                expect(body.data.isHostingLiveEvent).toBe(true)
+              })
+            })
+
+            describe('and the community is not hosting live events', () => {
+              beforeEach(async () => {
+                spyComponents.communityEvents.isCurrentlyHostingEvents.mockResolvedValue(false)
+              })
+
+              it('should respond with isHostingLiveEvent as false', async () => {
+                const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+                const body = await response.json()
+
+                expect(response.status).toBe(200)
+                expect(body.data.isHostingLiveEvent).toBe(false)
               })
             })
           })

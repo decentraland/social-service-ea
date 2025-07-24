@@ -162,7 +162,6 @@ describe('createRpcServerComponent', () => {
     it('should attach a user and register transport events', () => {
       rpcServer.attachUser({ transport: mockTransport, address })
 
-      expect(mockTransport.on).toHaveBeenCalledWith('close', expect.any(Function))
       expect(attachTransportMock).toHaveBeenCalledWith(mockTransport, {
         subscribersContext: expect.any(Object),
         address
@@ -186,16 +185,6 @@ describe('createRpcServerComponent', () => {
       const secondSubscriber = subscribersContext.getOrAddSubscriber(address)
 
       expect(secondSubscriber).toBe(firstSubscriber)
-    })
-
-    it('should clean up subscribers when transport closes', () => {
-      rpcServer.attachUser({ transport: mockTransport, address })
-
-      const closeHandler = (mockTransport.on as jest.Mock).mock.calls[0][1]
-
-      closeHandler()
-
-      expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
     })
 
     it('should maintain separate subscribers for different addresses', () => {

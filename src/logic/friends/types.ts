@@ -1,8 +1,7 @@
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { EthAddress } from '@dcl/schemas'
 import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { BlockedUserWithDate, FriendshipRequest } from '../../types'
-import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Action, BlockedUserWithDate, FriendshipAction, FriendshipRequest } from '../../types'
 
 export type BlockedUser = {
   profile: Profile
@@ -19,7 +18,15 @@ export interface IFriendsComponent {
     userAddress: EthAddress,
     pagination?: Pagination
   ): Promise<{ friendsProfiles: Profile[]; total: number }>
-  getFriendshipStatus(loggedUserAddress: string, userAddress: string): Promise<FriendshipStatus>
+  blockUser(blockerAddress: string, blockedAddress: string): Promise<BlockedUser>
+  unblockUser(blockerAddress: string, blockedAddress: string): Promise<Profile>
+  upsertFriendship(
+    userAddress: EthAddress,
+    friendAddress: EthAddress,
+    action: Action,
+    metadata: Record<string, string> | null
+  ): Promise<{ friendshipRequest: FriendshipRequest; receiverProfile: Profile }>
+  getFriendshipStatus(loggedUserAddress: string, userAddress: string): Promise<FriendshipAction | undefined>
   getMutualFriendsProfiles(
     requesterAddress: string,
     requestedAddress: string,
@@ -33,5 +40,4 @@ export interface IFriendsComponent {
     userAddress: string,
     pagination?: Pagination
   ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }>
-  unblockUser(blockerAddress: string, blockedAddress: string): Promise<Profile>
 }

@@ -4,7 +4,7 @@ import {
   Community,
   CommunityDB,
   GetCommunitiesOptions,
-  CommunityWithMembersCountAndFriends,
+  AggregatedCommunityWithMemberAndFriendsData,
   CommunityPublicInformation,
   CommunityMember,
   MemberCommunity,
@@ -247,7 +247,7 @@ export function createCommunitiesDBComponent(
     async getCommunities(
       memberAddress: EthAddress,
       options: GetCommunitiesOptions
-    ): Promise<CommunityWithMembersCountAndFriends[]> {
+    ): Promise<AggregatedCommunityWithMemberAndFriendsData[]> {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const communityFriendsCTE = SQL`
@@ -305,7 +305,7 @@ export function createCommunitiesDBComponent(
         sortBy: options.onlyMemberOf ? 'role' : 'membersCount'
       })
 
-      const result = await pg.query<CommunityWithMembersCountAndFriends>(query)
+      const result = await pg.query<AggregatedCommunityWithMemberAndFriendsData>(query)
       return result.rows
     },
 

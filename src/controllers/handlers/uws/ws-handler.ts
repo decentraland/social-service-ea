@@ -27,7 +27,8 @@ export async function registerWsHandler(
   const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool } = components
   const logger = logs.getLogger('ws-handler')
 
-  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_SECONDS')) ?? 180000 // 3 minutes in ms
+  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_MS')) ?? 300000 // 3 minutes in ms
+  const authSignatureExpirationInMs = (await config.getNumber('WS_AUTH_SIGNATURE_EXPIRATION_IN_MS')) ?? 300000 // 3 minutes in ms
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
@@ -78,7 +79,8 @@ export async function registerWsHandler(
       const authChainMessage = textDecoder.decode(message)
 
       const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
-        fetcher
+        fetcher,
+        expiration: authSignatureExpirationInMs
       })
       const address = normalizeAddress(verifyResult.auth)
 
@@ -100,8 +102,6 @@ export async function registerWsHandler(
         delete data.timeout
       }
 
-      rpcServer.attachUser({ transport, address })
-
       transport.on('close', () => {
         logger.debug('[DEBUGGING CONNECTION] Transport close event received', {
           wsConnectionId: data.wsConnectionId,
@@ -117,6 +117,8 @@ export async function registerWsHandler(
           error: isErrorWithMessage(error) ? error.message : 'Unknown error'
         })
       })
+
+      rpcServer.attachUser({ transport, address })
     } catch (error: any) {
       logger.error(`Error verifying auth chain: ${error.message}`, {
         wsConnectionId: data.wsConnectionId

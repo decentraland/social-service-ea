@@ -87,10 +87,6 @@ export async function createRpcServerComponent({
       )
     },
     attachUser({ transport, address }) {
-      transport.on('close', () => {
-        subscribersContext.removeSubscriber(address)
-      })
-
       const eventEmitter = subscribersContext.getOrAddSubscriber(address)
       subscribersContext.addSubscriber(address, eventEmitter)
       rpcServer.attachTransport(transport, {

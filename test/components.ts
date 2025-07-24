@@ -44,7 +44,8 @@ import {
   createCommunityMembersComponent,
   createCommunityPlacesComponent,
   createCommunityRolesComponent,
-  createCommunityOwnersComponent
+  createCommunityOwnersComponent,
+  createCommunityEventsComponent
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
@@ -175,12 +176,14 @@ async function initComponents(): Promise<TestComponents> {
     pubsub
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
+  const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
   const communities = await createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
     communityOwners,
+    communityEvents,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     logs,
     storage,
@@ -247,7 +250,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const wsPool = createWsPoolComponent({ logs, metrics })
 
-  const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub })
+  const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
 
   return {
     analytics,
@@ -262,6 +265,7 @@ async function initComponents(): Promise<TestComponents> {
     communityPlaces,
     communityOwners,
     communityRoles,
+    communityEvents,
     config,
     email,
     fetcher,
