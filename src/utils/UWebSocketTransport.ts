@@ -362,7 +362,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     sendMessage(message: any) {
       if (!(message instanceof Uint8Array)) {
         events.emit('error', new Error(`WebSocketTransport: Received unknown type of message, expecting Uint8Array`))
-        return Promise.resolve()
+        return
       }
       return send(message)
     },
