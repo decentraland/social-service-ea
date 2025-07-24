@@ -4,8 +4,8 @@ import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockCatalystClient, mockPubSub } from '../../mocks/components'
 import { createCommunityBansComponent } from '../../../src/logic/community/bans'
 import { ICommunityBansComponent } from '../../../src/logic/community'
-import { BannedMember, ICommunityRolesComponent } from '../../../src/logic/community/types'
-import { createMockCommunityRolesComponent } from '../../mocks/communities'
+import { BannedMember, ICommunityBroadcasterComponent, ICommunityRolesComponent, ICommunityThumbnailComponent } from '../../../src/logic/community/types'
+import { createMockCommunityBroadcasterComponent, createMockCommunityRolesComponent, createMockCommunityThumbnailComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
@@ -16,6 +16,8 @@ import { CommunityRole } from '../../../src/types'
 describe('Community Bans Component', () => {
   let communityBansComponent: ICommunityBansComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
+  let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
+  let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
   let mockUserAddress: string
   const communityId = 'test-community'
   const mockBannedMembers: BannedMember[] = [
@@ -40,13 +42,16 @@ describe('Community Bans Component', () => {
   beforeEach(async () => {
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockCommunityRoles = createMockCommunityRolesComponent({})
+    mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
+    mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
     communityBansComponent = await createCommunityBansComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
+      communityThumbnail: mockCommunityThumbnail,
+      communityBroadcaster: mockCommunityBroadcaster,
       logs: mockLogs,
-      pubsub: mockPubSub,
-      sns: mockSns
+      pubsub: mockPubSub
     })
   })
 
@@ -106,7 +111,9 @@ describe('Community Bans Component', () => {
           it('should publish SNS event for member ban', async () => {
             await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
 
-            expect(mockSns.publishMessage).toHaveBeenCalledWith({
+            // Wait for setImmediate callback to execute
+            await new Promise(resolve => setImmediate(resolve))
+            expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_BANNED,
               key: expect.stringContaining(`${communityId}-${targetAddress}-`),
@@ -153,7 +160,9 @@ describe('Community Bans Component', () => {
           it('should publish SNS event for member ban', async () => {
             await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
 
-            expect(mockSns.publishMessage).toHaveBeenCalledWith({
+            // Wait for setImmediate callback to execute
+            await new Promise(resolve => setImmediate(resolve))
+            expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_BANNED,
               key: expect.stringContaining(`${communityId}-${targetAddress}-`),

@@ -4,8 +4,8 @@ import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockCatalystClient, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
 import { createCommunityMembersComponent } from '../../../src/logic/community/members'
-import { ICommunityMembersComponent, ICommunityRolesComponent } from '../../../src/logic/community/types'
-import { createMockCommunityRolesComponent } from '../../mocks/communities'
+import { ICommunityBroadcasterComponent, ICommunityMembersComponent, ICommunityRolesComponent, ICommunityThumbnailComponent } from '../../../src/logic/community/types'
+import { createMockCommunityBroadcasterComponent, createMockCommunityRolesComponent, createMockCommunityThumbnailComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { CommunityMember, CommunityMemberProfile } from '../../../src/logic/community/types'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
@@ -17,6 +17,8 @@ import { Events } from '@dcl/schemas'
 describe('Community Members Component', () => {
   let communityMembersComponent: ICommunityMembersComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
+  let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
+  let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
   let mockUserAddress: string
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
 
@@ -43,13 +45,16 @@ describe('Community Members Component', () => {
   beforeEach(async () => {
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockCommunityRoles = createMockCommunityRolesComponent({})
+    mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
+    mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
     mockPeersStats = createMockPeersStatsComponent()
     communityMembersComponent = await createCommunityMembersComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
+      communityThumbnail: mockCommunityThumbnail,
+      communityBroadcaster: mockCommunityBroadcaster,
       logs: mockLogs,
-      sns: mockSns,
       peersStats: mockPeersStats,
       pubsub: mockPubSub
     })
@@ -646,7 +651,9 @@ describe('Community Members Component', () => {
           it('should publish event to notify member kick', async () => {
             await communityMembersComponent.kickMember(communityId, kickerAddress, targetAddress)
 
-            expect(mockSns.publishMessage).toHaveBeenCalledWith({
+            // Wait for setImmediate callback to execute
+            await new Promise(resolve => setImmediate(resolve))
+            expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_REMOVED,
               key: expect.stringContaining(`${communityId}-${targetAddress}-`),
