@@ -7,9 +7,19 @@ import { EthAddress, Events, PaginatedParameters } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
 
 export async function createCommunityBansComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'pubsub' | 'sns'>
+  components: Pick<
+    AppComponents,
+    | 'communitiesDb'
+    | 'catalystClient'
+    | 'communityRoles'
+    | 'communityThumbnail'
+    | 'communityBroadcaster'
+    | 'logs'
+    | 'pubsub'
+  >
 ): Promise<ICommunityBansComponent> {
-  const { communitiesDb, catalystClient, communityRoles, logs, pubsub, sns } = components
+  const { communitiesDb, catalystClient, communityRoles, communityThumbnail, communityBroadcaster, logs, pubsub } =
+    components
 
   const logger = logs.getLogger('community-bans-component')
 
@@ -37,17 +47,20 @@ export async function createCommunityBansComponent(
         status: ConnectivityStatus.OFFLINE
       })
 
-      const timestamp = Date.now()
-      await sns.publishMessage({
-        type: Events.Type.COMMUNITY,
-        subType: Events.SubType.Community.MEMBER_BANNED,
-        key: `${communityId}-${targetAddress}-${timestamp}`,
-        timestamp,
-        metadata: {
-          id: communityId,
-          name: community.name,
-          memberAddress: targetAddress
-        }
+      setImmediate(async () => {
+        const timestamp = Date.now()
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.MEMBER_BANNED,
+          key: `${communityId}-${targetAddress}-${timestamp}`,
+          timestamp,
+          metadata: {
+            id: communityId,
+            name: community.name,
+            memberAddress: targetAddress,
+            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+          }
+        })
       })
     },
 

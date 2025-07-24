@@ -15,10 +15,26 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 export async function createCommunityMembersComponent(
   components: Pick<
     AppComponents,
-    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats' | 'pubsub' | 'sns'
+    | 'communitiesDb'
+    | 'catalystClient'
+    | 'communityRoles'
+    | 'communityThumbnail'
+    | 'communityBroadcaster'
+    | 'logs'
+    | 'peersStats'
+    | 'pubsub'
   >
 ): Promise<ICommunityMembersComponent> {
-  const { communitiesDb, catalystClient, communityRoles, logs, peersStats, pubsub, sns } = components
+  const {
+    communitiesDb,
+    catalystClient,
+    communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
+    logs,
+    peersStats,
+    pubsub
+  } = components
 
   const logger = logs.getLogger('community-component')
 
@@ -156,17 +172,20 @@ export async function createCommunityMembersComponent(
         status: ConnectivityStatus.OFFLINE
       })
 
-      const timestamp = Date.now()
-      await sns.publishMessage({
-        type: Events.Type.COMMUNITY,
-        subType: Events.SubType.Community.MEMBER_REMOVED,
-        key: `${communityId}-${targetAddress}-${timestamp}`,
-        timestamp,
-        metadata: {
-          id: communityId,
-          name: community.name,
-          memberAddress: targetAddress
-        }
+      setImmediate(async () => {
+        const timestamp = Date.now()
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.MEMBER_REMOVED,
+          key: `${communityId}-${targetAddress}-${timestamp}`,
+          timestamp,
+          metadata: {
+            id: communityId,
+            name: community.name,
+            memberAddress: targetAddress,
+            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+          }
+        })
       })
     },
 

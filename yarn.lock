@@ -1267,15 +1267,6 @@
     ajv-errors "^3.0.0"
     ajv-keywords "^5.1.0"
 
-"@dcl/schemas@https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-events/dcl-schemas-17.0.1-16453374018.commit-fb3d6cb.tgz":
-  version "17.0.1-16453374018.commit-fb3d6cb"
-  resolved "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-events/dcl-schemas-17.0.1-16453374018.commit-fb3d6cb.tgz#80ab7663842306cecb5195f9caefc999bf39b4d3"
-  dependencies:
-    ajv "^8.11.0"
-    ajv-errors "^3.0.0"
-    ajv-keywords "^5.1.0"
-    mitt "^3.0.1"
-
 "@dcl/schemas@https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-events/dcl-schemas-17.0.1-16501786857.commit-4e5e84c.tgz":
   version "17.0.1-16501786857.commit-4e5e84c"
   resolved "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-events/dcl-schemas-17.0.1-16501786857.commit-4e5e84c.tgz#a27da837266b6be4cc40d8dd180f53eee3fd2748"

@@ -142,13 +142,19 @@ export interface ICommunityOwnersComponent {
 }
 
 export interface ICommunityBroadcasterComponent {
-  broadcast: (
+  broadcast(
     event:
       | CommunityDeletedEventReducedMetadata
       | CommunityRenamedEventReducedMetadata
       | CommunityMemberRemovedEvent
       | CommunityMemberBannedEvent
-  ) => Promise<void>
+  ): Promise<void>
+}
+
+export interface ICommunityThumbnailComponent {
+  buildThumbnailUrl(communityId: string): string
+  getThumbnail(communityId: string): Promise<string | undefined>
+  uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string>
 }
 
 export type CommunityDB = {

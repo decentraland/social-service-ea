@@ -44,7 +44,9 @@ import {
   createCommunityPlacesComponent,
   createCommunityRolesComponent,
   createCommunityOwnersComponent,
-  createCommunityEventsComponent
+  createCommunityEventsComponent,
+  createCommunityThumbnailComponent,
+  createCommunityBroadcasterComponent
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
@@ -149,6 +151,8 @@ async function initComponents(): Promise<TestComponents> {
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
+  const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
+  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
 
   // Community voice chat cache and polling components
@@ -162,35 +166,36 @@ async function initComponents(): Promise<TestComponents> {
   const communityMembers = await createCommunityMembersComponent({
     communitiesDb,
     communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
     logs,
     catalystClient,
     peersStats,
-    pubsub,
-    sns
+    pubsub
   })
   const communityBans = await createCommunityBansComponent({
     communitiesDb,
     communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
     logs,
     catalystClient,
-    pubsub,
-    sns
+    pubsub
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
-  const communities = await createCommunityComponent({
+  const communities = createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
     communityOwners,
     communityEvents,
+    communityBroadcaster,
+    communityThumbnail,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     logs,
-    storage,
-    config,
-    commsGatekeeper,
-    sns
+    commsGatekeeper
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -268,6 +273,8 @@ async function initComponents(): Promise<TestComponents> {
     communityOwners,
     communityRoles,
     communityEvents,
+    communityBroadcaster,
+    communityThumbnail,
     config,
     email,
     fetcher,

@@ -3,10 +3,12 @@ import {
   ICommunitiesComponent,
   ICommunityBansComponent,
   ICommunityEventsComponent,
+  ICommunityBroadcasterComponent,
   ICommunityMembersComponent,
   ICommunityOwnersComponent,
   ICommunityPlacesComponent,
-  ICommunityRolesComponent
+  ICommunityRolesComponent,
+  ICommunityThumbnailComponent
 } from '../../src/logic/community'
 
 export const mockCommunity = (community: Partial<CommunityDB> = {}): CommunityDB => ({
@@ -131,5 +133,25 @@ export function createMockCommunityBansComponent({
     getBannedMembers,
     banMember,
     unbanMember
+  }
+}
+
+export function createMockCommunityThumbnailComponent({
+  buildThumbnailUrl = jest.fn(),
+  getThumbnail = jest.fn(),
+  uploadThumbnail = jest.fn()
+}: Partial<jest.Mocked<ICommunityThumbnailComponent>>): jest.Mocked<ICommunityThumbnailComponent> {
+  return {
+    buildThumbnailUrl,
+    getThumbnail,
+    uploadThumbnail
+  }
+}
+
+export function createMockCommunityBroadcasterComponent({
+  broadcast = jest.fn()
+}: Partial<jest.Mocked<ICommunityBroadcasterComponent>>): jest.Mocked<ICommunityBroadcasterComponent> {
+  return {
+    broadcast
   }
 }
