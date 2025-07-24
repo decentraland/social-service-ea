@@ -31,7 +31,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         createMockProfile(friendAddress1),
         createMockProfile(friendAddress2)
       ])
-      
+
       // Mock the communityOwners.getOwnerName to return owner names
       spyComponents.communityOwners.getOwnerName.mockImplementation(async (ownerAddress: string) => {
         if (ownerAddress === address) {
@@ -244,8 +244,123 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
 
           expect(response.status).toBe(200)
           expect(body.data.results).toHaveLength(3)
-          expect(body.data.results.every(community => community.ownerName === 'Test Owner')).toBe(true)
+          expect(body.data.results.every((community) => community.ownerName === 'Test Owner')).toBe(true)
           expect(body.data.total).toBe(3)
+        })
+      })
+
+      describe('when filtering by active voice chat', () => {
+        beforeEach(() => {
+          // Mock voice chat status for the communities
+          spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockImplementation(async (communityId: string) => {
+            if (communityId === communityId1) {
+              return { isActive: true, participantCount: 5, moderatorCount: 2 }
+            } else if (communityId === communityId2) {
+              return { isActive: false, participantCount: 0, moderatorCount: 0 }
+            }
+            return null
+          })
+
+          // Mock batch voice chat status method
+          spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mockImplementation(
+            async (communityIds: string[]) => {
+              const result: Record<string, any> = {}
+              communityIds.forEach((communityId) => {
+                if (communityId === communityId1) {
+                  result[communityId] = { isActive: true, participantCount: 5, moderatorCount: 2 }
+                } else if (communityId === communityId2) {
+                  result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+                } else {
+                  result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+                }
+              })
+              return result
+            }
+          )
+        })
+
+        it('should return only communities with active voice chat when onlyWithActiveVoiceChat=true', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=true')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(1)
+          expect(body.data.results[0].id).toBe(communityId1)
+          expect(body.data.total).toBe(1)
+
+          // Verify that the comms gatekeeper was called to check voice chat status
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
+            communityId1,
+            communityId2
+          ])
+        })
+
+        it('should return all communities when onlyWithActiveVoiceChat=false', async () => {
+          const response = await makeRequest(
+            identity,
+            '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=false'
+          )
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(2)
+          expect(body.data.total).toBe(2)
+        })
+
+        it('should return all communities when onlyWithActiveVoiceChat is not provided', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(2)
+          expect(body.data.total).toBe(2)
+        })
+
+        describe('when voice chat status check fails', () => {
+          beforeEach(() => {
+            // Mock one success and one failure
+            spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockImplementation(
+              async (communityId: string) => {
+                if (communityId === communityId1) {
+                  return { isActive: true, participantCount: 5, moderatorCount: 2 }
+                } else if (communityId === communityId2) {
+                  throw new Error('Voice chat service unavailable')
+                }
+                return null
+              }
+            )
+
+            // Mock batch method to simulate one success and one failure
+            spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mockImplementation(
+              async (communityIds: string[]) => {
+                const result: Record<string, any> = {}
+                communityIds.forEach((communityId) => {
+                  if (communityId === communityId1) {
+                    result[communityId] = { isActive: true, participantCount: 5, moderatorCount: 2 }
+                  } else if (communityId === communityId2) {
+                    // When community2 fails, it gets marked as inactive in our batch implementation
+                    result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+                  } else {
+                    result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+                  }
+                })
+                return result
+              }
+            )
+          })
+
+          it('should exclude communities where status check fails', async () => {
+            const response = await makeRequest(
+              identity,
+              '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=true'
+            )
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+            expect(body.data.results).toHaveLength(1)
+            expect(body.data.results[0].id).toBe(communityId1)
+            expect(body.data.total).toBe(1)
+          })
         })
       })
 
@@ -334,7 +449,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
 
           expect(response.status).toBe(200)
           expect(body.data.results).toHaveLength(3)
-          
+
           const originalOwnerCommunities = body.data.results.filter(
             (community: any) => community.ownerAddress === address
           )
@@ -343,7 +458,9 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           )
 
           expect(originalOwnerCommunities.every((community: any) => community.ownerName === 'Test Owner')).toBe(true)
-          expect(differentOwnerCommunities.every((community: any) => community.ownerName === 'Different Owner')).toBe(true)
+          expect(differentOwnerCommunities.every((community: any) => community.ownerName === 'Different Owner')).toBe(
+            true
+          )
         })
       })
     })

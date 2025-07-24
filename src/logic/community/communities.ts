@@ -21,6 +21,7 @@ import {
   getCommunityThumbnailPath
 } from './utils'
 import { EthAddress } from '@dcl/schemas'
+import { isErrorWithMessage } from '../../utils/errors'
 
 export async function createCommunityComponent(
   components: Pick<
@@ -57,6 +58,29 @@ export async function createCommunityComponent(
 
   const buildThumbnailUrl = (communityId: string) => {
     return `${CDN_URL}${getCommunityThumbnailPath(communityId)}`
+  }
+
+  /**
+   * Helper function to filter communities with active voice chat using batch API
+   * @param communities - Array of communities to filter
+   * @returns Promise<T[]> - Filtered array containing only communities with active voice chat
+   */
+  async function filterCommunitiesWithActiveVoiceChat<T extends { id: string }>(communities: T[]): Promise<T[]> {
+    if (communities.length === 0) {
+      return communities
+    }
+
+    try {
+      const communityIds = communities.map((c) => c.id)
+      const voiceChatStatuses = await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)
+
+      return communities.filter((community) => voiceChatStatuses[community.id]?.isActive ?? false)
+    } catch (error) {
+      logger.warn('Error filtering communities by voice chat status', {
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      return [] // If batch call fails, return empty array for safety
+    }
   }
 
   const getThumbnail = async (communityId: string): Promise<string | undefined> => {
@@ -127,11 +151,17 @@ export async function createCommunityComponent(
         })
       )
 
-      const friendsAddresses = Array.from(new Set(communities.flatMap((community) => community.friends)))
+      // Filter by active voice chat if requested
+      const filteredCommunities = options.onlyWithActiveVoiceChat
+        ? await filterCommunitiesWithActiveVoiceChat(communitiesWithThumbnailsAndOwnerNames)
+        : communitiesWithThumbnailsAndOwnerNames
+
+      const friendsAddresses = Array.from(new Set(filteredCommunities.flatMap((community) => community.friends)))
       const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
+
       return {
-        communities: toCommunityResults(communitiesWithThumbnailsAndOwnerNames, friendsProfiles),
-        total
+        communities: toCommunityResults(filteredCommunities, friendsProfiles),
+        total: options.onlyWithActiveVoiceChat ? filteredCommunities.length : total
       }
     },
 
@@ -163,9 +193,14 @@ export async function createCommunityComponent(
         })
       )
 
+      // Filter by active voice chat if requested
+      const filteredCommunities = options.onlyWithActiveVoiceChat
+        ? await filterCommunitiesWithActiveVoiceChat(communitiesWithThumbnailsAndOwnerNames)
+        : communitiesWithThumbnailsAndOwnerNames
+
       return {
-        communities: communitiesWithThumbnailsAndOwnerNames.map(toPublicCommunity),
-        total
+        communities: filteredCommunities.map(toPublicCommunity),
+        total: options.onlyWithActiveVoiceChat ? filteredCommunities.length : total
       }
     },
 

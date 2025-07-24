@@ -235,6 +235,7 @@ export type GetCommunitiesOptions = {
   onlyPublic?: boolean
   sortBy?: 'membersCount' | 'role'
   onlyMemberOf?: boolean
+  onlyWithActiveVoiceChat?: boolean
 }
 
 export type GetCommunityMembersOptions = {

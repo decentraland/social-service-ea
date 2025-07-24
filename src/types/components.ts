@@ -36,6 +36,7 @@ import {
   Community,
   CommunityDB,
   CommunityMember,
+  CommunityVoiceChatStatus,
   AggregatedCommunityWithMemberAndFriendsData,
   GetCommunitiesOptions,
   CommunityPublicInformation,
@@ -302,11 +303,8 @@ export type ICommsGatekeeperComponent = {
   requestToSpeakInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   promoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   demoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
-  getCommunityVoiceChatStatus: (communityId: string) => Promise<{
-    isActive: boolean
-    participantCount: number
-    moderatorCount: number
-  } | null>
+  getCommunityVoiceChatStatus: (communityId: string) => Promise<CommunityVoiceChatStatus | null>
+  getCommunitiesVoiceChatStatus: (communityIds: string[]) => Promise<Record<string, CommunityVoiceChatStatus>>
   kickUserFromCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
 }
 
