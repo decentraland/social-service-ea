@@ -5,6 +5,8 @@ import { retry } from '../utils/retrier'
 import { shuffleArray } from '../utils/array'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { EthAddress } from '@dcl/schemas'
+import { isErrorWithMessage } from '../utils/errors'
+import { getProfileUserId } from '../logic/profiles'
 
 const L1_MAINNET = 'mainnet'
 const L1_TESTNET = 'sepolia'
@@ -39,10 +41,28 @@ export async function createCatalystClient({
     }
   }
 
+  function createDefaultProfile(userAddress: EthAddress): Profile {
+    return {
+      avatars: [
+        {
+          userId: userAddress,
+          name: 'Name not found',
+          hasClaimedName: false,
+          avatar: {
+            snapshots: {
+              face256: ''
+            }
+          }
+        }
+      ]
+    }
+  }
+
   async function getProfiles(ids: string[], options: ICatalystClientRequestOptions = {}): Promise<Profile[]> {
     if (ids.length === 0) return []
 
     let response: Profile[] = []
+    let defaultProfiles: Profile[] = []
 
     const cachedProfiles = (await Promise.all(ids.map((id) => redis.get(`catalyst:profile:${id}`))))
       .filter((profile) => profile !== null)
@@ -60,6 +80,11 @@ export async function createCatalystClient({
       )
       response = await retry(executeClientRequest, retries, waitTime)
 
+      // Create a Set for O(1) lookup performance
+      const foundedIdsSet = new Set(response.map((profile) => getProfileUserId(profile)))
+      const idsNotFound = idsToFetch.filter((id) => !foundedIdsSet.has(id))
+      defaultProfiles = idsNotFound.map((id) => createDefaultProfile(id))
+
       await Promise.all(
         response.map((profile) => {
           const cacheKey = `catalyst:profile:${profile.avatars?.[0]?.ethAddress}`
@@ -70,7 +95,7 @@ export async function createCatalystClient({
       )
     }
 
-    return [...cachedProfiles, ...response]
+    return [...cachedProfiles, ...response, ...defaultProfiles]
   }
 
   async function getProfile(id: string, options: ICatalystClientRequestOptions = {}): Promise<Profile> {
@@ -86,13 +111,21 @@ export async function createCatalystClient({
       lambdasServerUrl
     )
 
-    const response = await retry(executeClientRequest, retries, waitTime)
+    try {
+      const response = await retry(executeClientRequest, retries, waitTime)
 
-    await redis.put(`catalyst:profile:${id}`, JSON.stringify(response), {
-      EX: 60 * 10 // 10 minutes
-    })
+      await redis.put(`catalyst:profile:${id}`, JSON.stringify(response), {
+        EX: 60 * 10 // 10 minutes
+      })
 
-    return response
+      return response
+    } catch (error) {
+      if (isErrorWithMessage(error) && error.message.includes('Profile not found')) {
+        return createDefaultProfile(id)
+      }
+
+      throw error
+    }
   }
 
   async function getOwnedNames(
