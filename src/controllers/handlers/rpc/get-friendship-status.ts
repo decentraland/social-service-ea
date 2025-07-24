@@ -42,6 +42,15 @@ export function getFriendshipStatusService({ components: { logs, friends } }: RP
         stack: error.stack
       })
 
+      if (error instanceof InvalidRequestError) {
+        return {
+          response: {
+            $case: 'invalidRequest',
+            invalidRequest: { message: error.message }
+          }
+        }
+      }
+
       return {
         response: {
           $case: 'internalServerError',

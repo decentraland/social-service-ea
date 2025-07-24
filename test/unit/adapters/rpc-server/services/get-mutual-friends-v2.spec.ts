@@ -1,13 +1,13 @@
 import { createFriendsMockedComponent, mockLogs } from '../../../../mocks/components'
-import { getMutualFriendsService } from '../../../../../src/controllers/handlers/rpc/get-mutual-friends'
+import { getMutualFriendsV2Service } from '../../../../../src/controllers/handlers/rpc/get-mutual-friends-v2'
 import { GetMutualFriendsPayload } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseExpectedFriends } from '../../../../mocks/friend'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('when getting mutual friends', () => {
-  let getMutualFriends: ReturnType<typeof getMutualFriendsService>
+describe('when getting mutual friends v2', () => {
+  let getMutualFriendsV2: ReturnType<typeof getMutualFriendsV2Service>
   let friendsComponent: IFriendsComponent
   let getMutualFriendsProfilesMethod: jest.MockedFunction<typeof friendsComponent.getMutualFriendsProfiles>
 
@@ -27,7 +27,7 @@ describe('when getting mutual friends', () => {
       getMutualFriendsProfiles: getMutualFriendsProfilesMethod
     })
 
-    getMutualFriends = getMutualFriendsService({
+    getMutualFriendsV2 = getMutualFriendsV2Service({
       components: { friends: friendsComponent, logs: mockLogs }
     })
   })
@@ -37,14 +37,15 @@ describe('when getting mutual friends', () => {
       getMutualFriendsProfilesMethod.mockRejectedValue(new Error('Database error'))
     })
 
-    it('should return an empty list', async () => {
-      const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
+    it('should return internal server error', async () => {
+      const response = await getMutualFriendsV2(mutualFriendsRequest, rpcContext)
 
       expect(response).toEqual({
-        friends: [],
-        paginationData: {
-          total: 0,
-          page: 1
+        response: {
+          $case: 'internalServerError',
+          internalServerError: {
+            message: 'Database error'
+          }
         }
       })
     })
@@ -71,7 +72,7 @@ describe('when getting mutual friends', () => {
       })
 
       it('should return an empty list', async () => {
-        const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
+        const response = await getMutualFriendsV2(mutualFriendsRequest, rpcContext)
 
         expect(getMutualFriendsProfilesMethod).toHaveBeenCalledWith(
           rpcContext.address,
@@ -79,10 +80,15 @@ describe('when getting mutual friends', () => {
           { limit: 10, offset: 0 }
         )
         expect(response).toEqual({
-          friends: [],
-          paginationData: {
-            total: 0,
-            page: 1
+          response: {
+            $case: 'ok',
+            ok: {
+              friends: [],
+              paginationData: {
+                total: 0,
+                page: 1
+              }
+            }
           }
         })
       })
@@ -97,7 +103,7 @@ describe('when getting mutual friends', () => {
       })
 
       it('should return the list of mutual friends with the pagination data for the page', async () => {
-        const response = await getMutualFriends(mutualFriendsRequest, rpcContext)
+        const response = await getMutualFriendsV2(mutualFriendsRequest, rpcContext)
 
         expect(getMutualFriendsProfilesMethod).toHaveBeenCalledWith(
           rpcContext.address,
@@ -105,10 +111,15 @@ describe('when getting mutual friends', () => {
           { limit: 10, offset: 0 }
         )
         expect(response).toEqual({
-          friends: mutualFriendsData.friendsProfiles.map(parseExpectedFriends()),
-          paginationData: {
-            total: mutualFriendsData.total,
-            page: 1
+          response: {
+            $case: 'ok',
+            ok: {
+              friends: mutualFriendsData.friendsProfiles.map(parseExpectedFriends()),
+              paginationData: {
+                total: mutualFriendsData.total,
+                page: 1
+              }
+            }
           }
         })
       })
@@ -121,15 +132,16 @@ describe('when getting mutual friends', () => {
       pagination: { limit: 10, offset: 0 }
     }
 
-    it('should return an empty list', async () => {
-      const response = await getMutualFriends(requestWithoutAddress, rpcContext)
+    it('should return invalid request error', async () => {
+      const response = await getMutualFriendsV2(requestWithoutAddress, rpcContext)
 
       expect(getMutualFriendsProfilesMethod).not.toHaveBeenCalled()
       expect(response).toEqual({
-        friends: [],
-        paginationData: {
-          total: 0,
-          page: 1
+        response: {
+          $case: 'invalidRequest',
+          invalidRequest: {
+            message: 'User address is missing in the request payload'
+          }
         }
       })
     })
@@ -141,15 +153,16 @@ describe('when getting mutual friends', () => {
       pagination: { limit: 10, offset: 0 }
     }
 
-    it('should return an empty list', async () => {
-      const response = await getMutualFriends(requestWithInvalidAddress, rpcContext)
+    it('should return invalid request error', async () => {
+      const response = await getMutualFriendsV2(requestWithInvalidAddress, rpcContext)
 
       expect(getMutualFriendsProfilesMethod).not.toHaveBeenCalled()
       expect(response).toEqual({
-        friends: [],
-        paginationData: {
-          total: 0,
-          page: 1
+        response: {
+          $case: 'invalidRequest',
+          invalidRequest: {
+            message: 'Invalid user address in the request payload'
+          }
         }
       })
     })

@@ -111,9 +111,11 @@ describe('when subscribing to community voice chat updates', () => {
 
       it('should use current timestamp for createdAt', () => {
         const beforeCall = Date.now()
-        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update) as CommunityVoiceChatUpdate
+        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(
+          update
+        ) as CommunityVoiceChatUpdate
         const afterCall = Date.now()
-        
+
         expect(result.createdAt).toBeGreaterThanOrEqual(beforeCall)
         expect(result.createdAt).toBeLessThanOrEqual(afterCall)
       })
@@ -180,7 +182,7 @@ describe('when subscribing to community voice chat updates', () => {
         voiceChatId: 'test',
         status: 'started'
       }
-      
+
       expect(handlerCall.rpcContext).toBe(rpcContext)
       expect(handlerCall.eventName).toBe('communityVoiceChatUpdate')
       expect(handlerCall.shouldRetrieveProfile).toBe(false)
@@ -196,4 +198,4 @@ describe('when subscribing to community voice chat updates', () => {
       expect(typeof service).toBe('function')
     })
   })
-}) 
+})

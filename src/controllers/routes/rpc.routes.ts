@@ -29,7 +29,8 @@ import {
   promoteSpeakerInCommunityVoiceChatService,
   demoteSpeakerInCommunityVoiceChatService,
   kickPlayerFromCommunityVoiceChatService,
-  subscribeToCommunityVoiceChatUpdatesService
+  subscribeToCommunityVoiceChatUpdatesService,
+  getMutualFriendsV2Service
 } from '../handlers/rpc'
 import { ServiceType, StreamEvent } from '../../adapters/rpc-server/metrics-wrapper'
 
@@ -49,6 +50,10 @@ export async function setupRpcRoutes(components: AppComponents): Promise<RpcServ
     },
     getMutualFriends: {
       creator: getMutualFriendsService({ components }),
+      type: ServiceType.CALL
+    },
+    getMutualFriendsV2: {
+      creator: getMutualFriendsV2Service({ components }),
       type: ServiceType.CALL
     },
     getPendingFriendshipRequests: {

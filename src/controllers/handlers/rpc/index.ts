@@ -1,26 +1,32 @@
-export * from './accept-private-voice-chat'
+// Friendship handlers
 export * from './block-user'
-export * from './end-private-voice-chat'
 export * from './get-blocked-users'
 export * from './get-blocking-status'
 export * from './get-friends'
 export * from './get-friendship-status'
-export * from './get-incoming-private-voice-chat-requests'
 export * from './get-mutual-friends'
+export * from './get-mutual-friends-v2'
 export * from './get-pending-friendship-requests'
-export * from './get-private-messages-settings'
 export * from './get-sent-friendship-requests'
+export * from './subscribe-to-block-updates'
+export * from './subscribe-to-friend-connectivity-updates'
+export * from './subscribe-to-friendship-updates'
+export * from './unblock-user'
+export * from './upsert-friendship'
+
+// Private voice chat handlers
+export * from './accept-private-voice-chat'
+export * from './end-private-voice-chat'
+export * from './get-incoming-private-voice-chat-requests'
+export * from './get-private-messages-settings'
 export * from './get-social-settings'
 export * from './reject-private-voice-chat'
 export * from './start-private-voice-chat'
-export * from './subscribe-to-block-updates'
-export * from './subscribe-to-community-member-connectivity-updates'
-export * from './subscribe-to-friend-connectivity-updates'
-export * from './subscribe-to-friendship-updates'
 export * from './subscribe-to-private-voice-chat-updates'
-export * from './unblock-user'
-export * from './upsert-friendship'
 export * from './upsert-social-settings'
+
+// Community handlers
+export * from './subscribe-to-community-member-connectivity-updates'
 
 // Community voice chat handlers
 export * from './start-community-voice-chat'
