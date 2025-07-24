@@ -47,13 +47,13 @@ describe('when upserting a friendship', () => {
       }
     })
 
-    it('should return an internal server error', async () => {
+    it('should return an invalid request error', async () => {
       const result: UpsertFriendshipResponse = await upsertFriendship(mockRequest, rpcContext)
 
       expect(result).toEqual({
         response: {
-          $case: 'internalServerError',
-          internalServerError: { message: 'Unknown message' }
+          $case: 'invalidRequest',
+          invalidRequest: { message: 'Unknown message' }
         }
       })
     })
@@ -168,8 +168,8 @@ describe('when upserting a friendship', () => {
 
       expect(result).toEqual({
         response: {
-          $case: 'internalServerError',
-          internalServerError: { message: 'Invalid user address in the request payload' }
+          $case: 'invalidRequest',
+          invalidRequest: { message: 'Invalid user address in the request payload' }
         }
       })
     })

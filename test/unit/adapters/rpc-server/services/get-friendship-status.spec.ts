@@ -85,14 +85,14 @@ describe('when getting friendship status', () => {
       user: undefined
     }
 
-    it('should return internal server error', async () => {
+    it('should return an invalid request error', async () => {
       const response = await getFriendshipStatus(requestWithoutAddress, rpcContext)
 
       expect(getFriendshipStatusMethod).not.toHaveBeenCalled()
       expect(response).toEqual({
         response: {
-          $case: 'internalServerError',
-          internalServerError: {
+          $case: 'invalidRequest',
+          invalidRequest: {
             message: 'User address is missing in the request payload'
           }
         }
@@ -105,14 +105,14 @@ describe('when getting friendship status', () => {
       user: { address: 'invalid-address' }
     }
 
-    it('should return internal server error', async () => {
+    it('should return invalid request error', async () => {
       const response = await getFriendshipStatus(requestWithInvalidAddress, rpcContext)
 
       expect(getFriendshipStatusMethod).not.toHaveBeenCalled()
       expect(response).toEqual({
         response: {
-          $case: 'internalServerError',
-          internalServerError: {
+          $case: 'invalidRequest',
+          invalidRequest: {
             message: 'Invalid user address in the request payload'
           }
         }

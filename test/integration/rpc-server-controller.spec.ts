@@ -23,7 +23,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     stubComponents.peersSynchronizer.syncPeers.resolves()
   })
 
-  describe('GetFriends handler', function () {
+  describe('when getting friends', function () {
     it('should return friends list successfully', async () => {
       const { rpcClient, friendsDb } = components
       const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
@@ -60,7 +60,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('GetMutualFriends handler', function () {
+  describe('when getting mutual friends', function () {
     it('should return mutual friends successfully', async () => {
       const { rpcClient, friendsDb } = components
       const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
@@ -114,7 +114,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('getPendingFriendshipRequests', function () {
+  describe('when getting pending friendship requests', function () {
     it('should return pending friendship requests successfully', async () => {
       const { rpcClient, friendsDb } = components
       const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
@@ -201,7 +201,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('getSentFriendshipRequests', function () {
+  describe('when getting sent friendship requests', function () {
     it('should return sent friendship requests successfully', async () => {
       const { rpcClient, friendsDb } = components
       const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
@@ -288,10 +288,10 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('blockUser', function () {
+  describe('when blocking a user', function () {
     const blockedAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
 
-    describe('when blocking a user', () => {
+    describe('and the user is not blocked', () => {
       let mockBlockedProfile: any
 
       beforeEach(() => {
@@ -333,10 +333,10 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('unblockUser', function () {
+  describe('when unblocking a user', function () {
     const blockedAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
 
-    describe('when unblocking a user', () => {
+    describe('and the user is blocked', () => {
       let mockBlockedProfile: any
 
       beforeEach(async () => {
@@ -361,7 +361,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('when getting the private message settings', () => {
+  describe('when getting private message settings', () => {
     let requestedUsers: User[]
 
     beforeEach(() => {
@@ -496,7 +496,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       })
     })
 
-    describe('and the user requested the private message settings for an amount of users greater than the limit', () => {
+    describe('and the user requested settings for an amount of users greater than the limit', () => {
       it('should return an invalid request case with a message indicating that the amount of users is greater than the limit', async () => {
         const { rpcClient } = components
 
@@ -511,7 +511,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
   })
 
-  describe('Community Voice Chat RPC', () => {
+  describe('when working with community voice chat', () => {
     let testCommunity: any
     let communityId: string
     let communitiesDbSpy: any = {}
@@ -606,8 +606,8 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       }
     })
 
-    describe('when starting a community voice chat', () => {
-      describe('when user is community owner and voice chat is not active', () => {
+    describe('and starting a community voice chat', () => {
+      describe('and user is community owner and voice chat is not active', () => {
         beforeEach(() => {
           // Mock successful external service responses
           commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
@@ -670,7 +670,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         })
       })
 
-      describe('when community voice chat is already active', () => {
+      describe('and community voice chat is already active', () => {
         beforeEach(() => {
           // Override mock for this specific scenario
           commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
@@ -703,7 +703,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         })
       })
 
-      describe('when community does not exist', () => {
+      describe('and community does not exist', () => {
         beforeEach(() => {
           // Clear and re-mock for this specific scenario
           commsGatekeeperSpy.getCommunityVoiceChatStatus.mockClear()
@@ -748,7 +748,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         })
       })
 
-      describe('when external services fail', () => {
+      describe('and external services fail', () => {
         beforeEach(() => {
           // Override mocks for this specific scenario
           commsGatekeeperSpy.createCommunityVoiceChatRoom.mockRejectedValue(new Error('Service unavailable'))
@@ -781,7 +781,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         })
       })
 
-      describe('when community id is invalid', () => {
+      describe('and community id is invalid', () => {
         it('should fail with invalid request', async () => {
           const { rpcClient } = components
 
@@ -794,8 +794,8 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       })
     })
 
-    describe('when joining a community voice chat', () => {
-      describe('when voice chat is active and user is community member', () => {
+    describe('and joining a community voice chat', () => {
+      describe('and voice chat is active and user is community member', () => {
         beforeEach(() => {
           // Override mocks for this specific scenario
           commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
@@ -840,7 +840,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         })
       })
 
-      describe('when community voice chat is not active', () => {
+      describe('and community voice chat is not active', () => {
         beforeEach(() => {
           // Override mock for this specific scenario (default is already false, but being explicit)
           commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
@@ -867,7 +867,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         })
       })
 
-      describe('when community does not exist', () => {
+      describe('and community does not exist', () => {
         beforeEach(() => {
           // Override mock for this specific scenario
           commsGatekeeperSpy.getCommunityVoiceChatStatus.mockResolvedValue({
@@ -899,6 +899,235 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           expect(['notFoundError', 'forbiddenError']).toContain(result.response?.$case)
         })
       })
+    })
+  })
+
+  describe('when getting friendship status', function () {
+    it('should return friendship status successfully', async () => {
+      const { rpcClient, friendsDb } = components
+      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+      const id = await createPendingFriendshipRequest(friendsDb, [rpcClient.authAddress, friendAddress])
+
+      const result = await rpcClient.client.getFriendshipStatus({
+        user: { address: friendAddress }
+      })
+
+      expect(result.response?.$case).toBe('accepted')
+      if (result.response?.$case === 'accepted') {
+        expect(result.response.accepted.status).toBeDefined()
+      }
+
+      await removeFriendship(friendsDb, id, rpcClient.authAddress)
+    })
+
+    it('should return invalid request when user address is missing', async () => {
+      const { rpcClient } = components
+
+      const result = await rpcClient.client.getFriendshipStatus({
+        user: undefined
+      })
+
+      assertInvalidRequestCase(result, 'User address is missing in the request payload')
+    })
+
+    it('should return invalid request when user address is invalid', async () => {
+      const { rpcClient } = components
+
+      const result = await rpcClient.client.getFriendshipStatus({
+        user: { address: 'invalid-address' }
+      })
+
+      assertInvalidRequestCase(result, 'Invalid user address in the request payload')
+    })
+
+    it('should return NONE status when no friendship exists', async () => {
+      const { rpcClient } = components
+      const nonFriendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+
+      const result = await rpcClient.client.getFriendshipStatus({
+        user: { address: nonFriendAddress }
+      })
+
+      expect(result.response?.$case).toBe('accepted')
+      if (result.response?.$case === 'accepted') {
+        expect(result.response.accepted.status).toBe(0) // NONE status
+      }
+    })
+  })
+
+  describe('when upserting a friendship', function () {
+    it('should create friendship request successfully', async () => {
+      const { rpcClient, friendsDb } = components
+      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+
+      const result = await rpcClient.client.upsertFriendship({
+        action: {
+          $case: 'request',
+          request: {
+            user: { address: friendAddress },
+            message: "Hello, let's be friends!"
+          }
+        }
+      })
+
+      expect(result.response?.$case).toBe('accepted')
+      if (result.response?.$case === 'accepted') {
+        expect(result.response.accepted.friend.address).toBe(friendAddress)
+        expect(result.response.accepted.message).toBe("Hello, let's be friends!")
+      }
+
+      // Clean up
+      const friendship = await friendsDb.getFriendship([rpcClient.authAddress, friendAddress])
+      if (friendship) {
+        await removeFriendship(friendsDb, friendship.id, rpcClient.authAddress)
+      }
+    })
+
+    it('should return invalid friendship action when sending request to self', async () => {
+      const { rpcClient } = components
+
+      const result = await rpcClient.client.upsertFriendship({
+        action: {
+          $case: 'request',
+          request: {
+            user: { address: rpcClient.authAddress },
+            message: 'Hello'
+          }
+        }
+      })
+
+      expect(result.response?.$case).toBe('invalidFriendshipAction')
+      if (result.response?.$case === 'invalidFriendshipAction') {
+        expect(result.response.invalidFriendshipAction.message).toBe('You cannot send a friendship request to yourself')
+      }
+    })
+
+    it('should return invalid request when user address is invalid', async () => {
+      const { rpcClient } = components
+
+      const result = await rpcClient.client.upsertFriendship({
+        action: {
+          $case: 'request',
+          request: {
+            user: { address: 'invalid-address' },
+            message: 'Hello'
+          }
+        }
+      })
+
+      assertInvalidRequestCase(result, 'Invalid user address in the request payload')
+    })
+
+    it('should accept friendship request successfully', async () => {
+      const { rpcClient, friendsDb } = components
+      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+      const id = await createPendingFriendshipRequest(friendsDb, [friendAddress, rpcClient.authAddress])
+
+      const result = await rpcClient.client.upsertFriendship({
+        action: {
+          $case: 'accept',
+          accept: {
+            user: { address: friendAddress }
+          }
+        }
+      })
+
+      expect(result.response?.$case).toBe('accepted')
+      if (result.response?.$case === 'accepted') {
+        expect(result.response.accepted.friend.address).toBe(friendAddress)
+      }
+
+      await removeFriendship(friendsDb, id, friendAddress)
+    })
+  })
+
+  describe('when getting mutual friends v2', function () {
+    it('should return mutual friends successfully', async () => {
+      const { rpcClient, friendsDb } = components
+      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+      const mutualFriendAddress = '0x77c4c17331436d3b8798596e3d7c0d8e1b786aa4'
+      const mockMutualFriendProfile = createMockProfile(mutualFriendAddress)
+
+      stubComponents.catalystClient.getProfiles.resolves([mockMutualFriendProfile])
+
+      const id1 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
+      const id2 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, mutualFriendAddress])
+      const id3 = await createOrUpsertActiveFriendship(friendsDb, [friendAddress, mutualFriendAddress])
+
+      const response = await rpcClient.client.getMutualFriendsV2({
+        user: {
+          address: friendAddress
+        },
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      expect(response.response?.$case).toBe('ok')
+      if (response.response?.$case === 'ok') {
+        expect(response.response.ok.friends).toHaveLength(1)
+        expect(response.response.ok.friends[0].address).toEqual(mutualFriendAddress)
+        expect(response.response.ok.paginationData.total).toBe(1)
+      }
+
+      await removeFriendship(friendsDb, id1, rpcClient.authAddress)
+      await removeFriendship(friendsDb, id2, rpcClient.authAddress)
+      await removeFriendship(friendsDb, id3, friendAddress)
+    })
+
+    it('should return empty list when no mutual friends exist', async () => {
+      const { rpcClient, friendsDb } = components
+      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+      const id = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
+
+      stubComponents.catalystClient.getProfiles.resolves([])
+
+      const response = await rpcClient.client.getMutualFriendsV2({
+        user: {
+          address: friendAddress
+        },
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      expect(response.response?.$case).toBe('ok')
+      if (response.response?.$case === 'ok') {
+        expect(response.response.ok.friends).toHaveLength(0)
+        expect(response.response.ok.paginationData.total).toBe(0)
+      }
+
+      await removeFriendship(friendsDb, id, rpcClient.authAddress)
+    })
+
+    it('should return invalid request when user address is missing', async () => {
+      const { rpcClient } = components
+
+      const response = await rpcClient.client.getMutualFriendsV2({
+        user: undefined,
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      assertInvalidRequestCase(response, 'User address is missing in the request payload')
+    })
+
+    it('should return invalid request when user address is invalid', async () => {
+      const { rpcClient } = components
+
+      const response = await rpcClient.client.getMutualFriendsV2({
+        user: { address: 'invalid-address' },
+        pagination: {
+          limit: 10,
+          offset: 0
+        }
+      })
+
+      assertInvalidRequestCase(response, 'Invalid user address in the request payload')
     })
   })
 
