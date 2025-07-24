@@ -228,7 +228,7 @@ describe('ws-handler', () => {
         const updatedData = mockWs.getUserData()
         expect(updatedData.authenticating).toBe(false)
         expect(updatedData.auth).toBe(false)
-        expect(mockWs.close).toHaveBeenCalled()
+        expect(mockWs.end).toHaveBeenCalledWith(3003, 'Unauthorized')
       })
 
       it('should clear timeout when user authenticates', async () => {

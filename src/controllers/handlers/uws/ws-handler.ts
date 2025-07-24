@@ -34,14 +34,13 @@ export async function registerWsHandler(
     Object.assign(data, { ...data, ...newData })
   }
 
-  function cleanupConnection(data: WsUserData, code: number, messageText: string) {
+  function cleanupConnection(data: WsUserData, code: number) {
     const { wsConnectionId } = data
 
     if (isAuthenticated(data)) {
       try {
         data.transport.close()
         rpcServer.detachUser(data.address)
-        data.eventEmitter.emit('close', { code, reason: messageText })
         data.eventEmitter.all.clear()
       } catch (error: any) {
         tracing.captureException(error as Error, {
@@ -128,7 +127,7 @@ export async function registerWsHandler(
         address: getAddress(data),
         wsConnectionId: data.wsConnectionId
       })
-      ws.close()
+      ws.end(3003, 'Unauthorized')
     } finally {
       changeStage(data, { authenticating: false })
     }
@@ -228,7 +227,7 @@ export async function registerWsHandler(
               logger.error('Closing connection, no auth chain received', {
                 wsConnectionId: data.wsConnectionId
               })
-              ws.end()
+              ws.end(3004, 'Authorization timeout')
             } catch (err) {}
           }, authTimeoutInMs)
         }
@@ -288,7 +287,7 @@ export async function registerWsHandler(
         auth: String(auth)
       })
 
-      cleanupConnection(data, code, messageText)
+      cleanupConnection(data, code)
 
       logger.debug('WebSocket closed', {
         code,

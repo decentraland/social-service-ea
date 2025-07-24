@@ -254,15 +254,24 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       isConnected: String(socket.getUserData().isConnected)
     })
 
-    if (!isTransportActive || !isInitialized || !socket.getUserData().isConnected) {
-      const error = new Error('Transport is not ready or socket is not connected')
-      logger.error('Transport is not ready or socket is not connected', {
+    if (!isInitialized) {
+      const error = new Error('Transport is not ready')
+      logger.error('Transport is not ready', {
         transportId,
         isTransportActive: String(isTransportActive),
         isInitialized: String(isInitialized),
         isConnected: String(socket.getUserData().isConnected)
       })
-      events.emit('error', error)
+      return events.emit('error', error)
+    }
+
+    if (!isTransportActive || !socket.getUserData().isConnected) {
+      // The transport is not active or the socket is not connected, skip message
+      logger.debug('Skipping message because transport is not active or socket is not connected', {
+        transportId,
+        isTransportActive: String(isTransportActive),
+        isConnected: String(socket.getUserData().isConnected)
+      })
       return
     }
 
@@ -273,8 +282,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         queueSize: messageQueue.length,
         maxQueueSize
       })
-      events.emit('error', error)
-      return
+      return events.emit('error', error)
     }
 
     const messageFuture = future<void>()
@@ -313,18 +321,15 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
   }
 
-  function cleanup(code: number = 1000, reason: string = 'Normal closure') {
+  function cleanup() {
     logger.debug('Cleaning up transport', {
       transportId,
-      code,
-      reason,
       queueLength: messageQueue.length,
       isTransportActive: String(isTransportActive),
       isInitialized: String(isInitialized)
     })
 
     isTransportActive = false
-    isInitialized = false
 
     if (processingTimeout) {
       clearTimeout(processingTimeout)
@@ -340,13 +345,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
 
     uServerEmitter.off('message', handleMessage)
-    uServerEmitter.off('close', handleClose)
-  }
-
-  function handleClose(payload: { code: number; reason: string } = { code: 1000, reason: '' }) {
-    const { code, reason } = payload
-    cleanup(code, reason)
-    events.emit('close', { code, reason })
   }
 
   const events = mitt<TransportEvents>()
@@ -354,7 +352,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   isInitialized = true
   events.emit('connect', {})
 
-  uServerEmitter.on('close', handleClose)
   uServerEmitter.on('message', handleMessage)
 
   const api: Transport = {
@@ -365,13 +362,13 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     sendMessage(message: any) {
       if (!(message instanceof Uint8Array)) {
         events.emit('error', new Error(`WebSocketTransport: Received unknown type of message, expecting Uint8Array`))
-        return
+        return Promise.resolve()
       }
       return send(message)
     },
-    close(code: number = 1000, reason: string = 'Client requested closure') {
-      cleanup(code, reason)
-      events.emit('close', { code, reason })
+    close() {
+      cleanup()
+      events.emit('close', {})
     }
   }
 

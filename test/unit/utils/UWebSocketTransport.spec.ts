@@ -93,7 +93,7 @@ describe('UWebSocketTransport', () => {
       transport.close()
 
       expect(mockSocket.end).not.toHaveBeenCalled()
-      expect(closeListener).toHaveBeenCalledWith({ code: 1000, reason: 'Client requested closure' })
+      expect(closeListener).toHaveBeenCalled()
       expect(transport.isConnected).toBe(false)
     })
 
@@ -106,22 +106,6 @@ describe('UWebSocketTransport', () => {
       expect(transport.isConnected).toBe(false)
       expect(closeListener).toHaveBeenCalledTimes(2)
       expect(mockSocket.end).not.toHaveBeenCalled()
-    })
-
-    it('should handle close event from uServerEmitter', () => {
-      const closeEvent = { code: 1006, reason: 'Connection abnormally closed' }
-      mockEmitter.emit('close', closeEvent)
-
-      expect(closeListener).toHaveBeenCalledWith(closeEvent)
-      expect(transport.isConnected).toBe(false)
-    })
-
-    it('should handle close event with default parameters', () => {
-      const closeEvent = { code: 1000, reason: '' }
-      mockEmitter.emit('close', closeEvent)
-
-      expect(closeListener).toHaveBeenCalledWith(closeEvent)
-      expect(transport.isConnected).toBe(false)
     })
   })
 
@@ -204,19 +188,13 @@ describe('UWebSocketTransport', () => {
       })
     })
 
-    describe('and the transport is not ready', () => {
-      it('should reject when transport is closed', () => {
+    describe('and the transport has closed', () => {
+      beforeEach(() => {
         transport.close()
-        transport.sendMessage(mockMessage)
-
-        expect(errorListener).toHaveBeenCalledWith(new Error('Transport is not ready or socket is not connected'))
       })
 
-      it('should reject when socket is disconnected', () => {
-        mockSocket.getUserData.mockReturnValue({ isConnected: false })
-        transport.sendMessage(mockMessage)
-
-        expect(errorListener).toHaveBeenCalledWith(new Error('Transport is not ready or socket is not connected'))
+      it('should skip the message and return', () => {
+        expect(transport.sendMessage(mockMessage)).resolves.toBeUndefined()
       })
     })
 
@@ -261,8 +239,8 @@ describe('UWebSocketTransport', () => {
     })
 
     describe('and an invalid message type is provided', () => {
-      it('should reject invalid message types', () => {
-        transport.sendMessage('invalid' as any)
+      it('should reject invalid message types', async () => {
+        await transport.sendMessage('invalid' as any)
 
         expect(errorListener).toHaveBeenCalledWith(
           new Error('WebSocketTransport: Received unknown type of message, expecting Uint8Array')
@@ -327,25 +305,6 @@ describe('UWebSocketTransport', () => {
 
       expect(messageListener).not.toHaveBeenCalled()
     })
-
-    it('should ignore messages when transport is not initialized', () => {
-      const messageListener = jest.fn()
-
-      // Create a new transport instance and immediately close it to test uninitialized state
-      // We need to test the case where isInitialized is false
-      const uninitializedTransport = createUWebSocketTransport(mockSocket, mockEmitter, components)
-
-      // Close the transport immediately to set isInitialized to false
-      uninitializedTransport.then((t) => {
-        t.close()
-
-        // Now emit a message - it should be ignored
-        const buffer = new ArrayBuffer(4)
-        mockEmitter.emit('message', buffer)
-
-        expect(messageListener).not.toHaveBeenCalled()
-      })
-    })
   })
 
   describe('when handling adaptive queue sizing', () => {
@@ -371,7 +330,7 @@ describe('UWebSocketTransport', () => {
         // Test that the transport works with null maxBackpressure by sending messages
         mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
         const sendPromise = noBackpressureTransport.sendMessage(mockMessage)
-        expect(sendPromise).toBeInstanceOf(Promise)
+        return expect(sendPromise).resolves.not.toThrow()
       })
     })
 
@@ -398,7 +357,7 @@ describe('UWebSocketTransport', () => {
         // Test that the transport works with the calculated queue size
         mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
         const sendPromise = largeAdaptiveTransport.sendMessage(mockMessage)
-        expect(sendPromise).toBeInstanceOf(Promise)
+        return expect(sendPromise).resolves.toBeUndefined()
       })
     })
   })
