@@ -1,4 +1,4 @@
-import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy } from '../types'
+import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy, CommunityRole } from '../types'
 import { CommunityVoiceChatAction, CommunityVoiceChatProfileData } from '../logic/community-voice/types'
 import { isErrorWithMessage } from '../utils/errors'
 
@@ -152,12 +152,14 @@ export const createCommsGatekeeperComponent = async ({
    * Gets credentials for a community voice chat.
    * @param communityId - The ID of the community
    * @param userAddress - The address of the user joining
+   * @param userRole - The role of the user in the community (owner, moderator, member, none)
    * @param profileData - Optional profile data (name, has_claimed_name, profile_picture_url)
    * @returns Connection credentials for the user
    */
   async function getCommunityVoiceChatCredentials(
     communityId: string,
     userAddress: string,
+    userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ): Promise<{ connectionUrl: string }> {
     try {
@@ -165,11 +167,13 @@ export const createCommsGatekeeperComponent = async ({
         community_id: string
         user_address: string
         action: CommunityVoiceChatAction
+        user_role: string
         profile_data?: CommunityVoiceChatProfileData
       } = {
         community_id: communityId,
         user_address: userAddress,
-        action: CommunityVoiceChatAction.JOIN
+        action: CommunityVoiceChatAction.JOIN,
+        user_role: userRole
       }
 
       if (profileData) {
@@ -203,12 +207,14 @@ export const createCommsGatekeeperComponent = async ({
    * Creates a community voice chat room.
    * @param communityId - The ID of the community
    * @param createdBy - The address of the moderator creating the voice chat
+   * @param userRole - The role of the user creating the voice chat (owner, moderator, member, none)
    * @param profileData - Optional profile data for the creator
    * @returns The connection URL for the moderator
    */
   async function createCommunityVoiceChatRoom(
     communityId: string,
     createdBy: string,
+    userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ): Promise<{ connectionUrl: string }> {
     try {
@@ -216,11 +222,13 @@ export const createCommsGatekeeperComponent = async ({
         community_id: string
         user_address: string
         action: CommunityVoiceChatAction
+        user_role: string
         profile_data?: CommunityVoiceChatProfileData
       } = {
         community_id: communityId,
         user_address: createdBy,
-        action: CommunityVoiceChatAction.CREATE
+        action: CommunityVoiceChatAction.CREATE,
+        user_role: userRole
       }
 
       if (profileData) {

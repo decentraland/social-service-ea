@@ -289,11 +289,13 @@ export type ICommsGatekeeperComponent = {
   getCommunityVoiceChatCredentials: (
     communityId: string,
     userAddress: string,
+    userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ) => Promise<{ connectionUrl: string }>
   createCommunityVoiceChatRoom: (
     communityId: string,
     moderatorAddress: string,
+    userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ) => Promise<{ connectionUrl: string }>
   updateUserMetadataInCommunityVoiceChat: (communityId: string, userAddress: string, metadata: any) => Promise<void>

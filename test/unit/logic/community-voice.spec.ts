@@ -4,19 +4,19 @@ import { IAnalyticsComponent } from '@dcl/analytics-component'
 import { createCommunityVoiceComponent } from '../../../src/logic/community-voice'
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import {
-  CommunityRole,
   ICommsGatekeeperComponent,
   IPubSubComponent,
   ICommunitiesDatabaseComponent,
   ICatalystClientComponent
 } from '../../../src/types'
 import {
-  CommunityVoiceChatNotFoundError,
   CommunityVoiceChatAlreadyActiveError,
-  UserNotCommunityMemberError,
+  CommunityVoiceChatCreationError,
+  CommunityVoiceChatNotFoundError,
   CommunityVoiceChatPermissionError,
-  CommunityVoiceChatCreationError
+  UserNotCommunityMemberError
 } from '../../../src/logic/community-voice/errors'
+import { CommunityRole } from '../../../src/types'
 import { AnalyticsEvent, AnalyticsEventPayload } from '../../../src/types/analytics'
 import { ICommunityVoiceComponent } from '../../../src/logic/community-voice'
 import { ICommunityVoiceChatCacheComponent } from '../../../src/logic/community-voice/community-voice-cache'
@@ -151,11 +151,16 @@ describe('Community Voice Logic', () => {
             expect(result).toEqual({ connectionUrl: 'test-connection-url' })
             expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, creatorAddress)
             expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
-            expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, creatorAddress, {
-              name: 'CreatorUser',
-              has_claimed_name: true,
-              profile_picture_url: 'https://example.com/creator-face.png'
-            })
+            expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
+              communityId,
+              creatorAddress,
+              CommunityRole.Owner,
+              {
+                name: 'CreatorUser',
+                has_claimed_name: true,
+                profile_picture_url: 'https://example.com/creator-face.png'
+              }
+            )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
               status: 'started'
@@ -181,6 +186,7 @@ describe('Community Voice Logic', () => {
             expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
               communityId,
               creatorAddress,
+              CommunityRole.Owner,
               null
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -224,11 +230,16 @@ describe('Community Voice Logic', () => {
             expect(result).toEqual({ connectionUrl: 'test-connection-url' })
             expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, creatorAddress)
             expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
-            expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, creatorAddress, {
-              name: 'ModeratorUser',
-              has_claimed_name: false,
-              profile_picture_url: 'https://example.com/moderator-face.png'
-            })
+            expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
+              communityId,
+              creatorAddress,
+              CommunityRole.Moderator,
+              {
+                name: 'ModeratorUser',
+                has_claimed_name: false,
+                profile_picture_url: 'https://example.com/moderator-face.png'
+              }
+            )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
               status: 'started'
@@ -254,6 +265,7 @@ describe('Community Voice Logic', () => {
             expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
               communityId,
               creatorAddress,
+              CommunityRole.Moderator,
               null
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -390,6 +402,7 @@ describe('Community Voice Logic', () => {
             expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
               communityId,
               userAddress,
+              CommunityRole.Member,
               {
                 name: 'MemberUser',
                 has_claimed_name: true,
@@ -414,6 +427,7 @@ describe('Community Voice Logic', () => {
             expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
               communityId,
               userAddress,
+              CommunityRole.Member,
               null
             )
           })
@@ -431,6 +445,7 @@ describe('Community Voice Logic', () => {
             active: true,
             role: CommunityRole.None
           })
+          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(null) // User is not a member
           mockCommunitiesDb.isMemberBanned!.mockResolvedValue(false)
           mockCommsGatekeeper.getCommunityVoiceChatCredentials.mockResolvedValue({
             connectionUrl: 'test-public-connection-url'
@@ -461,10 +476,11 @@ describe('Community Voice Logic', () => {
             expect(result).toEqual({ connectionUrl: 'test-public-connection-url' })
             expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
             expect(mockCommunitiesDb.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-            expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+            expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
             expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
               communityId,
               userAddress,
+              CommunityRole.None,
               {
                 name: 'PublicUser#0456',
                 has_claimed_name: false,
@@ -485,10 +501,11 @@ describe('Community Voice Logic', () => {
             expect(result).toEqual({ connectionUrl: 'test-public-connection-url' })
             expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
             expect(mockCommunitiesDb.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-            expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+            expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
             expect(mockCommsGatekeeper.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
               communityId,
               userAddress,
+              CommunityRole.None,
               null
             )
           })
