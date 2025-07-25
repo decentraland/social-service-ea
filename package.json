@@ -50,7 +50,7 @@
     "@dcl/platform-server-commons": "^0.1.0",
     "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16365451498.commit-b69cfdd.tgz",
     "@dcl/rpc": "^1.1.2",
-    "@dcl/schemas": "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-events/dcl-schemas-17.0.1-16501786857.commit-4e5e84c.tgz",
+    "@dcl/schemas": "^17.1.0",
     "@sentry/node": "^9.12.0",
     "@well-known-components/env-config-provider": "^1.2.0",
     "@well-known-components/fetch-component": "^2.0.2",
