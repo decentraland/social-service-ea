@@ -257,7 +257,15 @@ export function parseFriendshipRequestsToFriendshipRequestResponses(
         return null
       }
 
-      return parseFriendshipRequestToFriendshipRequestResponse(request, profile)
+      let parsedRequest: FriendshipRequestResponse
+      try {
+        parsedRequest = parseFriendshipRequestToFriendshipRequestResponse(request, profile)
+      } catch (_) {
+        // Ignore profiles that can't be parsed
+        return null
+      }
+
+      return parsedRequest
     })
     .filter((request) => !!request)
 }
