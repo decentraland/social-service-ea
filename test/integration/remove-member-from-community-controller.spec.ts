@@ -241,7 +241,8 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
                 metadata: {
                   id: communityId,
                   name: communityName,
-                  memberAddress: targetMemberAddress
+                  memberAddress: targetMemberAddress,
+                  thumbnailUrl: expect.stringContaining(`/social/communities/${communityId}/raw-thumbnail.png`)
                 }
               })
             })
@@ -308,7 +309,8 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
                 metadata: {
                   id: communityId,
                   name: communityName,
-                  memberAddress: targetMemberAddress
+                  memberAddress: targetMemberAddress,
+                  thumbnailUrl: expect.stringContaining(`/social/communities/${communityId}/raw-thumbnail.png`)
                 }
               })
             })

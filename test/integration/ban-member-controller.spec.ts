@@ -194,7 +194,8 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
               metadata: {
                 id: communityId,
                 name: "Test Community",
-                memberAddress: targetMemberAddress
+                memberAddress: targetMemberAddress,
+                thumbnailUrl: expect.stringContaining(`/social/communities/${communityId}/raw-thumbnail.png`)
               }
             })
           })
