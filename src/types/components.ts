@@ -8,6 +8,10 @@ import { createClient, SetOptions } from 'redis'
 import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
+  CommunityDeletedEvent,
+  CommunityMemberBannedEvent,
+  CommunityMemberRemovedEvent,
+  CommunityRenamedEvent,
   EthAddress,
   FriendshipAcceptedEvent,
   FriendshipRequestEvent,
@@ -260,6 +264,10 @@ export type IPublisherComponent = {
       | FriendshipAcceptedEvent
       | ReferralInvitedUsersAcceptedEvent
       | ReferralNewTierReachedEvent
+      | CommunityDeletedEvent
+      | CommunityRenamedEvent
+      | CommunityMemberBannedEvent
+      | CommunityMemberRemovedEvent
   ): Promise<PublishCommandOutput>
 }
 

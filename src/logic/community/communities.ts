@@ -20,10 +20,10 @@ import {
   toPublicCommunity,
   getCommunityThumbnailPath
 } from './utils'
-import { EthAddress } from '@dcl/schemas'
 import { isErrorWithMessage } from '../../utils/errors'
+import { EthAddress, Events } from '@dcl/schemas'
 
-export async function createCommunityComponent(
+export function createCommunityComponent(
   components: Pick<
     AppComponents,
     | 'communitiesDb'
@@ -33,12 +33,13 @@ export async function createCommunityComponent(
     | 'communityEvents'
     | 'cdnCacheInvalidator'
     | 'communityOwners'
-    | 'storage'
-    | 'config'
-    | 'logs'
+    | 'communityBroadcaster'
+    | 'communityThumbnail'
+    | 'cdnCacheInvalidator'
     | 'commsGatekeeper'
+    | 'logs'
   >
-): Promise<ICommunitiesComponent> {
+): ICommunitiesComponent {
   const {
     communitiesDb,
     catalystClient,
@@ -46,19 +47,14 @@ export async function createCommunityComponent(
     communityPlaces,
     communityEvents,
     communityOwners,
+    communityBroadcaster,
+    communityThumbnail,
     cdnCacheInvalidator,
-    storage,
-    config,
-    logs,
-    commsGatekeeper
+    commsGatekeeper,
+    logs
   } = components
 
   const logger = logs.getLogger('community-component')
-  const CDN_URL = await config.requireString('CDN_URL')
-
-  const buildThumbnailUrl = (communityId: string) => {
-    return `${CDN_URL}${getCommunityThumbnailPath(communityId)}`
-  }
 
   /**
    * Helper function to filter communities with active voice chat using batch API
@@ -83,16 +79,6 @@ export async function createCommunityComponent(
     }
   }
 
-  const getThumbnail = async (communityId: string): Promise<string | undefined> => {
-    const thumbnailExists = await storage.exists(`communities/${communityId}/raw-thumbnail.png`)
-
-    if (!thumbnailExists) {
-      return undefined
-    }
-
-    return buildThumbnailUrl(communityId)
-  }
-
   return {
     getCommunity: async (
       id: string,
@@ -109,7 +95,7 @@ export async function createCommunityComponent(
       }
 
       const [thumbnail, ownerName, isHostingLiveEvent] = await Promise.all([
-        getThumbnail(community.id),
+        communityThumbnail.getThumbnail(community.id),
         communityOwners.getOwnerName(community.ownerAddress, community.id),
         communityEvents.isCurrentlyHostingEvents(community.id)
       ])
@@ -135,7 +121,7 @@ export async function createCommunityComponent(
       const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
         communities.map(async (community) => {
           const [thumbnail, ownerName] = await Promise.all([
-            getThumbnail(community.id),
+            communityThumbnail.getThumbnail(community.id),
             communityOwners.getOwnerName(community.ownerAddress, community.id)
           ])
 
@@ -177,7 +163,7 @@ export async function createCommunityComponent(
       const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
         communities.map(async (community) => {
           const [thumbnail, ownerName] = await Promise.all([
-            getThumbnail(community.id),
+            communityThumbnail.getThumbnail(community.id),
             communityOwners.getOwnerName(community.ownerAddress, community.id)
           ])
 
@@ -259,11 +245,11 @@ export async function createCommunityComponent(
       })
 
       if (thumbnail) {
-        const thumbnailUrl = await storage.storeFile(thumbnail, `communities/${newCommunity.id}/raw-thumbnail.png`)
+        const thumbnailUrl = await communityThumbnail.uploadThumbnail(newCommunity.id, thumbnail)
 
         logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id, size: thumbnail.length })
         newCommunity.thumbnails = {
-          raw: buildThumbnailUrl(newCommunity.id)
+          raw: communityThumbnail.buildThumbnailUrl(newCommunity.id)
         }
       }
 
@@ -286,6 +272,20 @@ export async function createCommunityComponent(
       }
 
       await communitiesDb.deleteCommunity(id)
+
+      setImmediate(async () => {
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.DELETED,
+          key: id,
+          timestamp: Date.now(),
+          metadata: {
+            id,
+            name: community.name,
+            thumbnailUrl: (await communityThumbnail.getThumbnail(id)) || 'N/A'
+          }
+        })
+      })
     },
 
     updateCommunity: async (
@@ -330,8 +330,30 @@ export async function createCommunityComponent(
 
       const updatedCommunity = await communitiesDb.updateCommunity(communityId, updates)
 
+      if (!!updates.name) {
+        setImmediate(async () => {
+          const eventKeySuffix =
+            updates.name!.trim().toLowerCase().replace(/ /g, '-') +
+            '-' +
+            community.name.trim().toLowerCase().replace(/ /g, '-')
+
+          await communityBroadcaster.broadcast({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.RENAMED,
+            key: `${communityId}-${eventKeySuffix}`,
+            timestamp: Date.now(),
+            metadata: {
+              id: communityId,
+              oldName: community.name,
+              newName: updates.name!,
+              thumbnailUrl: (await communityThumbnail.getThumbnail(communityId)) || 'N/A'
+            }
+          })
+        })
+      }
+
       if (thumbnailBuffer) {
-        const thumbnailUrl = await storage.storeFile(thumbnailBuffer, `communities/${communityId}/raw-thumbnail.png`)
+        const thumbnailUrl = await communityThumbnail.uploadThumbnail(communityId, thumbnailBuffer)
         await cdnCacheInvalidator.invalidateThumbnail(communityId)
 
         logger.info('Thumbnail updated', {
@@ -341,7 +363,7 @@ export async function createCommunityComponent(
         })
 
         updatedCommunity.thumbnails = {
-          raw: buildThumbnailUrl(communityId)
+          raw: communityThumbnail.buildThumbnailUrl(communityId)
         }
       }
 

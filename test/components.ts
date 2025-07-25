@@ -23,7 +23,6 @@ import { createRedisComponent } from '../src/adapters/redis'
 import { createPubSubComponent } from '../src/adapters/pubsub'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createCatalystClient } from '../src/adapters/catalyst-client'
-import { createSnsComponent } from '../src/adapters/sns'
 import { createS3Adapter } from '../src/adapters/s3'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
 import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
@@ -34,7 +33,7 @@ import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
-import { mockPeersSynchronizer, mockCdnCacheInvalidator } from './mocks/components'
+import { mockPeersSynchronizer, mockCdnCacheInvalidator, mockSns } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
@@ -45,7 +44,9 @@ import {
   createCommunityPlacesComponent,
   createCommunityRolesComponent,
   createCommunityOwnersComponent,
-  createCommunityEventsComponent
+  createCommunityEventsComponent,
+  createCommunityThumbnailComponent,
+  createCommunityBroadcasterComponent
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
@@ -129,7 +130,7 @@ async function initComponents(): Promise<TestComponents> {
   const pubsub = createPubSubComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
   const catalystClient = await createCatalystClient({ config, fetcher, redis })
-  const sns = await createSnsComponent({ config })
+  const sns = mockSns
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
@@ -150,6 +151,8 @@ async function initComponents(): Promise<TestComponents> {
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
+  const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
+  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
 
   // Community voice chat cache and polling components
@@ -163,6 +166,8 @@ async function initComponents(): Promise<TestComponents> {
   const communityMembers = await createCommunityMembersComponent({
     communitiesDb,
     communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
     logs,
     catalystClient,
     peersStats,
@@ -171,23 +176,25 @@ async function initComponents(): Promise<TestComponents> {
   const communityBans = await createCommunityBansComponent({
     communitiesDb,
     communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
     logs,
     catalystClient,
     pubsub
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
-  const communities = await createCommunityComponent({
+  const communities = createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
     communityPlaces,
     communityOwners,
     communityEvents,
+    communityBroadcaster,
+    communityThumbnail,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     logs,
-    storage,
-    config,
     commsGatekeeper
   })
   const updateHandler = createUpdateHandlerComponent({
@@ -266,6 +273,8 @@ async function initComponents(): Promise<TestComponents> {
     communityOwners,
     communityRoles,
     communityEvents,
+    communityBroadcaster,
+    communityThumbnail,
     config,
     email,
     fetcher,

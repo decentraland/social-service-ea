@@ -38,7 +38,9 @@ import {
   createCommunityRolesComponent,
   createCommunityOwnersComponent,
   createCommunityPlacesComponent,
-  createCommunityEventsComponent
+  createCommunityEventsComponent,
+  createCommunityBroadcasterComponent,
+  createCommunityThumbnailComponent
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
@@ -170,11 +172,15 @@ export async function initComponents(): Promise<AppComponents> {
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
+  const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
+  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
   const communityMembers = await createCommunityMembersComponent({
     communitiesDb,
     communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
     logs,
     catalystClient,
     peersStats,
@@ -183,13 +189,15 @@ export async function initComponents(): Promise<AppComponents> {
   const communityBans = await createCommunityBansComponent({
     communitiesDb,
     communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
     logs,
     catalystClient,
     pubsub
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
-  const communities = await createCommunityComponent({
+  const communities = createCommunityComponent({
     communitiesDb,
     catalystClient,
     communityRoles,
@@ -197,10 +205,10 @@ export async function initComponents(): Promise<AppComponents> {
     communityOwners,
     communityEvents,
     cdnCacheInvalidator,
-    logs,
-    storage,
-    config,
-    commsGatekeeper
+    communityThumbnail,
+    communityBroadcaster,
+    commsGatekeeper,
+    logs
   })
 
   const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
@@ -266,6 +274,8 @@ export async function initComponents(): Promise<AppComponents> {
     communityRoles,
     communityVoice,
     communityEvents,
+    communityBroadcaster,
+    communityThumbnail,
     config,
     email,
     expirePrivateVoiceChatJob,
