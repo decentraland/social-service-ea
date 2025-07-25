@@ -56,6 +56,8 @@ import { createWsPoolComponent } from './logic/ws-pool'
 import { createCdnCacheInvalidatorComponent } from './adapters/cdn-cache-invalidator'
 import { createEmailComponent } from './adapters/email'
 import { createFriendsComponent } from './logic/friends'
+import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/community-voice-cache'
+import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -101,6 +103,7 @@ export async function initComponents(): Promise<AppComponents> {
     databaseUrl = `postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbDatabaseName}`
   }
   const privateVoiceChatJobInterval = await config.requireNumber('PRIVATE_VOICE_CHAT_JOB_INTERVAL')
+  const communityVoiceChatPollingJobInterval = await config.requireNumber('COMMUNITY_VOICE_CHAT_POLLING_JOB_INTERVAL')
 
   const pg = await createPgComponent(
     { logs, config, metrics },
@@ -146,13 +149,23 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     analytics
   })
+  // Community voice chat cache and polling
+  const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })
+  const communityVoiceChatPolling = createCommunityVoiceChatPollingComponent({
+    logs,
+    commsGatekeeper,
+    pubsub,
+    communityVoiceChatCache
+  })
+
   const communityVoice = await createCommunityVoiceComponent({
     logs,
     commsGatekeeper,
     communitiesDb,
     pubsub,
     analytics,
-    catalystClient
+    catalystClient,
+    communityVoiceChatCache
   })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
@@ -220,6 +233,14 @@ export async function initComponents(): Promise<AppComponents> {
     privateVoiceChatJobInterval,
     { repeat: true }
   )
+
+  // Community voice chat polling job (every 45 seconds)
+  const communityVoiceChatPollingJob = createJobComponent(
+    { logs },
+    communityVoiceChatPolling.checkAllVoiceChats,
+    communityVoiceChatPollingJobInterval,
+    { repeat: true }
+  )
   const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
   const queue = sqsEndpoint ? await createSqsAdapter(sqsEndpoint) : createMemoryQueueAdapter()
 
@@ -281,6 +302,9 @@ export async function initComponents(): Promise<AppComponents> {
     worldsStats,
     wsPool,
     cdnCacheInvalidator,
-    friends
+    friends,
+    communityVoiceChatCache,
+    communityVoiceChatPolling,
+    communityVoiceChatPollingJob
   }
 }

@@ -50,6 +50,8 @@ import {
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createCommunityVoiceComponent } from '../src/logic/community-voice'
+import { createCommunityVoiceChatCacheComponent } from '../src/logic/community-voice/community-voice-cache'
+import { createCommunityVoiceChatPollingComponent } from '../src/logic/community-voice/community-voice-polling'
 import { createSettingsComponent } from '../src/logic/settings'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from '../src/logic/sqs'
 import { createReferralDBComponent } from '../src/adapters/referral-db'
@@ -149,6 +151,15 @@ async function initComponents(): Promise<TestComponents> {
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
+
+  // Community voice chat cache and polling components
+  const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })
+  const communityVoiceChatPolling = createCommunityVoiceChatPollingComponent({
+    logs,
+    commsGatekeeper,
+    pubsub,
+    communityVoiceChatCache
+  })
   const communityMembers = await createCommunityMembersComponent({
     communitiesDb,
     communityRoles,
@@ -192,7 +203,8 @@ async function initComponents(): Promise<TestComponents> {
     pubsub,
     analytics,
     communitiesDb,
-    catalystClient
+    catalystClient,
+    communityVoiceChatCache
   })
   const rpcServer = await createRpcServerComponent({
     logs,
@@ -294,6 +306,8 @@ async function initComponents(): Promise<TestComponents> {
     worldsStats,
     wsPool,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
-    friends
+    friends,
+    communityVoiceChatCache,
+    communityVoiceChatPolling
   }
 }

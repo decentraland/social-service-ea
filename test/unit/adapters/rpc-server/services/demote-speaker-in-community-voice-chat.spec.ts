@@ -7,25 +7,7 @@ import {
   UserNotCommunityMemberError,
   CommunityVoiceChatNotFoundError
 } from '../../../../../src/logic/community-voice/errors'
-
-function createCommsGatekeeperMockedComponent({
-  demoteSpeakerInCommunityVoiceChat = jest.fn()
-}: Partial<jest.Mocked<ICommsGatekeeperComponent>>): jest.Mocked<ICommsGatekeeperComponent> {
-  return {
-    requestToSpeakInCommunityVoiceChat: jest.fn(),
-    createCommunityVoiceChatRoom: jest.fn(),
-    getCommunityVoiceChatCredentials: jest.fn(),
-    getCommunityVoiceChatStatus: jest.fn(),
-    isUserInAVoiceChat: jest.fn(),
-    getPrivateVoiceChatCredentials: jest.fn(),
-    endPrivateVoiceChat: jest.fn(),
-    updateUserPrivateMessagePrivacyMetadata: jest.fn(),
-    updateUserMetadataInCommunityVoiceChat: jest.fn(),
-    promoteSpeakerInCommunityVoiceChat: jest.fn(),
-    demoteSpeakerInCommunityVoiceChat,
-    kickUserFromCommunityVoiceChat: jest.fn()
-  }
-}
+import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 
 describe('when demoting speaker in community voice chat', () => {
   let demoteSpeakerMock: jest.MockedFn<ICommsGatekeeperComponent['demoteSpeakerInCommunityVoiceChat']>

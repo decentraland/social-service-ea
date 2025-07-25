@@ -38,6 +38,8 @@ import {
   IEmailComponent,
   ICdnCacheInvalidatorComponent
 } from './components'
+import { ICommunityVoiceChatCacheComponent } from '../logic/community-voice/community-voice-cache'
+import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/community-voice-polling'
 import {
   ICommunitiesComponent,
   ICommunityBansComponent,
@@ -118,6 +120,9 @@ export type BaseComponents = {
   wsPool: IWsPoolComponent
   cdnCacheInvalidator: ICdnCacheInvalidatorComponent
   friends: IFriendsComponent
+  communityVoiceChatCache: ICommunityVoiceChatCacheComponent
+  communityVoiceChatPolling: ICommunityVoiceChatPollingComponent
+  communityVoiceChatPollingJob?: IJobComponent
 }
 
 // components used in runtime

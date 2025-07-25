@@ -27,11 +27,12 @@ export async function getCommunitiesHandler(
   const pagination = getPaginationParams(url.searchParams)
   const search = url.searchParams.get('search')
   const onlyMemberOf = url.searchParams.get('onlyMemberOf')?.toLowerCase() === 'true'
+  const onlyWithActiveVoiceChat = url.searchParams.get('onlyWithActiveVoiceChat')?.toLowerCase() === 'true'
 
   try {
     const { communities: communitiesData, total } = userAddress
-      ? await communities.getCommunities(userAddress, { pagination, search, onlyMemberOf })
-      : await communities.getCommunitiesPublicInformation({ pagination, search })
+      ? await communities.getCommunities(userAddress, { pagination, search, onlyMemberOf, onlyWithActiveVoiceChat })
+      : await communities.getCommunitiesPublicInformation({ pagination, search, onlyWithActiveVoiceChat })
 
     return {
       status: 200,
