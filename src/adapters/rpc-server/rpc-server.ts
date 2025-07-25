@@ -95,11 +95,14 @@ export async function createRpcServerComponent({
       })
     },
     detachUser(address) {
-      // End all calls that the user is involved in
-      voice.endIncomingOrOutgoingPrivateVoiceChatForUser(address).catch((_) => {
-        // Do nothing
-      })
-      subscribersContext.removeSubscriber(address)
+      // Check if the user is subscribed before detaching
+      if (subscribersContext.getSubscribersAddresses().find((a) => a === address)) {
+        // End all calls that the user is involved in
+        subscribersContext.removeSubscriber(address)
+        voice.endIncomingOrOutgoingPrivateVoiceChatForUser(address).catch((_) => {
+          // Do nothing
+        })
+      }
     }
   }
 }
