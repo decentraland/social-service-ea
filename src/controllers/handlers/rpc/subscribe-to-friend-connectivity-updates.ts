@@ -32,6 +32,7 @@ export function subscribeToFriendConnectivityUpdatesService({
       >({
         rpcContext: context,
         eventName: 'friendConnectivityUpdate',
+        shouldRetrieveProfile: true,
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) => update.address,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) =>
           update.address !== context.address,
