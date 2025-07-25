@@ -16,12 +16,11 @@ export interface CachedCommunityVoiceChat {
  */
 export interface ICommunityVoiceChatCacheComponent {
   /**
-   * Adds or updates a community voice chat in the cache
+   * Adds or updates a community voice chat in the cache as active
    * @param communityId - The community ID
-   * @param isActive - Whether the voice chat is active
    * @param createdAt - When the voice chat was created (optional, defaults to now)
    */
-  setCommunityVoiceChat(communityId: string, isActive: boolean, createdAt?: number): Promise<void>
+  setCommunityVoiceChat(communityId: string, createdAt?: number): Promise<void>
 
   /**
    * Gets a community voice chat from the cache
@@ -67,23 +66,13 @@ export function createCommunityVoiceChatCacheComponent({
     return `${CACHE_PREFIX}${communityId}`
   }
 
-  async function setCommunityVoiceChat(
-    communityId: string,
-    isActive: boolean,
-    createdAt: number = Date.now()
-  ): Promise<void> {
-    if (!isActive) {
-      // Remove inactive communities from cache instead of storing them
-      await removeCommunityVoiceChat(communityId)
-      return
-    }
-
+  async function setCommunityVoiceChat(communityId: string, createdAt: number = Date.now()): Promise<void> {
     const now = Date.now()
     const existing = await getCommunityVoiceChat(communityId)
 
     const cachedChat: CachedCommunityVoiceChat = {
       communityId,
-      isActive,
+      isActive: true, // Always true for active chats
       lastChecked: now,
       createdAt: existing?.createdAt ?? createdAt
     }
@@ -91,7 +80,6 @@ export function createCommunityVoiceChatCacheComponent({
     await redis.put(getCacheKey(communityId), cachedChat, { EX: CACHE_TTL })
 
     logger.debug(`Updated cache for community ${communityId}`, {
-      isActive: isActive.toString(),
       createdAt: createdAt.toString()
     })
   }
@@ -121,19 +109,27 @@ export function createCommunityVoiceChatCacheComponent({
   async function getActiveCommunityVoiceChats(): Promise<CachedCommunityVoiceChat[]> {
     try {
       const keys = await redis.client.keys(`${CACHE_PREFIX}*`)
-      const activeChats: CachedCommunityVoiceChat[] = []
-
-      for (const key of keys) {
-        const communityId = key.replace(CACHE_PREFIX, '')
-        const chat = await getCommunityVoiceChat(communityId)
-        if (chat && chat.isActive) {
-          activeChats.push(chat)
-        }
+      if (keys.length === 0) {
+        return []
       }
 
-      return activeChats
+      const chats = await Promise.all(
+        keys.map(async (key) => {
+          try {
+            const chat = await redis.get<CachedCommunityVoiceChat>(key)
+            return chat?.isActive ? chat : null
+          } catch (error) {
+            logger.warn(`Error getting cached chat for key ${key}`, {
+              error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+            })
+            return null
+          }
+        })
+      )
+
+      return chats.filter((chat): chat is CachedCommunityVoiceChat => chat !== null)
     } catch (error) {
-      logger.error('Error getting active community voice chats', {
+      logger.error(`Error getting active community voice chats from cache`, {
         error: isErrorWithMessage(error) ? error.message : 'Unknown error'
       })
       return []
@@ -150,12 +146,12 @@ export function createCommunityVoiceChatCacheComponent({
       isActive: isActive ? 'true' : 'false'
     })
 
-    if (isActive !== null) {
-      // Update the cache with new status
-      await setCommunityVoiceChat(communityId, isActive, existing?.createdAt)
-    } else if (existing && wasActive) {
-      // Status is null (404 or error), but we had it as active - mark as ended
-      await setCommunityVoiceChat(communityId, false, existing.createdAt)
+    if (isActive === true) {
+      // Update the cache as active
+      await setCommunityVoiceChat(communityId, existing?.createdAt)
+    } else if (isActive === false || (isActive === null && existing && wasActive)) {
+      // Remove from cache when inactive or when we got null but it was active
+      await removeCommunityVoiceChat(communityId)
     }
 
     if (justEnded) {

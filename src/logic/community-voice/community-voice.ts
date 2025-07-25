@@ -100,7 +100,7 @@ export async function createCommunityVoiceComponent({
       logger.info(`Community voice chat room created for community ${communityId}`)
 
       // Add to cache as active
-      await communityVoiceChatCache.setCommunityVoiceChat(communityId, true, Date.now())
+      await communityVoiceChatCache.setCommunityVoiceChat(communityId, Date.now())
 
       // Publish start event
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {

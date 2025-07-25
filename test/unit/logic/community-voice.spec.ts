@@ -139,7 +139,6 @@ describe('Community Voice Logic', () => {
             )
             expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
               communityId,
-              true,
               expect.any(Number)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -172,7 +171,6 @@ describe('Community Voice Logic', () => {
             )
             expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
               communityId,
-              true,
               expect.any(Number)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -215,7 +213,6 @@ describe('Community Voice Logic', () => {
             )
             expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
               communityId,
-              true,
               expect.any(Number)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -248,7 +245,6 @@ describe('Community Voice Logic', () => {
             )
             expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
               communityId,
-              true,
               expect.any(Number)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {

@@ -207,7 +207,7 @@ describe('Community Voice Chat Polling Component', () => {
       })
     })
 
-    describe('when handling comms-gatekeeper errors gracefully', () => {
+    describe('when handling non 404 comms-gatekeeper errors', () => {
       beforeEach(() => {
         const activeChat = {
           communityId: 'community-1',
