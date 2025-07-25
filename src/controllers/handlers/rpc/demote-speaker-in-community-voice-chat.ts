@@ -7,13 +7,15 @@ import {
   UserNotCommunityMemberError,
   CommunityVoiceChatNotFoundError,
   InvalidCommunityIdError,
-  InvalidUserAddressError
+  InvalidUserAddressError,
+  CommunityVoiceChatPermissionError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
+import { CommunityRole } from '../../../types/entities'
 
 export function demoteSpeakerInCommunityVoiceChatService({
-  components: { logs, commsGatekeeper }
-}: RPCServiceContext<'logs' | 'commsGatekeeper'>) {
+  components: { logs, commsGatekeeper, communitiesDb }
+}: RPCServiceContext<'logs' | 'commsGatekeeper' | 'communitiesDb'>) {
   const logger = logs.getLogger('demote-speaker-in-community-voice-chat-rpc')
 
   return async function (
@@ -37,19 +39,56 @@ export function demoteSpeakerInCommunityVoiceChatService({
         throw new InvalidUserAddressError()
       }
 
+      const isSelfDemote = context.address.toLowerCase() === request.userAddress.toLowerCase()
+
+      // Get the role of the acting user (person making the request)
+      const actingUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, context.address)
+
+      if (actingUserRole === CommunityRole.None) {
+        throw new UserNotCommunityMemberError(context.address, request.communityId)
+      }
+
+      // If user is trying to demote someone else, check permissions
+      if (!isSelfDemote) {
+        // Only owners and moderators can demote other users
+        if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
+          throw new CommunityVoiceChatPermissionError('Only community owners and moderators can demote other speakers')
+        }
+
+        // Also verify the target user is a member of the community
+        const targetUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, request.userAddress)
+        if (targetUserRole === CommunityRole.None) {
+          throw new UserNotCommunityMemberError(request.userAddress, request.communityId)
+        }
+
+        logger.info('Permission check passed: moderator/owner demoting another user', {
+          communityId: request.communityId,
+          actingUserRole,
+          targetUserAddress: request.userAddress
+        })
+      } else {
+        logger.info('Self-demote detected: allowing user to demote themselves', {
+          communityId: request.communityId,
+          userAddress: request.userAddress
+        })
+      }
+
       await commsGatekeeper.demoteSpeakerInCommunityVoiceChat(request.communityId, request.userAddress)
 
       logger.info('Speaker demoted successfully', {
         communityId: request.communityId,
         targetUserAddress: request.userAddress,
-        moderatorAddress: context.address
+        moderatorAddress: context.address,
+        isSelfDemote: isSelfDemote.toString()
       })
 
       return {
         response: {
           $case: 'ok',
           ok: {
-            message: 'User demoted to listener successfully'
+            message: isSelfDemote
+              ? 'You have been demoted to listener successfully'
+              : 'User demoted to listener successfully'
           }
         }
       }
@@ -64,6 +103,15 @@ export function demoteSpeakerInCommunityVoiceChatService({
 
       // Handle specific error types
       if (error instanceof UserNotCommunityMemberError) {
+        return {
+          response: {
+            $case: 'forbiddenError',
+            forbiddenError: { message: error.message }
+          }
+        }
+      }
+
+      if (error instanceof CommunityVoiceChatPermissionError) {
         return {
           response: {
             $case: 'forbiddenError',
