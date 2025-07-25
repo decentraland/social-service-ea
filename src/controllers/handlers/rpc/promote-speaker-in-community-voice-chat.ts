@@ -7,13 +7,15 @@ import {
   UserNotCommunityMemberError,
   CommunityVoiceChatNotFoundError,
   InvalidCommunityIdError,
-  InvalidUserAddressError
+  InvalidUserAddressError,
+  CommunityVoiceChatPermissionError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
+import { CommunityRole } from '../../../types/entities'
 
 export function promoteSpeakerInCommunityVoiceChatService({
-  components: { logs, commsGatekeeper }
-}: RPCServiceContext<'logs' | 'commsGatekeeper'>) {
+  components: { logs, commsGatekeeper, communitiesDb }
+}: RPCServiceContext<'logs' | 'commsGatekeeper' | 'communitiesDb'>) {
   const logger = logs.getLogger('promote-speaker-in-community-voice-chat-rpc')
 
   return async function (
@@ -36,6 +38,25 @@ export function promoteSpeakerInCommunityVoiceChatService({
         logger.warn('Missing or empty user address in request')
         throw new InvalidUserAddressError()
       }
+
+      // Check permissions: only owners and moderators can promote speakers
+      const actingUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, context.address)
+      if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
+        throw new CommunityVoiceChatPermissionError('Only community owners and moderators can promote speakers')
+      }
+
+      // Verify the target user is a member of the community
+      const targetUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, request.userAddress)
+      if (targetUserRole === CommunityRole.None) {
+        throw new UserNotCommunityMemberError(request.userAddress, request.communityId)
+      }
+
+      logger.info('Permission check passed: moderator/owner promoting speaker', {
+        communityId: request.communityId,
+        actingUserRole,
+        targetUserAddress: request.userAddress,
+        moderatorAddress: context.address
+      })
 
       await commsGatekeeper.promoteSpeakerInCommunityVoiceChat(request.communityId, request.userAddress)
 
@@ -64,6 +85,15 @@ export function promoteSpeakerInCommunityVoiceChatService({
 
       // Handle specific error types
       if (error instanceof UserNotCommunityMemberError) {
+        return {
+          response: {
+            $case: 'forbiddenError',
+            forbiddenError: { message: error.message }
+          }
+        }
+      }
+
+      if (error instanceof CommunityVoiceChatPermissionError) {
         return {
           response: {
             $case: 'forbiddenError',
