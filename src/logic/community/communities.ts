@@ -56,6 +56,29 @@ export function createCommunityComponent(
 
   const logger = logs.getLogger('community-component')
 
+  /**
+   * Helper function to filter communities with active voice chat using batch API
+   * @param communities - Array of communities to filter
+   * @returns Promise<T[]> - Filtered array containing only communities with active voice chat
+   */
+  async function filterCommunitiesWithActiveVoiceChat<T extends { id: string }>(communities: T[]): Promise<T[]> {
+    if (communities.length === 0) {
+      return communities
+    }
+
+    try {
+      const communityIds = communities.map((c) => c.id)
+      const voiceChatStatuses = await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)
+
+      return communities.filter((community) => voiceChatStatuses[community.id]?.isActive ?? false)
+    } catch (error) {
+      logger.warn('Error filtering communities by voice chat status', {
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      return [] // If batch call fails, return empty array for safety
+    }
+  }
+
   return {
     getCommunity: async (
       id: string,
