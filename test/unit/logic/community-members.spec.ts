@@ -1,20 +1,24 @@
-import { CommunityRole } from '../../../src/types'
+import { CommunityRole, IPublisherComponent } from '../../../src/types'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockCatalystClient, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
 import { createCommunityMembersComponent } from '../../../src/logic/community/members'
-import { ICommunityMembersComponent, ICommunityRolesComponent } from '../../../src/logic/community/types'
-import { createMockCommunityRolesComponent } from '../../mocks/communities'
+import { ICommunityBroadcasterComponent, ICommunityMembersComponent, ICommunityRolesComponent, ICommunityThumbnailComponent } from '../../../src/logic/community/types'
+import { createMockCommunityBroadcasterComponent, createMockCommunityRolesComponent, createMockCommunityThumbnailComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { CommunityMember, CommunityMemberProfile } from '../../../src/logic/community/types'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import { mockSns } from '../../mocks/components/sns'
+import { Events } from '@dcl/schemas'
 
 describe('Community Members Component', () => {
   let communityMembersComponent: ICommunityMembersComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
+  let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
+  let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
   let mockUserAddress: string
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
 
@@ -41,11 +45,15 @@ describe('Community Members Component', () => {
   beforeEach(async () => {
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockCommunityRoles = createMockCommunityRolesComponent({})
+    mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
+    mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
     mockPeersStats = createMockPeersStatsComponent()
     communityMembersComponent = await createCommunityMembersComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
+      communityThumbnail: mockCommunityThumbnail,
+      communityBroadcaster: mockCommunityBroadcaster,
       logs: mockLogs,
       peersStats: mockPeersStats,
       pubsub: mockPubSub
@@ -230,7 +238,7 @@ describe('Community Members Component', () => {
 
     describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(false)
       })
 
       it('should throw CommunityNotFoundError', async () => {
@@ -584,6 +592,15 @@ describe('Community Members Component', () => {
     beforeEach(() => {
       isMember = false
       mockCommunitiesDB.communityExists.mockResolvedValue(false)
+      mockCommunitiesDB.getCommunity.mockResolvedValue({
+        id: communityId,
+        name: 'Test Community',
+        description: 'Test Description',
+        active: true,
+        ownerAddress: kickerAddress,
+        privacy: 'public',
+        role: CommunityRole.Owner
+      })
       mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(isMember)
       mockCommunityRoles.validatePermissionToKickMemberFromCommunity.mockResolvedValue()
       mockCommunitiesDB.kickMemberFromCommunity.mockResolvedValue()
@@ -591,7 +608,15 @@ describe('Community Members Component', () => {
 
     describe('and the community exists', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          active: true,
+          ownerAddress: kickerAddress,
+          privacy: 'public',
+          role: CommunityRole.Owner
+        })
       })
 
       describe('and the target is a member', () => {
@@ -608,7 +633,7 @@ describe('Community Members Component', () => {
           it('should kick the member from the community', async () => {
             await communityMembersComponent.kickMember(communityId, kickerAddress, targetAddress)
 
-            expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
             expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).toHaveBeenCalledWith(
               communityId,
@@ -620,6 +645,24 @@ describe('Community Members Component', () => {
               communityId,
               memberAddress: targetAddress,
               status: ConnectivityStatus.OFFLINE
+            })
+          })
+
+          it('should publish event to notify member kick', async () => {
+            await communityMembersComponent.kickMember(communityId, kickerAddress, targetAddress)
+
+            // Wait for setImmediate callback to execute
+            await new Promise(resolve => setImmediate(resolve))
+            expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+              type: Events.Type.COMMUNITY,
+              subType: Events.SubType.Community.MEMBER_REMOVED,
+              key: expect.stringContaining(`${communityId}-${targetAddress}-`),
+              timestamp: expect.any(Number),
+              metadata: {
+                id: communityId,
+                name: expect.any(String),
+                memberAddress: targetAddress
+              }
             })
           })
         })
@@ -641,7 +684,7 @@ describe('Community Members Component', () => {
               )
             )
 
-            expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
             expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).toHaveBeenCalledWith(
               communityId,
@@ -663,7 +706,7 @@ describe('Community Members Component', () => {
         it('should return without kicking', async () => {
           await communityMembersComponent.kickMember(communityId, kickerAddress, targetAddress)
 
-          expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
           expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
           expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
@@ -674,7 +717,7 @@ describe('Community Members Component', () => {
 
     describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
       })
 
       it('should throw CommunityNotFoundError', async () => {
@@ -682,7 +725,7 @@ describe('Community Members Component', () => {
           new CommunityNotFoundError(communityId)
         )
 
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()

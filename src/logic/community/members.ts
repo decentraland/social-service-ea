@@ -8,17 +8,33 @@ import {
   ICommunityMembersComponent
 } from './types'
 import { mapMembersWithProfiles } from './utils'
-import { EthAddress } from '@dcl/schemas'
+import { EthAddress, Events } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export async function createCommunityMembersComponent(
   components: Pick<
     AppComponents,
-    'communitiesDb' | 'catalystClient' | 'communityRoles' | 'logs' | 'peersStats' | 'pubsub'
+    | 'communitiesDb'
+    | 'catalystClient'
+    | 'communityRoles'
+    | 'communityThumbnail'
+    | 'communityBroadcaster'
+    | 'logs'
+    | 'peersStats'
+    | 'pubsub'
   >
 ): Promise<ICommunityMembersComponent> {
-  const { communitiesDb, catalystClient, communityRoles, logs, peersStats, pubsub } = components
+  const {
+    communitiesDb,
+    catalystClient,
+    communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
+    logs,
+    peersStats,
+    pubsub
+  } = components
 
   const logger = logs.getLogger('community-component')
 
@@ -133,9 +149,9 @@ export async function createCommunityMembersComponent(
     },
 
     kickMember: async (communityId: string, kickerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
-      const communityExists = await communitiesDb.communityExists(communityId)
+      const community = await communitiesDb.getCommunity(communityId)
 
-      if (!communityExists) {
+      if (!community) {
         throw new CommunityNotFoundError(communityId)
       }
 
@@ -154,6 +170,22 @@ export async function createCommunityMembersComponent(
         communityId,
         memberAddress: targetAddress,
         status: ConnectivityStatus.OFFLINE
+      })
+
+      setImmediate(async () => {
+        const timestamp = Date.now()
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.MEMBER_REMOVED,
+          key: `${communityId}-${targetAddress}-${timestamp}`,
+          timestamp,
+          metadata: {
+            id: communityId,
+            name: community.name,
+            memberAddress: targetAddress,
+            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+          }
+        })
       })
     },
 

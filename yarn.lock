@@ -1223,6 +1223,13 @@
     "@well-known-components/interfaces" "^1.4.3"
     node-fetch "^2.7.0"
 
+"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16365451498.commit-b69cfdd.tgz":
+  version "1.0.0-16365451498.commit-b69cfdd"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16365451498.commit-b69cfdd.tgz#35ccebbf9f58f043a339c6e7d7c835203abb404f"
+  dependencies:
+    "@dcl/ts-proto" "1.154.0"
+    protobufjs "7.2.4"
+
 "@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16491632419.commit-16f697f.tgz":
   version "1.0.0-16491632419.commit-16f697f"
   resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16491632419.commit-16f697f.tgz#9b2bc90a2539c1b1a9a1c05d2419f9e910835e6e"
@@ -1248,20 +1255,20 @@
     ajv-keywords "^5.1.0"
     mitt "^3.0.1"
 
-"@dcl/schemas@^16.12.0":
-  version "16.12.0"
-  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-16.12.0.tgz#f035d602b350785db349aa09016c6dd95daaeff5"
-  integrity sha512-wWnMWYY74oIRQX5SYbvt2R8XDw5tmyE/zaTgwj1mJoNJsVxw79uSTt5nENs9C74tcCWotOp7c/RV8df0Q40/3w==
+"@dcl/schemas@^16.9.0":
+  version "16.11.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-16.11.0.tgz#64fee36e822a10acc34cc2e1d4df28b983b8d6ce"
+  integrity sha512-jUay4P1DCDEQIDY8QTbV1jjpJ9wPNDmo8zpJGeUG3A9SDjGnni76/dgwZg0EAZ0/bkIMrQzN1sdmcnluTQgqYw==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
     ajv-keywords "^5.1.0"
     mitt "^3.0.1"
 
-"@dcl/schemas@^16.9.0":
-  version "16.11.0"
-  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-16.11.0.tgz#64fee36e822a10acc34cc2e1d4df28b983b8d6ce"
-  integrity sha512-jUay4P1DCDEQIDY8QTbV1jjpJ9wPNDmo8zpJGeUG3A9SDjGnni76/dgwZg0EAZ0/bkIMrQzN1sdmcnluTQgqYw==
+"@dcl/schemas@^17.1.0":
+  version "17.1.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-17.1.0.tgz#3854ccde05f9916c30254cad7c3fd9fe7e3ce81a"
+  integrity sha512-DCn9YU9tfdwJFtX7XJyEQM5i5STUTDZRliI+6wmORnq63NvyX3Q+Ftz/McZPyxYAgorPZtgM4X+YROuPX7NmHQ==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"

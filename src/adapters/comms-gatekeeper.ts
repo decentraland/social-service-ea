@@ -1,5 +1,6 @@
-import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy } from '../types'
+import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy, CommunityRole } from '../types'
 import { CommunityVoiceChatAction, CommunityVoiceChatProfileData } from '../logic/community-voice/types'
+import { CommunityVoiceChatStatus } from '../logic/community/types'
 import { isErrorWithMessage } from '../utils/errors'
 
 export class PrivateVoiceChatNotFoundError extends Error {
@@ -152,12 +153,14 @@ export const createCommsGatekeeperComponent = async ({
    * Gets credentials for a community voice chat.
    * @param communityId - The ID of the community
    * @param userAddress - The address of the user joining
+   * @param userRole - The role of the user in the community (owner, moderator, member, none)
    * @param profileData - Optional profile data (name, has_claimed_name, profile_picture_url)
    * @returns Connection credentials for the user
    */
   async function getCommunityVoiceChatCredentials(
     communityId: string,
     userAddress: string,
+    userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ): Promise<{ connectionUrl: string }> {
     try {
@@ -165,11 +168,13 @@ export const createCommsGatekeeperComponent = async ({
         community_id: string
         user_address: string
         action: CommunityVoiceChatAction
+        user_role: string
         profile_data?: CommunityVoiceChatProfileData
       } = {
         community_id: communityId,
         user_address: userAddress,
-        action: CommunityVoiceChatAction.JOIN
+        action: CommunityVoiceChatAction.JOIN,
+        user_role: userRole
       }
 
       if (profileData) {
@@ -203,12 +208,14 @@ export const createCommsGatekeeperComponent = async ({
    * Creates a community voice chat room.
    * @param communityId - The ID of the community
    * @param createdBy - The address of the moderator creating the voice chat
+   * @param userRole - The role of the user creating the voice chat (owner, moderator, member, none)
    * @param profileData - Optional profile data for the creator
    * @returns The connection URL for the moderator
    */
   async function createCommunityVoiceChatRoom(
     communityId: string,
     createdBy: string,
+    userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ): Promise<{ connectionUrl: string }> {
     try {
@@ -216,11 +223,13 @@ export const createCommsGatekeeperComponent = async ({
         community_id: string
         user_address: string
         action: CommunityVoiceChatAction
+        user_role: string
         profile_data?: CommunityVoiceChatProfileData
       } = {
         community_id: communityId,
         user_address: createdBy,
-        action: CommunityVoiceChatAction.CREATE
+        action: CommunityVoiceChatAction.CREATE,
+        user_role: userRole
       }
 
       if (profileData) {
@@ -359,11 +368,7 @@ export const createCommsGatekeeperComponent = async ({
    * @param communityId - The ID of the community
    * @returns The community voice chat status or null if not active
    */
-  async function getCommunityVoiceChatStatus(communityId: string): Promise<{
-    isActive: boolean
-    participantCount: number
-    moderatorCount: number
-  } | null> {
+  async function getCommunityVoiceChatStatus(communityId: string): Promise<CommunityVoiceChatStatus | null> {
     try {
       const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/status`, {
         method: 'GET',
@@ -390,6 +395,55 @@ export const createCommsGatekeeperComponent = async ({
     } catch (error) {
       logger.error(
         `Failed to get community voice chat status for community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Gets the status of multiple community voice chats in batch.
+   * @param communityIds - Array of community IDs to check
+   * @returns Record mapping community IDs to their voice chat status
+   */
+  async function getCommunitiesVoiceChatStatus(
+    communityIds: string[]
+  ): Promise<Record<string, CommunityVoiceChatStatus>> {
+    if (communityIds.length === 0) {
+      return {}
+    }
+
+    try {
+      const statuses = await Promise.all(
+        communityIds.map(async (communityId) => {
+          try {
+            const status = await getCommunityVoiceChatStatus(communityId)
+            return {
+              communityId,
+              status:
+                status || ({ isActive: false, participantCount: 0, moderatorCount: 0 } as CommunityVoiceChatStatus)
+            }
+          } catch (error) {
+            logger.warn(`Could not get voice chat status for community ${communityId}`, {
+              error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+            })
+            return {
+              communityId,
+              status: { isActive: false, participantCount: 0, moderatorCount: 0 } as CommunityVoiceChatStatus
+            }
+          }
+        })
+      )
+
+      return statuses.reduce(
+        (acc, { communityId, status }) => {
+          acc[communityId] = status
+          return acc
+        },
+        {} as Record<string, CommunityVoiceChatStatus>
+      )
+    } catch (error) {
+      logger.error(
+        `Failed to get multiple community voice chat statuses: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
       )
       throw error
     }
@@ -433,6 +487,7 @@ export const createCommsGatekeeperComponent = async ({
     promoteSpeakerInCommunityVoiceChat,
     demoteSpeakerInCommunityVoiceChat,
     getCommunityVoiceChatStatus,
+    getCommunitiesVoiceChatStatus,
     kickUserFromCommunityVoiceChat
   }
 }

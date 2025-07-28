@@ -1,6 +1,10 @@
 import { PublishCommand, PublishCommandOutput, SNSClient } from '@aws-sdk/client-sns'
 import { AppComponents, IPublisherComponent } from '../types'
 import {
+  CommunityDeletedEvent,
+  CommunityMemberBannedEvent,
+  CommunityMemberRemovedEvent,
+  CommunityRenamedEvent,
   FriendshipAcceptedEvent,
   FriendshipRequestEvent,
   ReferralInvitedUsersAcceptedEvent,
@@ -21,11 +25,14 @@ export async function createSnsComponent({ config }: Pick<AppComponents, 'config
       | FriendshipAcceptedEvent
       | ReferralNewTierReachedEvent
       | ReferralInvitedUsersAcceptedEvent
+      | CommunityDeletedEvent
+      | CommunityRenamedEvent
+      | CommunityMemberBannedEvent
+      | CommunityMemberRemovedEvent
   ): Promise<PublishCommandOutput> {
     const command = new PublishCommand({
       TopicArn: snsArn,
       Message: JSON.stringify(event),
-
       MessageAttributes: {
         type: {
           DataType: 'String',

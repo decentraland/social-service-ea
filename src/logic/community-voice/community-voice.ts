@@ -12,6 +12,7 @@ import {
 } from './errors'
 import { CommunityVoiceChatProfileData, ICommunityVoiceComponent } from './types'
 import { getProfileInfo } from '../profiles'
+import { ICommunityVoiceChatCacheComponent } from './community-voice-cache'
 
 export async function createCommunityVoiceComponent({
   logs,
@@ -19,11 +20,11 @@ export async function createCommunityVoiceComponent({
   communitiesDb,
   pubsub,
   analytics,
-  catalystClient
-}: Pick<
-  AppComponents,
-  'logs' | 'commsGatekeeper' | 'communitiesDb' | 'pubsub' | 'analytics' | 'catalystClient'
->): Promise<ICommunityVoiceComponent> {
+  catalystClient,
+  communityVoiceChatCache
+}: Pick<AppComponents, 'logs' | 'commsGatekeeper' | 'communitiesDb' | 'pubsub' | 'analytics' | 'catalystClient'> & {
+  communityVoiceChatCache: ICommunityVoiceChatCacheComponent
+}): Promise<ICommunityVoiceComponent> {
   const logger = logs.getLogger('community-voice-logic')
 
   /**
@@ -90,8 +91,16 @@ export async function createCommunityVoiceComponent({
       const profileData = await getUserProfileData(creatorAddress)
 
       // Create room in comms-gatekeeper and get credentials directly
-      const credentials = await commsGatekeeper.createCommunityVoiceChatRoom(communityId, creatorAddress, profileData)
+      const credentials = await commsGatekeeper.createCommunityVoiceChatRoom(
+        communityId,
+        creatorAddress,
+        userRole,
+        profileData
+      )
       logger.info(`Community voice chat room created for community ${communityId}`)
+
+      // Add to cache as active
+      await communityVoiceChatCache.setCommunityVoiceChat(communityId, Date.now())
 
       // Publish start event
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -137,25 +146,32 @@ export async function createCommunityVoiceComponent({
       throw new CommunityVoiceChatNotFoundError(communityId)
     }
 
-    // For private communities, check if user is a member
-    if (community.privacy === 'private') {
-      const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-      if (userRole === CommunityRole.None) {
-        throw new UserNotCommunityMemberError(userAddress, communityId)
-      }
-    }
-
     // Check if user is banned from the community (applies to both public and private communities)
     const isBanned = await communitiesDb.isMemberBanned(communityId, userAddress)
     if (isBanned) {
       throw new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
     }
 
+    // Get the user's role in the community for both public and private communities
+    const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
+
+    // For private communities, check if user is a member
+    if (community.privacy === 'private') {
+      if (userRole === CommunityRole.None) {
+        throw new UserNotCommunityMemberError(userAddress, communityId)
+      }
+    }
+
     // Fetch user profile data using helper function
     const profileData = await getUserProfileData(userAddress)
 
-    // Get credentials from comms-gatekeeper with profile data
-    const credentials = await commsGatekeeper.getCommunityVoiceChatCredentials(communityId, userAddress, profileData)
+    // Get credentials from comms-gatekeeper with profile data and user role
+    const credentials = await commsGatekeeper.getCommunityVoiceChatCredentials(
+      communityId,
+      userAddress,
+      userRole,
+      profileData
+    )
 
     return credentials
   }

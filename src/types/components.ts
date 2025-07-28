@@ -8,6 +8,10 @@ import { createClient, SetOptions } from 'redis'
 import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
+  CommunityDeletedEvent,
+  CommunityMemberBannedEvent,
+  CommunityMemberRemovedEvent,
+  CommunityRenamedEvent,
   EthAddress,
   FriendshipAcceptedEvent,
   FriendshipRequestEvent,
@@ -36,6 +40,7 @@ import {
   Community,
   CommunityDB,
   CommunityMember,
+  CommunityVoiceChatStatus,
   AggregatedCommunityWithMemberAndFriendsData,
   GetCommunitiesOptions,
   CommunityPublicInformation,
@@ -259,6 +264,10 @@ export type IPublisherComponent = {
       | FriendshipAcceptedEvent
       | ReferralInvitedUsersAcceptedEvent
       | ReferralNewTierReachedEvent
+      | CommunityDeletedEvent
+      | CommunityRenamedEvent
+      | CommunityMemberBannedEvent
+      | CommunityMemberRemovedEvent
   ): Promise<PublishCommandOutput>
 }
 
@@ -289,22 +298,21 @@ export type ICommsGatekeeperComponent = {
   getCommunityVoiceChatCredentials: (
     communityId: string,
     userAddress: string,
+    userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ) => Promise<{ connectionUrl: string }>
   createCommunityVoiceChatRoom: (
     communityId: string,
     moderatorAddress: string,
+    userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ) => Promise<{ connectionUrl: string }>
   updateUserMetadataInCommunityVoiceChat: (communityId: string, userAddress: string, metadata: any) => Promise<void>
   requestToSpeakInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   promoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   demoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
-  getCommunityVoiceChatStatus: (communityId: string) => Promise<{
-    isActive: boolean
-    participantCount: number
-    moderatorCount: number
-  } | null>
+  getCommunityVoiceChatStatus: (communityId: string) => Promise<CommunityVoiceChatStatus | null>
+  getCommunitiesVoiceChatStatus: (communityIds: string[]) => Promise<Record<string, CommunityVoiceChatStatus>>
   kickUserFromCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
 }
 

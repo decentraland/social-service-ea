@@ -653,6 +653,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           expect(commsGatekeeperSpy.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
             communityId,
             rpcClient.authAddress.toLowerCase(),
+            CommunityRole.Owner,
             expect.objectContaining({
               name: 'testuser',
               has_claimed_name: true,
@@ -770,6 +771,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           expect(commsGatekeeperSpy.createCommunityVoiceChatRoom).toHaveBeenCalledWith(
             communityId,
             rpcClient.authAddress.toLowerCase(),
+            CommunityRole.Owner,
             expect.objectContaining({
               name: 'testuser',
               has_claimed_name: true,
@@ -824,6 +826,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           expect(commsGatekeeperSpy.getCommunityVoiceChatCredentials).toHaveBeenCalledWith(
             communityId,
             rpcClient.authAddress.toLowerCase(),
+            CommunityRole.Owner,
             expect.objectContaining({
               name: 'testuser',
               has_claimed_name: true,
@@ -897,6 +900,114 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
           // Should fail with either notFoundError or forbiddenError (both are valid for non-existent communities)
           expect(['notFoundError', 'forbiddenError']).toContain(result.response?.$case)
+        })
+      })
+    })
+
+    describe('when promoting speaker in community voice chat', () => {
+      describe('when user is community owner', () => {
+        beforeEach(() => {
+          // Mock successful external service responses
+          commsGatekeeperSpy.promoteSpeakerInCommunityVoiceChat = jest
+            .spyOn(components.commsGatekeeper, 'promoteSpeakerInCommunityVoiceChat')
+            .mockResolvedValue(undefined)
+        })
+
+        afterEach(() => {
+          commsGatekeeperSpy.promoteSpeakerInCommunityVoiceChat?.mockRestore?.()
+        })
+
+        it('should successfully promote speaker', async () => {
+          const { rpcClient } = components
+          const targetMemberAddress = '0x456789abcdef123456789abcdef123456789abcde'
+
+          // Add target user as a member
+          await components.communitiesDb.addCommunityMember({
+            communityId,
+            memberAddress: targetMemberAddress.toLowerCase(),
+            role: CommunityRole.Member
+          })
+
+          const result = await rpcClient.client.promoteSpeakerInCommunityVoiceChat({
+            communityId,
+            userAddress: targetMemberAddress
+          })
+
+          // Verify DB interactions occurred
+          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(
+            communityId,
+            rpcClient.authAddress.toLowerCase()
+          )
+          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(communityId, targetMemberAddress)
+
+          // Verify external service calls
+          expect(commsGatekeeperSpy.promoteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+            communityId,
+            targetMemberAddress
+          )
+
+          // Verify successful response
+          expect(result.response?.$case).toBe('ok')
+          if (result.response?.$case === 'ok') {
+            expect(result.response.ok.message).toBe('User promoted to speaker successfully')
+          }
+
+          // Cleanup
+          await components.communitiesDb.kickMemberFromCommunity(communityId, targetMemberAddress.toLowerCase())
+        })
+      })
+    })
+
+    describe('when kicking player from community voice chat', () => {
+      describe('when user is community owner', () => {
+        beforeEach(() => {
+          // Mock successful external service responses
+          commsGatekeeperSpy.kickUserFromCommunityVoiceChat = jest
+            .spyOn(components.commsGatekeeper, 'kickUserFromCommunityVoiceChat')
+            .mockResolvedValue(undefined)
+        })
+
+        afterEach(() => {
+          commsGatekeeperSpy.kickUserFromCommunityVoiceChat?.mockRestore?.()
+        })
+
+        it('should successfully kick player', async () => {
+          const { rpcClient } = components
+          const targetMemberAddress = '0x456789abcdef123456789abcdef123456789abcde'
+
+          // Add target user as a member
+          await components.communitiesDb.addCommunityMember({
+            communityId,
+            memberAddress: targetMemberAddress.toLowerCase(),
+            role: CommunityRole.Member
+          })
+
+          const result = await rpcClient.client.kickPlayerFromCommunityVoiceChat({
+            communityId,
+            userAddress: targetMemberAddress
+          })
+
+          // Verify DB interactions occurred
+          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(
+            communityId,
+            rpcClient.authAddress.toLowerCase()
+          )
+          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(communityId, targetMemberAddress)
+
+          // Verify external service calls
+          expect(commsGatekeeperSpy.kickUserFromCommunityVoiceChat).toHaveBeenCalledWith(
+            communityId,
+            targetMemberAddress
+          )
+
+          // Verify successful response
+          expect(result.response?.$case).toBe('ok')
+          if (result.response?.$case === 'ok') {
+            expect(result.response.ok.message).toBe('User kicked from voice chat successfully')
+          }
+
+          // Cleanup
+          await components.communitiesDb.kickMemberFromCommunity(communityId, targetMemberAddress.toLowerCase())
         })
       })
     })

@@ -71,7 +71,7 @@ export async function createCommunityEventsComponent(
 
   async function fetchLiveEvents(communityId: string): Promise<boolean> {
     try {
-      const url = `${EVENTS_API_URL}/api/events?communityId=${communityId}&list=live`
+      const url = `${EVENTS_API_URL}/api/events?community_id=${communityId}&list=live`
 
       const response = await fetcher.fetch(url)
 

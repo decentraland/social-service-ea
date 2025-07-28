@@ -3,6 +3,7 @@ import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { mockCommunity } from '../mocks/communities'
 import { randomUUID } from 'crypto'
+import { Events } from '@dcl/schemas'
 
 test('Ban Member Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -176,6 +177,27 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
               'POST'
             )
             expect(response.status).toBe(204)
+          })
+
+          it('should publish event to notify member ban', async () => {
+            await makeRequest(
+              identity,
+              `/v1/communities/${communityId}/members/${targetMemberAddress}/bans`,
+              'POST'
+            )
+            
+            expect(spyComponents.sns.publishMessage).toHaveBeenCalledWith({
+              type: Events.Type.COMMUNITY,
+              subType: Events.SubType.Community.MEMBER_BANNED,
+              key: expect.stringContaining(`${communityId}-${targetMemberAddress}-`),
+              timestamp: expect.any(Number),
+              metadata: {
+                id: communityId,
+                name: "Test Community",
+                memberAddress: targetMemberAddress,
+                thumbnailUrl: expect.stringContaining(`/social/communities/${communityId}/raw-thumbnail.png`)
+              }
+            })
           })
 
           it('should respond with a 401 status code when trying to ban another moderator', async () => {

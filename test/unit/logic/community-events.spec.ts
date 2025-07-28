@@ -144,7 +144,7 @@ describe('CommunityEventsComponent', () => {
           await communityEventsComponent.isCurrentlyHostingEvents(communityId)
 
           expect(mockFetcherInstance.fetch).toHaveBeenCalledWith(
-            'https://events.decentraland.zone/api/events?communityId=test-community-123&list=live'
+            'https://events.decentraland.zone/api/events?community_id=test-community-123&list=live'
           )
         })
 

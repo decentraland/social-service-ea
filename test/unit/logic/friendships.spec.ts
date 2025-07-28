@@ -1,4 +1,9 @@
 import {
+  ConnectivityStatus,
+  FriendshipStatus as FriendshipRequestStatus
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import {
   getFriendshipRequestStatus,
   getNewFriendshipStatus,
   isFriendshipActionValid,
@@ -10,11 +15,7 @@ import {
   parseUpsertFriendshipRequest,
   validateNewFriendshipAction
 } from '../../../src/logic/friends'
-import { Action, FriendshipStatus } from '../../../src/types'
-import {
-  ConnectivityStatus,
-  FriendshipStatus as FriendshipRequestStatus
-} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { Action, FriendshipRequest, FriendshipStatus } from '../../../src/types'
 import { createMockExpectedFriendshipRequest, createMockFriendshipRequest } from '../../mocks/friendship-request'
 import { createMockProfile, mockProfile } from '../../mocks/profile'
 import { parseProfileToFriend } from '../../../src/logic/friends'
@@ -607,31 +608,97 @@ describe('parseEmittedUpdateToFriendConnectivityUpdate()', () => {
   })
 })
 
-describe('parseFriendshipRequestToFriendshipRequestResponse()', () => {
-  test('it should parse friendship request to friendship request response', () => {
-    const request = createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')
-    const profile = createMockProfile('0x456')
+describe('when parsing friendship request to friendship request response', () => {
+  let profile: Profile
+  let request: FriendshipRequest
 
-    expect(parseFriendshipRequestToFriendshipRequestResponse(request, profile)).toEqual(
-      createMockExpectedFriendshipRequest('id1', '0x456', profile, '2025-01-01T00:00:00Z', '')
-    )
+  beforeEach(() => {
+    profile = createMockProfile('0x456')
+    request = createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')
+  })
+
+  describe("and the profile can't be parsed", () => {
+    beforeEach(() => {
+      profile = { ...profile, avatars: [] }
+    })
+
+    it('should throw an error', () => {
+      expect(() => parseFriendshipRequestToFriendshipRequestResponse(request, profile)).toThrow()
+    })
+  })
+
+  describe('and the profile can be parsed', () => {
+    it('should return the friendship request response', () => {
+      expect(parseFriendshipRequestToFriendshipRequestResponse(request, profile)).toEqual(
+        createMockExpectedFriendshipRequest('id1', '0x456', profile, '2025-01-01T00:00:00Z', '')
+      )
+    })
   })
 })
 
-describe('parseFriendshipRequestsToFriendshipRequestResponses()', () => {
-  test('it should parse friendship requests to friendship request responses', () => {
-    const requests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
-    const profiles = [createMockProfile('0x456')]
+describe('when parsing friendship requests to friendship request responses and the profile is not found', () => {
+  let profile: Profile
+  let request: FriendshipRequest
 
-    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles)).toEqual([
-      createMockExpectedFriendshipRequest('id1', '0x456', profiles[0], '2025-01-01T00:00:00Z', '')
-    ])
+  beforeEach(() => {
+    profile = createMockProfile('0x456')
+    request = createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')
   })
 
-  test('it should return an empty array if the requester/requested address is not found in the profiles', () => {
-    const requests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
-    const profiles = [createMockProfile('0x789')]
+  describe('and there are no requests to be parsed', () => {
+    it('should return an empty array', () => {
+      expect(parseFriendshipRequestsToFriendshipRequestResponses([], [profile])).toEqual([])
+    })
+  })
 
-    expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles)).toEqual([])
+  describe('and there are requests to be parsed', () => {
+    let requests: FriendshipRequest[]
+    let profiles: Profile[]
+
+    beforeEach(() => {
+      profiles = [createMockProfile('0x456')]
+      requests = [createMockFriendshipRequest('id1', '0x456', '2025-01-01T00:00:00Z')]
+    })
+
+    describe("and there are requests that can't be parsed", () => {
+      beforeEach(() => {
+        const brokenProfileAvatar = createMockProfile('0x789')
+
+        requests = [...requests, createMockFriendshipRequest('id2', '0x789', '2025-01-01T00:00:00Z')]
+        profiles = [
+          ...profiles,
+          {
+            ...brokenProfileAvatar,
+            avatars: [{ ...brokenProfileAvatar.avatars[0], name: undefined }]
+          }
+        ]
+      })
+
+      it('should ignore such requests', () => {
+        expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles)).toEqual([
+          createMockExpectedFriendshipRequest('id1', '0x456', profiles[0], '2025-01-01T00:00:00Z', '')
+        ])
+      })
+    })
+
+    describe("and there are requests that don't have a profile", () => {
+      beforeEach(() => {
+        requests = [...requests, createMockFriendshipRequest('id3', '0x789', '2025-01-01T00:00:00Z')]
+      })
+
+      it('should ignore such requests', () => {
+        expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles)).toEqual([
+          createMockExpectedFriendshipRequest('id1', '0x456', profiles[0], '2025-01-01T00:00:00Z', '')
+        ])
+      })
+    })
+
+    describe('and there are requests that have a profile and can be parsed', () => {
+      it('should return the friendship request responses', () => {
+        expect(parseFriendshipRequestsToFriendshipRequestResponses(requests, profiles)).toEqual([
+          createMockExpectedFriendshipRequest('id1', '0x456', profiles[0], '2025-01-01T00:00:00Z', '')
+        ])
+      })
+    })
   })
 })
