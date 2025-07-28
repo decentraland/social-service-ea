@@ -48,7 +48,7 @@
     "@dcl/analytics-component": "^0.2.2",
     "@dcl/platform-crypto-middleware": "^1.1.0",
     "@dcl/platform-server-commons": "^0.1.0",
-    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16564746732.commit-501dda6.tgz",
+    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16572350247.commit-26e89e0.tgz",
     "@dcl/rpc": "^1.1.2",
     "@dcl/schemas": "^17.1.0",
     "@sentry/node": "^9.12.0",

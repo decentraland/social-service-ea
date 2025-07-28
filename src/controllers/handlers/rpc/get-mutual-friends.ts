@@ -45,6 +45,7 @@ export function getMutualFriendsService({ components: { logs, friends } }: RPCSe
         error: error.message,
         stack: error.stack
       })
+
       return {
         friends: [],
         paginationData: {

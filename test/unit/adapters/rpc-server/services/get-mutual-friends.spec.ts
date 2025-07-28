@@ -6,7 +6,7 @@ import { createMockProfile } from '../../../../mocks/profile'
 import { parseExpectedFriends } from '../../../../mocks/friend'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 
-describe('Get Mutual Friends Service', () => {
+describe('when getting mutual friends', () => {
   let getMutualFriends: ReturnType<typeof getMutualFriendsService>
   let friendsComponent: IFriendsComponent
   let getMutualFriendsProfilesMethod: jest.MockedFunction<typeof friendsComponent.getMutualFriendsProfiles>
@@ -32,7 +32,7 @@ describe('Get Mutual Friends Service', () => {
     })
   })
 
-  describe('when getting the users mutual friends fails', () => {
+  describe('and getting the users mutual friends fails', () => {
     beforeEach(() => {
       getMutualFriendsProfilesMethod.mockRejectedValue(new Error('Database error'))
     })
@@ -50,7 +50,7 @@ describe('Get Mutual Friends Service', () => {
     })
   })
 
-  describe('when getting the users mutual friends succeeds', () => {
+  describe('and getting the users mutual friends succeeds', () => {
     let mutualFriendsData: {
       friendsProfiles: any[]
       total: number
@@ -115,7 +115,7 @@ describe('Get Mutual Friends Service', () => {
     })
   })
 
-  describe('when the user address is missing', () => {
+  describe('and the user address is missing', () => {
     const requestWithoutAddress: GetMutualFriendsPayload = {
       user: undefined,
       pagination: { limit: 10, offset: 0 }
@@ -135,7 +135,7 @@ describe('Get Mutual Friends Service', () => {
     })
   })
 
-  describe('when the user address is invalid', () => {
+  describe('and the user address is invalid', () => {
     const requestWithInvalidAddress: GetMutualFriendsPayload = {
       user: { address: 'invalid-address' },
       pagination: { limit: 10, offset: 0 }

@@ -49,7 +49,14 @@ export function upsertFriendshipService({ components: { logs, friends } }: RPCSe
     } catch (error) {
       logger.error(`Error upserting friendship: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`)
 
-      if (error instanceof InvalidFriendshipActionError || error instanceof BlockedUserError) {
+      if (error instanceof InvalidRequestError) {
+        return {
+          response: {
+            $case: 'invalidRequest',
+            invalidRequest: { message: error.message }
+          }
+        }
+      } else if (error instanceof InvalidFriendshipActionError || error instanceof BlockedUserError) {
         return {
           response: {
             $case: 'invalidFriendshipAction',
