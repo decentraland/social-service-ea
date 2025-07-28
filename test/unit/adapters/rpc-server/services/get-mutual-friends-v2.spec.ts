@@ -11,17 +11,20 @@ describe('when getting mutual friends v2', () => {
   let friendsComponent: IFriendsComponent
   let getMutualFriendsProfilesMethod: jest.MockedFunction<typeof friendsComponent.getMutualFriendsProfiles>
 
-  const rpcContext: RpcServerContext = {
-    address: '0x1234567890123456789012345678901234567890',
-    subscribersContext: undefined
-  }
-
-  const mutualFriendsRequest: GetMutualFriendsPayload = {
-    user: { address: '0x4567890123456789012345678901234567890123' },
-    pagination: { limit: 10, offset: 0 }
-  }
+  let rpcContext: RpcServerContext
+  let mutualFriendsRequest: GetMutualFriendsPayload
 
   beforeEach(() => {
+    rpcContext = {
+      address: '0x1234567890123456789012345678901234567890',
+      subscribersContext: undefined
+    }
+
+    mutualFriendsRequest = {
+      user: { address: '0x4567890123456789012345678901234567890123' },
+      pagination: { limit: 10, offset: 0 }
+    }
+
     getMutualFriendsProfilesMethod = jest.fn()
     friendsComponent = createFriendsMockedComponent({
       getMutualFriendsProfiles: getMutualFriendsProfilesMethod
