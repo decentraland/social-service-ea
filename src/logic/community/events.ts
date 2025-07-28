@@ -105,6 +105,12 @@ export async function createCommunityEventsComponent(
       const cacheKey = `community:${communityId}:live-event`
       await redis.put(cacheKey, hasLiveEvents ? 'true' : 'false', { EX: ttlInSeconds })
 
+      logger.info('Events cache updated', {
+        communityId,
+        hasLiveEvents: hasLiveEvents ? 'true' : 'false',
+        ttlInSeconds
+      })
+
       return hasLiveEvents
     } catch (error) {
       logger.error('Error fetching live events', { communityId, error: String(error) })

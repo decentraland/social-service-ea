@@ -350,7 +350,6 @@ describe('Community Component', () => {
         active: true,
         role: CommunityRole.Member,
         membersCount: 10,
-        isLive: false,
         isHostingLiveEvent: false,
         voiceChatStatus: {
           isActive: false,
@@ -379,7 +378,7 @@ describe('Community Component', () => {
             privacy: 'public',
             active: mockCommunity.active,
             membersCount: 10,
-            isLive: false,
+            isHostingLiveEvent: false,
             ownerName: 'Test Owner Name'
           })
         ]),

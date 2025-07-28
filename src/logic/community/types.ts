@@ -262,7 +262,6 @@ export type GetCommunityMembersOptions = {
 
 export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
   friends: FriendProfile[]
-  isLive: boolean
 }
 
 export type CommunityPublicInformation = Omit<CommunityWithUserInformation, 'role' | 'friends' | 'privacy'> & {

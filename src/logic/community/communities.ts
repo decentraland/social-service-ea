@@ -120,12 +120,13 @@ export function createCommunityComponent(
 
       const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
         communities.map(async (community) => {
-          const [thumbnail, ownerName] = await Promise.all([
+          const [thumbnail, ownerName, isHostingLiveEvent] = await Promise.all([
             communityThumbnail.getThumbnail(community.id),
-            communityOwners.getOwnerName(community.ownerAddress, community.id)
+            communityOwners.getOwnerName(community.ownerAddress, community.id),
+            communityEvents.isCurrentlyHostingEvents(community.id)
           ])
 
-          const result = { ...community, ownerName }
+          const result = { ...community, ownerName, isHostingLiveEvent }
 
           if (thumbnail) {
             result.thumbnails = {
@@ -162,12 +163,13 @@ export function createCommunityComponent(
 
       const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
         communities.map(async (community) => {
-          const [thumbnail, ownerName] = await Promise.all([
+          const [thumbnail, ownerName, isHostingLiveEvent] = await Promise.all([
             communityThumbnail.getThumbnail(community.id),
-            communityOwners.getOwnerName(community.ownerAddress, community.id)
+            communityOwners.getOwnerName(community.ownerAddress, community.id),
+            communityEvents.isCurrentlyHostingEvents(community.id)
           ])
 
-          const result = { ...community, ownerName }
+          const result = { ...community, ownerName, isHostingLiveEvent }
 
           if (thumbnail) {
             result.thumbnails = {
