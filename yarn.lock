@@ -1223,16 +1223,16 @@
     "@well-known-components/interfaces" "^1.4.3"
     node-fetch "^2.7.0"
 
-"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16564746732.commit-501dda6.tgz":
-  version "1.0.0-16564746732.commit-501dda6"
-  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16564746732.commit-501dda6.tgz#b0428fcbfea2aee0a8e750702dbd69ecbca0e1fb"
+"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16566217993.commit-58abb74.tgz":
+  version "1.0.0-16566217993.commit-58abb74"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16566217993.commit-58abb74.tgz#b752810511b3fe43dd85c499225a1772567c1a5e"
   dependencies:
     "@dcl/ts-proto" "1.154.0"
     protobufjs "7.2.4"
 
-"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16566217993.commit-58abb74.tgz":
-  version "1.0.0-16566217993.commit-58abb74"
-  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16566217993.commit-58abb74.tgz#b752810511b3fe43dd85c499225a1772567c1a5e"
+"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16572350247.commit-26e89e0.tgz":
+  version "1.0.0-16572350247.commit-26e89e0"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16572350247.commit-26e89e0.tgz#7a1705dac8d3790f8df971d3e4337f92ddddd680"
   dependencies:
     "@dcl/ts-proto" "1.154.0"
     protobufjs "7.2.4"
