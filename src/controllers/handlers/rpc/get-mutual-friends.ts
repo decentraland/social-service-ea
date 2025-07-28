@@ -10,10 +10,6 @@ import { getPage } from '../../../utils/pagination'
 import { parseProfilesToFriends } from '../../../logic/friends'
 import { InvalidRequestError } from '../../errors/rpc.errors'
 
-/**
- * @deprecated Use getMutualFriendsV2Service instead
- * The new service returns more detailed error responses and is more consistent with the rest of the services.
- */
 export function getMutualFriendsService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('get-mutual-friends-service')
 
