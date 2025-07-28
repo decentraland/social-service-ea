@@ -1,6 +1,6 @@
 import { Router } from '@well-known-components/http-server'
 import { GlobalContext } from '../../types'
-import { errorHandler } from '@dcl/platform-server-commons'
+import { bearerTokenMiddleware, errorHandler } from '@dcl/platform-server-commons'
 import {
   getCommunityHandler,
   getCommunitiesHandler,
@@ -26,12 +26,14 @@ import {
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
+import { getManagedCommunitiesHandler } from '../handlers/http/get-managed-communities-handler'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
-    components: { fetcher }
+    components: { fetcher, config }
   } = context
 
+  const API_ADMIN_TOKEN = await config.getString('API_ADMIN_TOKEN')
   const router = new Router<GlobalContext>()
 
   const signedFetchMiddleware = ({ optional = false }: { optional?: boolean } = {}) =>
@@ -46,6 +48,10 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.use(errorHandler)
   router.use(communitiesErrorsHandler)
+
+  if (API_ADMIN_TOKEN) {
+    router.get('/v1/communities/:address/managed', bearerTokenMiddleware(API_ADMIN_TOKEN), getManagedCommunitiesHandler)
+  }
 
   router.get('/v1/communities/:id', signedFetchMiddleware(), getCommunityHandler)
   router.get('/v1/communities', signedFetchMiddleware({ optional: true }), getCommunitiesHandler)
