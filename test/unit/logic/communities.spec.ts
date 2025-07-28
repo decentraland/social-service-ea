@@ -365,29 +365,35 @@ describe('Community Component', () => {
       mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
 
-    it('should return public communities with total count and owner names', async () => {
-      const result = await communityComponent.getCommunitiesPublicInformation(options)
-
-      expect(result).toEqual({
-        communities: expect.arrayContaining([
-          expect.objectContaining({
-            id: mockCommunity.id,
-            name: mockCommunity.name,
-            description: mockCommunity.description,
-            ownerAddress: mockCommunity.ownerAddress,
-            privacy: 'public',
-            active: mockCommunity.active,
-            membersCount: 10,
-            isHostingLiveEvent: false,
-            ownerName: 'Test Owner Name'
-          })
-        ]),
-        total: 1
+    describe('when the community is not hosting live events', () => {
+      beforeEach(() => {
+        mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(false)
       })
-
-      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
-      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
-      expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
+      
+      it('should return public communities with total count and owner names', async () => {
+        const result = await communityComponent.getCommunitiesPublicInformation(options)
+  
+        expect(result).toEqual({
+          communities: expect.arrayContaining([
+            expect.objectContaining({
+              id: mockCommunity.id,
+              name: mockCommunity.name,
+              description: mockCommunity.description,
+              ownerAddress: mockCommunity.ownerAddress,
+              privacy: 'public',
+              active: mockCommunity.active,
+              membersCount: 10,
+              isHostingLiveEvent: false,
+              ownerName: 'Test Owner Name'
+            })
+          ]),
+          total: 1
+        })
+  
+        expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
+        expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
+        expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
+      })
     })
 
     describe('and the communities have a thumbnail', () => {
@@ -403,6 +409,19 @@ describe('Community Component', () => {
         expect(result.communities[0].thumbnails).toEqual({
           raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
+      })
+    })
+
+    describe('when the community is hosting live events', () => {
+      beforeEach(() => {
+        mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(true)
+      })
+
+      it('should include isHostingLiveEvent when community is hosting live events', async () => {
+        const result = await communityComponent.getCommunitiesPublicInformation(options)
+
+        expect(result.communities[0].isHostingLiveEvent).toBe(true)
+        expect(mockCommunityEvents.isCurrentlyHostingEvents).toHaveBeenCalledWith(communityId)
       })
     })
 
