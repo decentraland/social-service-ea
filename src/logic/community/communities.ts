@@ -13,13 +13,7 @@ import {
   CommunityUpdates,
   AggregatedCommunity
 } from './types'
-import {
-  isOwner,
-  toCommunityWithMembersCount,
-  toCommunityResults,
-  toPublicCommunity,
-  getCommunityThumbnailPath
-} from './utils'
+import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { isErrorWithMessage } from '../../utils/errors'
 import { EthAddress, Events } from '@dcl/schemas'
 
