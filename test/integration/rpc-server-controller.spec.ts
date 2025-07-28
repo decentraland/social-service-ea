@@ -16,6 +16,7 @@ import {
 } from './utils/friendships'
 import { PrivateMessagesPrivacy, User, CommunityRole } from '../../src/types'
 import { parseProfileToBlockedUser } from '../../src/logic/friends'
+import { EthAddress } from '@dcl/schemas'
 
 test('RPC Server Controller', function ({ components, stubComponents }) {
   beforeAll(async () => {
@@ -24,276 +25,376 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
   })
 
   describe('when getting friends', function () {
-    it('should return friends list successfully', async () => {
-      const { rpcClient, friendsDb } = components
-      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
-      const mockFriendProfile = createMockProfile(friendAddress)
-      const id = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
+    describe('and the user has friends', () => {
+      let friendAddress: string
+      let friendshipId: string
 
-      stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
-
-      const response = await rpcClient.client.getFriends({
-        pagination: {
-          limit: 10,
-          offset: 0
-        }
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+        const mockFriendProfile = createMockProfile(friendAddress)
+        friendshipId = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
+        stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
       })
 
-      expect(response.friends.length).toEqual(1)
-      expect(response.friends[0].address).toEqual(friendAddress)
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await removeFriendship(friendsDb, friendshipId, rpcClient.authAddress)
+      })
 
-      await removeFriendship(friendsDb, id, rpcClient.authAddress)
+      it('should return friends list successfully', async () => {
+        const { rpcClient } = components
+
+        const response = await rpcClient.client.getFriends({
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
+
+        expect(response.friends.length).toEqual(1)
+        expect(response.friends[0].address).toEqual(friendAddress)
+      })
     })
 
-    it('should return empty list when user has no friends', async () => {
-      const { rpcClient } = components
-      stubComponents.catalystClient.getProfiles.resolves([])
-
-      const response = await rpcClient.client.getFriends({
-        pagination: {
-          limit: 10,
-          offset: 0
-        }
+    describe('and the user has no friends', () => {
+      beforeEach(() => {
+        stubComponents.catalystClient.getProfiles.resolves([])
       })
 
-      expect(response.friends).toHaveLength(0)
+      it('should return empty list', async () => {
+        const { rpcClient } = components
+
+        const response = await rpcClient.client.getFriends({
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
+
+        expect(response.friends).toHaveLength(0)
+      })
     })
   })
 
   describe('when getting mutual friends', function () {
-    it('should return mutual friends successfully', async () => {
-      const { rpcClient, friendsDb } = components
-      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
-      const mutualFriendAddress = '0x77c4c17331436d3b8798596e3d7c0d8e1b786aa4'
-      const mockMutualFriendProfile = createMockProfile(mutualFriendAddress)
+    describe('and mutual friends exist', () => {
+      let friendAddress: string
+      let mutualFriendAddress: string
+      let friendshipIds: string[]
 
-      stubComponents.catalystClient.getProfiles.resolves([mockMutualFriendProfile])
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+        mutualFriendAddress = '0x77c4c17331436d3b8798596e3d7c0d8e1b786aa4'
+        const mockMutualFriendProfile = createMockProfile(mutualFriendAddress)
 
-      const id1 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
-      const id2 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, mutualFriendAddress])
-      const id3 = await createOrUpsertActiveFriendship(friendsDb, [friendAddress, mutualFriendAddress])
+        stubComponents.catalystClient.getProfiles.resolves([mockMutualFriendProfile])
 
-      const response = await rpcClient.client.getMutualFriends({
-        user: {
-          address: friendAddress
-        },
-        pagination: {
-          limit: 10,
-          offset: 0
-        }
+        const id1 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
+        const id2 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, mutualFriendAddress])
+        const id3 = await createOrUpsertActiveFriendship(friendsDb, [friendAddress, mutualFriendAddress])
+        friendshipIds = [id1, id2, id3]
       })
 
-      expect(response.friends).toHaveLength(1)
-      expect(response.friends[0].address).toEqual(mutualFriendAddress)
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await removeFriendship(friendsDb, friendshipIds[0], rpcClient.authAddress)
+        await removeFriendship(friendsDb, friendshipIds[1], rpcClient.authAddress)
+        await removeFriendship(friendsDb, friendshipIds[2], friendAddress)
+      })
 
-      await removeFriendship(friendsDb, id1, rpcClient.authAddress)
-      await removeFriendship(friendsDb, id2, rpcClient.authAddress)
-      await removeFriendship(friendsDb, id3, friendAddress)
+      it('should return mutual friends successfully', async () => {
+        const { rpcClient } = components
+
+        const response = await rpcClient.client.getMutualFriends({
+          user: {
+            address: friendAddress
+          },
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
+
+        expect(response.friends).toHaveLength(1)
+        expect(response.friends[0].address).toEqual(mutualFriendAddress)
+      })
     })
 
-    it('should return empty list when no mutual friends exist', async () => {
-      const { rpcClient, friendsDb } = components
-      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
-      const id = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
+    describe('and no mutual friends exist', () => {
+      let friendAddress: string
+      let friendshipId: string
 
-      stubComponents.catalystClient.getProfiles.resolves([])
-
-      const response = await rpcClient.client.getMutualFriends({
-        user: {
-          address: friendAddress
-        },
-        pagination: {
-          limit: 10,
-          offset: 0
-        }
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+        friendshipId = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
+        stubComponents.catalystClient.getProfiles.resolves([])
       })
 
-      expect(response.friends).toHaveLength(0)
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await removeFriendship(friendsDb, friendshipId, rpcClient.authAddress)
+      })
 
-      await removeFriendship(friendsDb, id, rpcClient.authAddress)
+      it('should return empty list', async () => {
+        const { rpcClient } = components
+
+        const response = await rpcClient.client.getMutualFriends({
+          user: {
+            address: friendAddress
+          },
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
+
+        expect(response.friends).toHaveLength(0)
+      })
     })
   })
 
   describe('when getting pending friendship requests', function () {
-    it('should return pending friendship requests successfully', async () => {
-      const { rpcClient, friendsDb } = components
-      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
-      const mockFriendProfile = createMockProfile(friendAddress)
+    describe('and the user has pending friendship requests', () => {
+      let friendAddress: string
+      let friendshipId: string
 
-      const id = await createPendingFriendshipRequest(friendsDb, [friendAddress, rpcClient.authAddress])
-
-      stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
-
-      const result = await rpcClient.client.getPendingFriendshipRequests({
-        pagination: {
-          limit: 10,
-          offset: 0
-        }
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+        const mockFriendProfile = createMockProfile(friendAddress)
+        friendshipId = await createPendingFriendshipRequest(friendsDb, [friendAddress, rpcClient.authAddress])
+        stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
       })
 
-      assertFriendshipRequests(result, (requests) => {
-        expect(requests.length).toEqual(1)
-        expect(requests[0].friend.address).toEqual(friendAddress)
+      afterEach(async () => {
+        const { friendsDb } = components
+        await removeFriendship(friendsDb, friendshipId, friendAddress)
       })
 
-      await removeFriendship(friendsDb, id, friendAddress)
-    })
+      it('should return pending friendship requests successfully', async () => {
+        const { rpcClient } = components
 
-    it('should return empty list when user has no pending friendship requests', async () => {
-      const { rpcClient } = components
-      stubComponents.catalystClient.getProfiles.resolves([])
-      const result = await rpcClient.client.getPendingFriendshipRequests({
-        pagination: {
-          limit: 10,
-          offset: 0
-        }
-      })
+        const result = await rpcClient.client.getPendingFriendshipRequests({
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
 
-      assertFriendshipRequests(result, (requests) => {
-        expect(requests.length).toEqual(0)
+        assertFriendshipRequests(result, (requests) => {
+          expect(requests.length).toEqual(1)
+          expect(requests[0].friend.address).toEqual(friendAddress)
+        })
       })
     })
 
-    it('should return pending requests paginated with most recent first', async () => {
-      const { rpcClient, friendsDb } = components
-      const friendAddresses = [
-        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd1',
-        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd2',
-        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd3'
-      ]
+    describe('and the user has no pending friendship requests', () => {
+      beforeEach(() => {
+        stubComponents.catalystClient.getProfiles.resolves([])
+      })
 
-      const mockProfiles = friendAddresses.map((addr) => createMockProfile(addr))
+      it('should return empty list', async () => {
+        const { rpcClient } = components
 
-      const requestIds = []
-      for (const addr of friendAddresses) {
-        const id = await createPendingFriendshipRequest(friendsDb, [addr, rpcClient.authAddress])
-        requestIds.push(id)
-      }
+        const result = await rpcClient.client.getPendingFriendshipRequests({
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
 
-      stubComponents.catalystClient.getProfiles.resolves(mockProfiles)
+        assertFriendshipRequests(result, (requests) => {
+          expect(requests.length).toEqual(0)
+        })
+      })
+    })
 
-      const firstPage = await rpcClient.client.getPendingFriendshipRequests({
-        pagination: {
-          limit: 2,
-          offset: 0
+    describe('and the user has multiple pending friendship requests', () => {
+      let friendAddresses: string[]
+      let requestIds: string[]
+
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddresses = [
+          '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd1',
+          '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd2',
+          '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd3'
+        ]
+
+        const mockProfiles = friendAddresses.map((addr) => createMockProfile(addr))
+
+        requestIds = []
+        for (const addr of friendAddresses) {
+          const id = await createPendingFriendshipRequest(friendsDb, [addr, rpcClient.authAddress])
+          requestIds.push(id)
         }
+
+        stubComponents.catalystClient.getProfiles.resolves(mockProfiles)
       })
 
-      assertFriendshipRequests(firstPage, (requests) => {
-        expect(requests.length).toEqual(2)
-        expect(requests[0].friend.address).toEqual(friendAddresses[2])
-        expect(requests[1].friend.address).toEqual(friendAddresses[1])
+      afterEach(async () => {
+        const { friendsDb } = components
+        await Promise.all(requestIds.map((id, index) => removeFriendship(friendsDb, id, friendAddresses[index])))
       })
 
-      const secondPage = await rpcClient.client.getPendingFriendshipRequests({
-        pagination: {
-          limit: 2,
-          offset: 2
-        }
-      })
+      it('should return pending requests paginated with most recent first', async () => {
+        const { rpcClient } = components
 
-      assertFriendshipRequests(secondPage, (requests) => {
-        expect(requests.length).toEqual(1)
-        expect(requests[0].friend.address).toEqual(friendAddresses[0])
-      })
+        const firstPage = await rpcClient.client.getPendingFriendshipRequests({
+          pagination: {
+            limit: 2,
+            offset: 0
+          }
+        })
 
-      await Promise.all(requestIds.map((id, index) => removeFriendship(friendsDb, id, friendAddresses[index])))
+        assertFriendshipRequests(firstPage, (requests) => {
+          expect(requests.length).toEqual(2)
+          expect(requests[0].friend.address).toEqual(friendAddresses[2])
+          expect(requests[1].friend.address).toEqual(friendAddresses[1])
+        })
+
+        const secondPage = await rpcClient.client.getPendingFriendshipRequests({
+          pagination: {
+            limit: 2,
+            offset: 2
+          }
+        })
+
+        assertFriendshipRequests(secondPage, (requests) => {
+          expect(requests.length).toEqual(1)
+          expect(requests[0].friend.address).toEqual(friendAddresses[0])
+        })
+      })
     })
   })
 
   describe('when getting sent friendship requests', function () {
-    it('should return sent friendship requests successfully', async () => {
-      const { rpcClient, friendsDb } = components
-      const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
-      const mockFriendProfile = createMockProfile(friendAddress)
+    describe('and the user has sent friendship requests', () => {
+      let friendAddress: string
+      let friendshipId: string
 
-      const id = await createPendingFriendshipRequest(friendsDb, [rpcClient.authAddress, friendAddress])
-
-      stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
-
-      const result = await rpcClient.client.getSentFriendshipRequests({
-        pagination: {
-          limit: 10,
-          offset: 0
-        }
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
+        const mockFriendProfile = createMockProfile(friendAddress)
+        friendshipId = await createPendingFriendshipRequest(friendsDb, [rpcClient.authAddress, friendAddress])
+        stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
       })
 
-      assertFriendshipRequests(result, (requests) => {
-        expect(requests.length).toEqual(1)
-        expect(requests[0].friend.address).toEqual(friendAddress)
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await removeFriendship(friendsDb, friendshipId, rpcClient.authAddress)
       })
 
-      await removeFriendship(friendsDb, id, rpcClient.authAddress)
-    })
+      it('should return sent friendship requests successfully', async () => {
+        const { rpcClient } = components
 
-    it('should return empty list when user has no sent friendship requests', async () => {
-      const { rpcClient } = components
-      stubComponents.catalystClient.getProfiles.resolves([])
-      const result = await rpcClient.client.getSentFriendshipRequests({
-        pagination: {
-          limit: 10,
-          offset: 0
-        }
-      })
+        const result = await rpcClient.client.getSentFriendshipRequests({
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
 
-      assertFriendshipRequests(result, (requests) => {
-        expect(requests.length).toEqual(0)
+        assertFriendshipRequests(result, (requests) => {
+          expect(requests.length).toEqual(1)
+          expect(requests[0].friend.address).toEqual(friendAddress)
+        })
       })
     })
 
-    it('should return sent requests paginated with most recent first', async () => {
-      const { rpcClient, friendsDb } = components
-      const friendAddresses = [
-        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd1',
-        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd2',
-        '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd3'
-      ]
+    describe('and the user has no sent friendship requests', () => {
+      beforeEach(() => {
+        stubComponents.catalystClient.getProfiles.resolves([])
+      })
 
-      const mockProfiles = friendAddresses.map((addr) => createMockProfile(addr))
+      it('should return empty list', async () => {
+        const { rpcClient } = components
 
-      const requestIds = []
-      for (const addr of friendAddresses) {
-        const id = await createPendingFriendshipRequest(friendsDb, [rpcClient.authAddress, addr])
-        requestIds.push(id)
-      }
+        const result = await rpcClient.client.getSentFriendshipRequests({
+          pagination: {
+            limit: 10,
+            offset: 0
+          }
+        })
 
-      stubComponents.catalystClient.getProfiles.resolves(mockProfiles)
+        assertFriendshipRequests(result, (requests) => {
+          expect(requests.length).toEqual(0)
+        })
+      })
+    })
 
-      const firstPage = await rpcClient.client.getSentFriendshipRequests({
-        pagination: {
-          limit: 2,
-          offset: 0
+    describe('and the user has multiple sent friendship requests', () => {
+      let friendAddresses: string[]
+      let requestIds: string[]
+
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddresses = [
+          '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd1',
+          '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd2',
+          '0x07b7c9e6aef7f6b6c259831953309f63c59bcfd3'
+        ]
+
+        const mockProfiles = friendAddresses.map((addr) => createMockProfile(addr))
+
+        requestIds = []
+        for (const addr of friendAddresses) {
+          const id = await createPendingFriendshipRequest(friendsDb, [rpcClient.authAddress, addr])
+          requestIds.push(id)
         }
+
+        stubComponents.catalystClient.getProfiles.resolves(mockProfiles)
       })
 
-      assertFriendshipRequests(firstPage, (requests) => {
-        expect(requests.length).toEqual(2)
-        expect(requests[0].friend.address).toEqual(friendAddresses[2])
-        expect(requests[1].friend.address).toEqual(friendAddresses[1])
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await Promise.all(requestIds.map((id, index) => removeFriendship(friendsDb, id, rpcClient.authAddress)))
       })
 
-      const secondPage = await rpcClient.client.getSentFriendshipRequests({
-        pagination: {
-          limit: 2,
-          offset: 2
-        }
-      })
+      it('should return sent requests paginated with most recent first', async () => {
+        const { rpcClient } = components
 
-      assertFriendshipRequests(secondPage, (requests) => {
-        expect(requests.length).toEqual(1)
-        expect(requests[0].friend.address).toEqual(friendAddresses[0])
-      })
+        const firstPage = await rpcClient.client.getSentFriendshipRequests({
+          pagination: {
+            limit: 2,
+            offset: 0
+          }
+        })
 
-      await Promise.all(requestIds.map((id, index) => removeFriendship(friendsDb, id, friendAddresses[index])))
+        assertFriendshipRequests(firstPage, (requests) => {
+          expect(requests.length).toEqual(2)
+          expect(requests[0].friend.address).toEqual(friendAddresses[2])
+          expect(requests[1].friend.address).toEqual(friendAddresses[1])
+        })
+
+        const secondPage = await rpcClient.client.getSentFriendshipRequests({
+          pagination: {
+            limit: 2,
+            offset: 2
+          }
+        })
+
+        assertFriendshipRequests(secondPage, (requests) => {
+          expect(requests.length).toEqual(1)
+          expect(requests[0].friend.address).toEqual(friendAddresses[0])
+        })
+      })
     })
   })
 
   describe('when blocking a user', function () {
-    const blockedAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
+    let mockBlockedProfile: any
+    let blockedAddress: EthAddress
+
+    beforeEach(() => {
+      blockedAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
+    })
 
     describe('and the user is not blocked', () => {
-      let mockBlockedProfile: any
-
       beforeEach(() => {
         mockBlockedProfile = createMockProfile(blockedAddress)
         stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
@@ -315,8 +416,19 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
         assertSuccessBlockingUnblocking(result, parseProfileToBlockedUser(mockBlockedProfile), expect.any(Number))
       })
+    })
 
-      it('should block a user successfully when the user is already blocked', async () => {
+    describe('and the user is already blocked', () => {
+      beforeEach(() => {
+        mockBlockedProfile = createMockProfile(blockedAddress)
+        stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
+      })
+
+      afterEach(async () => {
+        await components.friendsDb.unblockUser(components.rpcClient.authAddress, blockedAddress)
+      })
+
+      it('should block a user successfully', async () => {
         const { rpcClient } = components
 
         // Block the user twice
@@ -1015,10 +1127,22 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
   describe('when getting friendship status', function () {
     describe('and a friendship request exists', () => {
+      let friendAddress: string
+      let friendshipId: string
+
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd3'
+        friendshipId = await createPendingFriendshipRequest(friendsDb, [rpcClient.authAddress, friendAddress])
+      })
+
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await removeFriendship(friendsDb, friendshipId, rpcClient.authAddress)
+      })
+
       it('should return friendship status successfully', async () => {
-        const { rpcClient, friendsDb } = components
-        const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd3'
-        const id = await createPendingFriendshipRequest(friendsDb, [rpcClient.authAddress, friendAddress])
+        const { rpcClient } = components
 
         const result = await rpcClient.client.getFriendshipStatus({
           user: { address: friendAddress }
@@ -1028,13 +1152,11 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         if (result.response?.$case === 'accepted') {
           expect(result.response.accepted.status).toBeDefined()
         }
-
-        await removeFriendship(friendsDb, id, rpcClient.authAddress)
       })
     })
 
     describe('and user address is missing', () => {
-      it('should return invalid request when user address is missing', async () => {
+      it('should return invalid request', async () => {
         const { rpcClient } = components
 
         const result = await rpcClient.client.getFriendshipStatus({
@@ -1046,7 +1168,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
 
     describe('and user address is invalid', () => {
-      it('should return invalid request when user address is invalid', async () => {
+      it('should return invalid request', async () => {
         const { rpcClient } = components
 
         const result = await rpcClient.client.getFriendshipStatus({
@@ -1058,7 +1180,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
 
     describe('and no friendship exists', () => {
-      it('should return NONE status when no friendship exists', async () => {
+      it('should return NONE status', async () => {
         const { rpcClient } = components
         const nonFriendAddress = '0x9999999999999999999999999999999999999999'
 
@@ -1076,13 +1198,26 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
   describe('when upserting a friendship', function () {
     describe('and creating a friendship request', () => {
-      it('should create friendship request successfully', async () => {
-        const { rpcClient, friendsDb } = components
-        const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd4'
+      let friendAddress: string
+      let friendshipId: string | null = null
+
+      beforeEach(() => {
+        const { rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd4'
         const mockUserProfile = createMockProfile(rpcClient.authAddress)
         const mockFriendProfile = createMockProfile(friendAddress)
-
         stubComponents.catalystClient.getProfiles.resolves([mockUserProfile, mockFriendProfile])
+      })
+
+      afterEach(async () => {
+        if (friendshipId) {
+          const { friendsDb, rpcClient } = components
+          await removeFriendship(friendsDb, friendshipId, rpcClient.authAddress)
+        }
+      })
+
+      it('should create friendship request successfully', async () => {
+        const { rpcClient, friendsDb } = components
 
         const result = await rpcClient.client.upsertFriendship({
           action: {
@@ -1103,13 +1238,13 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         // Clean up the created friendship
         const friendship = await friendsDb.getFriendship([rpcClient.authAddress, friendAddress])
         if (friendship) {
-          await removeFriendship(friendsDb, friendship.id, rpcClient.authAddress)
+          friendshipId = friendship.id
         }
       })
     })
 
     describe('and sending request to self', () => {
-      it('should return invalid friendship action when sending request to self', async () => {
+      it('should return invalid friendship action', async () => {
         const { rpcClient } = components
 
         const result = await rpcClient.client.upsertFriendship({
@@ -1132,7 +1267,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
 
     describe('and user address is invalid', () => {
-      it('should return invalid request when user address is invalid', async () => {
+      it('should return invalid request', async () => {
         const { rpcClient } = components
 
         const result = await rpcClient.client.upsertFriendship({
@@ -1150,14 +1285,26 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
 
     describe('and accepting a friendship request', () => {
-      it('should accept friendship request successfully', async () => {
-        const { rpcClient, friendsDb } = components
-        const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd5'
-        const id = await createPendingFriendshipRequest(friendsDb, [friendAddress, rpcClient.authAddress])
+      let friendAddress: string
+      let friendshipId: string
+
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd5'
+        friendshipId = await createPendingFriendshipRequest(friendsDb, [friendAddress, rpcClient.authAddress])
 
         const mockUserProfile = createMockProfile(rpcClient.authAddress)
         const mockFriendProfile = createMockProfile(friendAddress)
         stubComponents.catalystClient.getProfiles.resolves([mockUserProfile, mockFriendProfile])
+      })
+
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await removeFriendship(friendsDb, friendshipId, friendAddress)
+      })
+
+      it('should accept friendship request successfully', async () => {
+        const { rpcClient } = components
 
         const result = await rpcClient.client.upsertFriendship({
           action: {
@@ -1172,18 +1319,20 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         if (result.response?.$case === 'accepted') {
           expect(result.response.accepted.friend.address).toBe(friendAddress)
         }
-
-        await removeFriendship(friendsDb, id, friendAddress)
       })
     })
   })
 
   describe('when getting mutual friends v2', function () {
     describe('and mutual friends exist', () => {
-      it('should return mutual friends successfully', async () => {
-        const { rpcClient, friendsDb } = components
-        const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
-        const mutualFriendAddress = '0x77c4c17331436d3b8798596e3d7c0d8e1b786aa4'
+      let friendAddress: string
+      let mutualFriendAddress: string
+      let friendshipIds: string[]
+
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+        mutualFriendAddress = '0x77c4c17331436d3b8798596e3d7c0d8e1b786aa4'
         const mockMutualFriendProfile = createMockProfile(mutualFriendAddress)
 
         stubComponents.catalystClient.getProfiles.resolves([mockMutualFriendProfile])
@@ -1191,6 +1340,18 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         const id1 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
         const id2 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, mutualFriendAddress])
         const id3 = await createOrUpsertActiveFriendship(friendsDb, [friendAddress, mutualFriendAddress])
+        friendshipIds = [id1, id2, id3]
+      })
+
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await removeFriendship(friendsDb, friendshipIds[0], rpcClient.authAddress)
+        await removeFriendship(friendsDb, friendshipIds[1], rpcClient.authAddress)
+        await removeFriendship(friendsDb, friendshipIds[2], friendAddress)
+      })
+
+      it('should return mutual friends successfully', async () => {
+        const { rpcClient } = components
 
         const response = await rpcClient.client.getMutualFriendsV2({
           user: {
@@ -1208,20 +1369,28 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           expect(response.response.ok.friends[0].address).toEqual(mutualFriendAddress)
           expect(response.response.ok.paginationData.total).toBe(1)
         }
-
-        await removeFriendship(friendsDb, id1, rpcClient.authAddress)
-        await removeFriendship(friendsDb, id2, rpcClient.authAddress)
-        await removeFriendship(friendsDb, id3, friendAddress)
       })
     })
 
     describe('and no mutual friends exist', () => {
-      it('should return empty list when no mutual friends exist', async () => {
-        const { rpcClient, friendsDb } = components
-        const friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
-        const id = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
+      let friendAddress: string
+      let friendshipId: string
+
+      beforeEach(async () => {
+        const { friendsDb, rpcClient } = components
+        friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
+        friendshipId = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
 
         stubComponents.catalystClient.getProfiles.resolves([])
+      })
+
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await removeFriendship(friendsDb, friendshipId, rpcClient.authAddress)
+      })
+
+      it('should return empty list', async () => {
+        const { rpcClient } = components
 
         const response = await rpcClient.client.getMutualFriendsV2({
           user: {
@@ -1238,13 +1407,11 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           expect(response.response.ok.friends).toHaveLength(0)
           expect(response.response.ok.paginationData.total).toBe(0)
         }
-
-        await removeFriendship(friendsDb, id, rpcClient.authAddress)
       })
     })
 
     describe('and user address is missing', () => {
-      it('should return invalid request when user address is missing', async () => {
+      it('should return invalid request', async () => {
         const { rpcClient } = components
 
         const response = await rpcClient.client.getMutualFriendsV2({
@@ -1260,7 +1427,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     })
 
     describe('and user address is invalid', () => {
-      it('should return invalid request when user address is invalid', async () => {
+      it('should return invalid request', async () => {
         const { rpcClient } = components
 
         const response = await rpcClient.client.getMutualFriendsV2({
