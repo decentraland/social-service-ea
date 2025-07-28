@@ -83,8 +83,6 @@ export async function createCommunityEventsComponent(
       const result: EventsResponse = await response.json()
       const hasLiveEvents = result.ok && result.data && result.data.events.length > 0
 
-      logger.debug('Events endpoint response', { communityId, data: JSON.stringify(result.data) })
-
       let ttlInSeconds = TEN_MINUTES_IN_SECONDS // Default TTL: 10 minutes
 
       if (hasLiveEvents && result.data && result.data?.events.length > 0) {

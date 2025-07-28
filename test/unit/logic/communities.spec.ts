@@ -25,9 +25,7 @@ import {
 import { createMockProfile } from '../../mocks/profile'
 import { Community } from '../../../src/logic/community/types'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
-import { mockSns } from '../../mocks/components/sns'
 import { Events } from '@dcl/schemas'
-import { createCommunityThumbnailComponent } from '../../../src/logic/community'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -334,6 +332,32 @@ describe('Community Component', () => {
           expect(result.communities[0].id).toBe('community-with-voice-chat')
           expect(result.total).toBe(1)
         })
+      })
+    })
+
+    describe('when the community is hosting live events', () => {
+      beforeEach(() => {
+        mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(true)
+      })
+      
+      it('should include isHostingLiveEvent when community is hosting live events', async () => {
+        const result = await communityComponent.getCommunities(userAddress, options)
+
+        expect(result.communities[0].isHostingLiveEvent).toBe(true)
+        expect(mockCommunityEvents.isCurrentlyHostingEvents).toHaveBeenCalledWith(communityId)
+      })
+    })
+
+    describe('when the community is not hosting live events', () => {
+      beforeEach(() => {
+        mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(false)
+      })
+      
+      it('should not include isHostingLiveEvent when community is not hosting live events', async () => {
+        const result = await communityComponent.getCommunities(userAddress, options)
+
+        expect(result.communities[0].isHostingLiveEvent).toBe(false)
+        expect(mockCommunityEvents.isCurrentlyHostingEvents).toHaveBeenCalledWith(communityId)
       })
     })
   })
