@@ -275,7 +275,9 @@ export type GetCommunitiesWithTotal<T> = {
   total: number
 }
 
-export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress'> & { role: CommunityRole }
+export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress' | 'active'> & {
+  role: CommunityRole
+}
 
 export type CommunityPlace = {
   id: string
