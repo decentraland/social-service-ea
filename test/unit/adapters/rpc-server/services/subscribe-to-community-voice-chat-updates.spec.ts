@@ -110,7 +110,8 @@ describe('when subscribing to community voice chat updates', () => {
         expect(result).toEqual({
           communityId,
           voiceChatId,
-          createdAt: expect.any(Number)
+          createdAt: expect.any(Number),
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
         })
       })
 
@@ -147,7 +148,8 @@ describe('when subscribing to community voice chat updates', () => {
         expect(result).toEqual({
           communityId: 'minimal-community',
           voiceChatId: 'minimal-voice-chat',
-          createdAt: expect.any(Number)
+          createdAt: expect.any(Number),
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
         })
       })
     })
