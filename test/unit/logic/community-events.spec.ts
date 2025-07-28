@@ -84,54 +84,56 @@ describe('CommunityEventsComponent', () => {
         beforeEach(() => {
           mockLiveEventsResponse = {
             ok: true,
-            data: [
-              {
-                id: 'live-event-1',
-                name: 'Live Event 1',
-                finish_at: new Date(Date.now() + 1800000).toISOString(), // 30 minutes from now
-                start_at: '2024-01-01T10:00:00Z',
-                user: '0x1234567890123456789012345678901234567890',
-                approved: true,
-                created_at: '2024-01-01T09:00:00Z',
-                updated_at: '2024-01-01T09:00:00Z',
-                total_attendees: 10,
-                latest_attendees: ['0x1234567890123456789012345678901234567890'],
-                rejected: false,
-                trending: false,
-                all_day: false,
-                recurrent: false,
-                duration: 7200,
-                recurrent_dates: [],
-                highlighted: false,
-                next_start_at: '2024-01-01T10:00:00Z',
-                next_finish_at: '2024-01-01T12:00:00Z',
-                live: false,
-                world: false
-              },
-              {
-                id: 'live-event-2',
-                name: 'Live Event 2',
-                finish_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
-                start_at: '2024-01-01T11:00:00Z',
-                user: '0x1234567890123456789012345678901234567890',
-                approved: true,
-                created_at: '2024-01-01T09:00:00Z',
-                updated_at: '2024-01-01T09:00:00Z',
-                total_attendees: 5,
-                latest_attendees: ['0x1234567890123456789012345678901234567890'],
-                rejected: false,
-                trending: false,
-                all_day: false,
-                recurrent: false,
-                duration: 7200,
-                recurrent_dates: [],
-                highlighted: false,
-                next_start_at: '2024-01-01T11:00:00Z',
-                next_finish_at: '2024-01-01T13:00:00Z',
-                live: false,
-                world: false
-              }
-            ]
+            data: {
+              events: [
+                {
+                  id: 'live-event-1',
+                  name: 'Live Event 1',
+                  finish_at: new Date(Date.now() + 1800000).toISOString(), // 30 minutes from now
+                  start_at: '2024-01-01T10:00:00Z',
+                  user: '0x1234567890123456789012345678901234567890',
+                  approved: true,
+                  created_at: '2024-01-01T09:00:00Z',
+                  updated_at: '2024-01-01T09:00:00Z',
+                  total_attendees: 10,
+                  latest_attendees: ['0x1234567890123456789012345678901234567890'],
+                  rejected: false,
+                  trending: false,
+                  all_day: false,
+                  recurrent: false,
+                  duration: 7200,
+                  recurrent_dates: [],
+                  highlighted: false,
+                  next_start_at: '2024-01-01T10:00:00Z',
+                  next_finish_at: '2024-01-01T12:00:00Z',
+                  live: false,
+                  world: false
+                },
+                {
+                  id: 'live-event-2',
+                  name: 'Live Event 2',
+                  finish_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+                  start_at: '2024-01-01T11:00:00Z',
+                  user: '0x1234567890123456789012345678901234567890',
+                  approved: true,
+                  created_at: '2024-01-01T09:00:00Z',
+                  updated_at: '2024-01-01T09:00:00Z',
+                  total_attendees: 5,
+                  latest_attendees: ['0x1234567890123456789012345678901234567890'],
+                  rejected: false,
+                  trending: false,
+                  all_day: false,
+                  recurrent: false,
+                  duration: 7200,
+                  recurrent_dates: [],
+                  highlighted: false,
+                  next_start_at: '2024-01-01T11:00:00Z',
+                  next_finish_at: '2024-01-01T13:00:00Z',
+                  live: false,
+                  world: false
+                }
+              ]
+            }
           }
 
           mockFetcherInstance.fetch.mockResolvedValue({
@@ -187,7 +189,7 @@ describe('CommunityEventsComponent', () => {
         beforeEach(() => {
           const mockEmptyResponse = {
             ok: true,
-            data: []
+            data: { events: [] }
           }
 
           mockFetcherInstance.fetch.mockResolvedValue({
@@ -245,7 +247,7 @@ describe('CommunityEventsComponent', () => {
       it('should continue with API call and return result', async () => {
         const mockLiveEventsResponse = {
           ok: true,
-          data: [{ id: 'live-event-1', finish_at: new Date(Date.now() + 3600000).toISOString() }]
+          data: { events: [{ id: 'live-event-1', finish_at: new Date(Date.now() + 3600000).toISOString() }] }
         }
 
         mockFetcherInstance.fetch.mockResolvedValue({
