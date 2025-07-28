@@ -1,10 +1,13 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
+import {
+  CommunityVoiceChatStatus,
+  CommunityVoiceChatUpdate
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { subscribeToCommunityVoiceChatUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-voice-chat-updates'
 import { IUpdateHandlerComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
-import { CommunityVoiceChatUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('when subscribing to community voice chat updates', () => {
   let logs: jest.Mocked<ILoggerComponent>
@@ -39,7 +42,8 @@ describe('when subscribing to community voice chat updates', () => {
       startedUpdate = {
         communityId,
         voiceChatId,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
       }
 
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
@@ -59,7 +63,8 @@ describe('when subscribing to community voice chat updates', () => {
       const secondUpdate: CommunityVoiceChatUpdate = {
         communityId: 'another-community',
         voiceChatId: 'another-voice-chat',
-        createdAt: Date.now() + 1000
+        createdAt: Date.now() + 1000,
+        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
       }
 
       // Reset the mock to avoid conflicts
@@ -89,7 +94,7 @@ describe('when subscribing to community voice chat updates', () => {
         update = {
           communityId,
           voiceChatId,
-          status: 'started'
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
         }
 
         mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
@@ -105,7 +110,8 @@ describe('when subscribing to community voice chat updates', () => {
         expect(result).toEqual({
           communityId,
           voiceChatId,
-          createdAt: expect.any(Number)
+          createdAt: expect.any(Number),
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
         })
       })
 
@@ -126,7 +132,7 @@ describe('when subscribing to community voice chat updates', () => {
         update = {
           communityId: 'minimal-community',
           voiceChatId: 'minimal-voice-chat',
-          status: 'started'
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
         }
 
         mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
@@ -142,7 +148,8 @@ describe('when subscribing to community voice chat updates', () => {
         expect(result).toEqual({
           communityId: 'minimal-community',
           voiceChatId: 'minimal-voice-chat',
-          createdAt: expect.any(Number)
+          createdAt: expect.any(Number),
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
         })
       })
     })
@@ -180,7 +187,7 @@ describe('when subscribing to community voice chat updates', () => {
       const mockUpdate: SubscriptionEventsEmitter['communityVoiceChatUpdate'] = {
         communityId: 'test',
         voiceChatId: 'test',
-        status: 'started'
+        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
       }
 
       expect(handlerCall.rpcContext).toBe(rpcContext)
