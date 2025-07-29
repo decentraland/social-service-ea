@@ -13,7 +13,13 @@ export async function getCommunitiesHandler(
     HandlerContextWithPath<'communities' | 'logs', '/v1/communities'>,
     'components' | 'url' | 'verification'
   >
-): Promise<HTTPResponse<PaginatedResponse<CommunityWithUserInformation | CommunityPublicInformation>>> {
+): Promise<
+  HTTPResponse<
+    PaginatedResponse<
+      Omit<CommunityWithUserInformation, 'isHostingLiveEvent'> | Omit<CommunityPublicInformation, 'isHostingLiveEvent'>
+    >
+  >
+> {
   const {
     components: { communities, logs },
     verification,

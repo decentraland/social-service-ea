@@ -13,13 +13,7 @@ import {
   CommunityUpdates,
   AggregatedCommunity
 } from './types'
-import {
-  isOwner,
-  toCommunityWithMembersCount,
-  toCommunityResults,
-  toPublicCommunity,
-  getCommunityThumbnailPath
-} from './utils'
+import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { isErrorWithMessage } from '../../utils/errors'
 import { EthAddress, Events } from '@dcl/schemas'
 
@@ -112,7 +106,7 @@ export function createCommunityComponent(
     getCommunities: async (
       userAddress: string,
       options: GetCommunitiesOptions
-    ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>> => {
+    ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformation, 'isHostingLiveEvent'>>> => {
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunities(userAddress, options),
         communitiesDb.getCommunitiesCount(userAddress, options)
@@ -153,7 +147,7 @@ export function createCommunityComponent(
 
     getCommunitiesPublicInformation: async (
       options: GetCommunitiesOptions
-    ): Promise<GetCommunitiesWithTotal<CommunityPublicInformation>> => {
+    ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformation, 'isHostingLiveEvent'>>> => {
       const { search } = options
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunitiesPublicInformation(options),

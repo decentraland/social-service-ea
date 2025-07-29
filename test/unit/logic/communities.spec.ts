@@ -25,9 +25,7 @@ import {
 import { createMockProfile } from '../../mocks/profile'
 import { Community } from '../../../src/logic/community/types'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
-import { mockSns } from '../../mocks/components/sns'
 import { Events } from '@dcl/schemas'
-import { createCommunityThumbnailComponent } from '../../../src/logic/community'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -350,7 +348,6 @@ describe('Community Component', () => {
         active: true,
         role: CommunityRole.Member,
         membersCount: 10,
-        isLive: false,
         isHostingLiveEvent: false,
         voiceChatStatus: {
           isActive: false,
@@ -366,29 +363,35 @@ describe('Community Component', () => {
       mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
     })
 
-    it('should return public communities with total count and owner names', async () => {
-      const result = await communityComponent.getCommunitiesPublicInformation(options)
-
-      expect(result).toEqual({
-        communities: expect.arrayContaining([
-          expect.objectContaining({
-            id: mockCommunity.id,
-            name: mockCommunity.name,
-            description: mockCommunity.description,
-            ownerAddress: mockCommunity.ownerAddress,
-            privacy: 'public',
-            active: mockCommunity.active,
-            membersCount: 10,
-            isLive: false,
-            ownerName: 'Test Owner Name'
-          })
-        ]),
-        total: 1
+    describe('when the community is not hosting live events', () => {
+      beforeEach(() => {
+        mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(false)
       })
-
-      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
-      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
-      expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
+      
+      it('should return public communities with total count and owner names', async () => {
+        const result = await communityComponent.getCommunitiesPublicInformation(options)
+  
+        expect(result).toEqual({
+          communities: expect.arrayContaining([
+            expect.objectContaining({
+              id: mockCommunity.id,
+              name: mockCommunity.name,
+              description: mockCommunity.description,
+              ownerAddress: mockCommunity.ownerAddress,
+              privacy: 'public',
+              active: mockCommunity.active,
+              membersCount: 10,
+              isHostingLiveEvent: false,
+              ownerName: 'Test Owner Name'
+            })
+          ]),
+          total: 1
+        })
+  
+        expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
+        expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
+        expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
+      })
     })
 
     describe('and the communities have a thumbnail', () => {

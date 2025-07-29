@@ -54,7 +54,7 @@ type Event = {
 
 type EventsResponse = {
   ok: boolean
-  data: Event[]
+  data: { events: Event[] }
   total?: number
 }
 
@@ -81,13 +81,13 @@ export async function createCommunityEventsComponent(
       }
 
       const result: EventsResponse = await response.json()
-      const hasLiveEvents = result.ok && result.data && result.data.length > 0
+      const hasLiveEvents = result.ok && result.data && result.data.events.length > 0
 
       let ttlInSeconds = TEN_MINUTES_IN_SECONDS // Default TTL: 10 minutes
 
-      if (hasLiveEvents && result.data.length > 0) {
+      if (hasLiveEvents && result.data && result.data?.events.length > 0) {
         // Find the event with the latest finish_at time
-        const latestEvent = result.data.reduce((latest: Event, current: Event) => {
+        const latestEvent = result.data.events.reduce((latest: Event, current: Event) => {
           const latestTime = new Date(latest.finish_at).getTime()
           const currentTime = new Date(current.finish_at).getTime()
           return currentTime > latestTime ? current : latest
@@ -104,6 +104,12 @@ export async function createCommunityEventsComponent(
 
       const cacheKey = `community:${communityId}:live-event`
       await redis.put(cacheKey, hasLiveEvents ? 'true' : 'false', { EX: ttlInSeconds })
+
+      logger.info('Events cache updated', {
+        communityId,
+        hasLiveEvents: hasLiveEvents ? 'true' : 'false',
+        ttlInSeconds
+      })
 
       return hasLiveEvents
     } catch (error) {

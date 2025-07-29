@@ -25,10 +25,9 @@ const withMembersCount = <T extends { membersCount: number | string }>(community
   }
 }
 
-const toBaseCommunity = <T extends { membersCount: number | string }>(community: T): T & { isLive: boolean } => {
+const toBaseCommunity = <T extends { membersCount: number | string }>(community: T): T => {
   return {
-    ...withMembersCount(community),
-    isLive: false // TODO: calculate this in the future
+    ...withMembersCount(community)
   }
 }
 
