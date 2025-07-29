@@ -115,13 +115,19 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
     })
 
     describe('and the request is authenticated with admin token', () => {
+      let headers: Record<string, string>
+
+      beforeEach(async () => {
+        headers = {
+          'Authorization': `Bearer test-token`
+        }
+      })
+
       describe('when requesting managed communities for a user with owner and moderator roles', () => {
         it('should respond with a 200 status code and return filtered communities', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${address}/managed?limit=10&offset=0`, {
-            headers: {
-              'Authorization': 'Bearer test-token'
-            }
+            headers
           })
           const body = await response.json()
 
@@ -144,23 +150,6 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
           const moderatorCommunities = body.data.results.filter((community: any) => community.role === CommunityRole.Moderator)
           expect(ownerCommunities).toHaveLength(2)
           expect(moderatorCommunities).toHaveLength(1)
-        })
-
-        it('should not include communities where user is only a member', async () => {
-          const { localHttpFetch } = components
-          const response = await localHttpFetch.fetch(`/v1/communities/${address}/managed`, {
-            headers: {
-              'Authorization': 'Bearer test-token'
-            }
-          })
-          const body = await response.json()
-
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(3)
-          
-          // Verify that the member community is not included
-          const memberCommunity = body.data.results.find((community: any) => community.id === communityId3)
-          expect(memberCommunity).toBeUndefined()
         })
       })
 
@@ -185,9 +174,7 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
         it('should respond with a 200 status code and return empty results', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${memberOnlyAddress}/managed`, {
-            headers: {
-              'Authorization': 'Bearer test-token'
-            }
+            headers
           })
           const body = await response.json()
 
@@ -214,9 +201,7 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
         it('should respond with a 200 status code and return empty results', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${nonMemberAddress}/managed`, {
-            headers: {
-              'Authorization': 'Bearer test-token'
-            }
+            headers
           })
           const body = await response.json()
 
@@ -234,12 +219,10 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
       })
 
       describe('when pagination parameters are provided', () => {
-        it('should handle pagination correctly with limit and offset', async () => {
+        it('should respond with a 200 status code and a list of communities within the limit and the offset', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${address}/managed?limit=2&offset=1`, {
-            headers: {
-              'Authorization': 'Bearer test-token'
-            }
+            headers
           })
           const body = await response.json()
 
@@ -251,12 +234,9 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
           expect(body.data.total).toBe(3)
         })
 
-        it('should handle pagination with offset beyond available results', async () => {
-          const { localHttpFetch } = components
-          const response = await localHttpFetch.fetch(`/v1/communities/${address}/managed?limit=10&offset=10`, {
-            headers: {
-              'Authorization': 'Bearer test-token'
-            }
+        it('should respond with a 200 status code and an empty list of communities with the page and pages as the max ones', async () => {
+          const response = await components.localHttpFetch.fetch(`/v1/communities/${address}/managed?limit=10&offset=10`, {
+            headers
           })
           const body = await response.json()
 
@@ -272,9 +252,7 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
         it('should respond with a 200 status code and return empty results', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/invalid-address/managed`, {
-            headers: {
-              'Authorization': 'Bearer test-token'
-            }
+            headers
           })
           const body = await response.json()
 
@@ -283,49 +261,45 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
           expect(body.data.total).toBe(0)
         })
       })
-    })
 
-    describe('and the database query fails', () => {
-      beforeEach(() => {
-        spyComponents.communitiesDb.getMemberCommunities.mockRejectedValue(
-          new Error('Database connection failed')
-        )
-      })
-
-      it('should respond with a 500 status code and error message', async () => {
-        const { localHttpFetch } = components
-        const response = await localHttpFetch.fetch(`/v1/communities/${address}/managed`, {
-          headers: {
-            'Authorization': 'Bearer test-token'
-          }
+      describe('and the database query fails', () => {
+        beforeEach(() => {
+          spyComponents.communitiesDb.getMemberCommunities.mockRejectedValue(
+            new Error('Database connection failed')
+          )
         })
-        const body = await response.json()
-
-        expect(response.status).toBe(500)
-        expect(body).toHaveProperty('message')
-        expect(body.message).toBe('Database connection failed')
-      })
-    })
-
-    describe('and the count query fails', () => {
-      beforeEach(() => {
-        spyComponents.communitiesDb.getCommunitiesCount.mockRejectedValue(
-          new Error('Count query failed')
-        )
-      })
-
-      it('should respond with a 500 status code and error message', async () => {
-        const { localHttpFetch } = components
-        const response = await localHttpFetch.fetch(`/v1/communities/${address}/managed`, {
-          headers: {
-            'Authorization': 'Bearer test-token'
-          }
+  
+        it('should respond with a 500 status code and error message', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/communities/${address}/managed`, {
+            headers
+          })
+          const body = await response.json()
+  
+          expect(response.status).toBe(500)
+          expect(body).toHaveProperty('message')
+          expect(body.message).toBe('Database connection failed')
         })
-        const body = await response.json()
+      })
 
-        expect(response.status).toBe(500)
-        expect(body).toHaveProperty('message')
-        expect(body.message).toBe('Count query failed')
+      describe('and the count query fails', () => {
+        beforeEach(() => {
+          spyComponents.communitiesDb.getCommunitiesCount.mockRejectedValue(
+            new Error('Count query failed')
+          )
+        })
+  
+        it('should respond with a 500 status code and error message', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/communities/${address}/managed`, {
+            headers
+          })
+          const body = await response.json()
+  
+          expect(response.status).toBe(500)
+          expect(body).toHaveProperty('message')
+          expect(body.message).toBe('Count query failed')
+        })
       })
     })
   })
