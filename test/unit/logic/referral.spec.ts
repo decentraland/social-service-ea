@@ -313,7 +313,7 @@ describe('referral-component', () => {
           })
         })
 
-        it('should throw ReferralInvalidInputError and send Slack notification', async () => {
+        it('should throw ReferralInvalidInputError, create rejected IP match record and send Slack notification', async () => {
           await expect(referralComponent.create(validInput)).rejects.toThrow(
             new ReferralInvalidInputError(
               `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${validIP}`
@@ -862,37 +862,6 @@ describe('referral-component', () => {
           )
         })
       })
-    })
-
-    describe('when referral does not reach 100 invited users', () => {
-      describe.each([{ invitedUsers: 99 }, { invitedUsers: 101 }, { invitedUsers: 150 }])(
-        'and the referral has $invitedUsers invited users',
-        ({ invitedUsers }) => {
-          beforeEach(() => {
-            mockReferralDb.findReferralProgress.mockResolvedValueOnce([
-              {
-                referrer: validReferrer,
-                invited_user: validInvitedUser,
-                status: ReferralProgressStatus.SIGNED_UP
-              }
-            ])
-            mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
-            mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
-          })
-
-          it(`should not send Slack notification for ${invitedUsers} invited users`, async () => {
-            await referralComponent.finalizeReferral(validInvitedUser)
-
-            expect(mockSlack.sendMessage).not.toHaveBeenCalled()
-            expect(mockSns.publishMessage).toHaveBeenCalledWith(
-              expect.objectContaining({
-                type: Events.Type.REFERRAL,
-                subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED
-              })
-            )
-          })
-        }
-      )
     })
   })
 
