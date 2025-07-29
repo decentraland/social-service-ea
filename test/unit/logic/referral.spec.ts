@@ -304,6 +304,7 @@ describe('referral-component', () => {
     describe('when IP validation fails', () => {
       describe('and the invited user has been created with the rejected ip match status', () => {
         beforeEach(() => {
+          mockSlack.sendMessage.mockResolvedValueOnce(undefined)
           mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
           mockReferralDb.createReferral.mockResolvedValueOnce({
             referrer: validReferrer,
@@ -312,7 +313,7 @@ describe('referral-component', () => {
           })
         })
 
-        it('should throw ReferralInvalidInputError and create rejected IP match record', async () => {
+        it('should throw ReferralInvalidInputError and send Slack notification', async () => {
           await expect(referralComponent.create(validInput)).rejects.toThrow(
             new ReferralInvalidInputError(
               `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${validIP}`
@@ -323,6 +324,78 @@ describe('referral-component', () => {
             referrer: validReferrer.toLowerCase(),
             invitedUser: validInvitedUser.toLowerCase(),
             invitedUserIP: validIP
+          })
+
+          expect(mockSlack.sendMessage).toHaveBeenCalledWith({
+            channel: expect.any(String),
+            text: '🚨 IP Match Rejection - Referral blocked due to IP limit exceeded',
+            blocks: expect.arrayContaining([
+              expect.objectContaining({
+                type: 'header',
+                text: expect.objectContaining({
+                  type: 'plain_text',
+                  text: '🚨 IP Match Rejection Detected',
+                  emoji: true
+                })
+              }),
+              expect.objectContaining({
+                type: 'section',
+                text: expect.objectContaining({
+                  type: 'mrkdwn',
+                  text: expect.stringContaining('⚠️ Suspicious Activity Detected')
+                })
+              }),
+              expect.objectContaining({
+                type: 'section',
+                text: expect.objectContaining({
+                  type: 'mrkdwn',
+                  text: expect.stringContaining('📊 Details:')
+                })
+              }),
+              expect.objectContaining({
+                type: 'actions',
+                elements: expect.arrayContaining([
+                  expect.objectContaining({
+                    type: 'button',
+                    text: expect.objectContaining({
+                      type: 'plain_text',
+                      text: 'View Referral Dashboard',
+                      emoji: true
+                    }),
+                    url: expect.stringContaining('dashboard.decentraland.systems'),
+                    style: 'danger'
+                  })
+                ])
+              })
+            ])
+          })
+        })
+
+        describe('and Slack notification fails', () => {
+          beforeEach(() => {
+            mockSlack.sendMessage.mockReset()
+            mockSlack.sendMessage.mockRejectedValueOnce(new Error('Slack service unavailable'))
+            mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+            mockReferralDb.createReferral.mockResolvedValueOnce({
+              referrer: validReferrer,
+              invited_user: validInvitedUser,
+              status: ReferralProgressStatus.REJECTED_IP_MATCH
+            })
+          })
+
+          it('should still throw error even', async () => {
+            await expect(referralComponent.create(validInput)).rejects.toThrow(
+              new ReferralInvalidInputError(
+                `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${validIP}`
+              )
+            )
+
+            expect(mockLogger.warn).toHaveBeenCalledWith('Failed to send IP rejection Slack notification', {
+              invitedUser: validInvitedUser.toLowerCase(),
+              referrer: validReferrer.toLowerCase(),
+              invitedUserIP: validIP,
+              error: 'Slack service unavailable'
+            })
           })
         })
       })

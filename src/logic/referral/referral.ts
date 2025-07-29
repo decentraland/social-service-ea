@@ -142,6 +142,59 @@ export async function createReferralComponent(
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
       if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
+        try {
+          await slack.sendMessage({
+            channel: isDev ? 'notifications-dev' : 'referral-notifications',
+            text: `🚨 IP Match Rejection - Referral blocked due to IP limit exceeded`,
+            blocks: [
+              {
+                type: 'header',
+                text: {
+                  type: 'plain_text',
+                  text: '🚨 IP Match Rejection Detected',
+                  emoji: true
+                }
+              },
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `*⚠️ Suspicious Activity Detected*\n\n*Invited User:* \`${invitedUser}\`\n*IP Address:* \`${invitedUserIP}\`\n*Referrer:* \`${referrer}\``
+                }
+              },
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `*📊 Details:*\n• IP address has reached maximum of ${MAX_IP_MATCHES} referrals\n• Potential abuse or automated system detected\n• Referral automatically rejected\n\n*🔍 Next Steps:*\n• Monitor for similar patterns\n• Review IP address activity`
+                }
+              },
+              {
+                type: 'actions',
+                elements: [
+                  {
+                    type: 'button',
+                    text: {
+                      type: 'plain_text',
+                      text: 'View Referral Dashboard',
+                      emoji: true
+                    },
+                    url: REFERRAL_METABASE_DASHBOARD,
+                    style: 'danger'
+                  }
+                ]
+              }
+            ]
+          })
+        } catch (error) {
+          logger.warn('Failed to send IP rejection Slack notification', {
+            invitedUser,
+            referrer,
+            invitedUserIP,
+            error: error instanceof Error ? error.message : String(error)
+          })
+        }
+
         throw new ReferralInvalidInputError(
           `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${invitedUserIP}`
         )
