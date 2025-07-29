@@ -398,131 +398,209 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           await components.communitiesDbHelper.forceCommunityRemoval(communityId4)
         })
 
-        it('should return only communities where user has owner role', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=owner')
-          const body = await response.json()
+        describe('when filtering by single role', () => {
+          describe('with owner role', () => {
+            let queryParams: string
 
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(1)
-          expect(body.data.results[0]).toEqual(
-            expect.objectContaining({
-              id: communityId4,
-              name: 'Test Community 4',
-              role: CommunityRole.Owner
+            beforeEach(() => {
+              queryParams = 'limit=10&offset=0&roles=owner'
             })
-          )
-          expect(body.data.total).toBe(1)
-        })
 
-        it('should return only communities where user has member role', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=member')
-          const body = await response.json()
+            it('should return only communities where user has owner role', async () => {
+              const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
+              const body = await response.json()
 
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(1)
-          expect(body.data.results[0]).toEqual(
-            expect.objectContaining({
-              id: communityId1,
-              name: 'Test Community 1',
-              role: CommunityRole.Member
+              expect(response.status).toBe(200)
+              expect(body.data.results).toHaveLength(1)
+              expect(body.data.results[0]).toEqual(
+                expect.objectContaining({
+                  id: communityId4,
+                  name: 'Test Community 4',
+                  role: CommunityRole.Owner
+                })
+              )
+              expect(body.data.total).toBe(1)
             })
-          )
-          expect(body.data.total).toBe(1)
-        })
+          })
 
-        it('should return communities where user has owner or member role', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=owner&roles=member')
-          const body = await response.json()
+          describe('with member role', () => {
+            let queryParams: string
 
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(2)
-          
-          const communityIds = body.data.results.map((community: any) => community.id)
-          expect(communityIds).toContain(communityId1)
-          expect(communityIds).toContain(communityId4)
-          
-          const roles = body.data.results.map((community: any) => community.role)
-          expect(roles).toContain(CommunityRole.Member)
-          expect(roles).toContain(CommunityRole.Owner)
-          
-          expect(body.data.total).toBe(2)
-        })
-
-        it('should return empty results since user has no moderator role', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=moderator')
-          const body = await response.json()
-
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(0)
-          expect(body.data.total).toBe(0)
-        })
-
-        it('should handle empty roles parameter gracefully', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=')
-          const body = await response.json()
-
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(3) // All communities (no role filtering)
-          expect(body.data.total).toBe(3)
-        })
-
-        it('should handle multiple empty roles parameters gracefully', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=&roles=')
-          const body = await response.json()
-
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(3) // All communities (no role filtering)
-          expect(body.data.total).toBe(3)
-        })
-
-        it('should combine role filtering with onlyMemberOf=true', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyMemberOf=true&roles=owner')
-          const body = await response.json()
-
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(1)
-          expect(body.data.results[0]).toEqual(
-            expect.objectContaining({
-              id: communityId4,
-              name: 'Test Community 4',
-              role: CommunityRole.Owner
+            beforeEach(() => {
+              queryParams = 'limit=10&offset=0&roles=member'
             })
-          )
-          expect(body.data.total).toBe(1)
+
+            it('should return only communities where user has member role', async () => {
+              const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
+              const body = await response.json()
+
+              expect(response.status).toBe(200)
+              expect(body.data.results).toHaveLength(1)
+              expect(body.data.results[0]).toEqual(
+                expect.objectContaining({
+                  id: communityId1,
+                  name: 'Test Community 1',
+                  role: CommunityRole.Member
+                })
+              )
+              expect(body.data.total).toBe(1)
+            })
+          })
+
+          describe('with moderator role', () => {
+            let queryParams: string
+
+            beforeEach(() => {
+              queryParams = 'limit=10&offset=0&roles=moderator'
+            })
+
+            it('should return empty results since user has no moderator role', async () => {
+              const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
+              const body = await response.json()
+
+              expect(response.status).toBe(200)
+              expect(body.data.results).toHaveLength(0)
+              expect(body.data.total).toBe(0)
+            })
+          })
         })
 
-        it('should combine role filtering with search', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&search=Community&roles=member')
-          const body = await response.json()
+        describe('when filtering by multiple roles', () => {
+          let queryParams: string
 
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(1)
-          expect(body.data.results[0]).toEqual(
-            expect.objectContaining({
-              id: communityId1,
-              name: 'Test Community 1',
-              role: CommunityRole.Member
-            })
-          )
-          expect(body.data.total).toBe(1)
+          beforeEach(() => {
+            queryParams = 'limit=10&offset=0&roles=owner&roles=member'
+          })
+
+          it('should return communities where user has owner or member role', async () => {
+            const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+            expect(body.data.results).toHaveLength(2)
+            
+            const communityIds = body.data.results.map((community: any) => community.id)
+            expect(communityIds).toContain(communityId1)
+            expect(communityIds).toContain(communityId4)
+            
+            const roles = body.data.results.map((community: any) => community.role)
+            expect(roles).toContain(CommunityRole.Member)
+            expect(roles).toContain(CommunityRole.Owner)
+            
+            expect(body.data.total).toBe(2)
+          })
         })
 
-        it('should handle invalid roles parameter gracefully', async () => {
-          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=owner&roles=invalid')
-          const body = await response.json()
+        describe('when handling edge cases', () => {
+          describe('with empty roles parameter', () => {
+            let queryParams: string
 
-          expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(1)
-          expect(body.data.total).toBe(1)
-          
-          // Verify that only the valid role (owner) was applied
-          expect(body.data.results[0]).toEqual(
-            expect.objectContaining({
-              id: communityId4,
-              name: 'Test Community 4',
-              role: CommunityRole.Owner
+            beforeEach(() => {
+              queryParams = 'limit=10&offset=0&roles='
             })
-          )
+
+            it('should handle empty roles parameter gracefully', async () => {
+              const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
+              const body = await response.json()
+
+              expect(response.status).toBe(200)
+              expect(body.data.results).toHaveLength(3) // All communities (no role filtering)
+              expect(body.data.total).toBe(3)
+            })
+          })
+
+          describe('with multiple empty roles parameters', () => {
+            let queryParams: string
+
+            beforeEach(() => {
+              queryParams = 'limit=10&offset=0&roles=&roles='
+            })
+
+            it('should handle multiple empty roles parameters gracefully', async () => {
+              const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
+              const body = await response.json()
+
+              expect(response.status).toBe(200)
+              expect(body.data.results).toHaveLength(3) // All communities (no role filtering)
+              expect(body.data.total).toBe(3)
+            })
+          })
+
+          describe('with invalid roles parameter', () => {
+            let queryParams: string
+
+            beforeEach(() => {
+              queryParams = 'limit=10&offset=0&roles=owner&roles=invalid'
+            })
+
+            it('should handle invalid roles parameter gracefully', async () => {
+              const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
+              const body = await response.json()
+
+              expect(response.status).toBe(200)
+              expect(body.data.results).toHaveLength(1)
+              expect(body.data.total).toBe(1)
+              
+              // Verify that only the valid role (owner) was applied
+              expect(body.data.results[0]).toEqual(
+                expect.objectContaining({
+                  id: communityId4,
+                  name: 'Test Community 4',
+                  role: CommunityRole.Owner
+                })
+              )
+            })
+          })
+        })
+
+        describe('when combining with other filters', () => {
+          describe('with onlyMemberOf filter', () => {
+            let queryParams: string
+
+            beforeEach(() => {
+              queryParams = 'limit=10&offset=0&onlyMemberOf=true&roles=owner'
+            })
+
+            it('should combine role filtering with onlyMemberOf=true', async () => {
+              const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
+              const body = await response.json()
+
+              expect(response.status).toBe(200)
+              expect(body.data.results).toHaveLength(1)
+              expect(body.data.results[0]).toEqual(
+                expect.objectContaining({
+                  id: communityId4,
+                  name: 'Test Community 4',
+                  role: CommunityRole.Owner
+                })
+              )
+              expect(body.data.total).toBe(1)
+            })
+          })
+
+          describe('with search filter', () => {
+            let queryParams: string
+
+            beforeEach(() => {
+              queryParams = 'limit=10&offset=0&search=Community&roles=member'
+            })
+
+            it('should combine role filtering with search', async () => {
+              const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
+              const body = await response.json()
+
+              expect(response.status).toBe(200)
+              expect(body.data.results).toHaveLength(1)
+              expect(body.data.results[0]).toEqual(
+                expect.objectContaining({
+                  id: communityId1,
+                  name: 'Test Community 1',
+                  role: CommunityRole.Member
+                })
+              )
+              expect(body.data.total).toBe(1)
+            })
+          })
         })
       })
 
