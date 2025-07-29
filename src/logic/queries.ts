@@ -359,3 +359,23 @@ export function getLatestFriendshipActionCTE(userAddress: string): CTE {
     name: 'latest_friendship_actions'
   }
 }
+
+export function getCommunityMembersJoin(
+  memberAddress: string,
+  options: { onlyMemberOf?: boolean; roles?: CommunityRole[] } = {}
+): SQLStatement {
+  const { onlyMemberOf, roles } = options
+  const normalizedMemberAddress = normalizeAddress(memberAddress)
+
+  const baseJoin = SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
+
+  if (roles && roles.length > 0) {
+    return baseJoin.append(SQL` AND cm.role = ANY(${roles})`)
+  }
+
+  if (onlyMemberOf) {
+    return baseJoin
+  }
+
+  return SQL` LEFT `.append(baseJoin)
+}

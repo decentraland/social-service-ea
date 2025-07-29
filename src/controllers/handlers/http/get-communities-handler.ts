@@ -28,10 +28,10 @@ export async function getCommunitiesHandler(
   const search = url.searchParams.get('search')
   const onlyMemberOf = url.searchParams.get('onlyMemberOf')?.toLowerCase() === 'true'
   const onlyWithActiveVoiceChat = url.searchParams.get('onlyWithActiveVoiceChat')?.toLowerCase() === 'true'
-  const roles: CommunityRole[] | undefined = url.searchParams
+  const roles: CommunityRole[] = url.searchParams
     .getAll('roles')
-    ?.map((role) => role as CommunityRole)
-    .filter(Boolean)
+    .filter((role) => Object.values(CommunityRole).includes(role as CommunityRole))
+    .map((role) => role as CommunityRole)
 
   try {
     const { communities: communitiesData, total } = userAddress

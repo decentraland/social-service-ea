@@ -213,7 +213,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           await components.communitiesDbHelper.forceCommunityRemoval(communityId3)
         })
 
-        it('should return only member communities sorted by role with owner names when onlyMemberOf=true', async () => {
+        it('should return only member communities sorted by role with owner names', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyMemberOf=true')
           const body = await response.json()
 
@@ -398,7 +398,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           await components.communitiesDbHelper.forceCommunityRemoval(communityId4)
         })
 
-        it('should return only communities where user has owner role when roles=owner', async () => {
+        it('should return only communities where user has owner role', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=owner')
           const body = await response.json()
 
@@ -414,7 +414,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(body.data.total).toBe(1)
         })
 
-        it('should return only communities where user has member role when roles=member', async () => {
+        it('should return only communities where user has member role', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=member')
           const body = await response.json()
 
@@ -430,7 +430,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(body.data.total).toBe(1)
         })
 
-        it('should return communities where user has owner or member role when roles=owner&roles=member', async () => {
+        it('should return communities where user has owner or member role', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=owner&roles=member')
           const body = await response.json()
 
@@ -448,7 +448,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(body.data.total).toBe(2)
         })
 
-        it('should return empty results when roles=moderator (user has no moderator role)', async () => {
+        it('should return empty results since user has no moderator role', async () => {
           const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&roles=moderator')
           const body = await response.json()
 
@@ -569,7 +569,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           )
         })
 
-        it('should respond with a 404 status code when owner profile is not found', async () => {
+        it('should respond with a 404 status code', async () => {
           const response = await makeRequest(identity, '/v1/communities')
           expect(response.status).toBe(404)
         })

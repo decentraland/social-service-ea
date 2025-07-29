@@ -22,6 +22,7 @@ import {
   withSearchAndPagination,
   getLatestFriendshipActionCTE,
   getMembersCTE,
+  getCommunityMembersJoin,
   CTE
 } from '../logic/queries'
 import { EthAddress } from '@dcl/schemas'
@@ -269,17 +270,7 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true
       `
 
-      let membersJoin = SQL``
-
-      if (onlyMemberOf && roles) {
-        membersJoin = SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress} AND cm.role = ANY(${roles})`
-      } else if (onlyMemberOf) {
-        membersJoin = SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
-      } else if (roles) {
-        membersJoin = SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress} AND cm.role = ANY(${roles})`
-      } else {
-        membersJoin = SQL` LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
-      }
+      const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
 
       const baseQuery = useCTEs([
         getUserFriendsCTE(normalizedMemberAddress),
@@ -326,15 +317,7 @@ export function createCommunitiesDBComponent(
       const { search, onlyMemberOf, roles } = options ?? {}
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
-      let membersJoin = SQL``
-
-      if (onlyMemberOf && roles) {
-        membersJoin = SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress} AND cm.role = ANY(${roles})`
-      } else if (onlyMemberOf) {
-        membersJoin = SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
-      } else if (roles) {
-        membersJoin = SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress} AND cm.role = ANY(${roles})`
-      }
+      const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
 
       const query = SQL`SELECT COUNT(1) as count FROM communities c`.append(membersJoin).append(SQL`
         LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true

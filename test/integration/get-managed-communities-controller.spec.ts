@@ -116,7 +116,7 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
 
     describe('and the request is authenticated with admin token', () => {
       describe('when requesting managed communities for a user with owner and moderator roles', () => {
-        it('should respond with a 200 status code and return only communities where user is owner or moderator', async () => {
+        it('should respond with a 200 status code and return filtered communities', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${address}/managed?limit=10&offset=0`, {
             headers: {
@@ -329,4 +329,4 @@ test('Get Managed Communities Controller', function ({ components, spyComponents
       })
     })
   })
-}) 
+})
