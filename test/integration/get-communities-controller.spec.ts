@@ -107,8 +107,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                 ownerName: 'Test Owner',
                 privacy: 'public',
                 active: true,
-                membersCount: 2,
-                isHostingLiveEvent: false
+                membersCount: 2
               }),
               expect.objectContaining({
                 id: communityId2,
@@ -118,8 +117,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                 ownerName: 'Test Owner',
                 privacy: 'public',
                 active: true,
-                membersCount: 1,
-                isHostingLiveEvent: false
+                membersCount: 1
               })
             ]),
             total: 2,
@@ -154,8 +152,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                   active: true,
                   role: CommunityRole.None,
                   membersCount: 2,
-                  friends: expect.arrayContaining([parseFriend(friend1Profile), parseFriend(friend2Profile)]),
-                  isHostingLiveEvent: false
+                  friends: expect.arrayContaining([parseFriend(friend1Profile), parseFriend(friend2Profile)])
                 }),
                 expect.objectContaining({
                   id: communityId2,
@@ -167,8 +164,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                   active: true,
                   role: CommunityRole.None,
                   membersCount: 1,
-                  friends: expect.arrayContaining([parseFriend(friend1Profile)]),
-                  isHostingLiveEvent: false
+                  friends: expect.arrayContaining([parseFriend(friend1Profile)])
                 })
               ]),
               total: 2,

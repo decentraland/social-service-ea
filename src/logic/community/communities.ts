@@ -106,7 +106,7 @@ export function createCommunityComponent(
     getCommunities: async (
       userAddress: string,
       options: GetCommunitiesOptions
-    ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>> => {
+    ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformation, 'isHostingLiveEvent'>>> => {
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunities(userAddress, options),
         communitiesDb.getCommunitiesCount(userAddress, options)
@@ -114,13 +114,12 @@ export function createCommunityComponent(
 
       const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
         communities.map(async (community) => {
-          const [thumbnail, ownerName, isHostingLiveEvent] = await Promise.all([
+          const [thumbnail, ownerName] = await Promise.all([
             communityThumbnail.getThumbnail(community.id),
-            communityOwners.getOwnerName(community.ownerAddress, community.id),
-            communityEvents.isCurrentlyHostingEvents(community.id)
+            communityOwners.getOwnerName(community.ownerAddress, community.id)
           ])
 
-          const result = { ...community, ownerName, isHostingLiveEvent }
+          const result = { ...community, ownerName }
 
           if (thumbnail) {
             result.thumbnails = {
@@ -148,7 +147,7 @@ export function createCommunityComponent(
 
     getCommunitiesPublicInformation: async (
       options: GetCommunitiesOptions
-    ): Promise<GetCommunitiesWithTotal<CommunityPublicInformation>> => {
+    ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformation, 'isHostingLiveEvent'>>> => {
       const { search } = options
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunitiesPublicInformation(options),
@@ -157,13 +156,12 @@ export function createCommunityComponent(
 
       const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
         communities.map(async (community) => {
-          const [thumbnail, ownerName, isHostingLiveEvent] = await Promise.all([
+          const [thumbnail, ownerName] = await Promise.all([
             communityThumbnail.getThumbnail(community.id),
-            communityOwners.getOwnerName(community.ownerAddress, community.id),
-            communityEvents.isCurrentlyHostingEvents(community.id)
+            communityOwners.getOwnerName(community.ownerAddress, community.id)
           ])
 
-          const result = { ...community, ownerName, isHostingLiveEvent }
+          const result = { ...community, ownerName }
 
           if (thumbnail) {
             result.thumbnails = {

@@ -11,10 +11,10 @@ export interface ICommunitiesComponent {
   getCommunities(
     userAddress: string,
     options: GetCommunitiesOptions
-  ): Promise<GetCommunitiesWithTotal<CommunityWithUserInformation>>
+  ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformation, 'isHostingLiveEvent'>>>
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
-  ): Promise<GetCommunitiesWithTotal<CommunityPublicInformation>>
+  ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformation, 'isHostingLiveEvent'>>>
   getMemberCommunities(
     memberAddress: string,
     options: Pick<GetCommunitiesOptions, 'pagination'>

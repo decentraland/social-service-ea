@@ -334,32 +334,6 @@ describe('Community Component', () => {
         })
       })
     })
-
-    describe('when the community is hosting live events', () => {
-      beforeEach(() => {
-        mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(true)
-      })
-      
-      it('should include isHostingLiveEvent', async () => {
-        const result = await communityComponent.getCommunities(userAddress, options)
-
-        expect(result.communities[0].isHostingLiveEvent).toBe(true)
-        expect(mockCommunityEvents.isCurrentlyHostingEvents).toHaveBeenCalledWith(communityId)
-      })
-    })
-
-    describe('when the community is not hosting live events', () => {
-      beforeEach(() => {
-        mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(false)
-      })
-      
-      it('should not include isHostingLiveEvent', async () => {
-        const result = await communityComponent.getCommunities(userAddress, options)
-
-        expect(result.communities[0].isHostingLiveEvent).toBe(false)
-        expect(mockCommunityEvents.isCurrentlyHostingEvents).toHaveBeenCalledWith(communityId)
-      })
-    })
   })
 
   describe('when getting public communities', () => {
@@ -433,19 +407,6 @@ describe('Community Component', () => {
         expect(result.communities[0].thumbnails).toEqual({
           raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
-      })
-    })
-
-    describe('when the community is hosting live events', () => {
-      beforeEach(() => {
-        mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(true)
-      })
-
-      it('should include isHostingLiveEvent', async () => {
-        const result = await communityComponent.getCommunitiesPublicInformation(options)
-
-        expect(result.communities[0].isHostingLiveEvent).toBe(true)
-        expect(mockCommunityEvents.isCurrentlyHostingEvents).toHaveBeenCalledWith(communityId)
       })
     })
 
