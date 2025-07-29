@@ -340,7 +340,7 @@ describe('Community Component', () => {
         mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(true)
       })
       
-      it('should include isHostingLiveEvent when community is hosting live events', async () => {
+      it('should include isHostingLiveEvent', async () => {
         const result = await communityComponent.getCommunities(userAddress, options)
 
         expect(result.communities[0].isHostingLiveEvent).toBe(true)
@@ -353,7 +353,7 @@ describe('Community Component', () => {
         mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(false)
       })
       
-      it('should not include isHostingLiveEvent when community is not hosting live events', async () => {
+      it('should not include isHostingLiveEvent', async () => {
         const result = await communityComponent.getCommunities(userAddress, options)
 
         expect(result.communities[0].isHostingLiveEvent).toBe(false)
@@ -441,7 +441,7 @@ describe('Community Component', () => {
         mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(true)
       })
 
-      it('should include isHostingLiveEvent when community is hosting live events', async () => {
+      it('should include isHostingLiveEvent', async () => {
         const result = await communityComponent.getCommunitiesPublicInformation(options)
 
         expect(result.communities[0].isHostingLiveEvent).toBe(true)

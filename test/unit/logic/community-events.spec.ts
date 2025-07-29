@@ -86,52 +86,8 @@ describe('CommunityEventsComponent', () => {
             ok: true,
             data: {
               events: [
-                {
-                  id: 'live-event-1',
-                  name: 'Live Event 1',
-                  finish_at: new Date(Date.now() + 1800000).toISOString(), // 30 minutes from now
-                  start_at: '2024-01-01T10:00:00Z',
-                  user: '0x1234567890123456789012345678901234567890',
-                  approved: true,
-                  created_at: '2024-01-01T09:00:00Z',
-                  updated_at: '2024-01-01T09:00:00Z',
-                  total_attendees: 10,
-                  latest_attendees: ['0x1234567890123456789012345678901234567890'],
-                  rejected: false,
-                  trending: false,
-                  all_day: false,
-                  recurrent: false,
-                  duration: 7200,
-                  recurrent_dates: [],
-                  highlighted: false,
-                  next_start_at: '2024-01-01T10:00:00Z',
-                  next_finish_at: '2024-01-01T12:00:00Z',
-                  live: false,
-                  world: false
-                },
-                {
-                  id: 'live-event-2',
-                  name: 'Live Event 2',
-                  finish_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
-                  start_at: '2024-01-01T11:00:00Z',
-                  user: '0x1234567890123456789012345678901234567890',
-                  approved: true,
-                  created_at: '2024-01-01T09:00:00Z',
-                  updated_at: '2024-01-01T09:00:00Z',
-                  total_attendees: 5,
-                  latest_attendees: ['0x1234567890123456789012345678901234567890'],
-                  rejected: false,
-                  trending: false,
-                  all_day: false,
-                  recurrent: false,
-                  duration: 7200,
-                  recurrent_dates: [],
-                  highlighted: false,
-                  next_start_at: '2024-01-01T11:00:00Z',
-                  next_finish_at: '2024-01-01T13:00:00Z',
-                  live: false,
-                  world: false
-                }
+                createMockLiveEvent(new Date(Date.now() + 1800000)),
+                createMockLiveEvent(new Date(Date.now() + 3600000))
               ]
             }
           }
@@ -159,11 +115,7 @@ describe('CommunityEventsComponent', () => {
         it('should cache the result as true', async () => {
           await communityEventsComponent.isCurrentlyHostingEvents(communityId)
 
-          expect(mockRedisInstance.put).toHaveBeenCalledWith(
-            cacheKey,
-            'true',
-            { EX: expect.any(Number) }
-          )
+          expect(mockRedisInstance.put).toHaveBeenCalledWith(cacheKey, 'true', { EX: expect.any(Number) })
         })
 
         it('should use the event with the latest finish_at for TTL calculation', async () => {
@@ -172,7 +124,7 @@ describe('CommunityEventsComponent', () => {
           // Should use the event that finishes later (1 hour from now) for TTL
           const putCall = mockRedisInstance.put.mock.calls[0]
           const ttl = putCall[2].EX
-          
+
           // TTL should be approximately 3600 seconds (1 hour) minus a small buffer
           expect(ttl).toBeGreaterThan(3500)
           expect(ttl).toBeLessThanOrEqual(3600)
@@ -263,3 +215,29 @@ describe('CommunityEventsComponent', () => {
     })
   })
 })
+
+function createMockLiveEvent(finishAt: Date) {
+  return {
+    id: Date.now().toString(),
+    name: 'Live Event 1',
+    finish_at: finishAt.toISOString(),
+    start_at: '2024-01-01T10:00:00Z',
+    user: '0x1234567890123456789012345678901234567890',
+    approved: true,
+    created_at: '2024-01-01T09:00:00Z',
+    updated_at: '2024-01-01T09:00:00Z',
+    total_attendees: 10,
+    latest_attendees: ['0x1234567890123456789012345678901234567890'],
+    rejected: false,
+    trending: false,
+    all_day: false,
+    recurrent: false,
+    duration: 7200,
+    recurrent_dates: [],
+    highlighted: false,
+    next_start_at: '2024-01-01T10:00:00Z',
+    next_finish_at: '2024-01-01T12:00:00Z',
+    live: false,
+    world: false
+  }
+}
