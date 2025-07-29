@@ -1,5 +1,5 @@
 import { getPaginationParams } from '@dcl/platform-server-commons'
-import { HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { CommunityRole, HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
 import {
@@ -34,10 +34,20 @@ export async function getCommunitiesHandler(
   const search = url.searchParams.get('search')
   const onlyMemberOf = url.searchParams.get('onlyMemberOf')?.toLowerCase() === 'true'
   const onlyWithActiveVoiceChat = url.searchParams.get('onlyWithActiveVoiceChat')?.toLowerCase() === 'true'
+  const roles: CommunityRole[] = url.searchParams
+    .getAll('roles')
+    .filter((role) => Object.values(CommunityRole).includes(role as CommunityRole))
+    .map((role) => role as CommunityRole)
 
   try {
     const { communities: communitiesData, total } = userAddress
-      ? await communities.getCommunities(userAddress, { pagination, search, onlyMemberOf, onlyWithActiveVoiceChat })
+      ? await communities.getCommunities(userAddress, {
+          pagination,
+          search,
+          onlyMemberOf,
+          onlyWithActiveVoiceChat,
+          roles: roles?.length > 0 ? roles : undefined
+        })
       : await communities.getCommunitiesPublicInformation({ pagination, search, onlyWithActiveVoiceChat })
 
     return {

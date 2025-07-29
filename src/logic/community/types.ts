@@ -17,7 +17,7 @@ export interface ICommunitiesComponent {
   ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformation, 'isHostingLiveEvent'>>>
   getMemberCommunities(
     memberAddress: string,
-    options: Pick<GetCommunitiesOptions, 'pagination'>
+    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
   ): Promise<GetCommunitiesWithTotal<MemberCommunity>>
   createCommunity(
     community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
@@ -253,6 +253,7 @@ export type GetCommunitiesOptions = {
   sortBy?: 'membersCount' | 'role'
   onlyMemberOf?: boolean
   onlyWithActiveVoiceChat?: boolean
+  roles?: CommunityRole[]
 }
 
 export type GetCommunityMembersOptions = {
@@ -273,7 +274,9 @@ export type GetCommunitiesWithTotal<T> = {
   total: number
 }
 
-export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress'> & { role: CommunityRole }
+export type MemberCommunity = Pick<Community, 'id' | 'name' | 'thumbnails' | 'ownerAddress' | 'active'> & {
+  role: CommunityRole
+}
 
 export type CommunityPlace = {
   id: string

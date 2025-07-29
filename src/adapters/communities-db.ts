@@ -22,6 +22,7 @@ import {
   withSearchAndPagination,
   getLatestFriendshipActionCTE,
   getMembersCTE,
+  getCommunityMembersJoin,
   CTE
 } from '../logic/queries'
 import { EthAddress } from '@dcl/schemas'
@@ -248,6 +249,8 @@ export function createCommunitiesDBComponent(
       memberAddress: EthAddress,
       options: GetCommunitiesOptions
     ): Promise<AggregatedCommunityWithMemberAndFriendsData[]> {
+      const { onlyMemberOf, roles } = options
+
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const communityFriendsCTE = SQL`
@@ -267,9 +270,7 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true
       `
 
-      const membersJoin = options.onlyMemberOf
-        ? SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
-        : SQL` LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
+      const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
 
       const baseQuery = useCTEs([
         getUserFriendsCTE(normalizedMemberAddress),
@@ -311,14 +312,12 @@ export function createCommunitiesDBComponent(
 
     async getCommunitiesCount(
       memberAddress: EthAddress,
-      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf'>
+      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles'>
     ): Promise<number> {
-      const { search, onlyMemberOf } = options ?? {}
+      const { search, onlyMemberOf, roles } = options ?? {}
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
-      const membersJoin = onlyMemberOf
-        ? SQL` JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}`
-        : SQL``
+      const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
 
       const query = SQL`SELECT COUNT(1) as count FROM communities c`.append(membersJoin).append(SQL`
         LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
@@ -372,7 +371,7 @@ export function createCommunitiesDBComponent(
 
     async getMemberCommunities(
       memberAddress: EthAddress,
-      options: Pick<GetCommunitiesOptions, 'pagination'>
+      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
     ): Promise<MemberCommunity[]> {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
@@ -384,8 +383,9 @@ export function createCommunitiesDBComponent(
           COALESCE(cm.role, ${CommunityRole.None}) as role
         FROM communities c
         JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}
-        WHERE c.active = true
       `
+        .append(options.roles ? SQL` AND cm.role = ANY(${options.roles})` : SQL``)
+        .append(SQL` WHERE c.active = true`)
 
       const query = withSearchAndPagination(baseQuery, {
         sortBy: 'role',
