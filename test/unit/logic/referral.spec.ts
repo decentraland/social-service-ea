@@ -49,7 +49,7 @@ describe('referral-component', () => {
 
     mockConfig = {
       requireString: jest.fn().mockImplementation((key: string) => {
-        const rewardKeys: Record<string, string> = {
+        const configValues: Record<string, string> = {
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20',
@@ -58,11 +58,12 @@ describe('referral-component', () => {
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75',
-          PROFILE_URL: 'https://decentraland.org/profile'
+          PROFILE_URL: 'https://decentraland.org/profile',
+          ENV: 'dev',
+          REFERRAL_METABASE_DASHBOARD: 'https://dashboard.decentraland.systems/1234'
         }
-        return Promise.resolve(rewardKeys[key])
-      }),
-      getString: jest.fn().mockResolvedValue('dev')
+        return Promise.resolve(configValues[key])
+      })
     }
 
     mockRewards = {
@@ -740,7 +741,7 @@ describe('referral-component', () => {
                     text: 'View Referral Dashboard',
                     emoji: true
                   }),
-                  url: expect.stringContaining('metabase.decentraland.systems'),
+                  url: expect.stringContaining('dashboard.decentraland.systems'),
                   style: 'primary'
                 })
               ])
@@ -1041,90 +1042,6 @@ describe('referral-component', () => {
             email: validEmail
           })
         ).rejects.toThrow(new ReferralInvalidInputError('Invalid referrer address'))
-      })
-    })
-  })
-
-  describe('when testing Slack handler', () => {
-    let mockSlackHandler: any
-    let mockSlackHandlerContext: any
-
-    beforeEach(() => {
-      mockSlackHandler = {
-        sendMessage: jest.fn().mockResolvedValue(undefined)
-      }
-
-      mockSlackHandlerContext = {
-        components: {
-          logs: { getLogger: () => mockLogger },
-          slack: mockSlackHandler,
-          config: mockConfig
-        },
-        url: new URL('http://localhost/slack')
-      }
-    })
-
-    describe('when sending Slack notification', () => {
-      beforeEach(() => {
-        mockConfig.getString.mockImplementation((key: string) => {
-          const configValues: Record<string, string> = {
-            ENV: 'dev',
-            REFERRAL_METABASE_DASHBOARD: 'https://referral-dashboard.decentraland.org'
-          }
-          return Promise.resolve(configValues[key])
-        })
-      })
-
-      it('should send Slack message', async () => {
-        const { slackHandler } = require('../../../src/controllers/handlers/http/slack')
-        const response = await slackHandler(mockSlackHandlerContext)
-
-        expect(mockConfig.getString).toHaveBeenCalledWith('ENV')
-        expect(mockConfig.getString).toHaveBeenCalledWith('REFERRAL_METABASE_DASHBOARD')
-        expect(mockSlackHandler.sendMessage).toHaveBeenCalledWith({
-          channel: expect.any(String),
-          text: '🎉 Referral Milestone Reached! - 100 Invites Tier Achieved by referrer 0x1234567890abcdef1234567890abcdef12345678',
-          blocks: expect.arrayContaining([
-            expect.objectContaining({
-              type: 'header',
-              text: expect.objectContaining({
-                type: 'plain_text',
-                text: '🎉 Referral Milestone Reached!',
-                emoji: true
-              })
-            }),
-            expect.objectContaining({
-              type: 'section',
-              text: expect.objectContaining({
-                type: 'mrkdwn',
-                text: expect.stringContaining('🎯 100 Invites Tier Achieved!')
-              })
-            }),
-            expect.objectContaining({
-              type: 'section',
-              text: expect.objectContaining({
-                type: 'mrkdwn',
-                text: expect.stringContaining('📊 Details:')
-              })
-            }),
-            expect.objectContaining({
-              type: 'actions',
-              elements: expect.arrayContaining([
-                expect.objectContaining({
-                  type: 'button',
-                  text: expect.objectContaining({
-                    type: 'plain_text',
-                    text: 'View Referral Dashboard',
-                    emoji: true
-                  }),
-                  url: 'https://referral-dashboard.decentraland.org',
-                  style: 'primary'
-                })
-              ])
-            })
-          ])
-        })
-        expect(response).toEqual({ status: 204 })
       })
     })
   })

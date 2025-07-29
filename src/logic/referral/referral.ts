@@ -31,8 +31,6 @@ export async function createReferralComponent(
 
   const logger = logs.getLogger('referral-component')
 
-  const isDev = (await config.getString('ENV')) === 'dev'
-
   const [
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5,
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10,
@@ -42,7 +40,9 @@ export async function createReferralComponent(
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50,
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60,
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
-    PROFILE_URL
+    PROFILE_URL,
+    ENV,
+    REFERRAL_METABASE_DASHBOARD
   ] = await Promise.all([
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10'),
@@ -52,8 +52,12 @@ export async function createReferralComponent(
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75'),
-    config.requireString('PROFILE_URL')
+    config.requireString('PROFILE_URL'),
+    config.requireString('ENV'),
+    config.requireString('REFERRAL_METABASE_DASHBOARD')
   ])
+
+  const isDev = ENV === 'dev'
 
   const rewardKeys = {
     5: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5,
@@ -273,7 +277,7 @@ export async function createReferralComponent(
                       text: 'View Referral Dashboard',
                       emoji: true
                     },
-                    url: 'https://metabase.decentraland.systems/dashboard/4958-social-dashboard?alpha_users=true&bot_filter=Real+Users&date=past3months~&known_wallet_filter=User&tab=1057-referrals&time_grouping=',
+                    url: REFERRAL_METABASE_DASHBOARD,
                     style: 'primary'
                   }
                 ]
