@@ -26,6 +26,7 @@ import {
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
+import { slackHandler } from '../handlers/http/slack'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -74,5 +75,6 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.get('/v1/referral-progress', signedFetchMiddleware(), getInvitedUsersAcceptedHandler)
   router.post('/v1/referral-email', signedFetchMiddleware(), addReferralEmailHandler)
 
+  router.get('/slack', slackHandler)
   return router
 }

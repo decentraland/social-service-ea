@@ -66,6 +66,7 @@ import { createRewardComponent } from '../src/adapters/rewards'
 import { createWsPoolComponent } from '../src/logic/ws-pool'
 import { createEmailComponent } from '../src/adapters/email'
 import { createFriendsComponent } from '../src/logic/friends'
+import { createSlackComponent } from '@dcl/slack-component'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -238,7 +239,14 @@ async function initComponents(): Promise<TestComponents> {
 
   const email = await createEmailComponent({ fetcher, config })
 
-  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email })
+  const slack = await createSlackComponent(
+    { logs },
+    {
+      token: 'sometoken'
+    }
+  )
+
+  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack })
 
   const queue = createMemoryQueueAdapter()
 
@@ -317,6 +325,7 @@ async function initComponents(): Promise<TestComponents> {
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     friends,
     communityVoiceChatCache,
-    communityVoiceChatPolling
+    communityVoiceChatPolling,
+    slack
   }
 }

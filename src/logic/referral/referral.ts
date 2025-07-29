@@ -25,11 +25,13 @@ function validateAddress(value: string, field: string): string {
 }
 
 export async function createReferralComponent(
-  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email'>
+  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email' | 'slack'>
 ): Promise<IReferralComponent> {
-  const { referralDb, logs, sns, config, rewards, email: emailComponent } = components
+  const { referralDb, logs, sns, config, rewards, email: emailComponent, slack } = components
 
   const logger = logs.getLogger('referral-component')
+
+  const isDev = (await config.getString('ENV')) === 'dev'
 
   const [
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5,
@@ -231,6 +233,52 @@ export async function createReferralComponent(
         ])
 
         return
+      }
+
+      if (acceptedInvites === TIERS_IRL_SWAG) {
+        await slack.sendMessage({
+          channel: isDev ? 'notifications-dev' : 'referral-notifications',
+          text: '🎉 Referral Milestone Reached! - 100 Invites Tier Achieved by referrer 0x1234567890abcdef1234567890abcdef12345678',
+          blocks: [
+            {
+              type: 'header',
+              text: {
+                type: 'plain_text',
+                text: '🎉 Referral Milestone Reached!',
+                emoji: true
+              }
+            },
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*🎯 100 Invites Tier Achieved!*\n\n*Referrer Wallet:* \`0x1234567890abcdef1234567890abcdef12345678\``
+              }
+            },
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*📊 Details:*\n• Referrer has successfully invited 100 users\n• Tier milestone unlocked\n• Ready for outreach and communication\n\n*💬 Next Steps:*\n• Monitor for email submission from referrer`
+              }
+            },
+            {
+              type: 'actions',
+              elements: [
+                {
+                  type: 'button',
+                  text: {
+                    type: 'plain_text',
+                    text: 'View Referral Dashboard',
+                    emoji: true
+                  },
+                  url: 'https://metabase.decentraland.systems/dashboard/4958-social-dashboard?alpha_users=true&bot_filter=Real+Users&date=past3months~&known_wallet_filter=User&tab=1057-referrals&time_grouping=',
+                  style: 'primary'
+                }
+              ]
+            }
+          ]
+        })
       }
 
       logger.info('Referral finalized successfully', {

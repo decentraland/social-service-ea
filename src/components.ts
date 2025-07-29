@@ -60,6 +60,7 @@ import { createEmailComponent } from './adapters/email'
 import { createFriendsComponent } from './logic/friends'
 import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/community-voice-cache'
 import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
+import { createSlackComponent } from '@dcl/slack-component'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -128,7 +129,6 @@ export async function initComponents(): Promise<AppComponents> {
 
   const email = await createEmailComponent({ fetcher, config })
   const rewards = await createRewardComponent({ fetcher, config })
-  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email })
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
@@ -252,6 +252,11 @@ export async function initComponents(): Promise<AppComponents> {
   const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
   const queue = sqsEndpoint ? await createSqsAdapter(sqsEndpoint) : createMemoryQueueAdapter()
 
+  const slackToken = await config.requireString('SLACK_BOT_TOKEN')
+  const slack = await createSlackComponent({ logs }, { token: slackToken })
+
+  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack })
+
   const messageProcessor = await createMessageProcessorComponent({ logs, referral })
 
   const messageConsumer = createMessagesConsumerComponent({
@@ -264,22 +269,27 @@ export async function initComponents(): Promise<AppComponents> {
     analytics,
     archipelagoStats,
     catalystClient,
+    cdnCacheInvalidator,
     commsGatekeeper,
     communities,
     communitiesDb,
     communityBans,
-    communityOwners,
+    communityBroadcaster,
+    communityEvents,
     communityMembers,
+    communityOwners,
     communityPlaces,
     communityRoles,
-    communityVoice,
-    communityEvents,
-    communityBroadcaster,
     communityThumbnail,
+    communityVoice,
+    communityVoiceChatCache,
+    communityVoiceChatPolling,
+    communityVoiceChatPollingJob,
     config,
     email,
     expirePrivateVoiceChatJob,
     fetcher,
+    friends,
     friendsDb,
     httpServer,
     logs,
@@ -287,9 +297,9 @@ export async function initComponents(): Promise<AppComponents> {
     messageProcessor,
     metrics,
     nats,
+    peerTracking,
     peersStats,
     peersSynchronizer,
-    peerTracking,
     pg,
     placesApi,
     pubsub,
@@ -300,6 +310,7 @@ export async function initComponents(): Promise<AppComponents> {
     rewards,
     rpcServer,
     settings,
+    slack,
     sns,
     statusChecks,
     storage,
@@ -310,11 +321,6 @@ export async function initComponents(): Promise<AppComponents> {
     voice,
     voiceDb,
     worldsStats,
-    wsPool,
-    cdnCacheInvalidator,
-    friends,
-    communityVoiceChatCache,
-    communityVoiceChatPolling,
-    communityVoiceChatPollingJob
+    wsPool
   }
 }
