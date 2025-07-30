@@ -332,8 +332,8 @@ describe('referral-component', () => {
               validReferrer,
               validInvitedUser,
               validIP,
-              mockConfig.requireString('ENV') === 'dev',
-              mockConfig.requireString('REFERRAL_METABASE_DASHBOARD')
+              true,
+              'https://dashboard.decentraland.systems/1234'
             )
           )
         })
@@ -744,7 +744,7 @@ describe('referral-component', () => {
         await referralComponent.finalizeReferral(validInvitedUser)
 
         expect(mockSlack.sendMessage).toHaveBeenCalledWith(
-          referral100InvitesReachedMessage(validReferrer, false, 'https://metabase.example.com/dashboard')
+          referral100InvitesReachedMessage(validReferrer, true, 'https://dashboard.decentraland.systems/1234')
         )
       })
 
