@@ -11,6 +11,7 @@ import {
 } from './errors'
 import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput } from './types'
 import type { AppComponents } from '../../types/system'
+import { referral100InvitesReachedMessage, referralIpMatchRejectionMessage } from '../../utils/slackMessages'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
@@ -143,49 +144,9 @@ export async function createReferralComponent(
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
       if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
         try {
-          await slack.sendMessage({
-            channel: isDev ? 'notifications-dev' : 'referral-notifications',
-            text: `🚨 IP Match Rejection - Referral blocked due to IP limit exceeded`,
-            blocks: [
-              {
-                type: 'header',
-                text: {
-                  type: 'plain_text',
-                  text: '🚨 IP Match Rejection Detected',
-                  emoji: true
-                }
-              },
-              {
-                type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `*⚠️ Suspicious Activity Detected*\n\n*Invited User:* \`${invitedUser}\`\n*IP Address:* \`${invitedUserIP}\`\n*Referrer:* \`${referrer}\``
-                }
-              },
-              {
-                type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `*📊 Details:*\n• IP address has reached maximum of ${MAX_IP_MATCHES} referrals\n• Potential abuse or automated system detected\n• Referral automatically rejected\n\n*🔍 Next Steps:*\n• Monitor for similar patterns\n• Review IP address activity`
-                }
-              },
-              {
-                type: 'actions',
-                elements: [
-                  {
-                    type: 'button',
-                    text: {
-                      type: 'plain_text',
-                      text: 'View Referral Dashboard',
-                      emoji: true
-                    },
-                    url: REFERRAL_METABASE_DASHBOARD,
-                    style: 'danger'
-                  }
-                ]
-              }
-            ]
-          })
+          await slack.sendMessage(
+            referralIpMatchRejectionMessage(referrer, invitedUser, invitedUserIP, isDev, REFERRAL_METABASE_DASHBOARD)
+          )
         } catch (error) {
           logger.warn('Failed to send IP rejection Slack notification', {
             invitedUser,
@@ -294,49 +255,7 @@ export async function createReferralComponent(
 
       if (acceptedInvites === TIERS_IRL_SWAG) {
         try {
-          await slack.sendMessage({
-            channel: isDev ? 'notifications-dev' : 'referral-notifications',
-            text: `🎉 Referral Milestone Reached! - 100 Invites Tier Achieved by referrer ${referrer}`,
-            blocks: [
-              {
-                type: 'header',
-                text: {
-                  type: 'plain_text',
-                  text: '🎉 Referral Milestone Reached!',
-                  emoji: true
-                }
-              },
-              {
-                type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `*🎯 100 Invites Tier Achieved!*\n\n*Referrer Wallet:* \`${referrer}\``
-                }
-              },
-              {
-                type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `*📊 Details:*\n• Referrer has successfully invited 100 users\n• Tier milestone unlocked\n• Ready for outreach and communication\n\n*💬 Next Steps:*\n• Monitor for email submission from referrer`
-                }
-              },
-              {
-                type: 'actions',
-                elements: [
-                  {
-                    type: 'button',
-                    text: {
-                      type: 'plain_text',
-                      text: 'View Referral Dashboard',
-                      emoji: true
-                    },
-                    url: REFERRAL_METABASE_DASHBOARD,
-                    style: 'primary'
-                  }
-                ]
-              }
-            ]
-          })
+          await slack.sendMessage(referral100InvitesReachedMessage(referrer, isDev, REFERRAL_METABASE_DASHBOARD))
         } catch (error) {
           logger.warn('Failed to send Slack notification, but referral was finalized successfully', {
             referrer,
