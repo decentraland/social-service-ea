@@ -11,6 +11,7 @@ import {
 } from './errors'
 import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput } from './types'
 import type { AppComponents } from '../../types/system'
+import { referral100InvitesReachedMessage, referralIpMatchRejectionMessage } from '../../utils/slackMessages'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
@@ -25,9 +26,9 @@ function validateAddress(value: string, field: string): string {
 }
 
 export async function createReferralComponent(
-  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email'>
+  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email' | 'slack'>
 ): Promise<IReferralComponent> {
-  const { referralDb, logs, sns, config, rewards, email: emailComponent } = components
+  const { referralDb, logs, sns, config, rewards, email: emailComponent, slack } = components
 
   const logger = logs.getLogger('referral-component')
 
@@ -40,7 +41,9 @@ export async function createReferralComponent(
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50,
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60,
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
-    PROFILE_URL
+    PROFILE_URL,
+    ENV,
+    REFERRAL_METABASE_DASHBOARD
   ] = await Promise.all([
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10'),
@@ -50,8 +53,12 @@ export async function createReferralComponent(
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75'),
-    config.requireString('PROFILE_URL')
+    config.requireString('PROFILE_URL'),
+    config.requireString('ENV'),
+    config.requireString('REFERRAL_METABASE_DASHBOARD')
   ])
+
+  const isDev = ENV === 'dev'
 
   const rewardKeys = {
     5: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5,
@@ -136,6 +143,19 @@ export async function createReferralComponent(
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
       if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
+        try {
+          await slack.sendMessage(
+            referralIpMatchRejectionMessage(referrer, invitedUser, invitedUserIP, isDev, REFERRAL_METABASE_DASHBOARD)
+          )
+        } catch (error) {
+          logger.warn('Failed to send IP rejection Slack notification', {
+            invitedUser,
+            referrer,
+            invitedUserIP,
+            error: error instanceof Error ? error.message : String(error)
+          })
+        }
+
         throw new ReferralInvalidInputError(
           `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${invitedUserIP}`
         )
@@ -231,6 +251,19 @@ export async function createReferralComponent(
         ])
 
         return
+      }
+
+      if (acceptedInvites === TIERS_IRL_SWAG) {
+        try {
+          await slack.sendMessage(referral100InvitesReachedMessage(referrer, isDev, REFERRAL_METABASE_DASHBOARD))
+        } catch (error) {
+          logger.warn('Failed to send Slack notification, but referral was finalized successfully', {
+            referrer,
+            invitedUser,
+            acceptedInvites,
+            error: error instanceof Error ? error.message : String(error)
+          })
+        }
       }
 
       logger.info('Referral finalized successfully', {

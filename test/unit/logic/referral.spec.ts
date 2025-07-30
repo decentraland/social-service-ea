@@ -10,6 +10,7 @@ import {
 import { Events } from '@dcl/schemas'
 import { RewardStatus } from '../../../src/logic/referral/types'
 import { MAX_IP_MATCHES } from '../../../src/logic/referral/referral'
+import { referralIpMatchRejectionMessage, referral100InvitesReachedMessage } from '../../../src/utils/slackMessages'
 
 describe('referral-component', () => {
   let mockReferralDb: any
@@ -18,6 +19,7 @@ describe('referral-component', () => {
   let mockConfig: any
   let mockRewards: any
   let mockEmail: any
+  let mockSlack: any
   let referralComponent: IReferralComponent
 
   beforeEach(async () => {
@@ -48,7 +50,7 @@ describe('referral-component', () => {
 
     mockConfig = {
       requireString: jest.fn().mockImplementation((key: string) => {
-        const rewardKeys: Record<string, string> = {
+        const configValues: Record<string, string> = {
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20',
@@ -57,9 +59,11 @@ describe('referral-component', () => {
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_50',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_60',
           REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75: 'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75',
-          PROFILE_URL: 'https://decentraland.org/profile'
+          PROFILE_URL: 'https://decentraland.org/profile',
+          ENV: 'dev',
+          REFERRAL_METABASE_DASHBOARD: 'https://dashboard.decentraland.systems/1234'
         }
-        return Promise.resolve(rewardKeys[key])
+        return Promise.resolve(configValues[key])
       })
     }
 
@@ -71,13 +75,18 @@ describe('referral-component', () => {
       sendEmail: jest.fn().mockResolvedValue(undefined)
     }
 
+    mockSlack = {
+      sendMessage: jest.fn().mockResolvedValue(undefined)
+    }
+
     referralComponent = await createReferralComponent({
       referralDb: mockReferralDb,
       logs: { getLogger: () => mockLogger },
       sns: mockSns,
       config: mockConfig,
       rewards: mockRewards,
-      email: mockEmail
+      email: mockEmail,
+      slack: mockSlack
     })
   })
 
@@ -296,6 +305,7 @@ describe('referral-component', () => {
     describe('when IP validation fails', () => {
       describe('and the invited user has been created with the rejected ip match status', () => {
         beforeEach(() => {
+          mockSlack.sendMessage.mockResolvedValueOnce(undefined)
           mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
           mockReferralDb.createReferral.mockResolvedValueOnce({
             referrer: validReferrer,
@@ -304,7 +314,7 @@ describe('referral-component', () => {
           })
         })
 
-        it('should throw ReferralInvalidInputError and create rejected IP match record', async () => {
+        it('should throw ReferralInvalidInputError, create rejected IP match record and send Slack notification', async () => {
           await expect(referralComponent.create(validInput)).rejects.toThrow(
             new ReferralInvalidInputError(
               `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${validIP}`
@@ -315,6 +325,44 @@ describe('referral-component', () => {
             referrer: validReferrer.toLowerCase(),
             invitedUser: validInvitedUser.toLowerCase(),
             invitedUserIP: validIP
+          })
+
+          expect(mockSlack.sendMessage).toHaveBeenCalledWith(
+            referralIpMatchRejectionMessage(
+              validReferrer,
+              validInvitedUser,
+              validIP,
+              true,
+              'https://dashboard.decentraland.systems/1234'
+            )
+          )
+        })
+
+        describe('and Slack notification fails', () => {
+          beforeEach(() => {
+            mockSlack.sendMessage.mockReset()
+            mockSlack.sendMessage.mockRejectedValueOnce(new Error('Slack service unavailable'))
+            mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+            mockReferralDb.createReferral.mockResolvedValueOnce({
+              referrer: validReferrer,
+              invited_user: validInvitedUser,
+              status: ReferralProgressStatus.REJECTED_IP_MATCH
+            })
+          })
+
+          it('should still throw error even', async () => {
+            await expect(referralComponent.create(validInput)).rejects.toThrow(
+              new ReferralInvalidInputError(
+                `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${validIP}`
+              )
+            )
+
+            expect(mockLogger.warn).toHaveBeenCalledWith('Failed to send IP rejection Slack notification', {
+              invitedUser: validInvitedUser.toLowerCase(),
+              referrer: validReferrer.toLowerCase(),
+              invitedUserIP: validIP,
+              error: 'Slack service unavailable'
+            })
           })
         })
       })
@@ -675,6 +723,69 @@ describe('referral-component', () => {
           validInvitedUser.toLowerCase(),
           ReferralProgressStatus.TIER_GRANTED
         )
+      })
+    })
+
+    describe('when referral reaches 100 invited users', () => {
+      beforeEach(() => {
+        mockSlack.sendMessage.mockResolvedValueOnce(undefined)
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.SIGNED_UP
+          }
+        ])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
+      })
+
+      it('should send Slack notification', async () => {
+        await referralComponent.finalizeReferral(validInvitedUser)
+
+        expect(mockSlack.sendMessage).toHaveBeenCalledWith(
+          referral100InvitesReachedMessage(validReferrer, true, 'https://dashboard.decentraland.systems/1234')
+        )
+      })
+
+      describe('and Slack notification fails', () => {
+        beforeEach(() => {
+          mockSlack.sendMessage.mockReset()
+          mockSlack.sendMessage.mockRejectedValueOnce(new Error('Slack service unavailable'))
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+            {
+              referrer: validReferrer,
+              invited_user: validInvitedUser,
+              status: ReferralProgressStatus.SIGNED_UP
+            }
+          ])
+          mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+          mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
+        })
+
+        it('should still finalize referral even if Slack fails', async () => {
+          await referralComponent.finalizeReferral(validInvitedUser)
+
+          expect(mockReferralDb.updateReferralProgress).toHaveBeenCalledWith(
+            validInvitedUser.toLowerCase(),
+            ReferralProgressStatus.TIER_GRANTED
+          )
+          expect(mockSns.publishMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: Events.Type.REFERRAL,
+              subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED
+            })
+          )
+          expect(mockLogger.warn).toHaveBeenCalledWith(
+            'Failed to send Slack notification, but referral was finalized successfully',
+            expect.objectContaining({
+              referrer: validReferrer.toLowerCase(),
+              invitedUser: validInvitedUser.toLowerCase(),
+              acceptedInvites: 100,
+              error: 'Slack service unavailable'
+            })
+          )
+        })
       })
     })
   })

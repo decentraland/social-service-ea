@@ -63,6 +63,7 @@ import { IJobComponent } from '../logic/job'
 import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
+import { ISlackComponent } from '@dcl/slack-component'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -127,6 +128,7 @@ export type BaseComponents = {
   communityVoiceChatCache: ICommunityVoiceChatCacheComponent
   communityVoiceChatPolling: ICommunityVoiceChatPollingComponent
   communityVoiceChatPollingJob?: IJobComponent
+  slack: ISlackComponent
 }
 
 // components used in runtime

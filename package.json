@@ -51,6 +51,7 @@
     "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-16572350247.commit-26e89e0.tgz",
     "@dcl/rpc": "^1.1.2",
     "@dcl/schemas": "^17.1.0",
+    "@dcl/slack-component": "^1.0.1",
     "@sentry/node": "^9.12.0",
     "@well-known-components/env-config-provider": "^1.2.0",
     "@well-known-components/fetch-component": "^2.0.2",
