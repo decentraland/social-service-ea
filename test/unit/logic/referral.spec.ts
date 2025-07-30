@@ -10,6 +10,7 @@ import {
 import { Events } from '@dcl/schemas'
 import { RewardStatus } from '../../../src/logic/referral/types'
 import { MAX_IP_MATCHES } from '../../../src/logic/referral/referral'
+import { referralIpMatchRejectionMessage, referral100InvitesReachedMessage } from '../../../src/utils/slackMessages'
 
 describe('referral-component', () => {
   let mockReferralDb: any
@@ -326,49 +327,15 @@ describe('referral-component', () => {
             invitedUserIP: validIP
           })
 
-          expect(mockSlack.sendMessage).toHaveBeenCalledWith({
-            channel: expect.any(String),
-            text: '🚨 IP Match Rejection - Referral blocked due to IP limit exceeded',
-            blocks: expect.arrayContaining([
-              expect.objectContaining({
-                type: 'header',
-                text: expect.objectContaining({
-                  type: 'plain_text',
-                  text: '🚨 IP Match Rejection Detected',
-                  emoji: true
-                })
-              }),
-              expect.objectContaining({
-                type: 'section',
-                text: expect.objectContaining({
-                  type: 'mrkdwn',
-                  text: expect.stringContaining('⚠️ Suspicious Activity Detected')
-                })
-              }),
-              expect.objectContaining({
-                type: 'section',
-                text: expect.objectContaining({
-                  type: 'mrkdwn',
-                  text: expect.stringContaining('📊 Details:')
-                })
-              }),
-              expect.objectContaining({
-                type: 'actions',
-                elements: expect.arrayContaining([
-                  expect.objectContaining({
-                    type: 'button',
-                    text: expect.objectContaining({
-                      type: 'plain_text',
-                      text: 'View Referral Dashboard',
-                      emoji: true
-                    }),
-                    url: expect.stringContaining('dashboard.decentraland.systems'),
-                    style: 'danger'
-                  })
-                ])
-              })
-            ])
-          })
+          expect(mockSlack.sendMessage).toHaveBeenCalledWith(
+            referralIpMatchRejectionMessage(
+              validReferrer,
+              validInvitedUser,
+              validIP,
+              mockConfig.requireString('ENV') === 'dev',
+              mockConfig.requireString('REFERRAL_METABASE_DASHBOARD')
+            )
+          )
         })
 
         describe('and Slack notification fails', () => {
@@ -776,51 +743,9 @@ describe('referral-component', () => {
       it('should send Slack notification', async () => {
         await referralComponent.finalizeReferral(validInvitedUser)
 
-        expect(mockSlack.sendMessage).toHaveBeenCalledWith({
-          channel: expect.any(String),
-          text: `🎉 Referral Milestone Reached! - 100 Invites Tier Achieved by referrer ${validReferrer.toLowerCase()}`,
-          blocks: expect.arrayContaining([
-            expect.objectContaining({
-              type: 'header',
-              text: expect.objectContaining({
-                type: 'plain_text',
-                text: '🎉 Referral Milestone Reached!',
-                emoji: true
-              })
-            }),
-            expect.objectContaining({
-              type: 'section',
-              text: expect.objectContaining({
-                type: 'mrkdwn',
-                text: expect.stringContaining(
-                  `🎯 100 Invites Tier Achieved!*\n\n*Referrer Wallet:* \`${validReferrer.toLowerCase()}\``
-                )
-              })
-            }),
-            expect.objectContaining({
-              type: 'section',
-              text: expect.objectContaining({
-                type: 'mrkdwn',
-                text: expect.stringContaining('📊 Details:')
-              })
-            }),
-            expect.objectContaining({
-              type: 'actions',
-              elements: expect.arrayContaining([
-                expect.objectContaining({
-                  type: 'button',
-                  text: expect.objectContaining({
-                    type: 'plain_text',
-                    text: 'View Referral Dashboard',
-                    emoji: true
-                  }),
-                  url: expect.stringContaining('dashboard.decentraland.systems'),
-                  style: 'primary'
-                })
-              ])
-            })
-          ])
-        })
+        expect(mockSlack.sendMessage).toHaveBeenCalledWith(
+          referral100InvitesReachedMessage(validReferrer, false, 'https://metabase.example.com/dashboard')
+        )
       })
 
       describe('and Slack notification fails', () => {
