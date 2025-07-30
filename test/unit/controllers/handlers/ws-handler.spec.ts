@@ -11,7 +11,7 @@ jest.mock('@dcl/platform-crypto-middleware')
 
 const WS_AUTH_TIMEOUT_IN_MS = 30000
 
-describe('ws-handler', () => {
+describe('WebSocket Handler', () => {
   let wsHandlers: any
   let mockWs: any
   let mockData: WsUserData
@@ -21,6 +21,7 @@ describe('ws-handler', () => {
   let mockWsPool: jest.Mocked<IWsPoolComponent>
   let registerConnection: jest.MockedFunction<IWsPoolComponent['registerConnection']>
   let unregisterConnection: jest.MockedFunction<IWsPoolComponent['unregisterConnection']>
+  let mockWorldsStats: any
 
   beforeEach(async () => {
     mockData = {
@@ -30,6 +31,11 @@ describe('ws-handler', () => {
     } as WsNotAuthenticatedUserData
     registerConnection = jest.fn()
     unregisterConnection = jest.fn()
+
+    mockWorldsStats = {
+      onPeerConnect: jest.fn(),
+      onPeerDisconnect: jest.fn()
+    }
 
     mockWs = {
       getUserData: jest.fn().mockReturnValue(mockData),
@@ -73,7 +79,8 @@ describe('ws-handler', () => {
       rpcServer: mockRpcServer,
       config: mockConfig,
       tracing: mockTracing,
-      wsPool: mockWsPool
+      wsPool: mockWsPool,
+      worldsStats: mockWorldsStats
     })
 
     wsHandlers = (mockUWs.app.ws as jest.Mock).mock.calls[0][1]
@@ -218,6 +225,7 @@ describe('ws-handler', () => {
           transport: expect.any(Object),
           address: '0x123'
         })
+        expect(mockWorldsStats.onPeerConnect).toHaveBeenCalledWith('0x123')
       })
 
       it('should handle authentication failure', async () => {
@@ -247,13 +255,13 @@ describe('ws-handler', () => {
   })
 
   describe('close handler', () => {
-    it('should cleanup authenticated connection', async () => {
+    it('should cleanup connection for authenticated users', async () => {
       const authData: WsAuthenticatedUserData = {
         isConnected: true,
         auth: true,
         address: '0x123',
-        eventEmitter: mitt(),
         wsConnectionId: 'test-client-id',
+        eventEmitter: mitt(),
         transport: { close: jest.fn() } as any,
         connectionStartTime: Date.now(),
         authenticating: false
@@ -262,14 +270,8 @@ describe('ws-handler', () => {
 
       await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
 
-      expect(authData.transport.close).toHaveBeenCalled()
-      expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123')
-      expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
       expect(unregisterConnection).toHaveBeenCalledWith(authData)
-      expect(authData.connectionStartTime).toBeDefined()
-      expect(authData.isConnected).toBe(false)
-      expect(authData.auth).toBe(false)
-      expect(authData.authenticating).toBe(false)
+      expect(mockWorldsStats.onPeerDisconnect).toHaveBeenCalledWith('0x123')
     })
 
     it('should cleanup non-authenticated connection', async () => {

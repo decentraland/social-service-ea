@@ -21,10 +21,10 @@ const getAddress = (data: WsUserData) => {
 export async function registerWsHandler(
   components: Pick<
     AppComponents,
-    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing' | 'wsPool'
+    'logs' | 'uwsServer' | 'metrics' | 'fetcher' | 'rpcServer' | 'config' | 'tracing' | 'wsPool' | 'worldsStats'
   >
 ) {
-  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool } = components
+  const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool, worldsStats } = components
   const logger = logs.getLogger('ws-handler')
 
   const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_MS')) ?? 300000 // 3 minutes in ms
@@ -42,6 +42,15 @@ export async function registerWsHandler(
         data.transport.close()
         rpcServer.detachUser(data.address)
         data.eventEmitter.all.clear()
+
+        // Remove user from worlds stats when they disconnect
+        worldsStats.onPeerDisconnect(data.address).catch((error: any) => {
+          logger.error('Failed to remove user from worlds stats on disconnect', {
+            error: error.message,
+            address: data.address,
+            wsConnectionId
+          })
+        })
       } catch (error: any) {
         tracing.captureException(error as Error, {
           address: getAddress(data),
@@ -84,6 +93,18 @@ export async function registerWsHandler(
       const address = normalizeAddress(verifyResult.auth)
 
       logger.debug('Authenticated User', { address, wsConnectionId: data.wsConnectionId })
+
+      // Immediately track the connection in worlds stats for real-time peer counting
+      try {
+        await worldsStats.onPeerConnect(address)
+        logger.debug('User connection tracked in worlds stats', { address, wsConnectionId: data.wsConnectionId })
+      } catch (error: any) {
+        logger.error('Failed to track user connection in worlds stats', {
+          error: error.message,
+          address,
+          wsConnectionId: data.wsConnectionId
+        })
+      }
 
       const eventEmitter = mitt<IUWebSocketEventMap>()
       const transport = await createUWebSocketTransport(ws, eventEmitter, components)
