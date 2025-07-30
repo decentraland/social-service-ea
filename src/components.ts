@@ -171,7 +171,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
-  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
+  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats, logs })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
   const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })

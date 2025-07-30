@@ -22,6 +22,12 @@ export async function createPeersSynchronizerComponent({
       await redis.put(PEERS_CACHE_KEY, currentPeers, {
         EX: cacheTTLInSeconds
       })
+
+      logger.info('Synced peers to archipelago cache', {
+        peerCount: currentPeers.length,
+        cacheTTLSeconds: cacheTTLInSeconds,
+        peers: currentPeers.slice(0, 5).join(',') // Log first 5 peers
+      })
     } catch (error: any) {
       logger.error('Error syncing peers:', error)
     }

@@ -1,5 +1,5 @@
 import { createPeersStatsComponent } from '../../../src/logic/peers-stats'
-import { mockArchipelagoStats, mockWorldsStats } from '../../mocks/components'
+import { mockArchipelagoStats, mockWorldsStats, mockLogs } from '../../mocks/components'
 
 describe('when handling peers stats operations', () => {
   let peersStatsComponent: ReturnType<typeof createPeersStatsComponent>
@@ -14,7 +14,8 @@ describe('when handling peers stats operations', () => {
 
     peersStatsComponent = createPeersStatsComponent({
       archipelagoStats: mockArchipelagoStats,
-      worldsStats: mockWorldsStats
+      worldsStats: mockWorldsStats,
+      logs: mockLogs
     })
   })
 
@@ -37,6 +38,18 @@ describe('when handling peers stats operations', () => {
 
         expect(mockArchipelagoStats.getPeers).toHaveBeenCalled()
         expect(mockWorldsStats.getPeers).toHaveBeenCalled()
+      })
+
+      it('should prioritize worlds stats over archipelago stats', async () => {
+        // Simulate archipelago stats having stale data (missing a peer that exists in worlds stats)
+        mockArchipelagoStats.getPeers.mockResolvedValue([mockPeers[0], mockPeers[1]])
+        mockWorldsStats.getPeers.mockResolvedValue([mockPeers[1], mockPeers[2], mockPeers[3]])
+
+        const result = await peersStatsComponent.getConnectedPeers()
+
+        // Should include all peers from worlds stats, even if archipelago stats is missing some
+        expect(result).toContain(mockPeers[3]) // This peer only exists in worlds stats
+        expect(result).toHaveLength(4) // All unique peers
       })
     })
 

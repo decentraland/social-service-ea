@@ -20,15 +20,26 @@ export async function createArchipelagoStatsComponent({
         }
 
         const { peers } = await response.json()
+        const peerIds = peers.map((peer: { id: string }) => peer.id)
 
-        return peers.map((peer: { id: string }) => peer.id)
+        logger.info('Fetched peers from external archipelago service', {
+          peerCount: peerIds.length,
+          peers: peerIds.slice(0, 5).join(',') // Log first 5 peers
+        })
+
+        return peerIds
       } catch (error: any) {
         logger.error(`Error fetching peers from archipelago stats: ${error.message}`)
         throw error
       }
     },
     async getPeers() {
-      return (await redis.get<string[]>(PEERS_CACHE_KEY)) || []
+      const cachedPeers = (await redis.get<string[]>(PEERS_CACHE_KEY)) || []
+      logger.debug('Retrieved peers from archipelago stats cache', {
+        peerCount: cachedPeers.length,
+        peers: cachedPeers.slice(0, 5).join(',') // Log first 5 peers
+      })
+      return cachedPeers
     }
   }
 }
