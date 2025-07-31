@@ -40,7 +40,7 @@ export async function createCommunityMembersComponent(
 
   const filterAndCountCommunityMembers = async (id: string, options: GetCommunityMembersOptions) => {
     const { pagination, onlyOnline, as: userAddress, byPassPrivacy } = options
-    const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress })
+    const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress && !byPassPrivacy })
 
     if (!communityExists) {
       throw new CommunityNotFoundError(id)

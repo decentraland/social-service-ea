@@ -3,8 +3,7 @@ import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityMemberProfile, CommunityNotFoundError, GetCommunityMembersOptions } from '../../../logic/community'
 import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { getPaginationResultProperties } from '../../../utils/pagination'
-import { EthAddress, PaginatedResponse } from '@dcl/schemas'
-import { IConfigComponent } from '@well-known-components/interfaces'
+import { PaginatedResponse } from '@dcl/schemas'
 
 export async function getCommunityMembersHandler(
   context: Pick<
