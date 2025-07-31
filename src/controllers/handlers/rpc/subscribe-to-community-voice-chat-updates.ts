@@ -13,7 +13,6 @@ function parseEmittedUpdateToCommunityVoiceChatUpdate(
 ): CommunityVoiceChatUpdate {
   return {
     communityId: update.communityId,
-    voiceChatId: update.voiceChatId,
     createdAt: Date.now(),
     status: update.status,
     positions: update.positions || [],

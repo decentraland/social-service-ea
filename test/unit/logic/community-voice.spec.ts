@@ -319,7 +319,7 @@ describe('Community Voice Logic', () => {
             mockCommunitiesDb.getCommunityPlaces!.mockRejectedValue(new Error('Places fetch failed'))
           })
 
-          it('should successfully start a community voice chat without positions when fetch fails', async () => {
+          it('should successfully start a community voice chat without positions', async () => {
             const result = await communityVoice.startCommunityVoiceChat(communityId, creatorAddress)
 
             expect(result).toEqual({ connectionUrl: 'test-connection-url' })
@@ -340,7 +340,7 @@ describe('Community Voice Logic', () => {
             mockPlacesApi.getPlaces.mockRejectedValue(new Error('PlacesApi failed'))
           })
 
-          it('should successfully start a community voice chat without positions when placesApi fails', async () => {
+          it('should successfully start a community voice chat without positions', async () => {
             const result = await communityVoice.startCommunityVoiceChat(communityId, creatorAddress)
 
             expect(result).toEqual({ connectionUrl: 'test-connection-url' })

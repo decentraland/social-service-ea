@@ -213,12 +213,20 @@ export function createUpdateHandlerComponent(
 
     const onlineSubscribers = subscribersContext.getSubscribersAddresses()
 
-    // Notify ALL online users about the voice chat update with personalized membership info
-    const membershipChecks = onlineSubscribers.map(async (userAddress) => {
-      try {
-        // Check if user is a member of the community
-        const userRole = await communitiesDb.getCommunityMemberRole(update.communityId, userAddress)
-        const isMember = userRole !== CommunityRole.None // Any role other than 'none' means member
+    try {
+      // Get all online members of this community in a single efficient query
+      const batches = communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)
+      const communityMemberAddresses = new Set<string>()
+
+      for await (const batch of batches) {
+        batch.forEach(({ memberAddress }) => {
+          communityMemberAddresses.add(memberAddress)
+        })
+      }
+
+      // Notify ALL online users with personalized membership info
+      const notifications = onlineSubscribers.map(async (userAddress) => {
+        const isMember = communityMemberAddresses.has(userAddress)
 
         // Create personalized update for this user
         const personalizedUpdate = {
@@ -231,9 +239,17 @@ export function createUpdateHandlerComponent(
         if (updateEmitter) {
           updateEmitter.emit('communityVoiceChatUpdate', personalizedUpdate)
         }
-      } catch (error) {
-        logger.warn(`Failed to check membership for user ${userAddress} in community ${update.communityId}`)
-        // Send update without membership info if check fails
+      })
+
+      // Wait for all notifications to complete
+      await Promise.all(notifications)
+
+      logger.info(`Community voice chat update sent to ${onlineSubscribers.length} online users`)
+    } catch (error) {
+      logger.error(`Failed to process community voice chat update for community ${update.communityId}: ${error}`)
+
+      // Fallback: send update to all users without membership info
+      const fallbackNotifications = onlineSubscribers.map(async (userAddress) => {
         const fallbackUpdate = {
           ...update,
           isMember: false
@@ -243,13 +259,11 @@ export function createUpdateHandlerComponent(
         if (updateEmitter) {
           updateEmitter.emit('communityVoiceChatUpdate', fallbackUpdate)
         }
-      }
-    })
+      })
 
-    // Wait for all membership checks to complete
-    await Promise.all(membershipChecks)
-
-    logger.info(`Community voice chat update sent to ${onlineSubscribers.length} online users`)
+      await Promise.all(fallbackNotifications)
+      logger.warn(`Sent fallback community voice chat update to ${onlineSubscribers.length} online users`)
+    }
   })
 
   async function* handleSubscriptionUpdates<T, U>({

@@ -126,8 +126,11 @@ describe('Community Voice Chat Polling Component', () => {
 
         expect(mockPublishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
           communityId,
-          status: 'ended',
-          ended_at: expect.any(Number)
+          status: 1, // COMMUNITY_VOICE_CHAT_ENDED enum value
+          ended_at: expect.any(Number),
+          positions: [],
+          communityName: '',
+          communityImage: undefined
         })
       })
     })
@@ -159,7 +162,10 @@ describe('Community Voice Chat Polling Component', () => {
           COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
           expect.objectContaining({
             communityId,
-            status: 'ended'
+            status: 1, // COMMUNITY_VOICE_CHAT_ENDED enum value
+            positions: [],
+            communityName: '',
+            communityImage: undefined
           })
         )
       })
@@ -185,11 +191,11 @@ describe('Community Voice Chat Polling Component', () => {
         mockGetCommunityVoiceChatStatus
           .mockResolvedValueOnce({ isActive: true })
           .mockResolvedValueOnce({ isActive: false })
-        
+
         mockUpdateAndDetectChange
           .mockResolvedValueOnce(false) // No change for community-1
-          .mockResolvedValueOnce(true)  // Change detected for community-2 (ended)
-        
+          .mockResolvedValueOnce(true) // Change detected for community-2 (ended)
+
         mockPublishInChannel.mockResolvedValue(undefined)
       })
 
@@ -201,7 +207,10 @@ describe('Community Voice Chat Polling Component', () => {
           COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
           expect.objectContaining({
             communityId: 'community-2',
-            status: 'ended'
+            status: 1, // COMMUNITY_VOICE_CHAT_ENDED enum value
+            positions: [],
+            communityName: '',
+            communityImage: undefined
           })
         )
       })

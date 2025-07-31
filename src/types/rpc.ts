@@ -1,7 +1,6 @@
 import type { IHttpServerComponent } from '@well-known-components/interfaces'
 import { Emitter } from 'mitt'
 import {
-  CommunityVoiceChatStatus,
   CommunityVoiceChatUpdate,
   ConnectivityStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'

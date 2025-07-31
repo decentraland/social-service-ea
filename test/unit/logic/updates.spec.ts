@@ -960,13 +960,14 @@ describe('Updates Handlers', () => {
 
     describe('when community voice chat starts', () => {
       beforeEach(() => {
-        // Mock membership checks - 456 is member, others are not
-        mockCommunitiesDb.getCommunityMemberRole.mockImplementation(
-          async (communityId: string, userAddress: string) => {
-            if (userAddress === '0x456') return 'member'
-            return 'none'
-          }
-        )
+        // Mock community members - 456 is member, others are not
+        mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* (
+          communityId: string,
+          onlineUsers: string[]
+        ) {
+          // Only return 0x456 as a member of the community
+          yield [{ communityId, memberAddress: '0x456' }]
+        })
       })
 
       it('should notify ALL online users about the voice chat update with personalized membership info', async () => {
@@ -1034,17 +1035,50 @@ describe('Updates Handlers', () => {
           communityImage: undefined
         })
       })
+
+      it('should send fallback updates when community members query fails', async () => {
+        const update = {
+          communityId: 'community-1',
+          voiceChatId: 'voice-chat-1',
+          status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: ['1,1', '1,2'],
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg'
+        }
+
+        // Mock community members to throw an error
+        mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
+          throw new Error('Community members query failed')
+        })
+
+        await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
+
+        // Should send fallback updates to all users with isMember: false
+        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false
+        })
+        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false
+        })
+        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false
+        })
+      })
     })
 
     describe('when community voice chat ends', () => {
       beforeEach(() => {
-        // Mock membership checks - 456 is member, others are not
-        mockCommunitiesDb.getCommunityMemberRole.mockImplementation(
-          async (communityId: string, userAddress: string) => {
-            if (userAddress === '0x456') return 'member'
-            return 'none'
-          }
-        )
+        // Mock community members - 456 is member, others are not
+        mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* (
+          communityId: string,
+          onlineUsers: string[]
+        ) {
+          // Only return 0x456 as a member of the community
+          yield [{ communityId, memberAddress: '0x456' }]
+        })
       })
 
       it('should notify ALL online users about the ended voice chat', async () => {
