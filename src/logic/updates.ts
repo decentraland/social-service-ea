@@ -209,16 +209,57 @@ export function createUpdateHandlerComponent(
     logger.info('Community voice chat update', { update: JSON.stringify(update) })
 
     const onlineSubscribers = subscribersContext.getSubscribersAddresses()
-    const batches = communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)
 
-    // Notify all online members of the community about the voice chat update
-    for await (const batch of batches) {
-      batch.forEach(({ memberAddress }) => {
-        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
+    try {
+      // Get all online members of this community in a single efficient query
+      const batches = communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)
+      const communityMemberAddresses = new Set<string>()
+
+      for await (const batch of batches) {
+        batch.forEach(({ memberAddress }) => {
+          communityMemberAddresses.add(memberAddress)
+        })
+      }
+
+      // Notify ALL online users with personalized membership info
+      const notifications = onlineSubscribers.map(async (userAddress) => {
+        const isMember = communityMemberAddresses.has(userAddress)
+
+        // Create personalized update for this user
+        const personalizedUpdate = {
+          ...update,
+          isMember
+        }
+
+        logger.info('Personalized update', { personalizedUpdate: JSON.stringify(personalizedUpdate) }) //TODO: remove this after testing it out
+        const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
         if (updateEmitter) {
-          updateEmitter.emit('communityVoiceChatUpdate', update)
+          updateEmitter.emit('communityVoiceChatUpdate', personalizedUpdate)
         }
       })
+
+      // Wait for all notifications to complete
+      await Promise.all(notifications)
+
+      logger.info(`Community voice chat update sent to ${onlineSubscribers.length} online users`)
+    } catch (error) {
+      logger.error(`Failed to process community voice chat update for community ${update.communityId}: ${error}`)
+
+      // Fallback: send update to all users without membership info
+      const fallbackNotifications = onlineSubscribers.map(async (userAddress) => {
+        const fallbackUpdate = {
+          ...update,
+          isMember: false
+        }
+
+        const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('communityVoiceChatUpdate', fallbackUpdate)
+        }
+      })
+
+      await Promise.all(fallbackNotifications)
+      logger.warn(`Sent fallback community voice chat update to ${onlineSubscribers.length} online users`)
     }
   })
 

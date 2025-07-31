@@ -2,6 +2,7 @@ import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, CommunityVoiceChat, CommunityRole, CommunityVoiceChatStatus } from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage } from '../../utils/errors'
+import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import {
   CommunityVoiceChatNotFoundError,
@@ -21,8 +22,20 @@ export async function createCommunityVoiceComponent({
   pubsub,
   analytics,
   catalystClient,
-  communityVoiceChatCache
-}: Pick<AppComponents, 'logs' | 'commsGatekeeper' | 'communitiesDb' | 'pubsub' | 'analytics' | 'catalystClient'> & {
+  communityVoiceChatCache,
+  placesApi,
+  communityThumbnail
+}: Pick<
+  AppComponents,
+  | 'logs'
+  | 'commsGatekeeper'
+  | 'communitiesDb'
+  | 'pubsub'
+  | 'analytics'
+  | 'catalystClient'
+  | 'placesApi'
+  | 'communityThumbnail'
+> & {
   communityVoiceChatCache: ICommunityVoiceChatCacheComponent
 }): Promise<ICommunityVoiceComponent> {
   const logger = logs.getLogger('community-voice-logic')
@@ -102,10 +115,56 @@ export async function createCommunityVoiceComponent({
       // Add to cache as active
       await communityVoiceChatCache.setCommunityVoiceChat(communityId, Date.now())
 
-      // Publish start event
+      // Get community information for the update
+      let communityPositions: string[] = []
+      let communityName = ''
+      let communityImage: string | undefined = undefined
+
+      try {
+        // Get community basic info and thumbnail
+        const [community, thumbnail] = await Promise.all([
+          communitiesDb.getCommunity(communityId),
+          communityThumbnail.getThumbnail(communityId)
+        ])
+
+        if (community) {
+          communityName = community.name
+          communityImage = thumbnail || undefined
+        }
+
+        // Get community positions
+        const places = await communitiesDb.getCommunityPlaces(communityId)
+        const placeIds = places.map((place) => place.id)
+
+        if (placeIds.length > 0) {
+          const uniquePlaceIds = Array.from(new Set(placeIds))
+          const placesData = await placesApi.getPlaces(uniquePlaceIds)
+
+          // Extract all positions from all places
+          communityPositions = placesData?.flatMap((place) => place.positions) || []
+
+          logger.info(
+            `Found ${communityPositions.length} positions for community ${communityId} from ${uniquePlaceIds.length} places`,
+            {
+              placesCount: uniquePlaceIds.length,
+              positionsCount: communityPositions.length
+            }
+          )
+        }
+      } catch (error) {
+        logger.warn(
+          `Failed to fetch community information for community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+        )
+        // Continue without community info - non-critical error
+      }
+
+      // Publish start event with community information using protocol enum
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId,
-        status: 'started'
+        status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+        positions: communityPositions,
+        communityName,
+        communityImage
       })
 
       // Analytics event

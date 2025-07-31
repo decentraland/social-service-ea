@@ -33,6 +33,8 @@ describe('Community Voice Logic', () => {
   let communityVoice: ICommunityVoiceComponent
   let logger: jest.Mocked<ReturnType<ILoggerComponent['getLogger']>>
   let mockCommunityVoiceChatCache: jest.Mocked<ICommunityVoiceChatCacheComponent>
+  let mockPlacesApi: jest.Mocked<any>
+  let mockCommunityThumbnail: jest.Mocked<any>
 
   beforeEach(async () => {
     logger = {
@@ -52,7 +54,8 @@ describe('Community Voice Logic', () => {
     mockCommunitiesDb = {
       getCommunityMemberRole: jest.fn(),
       getCommunity: jest.fn(),
-      isMemberBanned: jest.fn()
+      isMemberBanned: jest.fn(),
+      getCommunityPlaces: jest.fn()
     }
 
     mockPubsub = {
@@ -84,6 +87,14 @@ describe('Community Voice Logic', () => {
       size: jest.fn()
     } as jest.Mocked<ICommunityVoiceChatCacheComponent>
 
+    mockPlacesApi = {
+      getPlaces: jest.fn()
+    }
+
+    mockCommunityThumbnail = {
+      getThumbnail: jest.fn()
+    }
+
     communityVoice = await createCommunityVoiceComponent({
       logs: mockLogs,
       commsGatekeeper: mockCommsGatekeeper,
@@ -91,7 +102,9 @@ describe('Community Voice Logic', () => {
       pubsub: mockPubsub,
       analytics: mockAnalytics,
       catalystClient: mockCatalystClient,
-      communityVoiceChatCache: mockCommunityVoiceChatCache
+      communityVoiceChatCache: mockCommunityVoiceChatCache,
+      placesApi: mockPlacesApi,
+      communityThumbnail: mockCommunityThumbnail
     })
   })
 
@@ -114,6 +127,21 @@ describe('Community Voice Logic', () => {
       describe('when user is an owner', () => {
         beforeEach(() => {
           mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
+          mockCommunitiesDb.getCommunity!.mockResolvedValue({
+            id: communityId,
+            name: 'Test Community',
+            description: 'Test Description',
+            ownerAddress: '0x123',
+            privacy: 'public',
+            active: true,
+            role: CommunityRole.Owner
+          })
+          mockCommunityThumbnail.getThumbnail.mockResolvedValue('test-community.jpg')
+          mockCommunitiesDb.getCommunityPlaces!.mockResolvedValue([{ id: 'place-1' }, { id: 'place-2' }])
+          mockPlacesApi.getPlaces.mockResolvedValue([
+            { id: 'place-1', title: 'Place 1', positions: ['1,1', '1,2'], owner: '0x123' },
+            { id: 'place-2', title: 'Place 2', positions: ['2,1', '2,2'], owner: '0x123' }
+          ])
         })
 
         describe('when profile data is available', () => {
@@ -143,7 +171,10 @@ describe('Community Voice Logic', () => {
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
-              status: 'started'
+              status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+              positions: ['1,1', '1,2', '2,1', '2,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-community.jpg'
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -175,7 +206,10 @@ describe('Community Voice Logic', () => {
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
-              status: 'started'
+              status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+              positions: ['1,1', '1,2', '2,1', '2,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-community.jpg'
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -188,6 +222,21 @@ describe('Community Voice Logic', () => {
       describe('when user is a moderator', () => {
         beforeEach(() => {
           mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Moderator)
+          mockCommunitiesDb.getCommunity!.mockResolvedValue({
+            id: communityId,
+            name: 'Test Community',
+            description: 'Test Description',
+            ownerAddress: '0x123',
+            privacy: 'public',
+            active: true,
+            role: CommunityRole.Owner
+          })
+          mockCommunityThumbnail.getThumbnail.mockResolvedValue('test-community.jpg')
+          mockCommunitiesDb.getCommunityPlaces!.mockResolvedValue([{ id: 'place-1' }, { id: 'place-2' }])
+          mockPlacesApi.getPlaces.mockResolvedValue([
+            { id: 'place-1', title: 'Place 1', positions: ['1,1', '1,2'], owner: '0x123' },
+            { id: 'place-2', title: 'Place 2', positions: ['2,1', '2,2'], owner: '0x123' }
+          ])
         })
 
         describe('when profile data is available', () => {
@@ -217,7 +266,10 @@ describe('Community Voice Logic', () => {
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
-              status: 'started'
+              status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+              positions: ['1,1', '1,2', '2,1', '2,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-community.jpg'
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -249,11 +301,55 @@ describe('Community Voice Logic', () => {
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
-              status: 'started'
+              status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+              positions: ['1,1', '1,2', '2,1', '2,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-community.jpg'
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
               user_id: creatorAddress
+            })
+          })
+        })
+
+        describe('when getCommunityPlaces fails', () => {
+          beforeEach(() => {
+            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
+            mockCommunitiesDb.getCommunityPlaces!.mockRejectedValue(new Error('Places fetch failed'))
+          })
+
+          it('should successfully start a community voice chat without positions', async () => {
+            const result = await communityVoice.startCommunityVoiceChat(communityId, creatorAddress)
+
+            expect(result).toEqual({ connectionUrl: 'test-connection-url' })
+            expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
+              communityId,
+              status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+              positions: [],
+              communityName: 'Test Community', // Still gets community info even when places fail
+              communityImage: 'test-community.jpg'
+            })
+          })
+        })
+
+        describe('when placesApi fails', () => {
+          beforeEach(() => {
+            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
+            mockCommunitiesDb.getCommunityPlaces!.mockResolvedValue([{ id: 'place-1' }])
+            mockPlacesApi.getPlaces.mockRejectedValue(new Error('PlacesApi failed'))
+          })
+
+          it('should successfully start a community voice chat without positions', async () => {
+            const result = await communityVoice.startCommunityVoiceChat(communityId, creatorAddress)
+
+            expect(result).toEqual({ connectionUrl: 'test-connection-url' })
+            expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
+              communityId,
+              status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+              positions: [],
+              communityName: 'Test Community', // Still gets community info even when placesApi fails
+              communityImage: 'test-community.jpg'
             })
           })
         })

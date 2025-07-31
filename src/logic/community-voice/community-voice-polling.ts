@@ -1,6 +1,7 @@
 import { isErrorWithMessage } from '../../utils/errors'
 import { AppComponents } from '../../types'
 import { ICommunityVoiceChatCacheComponent } from './community-voice-cache'
+import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 
 /**
@@ -112,10 +113,14 @@ export function createCommunityVoiceChatPollingComponent({
       })
 
       // Publish ended event to the same channel as started events
+      // Note: For ended events, we don't need positions/community info since user already has context
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId: cachedChat.communityId,
-        status: 'ended',
-        ended_at: endedAt
+        status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+        ended_at: endedAt,
+        positions: [], // Empty for ended events
+        communityName: '', // Will be fetched by handler if needed
+        communityImage: undefined
       })
 
       logger.debug(`Community voice chat ended notification sent successfully for community ${cachedChat.communityId}`)

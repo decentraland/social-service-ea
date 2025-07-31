@@ -41,9 +41,12 @@ describe('when subscribing to community voice chat updates', () => {
     beforeEach(() => {
       startedUpdate = {
         communityId,
-        voiceChatId,
         createdAt: Date.now(),
-        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+        positions: ['1,1', '1,2'],
+        isMember: true,
+        communityName: 'Test Community',
+        communityImage: 'test-image.jpg'
       }
 
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
@@ -62,9 +65,12 @@ describe('when subscribing to community voice chat updates', () => {
     it('should handle multiple updates in sequence', async () => {
       const secondUpdate: CommunityVoiceChatUpdate = {
         communityId: 'another-community',
-        voiceChatId: 'another-voice-chat',
         createdAt: Date.now() + 1000,
-        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+        positions: ['2,1', '2,2'],
+        isMember: false,
+        communityName: 'Another Community',
+        communityImage: 'another-image.jpg'
       }
 
       // Reset the mock to avoid conflicts
@@ -93,8 +99,12 @@ describe('when subscribing to community voice chat updates', () => {
       beforeEach(async () => {
         update = {
           communityId,
-          voiceChatId,
-          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+          createdAt: Date.now(),
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: ['1,1', '1,2', '2,1', '2,2'],
+          isMember: true,
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg'
         }
 
         mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
@@ -105,13 +115,16 @@ describe('when subscribing to community voice chat updates', () => {
         await generator.next()
       })
 
-      it('should build the update with the community id, voice chat id and created timestamp', () => {
+      it('should build the update with the community id and created timestamp', () => {
         const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)
         expect(result).toEqual({
           communityId,
-          voiceChatId,
           createdAt: expect.any(Number),
-          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: ['1,1', '1,2', '2,1', '2,2'],
+          isMember: true,
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg'
         })
       })
 
@@ -131,8 +144,12 @@ describe('when subscribing to community voice chat updates', () => {
       beforeEach(async () => {
         update = {
           communityId: 'minimal-community',
-          voiceChatId: 'minimal-voice-chat',
-          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+          createdAt: Date.now(),
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: [],
+          isMember: false,
+          communityName: 'Minimal Community',
+          communityImage: undefined
         }
 
         mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
@@ -147,9 +164,12 @@ describe('when subscribing to community voice chat updates', () => {
         const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)
         expect(result).toEqual({
           communityId: 'minimal-community',
-          voiceChatId: 'minimal-voice-chat',
           createdAt: expect.any(Number),
-          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: [],
+          isMember: false,
+          communityName: 'Minimal Community',
+          communityImage: undefined
         })
       })
     })
@@ -186,8 +206,12 @@ describe('when subscribing to community voice chat updates', () => {
       const handlerCall = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0]
       const mockUpdate: SubscriptionEventsEmitter['communityVoiceChatUpdate'] = {
         communityId: 'test',
-        voiceChatId: 'test',
-        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+        createdAt: Date.now(),
+        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+        positions: ['test-position'],
+        isMember: true,
+        communityName: 'Test Community',
+        communityImage: 'test.jpg'
       }
 
       expect(handlerCall.rpcContext).toBe(rpcContext)
