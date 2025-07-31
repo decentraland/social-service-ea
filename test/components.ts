@@ -203,7 +203,8 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     friendsDb,
     communityMembers,
-    catalystClient
+    catalystClient,
+    communitiesDb
   })
   const communityVoice = await createCommunityVoiceComponent({
     logs,
@@ -212,7 +213,9 @@ async function initComponents(): Promise<TestComponents> {
     analytics,
     communitiesDb,
     catalystClient,
-    communityVoiceChatCache
+    communityVoiceChatCache,
+    placesApi,
+    communityThumbnail
   })
   const rpcServer = await createRpcServerComponent({
     logs,

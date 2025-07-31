@@ -94,7 +94,11 @@ describe('when subscribing to community voice chat updates', () => {
         update = {
           communityId,
           voiceChatId,
-          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: ['1,1', '1,2', '2,1', '2,2'],
+          isMember: true,
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg'
         }
 
         mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
@@ -111,7 +115,11 @@ describe('when subscribing to community voice chat updates', () => {
           communityId,
           voiceChatId,
           createdAt: expect.any(Number),
-          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: ['1,1', '1,2', '2,1', '2,2'],
+          isMember: true,
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg'
         })
       })
 
@@ -132,7 +140,11 @@ describe('when subscribing to community voice chat updates', () => {
         update = {
           communityId: 'minimal-community',
           voiceChatId: 'minimal-voice-chat',
-          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: [],
+          isMember: false,
+          communityName: 'Minimal Community',
+          communityImage: undefined
         }
 
         mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
@@ -149,7 +161,11 @@ describe('when subscribing to community voice chat updates', () => {
           communityId: 'minimal-community',
           voiceChatId: 'minimal-voice-chat',
           createdAt: expect.any(Number),
-          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: [],
+          isMember: false,
+          communityName: 'Minimal Community',
+          communityImage: undefined
         })
       })
     })
@@ -187,7 +203,11 @@ describe('when subscribing to community voice chat updates', () => {
       const mockUpdate: SubscriptionEventsEmitter['communityVoiceChatUpdate'] = {
         communityId: 'test',
         voiceChatId: 'test',
-        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
+        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+        positions: ['test-position'],
+        isMember: true,
+        communityName: 'Test Community',
+        communityImage: 'test.jpg'
       }
 
       expect(handlerCall.rpcContext).toBe(rpcContext)

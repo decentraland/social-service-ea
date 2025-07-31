@@ -1,6 +1,6 @@
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
+import { Action, AppComponents, CommunityRole, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
 import { VoiceChatStatus } from './voice/types'
@@ -25,9 +25,12 @@ export type SubscriptionHandlerParams<T, U> = {
 }
 
 export function createUpdateHandlerComponent(
-  components: Pick<AppComponents, 'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'catalystClient'>
+  components: Pick<
+    AppComponents,
+    'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'catalystClient' | 'communitiesDb'
+  >
 ): IUpdateHandlerComponent {
-  const { logs, subscribersContext, friendsDb, communityMembers, catalystClient } = components
+  const { logs, subscribersContext, friendsDb, communityMembers, catalystClient, communitiesDb } = components
   const logger = logs.getLogger('update-handler')
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
@@ -209,17 +212,44 @@ export function createUpdateHandlerComponent(
     logger.info('Community voice chat update', { update: JSON.stringify(update) })
 
     const onlineSubscribers = subscribersContext.getSubscribersAddresses()
-    const batches = communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)
 
-    // Notify all online members of the community about the voice chat update
-    for await (const batch of batches) {
-      batch.forEach(({ memberAddress }) => {
-        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityVoiceChatUpdate', update)
+    // Notify ALL online users about the voice chat update with personalized membership info
+    const membershipChecks = onlineSubscribers.map(async (userAddress) => {
+      try {
+        // Check if user is a member of the community
+        const userRole = await communitiesDb.getCommunityMemberRole(update.communityId, userAddress)
+        const isMember = userRole !== CommunityRole.None // Any role other than 'none' means member
+
+        // Create personalized update for this user
+        const personalizedUpdate = {
+          ...update,
+          isMember
         }
-      })
-    }
+
+        logger.info('Personalized update', { personalizedUpdate: JSON.stringify(personalizedUpdate) }) //TODO: remove this after testing it out
+        const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('communityVoiceChatUpdate', personalizedUpdate)
+        }
+      } catch (error) {
+        logger.warn(`Failed to check membership for user ${userAddress} in community ${update.communityId}`)
+        // Send update without membership info if check fails
+        const fallbackUpdate = {
+          ...update,
+          isMember: false
+        }
+
+        const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('communityVoiceChatUpdate', fallbackUpdate)
+        }
+      }
+    })
+
+    // Wait for all membership checks to complete
+    await Promise.all(membershipChecks)
+
+    logger.info(`Community voice chat update sent to ${onlineSubscribers.length} online users`)
   })
 
   async function* handleSubscriptionUpdates<T, U>({

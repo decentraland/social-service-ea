@@ -133,8 +133,3 @@ export enum CommunityVoiceChatRole {
 export enum CommunityVoiceChatUpdateStatus {
   STARTED = 'started'
 }
-
-export type CommunityVoiceChatUpdate = {
-  communityId: string
-  status: CommunityVoiceChatUpdateStatus
-}

@@ -10,6 +10,7 @@ import {
   SubscriptionEventsEmitter,
   RpcServerContext
 } from '../../../src/types'
+import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { sleep } from '../../../src/utils/timer'
 import { createMockProfile, mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
@@ -22,6 +23,7 @@ describe('Updates Handlers', () => {
   let subscribersContext: ISubscribersContext
   let updateHandler: IUpdateHandlerComponent
   let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
+  let mockCommunitiesDb: jest.Mocked<any>
 
   beforeEach(() => {
     subscribersContext = createSubscribersContext()
@@ -31,12 +33,18 @@ describe('Updates Handlers', () => {
     mockCommunityMembers = createMockCommunityMembersComponent({})
     mockCatalystClient.getProfile.mockResolvedValue(createMockProfile('0x456'))
 
+    mockCommunitiesDb = {
+      getCommunityMemberRole: jest.fn(),
+      getCommunity: jest.fn()
+    }
+
     updateHandler = createUpdateHandlerComponent({
       logs: mockLogs,
       subscribersContext,
       friendsDb: mockFriendsDB,
       catalystClient: mockCatalystClient,
-      communityMembers: mockCommunityMembers
+      communityMembers: mockCommunityMembers,
+      communitiesDb: mockCommunitiesDb
     })
   })
 
@@ -928,6 +936,161 @@ describe('Updates Handlers', () => {
 
       it('should resolve without emitting to any subscriber', () => {
         expect(updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))).resolves.toBeUndefined()
+      })
+    })
+  })
+
+  describe('when handling community voice chat updates', () => {
+    let subscriber456: Emitter<SubscriptionEventsEmitter>
+    let subscriber789: Emitter<SubscriptionEventsEmitter>
+    let subscriber123: Emitter<SubscriptionEventsEmitter>
+    let emitSpy456: jest.SpyInstance
+    let emitSpy789: jest.SpyInstance
+    let emitSpy123: jest.SpyInstance
+
+    beforeEach(() => {
+      subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
+      subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
+      subscriber123 = subscribersContext.getOrAddSubscriber('0x123')
+
+      emitSpy456 = jest.spyOn(subscriber456, 'emit')
+      emitSpy789 = jest.spyOn(subscriber789, 'emit')
+      emitSpy123 = jest.spyOn(subscriber123, 'emit')
+    })
+
+    describe('when community voice chat starts', () => {
+      beforeEach(() => {
+        // Mock membership checks - 456 is member, others are not
+        mockCommunitiesDb.getCommunityMemberRole.mockImplementation(
+          async (communityId: string, userAddress: string) => {
+            if (userAddress === '0x456') return 'member'
+            return 'none'
+          }
+        )
+      })
+
+      it('should notify ALL online users about the voice chat update with personalized membership info', async () => {
+        const update = {
+          communityId: 'community-1',
+          voiceChatId: 'voice-chat-1',
+          status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: ['1,1', '1,2', '2,1', '2,2'],
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg'
+        }
+
+        await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
+
+        // Should notify ALL online subscribers with personalized membership info
+        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: true, // 456 is a member
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg'
+        })
+        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false, // 789 is not a member
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg'
+        })
+        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false, // 123 is not a member
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg'
+        })
+      })
+
+      it('should notify ALL online users even when no positions are available', async () => {
+        const update = {
+          communityId: 'community-1',
+          voiceChatId: 'voice-chat-1',
+          status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: [],
+          communityName: 'Test Community',
+          communityImage: undefined
+        }
+
+        await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
+
+        // Should notify ALL online subscribers with personalized membership info
+        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: true, // 456 is a member
+          communityName: 'Test Community',
+          communityImage: undefined
+        })
+        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false, // 789 is not a member
+          communityName: 'Test Community',
+          communityImage: undefined
+        })
+        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false, // 123 is not a member
+          communityName: 'Test Community',
+          communityImage: undefined
+        })
+      })
+    })
+
+    describe('when community voice chat ends', () => {
+      beforeEach(() => {
+        // Mock membership checks - 456 is member, others are not
+        mockCommunitiesDb.getCommunityMemberRole.mockImplementation(
+          async (communityId: string, userAddress: string) => {
+            if (userAddress === '0x456') return 'member'
+            return 'none'
+          }
+        )
+      })
+
+      it('should notify ALL online users about the ended voice chat', async () => {
+        const update = {
+          communityId: 'community-1',
+          voiceChatId: 'voice-chat-1',
+          status: 'ended',
+          ended_at: Date.now(),
+          communityName: '',
+          communityImage: undefined
+        }
+
+        await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
+
+        // Should notify ALL online subscribers with personalized membership info
+        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: true, // 456 is a member
+          communityName: '',
+          communityImage: undefined
+        })
+        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false, // 789 is not a member
+          communityName: '',
+          communityImage: undefined
+        })
+        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false, // 123 is not a member
+          communityName: '',
+          communityImage: undefined
+        })
+      })
+    })
+
+    describe('when the update format is invalid', () => {
+      it('should log an error with invalid JSON message', async () => {
+        const errorSpy = jest.spyOn(logger, 'error')
+
+        await updateHandler.communityVoiceChatUpdateHandler('invalid json')
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error handling update:'),
+          expect.objectContaining({ message: 'invalid json' })
+        )
       })
     })
   })

@@ -15,8 +15,12 @@ function parseEmittedUpdateToCommunityVoiceChatUpdate(
     communityId: update.communityId,
     voiceChatId: update.voiceChatId,
     createdAt: Date.now(),
-    status: update.status
-  }
+    status: update.status,
+    positions: update.positions || [],
+    isMember: update.isMember || false,
+    communityName: update.communityName || '',
+    communityImage: update.communityImage
+  } as CommunityVoiceChatUpdate
 }
 
 export function subscribeToCommunityVoiceChatUpdatesService({
