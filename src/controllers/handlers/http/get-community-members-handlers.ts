@@ -32,13 +32,11 @@ export async function getCommunityMembersHandler(
 
     const options: GetCommunityMembersOptions = { pagination: paginationParams, onlyOnline }
 
-    const { members, totalMembers } = userAddress
-      ? await communityMembers.getCommunityMembers(communityId, {
-          ...options,
-          as: userAddress,
-          byPassPrivacy: !!(API_ADMIN_TOKEN && optionalAuthHeader === `Bearer ${API_ADMIN_TOKEN}`)
-        })
-      : await communityMembers.getCommunityMembers(communityId, options)
+    const { members, totalMembers } = await communityMembers.getCommunityMembers(communityId, {
+      ...options,
+      as: userAddress,
+      byPassPrivacy: !!(API_ADMIN_TOKEN && optionalAuthHeader === `Bearer ${API_ADMIN_TOKEN}`)
+    })
 
     return {
       status: 200,
