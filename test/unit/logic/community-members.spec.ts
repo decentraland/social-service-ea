@@ -102,7 +102,7 @@ describe('Community Members Component', () => {
 
         describe('and only online members are not requested', () => {
           it('should return community members with profiles', async () => {
-            const result = await communityMembersComponent.getCommunityMembers(communityId, userAddress, options)
+            const result = await communityMembersComponent.getCommunityMembers(communityId, { ...options, as: userAddress })
 
             expect(result).toEqual({
               members: expect.arrayContaining([
@@ -154,7 +154,7 @@ describe('Community Members Component', () => {
           })
 
           it('should filter by online peers', async () => {
-            await communityMembersComponent.getCommunityMembers(communityId, userAddress, onlineOptions)
+            await communityMembersComponent.getCommunityMembers(communityId, { ...onlineOptions, as: userAddress })
 
             expect(mockPeersStats.getConnectedPeers).toHaveBeenCalled()
             expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
@@ -189,7 +189,7 @@ describe('Community Members Component', () => {
           })
 
           it('should return community members with profiles', async () => {
-            const result = await communityMembersComponent.getCommunityMembers(communityId, userAddress, options)
+            const result = await communityMembersComponent.getCommunityMembers(communityId, { ...options, as: userAddress })
 
             expect(result).toEqual({
               members: expect.arrayContaining([
@@ -223,7 +223,7 @@ describe('Community Members Component', () => {
 
           it('should throw NotAuthorizedError', async () => {
             await expect(
-              communityMembersComponent.getCommunityMembers(communityId, userAddress, options)
+              communityMembersComponent.getCommunityMembers(communityId, { ...options, as: userAddress })
             ).rejects.toThrow(new NotAuthorizedError("The user doesn't have permission to get community members"))
 
             expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId, { onlyPublic: false })
@@ -242,7 +242,7 @@ describe('Community Members Component', () => {
       })
 
       it('should throw CommunityNotFoundError', async () => {
-        await expect(communityMembersComponent.getCommunityMembers(communityId, userAddress, options)).rejects.toThrow(
+        await expect(communityMembersComponent.getCommunityMembers(communityId, { ...options, as: userAddress })).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
 
@@ -287,7 +287,7 @@ describe('Community Members Component', () => {
       })
 
       it('should return community members with profiles', async () => {
-        const result = await communityMembersComponent.getMembersFromPublicCommunity(communityId, options)
+        const result = await communityMembersComponent.getCommunityMembers(communityId, options)
 
         expect(result).toEqual({
           members: expect.arrayContaining([
@@ -319,7 +319,7 @@ describe('Community Members Component', () => {
       })
 
       it('should throw CommunityNotFoundError', async () => {
-        await expect(communityMembersComponent.getMembersFromPublicCommunity(communityId, options)).rejects.toThrow(
+        await expect(communityMembersComponent.getCommunityMembers(communityId, options)).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
 
