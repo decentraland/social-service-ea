@@ -43,8 +43,7 @@ describe('Updates Handlers', () => {
       subscribersContext,
       friendsDb: mockFriendsDB,
       catalystClient: mockCatalystClient,
-      communityMembers: mockCommunityMembers,
-      communitiesDb: mockCommunitiesDb
+      communityMembers: mockCommunityMembers
     })
   })
 

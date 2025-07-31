@@ -99,6 +99,7 @@ describe('when subscribing to community voice chat updates', () => {
       beforeEach(async () => {
         update = {
           communityId,
+          createdAt: Date.now(),
           status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
           positions: ['1,1', '1,2', '2,1', '2,2'],
           isMember: true,
@@ -143,6 +144,7 @@ describe('when subscribing to community voice chat updates', () => {
       beforeEach(async () => {
         update = {
           communityId: 'minimal-community',
+          createdAt: Date.now(),
           status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
           positions: [],
           isMember: false,
@@ -204,6 +206,7 @@ describe('when subscribing to community voice chat updates', () => {
       const handlerCall = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0]
       const mockUpdate: SubscriptionEventsEmitter['communityVoiceChatUpdate'] = {
         communityId: 'test',
+        createdAt: Date.now(),
         status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
         positions: ['test-position'],
         isMember: true,

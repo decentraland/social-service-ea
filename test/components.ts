@@ -203,8 +203,7 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     friendsDb,
     communityMembers,
-    catalystClient,
-    communitiesDb
+    catalystClient
   })
   const communityVoice = await createCommunityVoiceComponent({
     logs,

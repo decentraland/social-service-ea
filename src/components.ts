@@ -220,8 +220,7 @@ export async function initComponents(): Promise<AppComponents> {
     subscribersContext,
     friendsDb,
     communityMembers,
-    catalystClient,
-    communitiesDb
+    catalystClient
   })
 
   const rpcServer = await createRpcServerComponent({

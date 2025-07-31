@@ -1,6 +1,6 @@
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
-import { Action, AppComponents, CommunityRole, RpcServerContext, SubscriptionEventsEmitter } from '../types'
+import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
 import { VoiceChatStatus } from './voice/types'
@@ -25,12 +25,9 @@ export type SubscriptionHandlerParams<T, U> = {
 }
 
 export function createUpdateHandlerComponent(
-  components: Pick<
-    AppComponents,
-    'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'catalystClient' | 'communitiesDb'
-  >
+  components: Pick<AppComponents, 'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'catalystClient'>
 ): IUpdateHandlerComponent {
-  const { logs, subscribersContext, friendsDb, communityMembers, catalystClient, communitiesDb } = components
+  const { logs, subscribersContext, friendsDb, communityMembers, catalystClient } = components
   const logger = logs.getLogger('update-handler')
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
