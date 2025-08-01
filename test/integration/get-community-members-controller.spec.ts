@@ -112,6 +112,12 @@ test('Get Community Members Controller', function ({ components, spyComponents }
               owner_address: '0x0000000000000000000000000000000000000000'
             })
           ).id
+
+          await components.communitiesDb.addCommunityMember({
+            communityId: privateCommunityId,
+            memberAddress: ownerAddress,
+            role: CommunityRole.Owner
+          })
         })
 
         afterEach(async () => {
@@ -125,6 +131,41 @@ test('Get Community Members Controller', function ({ components, spyComponents }
           expect(await response.json()).toEqual({
             error: 'Not Found',
             message: `Community not found: ${privateCommunityId}`
+          })
+        })
+
+        describe('and the request contains an invalid admin token', () => {
+          it('should not return community members from private community', async () => {
+            const { localHttpFetch } = components
+            const response = await localHttpFetch.fetch(`/v1/communities/${privateCommunityId}/members`, {
+              headers: { Authorization: `Bearer invalid-token` }
+            })
+            expect(response.status).toBe(404)
+            expect(await response.json()).toEqual({
+              error: 'Not Found',
+              message: `Community not found: ${privateCommunityId}`
+            })
+          })
+        })
+
+        describe('and the request contains a valid admin token', () => {
+          it('should return community members from private community', async () => {
+            const { localHttpFetch, config } = components
+            const API_ADMIN_TOKEN = await config.getString('API_ADMIN_TOKEN')
+            const response = await localHttpFetch.fetch(`/v1/communities/${privateCommunityId}/members`, {
+              headers: { Authorization: `Bearer ${API_ADMIN_TOKEN}` }
+            })
+            expect(response.status).toBe(200)
+            const result = await response.json()
+            expect(result.data.results).toEqual(
+              expect.arrayContaining([
+                expect.objectContaining({
+                  communityId: privateCommunityId,
+                  memberAddress: ownerAddress,
+                  role: CommunityRole.Owner
+                })
+              ])
+            )
           })
         })
       })
