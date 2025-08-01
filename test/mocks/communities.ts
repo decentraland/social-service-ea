@@ -90,7 +90,8 @@ export function createMockCommunityPlacesComponent({
   addPlaces = jest.fn(),
   removePlace = jest.fn(),
   updatePlaces = jest.fn(),
-  validateOwnership = jest.fn()
+  validateOwnership = jest.fn(),
+  getPlacesWithPositionsAndWorlds = jest.fn()
 }: Partial<jest.Mocked<ICommunityPlacesComponent>>): jest.Mocked<ICommunityPlacesComponent> {
   return {
     getPlaces,
@@ -98,7 +99,8 @@ export function createMockCommunityPlacesComponent({
     addPlaces,
     removePlace,
     updatePlaces,
-    validateOwnership
+    validateOwnership,
+    getPlacesWithPositionsAndWorlds
   }
 }
 

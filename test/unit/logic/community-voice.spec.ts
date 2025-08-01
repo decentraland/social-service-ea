@@ -95,6 +95,16 @@ describe('Community Voice Logic', () => {
       getThumbnail: jest.fn()
     }
 
+    const mockCommunityPlaces = {
+      getPlaces: jest.fn(),
+      validateAndAddPlaces: jest.fn(),
+      addPlaces: jest.fn(),
+      removePlace: jest.fn(),
+      updatePlaces: jest.fn(),
+      validateOwnership: jest.fn(),
+      getPlacesWithPositionsAndWorlds: jest.fn()
+    }
+
     communityVoice = await createCommunityVoiceComponent({
       logs: mockLogs,
       commsGatekeeper: mockCommsGatekeeper,
@@ -104,7 +114,8 @@ describe('Community Voice Logic', () => {
       catalystClient: mockCatalystClient,
       communityVoiceChatCache: mockCommunityVoiceChatCache,
       placesApi: mockPlacesApi,
-      communityThumbnail: mockCommunityThumbnail
+      communityThumbnail: mockCommunityThumbnail,
+      communityPlaces: mockCommunityPlaces
     })
   })
 

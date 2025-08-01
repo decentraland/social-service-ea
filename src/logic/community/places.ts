@@ -2,6 +2,7 @@ import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
 import { CommunityPlace, ICommunityPlacesComponent } from './types'
+import { separatePositionsAndWorlds } from '../../utils/places'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
 export async function createCommunityPlacesComponent(
@@ -149,6 +150,31 @@ export async function createCommunityPlacesComponent(
         addedBy: userAddress.toLowerCase()
       }))
       await communitiesDb.addCommunityPlaces(newPlaces)
+    },
+
+    getPlacesWithPositionsAndWorlds: async (
+      communityId: string
+    ): Promise<{ positions: string[]; worlds: string[] }> => {
+      try {
+        const places = await communitiesDb.getCommunityPlaces(communityId)
+        const placeIds = places.map((place) => place.id)
+
+        if (placeIds.length === 0) {
+          return { positions: [], worlds: [] }
+        }
+
+        const uniquePlaceIds = Array.from(new Set(placeIds))
+        const placesData = await placesApi.getPlaces(uniquePlaceIds)
+
+        if (placesData) {
+          return separatePositionsAndWorlds(placesData)
+        }
+
+        return { positions: [], worlds: [] }
+      } catch (error) {
+        logger.warn(`Failed to fetch positions and worlds for community ${communityId}: ${error}`)
+        return { positions: [], worlds: [] }
+      }
     },
 
     validateOwnership

@@ -1,8 +1,9 @@
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, CommunityVoiceChat, CommunityRole, CommunityVoiceChatStatus } from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
-import { isErrorWithMessage } from '../../utils/errors'
+import { isErrorWithMessage, errorMessageOrDefault } from '../../utils/errors'
 import { separatePositionsAndWorlds } from '../../utils/places'
+import { ActiveCommunityVoiceChat } from '../community/types'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import {
@@ -25,7 +26,8 @@ export async function createCommunityVoiceComponent({
   catalystClient,
   communityVoiceChatCache,
   placesApi,
-  communityThumbnail
+  communityThumbnail,
+  communityPlaces
 }: Pick<
   AppComponents,
   | 'logs'
@@ -36,6 +38,7 @@ export async function createCommunityVoiceComponent({
   | 'catalystClient'
   | 'placesApi'
   | 'communityThumbnail'
+  | 'communityPlaces'
 > & {
   communityVoiceChatCache: ICommunityVoiceChatCacheComponent
 }): Promise<ICommunityVoiceComponent> {
@@ -266,10 +269,142 @@ export async function createCommunityVoiceComponent({
     return []
   }
 
+  async function getActiveCommunityVoiceChatsForUser(userAddress: string): Promise<ActiveCommunityVoiceChat[]> {
+    try {
+      // Get all active voice chats from comms-gatekeeper
+      const activeChatsFromGatekeeper = await commsGatekeeper.getAllActiveCommunityVoiceChats()
+
+      if (activeChatsFromGatekeeper.length === 0) {
+        return []
+      }
+
+      // Extract community IDs from active chats
+      const activeCommunityIds = activeChatsFromGatekeeper.map((chat) => chat.communityId)
+
+      // Get detailed info for active communities with user membership in single efficient query
+      const activeCommunitiesWithMembership = await communitiesDb.getCommunities(userAddress, {
+        pagination: { offset: 0, limit: activeCommunityIds.length },
+        onlyMemberOf: false,
+        onlyWithActiveVoiceChat: false,
+        communityIds: activeCommunityIds // Filter by the active community IDs only
+      })
+
+      // Create membership map for quick lookup
+      const membershipMap = new Map(
+        activeCommunitiesWithMembership.map((community) => [
+          community.id,
+          {
+            isMember: community.role !== CommunityRole.None,
+            privacy: community.privacy,
+            name: community.name
+          }
+        ])
+      )
+
+      // Create voice chat status map for quick lookup
+      const voiceChatStatusMap = new Map(
+        activeChatsFromGatekeeper.map((chat) => [
+          chat.communityId,
+          {
+            participantCount: chat.participantCount,
+            moderatorCount: chat.moderatorCount
+          }
+        ])
+      )
+
+      // Process each active community
+      const processedChats = await Promise.allSettled(
+        activeCommunityIds.map(async (communityId): Promise<ActiveCommunityVoiceChat | null> => {
+          const membership = membershipMap.get(communityId)
+          const voiceChatStatus = voiceChatStatusMap.get(communityId)
+
+          if (!membership || !voiceChatStatus) {
+            return null
+          }
+
+          const { isMember, privacy, name: communityName } = membership
+          const { participantCount, moderatorCount } = voiceChatStatus
+
+          // Early privacy check: for non-members, only include public communities
+          if (!isMember && privacy !== 'public') {
+            return null
+          }
+
+          // For non-members, we need to check if community has positions/worlds
+          // For members, we always include them regardless of positions
+          let positions: string[] = []
+          let worlds: string[] = []
+          let communityImage: string | undefined
+
+          const [placesResult, thumbnailResult] = await Promise.allSettled([
+            // Only fetch places for non-members or when needed
+            !isMember ? communityPlaces.getPlacesWithPositionsAndWorlds(communityId) : { positions: [], worlds: [] },
+            // Fetch community thumbnail
+            communityThumbnail.getThumbnail(communityId)
+          ])
+
+          // Extract positions and worlds from places result
+          if (placesResult.status === 'fulfilled') {
+            const { positions: separatedPositions, worlds: separatedWorlds } = placesResult.value
+            positions = separatedPositions
+            worlds = separatedWorlds
+          } else {
+            logger.warn(
+              `Failed to fetch positions and worlds for community ${communityId}: ${errorMessageOrDefault(placesResult.reason)}`
+            )
+          }
+
+          // Extract community image from thumbnail result
+          if (thumbnailResult.status === 'fulfilled') {
+            communityImage = thumbnailResult.value || undefined
+          } else {
+            logger.warn(
+              `Failed to fetch thumbnail for community ${communityId}: ${errorMessageOrDefault(thumbnailResult.reason)}`
+            )
+          }
+
+          // Filter logic:
+          // - Include if user is a member (always)
+          // - Include if user is NOT a member AND community is public AND has positions or worlds
+          if (isMember || positions.length > 0 || worlds.length > 0) {
+            return {
+              communityId,
+              participantCount,
+              moderatorCount,
+              isMember,
+              communityName,
+              communityImage,
+              positions,
+              worlds
+            }
+          }
+
+          return null
+        })
+      )
+
+      // Filter out null results and failed promises
+      const filteredChats = processedChats
+        .filter(
+          (result): result is PromiseFulfilledResult<ActiveCommunityVoiceChat | null> =>
+            result.status === 'fulfilled' && result.value !== null
+        )
+        .map((result) => result.value as ActiveCommunityVoiceChat)
+
+      logger.info(`Retrieved ${filteredChats.length} active community voice chats for user ${userAddress}`)
+
+      return filteredChats
+    } catch (error) {
+      logger.error(`Failed to get active community voice chats: ${errorMessageOrDefault(error)}`)
+      throw error
+    }
+  }
+
   return {
     startCommunityVoiceChat,
     joinCommunityVoiceChat,
     getCommunityVoiceChat,
-    getActiveCommunityVoiceChats
+    getActiveCommunityVoiceChats,
+    getActiveCommunityVoiceChatsForUser
   }
 }

@@ -1,4 +1,5 @@
 import { CommunityVoiceChat } from '../../types'
+import { ActiveCommunityVoiceChat } from '../community/types'
 
 export interface ICommunityVoiceComponent {
   // Community voice chat management
@@ -10,6 +11,7 @@ export interface ICommunityVoiceComponent {
   // Queries
   getCommunityVoiceChat(communityId: string): Promise<CommunityVoiceChat | null>
   getActiveCommunityVoiceChats(): Promise<CommunityVoiceChat[]>
+  getActiveCommunityVoiceChatsForUser(userAddress: string): Promise<ActiveCommunityVoiceChat[]>
 }
 
 export enum CommunityVoiceChatAction {

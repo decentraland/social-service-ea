@@ -11,7 +11,7 @@ export async function createLargeThumbnailBuffer(targetSize = 501 * 1024): Promi
   let buffer: Buffer
 
   while (true) {
-    const image = new Jimp({width, height})
+    const image = new Jimp({ width, height })
     // Fill with random pixels to avoid compression
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
@@ -94,7 +94,9 @@ test('Create Community Controller', async function ({ components, stubComponents
                 tokenId: '1'
               }
             ])
-            stubComponents.catalystClient.getProfile.onFirstCall().resolves(createMockProfile(identity.realAccount.address.toLowerCase()))
+            stubComponents.catalystClient.getProfile
+              .onFirstCall()
+              .resolves(createMockProfile(identity.realAccount.address.toLowerCase()))
           })
 
           describe('and places are provided', () => {
@@ -109,14 +111,15 @@ test('Create Community Controller', async function ({ components, stubComponents
                 stubComponents.fetcher.fetch.onFirstCall().resolves({
                   ok: true,
                   status: 200,
-                  json: () => Promise.resolve({
-                    data: mockPlaceIds.map(id => ({
-                      id,
-                      title: 'Test Place',
-                      positions: ['0,0,0'],
-                      owner: identity.realAccount.address.toLowerCase()
-                    }))
-                  })
+                  json: () =>
+                    Promise.resolve({
+                      data: mockPlaceIds.map((id) => ({
+                        id,
+                        title: 'Test Place',
+                        positions: ['0,0,0'],
+                        owner: identity.realAccount.address.toLowerCase()
+                      }))
+                    })
                 } as any)
               })
 
@@ -141,7 +144,9 @@ test('Create Community Controller', async function ({ components, stubComponents
                 const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`)
                 expect(placesResponse.status).toBe(200)
                 const result = await placesResponse.json()
-                expect(result.data.results.map((p: { id: string }) => p.id)).toEqual(expect.arrayContaining(mockPlaceIds))
+                expect(result.data.results.map((p: { id: string }) => p.id)).toEqual(
+                  expect.arrayContaining(mockPlaceIds)
+                )
               })
 
               it('should create community without places when empty array is provided', async () => {
@@ -149,13 +154,13 @@ test('Create Community Controller', async function ({ components, stubComponents
                   ...validBody,
                   placeIds: []
                 }
-  
+
                 const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithEmptyPlaces)
                 const body = await response.json()
                 communityId = body.data.id
-  
+
                 expect(response.status).toBe(201)
-  
+
                 const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`)
                 expect(placesResponse.status).toBe(200)
                 const result = await placesResponse.json()
