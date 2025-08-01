@@ -114,6 +114,7 @@ export interface ICommunityPlacesComponent {
     notOwnedPlaces: string[]
     isValid: boolean
   }>
+  getPlacesWithPositionsAndWorlds(communityId: string): Promise<{ positions: string[]; worlds: string[] }>
 }
 
 export interface ICommunityBansComponent {
@@ -254,6 +255,7 @@ export type GetCommunitiesOptions = {
   onlyMemberOf?: boolean
   onlyWithActiveVoiceChat?: boolean
   roles?: CommunityRole[]
+  communityIds?: string[]
 }
 
 export type GetCommunityMembersOptions = {
@@ -283,4 +285,15 @@ export type CommunityPlace = {
   communityId: string
   addedBy: string
   addedAt: Date
+}
+
+export interface ActiveCommunityVoiceChat {
+  communityId: string
+  participantCount: number
+  moderatorCount: number
+  isMember: boolean
+  communityName: string
+  communityImage?: string
+  positions: string[]
+  worlds: string[]
 }

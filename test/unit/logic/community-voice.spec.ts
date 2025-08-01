@@ -95,6 +95,16 @@ describe('Community Voice Logic', () => {
       getThumbnail: jest.fn()
     }
 
+    const mockCommunityPlaces = {
+      getPlaces: jest.fn(),
+      validateAndAddPlaces: jest.fn(),
+      addPlaces: jest.fn(),
+      removePlace: jest.fn(),
+      updatePlaces: jest.fn(),
+      validateOwnership: jest.fn(),
+      getPlacesWithPositionsAndWorlds: jest.fn()
+    }
+
     communityVoice = await createCommunityVoiceComponent({
       logs: mockLogs,
       commsGatekeeper: mockCommsGatekeeper,
@@ -104,7 +114,8 @@ describe('Community Voice Logic', () => {
       catalystClient: mockCatalystClient,
       communityVoiceChatCache: mockCommunityVoiceChatCache,
       placesApi: mockPlacesApi,
-      communityThumbnail: mockCommunityThumbnail
+      communityThumbnail: mockCommunityThumbnail,
+      communityPlaces: mockCommunityPlaces
     })
   })
 
@@ -173,6 +184,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: ['1,1', '1,2', '2,1', '2,2'],
+              worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg'
             })
@@ -208,6 +220,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: ['1,1', '1,2', '2,1', '2,2'],
+              worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg'
             })
@@ -268,6 +281,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: ['1,1', '1,2', '2,1', '2,2'],
+              worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg'
             })
@@ -303,6 +317,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: ['1,1', '1,2', '2,1', '2,2'],
+              worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg'
             })
@@ -327,6 +342,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: [],
+              worlds: [],
               communityName: 'Test Community', // Still gets community info even when places fail
               communityImage: 'test-community.jpg'
             })
@@ -348,6 +364,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: [],
+              worlds: [],
               communityName: 'Test Community', // Still gets community info even when placesApi fails
               communityImage: 'test-community.jpg'
             })

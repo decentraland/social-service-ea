@@ -129,6 +129,7 @@ describe('Community Voice Chat Polling Component', () => {
           status: 1, // COMMUNITY_VOICE_CHAT_ENDED enum value
           ended_at: expect.any(Number),
           positions: [],
+          worlds: [],
           communityName: '',
           communityImage: undefined
         })

@@ -313,6 +313,13 @@ export type ICommsGatekeeperComponent = {
   demoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   getCommunityVoiceChatStatus: (communityId: string) => Promise<CommunityVoiceChatStatus | null>
   getCommunitiesVoiceChatStatus: (communityIds: string[]) => Promise<Record<string, CommunityVoiceChatStatus>>
+  getAllActiveCommunityVoiceChats: () => Promise<
+    Array<{
+      communityId: string
+      participantCount: number
+      moderatorCount: number
+    }>
+  >
   kickUserFromCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
 }
 

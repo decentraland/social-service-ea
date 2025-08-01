@@ -450,6 +450,40 @@ export const createCommsGatekeeperComponent = async ({
   }
 
   /**
+   * Gets all active community voice chats.
+   * @returns Array of active community voice chats with status information
+   */
+  async function getAllActiveCommunityVoiceChats(): Promise<
+    Array<{
+      communityId: string
+      participantCount: number
+      moderatorCount: number
+    }>
+  > {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/active`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data.data || []
+    } catch (error) {
+      logger.error(
+        `Failed to get all active community voice chats: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
    * Kicks a user from a community voice chat.
    * @param communityId - The ID of the community
    * @param userAddress - The address of the user to kick
@@ -488,6 +522,7 @@ export const createCommsGatekeeperComponent = async ({
     demoteSpeakerInCommunityVoiceChat,
     getCommunityVoiceChatStatus,
     getCommunitiesVoiceChatStatus,
+    getAllActiveCommunityVoiceChats,
     kickUserFromCommunityVoiceChat
   }
 }

@@ -249,7 +249,7 @@ export function createCommunitiesDBComponent(
       memberAddress: EthAddress,
       options: GetCommunitiesOptions
     ): Promise<AggregatedCommunityWithMemberAndFriendsData[]> {
-      const { onlyMemberOf, roles } = options
+      const { onlyMemberOf, roles, communityIds } = options
 
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
@@ -300,6 +300,11 @@ export function createCommunitiesDBComponent(
         LEFT JOIN community_friends cf ON c.id = cf.community_id
         LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
         WHERE c.active = true AND cb.banned_address IS NULL`)
+
+      // Filter by specific community IDs if provided
+      if (communityIds && communityIds.length > 0) {
+        baseQuery.append(SQL` AND c.id = ANY(${communityIds})`)
+      }
 
       const query = withSearchAndPagination(baseQuery, {
         ...options,
