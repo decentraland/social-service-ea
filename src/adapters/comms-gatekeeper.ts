@@ -461,7 +461,7 @@ export const createCommsGatekeeperComponent = async ({
     }>
   > {
     try {
-      const response = await fetch(`${commsUrl}/active-community-voice-chats`, {
+      const response = await fetch(`${commsUrl}/community-voice-chat/active`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

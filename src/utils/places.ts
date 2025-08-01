@@ -23,11 +23,9 @@ export function separatePositionsAndWorlds(placesData: PlaceData[]): SeparatedPl
   const worlds: string[] = []
 
   placesData.forEach((place) => {
-    if (place.world) {
+    if (place.world && place.world_name) {
       // It's a world - add world_name to worlds array
-      if (place.world_name) {
-        worlds.push(place.world_name)
-      }
+      worlds.push(place.world_name)
     } else {
       // It's a position - add positions to positions array
       positions.push(...place.positions)
