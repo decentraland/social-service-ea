@@ -119,6 +119,7 @@ export function createCommunityVoiceChatPollingComponent({
         status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
         ended_at: endedAt,
         positions: [], // Empty for ended events
+        worlds: [], // Empty for ended events
         communityName: '', // Will be fetched by handler if needed
         communityImage: undefined
       })

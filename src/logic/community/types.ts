@@ -254,6 +254,7 @@ export type GetCommunitiesOptions = {
   onlyMemberOf?: boolean
   onlyWithActiveVoiceChat?: boolean
   roles?: CommunityRole[]
+  communityIds?: string[]
 }
 
 export type GetCommunityMembersOptions = {

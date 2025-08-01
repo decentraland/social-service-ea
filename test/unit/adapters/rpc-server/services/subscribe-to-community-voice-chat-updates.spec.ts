@@ -44,6 +44,7 @@ describe('when subscribing to community voice chat updates', () => {
         createdAt: Date.now(),
         status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
         positions: ['1,1', '1,2'],
+        worlds: ['test-world'],
         isMember: true,
         communityName: 'Test Community',
         communityImage: 'test-image.jpg'
@@ -68,6 +69,7 @@ describe('when subscribing to community voice chat updates', () => {
         createdAt: Date.now() + 1000,
         status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
         positions: ['2,1', '2,2'],
+        worlds: ['another-world'],
         isMember: false,
         communityName: 'Another Community',
         communityImage: 'another-image.jpg'
@@ -102,6 +104,7 @@ describe('when subscribing to community voice chat updates', () => {
           createdAt: Date.now(),
           status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
           positions: ['1,1', '1,2', '2,1', '2,2'],
+          worlds: ['TestWorld'],
           isMember: true,
           communityName: 'Test Community',
           communityImage: 'test-image.jpg'
@@ -122,6 +125,7 @@ describe('when subscribing to community voice chat updates', () => {
           createdAt: expect.any(Number),
           status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
           positions: ['1,1', '1,2', '2,1', '2,2'],
+          worlds: ['TestWorld'],
           isMember: true,
           communityName: 'Test Community',
           communityImage: 'test-image.jpg'
@@ -147,6 +151,7 @@ describe('when subscribing to community voice chat updates', () => {
           createdAt: Date.now(),
           status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
           positions: [],
+          worlds: [],
           isMember: false,
           communityName: 'Minimal Community',
           communityImage: undefined
@@ -167,6 +172,7 @@ describe('when subscribing to community voice chat updates', () => {
           createdAt: expect.any(Number),
           status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
           positions: [],
+          worlds: [],
           isMember: false,
           communityName: 'Minimal Community',
           communityImage: undefined
@@ -209,6 +215,7 @@ describe('when subscribing to community voice chat updates', () => {
         createdAt: Date.now(),
         status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
         positions: ['test-position'],
+        worlds: ['test-world'],
         isMember: true,
         communityName: 'Test Community',
         communityImage: 'test.jpg'

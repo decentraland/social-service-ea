@@ -16,6 +16,7 @@ function parseEmittedUpdateToCommunityVoiceChatUpdate(
     createdAt: Date.now(),
     status: update.status,
     positions: update.positions || [],
+    worlds: update.worlds || [],
     isMember: update.isMember || false,
     communityName: update.communityName || '',
     communityImage: update.communityImage

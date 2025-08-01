@@ -3,7 +3,7 @@ import { AppComponents, IPlacesApiComponent } from '../types'
 export type PlacesApiResponse = {
   total?: number
   ok: boolean
-  data?: { id: string; title: string; positions: string[]; owner: string }[]
+  data?: { id: string; title: string; positions: string[]; owner: string; world: boolean; world_name: string }[]
 }
 
 export async function createPlacesApiAdapter(

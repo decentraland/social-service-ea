@@ -2,6 +2,7 @@ import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, CommunityVoiceChat, CommunityRole, CommunityVoiceChatStatus } from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage } from '../../utils/errors'
+import { separatePositionsAndWorlds } from '../../utils/places'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import {
@@ -117,6 +118,7 @@ export async function createCommunityVoiceComponent({
 
       // Get community information for the update
       let communityPositions: string[] = []
+      let communityWorlds: string[] = []
       let communityName = ''
       let communityImage: string | undefined = undefined
 
@@ -132,7 +134,7 @@ export async function createCommunityVoiceComponent({
           communityImage = thumbnail || undefined
         }
 
-        // Get community positions
+        // Get community places and separate positions from worlds
         const places = await communitiesDb.getCommunityPlaces(communityId)
         const placeIds = places.map((place) => place.id)
 
@@ -140,16 +142,20 @@ export async function createCommunityVoiceComponent({
           const uniquePlaceIds = Array.from(new Set(placeIds))
           const placesData = await placesApi.getPlaces(uniquePlaceIds)
 
-          // Extract all positions from all places
-          communityPositions = placesData?.flatMap((place) => place.positions) || []
+          if (placesData) {
+            const { positions, worlds } = separatePositionsAndWorlds(placesData)
+            communityPositions = positions
+            communityWorlds = worlds
 
-          logger.info(
-            `Found ${communityPositions.length} positions for community ${communityId} from ${uniquePlaceIds.length} places`,
-            {
-              placesCount: uniquePlaceIds.length,
-              positionsCount: communityPositions.length
-            }
-          )
+            logger.info(
+              `Found ${communityPositions.length} positions and ${communityWorlds.length} worlds for community ${communityId} from ${uniquePlaceIds.length} places`,
+              {
+                placesCount: uniquePlaceIds.length,
+                positionsCount: communityPositions.length,
+                worldsCount: communityWorlds.length
+              }
+            )
+          }
         }
       } catch (error) {
         logger.warn(
@@ -163,6 +169,7 @@ export async function createCommunityVoiceComponent({
         communityId,
         status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
         positions: communityPositions,
+        worlds: communityWorlds,
         communityName,
         communityImage
       })

@@ -173,6 +173,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: ['1,1', '1,2', '2,1', '2,2'],
+              worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg'
             })
@@ -208,6 +209,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: ['1,1', '1,2', '2,1', '2,2'],
+              worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg'
             })
@@ -268,6 +270,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: ['1,1', '1,2', '2,1', '2,2'],
+              worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg'
             })
@@ -303,6 +306,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: ['1,1', '1,2', '2,1', '2,2'],
+              worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg'
             })
@@ -327,6 +331,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: [],
+              worlds: [],
               communityName: 'Test Community', // Still gets community info even when places fail
               communityImage: 'test-community.jpg'
             })
@@ -348,6 +353,7 @@ describe('Community Voice Logic', () => {
               communityId,
               status: 0, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED
               positions: [],
+              worlds: [],
               communityName: 'Test Community', // Still gets community info even when placesApi fails
               communityImage: 'test-community.jpg'
             })

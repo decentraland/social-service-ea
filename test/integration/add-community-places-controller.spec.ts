@@ -117,7 +117,9 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
                 id: placeId,
                 title: placeId,
                 positions: [],
-                owner: userAddress
+                owner: userAddress,
+                world: false,
+                world_name: ''
               }))
             )
           })
@@ -147,7 +149,9 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
                 id: placeId,
                 title: placeId,
                 positions: [],
-                owner: '0xother-owner'
+                owner: '0xother-owner',
+                world: false,
+                world_name: ''
               }))
             )
 
@@ -183,6 +187,8 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
                 id: placeId,
                 title: placeId,
                 positions: [],
+                world: false,
+                world_name: '',
                 owner: userAddress
               }))
             )

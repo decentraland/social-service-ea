@@ -9,6 +9,7 @@ import { IPlacesApiComponent } from '../../../src/types/components'
 import { createMockCommunityRolesComponent } from '../../mocks/communities'
 
 describe('Community Places Component', () => {
+  let defaultWorldData: { world: boolean; world_name: string }
   let communityPlacesComponent: ICommunityPlacesComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
   let mockPlacesApi: jest.Mocked<IPlacesApiComponent>
@@ -30,6 +31,10 @@ describe('Community Places Component', () => {
   ]
 
   beforeEach(async () => {
+    defaultWorldData = {
+      world: false,
+      world_name: ''
+    }
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockCommunityRoles = createMockCommunityRolesComponent({})
     mockPlacesApi = createPlacesApiAdapterMockComponent({}) as jest.Mocked<IPlacesApiComponent>
@@ -253,7 +258,8 @@ describe('Community Places Component', () => {
           id: place.id,
           title: place.id,
           positions: [],
-          owner: mockUserAddress
+          owner: mockUserAddress,
+          ...defaultWorldData
         }))
       )
       mockCommunityRoles.validatePermissionToAddPlacesToCommunity.mockResolvedValue()
@@ -277,7 +283,8 @@ describe('Community Places Component', () => {
                 id: place.id,
                 title: place.id,
                 positions: [],
-                owner: mockUserAddress
+                owner: mockUserAddress,
+                ...defaultWorldData
               }))
             )
           })
@@ -320,8 +327,8 @@ describe('Community Places Component', () => {
         describe('and the user does not own all places', () => {
           beforeEach(() => {
             mockPlacesApi.getPlaces.mockResolvedValue([
-              { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress },
-              { id: 'place-2', title: 'Place 2', positions: [], owner: '0xother-owner' }
+              { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
+              { id: 'place-2', title: 'Place 2', positions: [], owner: '0xother-owner', ...defaultWorldData }
             ])
           })
 
@@ -551,7 +558,8 @@ describe('Community Places Component', () => {
           id: place.id,
           title: place.id,
           positions: [],
-          owner: mockUserAddress
+          owner: mockUserAddress,
+          ...defaultWorldData
         }))
       )
     })
@@ -563,7 +571,8 @@ describe('Community Places Component', () => {
             id: place.id,
             title: place.id,
             positions: [],
-            owner: mockUserAddress
+            owner: mockUserAddress,
+            ...defaultWorldData
           }))
         )
       })
@@ -580,8 +589,8 @@ describe('Community Places Component', () => {
       it('should handle case-insensitive owner comparison', async () => {
         const upperCaseUserAddress = mockUserAddress.toUpperCase()
         mockPlacesApi.getPlaces.mockResolvedValue([
-          { id: 'place-1', title: 'Place 1', positions: [], owner: upperCaseUserAddress },
-          { id: 'place-2', title: 'Place 2', positions: [], owner: upperCaseUserAddress }
+          { id: 'place-1', title: 'Place 1', positions: [], owner: upperCaseUserAddress, ...defaultWorldData },
+          { id: 'place-2', title: 'Place 2', positions: [], owner: upperCaseUserAddress, ...defaultWorldData }
         ])
 
         const result = await communityPlacesComponent.validateOwnership(placeIds, mockUserAddress)
@@ -596,8 +605,8 @@ describe('Community Places Component', () => {
         const uniquePlaceIds = ['place-1', 'place-2']
 
         mockPlacesApi.getPlaces.mockResolvedValue([
-          { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress },
-          { id: 'place-2', title: 'Place 2', positions: [], owner: mockUserAddress }
+          { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
+          { id: 'place-2', title: 'Place 2', positions: [], owner: mockUserAddress, ...defaultWorldData }
         ])
 
         const result = await communityPlacesComponent.validateOwnership(duplicatePlaceIds, mockUserAddress)
@@ -612,8 +621,8 @@ describe('Community Places Component', () => {
     describe('and the user does not own all places', () => {
       beforeEach(() => {
         mockPlacesApi.getPlaces.mockResolvedValue([
-          { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress },
-          { id: 'place-2', title: 'Place 2', positions: [], owner: '0xother-owner' }
+          { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
+          { id: 'place-2', title: 'Place 2', positions: [], owner: '0xother-owner', ...defaultWorldData }
         ])
       })
 
@@ -644,8 +653,8 @@ describe('Community Places Component', () => {
     describe('and places have no owner', () => {
       beforeEach(() => {
         mockPlacesApi.getPlaces.mockResolvedValue([
-          { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress },
-          { id: 'place-2', title: 'Place 2', positions: [], owner: null }
+          { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, world: false, world_name: '' },
+          { id: 'place-2', title: 'Place 2', positions: [], owner: null, world: false, world_name: '' }
         ])
       })
 
