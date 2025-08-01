@@ -38,13 +38,9 @@ export async function createCommunityMembersComponent(
 
   const logger = logs.getLogger('community-component')
 
-  const filterAndCountCommunityMembers = async (
-    id: string,
-    options: GetCommunityMembersOptions,
-    userAddress?: EthAddress
-  ) => {
-    const { pagination, onlyOnline } = options
-    const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress })
+  const filterAndCountCommunityMembers = async (id: string, options: GetCommunityMembersOptions) => {
+    const { pagination, onlyOnline, as: userAddress, byPassPrivacy } = options
+    const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress && !byPassPrivacy })
 
     if (!communityExists) {
       throw new CommunityNotFoundError(id)
@@ -55,12 +51,9 @@ export async function createCommunityMembersComponent(
       throw new CommunityNotFoundError(id)
     }
 
-    const memberRole =
-      community.privacy === 'private' && userAddress
-        ? await communitiesDb.getCommunityMemberRole(id, userAddress)
-        : CommunityRole.None
+    const memberRole = userAddress ? await communitiesDb.getCommunityMemberRole(id, userAddress) : CommunityRole.None
 
-    if (community.privacy === 'private' && userAddress && memberRole === CommunityRole.None) {
+    if (community.privacy === 'private' && userAddress && memberRole === CommunityRole.None && !byPassPrivacy) {
       throw new NotAuthorizedError("The user doesn't have permission to get community members")
     }
 
@@ -90,14 +83,6 @@ export async function createCommunityMembersComponent(
 
   return {
     getCommunityMembers: async (
-      id: string,
-      userAddress: EthAddress,
-      options: GetCommunityMembersOptions
-    ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      return filterAndCountCommunityMembers(id, options, userAddress)
-    },
-
-    getMembersFromPublicCommunity: async (
       id: string,
       options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {

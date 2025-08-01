@@ -31,11 +31,6 @@ export interface ICommunitiesComponent {
 export interface ICommunityMembersComponent {
   getCommunityMembers(
     id: string,
-    userAddress: EthAddress,
-    options: GetCommunityMembersOptions
-  ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
-  getMembersFromPublicCommunity(
-    id: string,
     options: GetCommunityMembersOptions
   ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }>
   getOnlineMembersFromCommunity(
@@ -261,6 +256,12 @@ export type GetCommunitiesOptions = {
 export type GetCommunityMembersOptions = {
   pagination: Required<PaginatedParameters>
   onlyOnline?: boolean
+  /**
+   * The address of the user to get the members for.
+   * If provided, friendships statuses will be included in the response.
+   */
+  as?: EthAddress
+  byPassPrivacy?: boolean
 }
 
 export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
