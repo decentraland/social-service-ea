@@ -5,7 +5,7 @@ import {
   CommunityOwnerNotFoundError,
   AggregatedCommunityWithMemberData
 } from '../../../logic/community'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import RequestError from '@dcl/platform-crypto-middleware/dist/errors'
 
 export async function getCommunityHandler(
   context: Pick<
@@ -30,7 +30,7 @@ export async function getCommunityHandler(
     const isAdmin = !!(API_ADMIN_TOKEN && optionalAuthHeader === `Bearer ${API_ADMIN_TOKEN}`)
 
     if (!isAdmin && !userAddress) {
-      throw new NotAuthorizedError('This endpoint requires a signed fetch request. See ADR-44.')
+      throw new RequestError('This endpoint requires a signed fetch request. See ADR-44.', 400)
     }
 
     return {
