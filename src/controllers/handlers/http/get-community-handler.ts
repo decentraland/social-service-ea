@@ -30,7 +30,7 @@ export async function getCommunityHandler(
     const isAdmin = !!(API_ADMIN_TOKEN && optionalAuthHeader === `Bearer ${API_ADMIN_TOKEN}`)
 
     if (!isAdmin && !userAddress) {
-      throw new NotAuthorizedError('User is not authorized to access this resource')
+      throw new NotAuthorizedError('This endpoint requires a signed fetch request. See ADR-44.')
     }
 
     return {
