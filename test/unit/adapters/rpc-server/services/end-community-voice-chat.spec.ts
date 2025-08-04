@@ -9,24 +9,7 @@ import {
   CommunityVoiceChatNotFoundError,
   InvalidCommunityIdError
 } from '../../../../../src/logic/community-voice/errors'
-
-function createCommunityVoiceMockedComponent({
-  startCommunityVoiceChat = jest.fn(),
-  endCommunityVoiceChat = jest.fn(),
-  joinCommunityVoiceChat = jest.fn(),
-  getCommunityVoiceChat = jest.fn(),
-  getActiveCommunityVoiceChats = jest.fn(),
-  getActiveCommunityVoiceChatsForUser = jest.fn()
-}: Partial<jest.Mocked<ICommunityVoiceComponent>>): jest.Mocked<ICommunityVoiceComponent> {
-  return {
-    startCommunityVoiceChat,
-    endCommunityVoiceChat,
-    joinCommunityVoiceChat,
-    getCommunityVoiceChat,
-    getActiveCommunityVoiceChats,
-    getActiveCommunityVoiceChatsForUser
-  }
-}
+import { createCommunityVoiceMockedComponent } from '../../../../mocks/components/community-voice'
 
 describe('when ending a community voice chat', () => {
   let endCommunityVoiceChatMock: jest.MockedFn<ICommunityVoiceComponent['endCommunityVoiceChat']>

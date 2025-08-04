@@ -7,22 +7,7 @@ import {
   CommunityVoiceChatAlreadyActiveError,
   CommunityVoiceChatPermissionError
 } from '../../../../../src/logic/community-voice/errors'
-
-function createCommunityVoiceMockedComponent({
-  startCommunityVoiceChat = jest.fn(),
-  joinCommunityVoiceChat = jest.fn(),
-  getCommunityVoiceChat = jest.fn(),
-  getActiveCommunityVoiceChats = jest.fn(),
-  getActiveCommunityVoiceChatsForUser = jest.fn()
-}: Partial<jest.Mocked<ICommunityVoiceComponent>>): jest.Mocked<ICommunityVoiceComponent> {
-  return {
-    startCommunityVoiceChat,
-    joinCommunityVoiceChat,
-    getCommunityVoiceChat,
-    getActiveCommunityVoiceChats,
-    getActiveCommunityVoiceChatsForUser
-  }
-}
+import { createCommunityVoiceMockedComponent } from '../../../../mocks/components/community-voice'
 
 describe('when starting a community voice chat', () => {
   let startCommunityVoiceChatMock: jest.MockedFn<ICommunityVoiceComponent['startCommunityVoiceChat']>
