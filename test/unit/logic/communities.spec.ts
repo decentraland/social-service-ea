@@ -99,7 +99,7 @@ describe('Community Component', () => {
       })
 
       it('should return community with members count and owner name and voice chat status', async () => {
-        const result = await communityComponent.getCommunity(communityId, userAddress)
+        const result = await communityComponent.getCommunity(communityId, { as: userAddress })
 
         expect(result).toEqual({
           id: mockCommunity.id,
@@ -129,7 +129,9 @@ describe('Community Component', () => {
         })
 
         it('should include thumbnail when it exists', async () => {
-          const result = await communityComponent.getCommunity(communityId, userAddress)
+          const result = await communityComponent.getCommunity(communityId, {
+            as: userAddress
+          })
 
           expect(result.thumbnails).toEqual({
             raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
@@ -143,7 +145,9 @@ describe('Community Component', () => {
         })
 
         it('should return null for voice chat status', async () => {
-          const result = await communityComponent.getCommunity(communityId, userAddress)
+          const result = await communityComponent.getCommunity(communityId, {
+            as: userAddress
+          })
 
           expect(result.voiceChatStatus).toBeNull()
         })
@@ -155,7 +159,9 @@ describe('Community Component', () => {
         })
 
         it('should include isHostingLiveEvent when community is hosting live events', async () => {
-          const result = await communityComponent.getCommunity(communityId, userAddress)
+          const result = await communityComponent.getCommunity(communityId, {
+            as: userAddress
+          })
 
           expect(result.isHostingLiveEvent).toBe(true)
           expect(mockCommunityEvents.isCurrentlyHostingEvents).toHaveBeenCalledWith(communityId)
@@ -171,7 +177,7 @@ describe('Community Component', () => {
       })
 
       it('should throw CommunityNotFoundError', async () => {
-        await expect(communityComponent.getCommunity(communityId, userAddress)).rejects.toThrow(
+        await expect(communityComponent.getCommunity(communityId, { as: userAddress })).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
 

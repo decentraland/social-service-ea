@@ -7,7 +7,7 @@ import { CommunityMemberBannedEvent, CommunityMemberRemovedEvent, EthAddress, Pa
 import { CommunityDeletedEventReducedMetadata, CommunityRenamedEventReducedMetadata } from './broadcaster'
 
 export interface ICommunitiesComponent {
-  getCommunity(id: string, userAddress: EthAddress): Promise<AggregatedCommunityWithMemberAndVoiceChatData>
+  getCommunity(id: string, options: { as?: EthAddress }): Promise<AggregatedCommunityWithMemberAndVoiceChatData>
   getCommunities(
     userAddress: string,
     options: GetCommunitiesOptions

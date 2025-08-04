@@ -39,7 +39,7 @@ export function createAuthHeaders(
 }
 
 export function makeAuthenticatedRequest(components: Pick<TestComponents, 'localHttpFetch'>) {
-  return (identity: Identity, path: string, method: string = 'GET', body?: any) => {
+  return (identity: Identity | undefined, path: string, method: string = 'GET', body?: any, headers?: Record<string, string>) => {
     const { localHttpFetch } = components
 
     return localHttpFetch.fetch(path, {
@@ -49,7 +49,8 @@ export function makeAuthenticatedRequest(components: Pick<TestComponents, 'local
         'cf-connecting-ip': '192.168.1.100',
         'x-forwarded-for': '192.168.1.100',
         'x-real-ip': '192.168.1.100',
-        ...createAuthHeaders(method, path, {}, identity)
+        ...(identity ? createAuthHeaders(method, path, {}, identity) : {}),
+        ...headers
       },
       body: body ? JSON.stringify(body) : undefined
     })

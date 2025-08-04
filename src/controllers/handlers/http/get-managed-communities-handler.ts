@@ -7,12 +7,12 @@ import { errorMessageOrDefault } from '../../../utils/errors'
 
 export async function getManagedCommunitiesHandler(
   context: Pick<
-    HandlerContextWithPath<'communities' | 'logs', '/v1/communities/:address/managed'>,
+    HandlerContextWithPath<'communities' | 'communityThumbnail' | 'logs', '/v1/communities/:address/managed'>,
     'components' | 'url' | 'params'
   >
 ): Promise<HTTPResponse<PaginatedResponse<MemberCommunity>>> {
   const {
-    components: { communities },
+    components: { communities, communityThumbnail },
     params: { address },
     url
   } = context
@@ -25,11 +25,18 @@ export async function getManagedCommunitiesHandler(
       roles: [CommunityRole.Owner, CommunityRole.Moderator]
     })
 
+    const managedCommunitiesWithThumbnails = await Promise.all(
+      managedCommunities.communities.map(async (community) => {
+        const thumbnail = await communityThumbnail.getThumbnail(community.id)
+        return { ...community, thumbnails: { raw: thumbnail || '' } }
+      })
+    )
+
     return {
       status: 200,
       body: {
         data: {
-          results: managedCommunities.communities,
+          results: managedCommunitiesWithThumbnails,
           total: managedCommunities.total,
           ...getPaginationResultProperties(managedCommunities.total, paginationParams)
         }

@@ -76,10 +76,12 @@ export function createCommunityComponent(
   return {
     getCommunity: async (
       id: string,
-      userAddress: EthAddress
+      options: {
+        as?: EthAddress
+      }
     ): Promise<AggregatedCommunityWithMemberAndVoiceChatData> => {
       const [community, membersCount, voiceChatStatus] = await Promise.all([
-        communitiesDb.getCommunity(id, userAddress),
+        communitiesDb.getCommunity(id, options?.as),
         communitiesDb.getCommunityMembersCount(id),
         commsGatekeeper.getCommunityVoiceChatStatus(id)
       ])
@@ -192,6 +194,7 @@ export function createCommunityComponent(
         communitiesDb.getMemberCommunities(memberAddress, options),
         communitiesDb.getCommunitiesCount(memberAddress, { onlyMemberOf: true, roles: options.roles })
       ])
+
       return { communities, total }
     },
 
