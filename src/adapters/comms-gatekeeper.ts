@@ -260,6 +260,37 @@ export const createCommsGatekeeperComponent = async ({
   }
 
   /**
+   * Ends a community voice chat room (force end regardless of participants).
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user ending the room
+   */
+  async function endCommunityVoiceChatRoom(communityId: string, userAddress: string): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        },
+        body: JSON.stringify({
+          user_address: userAddress
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+
+      logger.info(`Community voice chat room ended for community ${communityId} by ${userAddress}`)
+    } catch (error) {
+      logger.error(
+        `Failed to end community voice chat room for community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
    * Sends a request to speak in a community voice chat.
    * @param communityId - The ID of the community
    * @param userAddress - The address of the user requesting to speak
@@ -516,6 +547,7 @@ export const createCommsGatekeeperComponent = async ({
     getPrivateVoiceChatCredentials,
     getCommunityVoiceChatCredentials,
     createCommunityVoiceChatRoom,
+    endCommunityVoiceChatRoom,
     updateUserMetadataInCommunityVoiceChat,
     requestToSpeakInCommunityVoiceChat,
     promoteSpeakerInCommunityVoiceChat,

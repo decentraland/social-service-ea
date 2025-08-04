@@ -24,6 +24,7 @@ import {
   subscribeToBlockUpdatesService,
   subscribeToPrivateVoiceChatUpdatesService,
   startCommunityVoiceChatService,
+  endCommunityVoiceChatService,
   joinCommunityVoiceChatService,
   requestToSpeakInCommunityVoiceChatService,
   promoteSpeakerInCommunityVoiceChatService,
@@ -142,6 +143,10 @@ export async function setupRpcRoutes(components: AppComponents): Promise<RpcServ
     },
     startCommunityVoiceChat: {
       creator: startCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    endCommunityVoiceChat: {
+      creator: endCommunityVoiceChatService({ components }),
       type: ServiceType.CALL
     },
     joinCommunityVoiceChat: {
