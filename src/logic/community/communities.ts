@@ -194,7 +194,15 @@ export function createCommunityComponent(
         communitiesDb.getMemberCommunities(memberAddress, options),
         communitiesDb.getCommunitiesCount(memberAddress, { onlyMemberOf: true, roles: options.roles })
       ])
-      return { communities, total }
+
+      const communitiesWithThumbnails = await Promise.all(
+        communities.map(async (community) => {
+          const thumbnail = await communityThumbnail.getThumbnail(community.id)
+          return { ...community, thumbnails: { raw: thumbnail || '' } }
+        })
+      )
+
+      return { communities: communitiesWithThumbnails, total }
     },
 
     createCommunity: async (
