@@ -435,6 +435,109 @@ describe('Community Voice Logic', () => {
     })
   })
 
+  describe('when ending a community voice chat', () => {
+    const communityId = 'test-community-id'
+    const userAddress = '0x123'
+
+    describe('when user has permission and voice chat is active', () => {
+      beforeEach(() => {
+        mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+          isActive: true,
+          participantCount: 5,
+          moderatorCount: 1
+        })
+        mockCommsGatekeeper.endCommunityVoiceChatRoom.mockResolvedValue(undefined)
+      })
+
+      describe('when user is an owner', () => {
+        beforeEach(() => {
+          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
+        })
+
+        it('should successfully end a community voice chat', async () => {
+          await communityVoice.endCommunityVoiceChat(communityId, userAddress)
+
+          expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+          expect(mockCommsGatekeeper.endCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunityVoiceChatCache.removeCommunityVoiceChat).toHaveBeenCalledWith(communityId)
+          expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
+            communityId,
+            status: 1, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED
+            positions: undefined,
+            worlds: undefined,
+            communityName: undefined,
+            communityImage: undefined
+          })
+          expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.END_COMMUNITY_CALL, {
+            call_id: communityId,
+            user_id: userAddress
+          })
+        })
+      })
+
+      describe('when user is a moderator', () => {
+        beforeEach(() => {
+          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Moderator)
+        })
+
+        it('should successfully end a community voice chat as moderator', async () => {
+          await communityVoice.endCommunityVoiceChat(communityId, userAddress)
+
+          expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+          expect(mockCommsGatekeeper.endCommunityVoiceChatRoom).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunityVoiceChatCache.removeCommunityVoiceChat).toHaveBeenCalledWith(communityId)
+          expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.END_COMMUNITY_CALL, {
+            call_id: communityId,
+            user_id: userAddress
+          })
+        })
+      })
+    })
+
+    describe('when user is not a member', () => {
+      beforeEach(() => {
+        mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.None)
+      })
+
+      it('should throw UserNotCommunityMemberError', async () => {
+        await expect(communityVoice.endCommunityVoiceChat(communityId, userAddress)).rejects.toThrow(
+          UserNotCommunityMemberError
+        )
+      })
+    })
+
+    describe('when user does not have permission', () => {
+      beforeEach(() => {
+        mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
+      })
+
+      it('should throw CommunityVoiceChatPermissionError', async () => {
+        await expect(communityVoice.endCommunityVoiceChat(communityId, userAddress)).rejects.toThrow(
+          CommunityVoiceChatPermissionError
+        )
+      })
+    })
+
+    describe('when voice chat is not active', () => {
+      beforeEach(() => {
+        mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
+        mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+          isActive: false,
+          participantCount: 0,
+          moderatorCount: 0
+        })
+      })
+
+      it('should throw CommunityVoiceChatNotFoundError', async () => {
+        await expect(communityVoice.endCommunityVoiceChat(communityId, userAddress)).rejects.toThrow(
+          CommunityVoiceChatNotFoundError
+        )
+      })
+    })
+  })
+
   describe('joinCommunityVoiceChat', () => {
     const communityId = 'test-community-id'
     const userAddress = '0x456'

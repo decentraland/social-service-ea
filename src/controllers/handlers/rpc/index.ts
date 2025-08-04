@@ -29,6 +29,7 @@ export * from './subscribe-to-community-member-connectivity-updates'
 
 // Community voice chat handlers
 export * from './start-community-voice-chat'
+export * from './end-community-voice-chat'
 export * from './join-community-voice-chat'
 export * from './request-to-speak-in-community-voice-chat'
 export * from './promote-speaker-in-community-voice-chat'

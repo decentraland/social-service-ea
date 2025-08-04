@@ -307,6 +307,7 @@ export type ICommsGatekeeperComponent = {
     userRole: CommunityRole,
     profileData?: CommunityVoiceChatProfileData | null
   ) => Promise<{ connectionUrl: string }>
+  endCommunityVoiceChatRoom: (communityId: string, userAddress: string) => Promise<void>
   updateUserMetadataInCommunityVoiceChat: (communityId: string, userAddress: string, metadata: any) => Promise<void>
   requestToSpeakInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   promoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>

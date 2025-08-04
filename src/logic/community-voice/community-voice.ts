@@ -245,6 +245,67 @@ export async function createCommunityVoiceComponent({
     return credentials
   }
 
+  async function endCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    logger.info(`Ending community voice chat for community ${communityId} by ${userAddress}`)
+
+    // Check if user is member of the community
+    const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
+
+    if (userRole === CommunityRole.None) {
+      throw new UserNotCommunityMemberError(userAddress, communityId)
+    }
+
+    // Check if user has permission to end voice chats (only owners and moderators)
+    if (userRole !== CommunityRole.Owner && userRole !== CommunityRole.Moderator) {
+      throw new CommunityVoiceChatPermissionError('Only community owners and moderators can end voice chats')
+    }
+
+    // Check if community has an active voice chat
+    const existingVoiceChat = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
+
+    if (!existingVoiceChat?.isActive) {
+      throw new CommunityVoiceChatNotFoundError(communityId)
+    }
+
+    try {
+      // End the room in comms-gatekeeper (force end regardless of participants)
+      await commsGatekeeper.endCommunityVoiceChatRoom(communityId, userAddress)
+      logger.info(`Community voice chat room ended for community ${communityId}`)
+
+      // Remove from cache
+      await communityVoiceChatCache.removeCommunityVoiceChat(communityId)
+
+      // Publish end event - we don't need community details for ENDED status
+      await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
+        communityId,
+        status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+        positions: undefined,
+        worlds: undefined,
+        communityName: undefined,
+        communityImage: undefined
+      })
+
+      // Analytics event
+      analytics.fireEvent(AnalyticsEvent.END_COMMUNITY_CALL, {
+        call_id: communityId,
+        user_id: userAddress
+      })
+
+      logger.info(`Community voice chat ended successfully for community ${communityId}`)
+    } catch (error) {
+      logger.error(
+        `Failed to end community voice chat room: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`,
+        {
+          errorStack: error instanceof Error ? error.stack || 'No stack trace' : 'Unknown',
+          errorName: error instanceof Error ? error.constructor.name : 'Unknown',
+          communityId,
+          userAddress
+        }
+      )
+      throw error
+    }
+  }
+
   async function getCommunityVoiceChat(communityId: string): Promise<CommunityVoiceChat | null> {
     const status = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
     if (!status?.isActive) {
@@ -402,6 +463,7 @@ export async function createCommunityVoiceComponent({
 
   return {
     startCommunityVoiceChat,
+    endCommunityVoiceChat,
     joinCommunityVoiceChat,
     getCommunityVoiceChat,
     getActiveCommunityVoiceChats,
