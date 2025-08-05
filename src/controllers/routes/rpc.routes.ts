@@ -27,6 +27,7 @@ import {
   endCommunityVoiceChatService,
   joinCommunityVoiceChatService,
   requestToSpeakInCommunityVoiceChatService,
+  rejectSpeakRequestInCommunityVoiceChatService,
   promoteSpeakerInCommunityVoiceChatService,
   demoteSpeakerInCommunityVoiceChatService,
   kickPlayerFromCommunityVoiceChatService,
@@ -155,6 +156,10 @@ export async function setupRpcRoutes(components: AppComponents): Promise<RpcServ
     },
     requestToSpeakInCommunityVoiceChat: {
       creator: requestToSpeakInCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    rejectSpeakRequestInCommunityVoiceChat: {
+      creator: rejectSpeakRequestInCommunityVoiceChatService({ components }),
       type: ServiceType.CALL
     },
     promoteSpeakerInCommunityVoiceChat: {
