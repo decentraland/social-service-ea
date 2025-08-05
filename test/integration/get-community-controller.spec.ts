@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
-import { CommunityOwnerNotFoundError } from '../../src/logic/community'
+import { CommunityOwnerNotFoundError, CommunityPrivacyEnum } from '../../src/logic/community'
 
 test('Get Community Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -70,7 +70,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
               description: 'Test Description',
               ownerAddress: address,
               ownerName: 'Test Owner',
-              privacy: 'public',
+              privacy: CommunityPrivacyEnum.Public,
             })
           })
         })
@@ -132,7 +132,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                   description: 'Test Description',
                   ownerAddress: address,
                   ownerName: 'Test Owner',
-                  privacy: 'public',
+                  privacy: CommunityPrivacyEnum.Public,
                   active: true,
                   isHostingLiveEvent: false,
                   role: CommunityRole.None,
@@ -228,7 +228,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                   description: 'Test Description',
                   ownerAddress: address,
                   ownerName: 'Test Owner Unclaimed',
-                  privacy: 'public',
+                  privacy: CommunityPrivacyEnum.Public,
                   active: true,
                   isHostingLiveEvent: false,
                   role: CommunityRole.None,

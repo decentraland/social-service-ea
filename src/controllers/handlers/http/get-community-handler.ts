@@ -42,7 +42,6 @@ export async function getCommunityHandler(
       }
     }
   } catch (error: any) {
-    console.log('error', error?.message)
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting community: ${id}, error: ${message}`)
 

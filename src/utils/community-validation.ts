@@ -1,11 +1,13 @@
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 import fileType from 'file-type'
+import { CommunityPrivacyEnum } from '../logic/community'
 
 export interface CommunityValidationFields {
   name?: string
   description?: string
   placeIds?: string[]
   thumbnailBuffer?: Buffer
+  privacy: CommunityPrivacyEnum
 }
 
 export interface CommunityValidationOptions {
@@ -23,6 +25,7 @@ export async function validateCommunityFields(
   const name: string | undefined = formData.fields.name?.value
   const description: string | undefined = formData.fields.description?.value
   const placeIdsField: string | undefined = formData.fields.placeIds?.value
+  const privacy: string | undefined = formData.fields.privacy?.value
 
   let placeIds: string[] | undefined = undefined
   if (placeIdsField) {
@@ -49,7 +52,13 @@ export async function validateCommunityFields(
   }
 
   // Always require at least one field for updates
-  if (name === undefined && description === undefined && !thumbnailBuffer && placeIds === undefined) {
+  if (
+    name === undefined &&
+    description === undefined &&
+    !thumbnailBuffer &&
+    placeIds === undefined &&
+    privacy === undefined
+  ) {
     throw new InvalidRequestError('At least one field must be provided for update')
   }
 
@@ -70,6 +79,7 @@ export async function validateCommunityFields(
     name,
     description,
     placeIds,
+    privacy: privacy === 'private' ? CommunityPrivacyEnum.Private : CommunityPrivacyEnum.Public,
     thumbnailBuffer
   }
 }

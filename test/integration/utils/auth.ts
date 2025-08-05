@@ -1,6 +1,7 @@
 import { Authenticator, AuthIdentity, IdentityType } from '@dcl/crypto'
 import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
 import { signedHeaderFactory } from 'decentraland-crypto-fetch'
+import { CommunityPrivacyEnum } from '../../../src/logic/community'
 import { TestComponents } from '../../../src/types'
 import FormData from 'form-data'
 import fs from 'fs'
@@ -66,13 +67,15 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
       description,
       thumbnailPath,
       thumbnailBuffer,
-      placeIds
+      placeIds,
+      privacy
     }: {
       name?: string
       description?: string
       thumbnailPath?: string
       thumbnailBuffer?: Buffer
       placeIds?: string[]
+      privacy?: CommunityPrivacyEnum
     },
     method: string = 'POST'
   ) => {
@@ -97,6 +100,10 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
 
     if (placeIds !== undefined) {
       form.append('placeIds', JSON.stringify(placeIds))
+    }
+
+    if (privacy !== undefined) {
+      form.append('privacy', privacy)
     }
 
     const headers = {

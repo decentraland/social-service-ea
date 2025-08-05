@@ -1,3 +1,5 @@
+import { CommunityPrivacyEnum } from '../../src/logic/community'
+import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import {
   createTestIdentity,
@@ -60,8 +62,10 @@ test('Update Community Controller', async function ({ components, stubComponents
           limit: 1000,
           offset: 0
         })
-        for (const place of places) {
-          await components.communitiesDb.removeCommunityPlace(communityId, place.id)
+        if (places) {
+          for (const place of places) {
+            await components.communitiesDb.removeCommunityPlace(communityId, place.id)
+          }
         }
       }
     })
@@ -295,6 +299,49 @@ test('Update Community Controller', async function ({ components, stubComponents
             expect(body.data.name).toBe('Multi Updated Name')
             expect(body.data.description).toBe('Multi Updated Description')
             expect(body.message).toBe('Community updated successfully')
+          })
+        })
+
+        describe('when updating privacy', () => {
+          describe('and the user is the owner', () => {
+            it('should update the community privacy', async () => {
+              const response = await makeMultipartRequest(
+                identity,
+                `/v1/communities/${communityId}`,
+                {
+                  privacy: CommunityPrivacyEnum.Private
+                },
+                'PUT'
+              )
+  
+              expect(response.status).toBe(200)
+              const body = await response.json()
+              expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
+              expect(body.message).toBe('Community updated successfully')
+            })
+          })
+
+          describe('and the user is not the owner', () => {
+            beforeEach(async () => {
+              await components.communitiesDb.updateMemberRole(communityId, identity.realAccount.address, CommunityRole.Moderator)
+            })
+
+            afterEach(async () => {
+              await components.communitiesDb.updateMemberRole(communityId, identity.realAccount.address, CommunityRole.Owner)
+            })
+
+            it('should respond with a 401 status code', async () => {
+              const response = await makeMultipartRequest(
+                identity,
+                `/v1/communities/${communityId}`,
+                {
+                  privacy: CommunityPrivacyEnum.Private
+                },
+                'PUT'
+              )
+
+              expect(response.status).toBe(401)
+            })
           })
         })
       })

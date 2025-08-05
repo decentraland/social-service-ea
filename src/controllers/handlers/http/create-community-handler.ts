@@ -21,7 +21,7 @@ export async function createCommunityHandler(
     const thumbnailFile = formData?.files?.['thumbnail']
     const thumbnailBuffer = thumbnailFile?.value
 
-    const { name, description, placeIds } = await validateCommunityFields(formData, thumbnailBuffer, {
+    const { name, description, placeIds, privacy } = await validateCommunityFields(formData, thumbnailBuffer, {
       requireName: true,
       requireDescription: true
     })
@@ -36,7 +36,8 @@ export async function createCommunityHandler(
       {
         name: name!,
         description: description!,
-        ownerAddress: address
+        ownerAddress: address,
+        privacy
       },
       thumbnailBuffer,
       placeIds ?? []

@@ -3,7 +3,7 @@ import { AppComponents, CommunityVoiceChat, CommunityRole, CommunityVoiceChatSta
 import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage, errorMessageOrDefault } from '../../utils/errors'
 import { separatePositionsAndWorlds } from '../../utils/places'
-import { ActiveCommunityVoiceChat } from '../community/types'
+import { ActiveCommunityVoiceChat, CommunityPrivacyEnum } from '../community/types'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import {
@@ -387,7 +387,7 @@ export async function createCommunityVoiceComponent({
           const { participantCount, moderatorCount } = voiceChatStatus
 
           // Early privacy check: for non-members, only include public communities
-          if (!isMember && privacy !== 'public') {
+          if (!isMember && privacy !== CommunityPrivacyEnum.Public) {
             return null
           }
 

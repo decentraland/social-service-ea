@@ -20,7 +20,7 @@ export interface ICommunitiesComponent {
     options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
   ): Promise<GetCommunitiesWithTotal<MemberCommunity>>
   createCommunity(
-    community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
+    community: Omit<Community, 'id' | 'active' | 'thumbnails'>,
     thumbnail?: Buffer,
     placeIds?: string[]
   ): Promise<AggregatedCommunity>
@@ -81,6 +81,7 @@ export interface ICommunityRolesComponent {
   validatePermissionToRemovePlacesFromCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToUpdatePlaces: (communityId: string, editorAddress: string) => Promise<void>
   validatePermissionToEditCommunity: (communityId: string, editorAddress: string) => Promise<void>
+  validatePermissionToUpdateCommunityPrivacy: (communityId: string, updaterAddress: string) => Promise<void>
   validatePermissionToDeleteCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToLeaveCommunity: (communityId: string, memberAddress: string) => Promise<void>
 }
@@ -169,6 +170,12 @@ export type CommunityUpdates = {
   description?: string
   placeIds?: string[]
   thumbnailBuffer?: Buffer
+  privacy?: CommunityPrivacyEnum
+}
+
+export enum CommunityPrivacyEnum {
+  Public = 'public',
+  Private = 'private'
 }
 
 export type Community = {
@@ -177,7 +184,7 @@ export type Community = {
   name: string
   description: string
   ownerAddress: string
-  privacy: 'public' | 'private'
+  privacy: CommunityPrivacyEnum
   active: boolean
 }
 
@@ -269,7 +276,7 @@ export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
 }
 
 export type CommunityPublicInformation = Omit<CommunityWithUserInformation, 'role' | 'friends' | 'privacy'> & {
-  privacy: 'public'
+  privacy: CommunityPrivacyEnum.Public
 }
 
 export type GetCommunitiesWithTotal<T> = {

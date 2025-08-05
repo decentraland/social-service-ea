@@ -4,7 +4,7 @@ import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockCatalystClient, mockPubSub } from '../../mocks/components'
 import { createCommunityBansComponent } from '../../../src/logic/community/bans'
 import { ICommunityBansComponent } from '../../../src/logic/community'
-import { BannedMember, ICommunityBroadcasterComponent, ICommunityRolesComponent, ICommunityThumbnailComponent } from '../../../src/logic/community/types'
+import { BannedMember, CommunityPrivacyEnum, ICommunityBroadcasterComponent, ICommunityRolesComponent, ICommunityThumbnailComponent } from '../../../src/logic/community/types'
 import { createMockCommunityBroadcasterComponent, createMockCommunityRolesComponent, createMockCommunityThumbnailComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -67,7 +67,7 @@ describe('Community Bans Component', () => {
           description: 'Test Description',
           active: true,
           ownerAddress: bannerAddress,
-          privacy: 'public',
+          privacy: CommunityPrivacyEnum.Public,
           role: CommunityRole.Owner
         })
       })
@@ -347,7 +347,7 @@ describe('Community Bans Component', () => {
           description: 'Test Description',
           active: true,
           ownerAddress: userAddress,
-          privacy: 'public',
+          privacy: CommunityPrivacyEnum.Public,
           role: CommunityRole.Owner
         })
       })

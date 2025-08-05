@@ -1,3 +1,4 @@
+import { CommunityPrivacyEnum } from '../../src/logic/community'
 import { test } from '../components'
 import { createMockProfile } from '../mocks/profile'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
@@ -75,10 +76,21 @@ test('Create Community Controller', async function ({ components, stubComponents
 
       describe('and the body structure is valid', () => {
         let communityId: string
-        let validBody: { name: string; description: string; thumbnailPath?: string; placeIds?: string[] } = {
-          name: 'Test Community',
-          description: 'Test Description'
+        let validBody: {
+          name: string
+          description: string
+          privacy: CommunityPrivacyEnum
+          thumbnailPath?: string
+          placeIds?: string[]
         }
+
+        beforeEach(() => {
+          validBody = {
+            name: 'Test Community',
+            description: 'Test Description',
+            privacy: CommunityPrivacyEnum.Public
+          }
+        })
 
         afterEach(async () => {
           await components.communitiesDb.deleteCommunity(communityId)
@@ -100,11 +112,16 @@ test('Create Community Controller', async function ({ components, stubComponents
           })
 
           describe('and places are provided', () => {
-            const mockPlaceIds = [randomUUID(), randomUUID()]
-            const validBodyWithPlaces = {
-              ...validBody,
-              placeIds: mockPlaceIds
-            }
+            let mockPlaceIds: string[]
+            let validBodyWithPlaces
+
+            beforeEach(() => {
+              mockPlaceIds = [randomUUID(), randomUUID()]
+              validBodyWithPlaces = {
+                ...validBody,
+                placeIds: mockPlaceIds
+              }
+            })
 
             describe('and the places are owned by the user', () => {
               beforeEach(async () => {
@@ -136,7 +153,7 @@ test('Create Community Controller', async function ({ components, stubComponents
                     description: 'Test Description',
                     active: true,
                     ownerAddress: identity.realAccount.address.toLowerCase(),
-                    privacy: 'public'
+                    privacy: CommunityPrivacyEnum.Public
                   },
                   message: 'Community created successfully'
                 })
@@ -170,14 +187,16 @@ test('Create Community Controller', async function ({ components, stubComponents
           })
 
           describe('and a valid thumbnail is provided', () => {
-            const validBodyWithThumbnail = {
-              ...validBody,
-              thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
-            }
+            let validBodyWithThumbnail
 
             let expectedCdn: string
 
             beforeEach(async () => {
+              validBodyWithThumbnail = {
+                ...validBody,
+                thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+              }
+
               expectedCdn = await components.config.requireString('CDN_URL')
             })
 
@@ -194,7 +213,7 @@ test('Create Community Controller', async function ({ components, stubComponents
                   description: 'Test Description',
                   active: true,
                   ownerAddress: identity.realAccount.address.toLowerCase(),
-                  privacy: 'public'
+                  privacy: CommunityPrivacyEnum.Public
                 },
                 message: 'Community created successfully'
               })
@@ -249,7 +268,7 @@ test('Create Community Controller', async function ({ components, stubComponents
                   description: 'Test Description',
                   active: true,
                   ownerAddress: identity.realAccount.address.toLowerCase(),
-                  privacy: 'public'
+                  privacy: CommunityPrivacyEnum.Public
                 },
                 message: 'Community created successfully'
               })
@@ -266,6 +285,31 @@ test('Create Community Controller', async function ({ components, stubComponents
 
               expect(response.status).toBe(500)
               expect(await response.json()).toMatchObject({ message: 'Failed to fetch names' })
+            })
+          })
+
+          describe('and the community privacy is private', () => {
+            beforeEach(() => {
+              validBody.privacy = CommunityPrivacyEnum.Private
+            })
+
+            it('should respond with a 201 and the created community with private privacy', async () => {
+              const response = await makeMultipartRequest(identity, '/v1/communities', validBody)
+              const body = await response.json()
+              communityId = body.data.id
+
+              expect(response.status).toBe(201)
+              expect(body).toMatchObject({
+                data: {
+                  id: expect.any(String),
+                  name: 'Test Community',
+                  description: 'Test Description',
+                  active: true,
+                  ownerAddress: identity.realAccount.address.toLowerCase(),
+                  privacy: CommunityPrivacyEnum.Private
+                },
+                message: 'Community created successfully'
+              })
             })
           })
         })

@@ -164,6 +164,7 @@ export function createCommunityRolesComponent(
       'remove places from the community'
     ),
     validatePermissionToEditCommunity: validatePermission('edit_info', 'edit the community'),
+    validatePermissionToUpdateCommunityPrivacy: validatePermission('edit_settings', 'update the community privacy'),
     validatePermissionToDeleteCommunity: validatePermission('delete_community', 'delete the community'),
     validatePermissionToUpdatePlaces: validatePermissions(
       ['add_places', 'remove_places'],

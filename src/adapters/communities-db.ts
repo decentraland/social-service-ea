@@ -9,7 +9,8 @@ import {
   CommunityMember,
   MemberCommunity,
   BannedMember,
-  CommunityPlace
+  CommunityPlace,
+  CommunityPrivacyEnum
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -449,7 +450,7 @@ export function createCommunitiesDBComponent(
         name: row.name,
         description: row.description,
         ownerAddress: row.owner_address,
-        privacy: row.private ? 'private' : 'public',
+        privacy: row.private ? CommunityPrivacyEnum.Private : CommunityPrivacyEnum.Public,
         active: row.active
       }
     },
@@ -613,7 +614,7 @@ export function createCommunitiesDBComponent(
         name: row.name,
         description: row.description,
         ownerAddress: row.owner_address,
-        privacy: row.private ? 'private' : 'public',
+        privacy: row.private ? CommunityPrivacyEnum.Private : CommunityPrivacyEnum.Public,
         active: row.active
       }
     }

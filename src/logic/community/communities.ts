@@ -11,7 +11,8 @@ import {
   MemberCommunity,
   Community,
   CommunityUpdates,
-  AggregatedCommunity
+  AggregatedCommunity,
+  CommunityPrivacyEnum
 } from './types'
 import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
 import { isErrorWithMessage } from '../../utils/errors'
@@ -199,7 +200,7 @@ export function createCommunityComponent(
     },
 
     createCommunity: async (
-      community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
+      community: Omit<Community, 'id' | 'active' | 'thumbnails'>,
       thumbnail?: Buffer,
       placeIds: string[] = []
     ): Promise<AggregatedCommunity> => {
@@ -220,7 +221,7 @@ export function createCommunityComponent(
       const newCommunity = await communitiesDb.createCommunity({
         ...community,
         owner_address: community.ownerAddress,
-        private: false, // TODO: support private communities
+        private: community.privacy === CommunityPrivacyEnum.Private,
         active: true
       })
 
@@ -308,6 +309,10 @@ export function createCommunityComponent(
 
       await communityRoles.validatePermissionToEditCommunity(communityId, userAddress)
 
+      if (updates.privacy && updates.privacy !== community.privacy) {
+        await communityRoles.validatePermissionToUpdateCommunityPrivacy(communityId, userAddress)
+      }
+
       const { placeIds, thumbnailBuffer, ...restUpdates } = updates
 
       if (placeIds && placeIds.length > 0) {
@@ -325,7 +330,10 @@ export function createCommunityComponent(
         placeIds: placeIds ? placeIds.length : 0
       })
 
-      const updatedCommunity = await communitiesDb.updateCommunity(communityId, updates)
+      const updatedCommunity = await communitiesDb.updateCommunity(communityId, {
+        ...updates,
+        private: updates.privacy ? updates.privacy === CommunityPrivacyEnum.Private : undefined
+      })
 
       if (!!updates.name) {
         setImmediate(async () => {
