@@ -20,7 +20,7 @@ export interface ICommunitiesComponent {
     options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
   ): Promise<GetCommunitiesWithTotal<MemberCommunity>>
   createCommunity(
-    community: Omit<Community, 'id' | 'active' | 'privacy' | 'thumbnails'>,
+    community: Omit<Community, 'id' | 'active' | 'thumbnails'>,
     thumbnail?: Buffer,
     placeIds?: string[]
   ): Promise<AggregatedCommunity>
@@ -169,6 +169,12 @@ export type CommunityUpdates = {
   description?: string
   placeIds?: string[]
   thumbnailBuffer?: Buffer
+  privacy?: CommunityPrivacyEnum
+}
+
+export enum CommunityPrivacyEnum {
+  Public = 'public',
+  Private = 'private'
 }
 
 export type Community = {
@@ -177,7 +183,7 @@ export type Community = {
   name: string
   description: string
   ownerAddress: string
-  privacy: 'public' | 'private'
+  privacy: CommunityPrivacyEnum
   active: boolean
 }
 
