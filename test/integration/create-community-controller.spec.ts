@@ -76,10 +76,21 @@ test('Create Community Controller', async function ({ components, stubComponents
 
       describe('and the body structure is valid', () => {
         let communityId: string
-        let validBody: { name: string; description: string; thumbnailPath?: string; placeIds?: string[] } = {
-          name: 'Test Community',
-          description: 'Test Description'
+        let validBody: {
+          name: string
+          description: string
+          privacy: CommunityPrivacyEnum
+          thumbnailPath?: string
+          placeIds?: string[]
         }
+
+        beforeEach(() => {
+          validBody = {
+            name: 'Test Community',
+            description: 'Test Description',
+            privacy: CommunityPrivacyEnum.Public
+          }
+        })
 
         afterEach(async () => {
           await components.communitiesDb.deleteCommunity(communityId)
@@ -101,11 +112,16 @@ test('Create Community Controller', async function ({ components, stubComponents
           })
 
           describe('and places are provided', () => {
-            const mockPlaceIds = [randomUUID(), randomUUID()]
-            const validBodyWithPlaces = {
-              ...validBody,
-              placeIds: mockPlaceIds
-            }
+            let mockPlaceIds: string[]
+            let validBodyWithPlaces
+
+            beforeEach(() => {
+              mockPlaceIds = [randomUUID(), randomUUID()]
+              validBodyWithPlaces = {
+                ...validBody,
+                placeIds: mockPlaceIds
+              }
+            })
 
             describe('and the places are owned by the user', () => {
               beforeEach(async () => {
@@ -171,14 +187,16 @@ test('Create Community Controller', async function ({ components, stubComponents
           })
 
           describe('and a valid thumbnail is provided', () => {
-            const validBodyWithThumbnail = {
-              ...validBody,
-              thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
-            }
+            let validBodyWithThumbnail
 
             let expectedCdn: string
 
             beforeEach(async () => {
+              validBodyWithThumbnail = {
+                ...validBody,
+                thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+              }
+
               expectedCdn = await components.config.requireString('CDN_URL')
             })
 
@@ -271,13 +289,12 @@ test('Create Community Controller', async function ({ components, stubComponents
           })
 
           describe('and the community privacy is private', () => {
-            let validBodyWithPrivatePrivacy = {
-              ...validBody,
-              privacy: CommunityPrivacyEnum.Private
-            }
+            beforeEach(() => {
+              validBody.privacy = CommunityPrivacyEnum.Private
+            })
 
-            it('should create community with private privacy', async () => {
-              const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithPrivatePrivacy)
+            it('should respond with a 201 and the created community with private privacy', async () => {
+              const response = await makeMultipartRequest(identity, '/v1/communities', validBody)
               const body = await response.json()
               communityId = body.data.id
 

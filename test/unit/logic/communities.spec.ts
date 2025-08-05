@@ -346,20 +346,21 @@ describe('Community Component', () => {
 
   describe('when getting public communities', () => {
     const options = { pagination: { limit: 10, offset: 0 }, search: 'test' }
-    const mockCommunities: Omit<CommunityPublicInformation, 'ownerName'>[] = [
-      {
-        id: communityId,
-        name: 'Test Community',
-        description: 'Test Description',
-        ownerAddress: '0x1234567890123456789012345678901234567890',
-        privacy: CommunityPrivacyEnum.Public,
-        active: true,
-        membersCount: 10,
-        isHostingLiveEvent: false
-      }
-    ]
+    let mockCommunities: Omit<CommunityPublicInformation, 'ownerName'>[] = []
 
     beforeEach(() => {
+      mockCommunities = [
+        {
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0x1234567890123456789012345678901234567890',
+          privacy: CommunityPrivacyEnum.Public,
+          active: true,
+          membersCount: 10,
+          isHostingLiveEvent: false
+        }
+      ]
       mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunities)
       mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(1)
       mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
