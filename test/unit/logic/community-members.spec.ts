@@ -4,7 +4,7 @@ import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockCatalystClient, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
 import { createCommunityMembersComponent } from '../../../src/logic/community/members'
-import { ICommunityBroadcasterComponent, ICommunityMembersComponent, ICommunityRolesComponent, ICommunityThumbnailComponent } from '../../../src/logic/community/types'
+import { CommunityPrivacyEnum, ICommunityBroadcasterComponent, ICommunityMembersComponent, ICommunityRolesComponent, ICommunityThumbnailComponent } from '../../../src/logic/community/types'
 import { createMockCommunityBroadcasterComponent, createMockCommunityRolesComponent, createMockCommunityThumbnailComponent } from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { CommunityMember, CommunityMemberProfile } from '../../../src/logic/community/types'
@@ -92,7 +92,7 @@ describe('Community Members Component', () => {
             id: communityId,
             name: 'Test Community',
             description: 'Test Description',
-            privacy: 'public',
+            privacy: CommunityPrivacyEnum.Public,
             active: true,
             ownerAddress: '0xowner',
             role: CommunityRole.Member
@@ -175,7 +175,7 @@ describe('Community Members Component', () => {
             id: communityId,
             name: 'Test Community',
             description: 'Test Description',
-            privacy: 'private',
+            privacy: CommunityPrivacyEnum.Private,
             active: true,
             ownerAddress: '0xowner',
             role: CommunityRole.Member
@@ -278,7 +278,7 @@ describe('Community Members Component', () => {
           id: communityId,
           name: 'Test Community',
           description: 'Test Description',
-          privacy: 'public',
+          privacy: CommunityPrivacyEnum.Public,
           active: true,
           ownerAddress: '0xowner',
           role: CommunityRole.Member
@@ -598,7 +598,7 @@ describe('Community Members Component', () => {
         description: 'Test Description',
         active: true,
         ownerAddress: kickerAddress,
-        privacy: 'public',
+        privacy: CommunityPrivacyEnum.Public,
         role: CommunityRole.Owner
       })
       mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(isMember)
@@ -614,7 +614,7 @@ describe('Community Members Component', () => {
           description: 'Test Description',
           active: true,
           ownerAddress: kickerAddress,
-          privacy: 'public',
+          privacy: CommunityPrivacyEnum.Public,
           role: CommunityRole.Owner
         })
       })

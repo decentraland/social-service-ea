@@ -5,7 +5,7 @@ import { createMockProfile } from '../mocks/profile'
 import { parseExpectedFriends } from '../mocks/friend'
 import { mockCommunity } from '../mocks/communities'
 import { createOrUpsertActiveFriendship, removeFriendship } from './utils/friendships'
-import { CommunityOwnerNotFoundError } from '../../src/logic/community'
+import { CommunityOwnerNotFoundError, CommunityPrivacyEnum } from '../../src/logic/community'
 
 test('Get Communities Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -105,7 +105,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                 description: 'Test Description 1',
                 ownerAddress: address,
                 ownerName: 'Test Owner',
-                privacy: 'public',
+                privacy: CommunityPrivacyEnum.Public,
                 active: true,
                 membersCount: 2
               }),
@@ -115,7 +115,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                 description: 'Test Description 2',
                 ownerAddress: address,
                 ownerName: 'Test Owner',
-                privacy: 'public',
+                privacy: CommunityPrivacyEnum.Public,
                 active: true,
                 membersCount: 1
               })
@@ -148,7 +148,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                   description: 'Test Description 1',
                   ownerAddress: address,
                   ownerName: 'Test Owner',
-                  privacy: 'public',
+                  privacy: CommunityPrivacyEnum.Public,
                   active: true,
                   role: CommunityRole.None,
                   membersCount: 2,
@@ -160,7 +160,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                   description: 'Test Description 2',
                   ownerAddress: address,
                   ownerName: 'Test Owner',
-                  privacy: 'public',
+                  privacy: CommunityPrivacyEnum.Public,
                   active: true,
                   role: CommunityRole.None,
                   membersCount: 1,

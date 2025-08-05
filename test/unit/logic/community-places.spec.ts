@@ -4,7 +4,7 @@ import { CommunityNotFoundError, CommunityPlaceNotFoundError } from '../../../sr
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, createPlacesApiAdapterMockComponent } from '../../mocks/components'
 import { createCommunityPlacesComponent } from '../../../src/logic/community/places'
-import { ICommunityPlacesComponent, CommunityPlace, ICommunityRolesComponent } from '../../../src/logic/community'
+import { ICommunityPlacesComponent, CommunityPlace, ICommunityRolesComponent, CommunityPrivacyEnum } from '../../../src/logic/community'
 import { IPlacesApiComponent } from '../../../src/types/components'
 import { createMockCommunityRolesComponent } from '../../mocks/communities'
 
@@ -72,7 +72,7 @@ describe('Community Places Component', () => {
             name: 'Test Community',
             description: 'Test Description',
             ownerAddress: '0xowner',
-            privacy: 'public',
+            privacy: CommunityPrivacyEnum.Public,
             active: true,
             role: CommunityRole.Member
           }
@@ -101,7 +101,7 @@ describe('Community Places Component', () => {
             name: 'Test Community',
             description: 'Test Description',
             ownerAddress: '0xowner',
-            privacy: 'private',
+            privacy: CommunityPrivacyEnum.Private,
             active: true,
             role: CommunityRole.Member
           }
@@ -159,7 +159,7 @@ describe('Community Places Component', () => {
             name: 'Test Community',
             description: 'Test Description',
             ownerAddress: '0xowner',
-            privacy: 'public',
+            privacy: CommunityPrivacyEnum.Public,
             active: true,
             role: CommunityRole.Member
           }
@@ -188,7 +188,7 @@ describe('Community Places Component', () => {
             name: 'Test Community',
             description: 'Test Description',
             ownerAddress: '0xowner',
-            privacy: 'public',
+            privacy: CommunityPrivacyEnum.Public,
             active: true,
             role: CommunityRole.Member
           }

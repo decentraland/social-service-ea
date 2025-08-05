@@ -275,7 +275,7 @@ export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
 }
 
 export type CommunityPublicInformation = Omit<CommunityWithUserInformation, 'role' | 'friends' | 'privacy'> & {
-  privacy: 'public'
+  privacy: CommunityPrivacyEnum.Public
 }
 
 export type GetCommunitiesWithTotal<T> = {

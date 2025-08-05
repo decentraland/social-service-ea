@@ -12,7 +12,9 @@ import {
   ICommunityOwnersComponent,
   ICommunityEventsComponent,
   ICommunityThumbnailComponent,
-  ICommunityBroadcasterComponent
+  ICommunityBroadcasterComponent,
+  CommunityPrivacyEnum,
+  CommunityPublicInformation
 } from '../../../src/logic/community/types'
 import {
   createMockCommunityRolesComponent,
@@ -45,7 +47,7 @@ describe('Community Component', () => {
     name: 'Test Community',
     description: 'Test Description',
     ownerAddress: '0x1234567890123456789012345678901234567890',
-    privacy: 'public',
+    privacy: CommunityPrivacyEnum.Public,
     active: true,
     thumbnails: undefined
   }
@@ -344,22 +346,16 @@ describe('Community Component', () => {
 
   describe('when getting public communities', () => {
     const options = { pagination: { limit: 10, offset: 0 }, search: 'test' }
-    const mockCommunities = [
+    const mockCommunities: Omit<CommunityPublicInformation, 'ownerName'>[] = [
       {
         id: communityId,
         name: 'Test Community',
         description: 'Test Description',
         ownerAddress: '0x1234567890123456789012345678901234567890',
-        privacy: 'public' as const,
+        privacy: CommunityPrivacyEnum.Public,
         active: true,
-        role: CommunityRole.Member,
         membersCount: 10,
-        isHostingLiveEvent: false,
-        voiceChatStatus: {
-          isActive: false,
-          participantCount: 0,
-          moderatorCount: 0
-        }
+        isHostingLiveEvent: false
       }
     ]
 
@@ -384,7 +380,7 @@ describe('Community Component', () => {
               name: mockCommunity.name,
               description: mockCommunity.description,
               ownerAddress: mockCommunity.ownerAddress,
-              privacy: 'public',
+              privacy: CommunityPrivacyEnum.Public,
               active: mockCommunity.active,
               membersCount: 10,
               isHostingLiveEvent: false,
@@ -418,7 +414,7 @@ describe('Community Component', () => {
 
     describe('when filtering by active voice chat', () => {
       const optionsWithVoiceChat = { ...options, onlyWithActiveVoiceChat: true }
-      const mockCommunitiesWithVoiceChat = [
+      const mockCommunitiesWithVoiceChat: Omit<CommunityPublicInformation, 'ownerName'>[] = [
         {
           ...mockCommunities[0],
           id: 'public-community-with-voice-chat'
@@ -484,7 +480,7 @@ describe('Community Component', () => {
         name: 'Test Community',
         description: 'Test Description',
         ownerAddress: '0x1234567890123456789012345678901234567890',
-        privacy: 'public',
+        privacy: CommunityPrivacyEnum.Public,
         active: true,
         role: CommunityRole.Member,
         joinedAt: '2023-01-01T00:00:00Z'
@@ -514,7 +510,8 @@ describe('Community Component', () => {
     const communityData = {
       name: 'New Community',
       description: 'New Description',
-      ownerAddress
+      ownerAddress,
+      privacy: CommunityPrivacyEnum.Public
     }
     const placeIds = ['place-1', 'place-2']
     const thumbnail = Buffer.from('fake-thumbnail')

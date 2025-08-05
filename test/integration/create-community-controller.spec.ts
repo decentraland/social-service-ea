@@ -1,3 +1,4 @@
+import { CommunityPrivacyEnum } from '../../src/logic/community'
 import { test } from '../components'
 import { createMockProfile } from '../mocks/profile'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
@@ -136,7 +137,7 @@ test('Create Community Controller', async function ({ components, stubComponents
                     description: 'Test Description',
                     active: true,
                     ownerAddress: identity.realAccount.address.toLowerCase(),
-                    privacy: 'public'
+                    privacy: CommunityPrivacyEnum.Public
                   },
                   message: 'Community created successfully'
                 })
@@ -194,7 +195,7 @@ test('Create Community Controller', async function ({ components, stubComponents
                   description: 'Test Description',
                   active: true,
                   ownerAddress: identity.realAccount.address.toLowerCase(),
-                  privacy: 'public'
+                  privacy: CommunityPrivacyEnum.Public
                 },
                 message: 'Community created successfully'
               })
@@ -249,7 +250,7 @@ test('Create Community Controller', async function ({ components, stubComponents
                   description: 'Test Description',
                   active: true,
                   ownerAddress: identity.realAccount.address.toLowerCase(),
-                  privacy: 'public'
+                  privacy: CommunityPrivacyEnum.Public
                 },
                 message: 'Community created successfully'
               })
