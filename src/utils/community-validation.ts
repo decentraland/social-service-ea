@@ -52,7 +52,13 @@ export async function validateCommunityFields(
   }
 
   // Always require at least one field for updates
-  if (name === undefined && description === undefined && !thumbnailBuffer && placeIds === undefined) {
+  if (
+    name === undefined &&
+    description === undefined &&
+    !thumbnailBuffer &&
+    placeIds === undefined &&
+    privacy === undefined
+  ) {
     throw new InvalidRequestError('At least one field must be provided for update')
   }
 

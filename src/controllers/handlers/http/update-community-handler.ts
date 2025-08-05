@@ -22,18 +22,19 @@ export async function updateCommunityHandler(
   try {
     const thumbnailFile = formData?.files?.['thumbnail']
     const thumbnailBuffer = thumbnailFile?.value
-    const privacy: CommunityPrivacyEnum | undefined = formData?.fields?.['privacy']?.value
 
     const {
       name,
       description,
       placeIds,
+      privacy,
       thumbnailBuffer: validatedThumbnail
     } = await validateCommunityFields(formData, thumbnailBuffer)
 
     logger.info('Updating community', {
       communityId,
       userAddress,
+      privacy,
       updates: JSON.stringify({ name, description, placeIds: placeIds ? placeIds.length : 0 }),
       hasThumbnail: validatedThumbnail ? 'true' : 'false'
     })
