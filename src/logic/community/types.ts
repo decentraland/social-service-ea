@@ -81,6 +81,7 @@ export interface ICommunityRolesComponent {
   validatePermissionToRemovePlacesFromCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToUpdatePlaces: (communityId: string, editorAddress: string) => Promise<void>
   validatePermissionToEditCommunity: (communityId: string, editorAddress: string) => Promise<void>
+  validatePermissionToUpdateCommunityPrivacy: (communityId: string, updaterAddress: string) => Promise<void>
   validatePermissionToDeleteCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToLeaveCommunity: (communityId: string, memberAddress: string) => Promise<void>
 }

@@ -309,6 +309,10 @@ export function createCommunityComponent(
 
       await communityRoles.validatePermissionToEditCommunity(communityId, userAddress)
 
+      if (updates.privacy && updates.privacy !== community.privacy) {
+        await communityRoles.validatePermissionToUpdateCommunityPrivacy(communityId, userAddress)
+      }
+
       const { placeIds, thumbnailBuffer, ...restUpdates } = updates
 
       if (placeIds && placeIds.length > 0) {

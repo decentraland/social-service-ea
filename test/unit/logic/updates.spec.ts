@@ -1303,7 +1303,6 @@ describe('Updates Handlers', () => {
         rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('blockUpdate', blockUpdate)
 
         const result = await resultPromise
-        console.log(result)
         expect(result.value).toEqual({ parsed: true })
         expect(parser).toHaveBeenCalledWith(blockUpdate, null)
         expect(mockCatalystClient.getProfile).not.toHaveBeenCalled()
