@@ -67,7 +67,8 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
       description,
       thumbnailPath,
       thumbnailBuffer,
-      placeIds
+      placeIds,
+      privacy
     }: {
       name?: string
       description?: string
@@ -99,6 +100,10 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
 
     if (placeIds !== undefined) {
       form.append('placeIds', JSON.stringify(placeIds))
+    }
+
+    if (privacy !== undefined) {
+      form.append('privacy', privacy)
     }
 
     const headers = {
