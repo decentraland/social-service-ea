@@ -269,6 +269,32 @@ test('Create Community Controller', async function ({ components, stubComponents
               expect(await response.json()).toMatchObject({ message: 'Failed to fetch names' })
             })
           })
+
+          describe('and the community privacy is private', () => {
+            let validBodyWithPrivatePrivacy = {
+              ...validBody,
+              privacy: CommunityPrivacyEnum.Private
+            }
+
+            it('should create community with private privacy', async () => {
+              const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithPrivatePrivacy)
+              const body = await response.json()
+              communityId = body.data.id
+
+              expect(response.status).toBe(201)
+              expect(body).toMatchObject({
+                data: {
+                  id: expect.any(String),
+                  name: 'Test Community',
+                  description: 'Test Description',
+                  active: true,
+                  ownerAddress: identity.realAccount.address.toLowerCase(),
+                  privacy: CommunityPrivacyEnum.Private
+                },
+                message: 'Community created successfully'
+              })
+            })
+          })
         })
 
         describe('when the user does not own a name', () => {

@@ -2,7 +2,7 @@ import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { FormHandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { CommunityNotFoundError } from '../../../logic/community'
+import { CommunityNotFoundError, CommunityPrivacyEnum } from '../../../logic/community'
 import { validateCommunityFields } from '../../../utils/community-validation'
 
 export async function updateCommunityHandler(
@@ -22,6 +22,7 @@ export async function updateCommunityHandler(
   try {
     const thumbnailFile = formData?.files?.['thumbnail']
     const thumbnailBuffer = thumbnailFile?.value
+    const privacy: CommunityPrivacyEnum | undefined = formData?.fields?.['privacy']?.value
 
     const {
       name,
@@ -41,7 +42,8 @@ export async function updateCommunityHandler(
       name,
       description,
       placeIds,
-      thumbnailBuffer: validatedThumbnail
+      thumbnailBuffer: validatedThumbnail,
+      privacy
     })
 
     return {

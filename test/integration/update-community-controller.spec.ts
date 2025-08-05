@@ -1,3 +1,4 @@
+import { CommunityPrivacyEnum } from '../../src/logic/community'
 import { test } from '../components'
 import {
   createTestIdentity,
@@ -294,6 +295,24 @@ test('Update Community Controller', async function ({ components, stubComponents
             const body = await response.json()
             expect(body.data.name).toBe('Multi Updated Name')
             expect(body.data.description).toBe('Multi Updated Description')
+            expect(body.message).toBe('Community updated successfully')
+          })
+        })
+
+        describe('when updating privacy', () => {
+          it('should update the community privacy', async () => {
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                privacy: CommunityPrivacyEnum.Private
+              },
+              'PUT'
+            )
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
             expect(body.message).toBe('Community updated successfully')
           })
         })
