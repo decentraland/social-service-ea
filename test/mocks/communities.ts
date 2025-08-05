@@ -49,6 +49,7 @@ export function createMockCommunityRolesComponent({
   validatePermissionToAddPlacesToCommunity = jest.fn(),
   validatePermissionToRemovePlacesFromCommunity = jest.fn(),
   validatePermissionToEditCommunity = jest.fn(),
+  validatePermissionToUpdateCommunityPrivacy = jest.fn(),
   validatePermissionToDeleteCommunity = jest.fn(),
   validatePermissionToUpdatePlaces = jest.fn(),
   validatePermissionToLeaveCommunity = jest.fn()
@@ -62,6 +63,7 @@ export function createMockCommunityRolesComponent({
     validatePermissionToAddPlacesToCommunity,
     validatePermissionToRemovePlacesFromCommunity,
     validatePermissionToEditCommunity,
+    validatePermissionToUpdateCommunityPrivacy,
     validatePermissionToDeleteCommunity,
     validatePermissionToUpdatePlaces,
     validatePermissionToLeaveCommunity
