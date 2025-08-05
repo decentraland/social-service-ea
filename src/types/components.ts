@@ -310,6 +310,7 @@ export type ICommsGatekeeperComponent = {
   endCommunityVoiceChatRoom: (communityId: string, userAddress: string) => Promise<void>
   updateUserMetadataInCommunityVoiceChat: (communityId: string, userAddress: string, metadata: any) => Promise<void>
   requestToSpeakInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
+  rejectSpeakRequestInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   promoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   demoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   getCommunityVoiceChatStatus: (communityId: string) => Promise<CommunityVoiceChatStatus | null>

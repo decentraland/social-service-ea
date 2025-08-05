@@ -320,6 +320,36 @@ export const createCommsGatekeeperComponent = async ({
   }
 
   /**
+   * Rejects a speak request in a community voice chat.
+   * This sets the hand_raised metadata to false for the user.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user whose speak request is being rejected
+   */
+  async function rejectSpeakRequestInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+    try {
+      const response = await fetch(
+        `${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speak-request`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to reject speak request for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
+  /**
    * Promotes a user to speaker in a community voice chat.
    * @param communityId - The ID of the community
    * @param userAddress - The address of the user to promote
@@ -550,6 +580,7 @@ export const createCommsGatekeeperComponent = async ({
     endCommunityVoiceChatRoom,
     updateUserMetadataInCommunityVoiceChat,
     requestToSpeakInCommunityVoiceChat,
+    rejectSpeakRequestInCommunityVoiceChat,
     promoteSpeakerInCommunityVoiceChat,
     demoteSpeakerInCommunityVoiceChat,
     getCommunityVoiceChatStatus,
