@@ -323,6 +323,7 @@ export type ICommsGatekeeperComponent = {
     }>
   >
   kickUserFromCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
+  isUserInCommunityVoiceChat: (userAddress: string) => Promise<boolean>
 }
 
 export type IWebSocketComponent = IBaseComponent & {
