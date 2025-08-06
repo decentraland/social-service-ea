@@ -577,7 +577,7 @@ export const createCommsGatekeeperComponent = async ({
    */
   async function isUserInCommunityVoiceChat(userAddress: string): Promise<boolean> {
     try {
-      const response = await fetch(`${commsUrl}/users/${userAddress}/community-voice-chat/status`, {
+      const response = await fetch(`${commsUrl}/users/${userAddress}/community-voice-chat-status`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

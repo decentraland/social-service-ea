@@ -525,7 +525,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
 
         expect(result).toBe(true)
         expect(mockFetch).toHaveBeenCalledWith(
-          `${gatekeeperUrl}/users/${testUserAddress}/community-voice-chat/status`,
+          `${gatekeeperUrl}/users/${testUserAddress}/community-voice-chat-status`,
           {
             method: 'GET',
             headers: {
@@ -554,7 +554,7 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
 
         expect(result).toBe(false)
         expect(mockFetch).toHaveBeenCalledWith(
-          `${gatekeeperUrl}/users/${testUserAddress}/community-voice-chat/status`,
+          `${gatekeeperUrl}/users/${testUserAddress}/community-voice-chat-status`,
           {
             method: 'GET',
             headers: {
