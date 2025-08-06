@@ -49,7 +49,8 @@ import {
   ICommunityPlacesComponent,
   ICommunityRolesComponent,
   ICommunityEventsComponent,
-  ICommunityThumbnailComponent
+  ICommunityThumbnailComponent,
+  ICommunityRequestsComponent
 } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
@@ -88,6 +89,7 @@ export type BaseComponents = {
   communityEvents: ICommunityEventsComponent
   communityBroadcaster: ICommunityBroadcasterComponent
   communityThumbnail: ICommunityThumbnailComponent
+  communityRequests: ICommunityRequestsComponent
   config: IConfigComponent
   email: IEmailComponent
   expirePrivateVoiceChatJob?: IJobComponent

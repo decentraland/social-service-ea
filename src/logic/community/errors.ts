@@ -31,3 +31,17 @@ export class CommunityPlaceNotFoundError extends Error {
     this.name = 'CommunityPlaceNotFoundError'
   }
 }
+
+/**
+ * This error is thrown when a community request (invite or request to join) is invalid
+ *
+ * @export
+ * @class InvalidCommunityRequestError
+ * @extends {Error}
+ */
+export class InvalidCommunityRequestError extends Error {
+  constructor(public readonly message: string) {
+    super(message)
+    this.name = 'InvalidCommunityRequestError'
+  }
+}

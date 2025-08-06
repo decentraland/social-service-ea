@@ -10,7 +10,11 @@ import {
   MemberCommunity,
   BannedMember,
   CommunityPlace,
-  CommunityPrivacyEnum
+  CommunityPrivacyEnum,
+  CommunityRequestType,
+  CommunityRequest,
+  CommunityRequestStatus,
+  GetCommunityRequestsOptions
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -617,6 +621,79 @@ export function createCommunitiesDBComponent(
         privacy: row.private ? CommunityPrivacyEnum.Private : CommunityPrivacyEnum.Public,
         active: row.active
       }
+    },
+
+    async createCommunityRequest(
+      communityId: string,
+      memberAddress: EthAddress,
+      type: CommunityRequestType
+    ): Promise<CommunityRequest> {
+      const id = randomUUID()
+      const query = SQL`
+        INSERT INTO community_requests (id, community_id, member_address, type, status)
+        VALUES (${id}, ${communityId}, ${normalizeAddress(memberAddress)}, ${type}, ${CommunityRequestStatus.Pending})
+        RETURNING id
+      `
+
+      const result = await pg.query(query)
+
+      return {
+        id: result.rows[0].id,
+        communityId,
+        memberAddress,
+        type,
+        status: CommunityRequestStatus.Pending
+      }
+    },
+
+    async getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<CommunityRequest[]> {
+      let query = SQL`
+        SELECT id, community_id, member_address, type, status
+        FROM community_requests
+        WHERE community_id = ${communityId}
+      `
+
+      if (filters.status) {
+        query = query.append(SQL` AND status = ${filters.status}`)
+      }
+
+      if (filters.type) {
+        query = query.append(SQL` AND type = ${filters.type}`)
+      }
+
+      if (filters.targetAddress) {
+        query = query.append(SQL` AND member_address = ${normalizeAddress(filters.targetAddress)}`)
+      }
+
+      query = query.append(SQL` ORDER BY created_at DESC`)
+
+      // Apply pagination
+      query = query.append(SQL` LIMIT ${filters.pagination.limit} OFFSET ${filters.pagination.offset}`)
+
+      const result = await pg.query<CommunityRequest>(query)
+      return result.rows
+    },
+
+    async getCommunityRequestsCount(
+      communityId: string,
+      filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
+    ): Promise<number> {
+      let query = SQL`
+        SELECT COUNT(*) as count
+        FROM community_requests
+        WHERE community_id = ${communityId}
+      `
+
+      if (filters.status) {
+        query = query.append(SQL` AND status = ${filters.status}`)
+      }
+
+      if (filters.type) {
+        query = query.append(SQL` AND type = ${filters.type}`)
+      }
+
+      const result = await pg.query<{ count: string }>(query)
+      return parseInt(result.rows[0].count, 10)
     }
   }
 }

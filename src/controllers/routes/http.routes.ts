@@ -28,6 +28,7 @@ import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
 import { getManagedCommunitiesHandler } from '../handlers/http/get-managed-communities-handler'
+import { createCommunityRequestHandler } from '../handlers/http/create-community-request-handler'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -80,6 +81,8 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.patch('/v1/referral-progress', signedFetchMiddleware(), updateReferralSignedUpHandler)
   router.get('/v1/referral-progress', signedFetchMiddleware(), getInvitedUsersAcceptedHandler)
   router.post('/v1/referral-email', signedFetchMiddleware(), addReferralEmailHandler)
+
+  router.post('/v1/communities/:id/requests', signedFetchMiddleware(), createCommunityRequestHandler)
 
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)

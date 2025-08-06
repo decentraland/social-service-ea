@@ -61,6 +61,7 @@ import { createFriendsComponent } from './logic/friends'
 import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/community-voice-cache'
 import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
 import { createSlackComponent } from '@dcl/slack-component'
+import { createCommunityRequestsComponent } from './logic/community/requests'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -202,6 +203,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
+  const communityRequests = createCommunityRequestsComponent({ communitiesDb, logs })
   const communities = createCommunityComponent({
     communitiesDb,
     catalystClient,
@@ -285,6 +287,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityOwners,
     communityPlaces,
     communityRoles,
+    communityRequests,
     communityThumbnail,
     communityVoice,
     communityVoiceChatCache,

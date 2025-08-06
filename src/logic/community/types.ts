@@ -154,6 +154,22 @@ export interface ICommunityThumbnailComponent {
   uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string>
 }
 
+export interface ICommunityRequestsComponent {
+  /**
+   * Creates a community request for a given community and member address.
+   *
+   * @param communityId - The id of the community.
+   * @param memberAddress - The address of the member to create the request for.
+   * @param type - The type of request to create.
+   * @returns The created community request.
+   */
+  createCommunityRequest(
+    communityId: string,
+    memberAddress: EthAddress,
+    type: CommunityRequestType
+  ): Promise<CommunityRequest>
+}
+
 export type CommunityDB = {
   id?: string
   name: string
@@ -271,6 +287,13 @@ export type GetCommunityMembersOptions = {
   byPassPrivacy?: boolean
 }
 
+export type GetCommunityRequestsOptions = {
+  pagination: Required<PaginatedParameters>
+  targetAddress?: EthAddress
+  status?: CommunityRequestStatus
+  type?: CommunityRequestType
+}
+
 export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
   friends: FriendProfile[]
 }
@@ -293,6 +316,26 @@ export type CommunityPlace = {
   communityId: string
   addedBy: string
   addedAt: Date
+}
+
+export enum CommunityRequestStatus {
+  Pending = 'pending',
+  Accepted = 'accepted',
+  Rejected = 'rejected',
+  Cancelled = 'cancelled'
+}
+
+export enum CommunityRequestType {
+  Invite = 'invite',
+  RequestToJoin = 'request_to_join'
+}
+
+export type CommunityRequest = {
+  id: string
+  communityId: string
+  memberAddress: string
+  type: CommunityRequestType
+  status: CommunityRequestStatus
 }
 
 export interface ActiveCommunityVoiceChat {
