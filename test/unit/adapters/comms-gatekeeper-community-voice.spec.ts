@@ -45,7 +45,11 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should return connection URL', async () => {
-        const result = await commsGatekeeper.getCommunityVoiceChatCredentials(testCommunityId, testUserAddress, CommunityRole.Member)
+        const result = await commsGatekeeper.getCommunityVoiceChatCredentials(
+          testCommunityId,
+          testUserAddress,
+          CommunityRole.Member
+        )
 
         expect(result).toEqual({
           connectionUrl: 'wss://livekit.test/room?token=abc123'
@@ -96,7 +100,11 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should create room successfully and return connection URL', async () => {
-        const result = await commsGatekeeper.createCommunityVoiceChatRoom(testCommunityId, testUserAddress, CommunityRole.Owner)
+        const result = await commsGatekeeper.createCommunityVoiceChatRoom(
+          testCommunityId,
+          testUserAddress,
+          CommunityRole.Owner
+        )
 
         expect(result).toEqual({
           connectionUrl: 'wss://livekit.test/room?token=abc123'
@@ -127,9 +135,9 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should throw an error', async () => {
-        await expect(commsGatekeeper.createCommunityVoiceChatRoom(testCommunityId, testUserAddress, CommunityRole.Owner)).rejects.toThrow(
-          'Server responded with status 409'
-        )
+        await expect(
+          commsGatekeeper.createCommunityVoiceChatRoom(testCommunityId, testUserAddress, CommunityRole.Owner)
+        ).rejects.toThrow('Server responded with status 409')
       })
     })
   })
@@ -492,9 +500,85 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
 
       it('should throw an error', async () => {
-        await expect(
-          commsGatekeeper.kickUserFromCommunityVoiceChat(testCommunityId, testUserAddress)
-        ).rejects.toThrow('Server responded with status 403')
+        await expect(commsGatekeeper.kickUserFromCommunityVoiceChat(testCommunityId, testUserAddress)).rejects.toThrow(
+          'Server responded with status 403'
+        )
+      })
+    })
+  })
+
+  describe('when checking if user is in community voice chat', () => {
+    describe('and the request is successful with user in community voice chat', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              userAddress: testUserAddress,
+              isInCommunityVoiceChat: true
+            })
+        })
+      })
+
+      it('should return true', async () => {
+        const result = await commsGatekeeper.isUserInCommunityVoiceChat(testUserAddress)
+
+        expect(result).toBe(true)
+        expect(mockFetch).toHaveBeenCalledWith(
+          `${gatekeeperUrl}/users/${testUserAddress}/community-voice-chat/status`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${gatekeeperToken}`
+            }
+          }
+        )
+      })
+    })
+
+    describe('and the request is successful with user not in community voice chat', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              userAddress: testUserAddress,
+              isInCommunityVoiceChat: false
+            })
+        })
+      })
+
+      it('should return false', async () => {
+        const result = await commsGatekeeper.isUserInCommunityVoiceChat(testUserAddress)
+
+        expect(result).toBe(false)
+        expect(mockFetch).toHaveBeenCalledWith(
+          `${gatekeeperUrl}/users/${testUserAddress}/community-voice-chat/status`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${gatekeeperToken}`
+            }
+          }
+        )
+      })
+    })
+
+    describe('and the request fails', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: false,
+          status: 500,
+          text: () => Promise.resolve('Internal Server Error')
+        })
+      })
+
+      it('should throw an error', async () => {
+        await expect(commsGatekeeper.isUserInCommunityVoiceChat(testUserAddress)).rejects.toThrow(
+          'Server responded with status 500'
+        )
       })
     })
   })

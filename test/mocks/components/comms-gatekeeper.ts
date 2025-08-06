@@ -16,7 +16,8 @@ export function createCommsGatekeeperMockedComponent({
   getCommunityVoiceChatStatus = jest.fn(),
   getCommunitiesVoiceChatStatus = jest.fn(),
   getAllActiveCommunityVoiceChats = jest.fn(),
-  kickUserFromCommunityVoiceChat = jest.fn()
+  kickUserFromCommunityVoiceChat = jest.fn(),
+  isUserInCommunityVoiceChat = jest.fn()
 }: Partial<jest.Mocked<ICommsGatekeeperComponent>>): jest.Mocked<ICommsGatekeeperComponent> {
   return {
     getPrivateVoiceChatCredentials,
@@ -34,6 +35,7 @@ export function createCommsGatekeeperMockedComponent({
     getCommunityVoiceChatStatus,
     getCommunitiesVoiceChatStatus,
     getAllActiveCommunityVoiceChats,
-    kickUserFromCommunityVoiceChat
+    kickUserFromCommunityVoiceChat,
+    isUserInCommunityVoiceChat
   }
 }

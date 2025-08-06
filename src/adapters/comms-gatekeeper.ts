@@ -570,6 +570,35 @@ export const createCommsGatekeeperComponent = async ({
     }
   }
 
+  /**
+   * Checks if a user is currently in any community voice chat.
+   * @param userAddress - The address of the user to check.
+   * @returns Promise<boolean> - True if user is in a community voice chat, false otherwise.
+   */
+  async function isUserInCommunityVoiceChat(userAddress: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${commsUrl}/users/${userAddress}/community-voice-chat/status`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data.isInCommunityVoiceChat
+    } catch (error) {
+      logger.error(
+        `Failed to check community voice chat status for user ${userAddress}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
   return {
     endPrivateVoiceChat,
     updateUserPrivateMessagePrivacyMetadata,
@@ -586,6 +615,7 @@ export const createCommsGatekeeperComponent = async ({
     getCommunityVoiceChatStatus,
     getCommunitiesVoiceChatStatus,
     getAllActiveCommunityVoiceChats,
-    kickUserFromCommunityVoiceChat
+    kickUserFromCommunityVoiceChat,
+    isUserInCommunityVoiceChat
   }
 }
