@@ -123,8 +123,9 @@ export function createCommunitiesDBComponent(
     },
 
     async getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole> {
-      const roles = await this.getCommunityMemberRoles(id, [userAddress])
-      return roles[userAddress] ?? CommunityRole.None
+      const normalizedUserAddress = normalizeAddress(userAddress)
+      const roles = await this.getCommunityMemberRoles(id, [normalizedUserAddress])
+      return roles[normalizedUserAddress] ?? CommunityRole.None
     },
 
     async getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>> {
