@@ -1,4 +1,4 @@
-import { CommunityRole, IPublisherComponent } from '../../../src/types'
+import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
@@ -11,7 +11,6 @@ import { CommunityMember, CommunityMemberProfile } from '../../../src/logic/comm
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
-import { mockSns } from '../../mocks/components/sns'
 import { Events } from '@dcl/schemas'
 
 describe('Community Members Component', () => {

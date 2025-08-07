@@ -46,7 +46,10 @@ import {
   CommunityPublicInformation,
   MemberCommunity,
   BannedMember,
-  CommunityPlace
+  CommunityPlace,
+  CommunityRequestType,
+  CommunityRequest,
+  GetCommunityRequestsOptions
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -189,6 +192,16 @@ export interface ICommunitiesDatabaseComponent {
     communityId: string,
     updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private'>>
   ): Promise<Community>
+  createCommunityRequest(
+    communityId: string,
+    memberAddress: EthAddress,
+    type: CommunityRequestType
+  ): Promise<CommunityRequest>
+  getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<CommunityRequest[]>
+  getCommunityRequestsCount(
+    communityId: string,
+    filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
+  ): Promise<number>
 }
 
 export interface IVoiceDatabaseComponent {

@@ -5,7 +5,8 @@ import {
   CommunityMemberProfile,
   CommunityMember,
   GetCommunityMembersOptions,
-  ICommunityMembersComponent
+  ICommunityMembersComponent,
+  CommunityPrivacyEnum
 } from './types'
 import { mapMembersWithProfiles } from './utils'
 import { EthAddress, Events } from '@dcl/schemas'
@@ -53,7 +54,12 @@ export async function createCommunityMembersComponent(
 
     const memberRole = userAddress ? await communitiesDb.getCommunityMemberRole(id, userAddress) : CommunityRole.None
 
-    if (community.privacy === 'private' && userAddress && memberRole === CommunityRole.None && !byPassPrivacy) {
+    if (
+      community.privacy === CommunityPrivacyEnum.Private &&
+      userAddress &&
+      memberRole === CommunityRole.None &&
+      !byPassPrivacy
+    ) {
       throw new NotAuthorizedError("The user doesn't have permission to get community members")
     }
 

@@ -1,7 +1,7 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
-import { CommunityPlace, ICommunityPlacesComponent } from './types'
+import { CommunityPlace, CommunityPrivacyEnum, ICommunityPlacesComponent } from './types'
 import { separatePositionsAndWorlds } from '../../utils/places'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
@@ -102,11 +102,15 @@ export async function createCommunityPlacesComponent(
       }
 
       const memberRole =
-        community.privacy === 'private' && options.userAddress
+        community.privacy === CommunityPrivacyEnum.Private && options.userAddress
           ? await communitiesDb.getCommunityMemberRole(communityId, options.userAddress)
           : CommunityRole.None
 
-      if (community.privacy === 'private' && options.userAddress && memberRole === CommunityRole.None) {
+      if (
+        community.privacy === CommunityPrivacyEnum.Private &&
+        options.userAddress &&
+        memberRole === CommunityRole.None
+      ) {
         throw new NotAuthorizedError(
           `The user ${options.userAddress} doesn't have permission to get places from community ${communityId}`
         )
