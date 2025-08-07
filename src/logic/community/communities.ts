@@ -335,7 +335,7 @@ export function createCommunityComponent(
         private: updates.privacy ? updates.privacy === CommunityPrivacyEnum.Private : undefined
       })
 
-      if (!!updates.name && updates.name.trim() !== existingCommunity.name.trim()) {
+      if (!!updates.name && updates.name?.trim() !== existingCommunity.name.trim()) {
         setImmediate(async () => {
           const eventKeySuffix =
             updates.name!.trim().toLowerCase().replace(/ /g, '-') +
