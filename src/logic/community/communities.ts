@@ -291,25 +291,25 @@ export function createCommunityComponent(
       userAddress: EthAddress,
       updates: CommunityUpdates
     ): Promise<Community> => {
-      const community = await communitiesDb.getCommunity(communityId, userAddress)
-      if (!community) {
+      const existingCommunity = await communitiesDb.getCommunity(communityId, userAddress)
+      if (!existingCommunity) {
         throw new CommunityNotFoundError(communityId)
       }
 
       if (Object.keys(updates).length === 0) {
         return {
-          id: community.id,
-          name: community.name,
-          description: community.description,
-          ownerAddress: community.ownerAddress,
-          privacy: community.privacy,
-          active: community.active
+          id: existingCommunity.id,
+          name: existingCommunity.name,
+          description: existingCommunity.description,
+          ownerAddress: existingCommunity.ownerAddress,
+          privacy: existingCommunity.privacy,
+          active: existingCommunity.active
         }
       }
 
       await communityRoles.validatePermissionToEditCommunity(communityId, userAddress)
 
-      if (updates.privacy && updates.privacy !== community.privacy) {
+      if (updates.privacy && updates.privacy !== existingCommunity.privacy) {
         await communityRoles.validatePermissionToUpdateCommunityPrivacy(communityId, userAddress)
       }
 
@@ -335,12 +335,12 @@ export function createCommunityComponent(
         private: updates.privacy ? updates.privacy === CommunityPrivacyEnum.Private : undefined
       })
 
-      if (!!updates.name) {
+      if (!!updates.name && updates.name.trim() !== existingCommunity.name.trim()) {
         setImmediate(async () => {
           const eventKeySuffix =
             updates.name!.trim().toLowerCase().replace(/ /g, '-') +
             '-' +
-            community.name.trim().toLowerCase().replace(/ /g, '-')
+            existingCommunity.name.trim().toLowerCase().replace(/ /g, '-')
 
           await communityBroadcaster.broadcast({
             type: Events.Type.COMMUNITY,
@@ -349,7 +349,7 @@ export function createCommunityComponent(
             timestamp: Date.now(),
             metadata: {
               id: communityId,
-              oldName: community.name,
+              oldName: existingCommunity.name,
               newName: updates.name!,
               thumbnailUrl: (await communityThumbnail.getThumbnail(communityId)) || 'N/A'
             }
