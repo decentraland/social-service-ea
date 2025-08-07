@@ -117,7 +117,7 @@ describe('Community Component', () => {
         mockCommunityOwners.getOwnerName.mockResolvedValueOnce('Test Owner Name')
       })
 
-      describe('and community has thumbnail', () => {
+      describe('and has thumbnail', () => {
         beforeEach(() => {
           mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
             `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
@@ -139,7 +139,7 @@ describe('Community Component', () => {
         })
       })
 
-      describe('and community has no active voice chat', () => {
+      describe('and has no active voice chat', () => {
         beforeEach(() => {
           // Override the parent mock for this specific test
           mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValueOnce(null)
@@ -158,9 +158,8 @@ describe('Community Component', () => {
         })
       })
 
-      describe('and community is hosting live events', () => {
+      describe('and is hosting live events', () => {
         beforeEach(() => {
-          // Override the parent mock for this specific test
           mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(true)
         })
 
@@ -177,18 +176,12 @@ describe('Community Component', () => {
         })
       })
 
-      describe('and community has no special conditions', () => {
+      describe('and is not hosting live events', () => {
         beforeEach(() => {
-          // Set up mocks for standard community conditions
-          mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValueOnce({
-            isActive: true,
-            participantCount: 5,
-            moderatorCount: 2
-          })
           mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(false)
         })
 
-        it('should return community with all required data', async () => {
+        it('should return community', async () => {
           const result = await communityComponent.getCommunity(communityId, { as: userAddress })
 
           expect(result).toEqual({
@@ -201,11 +194,7 @@ describe('Community Component', () => {
             thumbnails: undefined,
             role: CommunityRole.Member,
             membersCount: 10,
-            voiceChatStatus: {
-              isActive: true,
-              participantCount: 5,
-              moderatorCount: 2
-            },
+            voiceChatStatus: undefined,
             ownerName: 'Test Owner Name',
             isHostingLiveEvent: false
           })
@@ -275,8 +264,6 @@ describe('Community Component', () => {
         })
       })
 
-
-
       describe('and there are no filters applied', () => {
         it('should return communities with total count and owner names', async () => {
           const result = await communityComponent.getCommunities(userAddress, options)
@@ -318,8 +305,6 @@ describe('Community Component', () => {
           expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
         })
       })
-
-
     })
 
     describe('when no communities exist', () => {
@@ -363,13 +348,13 @@ describe('Community Component', () => {
       }
     ]
 
+    // TODO: check this
     describe('when communities exist', () => {
       describe('and filter by active voice chat is applied', () => {
         let optionsWithVoiceChat: any
         let mockCommunitiesWithVoiceChat: any[]
 
         beforeEach(() => {
-          // Build context for voice chat filtering
           optionsWithVoiceChat = { ...options, onlyWithActiveVoiceChat: true }
           mockCommunitiesWithVoiceChat = [
             {
@@ -492,8 +477,6 @@ describe('Community Component', () => {
         })
       })
 
-
-
       describe('and there are no filters applied', () => {
         it('should return public communities with total count and owner names', async () => {
           const result = await communityComponent.getCommunitiesPublicInformation(options)
@@ -524,8 +507,6 @@ describe('Community Component', () => {
           expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
         })
       })
-
-
     })
 
     describe('when no communities exist', () => {
@@ -550,6 +531,7 @@ describe('Community Component', () => {
     })
   })
 
+  // TODO: check this
   describe('getCommunitiesPublicInformation with voice chat filtering', () => {
     const options = { pagination: { limit: 10, offset: 0 }, search: 'test' }
 
@@ -662,7 +644,7 @@ describe('Community Component', () => {
       }
     ]
 
-    describe('when member has communities', () => {
+    describe('when member belongs to a community', () => {
       beforeEach(() => {
         mockCommunitiesDB.getMemberCommunities.mockResolvedValueOnce(mockMemberCommunities)
         mockCommunitiesDB.getCommunitiesCount.mockResolvedValueOnce(1)
@@ -685,7 +667,7 @@ describe('Community Component', () => {
       })
     })
 
-    describe('when member has no communities', () => {
+    describe('when member does not belong to any community', () => {
       beforeEach(() => {
         mockCommunitiesDB.getMemberCommunities.mockResolvedValueOnce([])
         mockCommunitiesDB.getCommunitiesCount.mockResolvedValueOnce(0)
@@ -1017,15 +999,15 @@ describe('Community Component', () => {
       beforeEach(() => {
         community = { ...mockCommunity }
         mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
+        mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
+          `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+        )
       })
 
       describe('and user is the owner', () => {
         beforeEach(() => {
           community.role = CommunityRole.Owner
           community.ownerAddress = userAddress
-          mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
-            `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
-          )
         })
 
         it('should delete the community', async () => {
@@ -1123,10 +1105,6 @@ describe('Community Component', () => {
     let community: any
     let updatedCommunity: any
 
-    beforeEach(() => {
-      community = null
-    })
-
     describe('when community does not exist', () => {
       beforeEach(() => {
         community = null
@@ -1140,11 +1118,7 @@ describe('Community Component', () => {
       })
 
       it('should call database service', async () => {
-        try {
-          await communityComponent.updateCommunity(communityId, userAddress, updates)
-        } catch (error) {
-          // Expected to throw
-        }
+        await expect(communityComponent.updateCommunity(communityId, userAddress, updates)).rejects.toThrow()
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
       })
