@@ -141,7 +141,6 @@ describe('Community Component', () => {
 
       describe('and has no active voice chat', () => {
         beforeEach(() => {
-          // Override the parent mock for this specific test
           mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValueOnce(null)
         })
 
@@ -367,7 +366,6 @@ describe('Community Component', () => {
             }
           ]
 
-          // Complete independent context setup
           mockCommunitiesDB.getCommunities.mockResolvedValueOnce(mockCommunitiesWithVoiceChat)
           mockCommunitiesDB.getCommunitiesCount.mockResolvedValueOnce(2)
           mockStorage.exists.mockResolvedValueOnce(false)
@@ -377,7 +375,6 @@ describe('Community Component', () => {
 
         describe('and voice chat status check fails', () => {
           beforeEach(() => {
-            // Only voice chat specific mock - base data is set in parent
             mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockRejectedValueOnce(
               new Error('Voice chat service unavailable')
             )
@@ -402,7 +399,6 @@ describe('Community Component', () => {
 
         describe('and voice chat status check succeeds', () => {
           beforeEach(() => {
-            // Only voice chat specific mock - base data is set in parent
             mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValueOnce({
               'community-with-voice-chat': { isActive: true, participantCount: 3, moderatorCount: 1 },
               'community-without-voice-chat': { isActive: false, participantCount: 0, moderatorCount: 0 }
@@ -566,7 +562,6 @@ describe('Community Component', () => {
             }
           ]
 
-          // Complete independent context setup
           mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValueOnce(mockCommunitiesWithVoiceChat)
           mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValueOnce(2)
           mockStorage.exists.mockResolvedValueOnce(false)
@@ -575,7 +570,6 @@ describe('Community Component', () => {
 
         describe('and voice chat status check fails', () => {
           beforeEach(() => {
-            // Only voice chat specific mock - base data is set in parent
             mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockRejectedValueOnce(
               new Error('Voice chat service unavailable')
             )
@@ -600,7 +594,6 @@ describe('Community Component', () => {
 
         describe('and voice chat status check succeeds', () => {
           beforeEach(() => {
-            // Only voice chat specific mock - base data is set in parent
             mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValueOnce({
               'public-community-with-voice-chat': { isActive: true, participantCount: 5, moderatorCount: 2 },
               'public-community-without-voice-chat': { isActive: false, participantCount: 0, moderatorCount: 0 }
@@ -1187,16 +1180,6 @@ describe('Community Component', () => {
         describe('and user has permission to edit', () => {
           beforeEach(() => {
             mockCommunityRoles.validatePermissionToEditCommunity.mockResolvedValueOnce()
-            mockCommunityPlaces.validateOwnership.mockResolvedValueOnce({
-              isValid: true,
-              ownedPlaces: updates.placeIds,
-              notOwnedPlaces: []
-            })
-            mockCommunityThumbnail.uploadThumbnail.mockResolvedValueOnce(
-              `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
-            )
-            mockCommunityPlaces.updatePlaces.mockResolvedValueOnce()
-            mockCommunitiesDB.getCommunityPlaces.mockResolvedValueOnce([])
           })
 
           describe('and no places are provided', () => {
@@ -1215,11 +1198,7 @@ describe('Community Component', () => {
               })
 
               it('should update community without places', async () => {
-                const result = await communityComponent.updateCommunity(
-                  communityId,
-                  userAddress,
-                  updatesWithoutPlaces
-                )
+                const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutPlaces)
 
                 expect(result).toEqual({
                   ...mockCommunity,
@@ -1276,18 +1255,111 @@ describe('Community Component', () => {
                 })
               })
             })
+
+            describe('and thumbnail is provided', () => {
+              const updatesWithThumbnail = {
+                name: 'Updated Community',
+                description: 'Updated Description',
+                thumbnailBuffer: Buffer.from('fake-thumbnail')
+              }
+
+              beforeEach(() => {
+                mockCommunityThumbnail.uploadThumbnail.mockResolvedValueOnce(
+                  `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+                )
+                mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
+                  `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+                )
+                updatedCommunity = { ...mockCommunity, ...updatesWithThumbnail }
+                mockCommunitiesDB.updateCommunity.mockResolvedValueOnce(updatedCommunity)
+              })
+
+              it('should update community with thumbnail', async () => {
+                const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithThumbnail)
+
+                expect(result).toEqual({
+                  ...mockCommunity,
+                  ...updatesWithThumbnail,
+                  thumbnails: {
+                    raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+                  }
+                })
+              })
+
+              it('should call thumbnail services', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithThumbnail)
+
+                expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(
+                  communityId,
+                  updatesWithThumbnail.thumbnailBuffer
+                )
+                expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
+              })
+
+              it('should call database services', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithThumbnail)
+
+                expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+                expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithThumbnail)
+              })
+
+              it('should call permission validation service', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithThumbnail)
+
+                expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                  communityId,
+                  userAddress
+                )
+              })
+
+              it('should not call place services', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithThumbnail)
+
+                expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
+                expect(mockCommunityPlaces.updatePlaces).not.toHaveBeenCalled()
+              })
+
+              it('should publish community renamed event', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithThumbnail)
+
+                // Wait for setImmediate callback to execute
+                await new Promise((resolve) => setImmediate(resolve))
+                expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+                  type: Events.Type.COMMUNITY,
+                  subType: Events.SubType.Community.RENAMED,
+                  key: `${communityId}-${updatesWithThumbnail.name.trim().toLowerCase().replace(/ /g, '-')}-${community.name.trim().toLowerCase().replace(/ /g, '-')}`,
+                  timestamp: expect.any(Number),
+                  metadata: {
+                    id: communityId,
+                    oldName: community.name,
+                    newName: updatesWithThumbnail.name,
+                    thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+                  }
+                })
+              })
+            })
           })
 
           describe('and places are provided', () => {
+            beforeEach(() => {
+              mockCommunityPlaces.validateOwnership.mockResolvedValueOnce({
+                isValid: true,
+                ownedPlaces: updates.placeIds,
+                notOwnedPlaces: []
+              })
+              mockCommunityPlaces.updatePlaces.mockResolvedValueOnce()
+              mockCommunitiesDB.getCommunityPlaces.mockResolvedValueOnce([])
+            })
+
             describe('and no thumbnail is provided', () => {
-              const updatesWithoutThumbnail = {
+              const updatesWithPlaces = {
                 name: 'Updated Community',
                 description: 'Updated Description',
                 placeIds: ['place-1', 'place-2']
               }
 
               beforeEach(() => {
-                updatedCommunity = { ...mockCommunity, ...updatesWithoutThumbnail }
+                updatedCommunity = { ...mockCommunity, ...updatesWithPlaces }
                 mockCommunitiesDB.updateCommunity.mockResolvedValueOnce(updatedCommunity)
                 mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
                   `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
@@ -1295,27 +1367,23 @@ describe('Community Component', () => {
               })
 
               it('should update community with places', async () => {
-                const result = await communityComponent.updateCommunity(
-                  communityId,
-                  userAddress,
-                  updatesWithoutThumbnail
-                )
+                const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlaces)
 
                 expect(result).toEqual({
                   ...mockCommunity,
-                  ...updatesWithoutThumbnail
+                  ...updatesWithPlaces
                 })
               })
 
               it('should call database services', async () => {
-                await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutThumbnail)
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlaces)
 
                 expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-                expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutThumbnail)
+                expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithPlaces)
               })
 
               it('should call permission validation service', async () => {
-                await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutThumbnail)
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlaces)
 
                 expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
                   communityId,
@@ -1324,45 +1392,151 @@ describe('Community Component', () => {
               })
 
               it('should call place validation service', async () => {
-                await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutThumbnail)
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlaces)
 
                 expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(
-                  updatesWithoutThumbnail.placeIds,
+                  updatesWithPlaces.placeIds,
                   userAddress
                 )
               })
 
               it('should call place update service', async () => {
-                await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutThumbnail)
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlaces)
 
                 expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
                   communityId,
                   userAddress,
-                  updatesWithoutThumbnail.placeIds
+                  updatesWithPlaces.placeIds
                 )
               })
 
               it('should not call thumbnail services', async () => {
-                await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutThumbnail)
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlaces)
 
                 expect(mockCommunityThumbnail.uploadThumbnail).not.toHaveBeenCalled()
                 expect(mockCdnCacheInvalidator.invalidateThumbnail).not.toHaveBeenCalled()
               })
 
               it('should publish community renamed event', async () => {
-                await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutThumbnail)
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlaces)
 
                 // Wait for setImmediate callback to execute
                 await new Promise((resolve) => setImmediate(resolve))
                 expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
                   type: Events.Type.COMMUNITY,
                   subType: Events.SubType.Community.RENAMED,
-                  key: `${communityId}-${updatesWithoutThumbnail.name.trim().toLowerCase().replace(/ /g, '-')}-${community.name.trim().toLowerCase().replace(/ /g, '-')}`,
+                  key: `${communityId}-${updatesWithPlaces.name.trim().toLowerCase().replace(/ /g, '-')}-${community.name.trim().toLowerCase().replace(/ /g, '-')}`,
                   timestamp: expect.any(Number),
                   metadata: {
                     id: communityId,
                     oldName: community.name,
-                    newName: updatesWithoutThumbnail.name,
+                    newName: updatesWithPlaces.name,
+                    thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+                  }
+                })
+              })
+            })
+
+            describe('and thumbnail is provided', () => {
+              const updatesWithPlacesAndThumbnail = {
+                name: 'Updated Community',
+                description: 'Updated Description',
+                placeIds: ['place-1', 'place-2'],
+                thumbnailBuffer: Buffer.from('fake-thumbnail')
+              }
+
+              beforeEach(() => {
+                mockCommunityThumbnail.uploadThumbnail.mockResolvedValueOnce(
+                  `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+                )
+                mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
+                  `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+                )
+                updatedCommunity = { ...mockCommunity, ...updatesWithPlacesAndThumbnail }
+                mockCommunitiesDB.updateCommunity.mockResolvedValueOnce(updatedCommunity)
+              })
+
+              it('should update community with places and thumbnail', async () => {
+                const result = await communityComponent.updateCommunity(
+                  communityId,
+                  userAddress,
+                  updatesWithPlacesAndThumbnail
+                )
+
+                expect(result).toEqual({
+                  ...mockCommunity,
+                  name: updatesWithPlacesAndThumbnail.name,
+                  description: updatesWithPlacesAndThumbnail.description,
+                  placeIds: updatesWithPlacesAndThumbnail.placeIds,
+                  thumbnailBuffer: updatesWithPlacesAndThumbnail.thumbnailBuffer,
+                  thumbnails: {
+                    raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+                  }
+                })
+              })
+
+              it('should call database services', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlacesAndThumbnail)
+
+                expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+                expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(
+                  communityId,
+                  updatesWithPlacesAndThumbnail
+                )
+              })
+
+              it('should call permission validation service', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlacesAndThumbnail)
+
+                expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                  communityId,
+                  userAddress
+                )
+              })
+
+              it('should call place validation service', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlacesAndThumbnail)
+
+                expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(
+                  updatesWithPlacesAndThumbnail.placeIds,
+                  userAddress
+                )
+              })
+
+              it('should call place update service', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlacesAndThumbnail)
+
+                expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
+                  communityId,
+                  userAddress,
+                  updatesWithPlacesAndThumbnail.placeIds
+                )
+              })
+
+              it('should call thumbnail services', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlacesAndThumbnail)
+
+                expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(
+                  communityId,
+                  updatesWithPlacesAndThumbnail.thumbnailBuffer
+                )
+                expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
+              })
+
+              it('should publish community renamed event', async () => {
+                await communityComponent.updateCommunity(communityId, userAddress, updatesWithPlacesAndThumbnail)
+
+                // Wait for setImmediate callback to execute
+                await new Promise((resolve) => setImmediate(resolve))
+                expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+                  type: Events.Type.COMMUNITY,
+                  subType: Events.SubType.Community.RENAMED,
+                  key: `${communityId}-${updatesWithPlacesAndThumbnail.name.trim().toLowerCase().replace(/ /g, '-')}-${community.name.trim().toLowerCase().replace(/ /g, '-')}`,
+                  timestamp: expect.any(Number),
+                  metadata: {
+                    id: communityId,
+                    oldName: community.name,
+                    newName: updatesWithPlacesAndThumbnail.name,
                     thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
                   }
                 })
@@ -1374,4 +1548,3 @@ describe('Community Component', () => {
     })
   })
 })
-
