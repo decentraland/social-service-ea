@@ -379,15 +379,17 @@ components:
         - invitedUsersAcceptedViewed
         - rewardImages
       properties:
-        totalInvited:
+        invitedUsersAccepted:
           type: integer
-          description: 'Total number of users invited'
-        totalAccepted:
+          description: 'Current total number of users invited by the referral'
+        invitedUsersAcceptedViewed:
           type: integer
-          description: 'Total number of users who accepted the invitation'
-        totalSignedUp:
-          type: integer
-          description: 'Total number of users who signed up'
+          description: 'Total number of invited users recorded in the previous fetch'
+        rewardImages:
+          type: array
+          description: 'Images url for each tier reached'
+          items:
+            type: object
 
     CreateCommunityRequest200OkResponse:
       type: object
