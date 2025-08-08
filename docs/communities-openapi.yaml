@@ -959,7 +959,7 @@ paths:
     get:
       summary: Get invited users accepted stats
       description: |
-        Gets statistics about invited users who have accepted referrals.
+        Retrieves the current users invited by a referral and the ones from the last time they were fetched, along with reward images containing the tier and URL information. This allows comparing the previously seen data with the current one.
         This endpoint requires Signed Fetch authentication.
       security:
         - SignedFetch: []
