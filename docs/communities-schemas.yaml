@@ -332,3 +332,147 @@ components:
                   type: array
                   items:
                     $ref: '#/components/schemas/CommunityPlace'
+
+    GetManagedCommunities200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - ownerAddress
+                      - active
+                      - role
+                      - thumbnails
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      ownerAddress:
+                        type: string
+                      active:
+                        type: boolean
+                      role:
+                        type: string
+                        enum: [Owner, Moderator]
+                      thumbnails:
+                        type: object
+                        additionalProperties:
+                          type: string
+                        description: 'A map of thumbnail types to URLs. The key is the thumbnail type (e.g. "raw") and the value is the URL.'
+
+    GetReferralStats200OkResponse:
+      type: object
+      required:
+        - totalInvited
+        - totalAccepted
+        - totalSignedUp
+      properties:
+        totalInvited:
+          type: integer
+          description: 'Total number of users invited'
+        totalAccepted:
+          type: integer
+          description: 'Total number of users who accepted the invitation'
+        totalSignedUp:
+          type: integer
+          description: 'Total number of users who signed up'
+
+    CreateCommunityRequest200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - communityId
+            - memberAddress
+            - type
+            - status
+          properties:
+            id:
+              type: string
+              description: 'Unique identifier of the community request'
+            communityId:
+              type: string
+              description: 'ID of the community'
+            memberAddress:
+              type: string
+              description: 'ETH address of the member'
+            type:
+              type: string
+              enum: [invite, request_to_join]
+              description: 'Type of request'
+            status:
+              type: string
+              enum: [pending, accepted, rejected, cancelled]
+              description: 'Status of the request'
+
+    GetActiveCommunityVoiceChats200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - activeChats
+            - total
+          properties:
+            activeChats:
+              type: array
+              items:
+                type: object
+                required:
+                  - communityId
+                  - participantCount
+                  - moderatorCount
+                  - isMember
+                  - communityName
+                  - positions
+                  - worlds
+                properties:
+                  communityId:
+                    type: string
+                    description: 'ID of the community'
+                  participantCount:
+                    type: integer
+                    description: 'Number of participants in the voice chat'
+                  moderatorCount:
+                    type: integer
+                    description: 'Number of moderators in the voice chat'
+                  isMember:
+                    type: boolean
+                    description: 'Whether the user is a member of the community'
+                  communityName:
+                    type: string
+                    description: 'Name of the community'
+                  communityImage:
+                    type: string
+                    description: 'URL of the community image'
+                  positions:
+                    type: array
+                    items:
+                      type: string
+                    description: 'Array of position coordinates'
+                  worlds:
+                    type: array
+                    items:
+                      type: string
+                    description: 'Array of world identifiers'
+            total:
+              type: integer
+              description: 'Total number of active voice chats'

@@ -19,6 +19,12 @@ components:
       description: |
         Signed Fetch authentication.
         See ADR-44 for more details about the authentication mechanism.
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Bearer token authentication for admin endpoints.
+        Requires API_ADMIN_TOKEN.
 
 security:
   - SignedFetch: []
@@ -821,3 +827,307 @@ paths:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
+
+  /v1/communities/{address}/managed:
+    get:
+      summary: Get managed communities for an address
+      description: |
+        Lists all communities where the specified address is an owner or moderator.
+        This endpoint requires admin authentication.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the user to get managed communities for.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities to skip.
+      responses:
+        '200':
+          description: Managed communities found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetManagedCommunities200OkResponse'
+        '401':
+          description: Unauthorized - Admin token required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
+  /v1/referral-progress:
+    post:
+      summary: Create referral progress
+      description: |
+        Creates a referral relationship between a referrer and an invited user.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - referrer
+              properties:
+                referrer:
+                  type: string
+                  description: 'ETH address of the referrer'
+      responses:
+        '204':
+          description: Referral progress created successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Referrals
+    patch:
+      summary: Update referral signed up status
+      description: |
+        Updates the referral progress status to signed up for the authenticated user.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      responses:
+        '204':
+          description: Referral status updated successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Referral not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Referrals
+    get:
+      summary: Get invited users accepted stats
+      description: |
+        Gets statistics about invited users who have accepted referrals.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      responses:
+        '200':
+          description: Referral statistics found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetReferralStats200OkResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Referrals
+
+  /v1/referral-email:
+    post:
+      summary: Add referral email
+      description: |
+        Associates an email address with a referral for the authenticated user.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: 'Email address to associate with the referral'
+      responses:
+        '204':
+          description: Referral email added successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Referrals
+
+  /v1/communities/{id}/requests:
+    post:
+      summary: Create community request
+      description: |
+        Creates a community request (invite or join request) for a specific member.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - targetedAddress
+                - type
+              properties:
+                targetedAddress:
+                  type: string
+                  description: 'ETH address of the member to create the request for'
+                type:
+                  type: string
+                  enum: [invite, request_to_join]
+                  description: 'Type of request to create'
+      responses:
+        '200':
+          description: Community request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/CreateCommunityRequest200OkResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
+  /v1/community-voice-chats/active:
+    get:
+      summary: Get active community voice chats
+      description: |
+        Lists all active community voice chats for the authenticated user.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      responses:
+        '200':
+          description: Active community voice chats found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetActiveCommunityVoiceChats200OkResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Community Voice Chats
