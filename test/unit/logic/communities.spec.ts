@@ -14,7 +14,8 @@ import {
   ICommunityThumbnailComponent,
   ICommunityBroadcasterComponent,
   CommunityPrivacyEnum,
-  CommunityPublicInformation
+  CommunityPublicInformation,
+  CommunityUpdates
 } from '../../../src/logic/community/types'
 import {
   createMockCommunityRolesComponent,
@@ -1310,6 +1311,170 @@ describe('Community Component', () => {
                   )
                   expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
                 })
+              })
+            })
+          })
+
+          describe('and name is not updated', () => {
+            let updatesWithoutName: CommunityUpdates
+            
+            beforeEach(() => {
+              updatesWithoutName = {
+                description: 'Updated Description',
+                placeIds: ['place-1', 'place-2'],
+                thumbnailBuffer: Buffer.from('fake-thumbnail')
+                // name is intentionally undefined
+              }
+              updatedCommunity = { ...mockCommunity, ...updatesWithoutName }
+              mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+            })
+
+            it('should not update the name', async () => {
+              const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutName)
+              expect(result.name).toEqual(mockCommunity.name)
+            })
+          })
+
+          describe('and name is provided but unchanged', () => {
+            let updatesWithSameName: CommunityUpdates
+            
+            beforeEach(() => {
+              updatesWithSameName = {
+                name: mockCommunity.name, // Same name as existing
+                description: 'Updated Description',
+                placeIds: ['place-1', 'place-2'],
+                thumbnailBuffer: Buffer.from('fake-thumbnail')
+              }
+              updatedCommunity = { ...mockCommunity, ...updatesWithSameName }
+              mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+            })
+
+            it('should update the community but not broadcast rename event', async () => {
+              const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithSameName)
+
+              expect(result).toEqual({
+                ...mockCommunity,
+                ...updatesWithSameName,
+                thumbnails: {
+                  raw: `https://cdn.decentraland.org/social/communities/${communityId}/raw-thumbnail.png`
+                }
+              })
+
+              expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+              expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                communityId,
+                userAddress
+              )
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithSameName)
+              expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
+                communityId,
+                userAddress,
+                updatesWithSameName.placeIds
+              )
+
+              // Wait for setImmediate callback to execute
+              await new Promise(resolve => setImmediate(resolve))
+              // Should not broadcast rename event since name is the same
+              expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
+            })
+          })
+
+          describe('and name is provided with different casing but same trimmed value', () => {
+            let updatesWithDifferentCasing: CommunityUpdates
+            
+            beforeEach(() => {
+              updatesWithDifferentCasing = {
+                name: '  Test Community  ', // Same trimmed name as mockCommunity.name = 'Test Community'
+                description: 'Updated Description',
+                placeIds: ['place-1', 'place-2'],
+                thumbnailBuffer: Buffer.from('fake-thumbnail')
+              }
+              updatedCommunity = { ...mockCommunity, ...updatesWithDifferentCasing }
+              mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+            })
+
+            it('should update the community but not broadcast rename event', async () => {
+              const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithDifferentCasing)
+
+              expect(result).toEqual({
+                ...mockCommunity,
+                ...updatesWithDifferentCasing,
+                thumbnails: {
+                  raw: `https://cdn.decentraland.org/social/communities/${communityId}/raw-thumbnail.png`
+                }
+              })
+
+              expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+              expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                communityId,
+                userAddress
+              )
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithDifferentCasing)
+              expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
+                communityId,
+                userAddress,
+                updatesWithDifferentCasing.placeIds
+              )
+
+              // Wait for setImmediate callback to execute
+              await new Promise(resolve => setImmediate(resolve))
+              // Should not broadcast rename event since trimmed names are the same
+              expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
+            })
+          })
+
+          describe('and name is provided and is actually different', () => {
+            let updatesWithDifferentName: CommunityUpdates
+            
+            beforeEach(() => {
+              updatesWithDifferentName = {
+                name: 'Completely Different Name',
+                description: 'Updated Description',
+                placeIds: ['place-1', 'place-2'],
+                thumbnailBuffer: Buffer.from('fake-thumbnail')
+              }
+              updatedCommunity = { ...mockCommunity, ...updatesWithDifferentName }
+              mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
+              mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(`${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`)
+            })
+
+            it('should update the community and broadcast rename event', async () => {
+              const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithDifferentName)
+
+              expect(result).toEqual({
+                ...mockCommunity,
+                ...updatesWithDifferentName,
+                thumbnails: {
+                  raw: `https://cdn.decentraland.org/social/communities/${communityId}/raw-thumbnail.png`
+                }
+              })
+
+              expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+              expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                communityId,
+                userAddress
+              )
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithDifferentName)
+              expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
+                communityId,
+                userAddress,
+                updatesWithDifferentName.placeIds
+              )
+
+              // Wait for setImmediate callback to execute
+              await new Promise(resolve => setImmediate(resolve))
+              // Should broadcast rename event since name is actually different
+              expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+                type: Events.Type.COMMUNITY,
+                subType: Events.SubType.Community.RENAMED,
+                key: `${communityId}-${updatesWithDifferentName.name.trim().toLowerCase().replace(/ /g, '-')}-${mockCommunity.name.trim().toLowerCase().replace(/ /g, '-')}`,
+                timestamp: expect.any(Number),
+                metadata: {
+                  id: communityId,
+                  oldName: mockCommunity.name,
+                  newName: updatesWithDifferentName.name,
+                  thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+                }
               })
             })
           })
