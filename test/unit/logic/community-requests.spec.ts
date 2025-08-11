@@ -3,11 +3,11 @@ import {
   Community,
   CommunityNotFoundError,
   CommunityPrivacyEnum,
-  CommunityRequest,
   CommunityRequestStatus,
   CommunityRequestType,
   ICommunityRequestsComponent,
-  InvalidCommunityRequestError
+  InvalidCommunityRequestError,
+  MemberRequest
 } from '../../../src/logic/community'
 import { createCommunityRequestsComponent } from '../../../src/logic/community/requests'
 import { mockLogs } from '../../mocks/components'
@@ -42,7 +42,7 @@ describe('Community Requests Component', () => {
 
   describe('when community exists', () => {
     let community: Community & { role: CommunityRole }
-    let expectedCreatedRequest: CommunityRequest
+    let expectedCreatedRequest: MemberRequest
     beforeEach(() => {
       community = {
         id: randomUUID(),

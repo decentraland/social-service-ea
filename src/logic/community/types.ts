@@ -167,7 +167,14 @@ export interface ICommunityRequestsComponent {
     communityId: string,
     memberAddress: EthAddress,
     type: CommunityRequestType
-  ): Promise<CommunityRequest>
+  ): Promise<MemberRequest>
+  /**
+   * Returns pending requests (invites received and requests sent) for a user, optionally filtered by type.
+   */
+  getMemberRequests(
+    memberAddress: EthAddress,
+    options: { type?: CommunityRequestType; pagination: Required<PaginatedParameters> }
+  ): Promise<{ requests: MemberRequest[]; total: number }>
 }
 
 export type CommunityDB = {
@@ -294,7 +301,9 @@ export type GetCommunityRequestsOptions = {
   type?: CommunityRequestType
 }
 
-export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
+export type CommunityWithUserInformation = WithCommonFriends<AggregatedCommunityWithMemberData>
+
+export type WithCommonFriends<T> = T & {
   friends: FriendProfile[]
 }
 
@@ -338,13 +347,26 @@ export enum CommunityRequestType {
   RequestToJoin = 'request_to_join'
 }
 
-export type CommunityRequest = {
+export type MemberRequest = {
   id: string
   communityId: string
   memberAddress: string
   type: CommunityRequestType
   status: CommunityRequestStatus
 }
+
+export type MemberCommunityRequest = WithCommonFriends<{
+  id: string
+  communityId: string
+  thumbnails?: Record<string, string>
+  name: string
+  description: string
+  ownerAddress: string
+  ownerName: string
+  privacy: CommunityPrivacyEnum
+  membersCount: number
+  type: CommunityRequestType
+}>
 
 export interface ActiveCommunityVoiceChat {
   communityId: string

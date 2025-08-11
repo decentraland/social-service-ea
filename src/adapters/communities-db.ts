@@ -12,7 +12,7 @@ import {
   CommunityPlace,
   CommunityPrivacyEnum,
   CommunityRequestType,
-  CommunityRequest,
+  MemberRequest,
   CommunityRequestStatus,
   GetCommunityRequestsOptions
 } from '../logic/community'
@@ -628,7 +628,7 @@ export function createCommunitiesDBComponent(
       communityId: string,
       memberAddress: EthAddress,
       type: CommunityRequestType
-    ): Promise<CommunityRequest> {
+    ): Promise<MemberRequest> {
       const id = randomUUID()
       const query = SQL`
         INSERT INTO community_requests (id, community_id, member_address, type, status)
@@ -647,7 +647,7 @@ export function createCommunitiesDBComponent(
       }
     },
 
-    async getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<CommunityRequest[]> {
+    async getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<MemberRequest[]> {
       let query = SQL`
         SELECT id, community_id, member_address, type, status
         FROM community_requests
@@ -671,7 +671,7 @@ export function createCommunitiesDBComponent(
       // Apply pagination
       query = query.append(SQL` LIMIT ${filters.pagination.limit} OFFSET ${filters.pagination.offset}`)
 
-      const result = await pg.query<CommunityRequest>(query)
+      const result = await pg.query<MemberRequest>(query)
       return result.rows
     },
 
