@@ -5,10 +5,13 @@ import { getProfileUserId, getProfileInfo } from '../profiles'
 import {
   Community,
   CommunityWithUserInformation,
+  CommunityWithUserInformationAndVoiceChat,
   AggregatedCommunityWithMemberAndVoiceChatData,
   AggregatedCommunityWithMemberAndFriendsData,
   CommunityPublicInformation,
-  AggregatedCommunity
+  CommunityPublicInformationWithVoiceChat,
+  AggregatedCommunity,
+  CommunityVoiceChatStatus
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friends'
@@ -61,6 +64,18 @@ export const toCommunityWithUserInformation = (
   }
 }
 
+export const toCommunityWithUserInformationAndVoiceChat = (
+  community: AggregatedCommunityWithMemberAndFriendsData,
+  profilesMap: Map<string, Profile>,
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityWithUserInformationAndVoiceChat => {
+  const baseResult = toCommunityWithUserInformation(community, profilesMap)
+  return {
+    ...baseResult,
+    voiceChatStatus
+  }
+}
+
 export const toCommunityResults = (
   communities: AggregatedCommunityWithMemberAndFriendsData[],
   friendsProfiles: Profile[]
@@ -69,8 +84,30 @@ export const toCommunityResults = (
   return communities.map((community) => toCommunityWithUserInformation(community, profilesMap))
 }
 
+export const toCommunityResultsWithVoiceChat = (
+  communities: AggregatedCommunityWithMemberAndFriendsData[],
+  friendsProfiles: Profile[],
+  voiceChatStatuses: Record<string, CommunityVoiceChatStatus> | undefined
+): CommunityWithUserInformationAndVoiceChat[] => {
+  const profilesMap = new Map(friendsProfiles.map((profile) => [getProfileUserId(profile), profile]))
+  const safeVoiceChatStatuses = voiceChatStatuses || {}
+  return communities.map((community) =>
+    toCommunityWithUserInformationAndVoiceChat(community, profilesMap, safeVoiceChatStatuses[community.id] || null)
+  )
+}
+
 export const toPublicCommunity = (community: CommunityPublicInformation): CommunityPublicInformation => {
   return toBaseCommunity(community)
+}
+
+export const toPublicCommunityWithVoiceChat = (
+  community: CommunityPublicInformation,
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityPublicInformationWithVoiceChat => {
+  return {
+    ...toBaseCommunity(community),
+    voiceChatStatus
+  }
 }
 
 export const mapMembersWithProfiles = <

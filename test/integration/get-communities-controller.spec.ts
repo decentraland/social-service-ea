@@ -90,6 +90,25 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
     })
 
     describe('and the request is not signed', () => {
+      beforeEach(() => {
+        // Mock voice chat status for public information requests
+        spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mockImplementation(
+          async (communityIds: string[]) => {
+            const result: Record<string, any> = {}
+            communityIds.forEach((communityId) => {
+              if (communityId === communityId1) {
+                result[communityId] = { isActive: true, participantCount: 3, moderatorCount: 1 }
+              } else if (communityId === communityId2) {
+                result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+              } else {
+                result[communityId] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+              }
+            })
+            return result
+          }
+        )
+      })
+
       it('should respond with a 200 status code and the public communities with owner names', async () => {
         const { localHttpFetch } = components
         const response = await localHttpFetch.fetch('/v1/communities?limit=10&offset=0&search=test')
@@ -126,6 +145,47 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             limit: 10
           }
         })
+      })
+
+      it('should include voiceChatStatus in public community responses', async () => {
+        const { localHttpFetch } = components
+        const response = await localHttpFetch.fetch('/v1/communities?limit=10&offset=0&search=test')
+        const body = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(body.data.results).toHaveLength(2)
+
+        // Find communities by ID to check their voice chat status
+        const community1 = body.data.results.find((c: any) => c.id === communityId1)
+        const community2 = body.data.results.find((c: any) => c.id === communityId2)
+
+        expect(community1).toEqual(
+          expect.objectContaining({
+            id: communityId1,
+            voiceChatStatus: {
+              isActive: true,
+              participantCount: 3,
+              moderatorCount: 1
+            }
+          })
+        )
+
+        expect(community2).toEqual(
+          expect.objectContaining({
+            id: communityId2,
+            voiceChatStatus: {
+              isActive: false,
+              participantCount: 0,
+              moderatorCount: 0
+            }
+          })
+        )
+
+        // Verify that the batch method was called
+        expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
+          communityId1,
+          communityId2
+        ])
       })
     })
 
@@ -312,6 +372,46 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(body.data.total).toBe(2)
         })
 
+        it('should include voiceChatStatus in all community responses', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.results).toHaveLength(2)
+
+          // Find communities by ID to check their voice chat status
+          const community1 = body.data.results.find((c: any) => c.id === communityId1)
+          const community2 = body.data.results.find((c: any) => c.id === communityId2)
+
+          expect(community1).toEqual(
+            expect.objectContaining({
+              id: communityId1,
+              voiceChatStatus: {
+                isActive: true,
+                participantCount: 5,
+                moderatorCount: 2
+              }
+            })
+          )
+
+          expect(community2).toEqual(
+            expect.objectContaining({
+              id: communityId2,
+              voiceChatStatus: {
+                isActive: false,
+                participantCount: 0,
+                moderatorCount: 0
+              }
+            })
+          )
+
+          // Verify that the batch method was called
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
+            communityId1,
+            communityId2
+          ])
+        })
+
         describe('when voice chat status check fails', () => {
           beforeEach(() => {
             // Mock one success and one failure
@@ -419,15 +519,14 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             })
 
             describe('and filtering with onlyMemberOf filter', () => {
-    
               beforeEach(() => {
                 queryParams += '&onlyMemberOf=true'
               })
-    
+
               it('should respond 200 ok and return filtered communities', async () => {
                 const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
                 const body = await response.json()
-    
+
                 expect(response.status).toBe(200)
                 expect(body.data.results).toHaveLength(1)
                 expect(body.data.results[0]).toEqual(
@@ -469,11 +568,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               beforeEach(() => {
                 queryParams += '&search=Community'
               })
-    
+
               it('should respond 200 ok and return filtered communities', async () => {
                 const response = await makeRequest(identity, `/v1/communities?${queryParams}`)
                 const body = await response.json()
-    
+
                 expect(response.status).toBe(200)
                 expect(body.data.results).toHaveLength(1)
                 expect(body.data.results[0]).toEqual(
