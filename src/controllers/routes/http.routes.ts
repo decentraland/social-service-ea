@@ -22,7 +22,8 @@ import {
   removeCommunityPlaceHandler,
   updateCommunityHandler,
   addReferralEmailHandler,
-  getActiveCommunityVoiceChatsHandler
+  getActiveCommunityVoiceChatsHandler,
+  getMemberRequestsHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
@@ -68,6 +69,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.delete('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), unbanMemberHandler)
 
   router.get('/v1/members/:address/communities', signedFetchMiddleware(), getMemberCommunitiesHandler)
+  router.get('/v1/members/:address/requests', signedFetchMiddleware(), getMemberRequestsHandler)
 
   router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
   router.put('/v1/communities/:id', signedFetchMiddleware(), multipartParserWrapper(updateCommunityHandler))
