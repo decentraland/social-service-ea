@@ -202,6 +202,14 @@ export interface ICommunitiesDatabaseComponent {
     communityId: string,
     filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
   ): Promise<number>
+  getMemberRequests(
+    memberAddress: string,
+    filters: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
+  ): Promise<MemberRequest[]>
+  getMemberRequestsCount(
+    memberAddress: string,
+    filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
+  ): Promise<number>
 }
 
 export interface IVoiceDatabaseComponent {

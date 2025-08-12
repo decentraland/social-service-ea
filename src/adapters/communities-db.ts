@@ -647,9 +647,57 @@ export function createCommunitiesDBComponent(
       }
     },
 
+    async getMemberRequests(
+      memberAddress: string,
+      filters: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
+    ): Promise<MemberRequest[]> {
+      let query = SQL`
+        SELECT id, community_id AS "communityId", member_address AS "memberAddress", type, status
+        FROM community_requests
+        WHERE member_address = ${normalizeAddress(memberAddress)}
+      `
+
+      if (filters.status) {
+        query = query.append(SQL` AND status = ${filters.status}`)
+      }
+
+      if (filters.type) {
+        query = query.append(SQL` AND type = ${filters.type}`)
+      }
+
+      query = query.append(SQL` ORDER BY created_at DESC`)
+
+      query = query.append(SQL` LIMIT ${filters.pagination.limit} OFFSET ${filters.pagination.offset}`)
+
+      const result = await pg.query<MemberRequest>(query)
+      return result.rows
+    },
+
+    async getMemberRequestsCount(
+      memberAddress: string,
+      filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
+    ): Promise<number> {
+      let query = SQL`
+        SELECT COUNT(*) as count
+        FROM community_requests
+        WHERE member_address = ${normalizeAddress(memberAddress)}
+      `
+
+      if (filters.status) {
+        query = query.append(SQL` AND status = ${filters.status}`)
+      }
+
+      if (filters.type) {
+        query = query.append(SQL` AND type = ${filters.type}`)
+      }
+
+      const result = await pg.query<{ count: string }>(query)
+      return parseInt(result.rows[0].count, 10)
+    },
+
     async getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<MemberRequest[]> {
       let query = SQL`
-        SELECT id, community_id, member_address, type, status
+        SELECT id, community_id AS "communityId", member_address AS "memberAddress", type, status
         FROM community_requests
         WHERE community_id = ${communityId}
       `

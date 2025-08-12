@@ -60,14 +60,13 @@ export function createCommunityRequestsComponent(
     memberAddress: string,
     options: { type?: CommunityRequestType; pagination: Required<PaginatedParameters> }
   ): Promise<{ requests: MemberRequest[]; total: number }> {
-    const requests = await communitiesDb.getCommunityRequests(memberAddress, {
+    const requests = await communitiesDb.getMemberRequests(memberAddress, {
       pagination: options.pagination,
       status: CommunityRequestStatus.Pending,
-      targetAddress: memberAddress,
       type: options?.type
     })
 
-    const total = await communitiesDb.getCommunityRequestsCount(memberAddress, {
+    const total = await communitiesDb.getMemberRequestsCount(memberAddress, {
       status: CommunityRequestStatus.Pending,
       type: options?.type
     })
