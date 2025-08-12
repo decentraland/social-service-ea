@@ -146,9 +146,22 @@ export function createCommunityComponent(
         : communitiesWithThumbnailsAndOwnerNames
 
       const friendsAddresses = Array.from(new Set(filteredCommunities.flatMap((community) => community.friends)))
+
+      // Helper function to get voice chat statuses with error handling
+      const getVoiceChatStatuses = async (communityIds: string[]) => {
+        try {
+          return (await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)) || {}
+        } catch (error) {
+          logger.warn('Error getting voice chat statuses for communities', {
+            error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+          })
+          return {}
+        }
+      }
+
       const [friendsProfiles, voiceChatStatuses] = await Promise.all([
         catalystClient.getProfiles(friendsAddresses),
-        commsGatekeeper.getCommunitiesVoiceChatStatus(communities.map((c) => c.id))
+        getVoiceChatStatuses(communities.map((c) => c.id))
       ])
 
       return {
@@ -190,9 +203,19 @@ export function createCommunityComponent(
         ? await filterCommunitiesWithActiveVoiceChat(communitiesWithThumbnailsAndOwnerNames)
         : communitiesWithThumbnailsAndOwnerNames
 
-      const voiceChatStatuses = await commsGatekeeper.getCommunitiesVoiceChatStatus(
-        filteredCommunities.map((c) => c.id)
-      )
+      // Helper function to get voice chat statuses with error handling
+      const getVoiceChatStatuses = async (communityIds: string[]) => {
+        try {
+          return (await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)) || {}
+        } catch (error) {
+          logger.warn('Error getting voice chat statuses for public communities', {
+            error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+          })
+          return {}
+        }
+      }
+
+      const voiceChatStatuses = await getVoiceChatStatuses(filteredCommunities.map((c) => c.id))
 
       return {
         communities: filteredCommunities.map((community) =>

@@ -87,11 +87,12 @@ export const toCommunityResults = (
 export const toCommunityResultsWithVoiceChat = (
   communities: AggregatedCommunityWithMemberAndFriendsData[],
   friendsProfiles: Profile[],
-  voiceChatStatuses: Record<string, CommunityVoiceChatStatus>
+  voiceChatStatuses: Record<string, CommunityVoiceChatStatus> | undefined
 ): CommunityWithUserInformationAndVoiceChat[] => {
   const profilesMap = new Map(friendsProfiles.map((profile) => [getProfileUserId(profile), profile]))
+  const safeVoiceChatStatuses = voiceChatStatuses || {}
   return communities.map((community) =>
-    toCommunityWithUserInformationAndVoiceChat(community, profilesMap, voiceChatStatuses[community.id] || null)
+    toCommunityWithUserInformationAndVoiceChat(community, profilesMap, safeVoiceChatStatuses[community.id] || null)
   )
 }
 
