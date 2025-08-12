@@ -80,6 +80,22 @@ export function createCommunityComponent(
     }
   }
 
+  /**
+   * Helper function to get voice chat statuses with error handling
+   * @param communityIds - Array of community IDs
+   * @returns Promise<Record<string, any>> - Voice chat statuses or empty object if error
+   */
+  async function getVoiceChatStatuses(communityIds: string[]): Promise<Record<string, any>> {
+    try {
+      return (await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)) || {}
+    } catch (error) {
+      logger.warn('Error getting voice chat statuses for communities', {
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      return {}
+    }
+  }
+
   return {
     getCommunity: async (
       id: string,
@@ -147,18 +163,6 @@ export function createCommunityComponent(
 
       const friendsAddresses = Array.from(new Set(filteredCommunities.flatMap((community) => community.friends)))
 
-      // Helper function to get voice chat statuses with error handling
-      const getVoiceChatStatuses = async (communityIds: string[]) => {
-        try {
-          return (await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)) || {}
-        } catch (error) {
-          logger.warn('Error getting voice chat statuses for communities', {
-            error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-          })
-          return {}
-        }
-      }
-
       const [friendsProfiles, voiceChatStatuses] = await Promise.all([
         catalystClient.getProfiles(friendsAddresses),
         getVoiceChatStatuses(communities.map((c) => c.id))
@@ -202,18 +206,6 @@ export function createCommunityComponent(
       const filteredCommunities = options.onlyWithActiveVoiceChat
         ? await filterCommunitiesWithActiveVoiceChat(communitiesWithThumbnailsAndOwnerNames)
         : communitiesWithThumbnailsAndOwnerNames
-
-      // Helper function to get voice chat statuses with error handling
-      const getVoiceChatStatuses = async (communityIds: string[]) => {
-        try {
-          return (await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)) || {}
-        } catch (error) {
-          logger.warn('Error getting voice chat statuses for public communities', {
-            error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-          })
-          return {}
-        }
-      }
 
       const voiceChatStatuses = await getVoiceChatStatuses(filteredCommunities.map((c) => c.id))
 
