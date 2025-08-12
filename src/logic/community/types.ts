@@ -11,10 +11,10 @@ export interface ICommunitiesComponent {
   getCommunities(
     userAddress: string,
     options: GetCommunitiesOptions
-  ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformation, 'isHostingLiveEvent'>>>
+  ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformationAndVoiceChat, 'isHostingLiveEvent'>>>
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
-  ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformation, 'isHostingLiveEvent'>>>
+  ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>>
   getMemberCommunities(
     memberAddress: string,
     options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
@@ -298,8 +298,16 @@ export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
   friends: FriendProfile[]
 }
 
+export type CommunityWithUserInformationAndVoiceChat = CommunityWithUserInformation & {
+  voiceChatStatus: CommunityVoiceChatStatus | null
+}
+
 export type CommunityPublicInformation = Omit<CommunityWithUserInformation, 'role' | 'friends' | 'privacy'> & {
   privacy: CommunityPrivacyEnum.Public
+}
+
+export type CommunityPublicInformationWithVoiceChat = CommunityPublicInformation & {
+  voiceChatStatus: CommunityVoiceChatStatus | null
 }
 
 export type GetCommunitiesWithTotal<T> = {

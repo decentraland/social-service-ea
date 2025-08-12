@@ -3,8 +3,8 @@ import { CommunityRole, HandlerContextWithPath, HTTPResponse } from '../../../ty
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
 import {
-  CommunityWithUserInformation,
-  CommunityPublicInformation,
+  CommunityWithUserInformationAndVoiceChat,
+  CommunityPublicInformationWithVoiceChat,
   CommunityOwnerNotFoundError
 } from '../../../logic/community'
 
@@ -16,7 +16,8 @@ export async function getCommunitiesHandler(
 ): Promise<
   HTTPResponse<
     PaginatedResponse<
-      Omit<CommunityWithUserInformation, 'isHostingLiveEvent'> | Omit<CommunityPublicInformation, 'isHostingLiveEvent'>
+      | Omit<CommunityWithUserInformationAndVoiceChat, 'isHostingLiveEvent'>
+      | Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>
     >
   >
 > {

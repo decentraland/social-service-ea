@@ -2,11 +2,11 @@ import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import {
-  CommunityWithUserInformation,
+  CommunityWithUserInformationAndVoiceChat,
   GetCommunitiesOptions,
   GetCommunitiesWithTotal,
   ICommunitiesComponent,
-  CommunityPublicInformation,
+  CommunityPublicInformationWithVoiceChat,
   AggregatedCommunityWithMemberAndVoiceChatData,
   MemberCommunity,
   Community,
@@ -14,7 +14,13 @@ import {
   AggregatedCommunity,
   CommunityPrivacyEnum
 } from './types'
-import { isOwner, toCommunityWithMembersCount, toCommunityResults, toPublicCommunity } from './utils'
+import {
+  isOwner,
+  toCommunityWithMembersCount,
+  toCommunityResultsWithVoiceChat,
+  toPublicCommunity,
+  toPublicCommunityWithVoiceChat
+} from './utils'
 import { isErrorWithMessage } from '../../utils/errors'
 import { EthAddress, Events } from '@dcl/schemas'
 
@@ -109,7 +115,7 @@ export function createCommunityComponent(
     getCommunities: async (
       userAddress: string,
       options: GetCommunitiesOptions
-    ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformation, 'isHostingLiveEvent'>>> => {
+    ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformationAndVoiceChat, 'isHostingLiveEvent'>>> => {
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunities(userAddress, options),
         communitiesDb.getCommunitiesCount(userAddress, options)
@@ -140,17 +146,20 @@ export function createCommunityComponent(
         : communitiesWithThumbnailsAndOwnerNames
 
       const friendsAddresses = Array.from(new Set(filteredCommunities.flatMap((community) => community.friends)))
-      const friendsProfiles = await catalystClient.getProfiles(friendsAddresses)
+      const [friendsProfiles, voiceChatStatuses] = await Promise.all([
+        catalystClient.getProfiles(friendsAddresses),
+        commsGatekeeper.getCommunitiesVoiceChatStatus(communities.map((c) => c.id))
+      ])
 
       return {
-        communities: toCommunityResults(filteredCommunities, friendsProfiles),
+        communities: toCommunityResultsWithVoiceChat(filteredCommunities, friendsProfiles, voiceChatStatuses),
         total: options.onlyWithActiveVoiceChat ? filteredCommunities.length : total
       }
     },
 
     getCommunitiesPublicInformation: async (
       options: GetCommunitiesOptions
-    ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformation, 'isHostingLiveEvent'>>> => {
+    ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>> => {
       const { search } = options
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunitiesPublicInformation(options),
@@ -181,8 +190,14 @@ export function createCommunityComponent(
         ? await filterCommunitiesWithActiveVoiceChat(communitiesWithThumbnailsAndOwnerNames)
         : communitiesWithThumbnailsAndOwnerNames
 
+      const voiceChatStatuses = await commsGatekeeper.getCommunitiesVoiceChatStatus(
+        filteredCommunities.map((c) => c.id)
+      )
+
       return {
-        communities: filteredCommunities.map(toPublicCommunity),
+        communities: filteredCommunities.map((community) =>
+          toPublicCommunityWithVoiceChat(toPublicCommunity(community), voiceChatStatuses[community.id] || null)
+        ),
         total: options.onlyWithActiveVoiceChat ? filteredCommunities.length : total
       }
     },
