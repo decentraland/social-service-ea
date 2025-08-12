@@ -339,8 +339,8 @@ describe('Community Requests Component', () => {
           }
         ]
 
-        mockCommunitiesDB.getCommunityRequests.mockResolvedValue(requests)
-        mockCommunitiesDB.getCommunityRequestsCount.mockResolvedValue(2)
+        mockCommunitiesDB.getMemberRequests.mockResolvedValue(requests)
+        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValue(2)
       })
 
       it('should return pending requests (invites and requests) with total, forwarding pagination and filters', async () => {
@@ -349,13 +349,12 @@ describe('Community Requests Component', () => {
         } as any)
 
         expect(result).toEqual({ requests, total: requests.length })
-        expect(mockCommunitiesDB.getCommunityRequests).toHaveBeenCalledWith(memberAddress, {
+        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, {
           pagination,
           status: CommunityRequestStatus.Pending,
-          targetAddress: memberAddress,
           type: undefined
         })
-        expect(mockCommunitiesDB.getCommunityRequestsCount).toHaveBeenCalledWith(memberAddress, {
+        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, {
           status: CommunityRequestStatus.Pending,
           type: undefined
         })
@@ -376,8 +375,8 @@ describe('Community Requests Component', () => {
           }
         ]
 
-        mockCommunitiesDB.getCommunityRequests.mockResolvedValue(requests)
-        mockCommunitiesDB.getCommunityRequestsCount.mockResolvedValue(1)
+        mockCommunitiesDB.getMemberRequests.mockResolvedValue(requests)
+        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValue(1)
       })
 
       it('should forward the invite type filter', async () => {
@@ -387,13 +386,12 @@ describe('Community Requests Component', () => {
         })
 
         expect(result).toEqual({ requests, total: 1 })
-        expect(mockCommunitiesDB.getCommunityRequests).toHaveBeenCalledWith(memberAddress, {
+        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, {
           pagination,
           status: CommunityRequestStatus.Pending,
-          targetAddress: memberAddress,
           type: CommunityRequestType.Invite
         })
-        expect(mockCommunitiesDB.getCommunityRequestsCount).toHaveBeenCalledWith(memberAddress, {
+        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, {
           status: CommunityRequestStatus.Pending,
           type: CommunityRequestType.Invite
         })
@@ -414,8 +412,8 @@ describe('Community Requests Component', () => {
           }
         ]
 
-        mockCommunitiesDB.getCommunityRequests.mockResolvedValue(requests)
-        mockCommunitiesDB.getCommunityRequestsCount.mockResolvedValue(1)
+        mockCommunitiesDB.getMemberRequests.mockResolvedValue(requests)
+        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValue(1)
       })
 
       it('should forward the request_to_join type filter', async () => {
@@ -425,13 +423,12 @@ describe('Community Requests Component', () => {
         })
 
         expect(result).toEqual({ requests, total: requests.length })
-        expect(mockCommunitiesDB.getCommunityRequests).toHaveBeenCalledWith(memberAddress, {
+        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, {
           pagination,
           status: CommunityRequestStatus.Pending,
-          targetAddress: memberAddress,
           type: CommunityRequestType.RequestToJoin
         })
-        expect(mockCommunitiesDB.getCommunityRequestsCount).toHaveBeenCalledWith(memberAddress, {
+        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, {
           status: CommunityRequestStatus.Pending,
           type: CommunityRequestType.RequestToJoin
         })
@@ -440,8 +437,8 @@ describe('Community Requests Component', () => {
 
     describe('and there are no pending requests', () => {
       beforeEach(() => {
-        mockCommunitiesDB.getCommunityRequests.mockResolvedValue([])
-        mockCommunitiesDB.getCommunityRequestsCount.mockResolvedValue(0)
+        mockCommunitiesDB.getMemberRequests.mockResolvedValue([])
+        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValue(0)
       })
 
       it('should return empty results and zero total', async () => {
