@@ -306,4 +306,151 @@ describe('Community Requests Component', () => {
       })
     })
   })
+
+  describe('when getting member requests', () => {
+    let memberAddress: string
+    let pagination: { limit: number; offset: number }
+
+    beforeEach(() => {
+      memberAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+      pagination = { limit: 10, offset: 0 }
+      mockCommunitiesDB.getCommunityRequests.mockReset()
+      mockCommunitiesDB.getCommunityRequestsCount.mockReset()
+    })
+
+    describe('and no type filter is provided', () => {
+      let requests: MemberRequest[]
+
+      beforeEach(() => {
+        requests = [
+          {
+            id: randomUUID(),
+            communityId: randomUUID(),
+            memberAddress,
+            type: CommunityRequestType.Invite,
+            status: CommunityRequestStatus.Pending
+          },
+          {
+            id: randomUUID(),
+            communityId: randomUUID(),
+            memberAddress,
+            type: CommunityRequestType.RequestToJoin,
+            status: CommunityRequestStatus.Pending
+          }
+        ]
+
+        mockCommunitiesDB.getCommunityRequests.mockResolvedValue(requests)
+        mockCommunitiesDB.getCommunityRequestsCount.mockResolvedValue(2)
+      })
+
+      it('should return pending requests (invites and requests) with total, forwarding pagination and filters', async () => {
+        const result = await communityRequestsComponent.getMemberRequests(memberAddress, {
+          pagination
+        } as any)
+
+        expect(result).toEqual({ requests, total: requests.length })
+        expect(mockCommunitiesDB.getCommunityRequests).toHaveBeenCalledWith(memberAddress, {
+          pagination,
+          status: CommunityRequestStatus.Pending,
+          targetAddress: memberAddress,
+          type: undefined
+        })
+        expect(mockCommunitiesDB.getCommunityRequestsCount).toHaveBeenCalledWith(memberAddress, {
+          status: CommunityRequestStatus.Pending,
+          type: undefined
+        })
+      })
+    })
+
+    describe('and filtering by type invite', () => {
+      let requests: MemberRequest[]
+
+      beforeEach(() => {
+        requests = [
+          {
+            id: randomUUID(),
+            communityId: randomUUID(),
+            memberAddress,
+            type: CommunityRequestType.Invite,
+            status: CommunityRequestStatus.Pending
+          }
+        ]
+
+        mockCommunitiesDB.getCommunityRequests.mockResolvedValue(requests)
+        mockCommunitiesDB.getCommunityRequestsCount.mockResolvedValue(1)
+      })
+
+      it('should forward the invite type filter', async () => {
+        const result = await communityRequestsComponent.getMemberRequests(memberAddress, {
+          pagination,
+          type: CommunityRequestType.Invite
+        })
+
+        expect(result).toEqual({ requests, total: 1 })
+        expect(mockCommunitiesDB.getCommunityRequests).toHaveBeenCalledWith(memberAddress, {
+          pagination,
+          status: CommunityRequestStatus.Pending,
+          targetAddress: memberAddress,
+          type: CommunityRequestType.Invite
+        })
+        expect(mockCommunitiesDB.getCommunityRequestsCount).toHaveBeenCalledWith(memberAddress, {
+          status: CommunityRequestStatus.Pending,
+          type: CommunityRequestType.Invite
+        })
+      })
+    })
+
+    describe('and filtering by type request_to_join', () => {
+      let requests: MemberRequest[]
+
+      beforeEach(() => {
+        requests = [
+          {
+            id: randomUUID(),
+            communityId: randomUUID(),
+            memberAddress,
+            type: CommunityRequestType.RequestToJoin,
+            status: CommunityRequestStatus.Pending
+          }
+        ]
+
+        mockCommunitiesDB.getCommunityRequests.mockResolvedValue(requests)
+        mockCommunitiesDB.getCommunityRequestsCount.mockResolvedValue(1)
+      })
+
+      it('should forward the request_to_join type filter', async () => {
+        const result = await communityRequestsComponent.getMemberRequests(memberAddress, {
+          pagination,
+          type: CommunityRequestType.RequestToJoin
+        })
+
+        expect(result).toEqual({ requests, total: requests.length })
+        expect(mockCommunitiesDB.getCommunityRequests).toHaveBeenCalledWith(memberAddress, {
+          pagination,
+          status: CommunityRequestStatus.Pending,
+          targetAddress: memberAddress,
+          type: CommunityRequestType.RequestToJoin
+        })
+        expect(mockCommunitiesDB.getCommunityRequestsCount).toHaveBeenCalledWith(memberAddress, {
+          status: CommunityRequestStatus.Pending,
+          type: CommunityRequestType.RequestToJoin
+        })
+      })
+    })
+
+    describe('and there are no pending requests', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityRequests.mockResolvedValue([])
+        mockCommunitiesDB.getCommunityRequestsCount.mockResolvedValue(0)
+      })
+
+      it('should return empty results and zero total', async () => {
+        const result = await communityRequestsComponent.getMemberRequests(memberAddress, {
+          pagination
+        } as any)
+
+        expect(result).toEqual({ requests: [], total: 0 })
+      })
+    })
+  })
 })
