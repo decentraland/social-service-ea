@@ -5,7 +5,7 @@ import { mockCommunity } from '../mocks/communities'
 import { CommunityRole } from '../../src/types'
 
 test('Get Member Requests Controller', function ({ components, spyComponents }) {
-  const makeRequest = makeAuthenticatedRequest(components)
+  let makeRequest: any
 
   describe('when getting member requests', () => {
     let unrelatedUserAddress: string
@@ -15,9 +15,12 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
     })
 
     describe('and the request is not signed', () => {
-      it('should respond with a 400 status code', async () => {
-        const { localHttpFetch } = components
-        const response = await localHttpFetch.fetch(`/v1/members/${unrelatedUserAddress}/requests`)
+      beforeEach(async () => {
+        makeRequest = components.localHttpFetch.fetch
+      })
+
+      it('should return a 400 status code', async () => {
+        const response = await makeRequest(`/v1/members/${unrelatedUserAddress}/requests`)
         expect(response.status).toBe(400)
       })
     })
@@ -27,6 +30,7 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
       let address: string
 
       beforeEach(async () => {
+        makeRequest = makeAuthenticatedRequest(components)
         identity = await createTestIdentity()
         address = identity.realAccount.address.toLowerCase()
       })
