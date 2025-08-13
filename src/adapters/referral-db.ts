@@ -19,11 +19,14 @@ export async function createReferralDBComponent(
   const { pg, logs } = components as { pg: IPgComponent; logs: AppComponents['logs'] }
   const logger = logs.getLogger('database')
 
-  const createReferral = async (referralInput: {
-    referrer: string
-    invitedUser: string
-    invitedUserIP: string
-  }): Promise<ReferralProgress> => {
+  const createReferral = async (
+    referralInput: {
+      referrer: string
+      invitedUser: string
+      invitedUserIP: string
+    },
+    denyList: Set<string>
+  ): Promise<ReferralProgress> => {
     logger.debug(`Creating referral_progress for ${referralInput.referrer} and ${referralInput.invitedUser}`)
     const now = Date.now()
 
@@ -49,7 +52,7 @@ export async function createReferralDBComponent(
           ${referralInput.referrer.toLowerCase()},
           ${referralInput.invitedUser.toLowerCase()},
           ${referralInput.invitedUserIP},
-          CASE WHEN other_users_invited.count <= ${MAX_IP_MATCHES} THEN ${ReferralProgressStatus.PENDING} ELSE ${ReferralProgressStatus.REJECTED_IP_MATCH} END,
+          CASE WHEN other_users_invited.count <= ${MAX_IP_MATCHES} AND ${referralInput.invitedUser.toLowerCase()} NOT IN (${Array.from(denyList).join(',')}) THEN ${ReferralProgressStatus.PENDING} ELSE ${ReferralProgressStatus.REJECTED_IP_MATCH} END,
           ${now},
           ${now}
           FROM other_users_invited
