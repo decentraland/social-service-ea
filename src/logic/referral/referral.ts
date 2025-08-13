@@ -204,6 +204,10 @@ export async function createReferralComponent(
         progress[0].status === ReferralProgressStatus.TIER_GRANTED ||
         progress[0].status === ReferralProgressStatus.REJECTED_IP_MATCH
       ) {
+        logger.info('Avoiding finalizing referral', {
+          invitedUser,
+          status: progress[0].status
+        })
         return
       }
 
