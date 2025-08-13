@@ -162,7 +162,7 @@ export async function createReferralComponent(
 
       const denyList = await fetchDenyList()
 
-      if (denyList.has(referrer)) {
+      if (denyList.has(referrer.toLowerCase())) {
         throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer}, ${invitedUserIP}`)
       }
 
