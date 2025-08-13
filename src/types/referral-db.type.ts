@@ -1,12 +1,9 @@
 export interface IReferralDatabaseComponent {
-  createReferral(
-    referralInput: {
-      referrer: string
-      invitedUser: string
-      invitedUserIP: string
-    },
-    denyList: Set<string>
-  ): Promise<ReferralProgress>
+  createReferral(referralInput: {
+    referrer: string
+    invitedUser: string
+    invitedUserIP: string
+  }): Promise<ReferralProgress>
   findReferralProgress(filter: ReferralProgressFilter): Promise<ReferralProgress[]>
   updateReferralProgress(
     invitedUser: string,

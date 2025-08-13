@@ -162,7 +162,11 @@ export async function createReferralComponent(
 
       const denyList = await fetchDenyList()
 
-      const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP }, denyList)
+      if (denyList.has(referrer)) {
+        throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer}, ${invitedUserIP}`)
+      }
+
+      const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
       if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
         try {
           await slack.sendMessage(
