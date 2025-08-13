@@ -224,6 +224,14 @@ export async function createReferralComponent(
       const invitedUser = validateAddress(invitedUserToFinalize, 'invitedUser')
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
+
+      const denyList = await fetchDenyList()
+
+      if (denyList.has(progress[0].referrer.toLowerCase())) {
+        throw new ReferralInvalidInputError(
+          `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
+        )
+      }
       if (
         !progress.length ||
         progress[0].status === ReferralProgressStatus.TIER_GRANTED ||
