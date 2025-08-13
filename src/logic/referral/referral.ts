@@ -206,7 +206,9 @@ export async function createReferralComponent(
       ) {
         logger.info('Avoiding finalizing referral', {
           invitedUser,
-          status: progress[0].status
+          status: progress[0].status,
+          invitedUserIP: progress[0].invited_user_ip || 'N/A',
+          referrer: progress[0].referrer
         })
         return
       }

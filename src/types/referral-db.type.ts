@@ -49,6 +49,7 @@ export type ReferralProgress = {
   tier_granted_at: number | null
   created_at: number
   updated_at: number
+  invited_user_ip: string | null
 }
 
 export type ReferralTierSeen = {
