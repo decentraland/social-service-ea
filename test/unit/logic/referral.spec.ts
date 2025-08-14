@@ -552,9 +552,10 @@ describe('referral-component', () => {
         denyListedReferrer = '0x1111111111111111111111111111111111111111'
         jest.spyOn(global, 'fetch').mockResolvedValueOnce({
           ok: true,
-          json: () => Promise.resolve({
-            users: [{ wallet: denyListedReferrer.toLowerCase() }]
-          })
+          json: () =>
+            Promise.resolve({
+              users: [{ wallet: denyListedReferrer.toLowerCase() }]
+            })
         } as any)
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
           {
@@ -894,9 +895,10 @@ describe('referral-component', () => {
         denyListedReferrer = '0x1111111111111111111111111111111111111111'
         jest.spyOn(global, 'fetch').mockResolvedValueOnce({
           ok: true,
-          json: () => Promise.resolve({
-            users: [{ wallet: denyListedReferrer.toLowerCase() }]
-          })
+          json: () =>
+            Promise.resolve({
+              users: [{ wallet: denyListedReferrer.toLowerCase() }]
+            })
         } as any)
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
           {
@@ -916,6 +918,32 @@ describe('referral-component', () => {
         expect(jest.mocked(global.fetch)).toHaveBeenCalledWith('https://config.decentraland.org/denylist.json')
         expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
         expect(mockSns.publishMessage).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when referral has REJECTED_IP_MATCH status', () => {
+      beforeEach(() => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer.toLowerCase(),
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.REJECTED_IP_MATCH,
+            invited_user_ip: '192.168.1.1'
+          }
+        ])
+      })
+
+      it('should not process the referral and not publish event', async () => {
+        await referralComponent.finalizeReferral(validInvitedUser)
+
+        expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
+        expect(mockLogger.info).toHaveBeenCalledWith('Avoiding finalizing referral', {
+          invitedUser: validInvitedUser.toLowerCase(),
+          status: ReferralProgressStatus.REJECTED_IP_MATCH,
+          invitedUserIP: '192.168.1.1',
+          referrer: validReferrer.toLowerCase()
+        })
       })
     })
   })
