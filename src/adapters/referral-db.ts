@@ -49,7 +49,7 @@ export async function createReferralDBComponent(
           ${referralInput.referrer.toLowerCase()},
           ${referralInput.invitedUser.toLowerCase()},
           ${referralInput.invitedUserIP},
-          CASE WHEN other_users_invited.count <= ${MAX_IP_MATCHES} THEN ${ReferralProgressStatus.PENDING} ELSE ${ReferralProgressStatus.REJECTED_IP_MATCH} END,
+          CASE WHEN other_users_invited.count < ${MAX_IP_MATCHES} THEN ${ReferralProgressStatus.PENDING} ELSE ${ReferralProgressStatus.REJECTED_IP_MATCH} END,
           ${now},
           ${now}
           FROM other_users_invited

@@ -16,7 +16,7 @@ import { referral100InvitesReachedMessage, referralIpMatchRejectionMessage } fro
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
 const MARKETING_EMAIL = 'marketing@decentraland.org'
-export const MAX_IP_MATCHES = 3
+export const MAX_IP_MATCHES = 2
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
