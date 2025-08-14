@@ -201,14 +201,14 @@ export async function createReferralComponent(
 
       const denyList = await fetchDenyList()
 
+      if (!progress.length) {
+        throw new ReferralNotFoundError(invitedUser)
+      }
+
       if (denyList.has(progress[0].referrer.toLowerCase())) {
         throw new ReferralInvalidInputError(
           `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
         )
-      }
-
-      if (!progress.length) {
-        throw new ReferralNotFoundError(invitedUser)
       }
 
       const currentStatus = progress[0].status
@@ -234,6 +234,10 @@ export async function createReferralComponent(
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
 
+      if (!progress.length) {
+        return
+      }
+
       const denyList = await fetchDenyList()
 
       if (denyList.has(progress[0].referrer.toLowerCase())) {
@@ -242,7 +246,6 @@ export async function createReferralComponent(
         )
       }
       if (
-        !progress.length ||
         progress[0].status === ReferralProgressStatus.TIER_GRANTED ||
         progress[0].status === ReferralProgressStatus.REJECTED_IP_MATCH
       ) {
