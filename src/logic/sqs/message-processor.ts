@@ -1,4 +1,4 @@
-import { Event, Events, UserJoinedRoomEvent } from '@dcl/schemas'
+import { Event, Events, LoggedInEvent, LoggedInCachedEvent } from '@dcl/schemas'
 
 import { AppComponents } from '../../types/system'
 import { IMessageProcessorComponent } from './types'
@@ -10,11 +10,15 @@ export async function createMessageProcessorComponent({
   const logger = logs.getLogger('message-processor')
 
   async function processMessage(message: Event) {
-    if (message.type !== Events.Type.COMMS || message.subType !== Events.SubType.Comms.USER_JOINED_ROOM) {
+    if (
+      message.type !== Events.Type.CLIENT ||
+      (message.subType !== Events.SubType.Client.LOGGED_IN_CACHED &&
+        message.subType !== Events.SubType.Client.LOGGED_IN)
+    ) {
       return
     }
 
-    const { metadata } = message as UserJoinedRoomEvent
+    const { metadata } = message as LoggedInEvent | LoggedInCachedEvent
     const userAddress = metadata.userAddress
 
     if (!userAddress) {
