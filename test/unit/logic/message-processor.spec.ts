@@ -1,4 +1,4 @@
-import { Event, Events, UserJoinedRoomEvent } from '@dcl/schemas'
+import { Event, Events, LoggedInEvent } from '@dcl/schemas'
 import { IMessageProcessorComponent, createMessageProcessorComponent } from '../../../src/logic/sqs'
 
 describe('message-processor', () => {
@@ -50,12 +50,12 @@ describe('message-processor', () => {
     describe('with valid message type but missing user address', () => {
       beforeEach(() => {
         message = {
-          type: Events.Type.COMMS,
-          subType: Events.SubType.Comms.USER_JOINED_ROOM,
+          type: Events.Type.CLIENT,
+          subType: Events.SubType.Client.LOGGED_IN,
           metadata: {},
           key: 'test-key',
           timestamp: Date.now()
-        } as unknown as UserJoinedRoomEvent
+        } as unknown as LoggedInEvent
       })
 
       it('should not finalize the referral', async () => {
@@ -70,14 +70,14 @@ describe('message-processor', () => {
     describe.skip('with valid message and user address', () => {
       beforeEach(() => {
         message = {
-          type: Events.Type.COMMS,
-          subType: Events.SubType.Comms.USER_JOINED_ROOM,
+          type: Events.Type.CLIENT,
+          subType: Events.SubType.Client.LOGGED_IN,
           metadata: {
             userAddress: '0x123'
           },
           key: 'test-key',
           timestamp: Date.now()
-        } as unknown as UserJoinedRoomEvent
+        } as unknown as LoggedInEvent
       })
 
       it('should finalize referral and log success', async () => {
