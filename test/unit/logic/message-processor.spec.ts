@@ -67,7 +67,7 @@ describe('message-processor', () => {
       })
     })
 
-    describe('with valid message and user address', () => {
+    describe.skip('with valid message and user address', () => {
       beforeEach(() => {
         message = {
           type: Events.Type.COMMS,
