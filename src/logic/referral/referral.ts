@@ -16,7 +16,7 @@ import { referral100InvitesReachedMessage, referralIpMatchRejectionMessage } fro
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
 const MARKETING_EMAIL = 'marketing@decentraland.org'
-export const MAX_IP_MATCHES = 3
+export const MAX_IP_MATCHES = 2
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -120,6 +120,25 @@ export async function createReferralComponent(
     }
   }
 
+  async function fetchDenyList(): Promise<Set<string>> {
+    try {
+      const response = await fetch('https://config.decentraland.org/denylist.json')
+      if (!response.ok) {
+        throw new Error(`Failed to fetch deny list, status: ${response.status}`)
+      }
+      const data = await response.json()
+      if (data.users && Array.isArray(data.users)) {
+        return new Set(data.users.map((user: { wallet: string }) => user.wallet.toLocaleLowerCase()))
+      } else {
+        logger.warn('Deny list is missing "users" field or it is not an array.')
+        return new Set()
+      }
+    } catch (error) {
+      logger.error(`Error fetching deny list: ${(error as Error).message}`)
+      return new Set()
+    }
+  }
+
   return {
     create: async (referralInput: CreateReferralWithInvitedUser) => {
       const referrer = validateAddress(referralInput.referrer, 'referrer')
@@ -140,6 +159,12 @@ export async function createReferralComponent(
         invitedUser,
         invitedUserIP
       })
+
+      const denyList = await fetchDenyList()
+
+      if (denyList.has(referrer.toLowerCase())) {
+        throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer}, ${invitedUserIP}`)
+      }
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
       if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
@@ -173,8 +198,17 @@ export async function createReferralComponent(
       const invitedUser = validateAddress(invitedUserToUpdate, 'invitedUser')
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
+
+      const denyList = await fetchDenyList()
+
       if (!progress.length) {
         throw new ReferralNotFoundError(invitedUser)
+      }
+
+      if (denyList.has(progress[0].referrer.toLowerCase())) {
+        throw new ReferralInvalidInputError(
+          `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
+        )
       }
 
       const currentStatus = progress[0].status
@@ -199,11 +233,28 @@ export async function createReferralComponent(
       const invitedUser = validateAddress(invitedUserToFinalize, 'invitedUser')
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
+
+      if (!progress.length) {
+        return
+      }
+
+      const denyList = await fetchDenyList()
+
+      if (denyList.has(progress[0].referrer.toLowerCase())) {
+        throw new ReferralInvalidInputError(
+          `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
+        )
+      }
       if (
-        !progress.length ||
         progress[0].status === ReferralProgressStatus.TIER_GRANTED ||
         progress[0].status === ReferralProgressStatus.REJECTED_IP_MATCH
       ) {
+        logger.info('Avoiding finalizing referral', {
+          invitedUser,
+          status: progress[0].status,
+          invitedUserIP: progress[0].invited_user_ip || 'N/A',
+          referrer: progress[0].referrer
+        })
         return
       }
 
