@@ -393,6 +393,71 @@ describe('referral-component', () => {
         })
       })
     })
+
+    describe('and the referrer is on deny list', () => {
+      let denyListedReferrer: string
+      let denyListedInput: { referrer: string; invitedUser: string; invitedUserIP: string }
+
+      beforeEach(() => {
+        denyListedReferrer = '0x1111111111111111111111111111111111111111'
+        denyListedInput = {
+          referrer: denyListedReferrer,
+          invitedUser: validInvitedUser,
+          invitedUserIP: validIP
+        }
+        jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              users: [
+                { wallet: denyListedReferrer.toLowerCase() },
+                { wallet: '0x2222222222222222222222222222222222222222' }
+              ]
+            })
+        } as any)
+        mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+      })
+
+      it('should throw ReferralInvalidInputError when referrer is deny listed', async () => {
+        await expect(referralComponent.create(denyListedInput)).rejects.toThrow(
+          new ReferralInvalidInputError(
+            `Referrer is on the deny list ${denyListedReferrer.toLowerCase()}, ${denyListedInput.invitedUserIP}`
+          )
+        )
+
+        expect(jest.mocked(global.fetch)).toHaveBeenCalledWith('https://config.decentraland.org/denylist.json')
+        expect(mockReferralDb.createReferral).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and deny list fetch fails', () => {
+      beforeEach(() => {
+        jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network error'))
+        mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        mockReferralDb.createReferral.mockResolvedValueOnce({
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.PENDING
+        })
+      })
+
+      it('should create referral successfully when deny list fetch fails', async () => {
+        const result = await referralComponent.create(validInput)
+
+        expect(jest.mocked(global.fetch)).toHaveBeenCalledWith('https://config.decentraland.org/denylist.json')
+        expect(mockLogger.error).toHaveBeenCalledWith('Error fetching deny list: Network error')
+        expect(mockReferralDb.createReferral).toHaveBeenCalledWith({
+          referrer: validReferrer.toLowerCase(),
+          invitedUser: validInvitedUser.toLowerCase(),
+          invitedUserIP: validInput.invitedUserIP
+        })
+        expect(result).toEqual({
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.PENDING
+        })
+      })
+    })
   })
 
   describe('when updating referral progress', () => {
@@ -477,6 +542,39 @@ describe('referral-component', () => {
         await expect(
           referralComponent.updateProgress('invalid-address', ReferralProgressStatus.SIGNED_UP)
         ).rejects.toThrow(new ReferralInvalidInputError('Invalid invitedUser address'))
+      })
+    })
+
+    describe('and the referrer is on deny list', () => {
+      let denyListedReferrer: string
+
+      beforeEach(() => {
+        denyListedReferrer = '0x1111111111111111111111111111111111111111'
+        jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            users: [{ wallet: denyListedReferrer.toLowerCase() }]
+          })
+        } as any)
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: denyListedReferrer.toLowerCase(),
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.PENDING,
+            invited_user_ip: '192.168.1.1'
+          }
+        ])
+      })
+
+      it('should throw ReferralInvalidInputError when referrer is deny listed', async () => {
+        await expect(
+          referralComponent.updateProgress(validInvitedUser, ReferralProgressStatus.SIGNED_UP)
+        ).rejects.toThrow(
+          new ReferralInvalidInputError(`Referrer is on the deny list ${denyListedReferrer.toLowerCase()}, 192.168.1.1`)
+        )
+
+        expect(jest.mocked(global.fetch)).toHaveBeenCalledWith('https://config.decentraland.org/denylist.json')
+        expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
       })
     })
   })
@@ -786,6 +884,38 @@ describe('referral-component', () => {
             })
           )
         })
+      })
+    })
+
+    describe('and the referrer is on deny list', () => {
+      let denyListedReferrer: string
+
+      beforeEach(() => {
+        denyListedReferrer = '0x1111111111111111111111111111111111111111'
+        jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            users: [{ wallet: denyListedReferrer.toLowerCase() }]
+          })
+        } as any)
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: denyListedReferrer.toLowerCase(),
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.SIGNED_UP,
+            invited_user_ip: '192.168.1.1'
+          }
+        ])
+      })
+
+      it('should throw ReferralInvalidInputError when referrer is deny listed', async () => {
+        await expect(referralComponent.finalizeReferral(validInvitedUser)).rejects.toThrow(
+          new ReferralInvalidInputError(`Referrer is on the deny list ${denyListedReferrer.toLowerCase()}, 192.168.1.1`)
+        )
+
+        expect(jest.mocked(global.fetch)).toHaveBeenCalledWith('https://config.decentraland.org/denylist.json')
+        expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
       })
     })
   })
