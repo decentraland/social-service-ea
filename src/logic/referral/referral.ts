@@ -443,6 +443,12 @@ export async function createReferralComponent(
         throw new ReferralInvalidInputError(`You must have at least ${TIERS_IRL_SWAG} accepted invites to set an email`)
       }
 
+      const denyList = await fetchDenyList()
+
+      if (denyList.has(referrer.toLowerCase())) {
+        throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer.toLowerCase()}`)
+      }
+
       if (!referralEmailInput.email || !referralEmailInput.email.trim()) {
         throw new ReferralInvalidInputError('Email is required')
       }

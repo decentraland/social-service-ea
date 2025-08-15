@@ -1500,5 +1500,38 @@ describe('referral-component', () => {
         ).rejects.toThrow(new ReferralInvalidInputError('Invalid referrer address'))
       })
     })
+
+    describe('and the referrer is on deny list', () => {
+      let denyListedReferrer: string
+      let denyListedInput: { referrer: string; email: string }
+
+      beforeEach(() => {
+        denyListedReferrer = '0x1111111111111111111111111111111111111111'
+        denyListedInput = {
+          referrer: denyListedReferrer,
+          email: validEmail
+        }
+        jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              users: [
+                { wallet: denyListedReferrer.toLowerCase() },
+                { wallet: '0x2222222222222222222222222222222222222222' }
+              ]
+            })
+        } as any)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
+      })
+
+      it('should throw ReferralInvalidInputError when referrer is deny listed', async () => {
+        await expect(referralComponent.setReferralEmail(denyListedInput)).rejects.toThrow(
+          new ReferralInvalidInputError(`Referrer is on the deny list ${denyListedReferrer.toLowerCase()}`)
+        )
+
+        expect(jest.mocked(global.fetch)).toHaveBeenCalledWith('https://config.decentraland.org/denylist.json')
+        expect(mockReferralDb.setReferralEmail).not.toHaveBeenCalled()
+      })
+    })
   })
 })
