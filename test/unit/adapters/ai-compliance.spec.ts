@@ -64,7 +64,7 @@ describe('AIComplianceComponent', () => {
               message: {
                 content: JSON.stringify({
                   isCompliant: true,
-                  violations: [],
+                  issues: [],
                   warnings: [],
                   confidence: 0.95,
                   reasoning: 'Content is compliant with ethical standards'
@@ -79,7 +79,7 @@ describe('AIComplianceComponent', () => {
           const result = await aiCompliance.validateCommunityContent({ name, description })
 
           expect(result.isCompliant).toBe(true)
-          expect(result.violations).toEqual([])
+          expect(result.issues).toEqual([])
           expect(result.warnings).toEqual([])
           expect(result.confidence).toBe(0.95)
           expect(mockOpenAICreate).toHaveBeenCalledWith(
@@ -95,14 +95,14 @@ describe('AIComplianceComponent', () => {
         })
       })
 
-      describe('when content has violations', () => {
+      describe('when content has issues', () => {
         beforeEach(() => {
           mockResponse = {
             choices: [{
               message: {
                 content: JSON.stringify({
                   isCompliant: false,
-                  violations: ['Contains inappropriate language'],
+                  issues: ['Contains inappropriate language'],
                   warnings: [],
                   confidence: 0.9,
                   reasoning: 'Content violates ethical standards'
@@ -117,7 +117,7 @@ describe('AIComplianceComponent', () => {
           const result = await aiCompliance.validateCommunityContent({ name, description })
 
           expect(result.isCompliant).toBe(false)
-          expect(result.violations).toEqual(['Contains inappropriate language'])
+          expect(result.issues).toEqual(['Contains inappropriate language'])
           expect(result.confidence).toBe(0.9)
           expect(mockAnthropicCreate).not.toHaveBeenCalled()
         })
@@ -130,7 +130,7 @@ describe('AIComplianceComponent', () => {
               message: {
                 content: JSON.stringify({
                   isCompliant: true,
-                  violations: [],
+                  issues: [],
                   warnings: ['Content is borderline but acceptable'],
                   confidence: 0.8,
                   reasoning: 'Content is compliant with minor concerns'
@@ -158,7 +158,7 @@ describe('AIComplianceComponent', () => {
               message: {
                 content: JSON.stringify({
                   isCompliant: true,
-                  violations: [],
+                  issues: [],
                   warnings: [],
                   confidence: 0.95,
                   reasoning: 'Content with thumbnail is compliant'
@@ -225,7 +225,7 @@ describe('AIComplianceComponent', () => {
                 message: {
                   content: JSON.stringify({
                     isCompliant: true,
-                    violations: [],
+                    issues: [],
                     warnings: [],
                     confidence: 0.95,
                     reasoning: 'Content is compliant'
@@ -262,7 +262,7 @@ describe('AIComplianceComponent', () => {
                 message: {
                   content: JSON.stringify({
                     isCompliant: true,
-                    violations: [],
+                    issues: [],
                     warnings: [],
                     confidence: 0.95,
                     reasoning: 'Content is compliant'
@@ -316,7 +316,7 @@ describe('AIComplianceComponent', () => {
               type: 'text',
               text: JSON.stringify({
                 isCompliant: true,
-                violations: [],
+                issues: [],
                 warnings: [],
                 confidence: 0.9,
                 reasoning: 'Content validated by Claude'
@@ -351,7 +351,7 @@ describe('AIComplianceComponent', () => {
               type: 'text',
               text: JSON.stringify({
                 isCompliant: true,
-                violations: [],
+                issues: [],
                 warnings: [],
                 confidence: 0.9,
                 reasoning: 'Content validated by Claude'
@@ -378,7 +378,7 @@ describe('AIComplianceComponent', () => {
                 content: JSON.stringify({
                   isCompliant: true,
                   // Missing required fields
-                  violations: []
+                  issues: []
                 })
               }
             }]
@@ -390,7 +390,7 @@ describe('AIComplianceComponent', () => {
               type: 'text',
               text: JSON.stringify({
                 isCompliant: true,
-                violations: [],
+                issues: [],
                 warnings: [],
                 confidence: 0.9,
                 reasoning: 'Content validated by Claude'
@@ -419,7 +419,7 @@ describe('AIComplianceComponent', () => {
               type: 'text',
               text: JSON.stringify({
                 isCompliant: true,
-                violations: [],
+                issues: [],
                 warnings: [],
                 confidence: 0.9,
                 reasoning: 'Content validated by Claude'
@@ -464,7 +464,7 @@ describe('AIComplianceComponent', () => {
               type: 'text',
               text: JSON.stringify({
                 isCompliant: true,
-                violations: [],
+                issues: [],
                 warnings: [],
                 confidence: 0.9,
                 reasoning: 'Content validated by Claude'

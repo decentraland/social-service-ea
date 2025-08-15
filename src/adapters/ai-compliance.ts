@@ -2,7 +2,7 @@ import { AppComponents } from '../types'
 
 export interface ComplianceValidationResult {
   isCompliant: boolean
-  violations: string[]
+  issues: string[]
   warnings: string[]
   confidence: number
   reasoning: string
@@ -106,7 +106,7 @@ POLICIES AND PRINCIPLES:
 
 1. Standard of Conduct: We conduct all operations with honesty, integrity and openness, respecting human rights and interests.
 
-2. Compliance with Law: We have zero tolerance for violations of applicable laws and regulations.
+2. Compliance with Law: We have zero tolerance for issues of applicable laws and regulations.
 
 3. Equal Opportunity Employment: We strictly prohibit unlawful discrimination, harassment, bullying in any form – verbal, physical, or visual.
 
@@ -129,7 +129,7 @@ POLICIES AND PRINCIPLES:
       const systemMessage = `You are a compliance expert for Decentraland. Analyze community content against our Code of Ethics and return a JSON response with the following structure:
 {
   "isCompliant": boolean,
-  "violations": ["list of specific violations"],
+  "issues": ["list of specific issues"],
   "warnings": ["list of warnings"],
   "confidence": number (0-1),
   "reasoning": "detailed explanation"
@@ -137,7 +137,7 @@ POLICIES AND PRINCIPLES:
               
 Be strict but fair. Flag any content that could violate our values of integrity, responsibility, respect, or pioneering. Consider potential legal, ethical, or reputational risks.
 
-IMPORTANT: When analyzing thumbnail images, pay special attention to visual content that may violate our Code of Ethics, including inappropriate imagery, violence, discrimination, or other violations that might not be apparent from text alone.`
+IMPORTANT: When analyzing thumbnail images, pay special attention to visual content that may violate our Code of Ethics, including inappropriate imagery, violence, discrimination, or other issues that might not be apparent from text alone.`
 
       const userMessage = `Please analyze the following community content against Decentraland's Code of Ethics:
             
@@ -164,7 +164,7 @@ Please evaluate if this community content complies with our ethical standards. C
 
 7. CONFIDENTIALITY: Does it expose confidential information or violate privacy? (Section 6)
 
-IMPORTANT: If a thumbnail image is provided, carefully analyze the visual content for any violations of the Code of Ethics. Images can contain inappropriate content that text alone might not reveal.
+IMPORTANT: If a thumbnail image is provided, carefully analyze the visual content for any issues of the Code of Ethics. Images can contain inappropriate content that text alone might not reveal.
 
 Return your analysis as a JSON object with specific references to which sections of the Code of Ethics are violated or at risk.`
 
@@ -185,7 +185,7 @@ export function createComplianceResponseValidator(): IComplianceValidator {
 
       if (
         typeof result.isCompliant !== 'boolean' ||
-        !Array.isArray(result.violations) ||
+        !Array.isArray(result.issues) ||
         !Array.isArray(result.warnings) ||
         typeof result.confidence !== 'number' ||
         typeof result.reasoning !== 'string'
@@ -264,7 +264,7 @@ export async function createAIComplianceComponent(
               name: request.name,
               provider: provider.name,
               isCompliant: String(result.isCompliant),
-              violations: result.violations.length,
+              issues: result.issues.length,
               warnings: result.warnings.length,
               confidence: result.confidence,
               duration

@@ -69,7 +69,7 @@ export async function updateCommunityHandler(
     if (error instanceof CommunityComplianceError) {
       return {
         status: 400,
-        body: { message: error.message, data: { violations: error.violations, warnings: error.warnings } }
+        body: { message: error.message, data: { issues: error.issues, warnings: error.warnings } }
       }
     }
 

@@ -39,7 +39,7 @@ export function createCommunityComplianceValidatorComponent(
         if (!validationResult.isCompliant) {
           logger.warn('Community content compliance validation failed', {
             name,
-            violations: validationResult.violations.join(', '),
+            issues: validationResult.issues.join(', '),
             warnings: validationResult.warnings.join(', '),
             confidence: validationResult.confidence,
             duration
@@ -47,7 +47,7 @@ export function createCommunityComplianceValidatorComponent(
 
           throw new CommunityComplianceError(
             `Community content violates Decentraland's Code of Ethics: ${validationResult.reasoning}`,
-            validationResult.violations,
+            validationResult.issues,
             validationResult.warnings,
             validationResult.confidence
           )

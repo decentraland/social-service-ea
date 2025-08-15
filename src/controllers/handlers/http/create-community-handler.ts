@@ -73,7 +73,7 @@ export async function createCommunityHandler(
         body: {
           message: error.message,
           data: {
-            violations: error.violations,
+            issues: error.issues,
             warnings: error.warnings
           }
         }

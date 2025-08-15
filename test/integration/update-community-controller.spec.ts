@@ -383,7 +383,7 @@ test('Update Community Controller', async function ({ components, stubComponents
             expect(response.status).toBe(400)
             const body = await response.json()
             expect(body.message).toContain("Community content violates Decentraland's Code of Ethics")
-            expect(body.data.violations).toEqual(['Contains inappropriate language', 'Promotes violence'])
+            expect(body.data.issues).toEqual(['Contains inappropriate language', 'Promotes violence'])
             expect(body.data.warnings).toEqual(['Content is borderline'])
           })
 
