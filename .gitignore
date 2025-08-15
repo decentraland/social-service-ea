@@ -7,3 +7,4 @@ protoc3
 bin/
 test/stress
 .cursor
+.claude

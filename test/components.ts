@@ -238,7 +238,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const communitiesDbHelper = createDbHelper(pg)
 
-  const referralDb = await createReferralDBComponent({ pg, logs })
+  const referralDb = await createReferralDBComponent({ pg, logs, config })
 
   const rewards = await createRewardComponent({ fetcher, config })
 
@@ -251,7 +251,7 @@ async function initComponents(): Promise<TestComponents> {
     }
   )
 
-  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack })
+  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
   const queue = createMemoryQueueAdapter()
 

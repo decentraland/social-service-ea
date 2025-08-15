@@ -11,12 +11,15 @@ import {
 } from './errors'
 import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput } from './types'
 import type { AppComponents } from '../../types/system'
-import { referral100InvitesReachedMessage, referralIpMatchRejectionMessage } from '../../utils/slackMessages'
+import {
+  referral100InvitesReachedMessage,
+  referralIpMatchRejectionMessage,
+  referralSuspiciousTimingMessage
+} from '../../utils/slackMessages'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
 const MARKETING_EMAIL = 'marketing@decentraland.org'
-export const MAX_IP_MATCHES = 2
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -26,9 +29,9 @@ function validateAddress(value: string, field: string): string {
 }
 
 export async function createReferralComponent(
-  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email' | 'slack'>
+  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email' | 'slack' | 'redis'>
 ): Promise<IReferralComponent> {
-  const { referralDb, logs, sns, config, rewards, email: emailComponent, slack } = components
+  const { referralDb, logs, sns, config, rewards, email: emailComponent, slack, redis } = components
 
   const logger = logs.getLogger('referral-component')
 
@@ -43,7 +46,10 @@ export async function createReferralComponent(
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
     PROFILE_URL,
     ENV,
-    REFERRAL_METABASE_DASHBOARD
+    REFERRAL_METABASE_DASHBOARD,
+    REFERRAL_MAX_IP_MATCHES,
+    REFERRAL_MIN_LOGIN_DAYS,
+    REFERRAL_FIVE_MINUTES_IN_MS
   ] = await Promise.all([
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10'),
@@ -55,7 +61,10 @@ export async function createReferralComponent(
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75'),
     config.requireString('PROFILE_URL'),
     config.requireString('ENV'),
-    config.requireString('REFERRAL_METABASE_DASHBOARD')
+    config.requireString('REFERRAL_METABASE_DASHBOARD'),
+    config.requireNumber('REFERRAL_MAX_IP_MATCHES'),
+    config.requireNumber('REFERRAL_MIN_LOGIN_DAYS'),
+    config.requireNumber('REFERRAL_FIVE_MINUTES_IN_MS')
   ])
 
   const isDev = ENV === 'dev'
@@ -167,10 +176,58 @@ export async function createReferralComponent(
       }
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
+
+      const recentInvitations = await referralDb.findReferralProgress({
+        referrer,
+        limit: 2
+      })
+
+      if (recentInvitations.length >= 2) {
+        const newestCreatedAt = recentInvitations[0].created_at
+        const previousCreatedAt = recentInvitations[1].created_at
+        const timeDifference = newestCreatedAt - previousCreatedAt
+
+        if (timeDifference < REFERRAL_FIVE_MINUTES_IN_MS) {
+          const timeDifferenceMins = Math.round((timeDifference / (1000 * 60)) * 100) / 100 // Round to 2 decimal places
+          const newInvitationTime = new Date(newestCreatedAt).toISOString()
+          const previousInvitationTime = new Date(previousCreatedAt).toISOString()
+
+          try {
+            await slack.sendMessage(
+              referralSuspiciousTimingMessage(
+                referrer,
+                newestCreatedAt.toString(),
+                previousCreatedAt.toString(),
+                timeDifferenceMins,
+                newInvitationTime,
+                previousInvitationTime,
+                isDev,
+                REFERRAL_METABASE_DASHBOARD
+              )
+            )
+          } catch (error) {
+            logger.warn('Failed to send suspicious timing Slack notification', {
+              referrer,
+              newestCreatedAt,
+              previousCreatedAt,
+              timeDifferenceMins,
+              error: error instanceof Error ? error.message : String(error)
+            })
+          }
+        }
+      }
+
       if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
         try {
           await slack.sendMessage(
-            referralIpMatchRejectionMessage(referrer, invitedUser, invitedUserIP, isDev, REFERRAL_METABASE_DASHBOARD)
+            referralIpMatchRejectionMessage(
+              referrer,
+              invitedUser,
+              invitedUserIP,
+              isDev,
+              REFERRAL_METABASE_DASHBOARD,
+              REFERRAL_MAX_IP_MATCHES
+            )
           )
         } catch (error) {
           logger.warn('Failed to send IP rejection Slack notification', {
@@ -182,7 +239,7 @@ export async function createReferralComponent(
         }
 
         throw new ReferralInvalidInputError(
-          `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${invitedUserIP}`
+          `Invited user has already reached the maximum number of ${REFERRAL_MAX_IP_MATCHES} referrals from the same IP: ${invitedUserIP}`
         )
       }
 
@@ -259,6 +316,23 @@ export async function createReferralComponent(
       }
 
       const { status: currentStatus, referrer } = progress[0]
+
+      const cacheKey = `referral:invited-user:${invitedUser}`
+      const cachedInvitedUserLogins: string[] = (await redis.get(cacheKey)) || []
+
+      if (cachedInvitedUserLogins.length < REFERRAL_MIN_LOGIN_DAYS) {
+        const loginDays = new Set(cachedInvitedUserLogins)
+        loginDays.add(new Date().toISOString().split('T')[0])
+        await redis.put(cacheKey, Array.from(loginDays), { noTTL: true })
+        logger.info(`User must have logged in at least ${REFERRAL_MIN_LOGIN_DAYS} days`, {
+          invitedUser,
+          referrer,
+          cachedInvitedUserLogins: JSON.stringify(cachedInvitedUserLogins)
+        })
+        return
+      }
+
+      await redis.put(cacheKey, [], { EX: 0 })
 
       logger.info('Finalizing referral', {
         invitedUser,
@@ -360,6 +434,12 @@ export async function createReferralComponent(
 
     setReferralEmail: async (referralEmailInput: Pick<ReferralEmail, 'referrer' | 'email'>) => {
       const referrer = validateAddress(referralEmailInput.referrer, 'referrer')
+
+      const denyList = await fetchDenyList()
+
+      if (denyList.has(referrer.toLowerCase())) {
+        throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer.toLowerCase()}`)
+      }
 
       const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
 
