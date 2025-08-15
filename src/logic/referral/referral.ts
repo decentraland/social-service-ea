@@ -183,8 +183,8 @@ export async function createReferralComponent(
       })
 
       if (recentInvitations.length >= 2) {
-        const newestCreatedAt = recentInvitations[0].created_at
-        const previousCreatedAt = recentInvitations[1].created_at
+        const newestCreatedAt = Number(recentInvitations[0].created_at)
+        const previousCreatedAt = Number(recentInvitations[1].created_at)
         const timeDifference = newestCreatedAt - previousCreatedAt
 
         if (timeDifference < REFERRAL_FIVE_MINUTES_IN_MS) {
