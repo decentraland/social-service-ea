@@ -29,7 +29,6 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
 
   afterEach(() => {
     nock.cleanAll()
-    jest.clearAllMocks()
   })
 
   describe('when getting community voice chat credentials', () => {

@@ -653,11 +653,11 @@ describe('Community Component', () => {
           expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
           expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
           expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
-          expect(mockCommunityComplianceValidator.validateCommunityCreation).toHaveBeenCalledWith(
-            communityData.name,
-            communityData.description,
-            undefined
-          )
+          expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+            name: communityData.name,
+            description: communityData.description,
+            thumbnailBuffer: undefined
+          })
           expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
             ...communityData,
             owner_address: ownerAddress,
@@ -688,11 +688,11 @@ describe('Community Component', () => {
             }
           })
 
-          expect(mockCommunityComplianceValidator.validateCommunityCreation).toHaveBeenCalledWith(
-            communityData.name,
-            communityData.description,
-            thumbnail
-          )
+          expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+            name: communityData.name,
+            description: communityData.description,
+            thumbnailBuffer: thumbnail
+          })
           expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(newCommunityId, thumbnail)
         })
       })
@@ -722,11 +722,11 @@ describe('Community Component', () => {
           })
 
           expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
-          expect(mockCommunityComplianceValidator.validateCommunityCreation).toHaveBeenCalledWith(
-            communityData.name,
-            communityData.description,
-            thumbnail
-          )
+          expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+            name: communityData.name,
+            description: communityData.description,
+            thumbnailBuffer: thumbnail
+          })
           expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith(newCommunityId, ownerAddress, placeIds)
           expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(newCommunityId, thumbnail)
         })
@@ -746,7 +746,7 @@ describe('Community Component', () => {
             expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
             expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
             expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
-            expect(mockCommunityComplianceValidator.validateCommunityCreation).not.toHaveBeenCalled()
+            expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.createCommunity).not.toHaveBeenCalled()
           })
         })
@@ -765,7 +765,7 @@ describe('Community Component', () => {
         )
 
         expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
-        expect(mockCommunityComplianceValidator.validateCommunityCreation).not.toHaveBeenCalled()
+        expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.createCommunity).not.toHaveBeenCalled()
       })
     })
@@ -907,11 +907,11 @@ describe('Community Component', () => {
               }
             })
 
-            expect(mockCommunityComplianceValidator.validateCommunityUpdate).toHaveBeenCalledWith(
-              updates.name,
-              updates.description,
-              updates.thumbnailBuffer
-            )
+            expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+              name: updates.name,
+              description: updates.description,
+              thumbnailBuffer: updates.thumbnailBuffer
+            })
             expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
             expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
               communityId,
@@ -950,11 +950,11 @@ describe('Community Component', () => {
               ...updatesWithOnlyContent
             })
 
-            expect(mockCommunityComplianceValidator.validateCommunityUpdate).toHaveBeenCalledWith(
-              updatesWithOnlyContent.name,
-              updatesWithOnlyContent.description,
-              undefined
-            )
+            expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+              name: updatesWithOnlyContent.name,
+              description: updatesWithOnlyContent.description,
+              thumbnailBuffer: undefined
+            })
           })
 
           it('should update the community with only non-content fields and not call compliance validation', async () => {
@@ -982,7 +982,7 @@ describe('Community Component', () => {
               ...updatesWithOnlyPlaces
             })
 
-            expect(mockCommunityComplianceValidator.validateCommunityUpdate).not.toHaveBeenCalled()
+            expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
             expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(
               updatesWithOnlyPlaces.placeIds,
               userAddress
@@ -1007,7 +1007,7 @@ describe('Community Component', () => {
               ...updatesWithOnlyPrivacy
             })
 
-            expect(mockCommunityComplianceValidator.validateCommunityUpdate).not.toHaveBeenCalled()
+            expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
               ...updatesWithOnlyPrivacy,
               private: true
@@ -1031,11 +1031,11 @@ describe('Community Component', () => {
               ...simpleUpdate
             })
 
-            expect(mockCommunityComplianceValidator.validateCommunityUpdate).toHaveBeenCalledWith(
-              undefined,
-              simpleUpdate.description,
-              undefined
-            )
+            expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+              name: mockCommunity.name, // Use existing community name
+              description: simpleUpdate.description,
+              thumbnailBuffer: undefined
+            })
           })
 
           it('should execute complete update process and log success', async () => {
@@ -1061,11 +1061,11 @@ describe('Community Component', () => {
               }
             })
 
-            expect(mockCommunityComplianceValidator.validateCommunityUpdate).toHaveBeenCalledWith(
-              completeUpdate.name,
-              completeUpdate.description,
-              completeUpdate.thumbnailBuffer
-            )
+            expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+              name: completeUpdate.name,
+              description: completeUpdate.description,
+              thumbnailBuffer: completeUpdate.thumbnailBuffer
+            })
             expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
               ...completeUpdate,
               private: undefined
@@ -1149,7 +1149,7 @@ describe('Community Component', () => {
               expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
               expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
               expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
-              expect(mockCommunityComplianceValidator.validateCommunityUpdate).not.toHaveBeenCalled()
+              expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
             })
           })
@@ -1170,7 +1170,7 @@ describe('Community Component', () => {
 
             expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
             expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
-            expect(mockCommunityComplianceValidator.validateCommunityUpdate).not.toHaveBeenCalled()
+            expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
           })
         })
@@ -1199,7 +1199,7 @@ describe('Community Component', () => {
           active: mockCommunity.active
         })
 
-        expect(mockCommunityComplianceValidator.validateCommunityUpdate).not.toHaveBeenCalled()
+        expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
         expect(mockCommunityRoles.validatePermissionToEditCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()

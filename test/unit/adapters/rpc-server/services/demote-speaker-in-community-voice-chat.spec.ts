@@ -30,9 +30,6 @@ describe('when demoting speaker in community voice chat', () => {
       demoteSpeakerInCommunityVoiceChat: demoteSpeakerMock
     })
 
-    // Reset mocks
-    jest.clearAllMocks()
-
     service = demoteSpeakerInCommunityVoiceChatService({
       components: { commsGatekeeper, logs, communitiesDb: mockCommunitiesDB }
     })

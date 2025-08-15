@@ -160,11 +160,9 @@ export function createMockCommunityBroadcasterComponent({
 }
 
 export function createMockCommunityComplianceValidatorComponent({
-  validateCommunityCreation = jest.fn(),
-  validateCommunityUpdate = jest.fn()
+  validateCommunityContent = jest.fn()
 }: Partial<jest.Mocked<ICommunityComplianceValidatorComponent>>): jest.Mocked<ICommunityComplianceValidatorComponent> {
   return {
-    validateCommunityCreation,
-    validateCommunityUpdate
+    validateCommunityContent
   }
 }

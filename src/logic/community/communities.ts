@@ -250,7 +250,11 @@ export function createCommunityComponent(
         await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
       }
 
-      await communityComplianceValidator.validateCommunityCreation(community.name, community.description, thumbnail)
+      await communityComplianceValidator.validateCommunityContent({
+        name: community.name,
+        description: community.description,
+        thumbnailBuffer: thumbnail
+      })
 
       const newCommunity = await communitiesDb.createCommunity({
         ...community,
@@ -357,7 +361,14 @@ export function createCommunityComponent(
       }
 
       if (updates.name || updates.description || thumbnailBuffer) {
-        await communityComplianceValidator.validateCommunityUpdate(updates.name, updates.description, thumbnailBuffer)
+        const nameToValidate = updates.name || existingCommunity.name
+        const descriptionToValidate = updates.description || existingCommunity.description
+
+        await communityComplianceValidator.validateCommunityContent({
+          name: nameToValidate,
+          description: descriptionToValidate,
+          thumbnailBuffer
+        })
       }
 
       logger.info('Updating community', {
