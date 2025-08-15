@@ -11,13 +11,18 @@ import {
 } from './errors'
 import type { IReferralComponent, RewardAttributes, SetReferralRewardImageInput } from './types'
 import type { AppComponents } from '../../types/system'
-import { referral100InvitesReachedMessage, referralIpMatchRejectionMessage } from '../../utils/slackMessages'
+import {
+  referral100InvitesReachedMessage,
+  referralIpMatchRejectionMessage,
+  referralSuspiciousTimingMessage
+} from '../../utils/slackMessages'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
 const MARKETING_EMAIL = 'marketing@decentraland.org'
 export const MAX_IP_MATCHES = 2
 export const MIN_LOGIN_DAYS = 3
+export const FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -168,6 +173,51 @@ export async function createReferralComponent(
       }
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
+
+      const recentInvitations = await referralDb.findReferralProgress({
+        referrer,
+        limit: 2
+      })
+
+      let timeDifference: number | null = null
+      let newestCreatedAt: number | null = null
+      let previousCreatedAt: number | null = null
+
+      if (recentInvitations.length >= 2) {
+        newestCreatedAt = recentInvitations[0].created_at
+        previousCreatedAt = recentInvitations[1].created_at
+        timeDifference = newestCreatedAt - previousCreatedAt
+      }
+
+      if (timeDifference && newestCreatedAt && previousCreatedAt && timeDifference < FIVE_MINUTES_IN_MS) {
+        const timeDifferenceMins = Math.round((timeDifference / (1000 * 60)) * 100) / 100 // Round to 2 decimal places
+        const newInvitationTime = new Date(newestCreatedAt).toISOString()
+        const previousInvitationTime = new Date(previousCreatedAt).toISOString()
+
+        try {
+          await slack.sendMessage(
+            referralSuspiciousTimingMessage(
+              referrer,
+              newestCreatedAt.toString(),
+              previousCreatedAt.toString(),
+              timeDifferenceMins,
+              newInvitationTime,
+              previousInvitationTime,
+              isDev,
+              REFERRAL_METABASE_DASHBOARD
+            )
+          )
+        } catch (error) {
+          logger.warn('Failed to send suspicious timing Slack notification', {
+            referrer,
+            newestCreatedAt,
+            previousCreatedAt,
+            timeDifferenceMins,
+            error: error instanceof Error ? error.message : String(error)
+          })
+        }
+      }
+
       if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
         try {
           await slack.sendMessage(

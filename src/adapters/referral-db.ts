@@ -78,7 +78,7 @@ export async function createReferralDBComponent(
         query = query.append(w)
       })
     }
-    query = query.append(SQL` LIMIT ${limit} OFFSET ${offset}`)
+    query = query.append(SQL` ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`)
     const result = await pg.query<ReferralProgress>(query)
     return result.rows
   }

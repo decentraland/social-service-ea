@@ -98,4 +98,66 @@ const referralIpMatchRejectionMessage = (
   }
 }
 
-export { referral100InvitesReachedMessage, referralIpMatchRejectionMessage }
+const referralSuspiciousTimingMessage = (
+  referrer: string,
+  newInvitedUser: string,
+  previousInvitedUser: string,
+  timeDifferenceMins: number,
+  newInvitationTime: string,
+  previousInvitationTime: string,
+  isDev: boolean,
+  referralMetabaseDashboard: string
+) => {
+  return {
+    channel: isDev ? 'notifications-dev' : 'referral-notifications',
+    text: `⚠️ Suspicious Referral Timing - Multiple invitations within 5 minutes`,
+    blocks: [
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: '⚠️ Suspicious Referral Timing',
+          emoji: true
+        }
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*🕒 Rapid Invitations Detected*\n\n*Referrer:* \`${referrer}\`\n*Time Between Invitations:* ${timeDifferenceMins} minutes`
+        }
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*📊 Invitation Details:*\n*New Invited User:* \`${newInvitedUser}\`\n*Time:* ${newInvitationTime}\n\n*Previous Invited User:* \`${previousInvitedUser}\`\n*Time:* ${previousInvitationTime}`
+        }
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*🔍 Analysis:*\n• Two invitations created within ${timeDifferenceMins} minutes\n• Potential automated behavior or coordination\n• May require manual review`
+        }
+      },
+      {
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            text: {
+              type: 'plain_text',
+              text: 'View Referral Dashboard',
+              emoji: true
+            },
+            url: referralMetabaseDashboard,
+            style: 'primary'
+          }
+        ]
+      }
+    ]
+  }
+}
+
+export { referral100InvitesReachedMessage, referralIpMatchRejectionMessage, referralSuspiciousTimingMessage }
