@@ -3,7 +3,7 @@ import { FormHandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { validateCommunityFields } from '../../../utils/community-validation'
-import { CommunityOwnerNotFoundError } from '../../../logic/community'
+import { CommunityOwnerNotFoundError, CommunityComplianceError } from '../../../logic/community'
 
 export async function createCommunityHandler(
   context: FormHandlerContextWithPath<'communities' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
@@ -65,6 +65,19 @@ export async function createCommunityHandler(
       error instanceof CommunityOwnerNotFoundError
     ) {
       throw error
+    }
+
+    if (error instanceof CommunityComplianceError) {
+      return {
+        status: 400,
+        body: {
+          message: error.message,
+          data: {
+            violations: error.violations,
+            warnings: error.warnings
+          }
+        }
+      }
     }
 
     return {

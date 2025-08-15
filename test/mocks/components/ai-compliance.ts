@@ -1,4 +1,4 @@
-import { IAIComplianceComponent, ComplianceValidationResult } from '../../../src/adapters/ai-compliance'
+import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 
 export function createAIComplianceMock({
   validateCommunityContent = jest.fn()
