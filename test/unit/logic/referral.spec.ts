@@ -70,6 +70,12 @@ describe('referral-component', () => {
           REFERRAL_METABASE_DASHBOARD: 'https://dashboard.decentraland.systems/1234'
         }
         return Promise.resolve(configValues[key])
+      }),
+      requireNumber: jest.fn().mockImplementation((key: string) => {
+        const configValues: Record<string, number> = {
+          REFERRAL_MAX_IP_MATCHES: MAX_IP_MATCHES
+        }
+        return Promise.resolve(configValues[key])
       })
     }
 
