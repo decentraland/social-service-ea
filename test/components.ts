@@ -187,6 +187,7 @@ async function initComponents(): Promise<TestComponents> {
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
   const communities = createCommunityComponent({
+    config,
     communitiesDb,
     catalystClient,
     communityRoles,
