@@ -1,5 +1,3 @@
-import { MAX_IP_MATCHES } from '../logic/referral'
-
 const referral100InvitesReachedMessage = (referrer: string, isDev: boolean, referralMetabaseDashboard: string) => {
   return {
     channel: isDev ? 'notifications-dev' : 'referral-notifications',
@@ -51,7 +49,8 @@ const referralIpMatchRejectionMessage = (
   invitedUser: string,
   invitedUserIP: string,
   isDev: boolean,
-  referralMetabaseDashboard: string
+  referralMetabaseDashboard: string,
+  maxIpMatches: number
 ) => {
   return {
     channel: isDev ? 'notifications-dev' : 'referral-notifications',
@@ -76,7 +75,7 @@ const referralIpMatchRejectionMessage = (
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*📊 Details:*\n• IP address has reached maximum of ${MAX_IP_MATCHES} referrals\n• Potential abuse or automated system detected\n• Referral automatically rejected\n\n*🔍 Next Steps:*\n• Monitor for similar patterns\n• Review IP address activity`
+          text: `*📊 Details:*\n• IP address has reached maximum of ${maxIpMatches} referrals\n• Potential abuse or automated system detected\n• Referral automatically rejected\n\n*🔍 Next Steps:*\n• Monitor for similar patterns\n• Review IP address activity`
         }
       },
       {

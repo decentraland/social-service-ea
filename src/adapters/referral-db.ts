@@ -1,5 +1,4 @@
 import SQL, { SQLStatement } from 'sql-template-strings'
-import { IPgComponent } from '@well-known-components/pg-component'
 import { randomUUID } from 'node:crypto'
 import {
   IReferralDatabaseComponent,
@@ -11,13 +10,13 @@ import {
   ReferralRewardImage
 } from '../types/referral-db.type'
 import { AppComponents } from '../types/system'
-import { MAX_IP_MATCHES } from '../logic/referral'
 
 export async function createReferralDBComponent(
-  components: Pick<AppComponents, 'pg' | 'logs'>
+  components: Pick<AppComponents, 'pg' | 'logs' | 'config'>
 ): Promise<IReferralDatabaseComponent> {
-  const { pg, logs } = components as { pg: IPgComponent; logs: AppComponents['logs'] }
+  const { pg, logs, config } = components
   const logger = logs.getLogger('database')
+  const MAX_IP_MATCHES = config.requireNumber('REFERRAL_MAX_IP_MATCHES')
 
   const createReferral = async (referralInput: {
     referrer: string

@@ -20,9 +20,6 @@ import {
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
 const MARKETING_EMAIL = 'marketing@decentraland.org'
-export const MAX_IP_MATCHES = 2
-export const MIN_LOGIN_DAYS = 3
-export const FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -49,7 +46,10 @@ export async function createReferralComponent(
     REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75,
     PROFILE_URL,
     ENV,
-    REFERRAL_METABASE_DASHBOARD
+    REFERRAL_METABASE_DASHBOARD,
+    REFERRAL_MAX_IP_MATCHES,
+    REFERRAL_MIN_LOGIN_DAYS,
+    REFERRAL_FIVE_MINUTES_IN_MS
   ] = await Promise.all([
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10'),
@@ -61,7 +61,10 @@ export async function createReferralComponent(
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_75'),
     config.requireString('PROFILE_URL'),
     config.requireString('ENV'),
-    config.requireString('REFERRAL_METABASE_DASHBOARD')
+    config.requireString('REFERRAL_METABASE_DASHBOARD'),
+    config.requireNumber('REFERRAL_MAX_IP_MATCHES'),
+    config.requireNumber('REFERRAL_MIN_LOGIN_DAYS'),
+    config.requireNumber('REFERRAL_FIVE_MINUTES_IN_MS')
   ])
 
   const isDev = ENV === 'dev'
@@ -189,7 +192,7 @@ export async function createReferralComponent(
         timeDifference = newestCreatedAt - previousCreatedAt
       }
 
-      if (timeDifference && newestCreatedAt && previousCreatedAt && timeDifference < FIVE_MINUTES_IN_MS) {
+      if (timeDifference && newestCreatedAt && previousCreatedAt && timeDifference < REFERRAL_FIVE_MINUTES_IN_MS) {
         const timeDifferenceMins = Math.round((timeDifference / (1000 * 60)) * 100) / 100 // Round to 2 decimal places
         const newInvitationTime = new Date(newestCreatedAt).toISOString()
         const previousInvitationTime = new Date(previousCreatedAt).toISOString()
@@ -221,7 +224,14 @@ export async function createReferralComponent(
       if (referral.status === ReferralProgressStatus.REJECTED_IP_MATCH) {
         try {
           await slack.sendMessage(
-            referralIpMatchRejectionMessage(referrer, invitedUser, invitedUserIP, isDev, REFERRAL_METABASE_DASHBOARD)
+            referralIpMatchRejectionMessage(
+              referrer,
+              invitedUser,
+              invitedUserIP,
+              isDev,
+              REFERRAL_METABASE_DASHBOARD,
+              REFERRAL_MAX_IP_MATCHES
+            )
           )
         } catch (error) {
           logger.warn('Failed to send IP rejection Slack notification', {
@@ -233,7 +243,7 @@ export async function createReferralComponent(
         }
 
         throw new ReferralInvalidInputError(
-          `Invited user has already reached the maximum number of ${MAX_IP_MATCHES} referrals from the same IP: ${invitedUserIP}`
+          `Invited user has already reached the maximum number of ${REFERRAL_MAX_IP_MATCHES} referrals from the same IP: ${invitedUserIP}`
         )
       }
 
@@ -322,8 +332,8 @@ export async function createReferralComponent(
       }
 
       const daysSinceFirstLogin = Math.floor((Date.now() - firstLoginAt) / (1000 * 60 * 60 * 24))
-      if (daysSinceFirstLogin < MIN_LOGIN_DAYS) {
-        throw new ReferralInvalidInputError(`User must have logged in at least ${MIN_LOGIN_DAYS} days ago`)
+      if (daysSinceFirstLogin < REFERRAL_MIN_LOGIN_DAYS) {
+        throw new ReferralInvalidInputError(`User must have logged in at least ${REFERRAL_MIN_LOGIN_DAYS} days ago`)
       }
 
       logger.info('Finalizing referral', {

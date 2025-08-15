@@ -238,7 +238,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const communitiesDbHelper = createDbHelper(pg)
 
-  const referralDb = await createReferralDBComponent({ pg, logs })
+  const referralDb = await createReferralDBComponent({ pg, logs, config })
 
   const rewards = await createRewardComponent({ fetcher, config })
 

@@ -9,12 +9,13 @@ import {
 } from '../../../src/logic/referral/errors'
 import { Events } from '@dcl/schemas'
 import { RewardStatus } from '../../../src/logic/referral/types'
-import { MAX_IP_MATCHES } from '../../../src/logic/referral/referral'
 import {
   referralIpMatchRejectionMessage,
   referral100InvitesReachedMessage,
   referralSuspiciousTimingMessage
 } from '../../../src/utils/slackMessages'
+
+const MAX_IP_MATCHES = 2
 
 describe('referral-component', () => {
   let mockReferralDb: any
@@ -475,7 +476,8 @@ describe('referral-component', () => {
               validInvitedUser,
               validIP,
               true,
-              'https://dashboard.decentraland.systems/1234'
+              'https://dashboard.decentraland.systems/1234',
+              MAX_IP_MATCHES
             )
           )
         })

@@ -124,7 +124,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
-  const referralDb = await createReferralDBComponent({ pg, logs })
+  const referralDb = await createReferralDBComponent({ pg, logs, config })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
 
