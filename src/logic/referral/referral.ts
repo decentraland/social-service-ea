@@ -17,6 +17,7 @@ const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
 const MARKETING_EMAIL = 'marketing@decentraland.org'
 export const MAX_IP_MATCHES = 2
+export const MIN_LOGIN_DAYS = 3
 
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
@@ -259,6 +260,21 @@ export async function createReferralComponent(
       }
 
       const { status: currentStatus, referrer } = progress[0]
+
+      const firstLoginAt = progress[0].first_login_at
+      if (!firstLoginAt) {
+        await referralDb.setFirstLoginAtByInvitedUser(invitedUser)
+        logger.info('First login at set successfully', {
+          referrer: progress[0].referrer,
+          invitedUser
+        })
+        return
+      }
+
+      const daysSinceFirstLogin = Math.floor((Date.now() - firstLoginAt) / (1000 * 60 * 60 * 24))
+      if (daysSinceFirstLogin < MIN_LOGIN_DAYS) {
+        throw new ReferralInvalidInputError(`User must have logged in at least ${MIN_LOGIN_DAYS} days ago`)
+      }
 
       logger.info('Finalizing referral', {
         invitedUser,
