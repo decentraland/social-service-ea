@@ -826,12 +826,11 @@ describe('referral-component', () => {
         mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02'])
       })
 
-      it('should add current day to cache and throw ReferralInvalidInputError', async () => {
+      it('should add current day to cache and return without processing', async () => {
         const today = new Date().toISOString().split('T')[0]
 
-        await expect(referralComponent.finalizeReferral(validInvitedUser)).rejects.toThrow(
-          new ReferralInvalidInputError('User must have logged in at least 3 days')
-        )
+        const result = await referralComponent.finalizeReferral(validInvitedUser)
+        expect(result).toBeUndefined()
 
         expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
         expect(mockRedis.put).toHaveBeenCalledWith(
@@ -856,12 +855,11 @@ describe('referral-component', () => {
         mockRedis.get.mockResolvedValueOnce([])
       })
 
-      it('should add current day to cache and throw ReferralInvalidInputError', async () => {
+      it('should add current day to cache and return without processing', async () => {
         const today = new Date().toISOString().split('T')[0]
 
-        await expect(referralComponent.finalizeReferral(validInvitedUser)).rejects.toThrow(
-          new ReferralInvalidInputError('User must have logged in at least 3 days')
-        )
+        const result = await referralComponent.finalizeReferral(validInvitedUser)
+        expect(result).toBeUndefined()
 
         expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
         expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [today], {
