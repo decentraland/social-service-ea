@@ -58,6 +58,7 @@ describe('UWebSocketTransport', () => {
   afterEach(() => {
     mockEmitter.all.clear()
     jest.useRealTimers()
+    jest.clearAllMocks()
   })
 
   describe('when initializing the transport', () => {

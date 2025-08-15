@@ -80,6 +80,7 @@ describe('ws-handler', () => {
   })
 
   afterEach(async () => {
+    jest.clearAllMocks()
     await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
   })
 

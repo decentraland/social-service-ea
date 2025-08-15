@@ -17,6 +17,10 @@ describe('CDN Cache Invalidator Component', () => {
     CDN_URL: 'https://cdn.example.com'
   }
 
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
   describe('createCdnCacheInvalidatorComponent', () => {
     describe('when all required configuration is provided', () => {
       beforeEach(() => {
