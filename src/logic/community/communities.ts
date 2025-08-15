@@ -27,6 +27,7 @@ import { EthAddress, Events } from '@dcl/schemas'
 export function createCommunityComponent(
   components: Pick<
     AppComponents,
+    | 'config'
     | 'communitiesDb'
     | 'catalystClient'
     | 'communityRoles'
@@ -43,6 +44,7 @@ export function createCommunityComponent(
   >
 ): ICommunitiesComponent {
   const {
+    config,
     communitiesDb,
     catalystClient,
     communityRoles,
@@ -297,17 +299,24 @@ export function createCommunityComponent(
     },
 
     deleteCommunity: async (id: string, userAddress: string): Promise<void> => {
+      // TODO: maybe we need to include a reason and store the reason in the database
       const community = await communitiesDb.getCommunity(id, userAddress)
 
       if (!community) {
         throw new CommunityNotFoundError(id)
       }
 
-      if (!isOwner(community, userAddress)) {
+      const globalModerators = ((await config.getString('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')) || '')
+        .split(',')
+        .map((wallet) => wallet.trim().toLowerCase())
+
+      if (!isOwner(community, userAddress) && !globalModerators.includes(userAddress)) {
         throw new NotAuthorizedError("The user doesn't have permission to delete this community")
       }
 
       await communitiesDb.deleteCommunity(id)
+
+      // TODO: should we still broadcast the event if a global moderator is deleting the community?
 
       setImmediate(async () => {
         await communityBroadcaster.broadcast({

@@ -45,7 +45,7 @@ describe('Community Component', () => {
   let mockCommunityComplianceValidator: jest.Mocked<ICommunityComplianceValidatorComponent>
 
   let mockUserAddress: string
-  
+
   const communityId = 'test-community'
   const cdnUrl = 'https://cdn.decentraland.org'
   const mockCommunity: Community = {
@@ -73,7 +73,11 @@ describe('Community Component', () => {
     mockCommunityThumbnail.buildThumbnailUrl.mockImplementation(
       (communityId: string) => `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
     )
+
+    mockConfig.requireString.mockResolvedValue(cdnUrl)
+
     communityComponent = createCommunityComponent({
+      config: mockConfig,
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
@@ -821,10 +825,48 @@ describe('Community Component', () => {
         })
       })
 
-      describe('and the user is not the owner', () => {
+      describe('and the user is a global moderator', () => {
         beforeEach(() => {
           community.role = CommunityRole.Member
           community.ownerAddress = '0xother-owner'
+          mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
+            `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+          )
+          mockConfig.getString.mockResolvedValueOnce(`${userAddress},0xanother-moderator`)
+        })
+
+        it('should delete the community when user is a global moderator', async () => {
+          await communityComponent.deleteCommunity(communityId, userAddress)
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.deleteCommunity).toHaveBeenCalledWith(communityId)
+          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+        })
+
+        it('should publish a community deleted event when deleted by global moderator', async () => {
+          await communityComponent.deleteCommunity(communityId, userAddress)
+
+          // Wait for setImmediate callback to execute
+          await new Promise((resolve) => setImmediate(resolve))
+          expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED,
+            key: communityId,
+            timestamp: expect.any(Number),
+            metadata: {
+              id: communityId,
+              name: community.name,
+              thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+            }
+          })
+        })
+      })
+
+      describe('and the user is not the owner and not a global moderator', () => {
+        beforeEach(() => {
+          community.role = CommunityRole.Member
+          community.ownerAddress = '0xother-owner'
+          mockConfig.getString.mockResolvedValueOnce('0xanother-moderator,0xthird-moderator')
         })
 
         it('should throw NotAuthorizedError', async () => {
@@ -834,6 +876,64 @@ describe('Community Component', () => {
 
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
+          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+        })
+      })
+
+      describe('and the user is a member', () => {
+        beforeEach(() => {
+          community.role = CommunityRole.Member
+          community.ownerAddress = '0xother-owner'
+          // Mock config to return empty global moderators list
+          mockConfig.getString.mockResolvedValueOnce('')
+        })
+
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityComponent.deleteCommunity(communityId, userAddress)).rejects.toThrow(
+            new NotAuthorizedError("The user doesn't have permission to delete this community")
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
+          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+        })
+      })
+
+      describe('and the user is a moderator', () => {
+        beforeEach(() => {
+          community.role = CommunityRole.Moderator
+          community.ownerAddress = '0xother-owner'
+          // Mock config to return empty global moderators list
+          mockConfig.getString.mockResolvedValueOnce('')
+        })
+
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityComponent.deleteCommunity(communityId, userAddress)).rejects.toThrow(
+            new NotAuthorizedError("The user doesn't have permission to delete this community")
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
+          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+        })
+      })
+
+      describe('and global moderators config is malformed', () => {
+        beforeEach(() => {
+          community.role = CommunityRole.Member
+          community.ownerAddress = '0xother-owner'
+          // Mock config to return malformed global moderators list
+          mockConfig.getString.mockResolvedValueOnce('  ,  ,invalid-address,  ')
+        })
+
+        it('should handle malformed global moderators config gracefully', async () => {
+          await expect(communityComponent.deleteCommunity(communityId, userAddress)).rejects.toThrow(
+            new NotAuthorizedError("The user doesn't have permission to delete this community")
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
+          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
         })
       })
     })
@@ -914,22 +1014,12 @@ describe('Community Component', () => {
               thumbnailBuffer: updates.thumbnailBuffer
             })
             expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-            expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
-              communityId,
-              userAddress
-            )
+            expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
             expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
             expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updates)
-            expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(
-              communityId,
-              updates.thumbnailBuffer
-            )
+            expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(communityId, updates.thumbnailBuffer)
             expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
-            expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
-              communityId,
-              userAddress,
-              updates.placeIds
-            )
+            expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, updates.placeIds)
           })
 
           it('should update the community with only content fields and call compliance validation', async () => {
@@ -1099,7 +1189,7 @@ describe('Community Component', () => {
               ...nameUpdate
             })
 
-            await new Promise(resolve => setImmediate(resolve))
+            await new Promise((resolve) => setImmediate(resolve))
 
             expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
@@ -1148,7 +1238,10 @@ describe('Community Component', () => {
               )
 
               expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-              expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
+              expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(
+                communityId,
+                userAddress
+              )
               expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
               expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
@@ -1188,7 +1281,7 @@ describe('Community Component', () => {
 
             it('should not migrate all requests to join to members', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPrivate)
-  
+
               expect(mockCommunitiesDB.acceptAllRequestsToJoin).not.toHaveBeenCalled()
             })
           })

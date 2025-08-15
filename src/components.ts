@@ -217,6 +217,7 @@ export async function initComponents(): Promise<AppComponents> {
   const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
 
   const communities = createCommunityComponent({
+    config,
     communitiesDb,
     catalystClient,
     communityRoles,

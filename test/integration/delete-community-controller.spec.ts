@@ -44,7 +44,7 @@ test('Delete Community Controller', function ({ components, spyComponents }) {
             active: true
           })
           communityId = id
-          spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
+          spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValueOnce(null)
         })
 
         describe('and the user is not the owner', () => {
@@ -62,9 +62,47 @@ test('Delete Community Controller', function ({ components, spyComponents }) {
             anotherCommunityId = id
           })
 
-          it('should respond with a 401 status code', async () => {
-            const response = await makeRequest(identity, `/v1/communities/${anotherCommunityId}`, 'DELETE')
-            expect(response.status).toBe(401)
+          describe('and the user is not a global moderator', () => {
+            beforeEach(async () => {
+              // Mock config to return empty global moderators list
+              spyComponents.config.getString.mockResolvedValueOnce('')
+            })
+
+            it('should respond with a 401 status code', async () => {
+              const response = await makeRequest(identity, `/v1/communities/${anotherCommunityId}`, 'DELETE')
+              expect(response.status).toBe(401)
+              expect(spyComponents.config.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+            })
+          })
+
+          describe('and the user is a global moderator', () => {
+            beforeEach(async () => {
+              // Mock config to return global moderators list including the user
+              spyComponents.config.getString.mockResolvedValueOnce(`${address},0xanother-moderator`)
+            })
+
+            it('should respond with a 204 status code and delete the community when user is global moderator', async () => {
+              const response = await makeRequest(identity, `/v1/communities/${anotherCommunityId}`, 'DELETE')
+              expect(response.status).toBe(204)
+              expect(spyComponents.config.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+
+              // Try to get the deleted community
+              const getResponse = await makeRequest(identity, `/v1/communities/${anotherCommunityId}`)
+              expect(getResponse.status).toBe(404)
+            })
+          })
+
+          describe('and global moderators config is malformed', () => {
+            beforeEach(async () => {
+              // Mock config to return malformed global moderators list
+              spyComponents.config.getString.mockResolvedValueOnce('  ,  ,invalid-address,  ')
+            })
+
+            it('should respond with a 401 status code when global moderators config is malformed', async () => {
+              const response = await makeRequest(identity, `/v1/communities/${anotherCommunityId}`, 'DELETE')
+              expect(response.status).toBe(401)
+              expect(spyComponents.config.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+            })
           })
         })
 
@@ -92,7 +130,7 @@ test('Delete Community Controller', function ({ components, spyComponents }) {
             active: true
           })
           failingCommunityId = id
-          spyComponents.communitiesDb.deleteCommunity.mockRejectedValue(new Error('Unable to delete community'))
+          spyComponents.communitiesDb.deleteCommunity.mockRejectedValueOnce(new Error('Unable to delete community'))
         })
 
         it('should respond with a 500 status code', async () => {

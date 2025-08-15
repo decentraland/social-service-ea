@@ -197,6 +197,7 @@ async function initComponents(): Promise<TestComponents> {
   const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
   const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
   const communities = createCommunityComponent({
+    config,
     communitiesDb,
     catalystClient,
     communityRoles,
