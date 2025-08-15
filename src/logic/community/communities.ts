@@ -39,6 +39,7 @@ export function createCommunityComponent(
     | 'cdnCacheInvalidator'
     | 'commsGatekeeper'
     | 'logs'
+    | 'communityComplianceValidator'
   >
 ): ICommunitiesComponent {
   const {
@@ -52,7 +53,8 @@ export function createCommunityComponent(
     communityThumbnail,
     cdnCacheInvalidator,
     commsGatekeeper,
-    logs
+    logs,
+    communityComplianceValidator
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -248,6 +250,8 @@ export function createCommunityComponent(
         await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
       }
 
+      await communityComplianceValidator.validateCommunityCreation(community.name, community.description, thumbnail)
+
       const newCommunity = await communitiesDb.createCommunity({
         ...community,
         owner_address: community.ownerAddress,
@@ -350,6 +354,10 @@ export function createCommunityComponent(
         const currentPlaces = await communitiesDb.getCommunityPlaces(communityId)
         const placeIdsToValidate = uniquePlaceIds.filter((placeId) => !currentPlaces.some((p) => p.id === placeId))
         await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
+      }
+
+      if (updates.name || updates.description || thumbnailBuffer) {
+        await communityComplianceValidator.validateCommunityUpdate(updates.name, updates.description, thumbnailBuffer)
       }
 
       logger.info('Updating community', {

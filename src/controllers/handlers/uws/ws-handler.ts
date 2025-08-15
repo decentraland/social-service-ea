@@ -115,6 +115,11 @@ export async function registerWsHandler(
           address,
           error: isErrorWithMessage(error) ? error.message : 'Unknown error'
         })
+
+        tracing.captureException(error as Error, {
+          address,
+          wsConnectionId: data.wsConnectionId
+        })
       })
 
       rpcServer.attachUser({ transport, address })

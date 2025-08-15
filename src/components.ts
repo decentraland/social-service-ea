@@ -62,6 +62,8 @@ import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/
 import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
 import { createSlackComponent } from '@dcl/slack-component'
 import { createCommunityRequestsComponent } from './logic/community/requests'
+import { createAIComplianceComponent } from './adapters/ai-compliance'
+import { createCommunityComplianceValidatorComponent } from './logic/community/compliance-validator'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -204,6 +206,11 @@ export async function initComponents(): Promise<AppComponents> {
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
   const communityRequests = createCommunityRequestsComponent({ communitiesDb, logs })
+
+  // AI Compliance components
+  const aiCompliance = createAIComplianceComponent({ config, logs, fetcher })
+  const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, logs })
+
   const communities = createCommunityComponent({
     communitiesDb,
     catalystClient,
@@ -215,6 +222,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityThumbnail,
     communityBroadcaster,
     commsGatekeeper,
+    communityComplianceValidator,
     logs
   })
 
@@ -273,6 +281,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   return {
+    aiCompliance,
     analytics,
     archipelagoStats,
     catalystClient,
@@ -282,6 +291,7 @@ export async function initComponents(): Promise<AppComponents> {
     communitiesDb,
     communityBans,
     communityBroadcaster,
+    communityComplianceValidator,
     communityEvents,
     communityMembers,
     communityOwners,

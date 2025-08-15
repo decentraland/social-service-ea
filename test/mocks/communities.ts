@@ -8,7 +8,8 @@ import {
   ICommunityOwnersComponent,
   ICommunityPlacesComponent,
   ICommunityRolesComponent,
-  ICommunityThumbnailComponent
+  ICommunityThumbnailComponent,
+  ICommunityComplianceValidatorComponent
 } from '../../src/logic/community'
 
 export const mockCommunity = (community: Partial<CommunityDB> = {}): CommunityDB => ({
@@ -155,5 +156,15 @@ export function createMockCommunityBroadcasterComponent({
 }: Partial<jest.Mocked<ICommunityBroadcasterComponent>>): jest.Mocked<ICommunityBroadcasterComponent> {
   return {
     broadcast
+  }
+}
+
+export function createMockCommunityComplianceValidatorComponent({
+  validateCommunityCreation = jest.fn(),
+  validateCommunityUpdate = jest.fn()
+}: Partial<jest.Mocked<ICommunityComplianceValidatorComponent>>): jest.Mocked<ICommunityComplianceValidatorComponent> {
+  return {
+    validateCommunityCreation,
+    validateCommunityUpdate
   }
 }

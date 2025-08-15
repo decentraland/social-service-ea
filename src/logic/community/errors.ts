@@ -45,3 +45,22 @@ export class InvalidCommunityRequestError extends Error {
     this.name = 'InvalidCommunityRequestError'
   }
 }
+
+/**
+ * This error is thrown when community content violates Decentraland's Code of Ethics
+ *
+ * @export
+ * @class CommunityComplianceError
+ * @extends {Error}
+ */
+export class CommunityComplianceError extends Error {
+  constructor(
+    message: string,
+    public readonly violations: string[],
+    public readonly warnings: string[],
+    public readonly confidence: number
+  ) {
+    super(message)
+    this.name = 'CommunityComplianceError'
+  }
+}
