@@ -22,7 +22,6 @@ export interface IReferralDatabaseComponent {
   }): Promise<ReferralRewardImage>
   getLastReferralEmailByReferrer(referrer: string): Promise<ReferralEmail | null>
   getReferralRewardImage(referrer: string): Promise<ReferralRewardImage[] | null>
-  setFirstLoginAtByInvitedUser(invitedUser: string): Promise<void>
 }
 
 export enum ReferralProgressStatus {
@@ -47,7 +46,6 @@ export type ReferralProgress = {
   status: ReferralProgressStatus
   signed_up_at: number | null
   tier_granted: boolean
-  first_login_at: number | null
   tier_granted_at: number | null
   created_at: number
   updated_at: number

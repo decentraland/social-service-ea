@@ -262,7 +262,7 @@ export async function initComponents(): Promise<AppComponents> {
   const slackToken = await config.requireString('SLACK_BOT_TOKEN')
   const slack = await createSlackComponent({ logs }, { token: slackToken })
 
-  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack })
+  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
   const messageProcessor = await createMessageProcessorComponent({ logs, referral })
 

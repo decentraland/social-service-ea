@@ -29,9 +29,9 @@ function validateAddress(value: string, field: string): string {
 }
 
 export async function createReferralComponent(
-  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email' | 'slack'>
+  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email' | 'slack' | 'redis'>
 ): Promise<IReferralComponent> {
-  const { referralDb, logs, sns, config, rewards, email: emailComponent, slack } = components
+  const { referralDb, logs, sns, config, rewards, email: emailComponent, slack, redis } = components
 
   const logger = logs.getLogger('referral-component')
 
@@ -321,20 +321,17 @@ export async function createReferralComponent(
 
       const { status: currentStatus, referrer } = progress[0]
 
-      const firstLoginAt = progress[0].first_login_at
-      if (!firstLoginAt) {
-        await referralDb.setFirstLoginAtByInvitedUser(invitedUser)
-        logger.info('First login at set successfully', {
-          referrer: progress[0].referrer,
-          invitedUser
-        })
-        return
+      const cacheKey = `referral:invited-user:${invitedUser}`
+      const cachedInvitedUserLogins: string[] = (await redis.get(cacheKey)) || []
+
+      if (cachedInvitedUserLogins.length < REFERRAL_MIN_LOGIN_DAYS) {
+        const loginDays = new Set(cachedInvitedUserLogins)
+        loginDays.add(new Date().toISOString().split('T')[0])
+        await redis.put(cacheKey, Array.from(loginDays), { noTTL: true })
+        throw new ReferralInvalidInputError(`User must have logged in at least ${REFERRAL_MIN_LOGIN_DAYS} days`)
       }
 
-      const daysSinceFirstLogin = Math.floor((Date.now() - firstLoginAt) / (1000 * 60 * 60 * 24))
-      if (daysSinceFirstLogin < REFERRAL_MIN_LOGIN_DAYS) {
-        throw new ReferralInvalidInputError(`User must have logged in at least ${REFERRAL_MIN_LOGIN_DAYS} days ago`)
-      }
+      await redis.put(cacheKey, [], { EX: 0 })
 
       logger.info('Finalizing referral', {
         invitedUser,

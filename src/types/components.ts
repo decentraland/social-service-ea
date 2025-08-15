@@ -220,7 +220,7 @@ export interface IRedisComponent extends IBaseComponent {
 
 export interface ICacheComponent extends IBaseCacheComponent {
   get: <T>(key: string) => Promise<T | null>
-  put: <T>(key: string, value: T, options?: SetOptions) => Promise<void>
+  put: <T>(key: string, value: T, options?: SetOptions & { noTTL?: boolean }) => Promise<void>
 }
 
 export type IPubSubComponent = IBaseComponent & {

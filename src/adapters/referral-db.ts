@@ -204,14 +204,6 @@ export async function createReferralDBComponent(
     return result.rows || null
   }
 
-  async function setFirstLoginAtByInvitedUser(invitedUser: string): Promise<void> {
-    logger.debug('Setting first login at by invited user', { invitedUser })
-    const now = Date.now()
-    await pg.query(
-      SQL`UPDATE referral_progress SET first_login_at = ${now} WHERE invited_user = ${invitedUser.toLowerCase()}`
-    )
-  }
-
   return {
     createReferral,
     findReferralProgress,
@@ -224,7 +216,6 @@ export async function createReferralDBComponent(
     setReferralEmail,
     setReferralRewardImage,
     getLastReferralEmailByReferrer,
-    getReferralRewardImage,
-    setFirstLoginAtByInvitedUser
+    getReferralRewardImage
   }
 }
