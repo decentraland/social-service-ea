@@ -73,7 +73,9 @@ describe('referral-component', () => {
       }),
       requireNumber: jest.fn().mockImplementation((key: string) => {
         const configValues: Record<string, number> = {
-          REFERRAL_MAX_IP_MATCHES: MAX_IP_MATCHES
+          REFERRAL_MAX_IP_MATCHES: MAX_IP_MATCHES,
+          REFERRAL_MIN_LOGIN_DAYS: 3,
+          REFERRAL_FIVE_MINUTES_IN_MS: 5 * 60 * 1000
         }
         return Promise.resolve(configValues[key])
       })
