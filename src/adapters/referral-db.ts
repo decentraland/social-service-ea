@@ -16,7 +16,7 @@ export async function createReferralDBComponent(
 ): Promise<IReferralDatabaseComponent> {
   const { pg, logs, config } = components
   const logger = logs.getLogger('database')
-  const MAX_IP_MATCHES = config.requireNumber('REFERRAL_MAX_IP_MATCHES')
+  const MAX_IP_MATCHES = await config.requireNumber('REFERRAL_MAX_IP_MATCHES')
 
   const createReferral = async (referralInput: {
     referrer: string
