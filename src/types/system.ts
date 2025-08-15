@@ -50,7 +50,8 @@ import {
   ICommunityRolesComponent,
   ICommunityEventsComponent,
   ICommunityThumbnailComponent,
-  ICommunityRequestsComponent
+  ICommunityRequestsComponent,
+  ICommunityComplianceValidatorComponent
 } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
@@ -65,6 +66,7 @@ import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
 import { ISlackComponent } from '@dcl/slack-component'
+import { IAIComplianceComponent } from '../adapters/ai-compliance'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -74,6 +76,7 @@ export type MetricsDeclaration = keyof typeof metricDeclarations
 
 // components used in every environment
 export type BaseComponents = {
+  aiCompliance: IAIComplianceComponent
   analytics: IAnalyticsComponent<AnalyticsEventPayload>
   archipelagoStats: IArchipelagoStatsComponent
   catalystClient: ICatalystClientComponent
@@ -81,6 +84,7 @@ export type BaseComponents = {
   communities: ICommunitiesComponent
   communitiesDb: ICommunitiesDatabaseComponent
   communityBans: ICommunityBansComponent
+  communityComplianceValidator: ICommunityComplianceValidatorComponent
   communityOwners: ICommunityOwnersComponent
   communityMembers: ICommunityMembersComponent
   communityPlaces: ICommunityPlacesComponent
