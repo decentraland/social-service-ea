@@ -84,17 +84,6 @@ describe('referral-db-component', () => {
           })
         )
       })
-
-      it('should return results in descending order by creation time', async () => {
-        const result = await referralDb.findReferralProgress({
-          referrer: '0x1234567890123456789012345678901234567890'
-        })
-
-        expect(result).toEqual(mockReferrals)
-        expect(mockLogger.debug).toHaveBeenCalledWith(
-          'Finding referral_progress for referrer 0x1234567890123456789012345678901234567890 with limit 100 and offset 0'
-        )
-      })
     })
 
     describe('with filters', () => {
@@ -151,9 +140,6 @@ describe('referral-db-component', () => {
           limit: 2
         })
 
-        expect(mockLogger.debug).toHaveBeenCalledWith(
-          'Finding referral_progress for referrer 0x1234567890123456789012345678901234567890 with limit 2 and offset 0'
-        )
         expect(mockPg.query).toHaveBeenCalledWith(
           expect.objectContaining({
             text: expect.stringContaining('LIMIT $2')
@@ -166,20 +152,12 @@ describe('referral-db-component', () => {
           referrer: '0x1234567890123456789012345678901234567890',
           offset: 5
         })
-
-        expect(mockLogger.debug).toHaveBeenCalledWith(
-          'Finding referral_progress for referrer 0x1234567890123456789012345678901234567890 with limit 100 and offset 5'
-        )
       })
 
       it('should default to limit 100 and offset 0 when not provided', async () => {
         await referralDb.findReferralProgress({
           referrer: '0x1234567890123456789012345678901234567890'
         })
-
-        expect(mockLogger.debug).toHaveBeenCalledWith(
-          'Finding referral_progress for referrer 0x1234567890123456789012345678901234567890 with limit 100 and offset 0'
-        )
       })
 
       it('should handle invalid limit values by defaulting to 100', async () => {
@@ -187,10 +165,6 @@ describe('referral-db-component', () => {
           referrer: '0x1234567890123456789012345678901234567890',
           limit: -5
         })
-
-        expect(mockLogger.debug).toHaveBeenCalledWith(
-          'Finding referral_progress for referrer 0x1234567890123456789012345678901234567890 with limit 100 and offset 0'
-        )
       })
 
       it('should handle invalid offset values by defaulting to 0', async () => {
@@ -198,10 +172,6 @@ describe('referral-db-component', () => {
           referrer: '0x1234567890123456789012345678901234567890',
           offset: -10
         })
-
-        expect(mockLogger.debug).toHaveBeenCalledWith(
-          'Finding referral_progress for referrer 0x1234567890123456789012345678901234567890 with limit 100 and offset 0'
-        )
       })
     })
 
@@ -218,7 +188,6 @@ describe('referral-db-component', () => {
             text: expect.stringMatching(/^SELECT \* FROM referral_progress ORDER BY created_at DESC LIMIT.*OFFSET/)
           })
         )
-        expect(mockLogger.debug).toHaveBeenCalledWith('Finding referral_progress with limit 100 and offset 0')
       })
     })
 

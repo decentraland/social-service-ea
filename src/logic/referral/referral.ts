@@ -182,42 +182,38 @@ export async function createReferralComponent(
         limit: 2
       })
 
-      let timeDifference: number | null = null
-      let newestCreatedAt: number | null = null
-      let previousCreatedAt: number | null = null
-
       if (recentInvitations.length >= 2) {
-        newestCreatedAt = recentInvitations[0].created_at
-        previousCreatedAt = recentInvitations[1].created_at
-        timeDifference = newestCreatedAt - previousCreatedAt
-      }
+        const newestCreatedAt = recentInvitations[0].created_at
+        const previousCreatedAt = recentInvitations[1].created_at
+        const timeDifference = newestCreatedAt - previousCreatedAt
 
-      if (timeDifference && newestCreatedAt && previousCreatedAt && timeDifference < REFERRAL_FIVE_MINUTES_IN_MS) {
-        const timeDifferenceMins = Math.round((timeDifference / (1000 * 60)) * 100) / 100 // Round to 2 decimal places
-        const newInvitationTime = new Date(newestCreatedAt).toISOString()
-        const previousInvitationTime = new Date(previousCreatedAt).toISOString()
+        if (timeDifference < REFERRAL_FIVE_MINUTES_IN_MS) {
+          const timeDifferenceMins = Math.round((timeDifference / (1000 * 60)) * 100) / 100 // Round to 2 decimal places
+          const newInvitationTime = new Date(newestCreatedAt).toISOString()
+          const previousInvitationTime = new Date(previousCreatedAt).toISOString()
 
-        try {
-          await slack.sendMessage(
-            referralSuspiciousTimingMessage(
-              referrer,
-              newestCreatedAt.toString(),
-              previousCreatedAt.toString(),
-              timeDifferenceMins,
-              newInvitationTime,
-              previousInvitationTime,
-              isDev,
-              REFERRAL_METABASE_DASHBOARD
+          try {
+            await slack.sendMessage(
+              referralSuspiciousTimingMessage(
+                referrer,
+                newestCreatedAt.toString(),
+                previousCreatedAt.toString(),
+                timeDifferenceMins,
+                newInvitationTime,
+                previousInvitationTime,
+                isDev,
+                REFERRAL_METABASE_DASHBOARD
+              )
             )
-          )
-        } catch (error) {
-          logger.warn('Failed to send suspicious timing Slack notification', {
-            referrer,
-            newestCreatedAt,
-            previousCreatedAt,
-            timeDifferenceMins,
-            error: error instanceof Error ? error.message : String(error)
-          })
+          } catch (error) {
+            logger.warn('Failed to send suspicious timing Slack notification', {
+              referrer,
+              newestCreatedAt,
+              previousCreatedAt,
+              timeDifferenceMins,
+              error: error instanceof Error ? error.message : String(error)
+            })
+          }
         }
       }
 
@@ -328,7 +324,12 @@ export async function createReferralComponent(
         const loginDays = new Set(cachedInvitedUserLogins)
         loginDays.add(new Date().toISOString().split('T')[0])
         await redis.put(cacheKey, Array.from(loginDays), { noTTL: true })
-        throw new ReferralInvalidInputError(`User must have logged in at least ${REFERRAL_MIN_LOGIN_DAYS} days`)
+        logger.info(`User must have logged in at least ${REFERRAL_MIN_LOGIN_DAYS} days`, {
+          invitedUser,
+          referrer,
+          cachedInvitedUserLogins: JSON.stringify(cachedInvitedUserLogins)
+        })
+        return
       }
 
       await redis.put(cacheKey, [], { EX: 0 })
@@ -434,16 +435,16 @@ export async function createReferralComponent(
     setReferralEmail: async (referralEmailInput: Pick<ReferralEmail, 'referrer' | 'email'>) => {
       const referrer = validateAddress(referralEmailInput.referrer, 'referrer')
 
-      const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
-
-      if (acceptedInvites < TIERS_IRL_SWAG) {
-        throw new ReferralInvalidInputError(`You must have at least ${TIERS_IRL_SWAG} accepted invites to set an email`)
-      }
-
       const denyList = await fetchDenyList()
 
       if (denyList.has(referrer.toLowerCase())) {
         throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer.toLowerCase()}`)
+      }
+
+      const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
+
+      if (acceptedInvites < TIERS_IRL_SWAG) {
+        throw new ReferralInvalidInputError(`You must have at least ${TIERS_IRL_SWAG} accepted invites to set an email`)
       }
 
       if (!referralEmailInput.email || !referralEmailInput.email.trim()) {
