@@ -205,6 +205,7 @@ export async function initComponents(): Promise<AppComponents> {
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
   const communityRequests = createCommunityRequestsComponent({ communitiesDb, logs })
   const communities = createCommunityComponent({
+    config,
     communitiesDb,
     catalystClient,
     communityRoles,
