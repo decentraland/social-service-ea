@@ -1,5 +1,5 @@
 import { EthAddress } from '@dcl/schemas'
-import { CommunityRequest, CommunityRequestType } from '../../../logic/community/types'
+import { MemberRequest, CommunityRequestType } from '../../../logic/community/types'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { CommunityNotFoundError, InvalidCommunityRequestError } from '../../../logic/community'
 import { errorMessageOrDefault } from '../../../utils/errors'
@@ -9,7 +9,7 @@ export async function createCommunityRequestHandler(
     HandlerContextWithPath<'communityRequests' | 'logs', '/v1/communities/:id/requests'>,
     'components' | 'request' | 'params'
   >
-): Promise<HTTPResponse<CommunityRequest>> {
+): Promise<HTTPResponse<MemberRequest>> {
   const {
     components: { communityRequests, logs },
     params: { id: communityId },

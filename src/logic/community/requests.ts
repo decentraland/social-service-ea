@@ -1,8 +1,9 @@
+import { PaginatedParameters } from '@dcl/schemas'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, InvalidCommunityRequestError } from './errors'
 import {
   CommunityPrivacyEnum,
-  CommunityRequest,
+  MemberRequest,
   CommunityRequestStatus,
   CommunityRequestType,
   ICommunityRequestsComponent
@@ -19,7 +20,7 @@ export function createCommunityRequestsComponent(
     communityId: string,
     memberAddress: string,
     type: CommunityRequestType
-  ): Promise<CommunityRequest> {
+  ): Promise<MemberRequest> {
     const community = await communitiesDb.getCommunity(communityId, memberAddress)
     if (!community) {
       throw new CommunityNotFoundError(communityId)
@@ -55,7 +56,26 @@ export function createCommunityRequestsComponent(
     return request
   }
 
+  async function getMemberRequests(
+    memberAddress: string,
+    options: { type?: CommunityRequestType; pagination: Required<PaginatedParameters> }
+  ): Promise<{ requests: MemberRequest[]; total: number }> {
+    const requests = await communitiesDb.getMemberRequests(memberAddress, {
+      pagination: options.pagination,
+      status: CommunityRequestStatus.Pending,
+      type: options?.type
+    })
+
+    const total = await communitiesDb.getMemberRequestsCount(memberAddress, {
+      status: CommunityRequestStatus.Pending,
+      type: options?.type
+    })
+
+    return { requests, total }
+  }
+
   return {
-    createCommunityRequest
+    createCommunityRequest,
+    getMemberRequests
   }
 }
