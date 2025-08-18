@@ -177,6 +177,10 @@ export function createCommunityRolesComponent(
       if (memberRole === CommunityRole.Owner) {
         throw new NotAuthorizedError(`The owner cannot leave the community ${communityId}`)
       }
-    }
+    },
+    validatePermissionToAcceptAndRejectRequests: validatePermissions(
+      ['accept_requests', 'reject_requests'],
+      'accept and reject requests'
+    )
   }
 }

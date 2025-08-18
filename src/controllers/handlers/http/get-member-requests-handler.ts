@@ -6,14 +6,6 @@ import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-co
 import { PaginatedResponse } from '@dcl/schemas'
 import { getPaginationResultProperties } from '../../../utils/pagination'
 
-function parseTypeFilter(param: string | null): CommunityRequestType | undefined {
-  if (!param) return undefined
-  const value = param.toLowerCase()
-  if (value === 'invite') return CommunityRequestType.Invite
-  if (value === 'request_to_join' || value === 'request') return CommunityRequestType.RequestToJoin
-  return undefined
-}
-
 export async function getMemberRequestsHandler(
   context: Pick<
     HandlerContextWithPath<'logs' | 'communityRequests' | 'communities', '/v1/members/:address/requests'>,
@@ -37,27 +29,22 @@ export async function getMemberRequestsHandler(
       throw new NotAuthorizedError('You are not authorized to get requests for this member')
     }
 
-    const typeParam: string | null = url.searchParams.get('type')
-    const typeFilter: CommunityRequestType | undefined = parseTypeFilter(typeParam)
     const paginationParams = getPaginationParams(url.searchParams)
+    const typeParam: string | null = url.searchParams.get('type')
+    const typeFilter =
+      typeParam === CommunityRequestType.Invite || typeParam === CommunityRequestType.RequestToJoin
+        ? (typeParam as CommunityRequestType)
+        : undefined
 
     const memberRequests = await communityRequests.getMemberRequests(normalizedTargetAddress, {
       type: typeFilter,
       pagination: paginationParams
     })
 
-    const communityIds = memberRequests.requests.map((request) => request.communityId)
-    const fetchedCommunities = await communities.getCommunities(normalizedTargetAddress, {
-      communityIds,
-      pagination: { limit: communityIds.length, offset: 0 }
-    })
-
-    const results = memberRequests.requests
-      .map((request) => {
-        const community = fetchedCommunities.communities.find((community) => community.id === request.communityId)
-        return community ? { ...request, ...community } : undefined
-      })
-      .filter(Boolean) as MemberCommunityRequest[]
+    const results = await communityRequests.aggregateRequestsWithCommunities(
+      normalizedTargetAddress,
+      memberRequests.requests
+    )
 
     return {
       status: 200,

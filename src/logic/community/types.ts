@@ -52,6 +52,13 @@ export interface ICommunityMembersComponent {
     targetAddress: EthAddress,
     newRole: CommunityRole
   ): Promise<void>
+  /**
+   * Aggregates any member data with their profile information.
+   */
+  aggregateWithProfiles<T extends { memberAddress: EthAddress }>(
+    userAddress: EthAddress | undefined,
+    members: T[]
+  ): Promise<(T & CommunityMemberProfile)[]>
 }
 
 export interface ICommunityRolesComponent {
@@ -84,6 +91,7 @@ export interface ICommunityRolesComponent {
   validatePermissionToUpdateCommunityPrivacy: (communityId: string, updaterAddress: string) => Promise<void>
   validatePermissionToDeleteCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToLeaveCommunity: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToAcceptAndRejectRequests: (communityId: string, memberAddress: string) => Promise<void>
 }
 
 export interface ICommunityEventsComponent {
@@ -175,6 +183,17 @@ export interface ICommunityRequestsComponent {
     memberAddress: EthAddress,
     options: { type?: CommunityRequestType; pagination: Required<PaginatedParameters> }
   ): Promise<{ requests: MemberRequest[]; total: number }>
+  getCommunityRequests(
+    communityId: string,
+    options: { pagination: Required<PaginatedParameters>; type?: CommunityRequestType }
+  ): Promise<{ requests: MemberRequest[]; total: number }>
+  /**
+   * Aggregates member requests with their associated community data.
+   */
+  aggregateRequestsWithCommunities(
+    memberAddress: EthAddress,
+    requests: MemberRequest[]
+  ): Promise<MemberCommunityRequest[]>
 }
 
 export type CommunityDB = {
