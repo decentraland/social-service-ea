@@ -1162,6 +1162,65 @@ paths:
       tags:
         - Communities
 
+  /v1/communities/{id}/requests/{requestId}:
+    patch:
+      summary: Update community request status
+      description: |
+        Updates the status of a community request (accept, reject, or cancel).
+        This endpoint requires Signed Fetch authentication with proper permissions:
+        - For invites: Only the invited user can accept/reject, community owners/moderators can cancel
+        - For join requests: Only community owners/moderators can accept/reject, the requesting user can cancel
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './communities-schemas.yaml#/components/schemas/UpdateCommunityRequestStatusRequest'
+      responses:
+        '204':
+          description: Community request status updated successfully
+        '400':
+          description: Invalid request or intention
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required or insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community or request not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
   /v1/members/{address}/requests:
     get:
       summary: Get member requests
