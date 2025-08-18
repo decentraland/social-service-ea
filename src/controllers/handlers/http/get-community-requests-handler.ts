@@ -29,7 +29,8 @@ export async function getCommunityRequestsHandler(
 
     const { requests, total } = await communityRequests.getCommunityRequests(communityId, {
       pagination: paginationParams,
-      type: typeFilter
+      type: typeFilter,
+      callerAddress: userAddress
     })
 
     const requestsWithProfiles = await communityMembers.aggregateWithProfiles(userAddress, requests)

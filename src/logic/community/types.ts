@@ -195,7 +195,7 @@ export interface ICommunityRequestsComponent {
   ): Promise<{ requests: MemberRequest[]; total: number }>
   getCommunityRequests(
     communityId: string,
-    options: ListCommunityRequestsOptions
+    options: ListCommunityRequestsOptions & RequestActionOptions
   ): Promise<{ requests: MemberRequest[]; total: number }>
   updateRequestStatus(
     requestId: string,
