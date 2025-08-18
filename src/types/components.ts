@@ -48,7 +48,7 @@ import {
   BannedMember,
   CommunityPlace,
   CommunityRequestType,
-  CommunityRequest,
+  MemberRequest,
   GetCommunityRequestsOptions
 } from '../logic/community'
 import { Pagination } from './entities'
@@ -196,10 +196,18 @@ export interface ICommunitiesDatabaseComponent {
     communityId: string,
     memberAddress: EthAddress,
     type: CommunityRequestType
-  ): Promise<CommunityRequest>
-  getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<CommunityRequest[]>
+  ): Promise<MemberRequest>
+  getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<MemberRequest[]>
   getCommunityRequestsCount(
     communityId: string,
+    filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
+  ): Promise<number>
+  getMemberRequests(
+    memberAddress: string,
+    filters: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
+  ): Promise<MemberRequest[]>
+  getMemberRequestsCount(
+    memberAddress: string,
     filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
   ): Promise<number>
 }

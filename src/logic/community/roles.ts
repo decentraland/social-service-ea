@@ -9,6 +9,7 @@ export const OWNER_PERMISSIONS: CommunityPermission[] = [
   'remove_places',
   'accept_requests',
   'reject_requests',
+  'view_requests',
   'ban_players',
   'send_invitations',
   'edit_settings',
@@ -22,6 +23,7 @@ export const MODERATOR_PERMISSIONS: CommunityPermission[] = [
   'remove_places',
   'accept_requests',
   'reject_requests',
+  'view_requests',
   'ban_players',
   'send_invitations'
 ]
@@ -177,6 +179,11 @@ export function createCommunityRolesComponent(
       if (memberRole === CommunityRole.Owner) {
         throw new NotAuthorizedError(`The owner cannot leave the community ${communityId}`)
       }
-    }
+    },
+    validatePermissionToAcceptAndRejectRequests: validatePermissions(
+      ['accept_requests', 'reject_requests'],
+      'accept and reject requests'
+    ),
+    validatePermissionToViewRequests: validatePermission('view_requests', 'view requests')
   }
 }

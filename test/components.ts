@@ -218,7 +218,7 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail,
     communityPlaces
   })
-  const communityRequests = createCommunityRequestsComponent({ communitiesDb, logs })
+  const communityRequests = createCommunityRequestsComponent({ communitiesDb, communities, logs })
   const rpcServer = await createRpcServerComponent({
     logs,
     pubsub,

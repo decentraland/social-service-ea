@@ -478,3 +478,160 @@ components:
             total:
               type: integer
               description: 'Total number of active voice chats'
+
+    GetCommunityRequests200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - communityId
+                      - memberAddress
+                      - type
+                      - status
+                      - name
+                      - hasClaimedName
+                      - profilePictureUrl
+                      - friendshipStatus
+                    properties:
+                      id:
+                        type: string
+                        description: 'Unique identifier of the community request'
+                      communityId:
+                        type: string
+                        description: 'ID of the community'
+                      memberAddress:
+                        type: string
+                        description: 'ETH address of the member who made/received the request'
+                      type:
+                        type: string
+                        enum: [invite, request_to_join]
+                        description: 'Type of request'
+                      status:
+                        type: string
+                        enum: [pending, accepted, rejected, cancelled]
+                        description: 'Status of the request'
+                      name:
+                        type: string
+                        description: 'Display name of the member'
+                      hasClaimedName:
+                        type: boolean
+                        description: 'Whether the member has claimed their name'
+                      profilePictureUrl:
+                        type: string
+                        description: 'URL of the member profile picture'
+                      friendshipStatus:
+                        type: integer
+                        description: 'Friendship status code between the authenticated user and the member'
+
+    GetMemberRequests200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - communityId
+                      - memberAddress
+                      - type
+                      - status
+                      - name
+                      - description
+                      - ownerAddress
+                      - ownerName
+                      - privacy
+                      - membersCount
+                      - role
+                      - active
+                      - friends
+                      - voiceChatStatus
+                    properties:
+                      id:
+                        type: string
+                        description: 'Unique identifier of the community request'
+                      communityId:
+                        type: string
+                        description: 'ID of the community'
+                      memberAddress:
+                        type: string
+                        description: 'ETH address of the member for whom the request was made'
+                      type:
+                        type: string
+                        enum: [invite, request_to_join]
+                        description: 'Type of request (invite received or join request sent)'
+                      status:
+                        type: string
+                        enum: [pending, accepted, rejected, cancelled]
+                        description: 'Status of the request'
+                      name:
+                        type: string
+                        description: 'Name of the community'
+                      description:
+                        type: string
+                        description: 'Description of the community'
+                      ownerAddress:
+                        type: string
+                        description: 'ETH address of the community owner'
+                      ownerName:
+                        type: string
+                        description: 'Display name of the community owner'
+                      privacy:
+                        type: string
+                        enum: [public, private]
+                        description: 'Privacy setting of the community'
+                      membersCount:
+                        type: integer
+                        description: 'Total number of members in the community'
+                      role:
+                        type: string
+                        enum: [none, Member, Moderator, Owner]
+                        description: 'Current role of the user in this community'
+                      active:
+                        type: boolean
+                        description: 'Whether the community is active'
+                      friends:
+                        type: array
+                        items:
+                          type: string
+                        description: 'List of friends who are members of this community'
+                      voiceChatStatus:
+                        type: object
+                        required:
+                          - isActive
+                          - participantCount
+                          - moderatorCount
+                        properties:
+                          isActive:
+                            type: boolean
+                            description: 'Whether there is an active voice chat in the community'
+                          participantCount:
+                            type: integer
+                            description: 'Number of participants in the voice chat'
+                          moderatorCount:
+                            type: integer
+                            description: 'Number of moderators in the voice chat'
+                        description: 'Voice chat status information for the community'
+                      thumbnails:
+                        type: object
+                        additionalProperties:
+                          type: string
+                        description: 'A map of thumbnail types to URLs for the community'

@@ -11,7 +11,8 @@ import {
   CommunityPublicInformation,
   CommunityPublicInformationWithVoiceChat,
   AggregatedCommunity,
-  CommunityVoiceChatStatus
+  CommunityVoiceChatStatus,
+  CommunityRequestType
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friends'
@@ -157,4 +158,11 @@ export const mapMembersWithProfiles = <
 
 export const getCommunityThumbnailPath = (communityId: string) => {
   return `/social/communities/${communityId}/raw-thumbnail.png`
+}
+
+export const parseRequestTypeFilter = (searchParams: URLSearchParams): CommunityRequestType | undefined => {
+  const typeParam: string | null = searchParams.get('type')
+  return typeParam === CommunityRequestType.Invite || typeParam === CommunityRequestType.RequestToJoin
+    ? (typeParam as CommunityRequestType)
+    : undefined
 }
