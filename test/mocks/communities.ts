@@ -53,7 +53,8 @@ export function createMockCommunityRolesComponent({
   validatePermissionToDeleteCommunity = jest.fn(),
   validatePermissionToUpdatePlaces = jest.fn(),
   validatePermissionToLeaveCommunity = jest.fn(),
-  validatePermissionToAcceptAndRejectRequests = jest.fn()
+  validatePermissionToAcceptAndRejectRequests = jest.fn(),
+  validatePermissionToViewRequests = jest.fn()
 }: Partial<jest.Mocked<ICommunityRolesComponent>>): jest.Mocked<ICommunityRolesComponent> {
   return {
     validatePermissionToKickMemberFromCommunity,
@@ -68,7 +69,8 @@ export function createMockCommunityRolesComponent({
     validatePermissionToDeleteCommunity,
     validatePermissionToUpdatePlaces,
     validatePermissionToLeaveCommunity,
-    validatePermissionToAcceptAndRejectRequests
+    validatePermissionToAcceptAndRejectRequests,
+    validatePermissionToViewRequests
   }
 }
 
