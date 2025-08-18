@@ -551,13 +551,19 @@ components:
                     required:
                       - id
                       - communityId
+                      - memberAddress
+                      - type
+                      - status
                       - name
                       - description
                       - ownerAddress
                       - ownerName
                       - privacy
                       - membersCount
-                      - type
+                      - role
+                      - active
+                      - friends
+                      - voiceChatStatus
                     properties:
                       id:
                         type: string
@@ -565,6 +571,17 @@ components:
                       communityId:
                         type: string
                         description: 'ID of the community'
+                      memberAddress:
+                        type: string
+                        description: 'ETH address of the member for whom the request was made'
+                      type:
+                        type: string
+                        enum: [invite, request_to_join]
+                        description: 'Type of request (invite received or join request sent)'
+                      status:
+                        type: string
+                        enum: [pending, accepted, rejected, cancelled]
+                        description: 'Status of the request'
                       name:
                         type: string
                         description: 'Name of the community'
@@ -584,17 +601,37 @@ components:
                       membersCount:
                         type: integer
                         description: 'Total number of members in the community'
-                      type:
+                      role:
                         type: string
-                        enum: [invite, request_to_join]
-                        description: 'Type of request (invite received or join request sent)'
-                      thumbnails:
-                        type: object
-                        additionalProperties:
-                          type: string
-                        description: 'A map of thumbnail types to URLs for the community'
+                        enum: [none, Member, Moderator, Owner]
+                        description: 'Current role of the user in this community'
+                      active:
+                        type: boolean
+                        description: 'Whether the community is active'
                       friends:
                         type: array
                         items:
                           type: string
                         description: 'List of friends who are members of this community'
+                      voiceChatStatus:
+                        type: object
+                        required:
+                          - isActive
+                          - participantCount
+                          - moderatorCount
+                        properties:
+                          isActive:
+                            type: boolean
+                            description: 'Whether there is an active voice chat in the community'
+                          participantCount:
+                            type: integer
+                            description: 'Number of participants in the voice chat'
+                          moderatorCount:
+                            type: integer
+                            description: 'Number of moderators in the voice chat'
+                        description: 'Voice chat status information for the community'
+                      thumbnails:
+                        type: object
+                        additionalProperties:
+                          type: string
+                        description: 'A map of thumbnail types to URLs for the community'
