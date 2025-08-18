@@ -35,7 +35,11 @@ export function requestToSpeakInCommunityVoiceChatService({
         throw new InvalidCommunityIdError()
       }
 
-      await commsGatekeeper.requestToSpeakInCommunityVoiceChat(request.communityId, context.address, request.isRaisingHand)
+      await commsGatekeeper.requestToSpeakInCommunityVoiceChat(
+        request.communityId,
+        context.address,
+        request.isRaisingHand
+      )
 
       const successMessage = request.isRaisingHand ? 'Request to speak sent successfully' : 'Hand lowered successfully'
       logger.info(successMessage, {

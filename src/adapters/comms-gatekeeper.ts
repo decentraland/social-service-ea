@@ -296,7 +296,11 @@ export const createCommsGatekeeperComponent = async ({
    * @param userAddress - The address of the user requesting to speak
    * @param isRaisingHand - True to raise hand (request to speak), false to lower hand (withdraw request)
    */
-  async function requestToSpeakInCommunityVoiceChat(communityId: string, userAddress: string, isRaisingHand: boolean = true): Promise<void> {
+  async function requestToSpeakInCommunityVoiceChat(
+    communityId: string,
+    userAddress: string,
+    isRaisingHand: boolean = true
+  ): Promise<void> {
     try {
       const method = isRaisingHand ? 'POST' : 'DELETE'
 
