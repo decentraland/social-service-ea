@@ -27,7 +27,7 @@ export function requestToSpeakInCommunityVoiceChatService({
       logger.info(`${action} in community voice chat`, {
         communityId: request.communityId,
         userAddress: context.address,
-        isRaisingHand: request.isRaisingHand
+        isRaisingHand: String(request.isRaisingHand)
       })
 
       if (!request.communityId || request.communityId.trim() === '') {
@@ -41,7 +41,7 @@ export function requestToSpeakInCommunityVoiceChatService({
       logger.info(successMessage, {
         communityId: request.communityId,
         userAddress: context.address,
-        isRaisingHand: request.isRaisingHand
+        isRaisingHand: String(request.isRaisingHand)
       })
 
       return {
@@ -58,7 +58,7 @@ export function requestToSpeakInCommunityVoiceChatService({
         errorMessage: errorMessage,
         communityId: request.communityId,
         userAddress: context.address,
-        isRaisingHand: request.isRaisingHand
+        isRaisingHand: String(request.isRaisingHand)
       })
 
       // Handle specific error types
