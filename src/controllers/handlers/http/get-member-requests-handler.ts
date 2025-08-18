@@ -8,12 +8,12 @@ import { getPaginationResultProperties } from '../../../utils/pagination'
 
 export async function getMemberRequestsHandler(
   context: Pick<
-    HandlerContextWithPath<'logs' | 'communityRequests' | 'communities', '/v1/members/:address/requests'>,
+    HandlerContextWithPath<'logs' | 'communityRequests', '/v1/members/:address/requests'>,
     'components' | 'params' | 'verification' | 'url'
   >
 ): Promise<HTTPResponse<PaginatedResponse<MemberCommunityRequest>>> {
   const {
-    components: { logs, communities, communityRequests },
+    components: { logs, communityRequests },
     params: { address: targetAddress },
     verification,
     url
