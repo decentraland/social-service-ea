@@ -371,6 +371,8 @@ export interface IPgComponent extends IBasePgComponent {
 export interface ICommunitiesDbHelperComponent {
   forceCommunityRemoval: (communityId: string) => Promise<void>
   forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
+  forceCommunityRequestRemoval: (requestId: string) => Promise<void>
+  updateCommunityRequestStatus: (requestId: string, status: string) => Promise<void>
 }
 
 export interface IStorageComponent {
