@@ -45,12 +45,8 @@ export function kickPlayerFromCommunityVoiceChatService({
         throw new CommunityVoiceChatPermissionError('Only community owners and moderators can kick players')
       }
 
-      // Verify the target user is a member of the community
-      const targetUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, request.userAddress)
-      if (targetUserRole === CommunityRole.None) {
-        throw new UserNotCommunityMemberError(request.userAddress, request.communityId)
-      }
-
+      // For kicking: no restrictions, moderators/owners can kick anyone in voice chat
+      // Let comms-gatekeeper validate if user is actually in voice chat
       logger.info('Permission check passed: moderator/owner kicking player', {
         communityId: request.communityId,
         actingUserRole,

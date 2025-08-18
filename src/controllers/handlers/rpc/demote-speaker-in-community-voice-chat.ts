@@ -8,8 +8,9 @@ import {
   CommunityVoiceChatNotFoundError,
   InvalidCommunityIdError,
   InvalidUserAddressError,
-  CommunityVoiceChatPermissionError
-} from '../../../logic/community-voice/errors'
+  CommunityVoiceChatPermissionError,
+  validateCommunityVoiceChatTargetUser
+} from '../../../logic/community-voice'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { CommunityRole } from '../../../types/entities'
 
@@ -41,10 +42,18 @@ export function demoteSpeakerInCommunityVoiceChatService({
 
       const isSelfDemote = context.address.toLowerCase() === request.userAddress.toLowerCase()
 
+      // Get community information to check privacy setting
+      const community = await communitiesDb.getCommunity(request.communityId, context.address)
+      if (!community) {
+        throw new InvalidCommunityIdError()
+      }
+
       // Get the role of the acting user (person making the request)
       const actingUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, context.address)
 
-      if (actingUserRole === CommunityRole.None) {
+      // For private communities, acting user must be a member
+      // For public communities, we allow voice chat participants to manage themselves and moderators to manage others
+      if (community.privacy === 'private' && actingUserRole === CommunityRole.None) {
         throw new UserNotCommunityMemberError(context.address, request.communityId)
       }
 
@@ -55,21 +64,20 @@ export function demoteSpeakerInCommunityVoiceChatService({
           throw new CommunityVoiceChatPermissionError('Only community owners and moderators can demote other speakers')
         }
 
-        // Also verify the target user is a member of the community
-        const targetUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, request.userAddress)
-        if (targetUserRole === CommunityRole.None) {
-          throw new UserNotCommunityMemberError(request.userAddress, request.communityId)
-        }
+        // Validate target user can be demoted based on community privacy and membership
+        await validateCommunityVoiceChatTargetUser(communitiesDb, community, request.communityId, request.userAddress)
 
         logger.info('Permission check passed: moderator/owner demoting another user', {
           communityId: request.communityId,
           actingUserRole,
-          targetUserAddress: request.userAddress
+          targetUserAddress: request.userAddress,
+          communityPrivacy: community.privacy
         })
       } else {
         logger.info('Self-demote detected: allowing user to demote themselves', {
           communityId: request.communityId,
-          userAddress: request.userAddress
+          userAddress: request.userAddress,
+          communityPrivacy: community.privacy
         })
       }
 
