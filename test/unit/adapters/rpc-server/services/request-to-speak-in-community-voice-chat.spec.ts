@@ -35,7 +35,7 @@ describe('when requesting to speak in community voice chat', () => {
       requestToSpeakMock.mockResolvedValue(undefined)
     })
 
-    it('should resolve with an ok response', async () => {
+    it('should resolve with an ok response for raising hand (default)', async () => {
       const result = await service(
         RequestToSpeakInCommunityVoiceChatPayload.create({
           communityId
@@ -47,7 +47,39 @@ describe('when requesting to speak in community voice chat', () => {
       )
 
       expect(result.response?.$case).toBe('ok')
-      expect(requestToSpeakMock).toHaveBeenCalledWith(communityId, userAddress)
+      expect(requestToSpeakMock).toHaveBeenCalledWith(communityId, userAddress, false) // default value
+    })
+
+    it('should resolve with an ok response for explicitly raising hand', async () => {
+      const result = await service(
+        RequestToSpeakInCommunityVoiceChatPayload.create({
+          communityId,
+          isRaisingHand: true
+        }),
+        {
+          address: userAddress,
+          subscribersContext: undefined
+        }
+      )
+
+      expect(result.response?.$case).toBe('ok')
+      expect(requestToSpeakMock).toHaveBeenCalledWith(communityId, userAddress, true)
+    })
+
+    it('should resolve with an ok response for lowering hand', async () => {
+      const result = await service(
+        RequestToSpeakInCommunityVoiceChatPayload.create({
+          communityId,
+          isRaisingHand: false
+        }),
+        {
+          address: userAddress,
+          subscribersContext: undefined
+        }
+      )
+
+      expect(result.response?.$case).toBe('ok')
+      expect(requestToSpeakMock).toHaveBeenCalledWith(communityId, userAddress, false)
     })
   })
 
