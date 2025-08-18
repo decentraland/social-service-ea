@@ -210,6 +210,8 @@ export interface ICommunitiesDatabaseComponent {
     memberAddress: string,
     filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
   ): Promise<number>
+  getCommunityRequest(requestId: string): Promise<MemberRequest | undefined>
+  removeCommunityRequest(requestId: string): Promise<void>
 }
 
 export interface IVoiceDatabaseComponent {

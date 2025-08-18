@@ -741,6 +741,24 @@ export function createCommunitiesDBComponent(
       }
 
       return pg.getCount(query)
+    },
+
+    async getCommunityRequest(requestId: string): Promise<MemberRequest | undefined> {
+      const query = SQL`
+        SELECT id, community_id AS "communityId", member_address AS "memberAddress", type, status
+        FROM community_requests
+        WHERE id = ${requestId}
+      `
+
+      const result = await pg.query<MemberRequest>(query)
+      return result.rows[0]
+    },
+
+    async removeCommunityRequest(requestId: string): Promise<void> {
+      const query = SQL`
+        DELETE FROM community_requests WHERE id = ${requestId}
+      `
+      await pg.query(query)
     }
   }
 }

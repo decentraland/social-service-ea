@@ -45,3 +45,10 @@ export class InvalidCommunityRequestError extends Error {
     this.name = 'InvalidCommunityRequestError'
   }
 }
+
+export class CommunityRequestNotFoundError extends Error {
+  constructor(public readonly id: string) {
+    super(`Community request not found: ${id}`)
+    this.name = 'CommunityRequestNotFoundError'
+  }
+}
