@@ -1,9 +1,10 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { CommunityMemberProfile, CommunityRequestType } from '../../../logic/community/types'
+import { CommunityMemberProfile } from '../../../logic/community/types'
 import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { PaginatedResponse } from '@dcl/schemas'
 import { getPaginationResultProperties } from '../../../utils/pagination'
+import { parseRequestTypeFilter } from '../../../logic/community/utils'
 
 export async function getCommunityRequestsHandler(
   context: Pick<
@@ -26,14 +27,10 @@ export async function getCommunityRequestsHandler(
   try {
     const userAddress = verification!.auth.toLowerCase()
 
-    await communityRoles.validatePermissionToAcceptAndRejectRequests(communityId, userAddress)
+    await communityRoles.validatePermissionToViewRequests(communityId, userAddress)
 
     const paginationParams = getPaginationParams(url.searchParams)
-    const typeParam: string | null = url.searchParams.get('type')
-    const typeFilter =
-      typeParam === CommunityRequestType.Invite || typeParam === CommunityRequestType.RequestToJoin
-        ? (typeParam as CommunityRequestType)
-        : undefined
+    const typeFilter = parseRequestTypeFilter(url.searchParams)
 
     const { requests, total } = await communityRequests.getCommunityRequests(communityId, {
       pagination: paginationParams,

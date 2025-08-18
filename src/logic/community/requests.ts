@@ -61,16 +61,17 @@ export function createCommunityRequestsComponent(
     memberAddress: string,
     options: { type?: CommunityRequestType; pagination: Required<PaginatedParameters> }
   ): Promise<{ requests: MemberRequest[]; total: number }> {
-    const requests = await communitiesDb.getMemberRequests(memberAddress, {
-      pagination: options.pagination,
-      status: CommunityRequestStatus.Pending,
-      type: options?.type
-    })
-
-    const total = await communitiesDb.getMemberRequestsCount(memberAddress, {
-      status: CommunityRequestStatus.Pending,
-      type: options?.type
-    })
+    const [requests, total] = await Promise.all([
+      communitiesDb.getMemberRequests(memberAddress, {
+        pagination: options.pagination,
+        status: CommunityRequestStatus.Pending,
+        type: options?.type
+      }),
+      communitiesDb.getMemberRequestsCount(memberAddress, {
+        status: CommunityRequestStatus.Pending,
+        type: options?.type
+      })
+    ])
 
     return { requests, total }
   }
@@ -79,16 +80,17 @@ export function createCommunityRequestsComponent(
     communityId: string,
     options: { pagination: Required<PaginatedParameters>; type?: CommunityRequestType }
   ): Promise<{ requests: MemberRequest[]; total: number }> {
-    const requests = await communitiesDb.getCommunityRequests(communityId, {
-      pagination: options.pagination,
-      status: CommunityRequestStatus.Pending,
-      type: options.type
-    })
-
-    const total = await communitiesDb.getCommunityRequestsCount(communityId, {
-      status: CommunityRequestStatus.Pending,
-      type: options.type
-    })
+    const [requests, total] = await Promise.all([
+      communitiesDb.getCommunityRequests(communityId, {
+        pagination: options.pagination,
+        status: CommunityRequestStatus.Pending,
+        type: options.type
+      }),
+      communitiesDb.getCommunityRequestsCount(communityId, {
+        status: CommunityRequestStatus.Pending,
+        type: options.type
+      })
+    ])
 
     return { requests, total }
   }

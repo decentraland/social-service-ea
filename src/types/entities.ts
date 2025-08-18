@@ -81,6 +81,7 @@ export type CommunityPermission =
   | 'remove_places'
   | 'accept_requests'
   | 'reject_requests'
+  | 'view_requests'
   | 'ban_players'
   | 'send_invitations'
   | 'edit_settings'

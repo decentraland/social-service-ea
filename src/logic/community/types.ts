@@ -92,6 +92,7 @@ export interface ICommunityRolesComponent {
   validatePermissionToDeleteCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToLeaveCommunity: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToAcceptAndRejectRequests: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToViewRequests: (communityId: string, memberAddress: string) => Promise<void>
 }
 
 export interface ICommunityEventsComponent {

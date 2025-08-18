@@ -1,10 +1,11 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { normalizeAddress } from '../../../utils/address'
-import { CommunityRequestType, MemberCommunityRequest } from '../../../logic/community/types'
+import { MemberCommunityRequest } from '../../../logic/community/types'
 import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { PaginatedResponse } from '@dcl/schemas'
 import { getPaginationResultProperties } from '../../../utils/pagination'
+import { parseRequestTypeFilter } from '../../../logic/community/utils'
 
 export async function getMemberRequestsHandler(
   context: Pick<
@@ -30,11 +31,7 @@ export async function getMemberRequestsHandler(
     }
 
     const paginationParams = getPaginationParams(url.searchParams)
-    const typeParam: string | null = url.searchParams.get('type')
-    const typeFilter =
-      typeParam === CommunityRequestType.Invite || typeParam === CommunityRequestType.RequestToJoin
-        ? (typeParam as CommunityRequestType)
-        : undefined
+    const typeFilter = parseRequestTypeFilter(url.searchParams)
 
     const memberRequests = await communityRequests.getMemberRequests(normalizedTargetAddress, {
       type: typeFilter,

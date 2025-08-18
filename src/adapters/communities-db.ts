@@ -691,8 +691,7 @@ export function createCommunitiesDBComponent(
         query = query.append(SQL` AND type = ${filters.type}`)
       }
 
-      const result = await pg.query<{ count: string }>(query)
-      return parseInt(result.rows[0].count, 10)
+      return pg.getCount(query)
     },
 
     async getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<MemberRequest[]> {
@@ -741,8 +740,7 @@ export function createCommunitiesDBComponent(
         query = query.append(SQL` AND type = ${filters.type}`)
       }
 
-      const result = await pg.query<{ count: string }>(query)
-      return parseInt(result.rows[0].count, 10)
+      return pg.getCount(query)
     }
   }
 }
