@@ -6,6 +6,7 @@ import {
   CommunityRequestStatus,
   CommunityRequestType,
   GetCommunityRequestsOptions,
+  ICommunitiesComponent,
   ICommunityRequestsComponent,
   InvalidCommunityRequestError,
   MemberRequest
@@ -14,15 +15,19 @@ import { createCommunityRequestsComponent } from '../../../src/logic/community/r
 import { mockLogs } from '../../mocks/components'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { CommunityRole } from '../../../src/types'
+import { createMockCommunitiesComponent } from '../../mocks/communities'
 
 describe('Community Requests Component', () => {
   let communityRequestsComponent: ICommunityRequestsComponent
+  let communitiesComponent: ICommunitiesComponent
   let type: CommunityRequestType
   let userAddress: string
 
   beforeEach(() => {
+    communitiesComponent = createMockCommunitiesComponent({})
     communityRequestsComponent = createCommunityRequestsComponent({
       communitiesDb: mockCommunitiesDB,
+      communities: communitiesComponent,
       logs: mockLogs
     })
 

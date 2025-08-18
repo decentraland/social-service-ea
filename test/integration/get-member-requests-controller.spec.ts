@@ -157,7 +157,7 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
 
         describe('and filtering by request type', () => {
           beforeEach(async () => { 
-            queryParameters = `?type=request`
+            queryParameters = `?type=request_to_join`
           })
 
           it('should return only requests to join', async () => {
