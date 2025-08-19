@@ -407,6 +407,30 @@ export function createCommunitiesDBComponent(
       return result.rows
     },
 
+    async getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]> {
+      const normalizedInviterAddress = normalizeAddress(inviter)
+      const normalizedInviteeAddress = normalizeAddress(invitee)
+
+      const query = SQL`
+        SELECT 
+          c.id,
+          c.name,
+          c.description,
+          c.owner_address as "ownerAddress",
+          CASE WHEN c.private = true THEN ${CommunityPrivacyEnum.Private} ELSE ${CommunityPrivacyEnum.Public} END as privacy,
+          c.active
+        FROM communities c
+        JOIN community_members cm_inviter ON c.id = cm_inviter.community_id AND cm_inviter.member_address = ${normalizedInviterAddress}
+        LEFT JOIN community_members cm_invitee ON c.id = cm_invitee.community_id AND cm_invitee.member_address = ${normalizedInviteeAddress}
+        WHERE c.active = true
+          AND cm_invitee.member_address IS NULL
+        ORDER BY c.name ASC
+      `
+
+      const result = await pg.query<Community>(query)
+      return result.rows
+    },
+
     async getOnlineMembersFromUserCommunities(
       userAddress: EthAddress,
       onlineUsers: string[],

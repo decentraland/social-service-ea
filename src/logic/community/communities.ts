@@ -423,6 +423,20 @@ export function createCommunityComponent(
       })
 
       return updatedCommunity
+    },
+
+    getCommunityInvites: async (inviter: EthAddress, invitee: EthAddress): Promise<Community[]> => {
+      const communities = await communitiesDb.getCommunityInvites(inviter, invitee)
+
+      return communities.map((community) => ({
+        id: community.id,
+        name: community.name,
+        description: community.description,
+        ownerAddress: community.ownerAddress,
+        privacy: community.privacy,
+        active: community.active,
+        thumbnails: community.thumbnails
+      }))
     }
   }
 }
