@@ -645,3 +645,24 @@ components:
           type: string
           enum: [accepted, rejected, cancelled]
           description: 'Action to perform on the community request'
+
+    GetCommunityInvites200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - name
+            properties:
+              id:
+                type: string
+                description: 'Unique identifier of the community'
+              name:
+                type: string
+                description: 'Name of the community'
+          description: 'List of communities where the inviter is a member but the invitee is not'
