@@ -150,20 +150,12 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
               
               expect(body.data).toContainEqual({
                 id: inviterCommunityId1,
-                name: 'Inviter Community 1',
-                description: 'Description 1',
-                ownerAddress: '0x1111111111111111111111111111111111111111',
-                privacy: 'public',
-                active: true
+                name: 'Inviter Community 1'
               })
 
               expect(body.data).toContainEqual({
                 id: inviterCommunityId2,
-                name: 'Inviter Community 2',
-                description: 'Description 2',
-                ownerAddress: '0x9999999999999999999999999999999999999999',
-                privacy: 'public',
-                active: true
+                name: 'Inviter Community 2'
               })
             })
           })
@@ -206,11 +198,7 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
               // Should only return inviterCommunityId2 (invitee is not a member)
               expect(body.data).toContainEqual({
                 id: inviterCommunityId2,
-                name: 'Inviter Community 2',
-                description: 'Description 2',
-                ownerAddress: '0x9999999999999999999999999999999999999999',
-                privacy: 'public',
-                active: true
+                name: 'Inviter Community 2'
               })
 
               // Should NOT return inviterCommunityId1 or sharedCommunityId
