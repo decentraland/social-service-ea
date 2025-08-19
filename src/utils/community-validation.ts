@@ -1,6 +1,7 @@
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 import fileType from 'file-type'
 import { CommunityPrivacyEnum } from '../logic/community'
+import { IAIContentValidatorComponent } from '../types/components'
 
 export interface CommunityValidationFields {
   name?: string
@@ -13,6 +14,7 @@ export interface CommunityValidationFields {
 export interface CommunityValidationOptions {
   requireName?: boolean
   requireDescription?: boolean
+  aiContentValidator?: IAIContentValidatorComponent
 }
 
 export async function validateCommunityFields(
@@ -20,7 +22,7 @@ export async function validateCommunityFields(
   thumbnailBuffer?: Buffer,
   options: CommunityValidationOptions = {}
 ): Promise<CommunityValidationFields> {
-  const { requireName = false, requireDescription = false } = options
+  const { requireName = false, requireDescription = false, aiContentValidator } = options
 
   const name: string | undefined = formData.fields.name?.value
   const description: string | undefined = formData.fields.description?.value
@@ -72,6 +74,21 @@ export async function validateCommunityFields(
     const size = thumbnailBuffer.length
     if (size < 1024 || size > 500 * 1024) {
       throw new InvalidRequestError('Thumbnail size must be between 1KB and 500KB')
+    }
+  }
+
+  // AI Content Validation
+  if (aiContentValidator && name && description) {
+    const imageBase64 = thumbnailBuffer ? thumbnailBuffer.toString('base64') : undefined
+
+    const isContentAppropriate = await aiContentValidator.validateContent({
+      title: name,
+      description: description,
+      image: imageBase64
+    })
+
+    if (!isContentAppropriate) {
+      throw new InvalidRequestError('Community content does not meet platform guidelines')
     }
   }
 

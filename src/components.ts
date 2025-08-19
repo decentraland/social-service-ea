@@ -62,6 +62,7 @@ import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/
 import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
 import { createSlackComponent } from '@dcl/slack-component'
 import { createCommunityRequestsComponent } from './logic/community/requests'
+import { createAIContentValidatorComponent } from './adapters/ai-content-validator'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -266,6 +267,8 @@ export async function initComponents(): Promise<AppComponents> {
   const slackToken = await config.requireString('SLACK_BOT_TOKEN')
   const slack = await createSlackComponent({ logs }, { token: slackToken })
 
+  const aiContentValidator = await createAIContentValidatorComponent({ config, logs })
+
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
   const messageProcessor = await createMessageProcessorComponent({ logs, referral })
@@ -277,6 +280,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   return {
+    aiContentValidator,
     analytics,
     archipelagoStats,
     catalystClient,

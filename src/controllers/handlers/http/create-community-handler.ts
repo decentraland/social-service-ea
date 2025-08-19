@@ -6,10 +6,11 @@ import { validateCommunityFields } from '../../../utils/community-validation'
 import { CommunityOwnerNotFoundError } from '../../../logic/community'
 
 export async function createCommunityHandler(
-  context: FormHandlerContextWithPath<'communities' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
+  context: FormHandlerContextWithPath<'communities' | 'logs' | 'aiContentValidator', '/v1/communities'> &
+    DecentralandSignatureContext<any>
 ): Promise<HTTPResponse> {
   const {
-    components: { communities, logs },
+    components: { communities, logs, aiContentValidator },
     verification,
     formData
   } = context
@@ -23,7 +24,8 @@ export async function createCommunityHandler(
 
     const { name, description, placeIds, privacy } = await validateCommunityFields(formData, thumbnailBuffer, {
       requireName: true,
-      requireDescription: true
+      requireDescription: true,
+      aiContentValidator
     })
 
     logger.info('Creating community', {

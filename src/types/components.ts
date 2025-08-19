@@ -403,3 +403,7 @@ export type IRewardComponent = IBaseComponent & {
 export type IEmailComponent = IBaseComponent & {
   sendEmail(email: string, subject: string, content: string): Promise<void>
 }
+
+export interface IAIContentValidatorComponent {
+  validateContent(request: { title: string; description: string; image?: string }): Promise<boolean>
+}
