@@ -6,13 +6,13 @@ import { errorMessageOrDefault } from '../../../utils/errors'
 
 export async function getCommunityInvitesHandler(
   context: Pick<
-    HandlerContextWithPath<'logs' | 'communities', '/v1/communities/:id/invites/:address'>,
+    HandlerContextWithPath<'logs' | 'communities', '/v1/members/:address/invites'>,
     'components' | 'params' | 'verification' | 'url'
   >
 ): Promise<HTTPResponse<Pick<Community, 'id' | 'name'>[]>> {
   const {
     components: { logs, communities },
-    params: { id: communityId, address: inviteeAddress },
+    params: { address: inviteeAddress },
     verification
   } = context
 
@@ -42,7 +42,7 @@ export async function getCommunityInvitesHandler(
     }
   } catch (error) {
     const message = errorMessageOrDefault(error)
-    logger.error(`Error getting community invites for ${communityId}: ${message}`)
+    logger.error(`Error getting community invites for invitee ${inviteeAddress}: ${message}`)
 
     if (error instanceof InvalidRequestError) {
       throw error

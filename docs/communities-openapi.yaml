@@ -1277,7 +1277,7 @@ paths:
       tags:
         - Communities
 
-  /v1/communities/{id}/invites/{address}:
+  /v1/members/{address}/invites:
     get:
       summary: Get community invites for a user
       description: |
@@ -1287,12 +1287,6 @@ paths:
       security:
         - SignedFetch: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: The unique identifier of the community (used for URL parameter but not filtering).
         - name: address
           in: path
           required: true

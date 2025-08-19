@@ -5,19 +5,17 @@ import { mockCommunity } from '../mocks/communities'
 
 test('Get Community Invites Controller', function ({ components, spyComponents }) {
   let makeRequest: any
-  let communityId: string
 
   describe('and the request is not signed', () => {
     let inviteeAddress: string
 
     beforeEach(async () => {
       makeRequest = components.localHttpFetch.fetch
-      communityId = '00000000-0000-0000-0000-000000000000'
       inviteeAddress = '0x1234567890123456789012345678901234567890'
     })
 
     it('should return a 400 status code', async () => {
-      const response = await makeRequest(`/v1/communities/${communityId}/invites/${inviteeAddress}`)
+      const response = await makeRequest(`/v1/members/${inviteeAddress}/invites`)
       expect(response.status).toBe(400)
     })
   })
@@ -33,15 +31,6 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
       let sharedCommunityId: string
 
       beforeEach(async () => {
-        // Create a base community for the URL parameter
-        const result = await components.communitiesDb.createCommunity(
-          mockCommunity({
-            name: 'Base Community',
-            description: 'Base Description',
-            owner_address: '0x0000000000000000000000000000000000000000'
-          })
-        )
-        communityId = result.id
 
         // Create all communities that will be used in subsequent tests
         const result1 = await components.communitiesDb.createCommunity(
@@ -73,7 +62,6 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
       })
 
       afterEach(async () => {
-        await components.communitiesDbHelper.forceCommunityRemoval(communityId)
         await components.communitiesDbHelper.forceCommunityRemoval(inviterCommunityId1)
         await components.communitiesDbHelper.forceCommunityRemoval(inviterCommunityId2)
         await components.communitiesDbHelper.forceCommunityRemoval(sharedCommunityId)
@@ -89,7 +77,7 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
         })
 
         it('should return a 400 status code with error message about self-invitation', async () => {
-          const response = await makeRequest(identity, `/v1/communities/${communityId}/invites/${userAddress}`)
+          const response = await makeRequest(identity, `/v1/members/${userAddress}/invites`)
           const body = await response.json()
 
           expect(response.status).toBe(400)
@@ -110,7 +98,7 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
 
         describe('and inviter is not a member of any community', () => {
           it('should return 200 status code with empty results', async () => {
-            const response = await makeRequest(inviterIdentity, `/v1/communities/${communityId}/invites/${inviteeAddress}`)
+            const response = await makeRequest(inviterIdentity, `/v1/members/${inviteeAddress}/invites`)
             const body = await response.json()
 
             expect(response.status).toBe(200)
@@ -142,7 +130,7 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
 
           describe('and invitee is not a member of any community', () => {
             it('should return 200 status code with all inviter communities', async () => {
-              const response = await makeRequest(inviterIdentity, `/v1/communities/${communityId}/invites/${inviteeAddress}`)
+              const response = await makeRequest(inviterIdentity, `/v1/members/${inviteeAddress}/invites`)
               const body = await response.json()
 
               expect(response.status).toBe(200)
@@ -189,7 +177,7 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
             })
 
             it('should return 200 status code with only communities where inviter is member but invitee is not', async () => {
-              const response = await makeRequest(inviterIdentity, `/v1/communities/${communityId}/invites/${inviteeAddress}`)
+              const response = await makeRequest(inviterIdentity, `/v1/members/${inviteeAddress}/invites`)
               const body = await response.json()
 
               expect(response.status).toBe(200)
