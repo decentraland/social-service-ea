@@ -215,9 +215,10 @@ export function createCommunityRequestsComponent(
           return undefined
         }
 
+        const { id, ...communityWithoutId } = community // prevent id override
         return {
-          ...request,
-          ...community
+          ...communityWithoutId,
+          ...request
         } as MemberCommunityRequest
       })
       .filter(Boolean) as MemberCommunityRequest[]
