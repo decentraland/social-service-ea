@@ -210,6 +210,9 @@ export interface ICommunitiesDatabaseComponent {
     memberAddress: string,
     filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
   ): Promise<number>
+  getCommunityRequest(requestId: string): Promise<MemberRequest | undefined>
+  removeCommunityRequest(requestId: string): Promise<void>
+  acceptCommunityRequestTransaction(requestId: string, member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
 }
 
 export interface IVoiceDatabaseComponent {
@@ -369,6 +372,8 @@ export interface IPgComponent extends IBasePgComponent {
 export interface ICommunitiesDbHelperComponent {
   forceCommunityRemoval: (communityId: string) => Promise<void>
   forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
+  forceCommunityRequestRemoval: (requestId: string) => Promise<void>
+  updateCommunityRequestStatus: (requestId: string, status: string) => Promise<void>
 }
 
 export interface IStorageComponent {

@@ -8,15 +8,12 @@ import { parseRequestTypeFilter } from '../../../logic/community/utils'
 
 export async function getCommunityRequestsHandler(
   context: Pick<
-    HandlerContextWithPath<
-      'logs' | 'communityRequests' | 'communityRoles' | 'communityMembers',
-      '/v1/communities/:id/requests'
-    >,
+    HandlerContextWithPath<'logs' | 'communityRequests' | 'communityMembers', '/v1/communities/:id/requests'>,
     'components' | 'params' | 'verification' | 'url'
   >
 ): Promise<HTTPResponse<PaginatedResponse<CommunityMemberProfile>>> {
   const {
-    components: { logs, communityRoles, communityRequests, communityMembers },
+    components: { logs, communityRequests, communityMembers },
     params: { id: communityId },
     verification,
     url
@@ -27,14 +24,13 @@ export async function getCommunityRequestsHandler(
   try {
     const userAddress = verification!.auth.toLowerCase()
 
-    await communityRoles.validatePermissionToViewRequests(communityId, userAddress)
-
     const paginationParams = getPaginationParams(url.searchParams)
     const typeFilter = parseRequestTypeFilter(url.searchParams)
 
     const { requests, total } = await communityRequests.getCommunityRequests(communityId, {
       pagination: paginationParams,
-      type: typeFilter
+      type: typeFilter,
+      callerAddress: userAddress
     })
 
     const requestsWithProfiles = await communityMembers.aggregateWithProfiles(userAddress, requests)

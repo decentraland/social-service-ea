@@ -163,6 +163,15 @@ export interface ICommunityThumbnailComponent {
   uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string>
 }
 
+export type ListCommunityRequestsOptions = {
+  type?: CommunityRequestType
+  pagination: Required<PaginatedParameters>
+}
+
+export type RequestActionOptions = {
+  callerAddress: EthAddress
+}
+
 export interface ICommunityRequestsComponent {
   /**
    * Creates a community request for a given community and member address.
@@ -182,12 +191,17 @@ export interface ICommunityRequestsComponent {
    */
   getMemberRequests(
     memberAddress: EthAddress,
-    options: { type?: CommunityRequestType; pagination: Required<PaginatedParameters> }
+    options: ListCommunityRequestsOptions
   ): Promise<{ requests: MemberRequest[]; total: number }>
   getCommunityRequests(
     communityId: string,
-    options: { pagination: Required<PaginatedParameters>; type?: CommunityRequestType }
+    options: ListCommunityRequestsOptions & RequestActionOptions
   ): Promise<{ requests: MemberRequest[]; total: number }>
+  updateRequestStatus(
+    requestId: string,
+    status: Exclude<CommunityRequestStatus, 'pending'>,
+    options: RequestActionOptions
+  ): Promise<void>
   /**
    * Aggregates member requests with their associated community data.
    */

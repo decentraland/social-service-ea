@@ -219,6 +219,7 @@ export async function initComponents(): Promise<AppComponents> {
   const communityRequests = createCommunityRequestsComponent({
     communitiesDb,
     communities,
+    communityRoles,
     logs
   })
 

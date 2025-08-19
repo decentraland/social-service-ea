@@ -635,3 +635,13 @@ components:
                         additionalProperties:
                           type: string
                         description: 'A map of thumbnail types to URLs for the community'
+
+    UpdateCommunityRequestStatusRequest:
+      type: object
+      required:
+        - intention
+      properties:
+        intention:
+          type: string
+          enum: [accepted, rejected, cancelled]
+          description: 'Action to perform on the community request'

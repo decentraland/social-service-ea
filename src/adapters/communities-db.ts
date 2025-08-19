@@ -741,6 +741,44 @@ export function createCommunitiesDBComponent(
       }
 
       return pg.getCount(query)
+    },
+
+    async getCommunityRequest(requestId: string): Promise<MemberRequest | undefined> {
+      const query = SQL`
+        SELECT id, community_id AS "communityId", member_address AS "memberAddress", type, status
+        FROM community_requests
+        WHERE id = ${requestId}
+      `
+
+      const result = await pg.query<MemberRequest>(query)
+      return result.rows[0]
+    },
+
+    async removeCommunityRequest(requestId: string): Promise<void> {
+      const query = SQL`
+        DELETE FROM community_requests WHERE id = ${requestId}
+      `
+      await pg.query(query)
+    },
+
+    async acceptCommunityRequestTransaction(
+      requestId: string,
+      member: Omit<CommunityMember, 'joinedAt'>
+    ): Promise<void> {
+      await pg.withTransaction(async (client) => {
+        // Add member to community
+        const addMemberQuery = SQL`
+          INSERT INTO community_members (community_id, member_address, role)
+          VALUES (${member.communityId}, ${normalizeAddress(member.memberAddress)}, ${member.role})
+        `
+        await client.query(addMemberQuery.text, addMemberQuery.values)
+
+        // Remove the request
+        const removeRequestQuery = SQL`
+          DELETE FROM community_requests WHERE id = ${requestId}
+        `
+        await client.query(removeRequestQuery.text, removeRequestQuery.values)
+      })
     }
   }
 }
