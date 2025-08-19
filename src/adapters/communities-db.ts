@@ -759,6 +759,26 @@ export function createCommunitiesDBComponent(
         DELETE FROM community_requests WHERE id = ${requestId}
       `
       await pg.query(query)
+    },
+
+    async acceptCommunityRequestTransaction(
+      requestId: string,
+      member: Omit<CommunityMember, 'joinedAt'>
+    ): Promise<void> {
+      await pg.withTransaction(async (client) => {
+        // Add member to community
+        const addMemberQuery = SQL`
+          INSERT INTO community_members (community_id, member_address, role)
+          VALUES (${member.communityId}, ${normalizeAddress(member.memberAddress)}, ${member.role})
+        `
+        await client.query(addMemberQuery.text, addMemberQuery.values)
+
+        // Remove the request
+        const removeRequestQuery = SQL`
+          DELETE FROM community_requests WHERE id = ${requestId}
+        `
+        await client.query(removeRequestQuery.text, removeRequestQuery.values)
+      })
     }
   }
 }

@@ -212,6 +212,7 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<number>
   getCommunityRequest(requestId: string): Promise<MemberRequest | undefined>
   removeCommunityRequest(requestId: string): Promise<void>
+  acceptCommunityRequestTransaction(requestId: string, member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
 }
 
 export interface IVoiceDatabaseComponent {

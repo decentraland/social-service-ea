@@ -119,14 +119,11 @@ export function createCommunityRequestsComponent(
 
     // User accepts invite or member with privileges accepts request to join
     if (status === CommunityRequestStatus.Accepted) {
-      await Promise.all([
-        communitiesDb.addCommunityMember({
-          communityId: request.communityId,
-          memberAddress: request.memberAddress,
-          role: CommunityRole.Member
-        }),
-        communitiesDb.removeCommunityRequest(requestId)
-      ])
+      await communitiesDb.acceptCommunityRequestTransaction(requestId, {
+        communityId: request.communityId,
+        memberAddress: request.memberAddress,
+        role: CommunityRole.Member
+      })
 
       logger.info('Community request accepted', {
         requestId,
