@@ -2,7 +2,6 @@ services:
   postgres:
     image: postgres:latest
     container_name: postgres-local
-
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
