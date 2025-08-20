@@ -1050,7 +1050,8 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
             communityId,
             rpcClient.authAddress.toLowerCase()
           )
-          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(communityId, targetMemberAddress)
+          // For public communities, no additional validation calls are made for target user
+          expect(communitiesDbSpy.getCommunity).toHaveBeenCalledWith(communityId, rpcClient.authAddress.toLowerCase())
 
           // Verify external service calls
           expect(commsGatekeeperSpy.promoteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
@@ -1104,7 +1105,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
             communityId,
             rpcClient.authAddress.toLowerCase()
           )
-          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(communityId, targetMemberAddress)
+          // For kick operations, no validation is performed on target user
 
           // Verify external service calls
           expect(commsGatekeeperSpy.kickUserFromCommunityVoiceChat).toHaveBeenCalledWith(

@@ -14,7 +14,9 @@ describe('when kicking player from community voice chat', () => {
   let kickPlayerMock: jest.MockedFn<ICommsGatekeeperComponent['kickUserFromCommunityVoiceChat']>
   let logs: jest.Mocked<ILoggerComponent>
   let commsGatekeeper: jest.Mocked<ICommsGatekeeperComponent>
-  let mockCommunitiesDB: { getCommunityMemberRole: jest.MockedFunction<any> }
+    let mockCommunitiesDB: {
+    getCommunityMemberRole: jest.MockedFunction<any>
+  }
   let communityId: string
   let userAddress: string
   let targetUserAddress: string
@@ -46,10 +48,8 @@ describe('when kicking player from community voice chat', () => {
   describe('and kicking player is successful', () => {
     beforeEach(() => {
       kickPlayerMock.mockResolvedValue(undefined)
-      // Setup permission validation to pass
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-        .mockResolvedValueOnce(CommunityRole.Member) // target user role
+      // Setup permission validation to pass - for public community (default), only acting user role is checked
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
     })
 
     it('should resolve with an ok response', async () => {
@@ -66,9 +66,9 @@ describe('when kicking player from community voice chat', () => {
 
       expect(result.response?.$case).toBe('ok')
       expect(kickPlayerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(2)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenNthCalledWith(1, communityId, userAddress)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenNthCalledWith(2, communityId, targetUserAddress)
+      // For public communities, only acting user role is checked (no target user validation)
+      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(1)
+      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
     })
   })
 
@@ -100,15 +100,14 @@ describe('when kicking player from community voice chat', () => {
     })
   })
 
-  describe('and target user is not a community member', () => {
+  describe('and moderator/owner kicking any user', () => {
     beforeEach(() => {
-      // Acting user has permissions but target user is not a member
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Owner) // acting user role
-        .mockResolvedValueOnce(CommunityRole.None) // target user is not a member
+      // Setup acting user as moderator
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
+      kickPlayerMock.mockResolvedValue(undefined)
     })
 
-    it('should resolve with a forbidden error response', async () => {
+    it('should allow kicking any user (no restrictions on target user)', async () => {
       const result = await service(
         KickPlayerFromCommunityVoiceChatPayload.create({
           communityId,
@@ -120,11 +119,12 @@ describe('when kicking player from community voice chat', () => {
         }
       )
 
-      expect(result.response?.$case).toBe('forbiddenError')
-      if (result.response?.$case === 'forbiddenError') {
-        expect(result.response.forbiddenError?.message).toContain('not a member of community')
-      }
-      expect(kickPlayerMock).not.toHaveBeenCalled()
+      expect(result.response?.$case).toBe('ok')
+      expect(kickPlayerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      // Should only check acting user role, no restrictions on target user
+      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(1)
+      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
+      // Should not check community privacy, target membership, or ban status
     })
   })
 
