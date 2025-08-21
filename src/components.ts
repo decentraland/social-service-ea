@@ -126,7 +126,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
-  const referralDb = await createReferralDBComponent({ pg, logs })
+  const referralDb = await createReferralDBComponent({ pg, logs, config })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
 
@@ -205,7 +205,6 @@ export async function initComponents(): Promise<AppComponents> {
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
-  const communityRequests = createCommunityRequestsComponent({ communitiesDb, logs })
 
   // AI Compliance components
   const aiCompliance = await createAIComplianceComponent({ config, logs })
@@ -223,6 +222,12 @@ export async function initComponents(): Promise<AppComponents> {
     communityBroadcaster,
     commsGatekeeper,
     communityComplianceValidator,
+    logs
+  })
+  const communityRequests = createCommunityRequestsComponent({
+    communitiesDb,
+    communities,
+    communityRoles,
     logs
   })
 
@@ -270,7 +275,7 @@ export async function initComponents(): Promise<AppComponents> {
   const slackToken = await config.requireString('SLACK_BOT_TOKEN')
   const slack = await createSlackComponent({ logs }, { token: slackToken })
 
-  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack })
+  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
   const messageProcessor = await createMessageProcessorComponent({ logs, referral })
 

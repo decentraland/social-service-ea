@@ -8,8 +8,9 @@ import {
   CommunityVoiceChatNotFoundError,
   InvalidCommunityIdError,
   InvalidUserAddressError,
-  CommunityVoiceChatPermissionError
-} from '../../../logic/community-voice/errors'
+  CommunityVoiceChatPermissionError,
+  validateCommunityVoiceChatTargetUser
+} from '../../../logic/community-voice'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { CommunityRole } from '../../../types/entities'
 
@@ -45,16 +46,20 @@ export function promoteSpeakerInCommunityVoiceChatService({
         throw new CommunityVoiceChatPermissionError('Only community owners and moderators can promote speakers')
       }
 
-      // Verify the target user is a member of the community
-      const targetUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, request.userAddress)
-      if (targetUserRole === CommunityRole.None) {
-        throw new UserNotCommunityMemberError(request.userAddress, request.communityId)
+      // Get community information to check privacy setting
+      const community = await communitiesDb.getCommunity(request.communityId, context.address)
+      if (!community) {
+        throw new InvalidCommunityIdError()
       }
+
+      // Validate target user can be promoted based on community privacy and membership
+      await validateCommunityVoiceChatTargetUser(communitiesDb, community, request.communityId, request.userAddress)
 
       logger.info('Permission check passed: moderator/owner promoting speaker', {
         communityId: request.communityId,
         actingUserRole,
         targetUserAddress: request.userAddress,
+        communityPrivacy: community.privacy,
         moderatorAddress: context.address
       })
 

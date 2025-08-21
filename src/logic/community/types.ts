@@ -52,6 +52,13 @@ export interface ICommunityMembersComponent {
     targetAddress: EthAddress,
     newRole: CommunityRole
   ): Promise<void>
+  /**
+   * Aggregates any member data with their profile information.
+   */
+  aggregateWithProfiles<T extends { memberAddress: EthAddress }>(
+    userAddress: EthAddress | undefined,
+    members: T[]
+  ): Promise<(T & CommunityMemberProfile)[]>
 }
 
 export interface ICommunityRolesComponent {
@@ -84,6 +91,8 @@ export interface ICommunityRolesComponent {
   validatePermissionToUpdateCommunityPrivacy: (communityId: string, updaterAddress: string) => Promise<void>
   validatePermissionToDeleteCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToLeaveCommunity: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToAcceptAndRejectRequests: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToViewRequests: (communityId: string, memberAddress: string) => Promise<void>
 }
 
 export interface ICommunityEventsComponent {
@@ -154,6 +163,15 @@ export interface ICommunityThumbnailComponent {
   uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string>
 }
 
+export type ListCommunityRequestsOptions = {
+  type?: CommunityRequestType
+  pagination: Required<PaginatedParameters>
+}
+
+export type RequestActionOptions = {
+  callerAddress: EthAddress
+}
+
 export interface ICommunityRequestsComponent {
   /**
    * Creates a community request for a given community and member address.
@@ -167,7 +185,30 @@ export interface ICommunityRequestsComponent {
     communityId: string,
     memberAddress: EthAddress,
     type: CommunityRequestType
-  ): Promise<CommunityRequest>
+  ): Promise<MemberRequest>
+  /**
+   * Returns pending requests (invites received and requests sent) for a user, optionally filtered by type.
+   */
+  getMemberRequests(
+    memberAddress: EthAddress,
+    options: ListCommunityRequestsOptions
+  ): Promise<{ requests: MemberRequest[]; total: number }>
+  getCommunityRequests(
+    communityId: string,
+    options: ListCommunityRequestsOptions & RequestActionOptions
+  ): Promise<{ requests: MemberRequest[]; total: number }>
+  updateRequestStatus(
+    requestId: string,
+    status: Exclude<CommunityRequestStatus, 'pending'>,
+    options: RequestActionOptions
+  ): Promise<void>
+  /**
+   * Aggregates member requests with their associated community data.
+   */
+  aggregateRequestsWithCommunities(
+    memberAddress: EthAddress,
+    requests: MemberRequest[]
+  ): Promise<MemberCommunityRequest[]>
 }
 
 export type CommunityDB = {
@@ -294,7 +335,9 @@ export type GetCommunityRequestsOptions = {
   type?: CommunityRequestType
 }
 
-export type CommunityWithUserInformation = AggregatedCommunityWithMemberData & {
+export type CommunityWithUserInformation = WithCommonFriends<AggregatedCommunityWithMemberData>
+
+export type WithCommonFriends<T> = T & {
   friends: FriendProfile[]
 }
 
@@ -338,13 +381,26 @@ export enum CommunityRequestType {
   RequestToJoin = 'request_to_join'
 }
 
-export type CommunityRequest = {
+export type MemberRequest = {
   id: string
   communityId: string
   memberAddress: string
   type: CommunityRequestType
   status: CommunityRequestStatus
 }
+
+export type MemberCommunityRequest = WithCommonFriends<{
+  id: string
+  communityId: string
+  thumbnails?: Record<string, string>
+  name: string
+  description: string
+  ownerAddress: string
+  ownerName: string
+  privacy: CommunityPrivacyEnum
+  membersCount: number
+  type: CommunityRequestType
+}>
 
 export interface ActiveCommunityVoiceChat {
   communityId: string

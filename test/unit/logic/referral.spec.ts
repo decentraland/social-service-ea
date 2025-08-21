@@ -9,8 +9,13 @@ import {
 } from '../../../src/logic/referral/errors'
 import { Events } from '@dcl/schemas'
 import { RewardStatus } from '../../../src/logic/referral/types'
-import { MAX_IP_MATCHES } from '../../../src/logic/referral/referral'
-import { referralIpMatchRejectionMessage, referral100InvitesReachedMessage } from '../../../src/utils/slackMessages'
+import {
+  referralIpMatchRejectionMessage,
+  referral100InvitesReachedMessage,
+  referralSuspiciousTimingMessage
+} from '../../../src/utils/slackMessages'
+
+const MAX_IP_MATCHES = 2
 
 describe('referral-component', () => {
   let mockReferralDb: any
@@ -20,6 +25,7 @@ describe('referral-component', () => {
   let mockRewards: any
   let mockEmail: any
   let mockSlack: any
+  let mockRedis: any
   let referralComponent: IReferralComponent
 
   beforeEach(async () => {
@@ -64,6 +70,14 @@ describe('referral-component', () => {
           REFERRAL_METABASE_DASHBOARD: 'https://dashboard.decentraland.systems/1234'
         }
         return Promise.resolve(configValues[key])
+      }),
+      requireNumber: jest.fn().mockImplementation((key: string) => {
+        const configValues: Record<string, number> = {
+          REFERRAL_MAX_IP_MATCHES: MAX_IP_MATCHES,
+          REFERRAL_MIN_LOGIN_DAYS: 3,
+          REFERRAL_FIVE_MINUTES_IN_MS: 5 * 60 * 1000
+        }
+        return Promise.resolve(configValues[key])
       })
     }
 
@@ -79,6 +93,11 @@ describe('referral-component', () => {
       sendMessage: jest.fn().mockResolvedValue(undefined)
     }
 
+    mockRedis = {
+      get: jest.fn(),
+      put: jest.fn().mockResolvedValue(undefined)
+    }
+
     referralComponent = await createReferralComponent({
       referralDb: mockReferralDb,
       logs: { getLogger: () => mockLogger },
@@ -86,7 +105,8 @@ describe('referral-component', () => {
       config: mockConfig,
       rewards: mockRewards,
       email: mockEmail,
-      slack: mockSlack
+      slack: mockSlack,
+      redis: mockRedis
     })
   })
 
@@ -120,14 +140,28 @@ describe('referral-component', () => {
     })
 
     describe('with a valid referral input', () => {
-      it('should create referral successfully', async () => {
+      let mockCreatedAt: number
+
+      beforeEach(() => {
+        mockCreatedAt = Date.now()
         mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
         mockReferralDb.createReferral.mockResolvedValueOnce({
           referrer: validReferrer,
           invited_user: validInvitedUser,
-          status: ReferralProgressStatus.PENDING
+          status: ReferralProgressStatus.PENDING,
+          created_at: mockCreatedAt
         })
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.PENDING,
+            created_at: mockCreatedAt
+          }
+        ])
+      })
 
+      it('should create referral successfully', async () => {
         const result = await referralComponent.create(validInput)
 
         expect(mockReferralDb.hasReferralProgress).toHaveBeenCalledWith(validInvitedUser)
@@ -135,6 +169,10 @@ describe('referral-component', () => {
           referrer: validReferrer.toLowerCase(),
           invitedUser: validInvitedUser.toLowerCase(),
           invitedUserIP: validIP
+        })
+        expect(mockReferralDb.findReferralProgress).toHaveBeenCalledWith({
+          referrer: validReferrer.toLowerCase(),
+          limit: 2
         })
         expect(mockLogger.info).toHaveBeenCalledWith('Creating referral', {
           referrer: validReferrer.toLowerCase(),
@@ -147,7 +185,8 @@ describe('referral-component', () => {
         expect(result).toEqual({
           referrer: validReferrer,
           invited_user: validInvitedUser,
-          status: ReferralProgressStatus.PENDING
+          status: ReferralProgressStatus.PENDING,
+          created_at: mockCreatedAt
         })
       })
     })
@@ -302,6 +341,123 @@ describe('referral-component', () => {
       })
     })
 
+    describe('when suspicious timing is detected', () => {
+      let newCreatedAt: number
+      let previousCreatedAt: number
+      let previousInvitedUser: string
+
+      beforeEach(() => {
+        newCreatedAt = Date.now()
+        previousCreatedAt = newCreatedAt - 2 * 60 * 1000 // 2 minutes earlier
+        previousInvitedUser = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+
+        mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        mockReferralDb.createReferral.mockResolvedValueOnce({
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.PENDING,
+          created_at: newCreatedAt
+        })
+        mockSlack.sendMessage.mockResolvedValueOnce(undefined)
+      })
+
+      describe('and referrals are within 5 minutes', () => {
+        beforeEach(() => {
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+            {
+              referrer: validReferrer.toLowerCase(),
+              invited_user: validInvitedUser.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: newCreatedAt
+            },
+            {
+              referrer: validReferrer.toLowerCase(),
+              invited_user: previousInvitedUser.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: previousCreatedAt
+            }
+          ])
+        })
+
+        it('should send Slack notification with timing details', async () => {
+          await referralComponent.create(validInput)
+
+          expect(mockReferralDb.findReferralProgress).toHaveBeenCalledWith({
+            referrer: validReferrer.toLowerCase(),
+            limit: 2
+          })
+
+          expect(mockSlack.sendMessage).toHaveBeenCalledWith(
+            referralSuspiciousTimingMessage(
+              validReferrer.toLowerCase(),
+              newCreatedAt.toString(),
+              previousCreatedAt.toString(),
+              2, // 2 minutes difference
+              new Date(newCreatedAt).toISOString(),
+              new Date(previousCreatedAt).toISOString(),
+              true, // isDev
+              'https://dashboard.decentraland.systems/1234'
+            )
+          )
+        })
+      })
+
+      describe('and referrals are more than 5 minutes apart', () => {
+        let oldCreatedAt: number
+
+        beforeEach(() => {
+          oldCreatedAt = newCreatedAt - 6 * 60 * 1000 // 6 minutes earlier
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+            {
+              referrer: validReferrer.toLowerCase(),
+              invited_user: validInvitedUser.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: newCreatedAt
+            },
+            {
+              referrer: validReferrer.toLowerCase(),
+              invited_user: previousInvitedUser.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: oldCreatedAt
+            }
+          ])
+        })
+
+        it('should not send Slack notification', async () => {
+          await referralComponent.create(validInput)
+
+          expect(mockSlack.sendMessage).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+              text: expect.stringContaining('Suspicious Referral Timing')
+            })
+          )
+        })
+      })
+
+      describe('and there is only one referral', () => {
+        beforeEach(() => {
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+            {
+              referrer: validReferrer.toLowerCase(),
+              invited_user: validInvitedUser.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: newCreatedAt
+            }
+          ])
+        })
+
+        it('should not send Slack notification', async () => {
+          await referralComponent.create(validInput)
+
+          expect(mockSlack.sendMessage).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+              text: expect.stringContaining('Suspicious Referral Timing')
+            })
+          )
+        })
+      })
+    })
+
     describe('when IP validation fails', () => {
       describe('and the invited user has been created with the rejected ip match status', () => {
         beforeEach(() => {
@@ -312,6 +468,7 @@ describe('referral-component', () => {
             invited_user: validInvitedUser,
             status: ReferralProgressStatus.REJECTED_IP_MATCH
           })
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([])
         })
 
         it('should throw ReferralInvalidInputError, create rejected IP match record and send Slack notification', async () => {
@@ -333,7 +490,8 @@ describe('referral-component', () => {
               validInvitedUser,
               validIP,
               true,
-              'https://dashboard.decentraland.systems/1234'
+              'https://dashboard.decentraland.systems/1234',
+              MAX_IP_MATCHES
             )
           )
         })
@@ -375,6 +533,15 @@ describe('referral-component', () => {
             invited_user: validInvitedUser,
             status: ReferralProgressStatus.PENDING
           })
+
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+            {
+              referrer: validReferrer,
+              invited_user: validInvitedUser,
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
         })
 
         it('should create referral successfully when IP matches equals maximum', async () => {
@@ -439,6 +606,15 @@ describe('referral-component', () => {
           invited_user: validInvitedUser,
           status: ReferralProgressStatus.PENDING
         })
+
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.PENDING,
+            created_at: Date.now()
+          }
+        ])
       })
 
       it('should create referral successfully when deny list fetch fails', async () => {
@@ -583,8 +759,16 @@ describe('referral-component', () => {
   describe('when finalizing referral', () => {
     const validInvitedUser = '0x1234567890123456789012345678901234567890'
     const validReferrer = '0x0987654321098765432109876543210987654321'
+    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000
 
-    describe('with valid signed up status', () => {
+    beforeEach(() => {
+      jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ users: [] })
+      } as any)
+    })
+
+    describe(`with valid signed up status and 3 login days in Redis cache`, () => {
       beforeEach(() => {
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
           {
@@ -595,9 +779,10 @@ describe('referral-component', () => {
         ])
         mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
       })
 
-      it('should finalize referral to tier granted and publish event', async () => {
+      it('should finalize referral to tier granted', async () => {
         await referralComponent.finalizeReferral(validInvitedUser)
 
         expect(mockReferralDb.findReferralProgress).toHaveBeenCalledWith({
@@ -624,6 +809,128 @@ describe('referral-component', () => {
           previousStatus: ReferralProgressStatus.SIGNED_UP,
           newStatus: ReferralProgressStatus.TIER_GRANTED
         })
+        expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
+        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
+      })
+    })
+
+    describe('when user has insufficient login days in Redis cache', () => {
+      beforeEach(() => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.SIGNED_UP
+          }
+        ])
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02'])
+      })
+
+      it('should add current day to cache and return without processing', async () => {
+        const today = new Date().toISOString().split('T')[0]
+
+        const result = await referralComponent.finalizeReferral(validInvitedUser)
+        expect(result).toBeUndefined()
+
+        expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
+        expect(mockRedis.put).toHaveBeenCalledWith(
+          `referral:invited-user:${validInvitedUser}`,
+          ['2024-01-01', '2024-01-02', today],
+          { noTTL: true }
+        )
+        expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when user has no login days in Redis cache', () => {
+      beforeEach(() => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.SIGNED_UP
+          }
+        ])
+        mockRedis.get.mockResolvedValueOnce([])
+      })
+
+      it('should add current day to cache and return without processing', async () => {
+        const today = new Date().toISOString().split('T')[0]
+
+        const result = await referralComponent.finalizeReferral(validInvitedUser)
+        expect(result).toBeUndefined()
+
+        expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
+        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [today], {
+          noTTL: true
+        })
+        expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when user has exactly minimum required login days', () => {
+      beforeEach(() => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.SIGNED_UP
+          }
+        ])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+      })
+
+      it('should clear Redis cache and finalize referral successfully', async () => {
+        await referralComponent.finalizeReferral(validInvitedUser)
+
+        expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
+        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
+        expect(mockReferralDb.updateReferralProgress).toHaveBeenCalledWith(
+          validInvitedUser.toLowerCase(),
+          ReferralProgressStatus.TIER_GRANTED
+        )
+        expect(mockSns.publishMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: Events.Type.REFERRAL,
+            subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED
+          })
+        )
+      })
+    })
+
+    describe('when user has more than minimum required login days', () => {
+      beforeEach(() => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.SIGNED_UP
+          }
+        ])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05'])
+      })
+
+      it('should clear Redis cache and finalize referral successfully', async () => {
+        await referralComponent.finalizeReferral(validInvitedUser)
+
+        expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
+        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
+        expect(mockReferralDb.updateReferralProgress).toHaveBeenCalledWith(
+          validInvitedUser.toLowerCase(),
+          ReferralProgressStatus.TIER_GRANTED
+        )
+        expect(mockSns.publishMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: Events.Type.REFERRAL,
+            subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED
+          })
+        )
       })
     })
 
@@ -648,6 +955,7 @@ describe('referral-component', () => {
           ])
           mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
+          mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
           mockRewards.sendReward.mockResolvedValueOnce([
             {
               id: '550e8400-e29b-41d4-a716-446655440000',
@@ -666,6 +974,8 @@ describe('referral-component', () => {
         it(`should send the notification with the correct tier for ${invitedUsers} invited users`, async () => {
           await referralComponent.finalizeReferral(validInvitedUser)
 
+          expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
+          expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
           expect(mockRewards.sendReward).toHaveBeenCalledWith(rewardKey, validReferrer.toLowerCase())
           expect(mockReferralDb.setReferralRewardImage).toHaveBeenCalledWith({
             referrer: validReferrer.toLowerCase(),
@@ -707,11 +1017,14 @@ describe('referral-component', () => {
           ])
           mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
+          mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
         })
 
         it(`should send the notification with the correct tier for ${invitedUsers} invited users and not send reward`, async () => {
           await referralComponent.finalizeReferral(validInvitedUser)
 
+          expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
+          expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
           expect(mockRewards.sendReward).not.toHaveBeenCalled()
           expect(mockReferralDb.setReferralRewardImage).not.toHaveBeenCalled()
           expect(mockSns.publishMessage).toHaveBeenCalledWith(
@@ -741,6 +1054,7 @@ describe('referral-component', () => {
           ])
           mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
+          mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
         })
 
         it(`should return tier ${tier} for ${invitedUsers} invited users (exceeds max)`, async () => {
@@ -812,6 +1126,7 @@ describe('referral-component', () => {
         ])
         mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
         mockSns.publishMessage.mockRejectedValueOnce(new Error('SNS publish failed'))
       })
 
@@ -837,6 +1152,7 @@ describe('referral-component', () => {
         ])
         mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
       })
 
       it('should send Slack notification', async () => {
@@ -860,6 +1176,7 @@ describe('referral-component', () => {
           ])
           mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
+          mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
         })
 
         it('should still finalize referral even if Slack fails', async () => {
@@ -893,6 +1210,9 @@ describe('referral-component', () => {
 
       beforeEach(() => {
         denyListedReferrer = '0x1111111111111111111111111111111111111111'
+
+        // Reset fetch mock and set up new response
+        jest.mocked(global.fetch).mockReset()
         jest.spyOn(global, 'fetch').mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -900,12 +1220,14 @@ describe('referral-component', () => {
               users: [{ wallet: denyListedReferrer.toLowerCase() }]
             })
         } as any)
+
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
           {
             referrer: denyListedReferrer.toLowerCase(),
             invited_user: validInvitedUser,
             status: ReferralProgressStatus.SIGNED_UP,
-            invited_user_ip: '192.168.1.1'
+            invited_user_ip: '192.168.1.1',
+            first_login_at: threeDaysAgo
           }
         ])
       })
@@ -1167,6 +1489,39 @@ describe('referral-component', () => {
             email: validEmail
           })
         ).rejects.toThrow(new ReferralInvalidInputError('Invalid referrer address'))
+      })
+    })
+
+    describe('and the referrer is on deny list', () => {
+      let denyListedReferrer: string
+      let denyListedInput: { referrer: string; email: string }
+
+      beforeEach(() => {
+        denyListedReferrer = '0x1111111111111111111111111111111111111111'
+        denyListedInput = {
+          referrer: denyListedReferrer,
+          email: validEmail
+        }
+        jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              users: [
+                { wallet: denyListedReferrer.toLowerCase() },
+                { wallet: '0x2222222222222222222222222222222222222222' }
+              ]
+            })
+        } as any)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
+      })
+
+      it('should throw ReferralInvalidInputError when referrer is deny listed', async () => {
+        await expect(referralComponent.setReferralEmail(denyListedInput)).rejects.toThrow(
+          new ReferralInvalidInputError(`Referrer is on the deny list ${denyListedReferrer.toLowerCase()}`)
+        )
+
+        expect(jest.mocked(global.fetch)).toHaveBeenCalledWith('https://config.decentraland.org/denylist.json')
+        expect(mockReferralDb.setReferralEmail).not.toHaveBeenCalled()
       })
     })
   })

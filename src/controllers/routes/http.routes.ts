@@ -22,13 +22,16 @@ import {
   removeCommunityPlaceHandler,
   updateCommunityHandler,
   addReferralEmailHandler,
-  getActiveCommunityVoiceChatsHandler
+  getActiveCommunityVoiceChatsHandler,
+  getMemberRequestsHandler,
+  getCommunityRequestsHandler,
+  getManagedCommunitiesHandler,
+  createCommunityRequestHandler,
+  updateCommunityRequestStatusHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
-import { getManagedCommunitiesHandler } from '../handlers/http/get-managed-communities-handler'
-import { createCommunityRequestHandler } from '../handlers/http/create-community-request-handler'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -68,6 +71,8 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.delete('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), unbanMemberHandler)
 
   router.get('/v1/members/:address/communities', signedFetchMiddleware(), getMemberCommunitiesHandler)
+  router.get('/v1/members/:address/requests', signedFetchMiddleware(), getMemberRequestsHandler)
+  router.get('/v1/communities/:id/requests', signedFetchMiddleware(), getCommunityRequestsHandler)
 
   router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
   router.put('/v1/communities/:id', signedFetchMiddleware(), multipartParserWrapper(updateCommunityHandler))
@@ -83,6 +88,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.post('/v1/referral-email', signedFetchMiddleware(), addReferralEmailHandler)
 
   router.post('/v1/communities/:id/requests', signedFetchMiddleware(), createCommunityRequestHandler)
+  router.patch('/v1/communities/:id/requests/:requestId', signedFetchMiddleware(), updateCommunityRequestStatusHandler)
 
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)

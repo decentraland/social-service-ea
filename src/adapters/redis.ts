@@ -50,11 +50,11 @@ export async function createRedisComponent(
     }
   }
 
-  async function put<T>(key: string, value: T, options?: SetOptions): Promise<void> {
+  async function put<T>(key: string, value: T, options?: SetOptions & { noTTL?: boolean }): Promise<void> {
     try {
       const serializedValue = JSON.stringify(value)
       await client.set(key, serializedValue, {
-        EX: options?.EX || TWO_HOURS_IN_SECONDS
+        EX: options?.noTTL ? undefined : options?.EX || TWO_HOURS_IN_SECONDS
       })
     } catch (err: any) {
       logger.error(`Error setting key "${key}"`, err)

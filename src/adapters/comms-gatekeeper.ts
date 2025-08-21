@@ -291,16 +291,23 @@ export const createCommsGatekeeperComponent = async ({
   }
 
   /**
-   * Sends a request to speak in a community voice chat.
+   * Sends a request to speak in a community voice chat or withdraws the request.
    * @param communityId - The ID of the community
    * @param userAddress - The address of the user requesting to speak
+   * @param isRaisingHand - True to raise hand (request to speak), false to lower hand (withdraw request)
    */
-  async function requestToSpeakInCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
+  async function requestToSpeakInCommunityVoiceChat(
+    communityId: string,
+    userAddress: string,
+    isRaisingHand: boolean = true
+  ): Promise<void> {
     try {
+      const method = isRaisingHand ? 'POST' : 'DELETE'
+
       const response = await fetch(
         `${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/speak-request`,
         {
-          method: 'POST',
+          method,
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${commsGateKeeperToken}`
@@ -312,8 +319,9 @@ export const createCommsGatekeeperComponent = async ({
         throw new Error(`Server responded with status ${response.status}`)
       }
     } catch (error) {
+      const action = isRaisingHand ? 'request to speak' : 'withdraw speak request'
       logger.error(
-        `Failed to request to speak for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+        `Failed to ${action} for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
       )
       throw error
     }
@@ -414,7 +422,9 @@ export const createCommsGatekeeperComponent = async ({
   ): Promise<void> {
     // Use the specific methods based on metadata
     if (metadata.isRequestingToSpeak === true) {
-      return requestToSpeakInCommunityVoiceChat(communityId, userAddress)
+      return requestToSpeakInCommunityVoiceChat(communityId, userAddress, true)
+    } else if (metadata.isRequestingToSpeak === false && metadata.canPublishTracks === undefined) {
+      return requestToSpeakInCommunityVoiceChat(communityId, userAddress, false)
     } else if (metadata.canPublishTracks === true && metadata.isRequestingToSpeak === false) {
       return promoteSpeakerInCommunityVoiceChat(communityId, userAddress)
     } else if (metadata.canPublishTracks === false && metadata.isRequestingToSpeak === false) {

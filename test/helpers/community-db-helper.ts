@@ -19,6 +19,23 @@ export function createDbHelper(pg: IPgComponent): ICommunitiesDbHelperComponent 
             WHERE community_id = ${communityId} AND member_address IN (${memberAddresses.map((address) => normalizeAddress(address))})
         `
       await pg.query(query)
+    },
+
+    async forceCommunityRequestRemoval(requestId: string): Promise<void> {
+      const query = SQL`
+            DELETE FROM community_requests
+            WHERE id = ${requestId}
+        `
+      await pg.query(query)
+    },
+
+    async updateCommunityRequestStatus(requestId: string, status: string): Promise<void> {
+      const query = SQL`
+            UPDATE community_requests 
+            SET status = ${status}
+            WHERE id = ${requestId}
+        `
+      await pg.query(query)
     }
   }
 }

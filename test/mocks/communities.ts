@@ -53,7 +53,9 @@ export function createMockCommunityRolesComponent({
   validatePermissionToUpdateCommunityPrivacy = jest.fn(),
   validatePermissionToDeleteCommunity = jest.fn(),
   validatePermissionToUpdatePlaces = jest.fn(),
-  validatePermissionToLeaveCommunity = jest.fn()
+  validatePermissionToLeaveCommunity = jest.fn(),
+  validatePermissionToAcceptAndRejectRequests = jest.fn(),
+  validatePermissionToViewRequests = jest.fn()
 }: Partial<jest.Mocked<ICommunityRolesComponent>>): jest.Mocked<ICommunityRolesComponent> {
   return {
     validatePermissionToKickMemberFromCommunity,
@@ -67,7 +69,9 @@ export function createMockCommunityRolesComponent({
     validatePermissionToUpdateCommunityPrivacy,
     validatePermissionToDeleteCommunity,
     validatePermissionToUpdatePlaces,
-    validatePermissionToLeaveCommunity
+    validatePermissionToLeaveCommunity,
+    validatePermissionToAcceptAndRejectRequests,
+    validatePermissionToViewRequests
   }
 }
 
@@ -114,7 +118,8 @@ export function createMockCommunityMembersComponent({
   kickMember = jest.fn(),
   updateMemberRole = jest.fn(),
   getOnlineMembersFromUserCommunities = jest.fn(),
-  getOnlineMembersFromCommunity = jest.fn()
+  getOnlineMembersFromCommunity = jest.fn(),
+  aggregateWithProfiles = jest.fn()
 }: Partial<jest.Mocked<ICommunityMembersComponent>>): jest.Mocked<ICommunityMembersComponent> {
   return {
     getCommunityMembers,
@@ -123,7 +128,8 @@ export function createMockCommunityMembersComponent({
     kickMember,
     updateMemberRole,
     getOnlineMembersFromUserCommunities,
-    getOnlineMembersFromCommunity
+    getOnlineMembersFromCommunity,
+    aggregateWithProfiles
   }
 }
 

@@ -1,17 +1,22 @@
+import { PaginatedParameters } from '@dcl/schemas'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
-import { CommunityNotFoundError, InvalidCommunityRequestError } from './errors'
+import { CommunityNotFoundError, CommunityRequestNotFoundError, InvalidCommunityRequestError } from './errors'
 import {
   CommunityPrivacyEnum,
-  CommunityRequest,
+  MemberRequest,
   CommunityRequestStatus,
   CommunityRequestType,
-  ICommunityRequestsComponent
+  ICommunityRequestsComponent,
+  MemberCommunityRequest,
+  ListCommunityRequestsOptions,
+  RequestActionOptions
 } from './types'
 
 export function createCommunityRequestsComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'logs'>
+  components: Pick<AppComponents, 'communitiesDb' | 'communities' | 'communityRoles' | 'logs'>
 ): ICommunityRequestsComponent {
-  const { communitiesDb, logs } = components
+  const { communitiesDb, communities, communityRoles, logs } = components
 
   const logger = logs.getLogger('community-requests-component')
 
@@ -19,7 +24,7 @@ export function createCommunityRequestsComponent(
     communityId: string,
     memberAddress: string,
     type: CommunityRequestType
-  ): Promise<CommunityRequest> {
+  ): Promise<MemberRequest> {
     const community = await communitiesDb.getCommunity(communityId, memberAddress)
     if (!community) {
       throw new CommunityNotFoundError(communityId)
@@ -55,7 +60,172 @@ export function createCommunityRequestsComponent(
     return request
   }
 
+  async function getMemberRequests(
+    memberAddress: string,
+    options: { type?: CommunityRequestType; pagination: Required<PaginatedParameters> }
+  ): Promise<{ requests: MemberRequest[]; total: number }> {
+    const [requests, total] = await Promise.all([
+      communitiesDb.getMemberRequests(memberAddress, {
+        pagination: options.pagination,
+        status: CommunityRequestStatus.Pending,
+        type: options?.type
+      }),
+      communitiesDb.getMemberRequestsCount(memberAddress, {
+        status: CommunityRequestStatus.Pending,
+        type: options?.type
+      })
+    ])
+
+    return { requests, total }
+  }
+
+  async function getCommunityRequests(
+    communityId: string,
+    options: ListCommunityRequestsOptions & RequestActionOptions
+  ): Promise<{ requests: MemberRequest[]; total: number }> {
+    await communityRoles.validatePermissionToViewRequests(communityId, options.callerAddress)
+
+    const [requests, total] = await Promise.all([
+      communitiesDb.getCommunityRequests(communityId, {
+        pagination: options.pagination,
+        status: CommunityRequestStatus.Pending,
+        type: options.type
+      }),
+      communitiesDb.getCommunityRequestsCount(communityId, {
+        status: CommunityRequestStatus.Pending,
+        type: options.type
+      })
+    ])
+
+    return { requests, total }
+  }
+
+  async function updateRequestStatus(
+    requestId: string,
+    status: Exclude<CommunityRequestStatus, 'pending'>,
+    options: RequestActionOptions
+  ): Promise<void> {
+    const request = await communitiesDb.getCommunityRequest(requestId)
+
+    if (!request || request.status !== CommunityRequestStatus.Pending) {
+      throw new CommunityRequestNotFoundError(requestId)
+    }
+
+    if (request.type === CommunityRequestType.Invite) {
+      await validateInvitePermissions(request, status, options.callerAddress)
+    } else if (request.type === CommunityRequestType.RequestToJoin) {
+      await validateJoinPermissions(request, status, options.callerAddress)
+    }
+
+    // User accepts invite or member with privileges accepts request to join
+    if (status === CommunityRequestStatus.Accepted) {
+      await communitiesDb.acceptCommunityRequestTransaction(requestId, {
+        communityId: request.communityId,
+        memberAddress: request.memberAddress,
+        role: CommunityRole.Member
+      })
+
+      logger.info('Community request accepted', {
+        requestId,
+        communityId: request.communityId,
+        type: request.type,
+        memberAddress: request.memberAddress,
+        callerAddress: options.callerAddress
+      })
+    }
+
+    if (status === CommunityRequestStatus.Rejected || status === CommunityRequestStatus.Cancelled) {
+      logger.info('Community request rejected or cancelled', {
+        requestId,
+        communityId: request.communityId,
+        type: request.type,
+        memberAddress: request.memberAddress,
+        callerAddress: options.callerAddress
+      })
+
+      await communitiesDb.removeCommunityRequest(requestId)
+    }
+  }
+
+  /**
+   * Validates permissions for invite actions using early returns to reduce nesting
+   */
+  async function validateInvitePermissions(
+    request: MemberRequest,
+    status: Exclude<CommunityRequestStatus, 'pending'>,
+    callerAddress: string
+  ): Promise<void> {
+    if (status === CommunityRequestStatus.Cancelled) {
+      if (request.memberAddress === callerAddress) {
+        throw new NotAuthorizedError('Invited user cannot cancel their invite')
+      }
+      await communityRoles.validatePermissionToAcceptAndRejectRequests(request.communityId, callerAddress)
+      return
+    }
+
+    if (request.memberAddress !== callerAddress) {
+      throw new NotAuthorizedError('Only invited user can accept or reject invites')
+    }
+  }
+
+  /**
+   * Validates permissions for join request actions using early returns to reduce nesting
+   */
+  async function validateJoinPermissions(
+    request: MemberRequest,
+    status: Exclude<CommunityRequestStatus, 'pending'>,
+    callerAddress: string
+  ): Promise<void> {
+    if (status === CommunityRequestStatus.Cancelled) {
+      if (request.memberAddress !== callerAddress) {
+        throw new NotAuthorizedError('Only requesting user can cancel their request')
+      }
+      return
+    }
+
+    if (request.memberAddress === callerAddress) {
+      throw new NotAuthorizedError('Requesting user cannot accept or reject their own request')
+    }
+
+    await communityRoles.validatePermissionToAcceptAndRejectRequests(request.communityId, callerAddress)
+  }
+
+  async function aggregateRequestsWithCommunities(
+    memberAddress: string,
+    requests: MemberRequest[]
+  ): Promise<MemberCommunityRequest[]> {
+    if (requests.length === 0) {
+      return []
+    }
+
+    const communityIds = requests.map((request) => request.communityId)
+    const { communities: communityData } = await communities.getCommunities(memberAddress, {
+      communityIds,
+      pagination: { limit: communityIds.length, offset: 0 }
+    })
+
+    return requests
+      .map((request) => {
+        const community = communityData.find((community) => community.id === request.communityId)
+        if (!community) {
+          logger.warn(`Community ${request.communityId} not found for request ${request.id}`)
+          return undefined
+        }
+
+        const { id, ...communityWithoutId } = community // prevent id override
+        return {
+          ...communityWithoutId,
+          ...request
+        } as MemberCommunityRequest
+      })
+      .filter(Boolean) as MemberCommunityRequest[]
+  }
+
   return {
-    createCommunityRequest
+    createCommunityRequest,
+    getMemberRequests,
+    getCommunityRequests,
+    updateRequestStatus,
+    aggregateRequestsWithCommunities
   }
 }

@@ -1037,6 +1037,66 @@ paths:
         - Referrals
 
   /v1/communities/{id}/requests:
+    get:
+      summary: Get community requests
+      description: |
+        Lists all pending requests (invites and join requests) for a specific community.
+        This endpoint requires Signed Fetch authentication and only community owners or moderators can access it.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of requests per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of requests to skip.
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [invite, request_to_join]
+          description: Filter requests by type (invite or request_to_join).
+      responses:
+        '200':
+          description: Community requests found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityRequests200OkResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required or insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
     post:
       summary: Create community request
       description: |
@@ -1089,6 +1149,121 @@ paths:
                 $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
         '404':
           description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
+  /v1/communities/{id}/requests/{requestId}:
+    patch:
+      summary: Update community request status
+      description: |
+        Updates the status of a community request (accept, reject, or cancel).
+        This endpoint requires Signed Fetch authentication with proper permissions:
+        - For invites: Only the invited user can accept/reject, community owners/moderators can cancel
+        - For join requests: Only community owners/moderators can accept/reject, the requesting user can cancel
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './communities-schemas.yaml#/components/schemas/UpdateCommunityRequestStatusRequest'
+      responses:
+        '204':
+          description: Community request status updated successfully
+        '400':
+          description: Invalid request or intention
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required or insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community or request not found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
+  /v1/members/{address}/requests:
+    get:
+      summary: Get member requests
+      description: |
+        Lists all pending requests (invites received and join requests sent) for a specific member.
+        This endpoint requires Signed Fetch authentication and users can only access their own requests.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the member.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of requests per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of requests to skip.
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [invite, request_to_join]
+          description: Filter requests by type (invite or request_to_join).
+      responses:
+        '200':
+          description: Member requests found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetMemberRequests200OkResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required or accessing another user's requests
           content:
             application/json:
               schema:

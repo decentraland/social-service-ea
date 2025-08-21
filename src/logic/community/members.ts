@@ -3,7 +3,6 @@ import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import {
   CommunityMemberProfile,
-  CommunityMember,
   GetCommunityMembersOptions,
   ICommunityMembersComponent,
   CommunityPrivacyEnum
@@ -38,6 +37,21 @@ export async function createCommunityMembersComponent(
   } = components
 
   const logger = logs.getLogger('community-component')
+
+  const aggregateWithProfiles = async <T extends { memberAddress: EthAddress }>(
+    userAddress: EthAddress | undefined,
+    members: T[]
+  ): Promise<(T & CommunityMemberProfile)[]> => {
+    if (members.length === 0) {
+      return []
+    }
+
+    const profiles = await catalystClient.getProfiles(members.map((member) => member.memberAddress))
+
+    const membersWithProfile = mapMembersWithProfiles<T, T & CommunityMemberProfile>(userAddress, members, profiles)
+
+    return membersWithProfile
+  }
 
   const filterAndCountCommunityMembers = async (id: string, options: GetCommunityMembersOptions) => {
     const { pagination, onlyOnline, as: userAddress, byPassPrivacy } = options
@@ -77,12 +91,7 @@ export async function createCommunityMembersComponent(
     })
     const totalMembers = await communitiesDb.getCommunityMembersCount(id, { filterByMembers: onlinePeers })
 
-    const profiles = await catalystClient.getProfiles(communityMembers.map((member) => member.memberAddress))
-
-    const membersWithProfile: CommunityMemberProfile[] = mapMembersWithProfiles<
-      CommunityMember,
-      CommunityMemberProfile
-    >(userAddress, communityMembers, profiles)
+    const membersWithProfile = await aggregateWithProfiles(userAddress, communityMembers)
 
     return { members: membersWithProfile, totalMembers }
   }
@@ -253,6 +262,8 @@ export async function createCommunityMembersComponent(
       await communityRoles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
 
       await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
-    }
+    },
+
+    aggregateWithProfiles
   }
 }

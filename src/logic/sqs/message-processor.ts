@@ -26,7 +26,7 @@ export async function createMessageProcessorComponent({
       return
     }
 
-    // await referral.finalizeReferral(userAddress)
+    await referral.finalizeReferral(userAddress)
 
     return
   }

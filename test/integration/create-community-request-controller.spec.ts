@@ -22,7 +22,6 @@ test('Create Community Request Controller', function ({ components, spyComponent
     })
 
     afterEach(async () => {
-      // Clean up community requests
       await components.communitiesDbHelper.forceCommunityRemoval(communityId)
     })
 

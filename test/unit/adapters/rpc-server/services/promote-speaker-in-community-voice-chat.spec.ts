@@ -14,7 +14,11 @@ describe('when promoting speaker in community voice chat', () => {
   let promoteSpeakerMock: jest.MockedFn<ICommsGatekeeperComponent['promoteSpeakerInCommunityVoiceChat']>
   let logs: jest.Mocked<ILoggerComponent>
   let commsGatekeeper: jest.Mocked<ICommsGatekeeperComponent>
-  let mockCommunitiesDB: { getCommunityMemberRole: jest.MockedFunction<any> }
+  let mockCommunitiesDB: {
+    getCommunityMemberRole: jest.MockedFunction<any>
+    getCommunity: jest.MockedFunction<any>
+    isMemberBanned: jest.MockedFunction<any>
+  }
   let communityId: string
   let userAddress: string
   let targetUserAddress: string
@@ -31,8 +35,17 @@ describe('when promoting speaker in community voice chat', () => {
     })
 
     mockCommunitiesDB = {
-      getCommunityMemberRole: jest.fn()
+      getCommunityMemberRole: jest.fn(),
+      getCommunity: jest.fn(),
+      isMemberBanned: jest.fn()
     }
+
+    // Setup default mocks
+    mockCommunitiesDB.getCommunity.mockResolvedValue({
+      id: communityId,
+      privacy: 'public' // Default to public community
+    })
+    mockCommunitiesDB.isMemberBanned.mockResolvedValue(false) // Default to not banned
 
     service = promoteSpeakerInCommunityVoiceChatService({
       components: {
@@ -43,13 +56,11 @@ describe('when promoting speaker in community voice chat', () => {
     })
   })
 
-  describe('and promoting speaker is successful', () => {
+  describe('and promoting speaker is successful in public community', () => {
     beforeEach(() => {
       promoteSpeakerMock.mockResolvedValue(undefined)
-      // Setup permission validation to pass
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-        .mockResolvedValueOnce(CommunityRole.Member) // target user role
+      // Setup permission validation to pass for public community (default setup)
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
     })
 
     it('should resolve with an ok response', async () => {
@@ -66,9 +77,9 @@ describe('when promoting speaker in community voice chat', () => {
 
       expect(result.response?.$case).toBe('ok')
       expect(promoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(2)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenNthCalledWith(1, communityId, userAddress)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenNthCalledWith(2, communityId, targetUserAddress)
+      // For public communities, only acting user role is checked
+      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(1)
+      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
     })
   })
 
@@ -100,31 +111,132 @@ describe('when promoting speaker in community voice chat', () => {
     })
   })
 
-  describe('and target user is not a community member', () => {
+  describe('when community is public', () => {
     beforeEach(() => {
-      // Acting user has permissions but target user is not a member
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Owner) // acting user role
-        .mockResolvedValueOnce(CommunityRole.None) // target user is not a member
+      // Setup public community - already set in global beforeEach
+      mockCommunitiesDB.getCommunity.mockResolvedValue({
+        id: communityId,
+        privacy: 'public'
+      })
     })
 
-    it('should resolve with a forbidden error response', async () => {
-      const result = await service(
-        PromoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+    describe('and acting user is a moderator', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
+        promoteSpeakerMock.mockResolvedValue(undefined)
+      })
 
-      expect(result.response?.$case).toBe('forbiddenError')
-      if (result.response?.$case === 'forbiddenError') {
-        expect(result.response.forbiddenError?.message).toContain('not a member of community')
-      }
-      expect(promoteSpeakerMock).not.toHaveBeenCalled()
+      it('should allow promoting any user (no membership restrictions for public communities)', async () => {
+        const result = await service(
+          PromoteSpeakerInCommunityVoiceChatPayload.create({
+            communityId,
+            userAddress: targetUserAddress
+          }),
+          {
+            address: userAddress,
+            subscribersContext: undefined
+          }
+        )
+
+        expect(result.response?.$case).toBe('ok')
+        expect(promoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+        // Should not check target user membership or ban status for public communities
+        expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(1)
+        expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when community is private', () => {
+    beforeEach(() => {
+      // Setup private community
+      mockCommunitiesDB.getCommunity.mockResolvedValue({
+        id: communityId,
+        privacy: 'private'
+      })
+    })
+
+    describe('and target user is a member and not banned', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole
+          .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
+          .mockResolvedValueOnce(CommunityRole.Member) // target user is member
+        mockCommunitiesDB.isMemberBanned.mockResolvedValue(false) // not banned
+        promoteSpeakerMock.mockResolvedValue(undefined)
+      })
+
+      it('should allow promoting member users who are not banned', async () => {
+        const result = await service(
+          PromoteSpeakerInCommunityVoiceChatPayload.create({
+            communityId,
+            userAddress: targetUserAddress
+          }),
+          {
+            address: userAddress,
+            subscribersContext: undefined
+          }
+        )
+
+        expect(result.response?.$case).toBe('ok')
+        expect(promoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+        expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+    })
+
+    describe('and target user is not a member', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole
+          .mockResolvedValueOnce(CommunityRole.Owner) // acting user role
+          .mockResolvedValueOnce(CommunityRole.None) // target user is not a member
+      })
+
+      it('should resolve with a forbidden error response', async () => {
+        const result = await service(
+          PromoteSpeakerInCommunityVoiceChatPayload.create({
+            communityId,
+            userAddress: targetUserAddress
+          }),
+          {
+            address: userAddress,
+            subscribersContext: undefined
+          }
+        )
+
+        expect(result.response?.$case).toBe('forbiddenError')
+        if (result.response?.$case === 'forbiddenError') {
+          expect(result.response.forbiddenError?.message).toContain('not a member of community')
+        }
+        expect(promoteSpeakerMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and target user is a member but is banned', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole
+          .mockResolvedValueOnce(CommunityRole.Owner) // acting user role
+          .mockResolvedValueOnce(CommunityRole.Member) // target user is member
+        mockCommunitiesDB.isMemberBanned.mockResolvedValue(true) // but is banned
+      })
+
+      it('should resolve with a forbidden error response (banned users cannot be promoted)', async () => {
+        const result = await service(
+          PromoteSpeakerInCommunityVoiceChatPayload.create({
+            communityId,
+            userAddress: targetUserAddress
+          }),
+          {
+            address: userAddress,
+            subscribersContext: undefined
+          }
+        )
+
+        expect(result.response?.$case).toBe('forbiddenError')
+        if (result.response?.$case === 'forbiddenError') {
+          expect(result.response.forbiddenError?.message).toContain('not a member of community')
+        }
+        expect(promoteSpeakerMock).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
     })
   })
 

@@ -48,7 +48,7 @@ import {
   BannedMember,
   CommunityPlace,
   CommunityRequestType,
-  CommunityRequest,
+  MemberRequest,
   GetCommunityRequestsOptions
 } from '../logic/community'
 import { Pagination } from './entities'
@@ -196,12 +196,23 @@ export interface ICommunitiesDatabaseComponent {
     communityId: string,
     memberAddress: EthAddress,
     type: CommunityRequestType
-  ): Promise<CommunityRequest>
-  getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<CommunityRequest[]>
+  ): Promise<MemberRequest>
+  getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<MemberRequest[]>
   getCommunityRequestsCount(
     communityId: string,
     filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
   ): Promise<number>
+  getMemberRequests(
+    memberAddress: string,
+    filters: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
+  ): Promise<MemberRequest[]>
+  getMemberRequestsCount(
+    memberAddress: string,
+    filters: Pick<GetCommunityRequestsOptions, 'status' | 'type'>
+  ): Promise<number>
+  getCommunityRequest(requestId: string): Promise<MemberRequest | undefined>
+  removeCommunityRequest(requestId: string): Promise<void>
+  acceptCommunityRequestTransaction(requestId: string, member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
 }
 
 export interface IVoiceDatabaseComponent {
@@ -220,7 +231,7 @@ export interface IRedisComponent extends IBaseComponent {
 
 export interface ICacheComponent extends IBaseCacheComponent {
   get: <T>(key: string) => Promise<T | null>
-  put: <T>(key: string, value: T, options?: SetOptions) => Promise<void>
+  put: <T>(key: string, value: T, options?: SetOptions & { noTTL?: boolean }) => Promise<void>
 }
 
 export type IPubSubComponent = IBaseComponent & {
@@ -322,7 +333,11 @@ export type ICommsGatekeeperComponent = {
   ) => Promise<{ connectionUrl: string }>
   endCommunityVoiceChatRoom: (communityId: string, userAddress: string) => Promise<void>
   updateUserMetadataInCommunityVoiceChat: (communityId: string, userAddress: string, metadata: any) => Promise<void>
-  requestToSpeakInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
+  requestToSpeakInCommunityVoiceChat: (
+    communityId: string,
+    userAddress: string,
+    isRaisingHand?: boolean
+  ) => Promise<void>
   rejectSpeakRequestInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   promoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   demoteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
@@ -357,6 +372,8 @@ export interface IPgComponent extends IBasePgComponent {
 export interface ICommunitiesDbHelperComponent {
   forceCommunityRemoval: (communityId: string) => Promise<void>
   forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
+  forceCommunityRequestRemoval: (requestId: string) => Promise<void>
+  updateCommunityRequestStatus: (requestId: string, status: string) => Promise<void>
 }
 
 export interface IStorageComponent {

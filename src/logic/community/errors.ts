@@ -64,3 +64,17 @@ export class CommunityComplianceError extends Error {
     this.name = 'CommunityComplianceError'
   }
 }
+
+/**
+ * This error is thrown when a community request (invite or request to join) is not found
+ *
+ * @export
+ * @class CommunityRequestNotFoundError
+ * @extends {Error}
+ */
+export class CommunityRequestNotFoundError extends Error {
+  constructor(public readonly id: string) {
+    super(`Community request not found: ${id}`)
+    this.name = 'CommunityRequestNotFoundError'
+  }
+}

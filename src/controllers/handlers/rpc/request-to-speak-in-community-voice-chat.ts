@@ -20,9 +20,14 @@ export function requestToSpeakInCommunityVoiceChatService({
     context: RpcServerContext
   ): Promise<RequestToSpeakInCommunityVoiceChatResponse> {
     try {
-      logger.info('Requesting to speak in community voice chat', {
+      // cast all addresses to lowercase
+      context.address = context.address.toLowerCase()
+
+      const action = request.isRaisingHand ? 'raising hand' : 'lowering hand'
+      logger.info(`${action} in community voice chat`, {
         communityId: request.communityId,
-        userAddress: context.address
+        userAddress: context.address,
+        isRaisingHand: String(request.isRaisingHand)
       })
 
       if (!request.communityId || request.communityId.trim() === '') {
@@ -30,27 +35,34 @@ export function requestToSpeakInCommunityVoiceChatService({
         throw new InvalidCommunityIdError()
       }
 
-      await commsGatekeeper.requestToSpeakInCommunityVoiceChat(request.communityId, context.address)
+      await commsGatekeeper.requestToSpeakInCommunityVoiceChat(
+        request.communityId,
+        context.address,
+        request.isRaisingHand
+      )
 
-      logger.info('Request to speak sent successfully', {
+      const successMessage = request.isRaisingHand ? 'Request to speak sent successfully' : 'Hand lowered successfully'
+      logger.info(successMessage, {
         communityId: request.communityId,
-        userAddress: context.address
+        userAddress: context.address,
+        isRaisingHand: String(request.isRaisingHand)
       })
 
       return {
         response: {
           $case: 'ok',
           ok: {
-            message: 'Request to speak sent successfully'
+            message: successMessage
           }
         }
       }
     } catch (error) {
       const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown'
-      logger.error('Failed to request to speak in community voice chat:', {
+      logger.error('Failed to update hand status in community voice chat:', {
         errorMessage: errorMessage,
         communityId: request.communityId,
-        userAddress: context.address
+        userAddress: context.address,
+        isRaisingHand: String(request.isRaisingHand)
       })
 
       // Handle specific error types
@@ -84,7 +96,7 @@ export function requestToSpeakInCommunityVoiceChatService({
       return {
         response: {
           $case: 'internalServerError',
-          internalServerError: { message: 'Failed to request to speak in community voice chat' }
+          internalServerError: { message: 'Failed to update hand status in community voice chat' }
         }
       }
     }
