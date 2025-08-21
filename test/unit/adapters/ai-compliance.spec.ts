@@ -3,7 +3,6 @@ import { mockConfig, mockLogs } from '../../mocks/components'
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 
 const mockOpenAICreate = jest.fn()
-const mockAnthropicCreate = jest.fn()
 
 jest.mock('openai', () => ({
   __esModule: true,
@@ -12,15 +11,6 @@ jest.mock('openai', () => ({
       completions: {
         create: mockOpenAICreate
       }
-    }
-  }))
-}))
-
-jest.mock('@anthropic-ai/sdk', () => ({
-  __esModule: true,
-  default: jest.fn().mockImplementation(() => ({
-    messages: {
-      create: mockAnthropicCreate
     }
   }))
 }))
@@ -35,630 +25,407 @@ describe('AIComplianceComponent', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    
+    // Default mock configuration
+    mockConfig.requireString.mockImplementation((key: string) => {
+      if (key === 'OPENAI_API_KEY') return Promise.resolve('test-api-key')
+      return Promise.reject(new Error(`Unknown key: ${key}`))
+    })
+    
+    mockConfig.getString.mockImplementation((key: string) => {
+      if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+      return Promise.resolve(undefined)
+    })
+  })
+
+  describe('createAIComplianceComponent', () => {
+    it('should create component with default model when OPENAI_MODEL not set', async () => {
+      aiCompliance = await createAIComplianceComponent({
+        config: mockConfig,
+        logs: mockLogs
+      })
+
+      expect(aiCompliance).toBeDefined()
+      expect(mockConfig.requireString).toHaveBeenCalledWith('OPENAI_API_KEY')
+      expect(mockConfig.getString).toHaveBeenCalledWith('OPENAI_MODEL')
+    })
+
+    it('should create component with custom model when OPENAI_MODEL is set', async () => {
+      mockConfig.getString.mockImplementation((key: string) => {
+        if (key === 'OPENAI_MODEL') return Promise.resolve('gpt-5')
+        return Promise.resolve(undefined)
+      })
+
+      aiCompliance = await createAIComplianceComponent({
+        config: mockConfig,
+        logs: mockLogs
+      })
+
+      expect(aiCompliance).toBeDefined()
+    })
+
+    it('should throw error when OPENAI_API_KEY is missing', async () => {
+      mockConfig.requireString.mockImplementation((key: string) => {
+        return Promise.reject(new Error('OPENAI_API_KEY not found'))
+      })
+
+      await expect(
+        createAIComplianceComponent({
+          config: mockConfig,
+          logs: mockLogs
+        })
+      ).rejects.toThrow('OPENAI_API_KEY not found')
+    })
   })
 
   describe('validateCommunityContent', () => {
-    describe('when using OpenAI', () => {
-      beforeEach(async () => {
-        mockConfig.requireString.mockImplementation((key: string) => {
-          if (key === 'OPENAI_API_KEY') return Promise.resolve('test-api-key')
-          return Promise.reject(new Error(`Unknown key: ${key}`))
-        })
-        mockConfig.getString.mockImplementation((key: string) => {
-          if (key === 'OPENAI_API_KEY') return Promise.resolve('test-api-key')
-          if (key === 'OPENAI_API_URL') return Promise.resolve(undefined)
-          if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-          return Promise.resolve(undefined)
-        })
-
-        aiCompliance = await createAIComplianceComponent({
-          config: mockConfig,
-          logs: mockLogs
-        })
+    beforeEach(async () => {
+      aiCompliance = await createAIComplianceComponent({
+        config: mockConfig,
+        logs: mockLogs
       })
+    })
 
-      describe('when content is compliant', () => {
-        beforeEach(() => {
-          mockResponse = {
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  isCompliant: true,
-                  issues: [],
-                  warnings: [],
-                  confidence: 0.95,
-                  reasoning: 'Content is compliant with ethical standards'
-                })
-              }
-            }]
-          }
-          mockOpenAICreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should validate content successfully', async () => {
-          const result = await aiCompliance.validateCommunityContent({ name, description })
-
-          expect(result.isCompliant).toBe(true)
-          expect(result.issues).toEqual([])
-          expect(result.warnings).toEqual([])
-          expect(result.confidence).toBe(0.95)
-          expect(mockOpenAICreate).toHaveBeenCalledWith(
-            expect.objectContaining({
-              model: 'gpt-4o',
-              messages: expect.arrayContaining([
-                expect.objectContaining({ role: 'system' }),
-                expect.objectContaining({ role: 'user', content: expect.stringContaining(name) })
-              ])
-            })
-          )
-          expect(mockAnthropicCreate).not.toHaveBeenCalled()
-        })
-      })
-
-      describe('when content has issues', () => {
-        beforeEach(() => {
-          mockResponse = {
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  isCompliant: false,
-                  issues: ['Contains inappropriate language'],
-                  warnings: [],
-                  confidence: 0.9,
-                  reasoning: 'Content violates ethical standards'
-                })
-              }
-            }]
-          }
-          mockOpenAICreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should return violation details', async () => {
-          const result = await aiCompliance.validateCommunityContent({ name, description })
-
-          expect(result.isCompliant).toBe(false)
-          expect(result.issues).toEqual(['Contains inappropriate language'])
-          expect(result.confidence).toBe(0.9)
-          expect(mockAnthropicCreate).not.toHaveBeenCalled()
-        })
-      })
-
-      describe('when content has warnings', () => {
-        beforeEach(() => {
-          mockResponse = {
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  isCompliant: true,
-                  issues: [],
-                  warnings: ['Content is borderline but acceptable'],
-                  confidence: 0.8,
-                  reasoning: 'Content is compliant with minor concerns'
-                })
-              }
-            }]
-          }
-          mockOpenAICreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should return warning details', async () => {
-          const result = await aiCompliance.validateCommunityContent({ name, description })
-
-          expect(result.isCompliant).toBe(true)
-          expect(result.warnings).toEqual(['Content is borderline but acceptable'])
-          expect(result.confidence).toBe(0.8)
-          expect(mockAnthropicCreate).not.toHaveBeenCalled()
-        })
-      })
-
-      describe('when validating content with thumbnails', () => {
-        beforeEach(() => {
-          mockResponse = {
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  isCompliant: true,
-                  issues: [],
-                  warnings: [],
-                  confidence: 0.95,
-                  reasoning: 'Content with thumbnail is compliant'
-                })
-              }
-            }]
-          }
-          mockOpenAICreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should handle thumbnail validation successfully', async () => {
-          const result = await aiCompliance.validateCommunityContent({ name, description, thumbnailBuffer })
-
-          expect(result.isCompliant).toBe(true)
-          expect(mockOpenAICreate).toHaveBeenCalledWith(
-            expect.objectContaining({
-              messages: expect.arrayContaining([
-                expect.objectContaining({
-                  content: expect.stringContaining('Thumbnail Image Data:')
-                })
-              ])
-            })
-          )
-          expect(mockAnthropicCreate).not.toHaveBeenCalled()
-        })
-      })
-
-      describe('when OpenAI returns empty content', () => {
-        beforeEach(() => {
-          mockResponse = {
-            choices: [{
-              message: {
-                content: null
-              }
-            }]
-          }
-          mockOpenAICreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should throw error for empty content', async () => {
-          await expect(
-            aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('No content received from OpenAI API')
-        })
-      })
-
-      describe('with custom configuration', () => {
-        describe('when using custom API URLs', () => {
-          beforeEach(async () => {
-            mockConfig.getString.mockImplementation((key: string) => {
-              if (key === 'OPENAI_API_KEY') return Promise.resolve('test-api-key')
-              if (key === 'OPENAI_API_URL') return Promise.resolve('https://custom-openai-endpoint.com/v1')
-              if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-              return Promise.resolve(undefined)
-            })
-
-            aiCompliance = await createAIComplianceComponent({
-              config: mockConfig,
-              logs: mockLogs
-            })
-
-            mockResponse = {
-              choices: [{
-                message: {
-                  content: JSON.stringify({
-                    isCompliant: true,
-                    issues: [],
-                    warnings: [],
-                    confidence: 0.95,
-                    reasoning: 'Content is compliant'
-                  })
-                }
-              }]
+    describe('when content is compliant', () => {
+      beforeEach(() => {
+        mockResponse = {
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                isCompliant: true,
+                issues: [],
+                warnings: [],
+                confidence: 0.95,
+                reasoning: 'Content is compliant with ethical standards'
+              })
             }
-            mockOpenAICreate.mockResolvedValue(mockResponse)
-          })
+          }],
+          usage: {
+            prompt_tokens: 500,
+            completion_tokens: 150,
+            total_tokens: 650
+          }
+        }
+        mockOpenAICreate.mockResolvedValue(mockResponse)
+      })
 
-          it('should use custom endpoint', async () => {
-            await aiCompliance.validateCommunityContent({ name, description })
+      it('should validate content successfully', async () => {
+        const result = await aiCompliance.validateCommunityContent({ name, description })
 
-            expect(mockOpenAICreate).toHaveBeenCalled()
+        expect(result.isCompliant).toBe(true)
+        expect(result.issues).toEqual([])
+        expect(result.warnings).toEqual([])
+        expect(result.confidence).toBe(0.95)
+        expect(result.reasoning).toBe('Content is compliant with ethical standards')
+      })
+
+      it('should call OpenAI with correct parameters', async () => {
+        await aiCompliance.validateCommunityContent({ name, description })
+
+        expect(mockOpenAICreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            model: 'gpt-5-nano',
+            response_format: {
+              type: 'json_schema',
+              json_schema: {
+                name: 'ComplianceValidationResult',
+                schema: expect.any(Object)
+              }
+            },
+            messages: expect.arrayContaining([
+              expect.objectContaining({ 
+                role: 'system', 
+                content: expect.stringContaining('Decentraland compliance expert') 
+              }),
+              expect.objectContaining({ 
+                role: 'user', 
+                content: expect.arrayContaining([
+                  expect.objectContaining({
+                    type: 'text',
+                    text: expect.stringContaining(name)
+                  })
+                ])
+              })
+            ])
           })
+        )
+      })
+
+      it('should log usage information', async () => {
+        await aiCompliance.validateCommunityContent({ name, description })
+
+        expect(mockLogs.getLogger).toHaveBeenCalledWith('ai-compliance')
+      })
+    })
+
+    describe('when content has compliance issues', () => {
+      beforeEach(() => {
+        mockResponse = {
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                isCompliant: false,
+                issues: ['Contains inappropriate language', 'Promotes illegal activities'],
+                warnings: ['Content may be borderline'],
+                confidence: 0.85,
+                reasoning: 'Content violates ethical standards'
+              })
+            }
+          }],
+          usage: {
+            prompt_tokens: 500,
+            completion_tokens: 200,
+            total_tokens: 700
+          }
+        }
+        mockOpenAICreate.mockResolvedValue(mockResponse)
+      })
+
+      it('should return violation details', async () => {
+        const result = await aiCompliance.validateCommunityContent({ name, description })
+
+        expect(result.isCompliant).toBe(false)
+        expect(result.issues).toEqual(['Contains inappropriate language', 'Promotes illegal activities'])
+        expect(result.warnings).toEqual(['Content may be borderline'])
+        expect(result.confidence).toBe(0.85)
+        expect(result.reasoning).toBe('Content violates ethical standards')
+      })
+    })
+
+    describe('when content has warnings but is compliant', () => {
+      beforeEach(() => {
+        mockResponse = {
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                isCompliant: true,
+                issues: [],
+                warnings: ['Content is borderline but acceptable'],
+                confidence: 0.8,
+                reasoning: 'Content is compliant with minor concerns'
+              })
+            }
+          }],
+          usage: {
+            prompt_tokens: 500,
+            completion_tokens: 180,
+            total_tokens: 680
+          }
+        }
+        mockOpenAICreate.mockResolvedValue(mockResponse)
+      })
+
+      it('should return warning details', async () => {
+        const result = await aiCompliance.validateCommunityContent({ name, description })
+
+        expect(result.isCompliant).toBe(true)
+        expect(result.warnings).toEqual(['Content is borderline but acceptable'])
+        expect(result.confidence).toBe(0.8)
+      })
+    })
+
+    describe('when validating content with thumbnails', () => {
+      beforeEach(() => {
+        mockResponse = {
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                isCompliant: true,
+                issues: [],
+                warnings: [],
+                confidence: 0.95,
+                reasoning: 'Content with thumbnail is compliant'
+              })
+            }
+          }],
+          usage: {
+            prompt_tokens: 800,
+            completion_tokens: 150,
+            total_tokens: 950
+          }
+        }
+        mockOpenAICreate.mockResolvedValue(mockResponse)
+      })
+
+      it('should handle thumbnail validation successfully', async () => {
+        const result = await aiCompliance.validateCommunityContent({ 
+          name, 
+          description, 
+          thumbnailBuffer,
+          thumbnailMime: 'image/png'
         })
 
-        describe('when using custom models', () => {
-          beforeEach(async () => {
-            mockConfig.getString.mockImplementation((key: string) => {
-              if (key === 'OPENAI_API_KEY') return Promise.resolve('test-api-key')
-              if (key === 'OPENAI_API_URL') return Promise.resolve(undefined)
-              if (key === 'OPENAI_MODEL') return Promise.resolve('gpt-4-turbo')
-              return Promise.resolve(undefined)
-            })
-
-            aiCompliance = await createAIComplianceComponent({
-              config: mockConfig,
-              logs: mockLogs
-            })
-
-            mockResponse = {
-              choices: [{
-                message: {
-                  content: JSON.stringify({
-                    isCompliant: true,
-                    issues: [],
-                    warnings: [],
-                    confidence: 0.95,
-                    reasoning: 'Content is compliant'
-                  })
-                }
-              }]
-            }
-            mockOpenAICreate.mockResolvedValue(mockResponse)
-          })
-
-          it('should use custom model', async () => {
-            await aiCompliance.validateCommunityContent({ name, description })
-
-            expect(mockOpenAICreate).toHaveBeenCalledWith(
+        expect(result.isCompliant).toBe(true)
+        expect(mockOpenAICreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            messages: expect.arrayContaining([
               expect.objectContaining({
-                model: 'gpt-4-turbo'
+                content: expect.arrayContaining([
+                  expect.objectContaining({
+                    type: 'image_url',
+                    image_url: expect.objectContaining({
+                      url: expect.stringContaining('data:image/png;base64,')
+                    })
+                  })
+                ])
               })
-            )
+            ])
           })
-        })
+        )
       })
     })
 
-    describe('when OpenAI fails and falling back to Claude', () => {
-      beforeEach(async () => {
-        mockConfig.requireString.mockImplementation((key: string) => {
-          if (key === 'OPENAI_API_KEY') return Promise.resolve('test-openai-key')
-          if (key === 'CLAUDE_API_KEY') return Promise.resolve('test-claude-key')
-          return Promise.reject(new Error(`Unknown key: ${key}`))
-        })
-        mockConfig.getString.mockImplementation((key: string) => {
-          if (key === 'OPENAI_API_KEY') return Promise.resolve('test-openai-key')
-          if (key === 'OPENAI_API_URL') return Promise.resolve(undefined)
-          if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-          return Promise.resolve(undefined)
-        })
-
-        aiCompliance = await createAIComplianceComponent({
-          config: mockConfig,
-          logs: mockLogs
-        })
-      })
-
-      describe('when OpenAI throws an error', () => {
-        beforeEach(() => {
-          const openaiError = new Error('OpenAI API error')
-          mockOpenAICreate.mockRejectedValue(openaiError)
-          
-          mockResponse = {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                isCompliant: true,
-                issues: [],
-                warnings: [],
-                confidence: 0.9,
-                reasoning: 'Content validated by Claude'
-              })
-            }]
+    describe('when OpenAI returns empty content', () => {
+      beforeEach(() => {
+        mockResponse = {
+          choices: [{
+            message: {
+              content: null
+            }
+          }],
+          usage: {
+            prompt_tokens: 500,
+            completion_tokens: 0,
+            total_tokens: 500
           }
-          mockAnthropicCreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should fallback to Claude successfully', async () => {
-          const result = await aiCompliance.validateCommunityContent({ name, description })
-
-          expect(result.isCompliant).toBe(true)
-          expect(mockOpenAICreate).toHaveBeenCalledTimes(1)
-          expect(mockAnthropicCreate).toHaveBeenCalledTimes(1)
-        })
+        }
+        mockOpenAICreate.mockResolvedValue(mockResponse)
       })
 
-      describe('when OpenAI returns invalid JSON', () => {
-        beforeEach(() => {
-          mockResponse = {
-            choices: [{
-              message: {
-                content: 'This is not valid JSON'
-              }
-            }]
-          }
-          mockOpenAICreate.mockResolvedValue(mockResponse)
-          
-          const claudeResponse = {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                isCompliant: true,
-                issues: [],
-                warnings: [],
-                confidence: 0.9,
-                reasoning: 'Content validated by Claude'
-              })
-            }]
-          }
-          mockAnthropicCreate.mockResolvedValue(claudeResponse)
-        })
-
-        it('should fallback to Claude for invalid responses', async () => {
-          const result = await aiCompliance.validateCommunityContent({ name, description })
-
-          expect(result.isCompliant).toBe(true)
-          expect(mockOpenAICreate).toHaveBeenCalledTimes(1)
-          expect(mockAnthropicCreate).toHaveBeenCalledTimes(1)
-        })
-      })
-
-      describe('when OpenAI returns malformed responses', () => {
-        beforeEach(() => {
-          mockResponse = {
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  isCompliant: true,
-                  // Missing required fields
-                  issues: []
-                })
-              }
-            }]
-          }
-          mockOpenAICreate.mockResolvedValue(mockResponse)
-          
-          const claudeResponse = {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                isCompliant: true,
-                issues: [],
-                warnings: [],
-                confidence: 0.9,
-                reasoning: 'Content validated by Claude'
-              })
-            }]
-          }
-          mockAnthropicCreate.mockResolvedValue(claudeResponse)
-        })
-
-        it('should fallback to Claude for malformed responses', async () => {
-          const result = await aiCompliance.validateCommunityContent({ name, description })
-
-          expect(result.isCompliant).toBe(true)
-          expect(mockOpenAICreate).toHaveBeenCalledTimes(1)
-          expect(mockAnthropicCreate).toHaveBeenCalledTimes(1)
-        })
-      })
-
-      describe('when OpenAI API has rate limit issues', () => {
-        beforeEach(() => {
-          const apiError = new Error('API rate limit exceeded')
-          mockOpenAICreate.mockRejectedValue(apiError)
-          
-          mockResponse = {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                isCompliant: true,
-                issues: [],
-                warnings: [],
-                confidence: 0.9,
-                reasoning: 'Content validated by Claude'
-              })
-            }]
-          }
-          mockAnthropicCreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should handle rate limit errors gracefully', async () => {
-          const result = await aiCompliance.validateCommunityContent({ name, description })
-
-          expect(result.isCompliant).toBe(true)
-          expect(mockOpenAICreate).toHaveBeenCalledTimes(1)
-          expect(mockAnthropicCreate).toHaveBeenCalledTimes(1)
-        })
-      })
-    })
-
-    describe('when using Claude directly', () => {
-      beforeEach(async () => {
-        mockConfig.requireString.mockImplementation((key: string) => {
-          if (key === 'OPENAI_API_KEY') {
-            return Promise.reject(new Error('OPENAI_API_KEY not found'))
-          }
-          if (key === 'CLAUDE_API_KEY') {
-            return Promise.resolve('test-claude-key')
-          }
-          return Promise.reject(new Error(`Unknown key: ${key}`))
-        })
-
-        aiCompliance = await createAIComplianceComponent({
-          config: mockConfig,
-          logs: mockLogs
-        })
-      })
-
-      describe('when OpenAI key is not available', () => {
-        beforeEach(() => {
-          mockResponse = {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                isCompliant: true,
-                issues: [],
-                warnings: [],
-                confidence: 0.9,
-                reasoning: 'Content validated by Claude'
-              })
-            }]
-          }
-          mockAnthropicCreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should use Claude successfully', async () => {
-          const result = await aiCompliance.validateCommunityContent({ name, description })
-
-          expect(result.isCompliant).toBe(true)
-          expect(mockOpenAICreate).not.toHaveBeenCalled()
-          expect(mockAnthropicCreate).toHaveBeenCalledTimes(1)
-        })
-      })
-
-      describe('when Claude returns invalid content type', () => {
-        beforeEach(() => {
-          mockResponse = {
-            content: [{
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/jpeg',
-                data: 'fake-image-data'
-              }
-            }]
-          }
-          mockAnthropicCreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should throw error for invalid content type', async () => {
-          await expect(
-            aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('No valid text content received from Claude API')
-        })
-      })
-
-      describe('when Claude returns empty content', () => {
-        beforeEach(() => {
-          mockResponse = {
-            content: []
-          }
-          mockAnthropicCreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should throw error for empty content', async () => {
-          await expect(
-            aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('No valid text content received from Claude API')
-        })
-      })
-    })
-
-    describe('when all providers fail', () => {
-      beforeEach(async () => {
-        mockConfig.requireString.mockImplementation((key: string) => {
-          if (key === 'OPENAI_API_KEY') return Promise.resolve('test-openai-key')
-          if (key === 'CLAUDE_API_KEY') return Promise.resolve('test-claude-key')
-          return Promise.reject(new Error(`Unknown key: ${key}`))
-        })
-        mockConfig.getString.mockImplementation((key: string) => {
-          if (key === 'OPENAI_API_KEY') return Promise.resolve('test-openai-key')
-          if (key === 'OPENAI_API_URL') return Promise.resolve(undefined)
-          if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-          return Promise.resolve(undefined)
-        })
-
-        aiCompliance = await createAIComplianceComponent({
-          config: mockConfig,
-          logs: mockLogs
-        })
-      })
-
-      describe('when both OpenAI and Claude fail completely', () => {
-        beforeEach(() => {
-          const openaiError = new Error('OpenAI API completely down')
-          mockOpenAICreate.mockRejectedValue(openaiError)
-          
-          const claudeError = new Error('Claude API completely down')
-          mockAnthropicCreate.mockRejectedValue(claudeError)
-        })
-
-        it('should throw error when all providers fail', async () => {
-          await expect(
-            aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('Claude API completely down')
-        })
-      })
-
-      describe('when OpenAI fails and Claude returns invalid response', () => {
-        beforeEach(() => {
-          const openaiError = new Error('OpenAI API error')
-          mockOpenAICreate.mockRejectedValue(openaiError)
-          
-          // Claude returns invalid JSON that can't be parsed
-          mockResponse = {
-            content: [{
-              type: 'text',
-              text: 'Invalid JSON response'
-            }]
-          }
-          mockAnthropicCreate.mockResolvedValue(mockResponse)
-        })
-
-        it('should throw error when all providers fail', async () => {
-          await expect(
-            aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('No valid JSON found in AI response')
-        })
-      })
-
-      describe('when OpenAI fails and Claude throws non-Error exception', () => {
-        beforeEach(() => {
-          const openaiError = new Error('OpenAI API error')
-          mockOpenAICreate.mockRejectedValue(openaiError)
-          
-          // Claude throws a non-Error object
-          const nonErrorException = { message: 'This is not an Error instance' }
-          mockAnthropicCreate.mockRejectedValue(nonErrorException)
-        })
-
-        it('should handle non-Error exceptions gracefully', async () => {
-          await expect(
-            aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('Unknown error')
-        })
-      })
-
-      describe('when OpenAI fails and Claude throws undefined', () => {
-        beforeEach(() => {
-          const openaiError = new Error('OpenAI API error')
-          mockOpenAICreate.mockRejectedValue(openaiError)
-          
-          // Claude throws undefined
-          mockAnthropicCreate.mockRejectedValue(undefined)
-        })
-
-        it('should handle undefined exceptions gracefully', async () => {
-          await expect(
-            aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('Unknown error')
-        })
-      })
-    })
-
-    describe('when no providers are available', () => {
-      it('should throw error during component creation', async () => {
-        mockConfig.requireString.mockImplementation((key: string) => {
-          return Promise.reject(new Error(`${key} not found`))
-        })
-
+      it('should throw error for empty content', async () => {
         await expect(
-          createAIComplianceComponent({
-            config: mockConfig,
-            logs: mockLogs
-          })
-        ).rejects.toThrow('No AI providers available - both OPENAI_API_KEY and CLAUDE_API_KEY are missing')
+          aiCompliance.validateCommunityContent({ name, description })
+        ).rejects.toThrow('No content received from OpenAI API')
       })
     })
 
-    describe('when only one provider is available', () => {
-      beforeEach(async () => {
-        mockConfig.requireString.mockImplementation((key: string) => {
-          if (key === 'OPENAI_API_KEY') return Promise.resolve('test-openai-key')
-          if (key === 'CLAUDE_API_KEY') return Promise.reject(new Error('CLAUDE_API_KEY not found'))
-          return Promise.reject(new Error(`Unknown key: ${key}`))
-        })
-        mockConfig.getString.mockImplementation((key: string) => {
-          if (key === 'OPENAI_API_KEY') return Promise.resolve('test-openai-key')
-          if (key === 'OPENAI_API_URL') return Promise.resolve(undefined)
-          if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-          return Promise.resolve(undefined)
-        })
-
-        aiCompliance = await createAIComplianceComponent({
-          config: mockConfig,
-          logs: mockLogs
-        })
+    describe('when OpenAI returns invalid JSON', () => {
+      beforeEach(() => {
+        mockResponse = {
+          choices: [{
+            message: {
+              content: 'This is not valid JSON'
+            }
+          }],
+          usage: {
+            prompt_tokens: 500,
+            completion_tokens: 50,
+            total_tokens: 550
+          }
+        }
+        mockOpenAICreate.mockResolvedValue(mockResponse)
       })
 
-      describe('when the single provider fails', () => {
-        beforeEach(() => {
-          const openaiError = new Error('OpenAI API completely down')
-          mockOpenAICreate.mockRejectedValue(openaiError)
-        })
+      it('should throw error for invalid JSON', async () => {
+        await expect(
+          aiCompliance.validateCommunityContent({ name, description })
+        ).rejects.toThrow('Invalid JSON response from OpenAI API')
+      })
+    })
 
-        it('should throw the provider error when no fallback is available', async () => {
-          await expect(
-            aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('OpenAI API completely down')
-        })
+    describe('when OpenAI returns malformed response structure', () => {
+      beforeEach(() => {
+        mockResponse = {
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                isCompliant: true,
+                // Missing required fields
+                issues: []
+                // warnings, confidence, reasoning missing
+              })
+            }
+          }],
+          usage: {
+            prompt_tokens: 500,
+            completion_tokens: 100,
+            total_tokens: 600
+          }
+        }
+        mockOpenAICreate.mockResolvedValue(mockResponse)
+      })
+
+      it('should throw error for malformed response', async () => {
+        await expect(
+          aiCompliance.validateCommunityContent({ name, description })
+        ).rejects.toThrow('Invalid response structure from OpenAI API')
+      })
+    })
+
+    describe('when OpenAI API throws an error', () => {
+      beforeEach(() => {
+        const apiError = new Error('OpenAI API error')
+        mockOpenAICreate.mockRejectedValue(apiError)
+      })
+
+      it('should propagate the error', async () => {
+        await expect(
+          aiCompliance.validateCommunityContent({ name, description })
+        ).rejects.toThrow('OpenAI API error')
+      })
+    })
+
+    describe('when OpenAI API returns usage information', () => {
+      beforeEach(() => {
+        mockResponse = {
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                isCompliant: true,
+                issues: [],
+                warnings: [],
+                confidence: 0.95,
+                reasoning: 'Content is compliant'
+              })
+            }
+          }],
+          usage: {
+            prompt_tokens: 500,
+            completion_tokens: 150,
+            total_tokens: 650
+          }
+        }
+        mockOpenAICreate.mockResolvedValue(mockResponse)
+      })
+
+      it('should log usage information correctly', async () => {
+        await aiCompliance.validateCommunityContent({ name, description })
+
+        // Verify that the logger was called with usage info
+        expect(mockLogs.getLogger).toHaveBeenCalledWith('ai-compliance')
+      })
+    })
+
+    describe('request ID generation', () => {
+      beforeEach(() => {
+        mockResponse = {
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                isCompliant: true,
+                issues: [],
+                warnings: [],
+                confidence: 0.95,
+                reasoning: 'Content is compliant'
+              })
+            }
+          }],
+          usage: {
+            prompt_tokens: 500,
+            completion_tokens: 150,
+            total_tokens: 650
+          }
+        }
+        mockOpenAICreate.mockResolvedValue(mockResponse)
+      })
+
+      it('should generate unique request IDs for each validation', async () => {
+        const result1 = await aiCompliance.validateCommunityContent({ name, description })
+        const result2 = await aiCompliance.validateCommunityContent({ name, description })
+
+        expect(result1).toBeDefined()
+        expect(result2).toBeDefined()
+        // The request IDs should be different due to timestamp + random suffix
       })
     })
   })

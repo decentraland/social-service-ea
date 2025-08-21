@@ -12,6 +12,7 @@ export interface ComplianceValidationRequest {
   name: string
   description: string
   thumbnailBuffer?: Buffer
+  thumbnailMime?: 'image/png' | 'image/jpeg' | 'image/gif'
 }
 
 export interface IAIComplianceComponent {
@@ -27,122 +28,123 @@ export async function createAIComplianceComponent(
   const apiKey = await config.requireString('OPENAI_API_KEY')
   const model = (await config.getString('OPENAI_MODEL')) || 'gpt-5-nano'
 
-  const DECENTRALAND_CODE_OF_ETHICS = `DECENTRALAND'S CODE OF ETHICS
+  // Comprehensive but focused prompt based on official Code of Ethics
+  const SYSTEM_PROMPT = `You are a Decentraland compliance expert analyzing community content against our Code of Ethics (https://decentraland.org/ethics/).
 
-Our Values of integrity, responsibility, respect and pioneering govern everything we do. Our reputation as a company that users can trust is our most valuable asset.
+Key compliance areas to evaluate:
+1. VIOLENCE & HARASSMENT: No violence, harassment, bullying, or inappropriate behavior (Section 2.9)
+2. DISCRIMINATION: No discrimination based on race, sex, marital status, medical condition, etc. (Section 2.7)
+3. ILLEGAL ACTIVITIES: No promotion of illegal drugs, criminal behavior, or law violations (Section 2.2, 2.10)
+4. BUSINESS INTEGRITY: No corruption, bribery, deceptive practices, or conflicts of interest (Section 5.3, 5.4)
+5. REPUTATIONAL RISK: Content must not damage Decentraland's reputation as a trustworthy company (Section 1)
+6. PRIVACY/CONFIDENTIALITY: No exposure of private data or confidential information (Section 2.13)
+7. ENVIRONMENTAL: No promotion of environmentally harmful activities (Section 2.11)
 
-POLICIES AND PRINCIPLES:
+Be strict but fair. Flag any content that violates these principles. Return ONLY valid JSON matching the exact schema provided.`
 
-1. Standard of Conduct: We conduct all operations with honesty, integrity and openness, respecting human rights and interests.
-
-2. Compliance with Law: We have zero tolerance for issues of applicable laws and regulations.
-
-3. Equal Opportunity Employment: We strictly prohibit unlawful discrimination, harassment, bullying in any form – verbal, physical, or visual.
-
-4. No Violence: We are committed to a violence-free environment with zero tolerance for any level of violence, harassment or inappropriate behavior.
-
-5. Drugs and Alcohol: Substance abuse is incompatible with health and safety. Illegal drugs are strictly prohibited.
-
-6. Confidentiality: We maintain confidentiality regarding internal corporate matters and protect data privacy and security.
-
-7. Business Integrity: We avoid corruption and do not give or receive bribes or improper payments for business gain.
-
-8. Conflicts of Interest: All employees must avoid personal activities that could conflict with their responsibilities to the Company.
-
-9. Know Your Client: We must identify directors, shareholders and final economic beneficiaries before entering contracts.
-
-10. Risk Matters: We ensure Decentraland does not receive proceeds of criminal activities and screen third parties for legitimacy.`
+  // JSON Schema for structured outputs
+  const COMPLIANCE_SCHEMA = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['isCompliant', 'issues', 'warnings', 'confidence', 'reasoning'],
+    properties: {
+      isCompliant: { type: 'boolean' },
+      issues: { type: 'array', items: { type: 'string', maxLength: 200 } },
+      warnings: { type: 'array', items: { type: 'string', maxLength: 200 } },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+      reasoning: { type: 'string', maxLength: 500 }
+    }
+  } as const
 
   return {
     async validateCommunityContent(request: ComplianceValidationRequest): Promise<ComplianceValidationResult> {
       const startTime = Date.now()
+      const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
       try {
         const { default: OpenAI } = await import('openai')
         const openai = new OpenAI({ apiKey })
 
-        const systemPrompt = `You are a compliance expert for Decentraland. Analyze community content against our Code of Ethics and return a structured response.
+        // Build user content
+        const userContent: any[] = [
+          {
+            type: 'text',
+            text: `Analyze this community content:\nName: "${request.name}"\nDescription: "${request.description}"\n\nReturn JSON matching the schema.`
+          }
+        ]
 
-Be strict but fair. Flag any content that could violate our values of integrity, responsibility, respect, or pioneering. Consider potential legal, ethical, or reputational risks.
-
-When analyzing thumbnail images, pay special attention to visual content that may violate our Code of Ethics, including inappropriate imagery, violence, discrimination, or other issues that might not be apparent from text alone.
-
-You must respond with a valid JSON object matching the exact structure specified.`
-
-        const userPrompt = `Please analyze the following community content against Decentraland's Code of Ethics:
-            
-Community Name: "${request.name}"
-Community Description: "${request.description}"
-${request.thumbnailBuffer ? `Thumbnail Image Data: ${request.thumbnailBuffer.toString('base64')}` : 'Thumbnail: None provided'}
-            
-Code of Ethics:
-${DECENTRALAND_CODE_OF_ETHICS}
-            
-Please evaluate if this community content complies with our ethical standards. Consider:
-
-1. VIOLENCE & HARASSMENT: Does the content promote violence, hate, harassment, bullying, or inappropriate behavior? (Section 4, 9)
-2. DISCRIMINATION: Does it contain discriminatory content based on race, sex, marital status, medical condition, or other protected characteristics? (Section 3)
-3. ILLEGAL ACTIVITIES: Does it promote illegal activities, substance abuse, or criminal behavior? (Section 5, 10)
-4. BUSINESS INTEGRITY: Does it violate principles of honesty, integrity, or fair competition? (Section 1, 7)
-5. REPUTATIONAL RISK: Could it damage Decentraland's reputation as a trustworthy company? (Section 1)
-6. LEGAL COMPLIANCE: Does it comply with applicable laws and regulations? (Section 2)
-7. CONFIDENTIALITY: Does it expose confidential information or violate privacy? (Section 6)
-
-IMPORTANT: If a thumbnail image is provided, carefully analyze the visual content for any issues of the Code of Ethics. Images can contain inappropriate content that text alone might not reveal.
-
-Return your analysis as a JSON object with the exact structure:
-{
-  "isCompliant": boolean,
-  "issues": ["list of specific issues"],
-  "warnings": ["list of warnings"],
-  "confidence": number (0-1),
-  "reasoning": "detailed explanation"
-}`
-
-        const userContent: any[] = [{ type: 'text', text: userPrompt }]
+        // Add image if provided
         if (request.thumbnailBuffer) {
-          userContent.push({
-            type: 'image_url',
-            image_url: { url: `data:image/png;base64,${request.thumbnailBuffer.toString('base64')}` }
-          })
+          const dataUrl = `data:${request.thumbnailMime || 'image/png'};base64,${request.thumbnailBuffer.toString('base64')}`
+          userContent.push({ type: 'image_url', image_url: { url: dataUrl } })
         }
 
-        const res = await openai.chat.completions.create({
+        // Production-optimized parameters
+        const completionParams = {
           model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userContent as any }
-          ],
-          response_format: { type: 'json_object' }
+          // max_completion_tokens: 800, // Increased to allow reasoning + JSON output
+          response_format: {
+            type: 'json_schema' as const,
+            json_schema: {
+              name: 'ComplianceValidationResult',
+              schema: COMPLIANCE_SCHEMA
+            }
+          }
+        }
+
+        const messages = [
+          { role: 'system' as const, content: SYSTEM_PROMPT },
+          { role: 'user' as const, content: userContent }
+        ]
+
+        logger.info('Starting compliance validation', {
+          requestId,
+          name: request.name,
+          hasImage: String(!!request.thumbnailBuffer),
+          model
         })
 
-        logger.info('OpenAI complete response', { res: JSON.stringify(res) })
+        const res = await openai.chat.completions.create({
+          ...completionParams,
+          messages
+        })
 
+        // Production logging - only what's useful
         if (res.usage) {
-          logger.debug('Usage details', {
-            usage: JSON.stringify(res.usage),
-            systemFingerprint: res.system_fingerprint || 'N/A',
-            serviceTier: res.service_tier || 'N/A',
-            model: res.model || 'N/A',
-            finishReason: res.choices[0]?.finish_reason
+          logger.info('OpenAI API usage', {
+            requestId,
+            promptTokens: res.usage.prompt_tokens,
+            completionTokens: res.usage.completion_tokens,
+            totalTokens: res.usage.total_tokens,
+            estimatedCost: `$${((res.usage.total_tokens / 1000) * 0.0001).toFixed(4)}` // GPT-5-nano pricing
           })
         }
 
         const content = res.choices[0]?.message?.content
-        if (!content) throw new Error('No content received from OpenAI API')
+        if (!content) {
+          logger.error('No content in OpenAI response', {
+            requestId,
+            choices: JSON.stringify(res.choices),
+            finishReason: res.choices[0]?.finish_reason,
+            response: JSON.stringify(res, null, 2)
+          })
+          throw new Error('No content received from OpenAI API')
+        }
 
+        // Parse and validate response
         let result: ComplianceValidationResult
         try {
           result = JSON.parse(content) as ComplianceValidationResult
         } catch (parseError) {
-          logger.error('Failed to parse OpenAI response as JSON', {
-            content,
+          logger.error('JSON parsing failed', {
+            requestId,
+            content: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
             error: parseError instanceof Error ? parseError.message : 'Unknown error'
           })
           throw new Error('Invalid JSON response from OpenAI API')
         }
 
-        // Validate the response structure
+        // Validate response structure
         if (
           typeof result.isCompliant !== 'boolean' ||
           !Array.isArray(result.issues) ||
@@ -150,28 +152,38 @@ Return your analysis as a JSON object with the exact structure:
           typeof result.confidence !== 'number' ||
           typeof result.reasoning !== 'string'
         ) {
-          logger.error('Invalid response structure from OpenAI', { result: JSON.stringify(result) })
+          logger.error('Invalid response structure', {
+            requestId,
+            result: JSON.stringify(result)
+          })
           throw new Error('Invalid response structure from OpenAI API')
         }
 
         const duration = Date.now() - startTime
-        logger.info('Community content compliance validation completed', {
+
+        // Success logging with relevant metrics
+        logger.info('Compliance validation completed', {
+          requestId,
           name: request.name,
           isCompliant: String(result.isCompliant),
-          issues: result.issues.length,
-          warnings: result.warnings.length,
+          issuesCount: result.issues.length,
+          warningsCount: result.warnings.length,
           confidence: result.confidence,
-          duration
+          durationMs: duration,
+          totalTokens: res.usage?.total_tokens || 'unknown'
         })
 
         return result
       } catch (error) {
         const duration = Date.now() - startTime
-        logger.error('Community content compliance validation failed', {
+
+        logger.error('Compliance validation failed', {
+          requestId,
           name: request.name,
           error: error instanceof Error ? error.message : 'Unknown error',
-          duration
+          durationMs: duration
         })
+
         throw error
       }
     }
