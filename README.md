@@ -19,27 +19,40 @@ A microservice that handles social interactions for Decentraland, built using th
 
 - Node.js v20.x.x
 - Docker and Docker Compose
-- PostgreSQL 14+
-- Redis 6+
-- NATS 2+
+
+#### Extra pre-requisites (optional when not using Docker Compose)
+
+- PostgreSQL 14
+- Redis 6
+- NATS 2
 - LocalStack (for AWS services emulation)
 
 ### Development Setup
 
+#### Clone and install
 ```bash
-# Clone and install
 git clone https://github.com/decentraland/social-service-ea.git
 cd social-service-ea
+
 yarn install
+```
 
-# Start services
-docker-compose up -d
+#### Environment Variables
+```bash
+cp .env.default .env
+```
 
-# Run migrations
-yarn migrate up
+Edit the `.env` file with your configuration if needed.
 
-# Start the service
-yarn dev
+#### Start services using Docker Compose
+```bash
+docker compose up -d --wait
+```
+
+You can see the logs of the services with:
+
+```bash
+docker compose logs -f
 ```
 
 For detailed setup instructions, see [Getting Started](https://github.com/decentraland/social-service-ea/wiki/Getting-Started).
