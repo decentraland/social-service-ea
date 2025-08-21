@@ -4,6 +4,11 @@ import { Community } from '../../../logic/community'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 
+/**
+ * This endpoint is used to retrieve potential invites for a user.
+ * It returns a list of communities where the authenticated user (inviter) is a member but the specified address (invitee) is not a member.
+ * This is used to render a list of potential communities to invite the user to.
+ */
 export async function getCommunityInvitesHandler(
   context: Pick<
     HandlerContextWithPath<'logs' | 'communities', '/v1/members/:address/invites'>,
