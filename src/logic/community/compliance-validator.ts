@@ -1,3 +1,4 @@
+import { FeatureFlag } from '../../adapters/feature-flags'
 import { AppComponents } from '../../types'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { CommunityComplianceError } from './errors'
@@ -7,9 +8,9 @@ export interface ICommunityComplianceValidatorComponent {
 }
 
 export function createCommunityComplianceValidatorComponent(
-  components: Pick<AppComponents, 'aiCompliance' | 'logs'>
+  components: Pick<AppComponents, 'aiCompliance' | 'featureFlags' | 'logs'>
 ): ICommunityComplianceValidatorComponent {
-  const { aiCompliance, logs } = components
+  const { aiCompliance, featureFlags, logs } = components
   const logger = logs.getLogger('community-compliance-validator')
 
   return {
@@ -18,6 +19,11 @@ export function createCommunityComplianceValidatorComponent(
       description: string
       thumbnailBuffer?: Buffer
     }): Promise<void> {
+      if (!featureFlags.isEnabled(FeatureFlag.COMMUNITIES_AI_COMPLIANCE)) {
+        logger.info('Skipping AI compliance validation for communities because the feature flag is disabled')
+        return
+      }
+
       const { name, description, thumbnailBuffer } = request
       const startTime = Date.now()
 

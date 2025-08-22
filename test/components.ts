@@ -70,6 +70,10 @@ import { createEmailComponent } from '../src/adapters/email'
 import { createFriendsComponent } from '../src/logic/friends'
 import { createSlackComponent } from '@dcl/slack-component'
 import { createAIComplianceComponent } from '../src/adapters/ai-compliance'
+import { createFeatureFlagsMockComponent } from './mocks/components/feature-flags'
+import { createFeaturesMockComponent } from './mocks/components/features'
+import { createFeaturesComponent } from '@well-known-components/features-component'
+import { createFeatureFlagsAdapter } from '../src/adapters/feature-flags'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -189,7 +193,9 @@ async function initComponents(): Promise<TestComponents> {
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
   const aiCompliance = await createAIComplianceComponent({ config, logs })
-  const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, logs })
+  const features = await createFeaturesComponent({ config, logs, fetch: fetcher }, 'https://social-service-ea.decentraland.test')
+  const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
+  const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
   const communities = createCommunityComponent({
     communitiesDb,
     catalystClient,
@@ -302,6 +308,8 @@ async function initComponents(): Promise<TestComponents> {
     communityVoiceChatPolling,
     config,
     email,
+    features,
+    featureFlags,
     fetcher,
     friends,
     friendsDb,

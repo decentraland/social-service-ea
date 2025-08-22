@@ -3457,6 +3457,13 @@
   dependencies:
     dotenv "^16.0.1"
 
+"@well-known-components/features-component@^2.1.0":
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/@well-known-components/features-component/-/features-component-2.1.0.tgz#193e2e40404481fe3e51ca963794692c1375f020"
+  integrity sha512-cFj/k30p3v3xvRjGqoTMKMAjMJQUGjCUZzZYCIBWmzGpSxfzSMxUIW8pqgDZ+2/jWL/nirz/okIkRxm7vLrimQ==
+  dependencies:
+    "@well-known-components/interfaces" "^1.4.3"
+
 "@well-known-components/fetch-component@^2.0.0", "@well-known-components/fetch-component@^2.0.2":
   version "2.0.2"
   resolved "https://registry.npmjs.org/@well-known-components/fetch-component/-/fetch-component-2.0.2.tgz"

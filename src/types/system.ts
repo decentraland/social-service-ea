@@ -8,6 +8,7 @@ import type {
 import { metricDeclarations } from '../metrics'
 import { IUWsComponent } from '@well-known-components/uws-http-server'
 import { INatsComponent } from '@well-known-components/nats-component/dist/types'
+import { IFeaturesComponent } from '@well-known-components/features-component'
 import { IAnalyticsComponent } from '@dcl/analytics-component'
 import {
   IFriendsDatabaseComponent,
@@ -67,6 +68,7 @@ import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
 import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
+import { IFeatureFlagsAdapter } from '../adapters/feature-flags'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -97,6 +99,8 @@ export type BaseComponents = {
   config: IConfigComponent
   email: IEmailComponent
   expirePrivateVoiceChatJob?: IJobComponent
+  features: IFeaturesComponent
+  featureFlags: IFeatureFlagsAdapter
   fetcher: IFetchComponent
   friendsDb: IFriendsDatabaseComponent
   httpServer: IHttpServerComponent<GlobalContext>

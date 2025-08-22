@@ -55,6 +55,7 @@
     "@dcl/slack-component": "^1.0.1",
     "@sentry/node": "^9.12.0",
     "@well-known-components/env-config-provider": "^1.2.0",
+    "@well-known-components/features-component": "^2.1.0",
     "@well-known-components/fetch-component": "^2.0.2",
     "@well-known-components/http-server": "^2.1.0",
     "@well-known-components/interfaces": "^1.5.2",
