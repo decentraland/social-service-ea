@@ -26,6 +26,7 @@ export interface ICommunitiesComponent {
   ): Promise<AggregatedCommunity>
   updateCommunity(communityId: string, userAddress: EthAddress, updates: CommunityUpdates): Promise<Community>
   deleteCommunity(id: string, userAddress: string): Promise<void>
+  getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
 }
 
 export interface ICommunityMembersComponent {
