@@ -73,6 +73,36 @@ test('Create Community Controller', async function ({ components, stubComponents
           })
           expect(response.status).toBe(400)
         })
+
+        it('should respond with a 400 status code when name exceeds 30 characters', async () => {
+          const longName = 'A'.repeat(31) // 31 characters, exceeds 30 limit
+          const response = await makeMultipartRequest(identity, '/v1/communities', {
+            name: longName,
+            description: 'Test Description',
+            thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+          })
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'Name must be less or equal to 30 characters'
+          })
+        })
+
+        it('should respond with a 400 status code when description exceeds 500 characters', async () => {
+          const longDescription = 'A'.repeat(501) // 501 characters, exceeds 500 limit
+          const response = await makeMultipartRequest(identity, '/v1/communities', {
+            name: 'Test Community',
+            description: longDescription,
+            thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+          })
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'Description must be less or equal to 500 characters'
+          })
+        })
       })
 
       describe('and the body structure is valid', () => {

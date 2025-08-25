@@ -42,12 +42,16 @@ export async function validateCommunityFields(
   if (requireName || name !== undefined) {
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new InvalidRequestError('Name must be a non-empty string')
+    } else if (name.length > 30) {
+      throw new InvalidRequestError('Name must be less or equal to 30 characters')
     }
   }
 
   if (requireDescription || description !== undefined) {
     if (!description || typeof description !== 'string' || description.trim().length === 0) {
       throw new InvalidRequestError('Description must be a non-empty string')
+    } else if (description.length > 500) {
+      throw new InvalidRequestError('Description must be less or equal to 500 characters')
     }
   }
 

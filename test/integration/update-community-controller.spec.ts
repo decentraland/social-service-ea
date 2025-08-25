@@ -465,12 +465,51 @@ test('Update Community Controller', async function ({ components, stubComponents
             identity,
             `/v1/communities/${communityId}`,
             {
+              name: 'Updated name',
               description: ''
             },
             'PUT'
           )
 
           expect(response.status).toBe(400)
+        })
+
+        it('should respond with a 400 status code when name exceeds 30 characters', async () => {
+          const longName = 'A'.repeat(31) // 31 characters, exceeds 30 limit
+          const response = await makeMultipartRequest(
+            identity,
+            `/v1/communities/${communityId}`,
+            {
+              name: longName,
+              description: 'Updated description'
+            },
+            'PUT'
+          )
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'Name must be less or equal to 30 characters'
+          })
+        })
+
+        it('should respond with a 400 status code when description exceeds 500 characters', async () => {
+          const longDescription = 'A'.repeat(501) // 501 characters, exceeds 500 limit
+          const response = await makeMultipartRequest(
+            identity,
+            `/v1/communities/${communityId}`,
+            {
+              name: 'Updated name',
+              description: longDescription
+            },
+            'PUT'
+          )
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'Description must be less or equal to 500 characters'
+          })
         })
 
         it('should respond with a 400 status code for invalid placeIds JSON', async () => {
