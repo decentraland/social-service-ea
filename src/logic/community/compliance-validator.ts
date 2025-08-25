@@ -1,7 +1,7 @@
 import { FeatureFlag } from '../../adapters/feature-flags'
 import { AppComponents } from '../../types'
 import { errorMessageOrDefault } from '../../utils/errors'
-import { CommunityComplianceError } from './errors'
+import { CommunityNotCompliantError } from './errors'
 
 export interface ICommunityComplianceValidatorComponent {
   validateCommunityContent(request: { name: string; description: string; thumbnailBuffer?: Buffer }): Promise<void>
@@ -43,7 +43,7 @@ export function createCommunityComplianceValidatorComponent(
         const duration = Date.now() - startTime
 
         if (!validationResult.isCompliant) {
-          logger.warn('Community content compliance validation failed', {
+          logger.warn('Community content is not compliant', {
             name,
             issues: validationResult.issues.join(', '),
             warnings: validationResult.warnings.join(', '),
@@ -51,7 +51,7 @@ export function createCommunityComplianceValidatorComponent(
             duration
           })
 
-          throw new CommunityComplianceError(
+          throw new CommunityNotCompliantError(
             `Community content violates Decentraland's Code of Ethics: ${validationResult.reasoning}`,
             validationResult.issues,
             validationResult.warnings,
@@ -60,38 +60,26 @@ export function createCommunityComplianceValidatorComponent(
         }
 
         if (validationResult.warnings.length > 0) {
-          logger.info('Community content compliance validation passed with warnings', {
+          logger.info('Community content is compliant with warnings', {
             name,
             warnings: validationResult.warnings.join(', '),
             confidence: validationResult.confidence,
             duration
           })
         } else {
-          logger.info('Community content compliance validation passed', {
+          logger.info('Community content is compliant', {
             name,
             confidence: validationResult.confidence,
             duration
           })
         }
       } catch (error) {
-        const duration = Date.now() - startTime
-
-        if (error instanceof CommunityComplianceError) {
-          throw error
-        }
-
-        logger.error('Community content compliance validation error', {
+        logger.error('Community compliance validation failed', {
           name,
-          error: errorMessageOrDefault(error, 'Unknown error'),
-          duration
+          error: errorMessageOrDefault(error, 'Unknown error')
         })
 
-        throw new CommunityComplianceError(
-          'Unable to validate community content compliance. Manual review required.',
-          ['Compliance validation system unavailable'],
-          ['Manual review recommended'],
-          0
-        )
+        throw error
       }
     }
   }

@@ -1,13 +1,13 @@
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import {
-  CommunityMemberNotFoundError,
   CommunityNotFoundError,
+  CommunityMemberNotFoundError,
   CommunityOwnerNotFoundError,
   CommunityPlaceNotFoundError,
-  CommunityRequestNotFoundError,
   InvalidCommunityRequestError,
-  CommunityComplianceError
-} from '../../logic/community/errors'
+  CommunityNotCompliantError,
+  CommunityRequestNotFoundError
+} from '../../logic/community'
 import { ComponentsWithLogger } from '@dcl/platform-server-commons/dist/types'
 
 export async function communitiesErrorsHandler(
@@ -43,7 +43,7 @@ export async function communitiesErrorsHandler(
       }
     }
 
-    if (error instanceof CommunityComplianceError) {
+    if (error instanceof CommunityNotCompliantError) {
       return {
         status: 400,
         body: {

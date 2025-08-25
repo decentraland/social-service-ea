@@ -1,6 +1,6 @@
 import { createCommunityComplianceValidatorComponent, ICommunityComplianceValidatorComponent } from '../../../src/logic/community/compliance-validator'
 import { createAIComplianceMock, createLogsMockedComponent } from '../../mocks/components'
-import { CommunityComplianceError } from '../../../src/logic/community/errors'
+import { CommunityNotCompliantError, AIComplianceError } from '../../../src/logic/community/errors'
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { createFeatureFlagsMockComponent } from '../../mocks/components/feature-flags'
@@ -111,13 +111,13 @@ describe('CommunityComplianceValidator', () => {
           })
         })
         
-        it('should throw CommunityComplianceError', async () => {
+        it('should throw CommunityNotCompliantError', async () => {
           const name = 'Hate Speech Community'
           const description = 'A community for spreading hate and violence'
           
           await expect(
             complianceValidator.validateCommunityContent({ name, description })
-          ).rejects.toThrow(CommunityComplianceError)
+          ).rejects.toThrow(CommunityNotCompliantError)
 
           expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
             name,
@@ -172,10 +172,38 @@ describe('CommunityComplianceValidator', () => {
           })
         })
         
-        it('should handle failures gracefully and throw CommunityComplianceError', async () => {
+        it('should propagate the original error', async () => {
           await expect(
             failingValidator.validateCommunityContent({ name: 'Test', description: 'Test description' })
-          ).rejects.toThrow(CommunityComplianceError)
+          ).rejects.toThrow('AI service unavailable')
+        })
+      })
+      
+      describe('and AI compliance process fails with AIComplianceError', () => {
+        let processFailingValidator: ICommunityComplianceValidatorComponent
+
+        beforeEach(() => {
+          const processFailingAiCompliance = {
+            async validateCommunityContent() {
+              throw new AIComplianceError('Invalid JSON response from OpenAI API')
+            }
+          }
+          
+          processFailingValidator = createCommunityComplianceValidatorComponent({
+            aiCompliance: processFailingAiCompliance,
+            featureFlags: featureFlagsMock,
+            logs: logsMock
+          })
+        })
+        
+        it('should propagate AIComplianceError as-is', async () => {
+          await expect(
+            processFailingValidator.validateCommunityContent({ name: 'Test', description: 'Test description' })
+          ).rejects.toThrow(AIComplianceError)
+          
+          await expect(
+            processFailingValidator.validateCommunityContent({ name: 'Test', description: 'Test description' })
+          ).rejects.toThrow('Invalid JSON response from OpenAI API')
         })
       })
     })

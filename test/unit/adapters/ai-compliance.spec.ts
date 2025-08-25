@@ -1,6 +1,7 @@
 import { ComplianceValidationResult, createAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { mockConfig, mockLogs } from '../../mocks/components'
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
+import { AIComplianceError } from '../../../src/logic/community/errors'
 
 const mockOpenAICreate = jest.fn()
 
@@ -354,7 +355,11 @@ describe('AIComplianceComponent', () => {
           mockOpenAICreate.mockResolvedValue(mockResponse)
         })
         
-        it('should throw error for empty content', async () => {
+        it('should throw AIComplianceError for empty content', async () => {
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow(AIComplianceError)
+          
           await expect(
             aiCompliance.validateCommunityContent({ name, description })
           ).rejects.toThrow('No content received from OpenAI API')
@@ -378,10 +383,14 @@ describe('AIComplianceComponent', () => {
           mockOpenAICreate.mockResolvedValue(mockResponse)
         })
         
-        it('should throw error for invalid JSON', async () => {
+        it('should throw AIComplianceError for invalid JSON', async () => {
           await expect(
             aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('Invalid JSON response from OpenAI API')
+          ).rejects.toThrow(AIComplianceError)
+          
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow('Invalid JSON response from OpenAI API: Unexpected token')
         })
       })
       
@@ -407,7 +416,11 @@ describe('AIComplianceComponent', () => {
           mockOpenAICreate.mockResolvedValue(mockResponse)
         })
         
-        it('should throw error for malformed response', async () => {
+        it('should throw AIComplianceError for malformed response', async () => {
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow(AIComplianceError)
+          
           await expect(
             aiCompliance.validateCommunityContent({ name, description })
           ).rejects.toThrow('Invalid response structure from OpenAI API')
@@ -420,10 +433,31 @@ describe('AIComplianceComponent', () => {
           mockOpenAICreate.mockRejectedValue(apiError)
         })
         
-        it('should propagate the error', async () => {
+        it('should throw AIComplianceError when API call fails', async () => {
           await expect(
             aiCompliance.validateCommunityContent({ name, description })
-          ).rejects.toThrow('OpenAI API error')
+          ).rejects.toThrow(AIComplianceError)
+          
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow('Unexpected error during compliance validation: OpenAI API error')
+        })
+      })
+      
+      describe('and AI compliance process fails', () => {
+        beforeEach(() => {
+          const processError = new AIComplianceError('Test process failure')
+          mockOpenAICreate.mockRejectedValue(processError)
+        })
+        
+        it('should throw AIComplianceError for process failures', async () => {
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow(AIComplianceError)
+          
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow('Test process failure')
         })
       })
       

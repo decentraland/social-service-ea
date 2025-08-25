@@ -10,7 +10,7 @@ import {
 } from './utils/auth'
 import { randomUUID } from 'crypto'
 import FormData from 'form-data'
-import { CommunityComplianceError } from '../../src/logic/community/errors'
+import { CommunityNotCompliantError } from '../../src/logic/community/errors'
 
 test('Update Community Controller', async function ({ components, stubComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
@@ -360,7 +360,7 @@ test('Update Community Controller', async function ({ components, stubComponents
           beforeEach(async () => {
             // Mock AI compliance to return non-compliant
             stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
-              new CommunityComplianceError(
+              new CommunityNotCompliantError(
                 "Community content violates Decentraland's Code of Ethics: Content violates Decentraland Code of Ethics",
                 ['Contains inappropriate language', 'Promotes violence'],
                 ['Content is borderline'],

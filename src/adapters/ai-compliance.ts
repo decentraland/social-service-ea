@@ -1,4 +1,6 @@
 import { AppComponents } from '../types'
+import { AIComplianceError } from '../logic/community/errors'
+import { errorMessageOrDefault } from '../utils/errors'
 
 export interface ComplianceValidationResult {
   isCompliant: boolean
@@ -139,19 +141,20 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
             finishReason: res.choices[0]?.finish_reason,
             response: JSON.stringify(res, null, 2)
           })
-          throw new Error('No content received from OpenAI API')
+          throw new AIComplianceError('No content received from OpenAI API')
         }
 
         let result: ComplianceValidationResult
         try {
           result = JSON.parse(content) as ComplianceValidationResult
         } catch (parseError) {
+          const errorMessage = errorMessageOrDefault(parseError, 'Unknown error')
           logger.error('JSON parsing failed', {
             requestId,
             content: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
-            error: parseError instanceof Error ? parseError.message : 'Unknown error'
+            error: errorMessageOrDefault(parseError, 'Unknown error')
           })
-          throw new Error('Invalid JSON response from OpenAI API')
+          throw new AIComplianceError(`Invalid JSON response from OpenAI API: ${errorMessage}`)
         }
 
         if (
@@ -165,7 +168,7 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
             requestId,
             result: JSON.stringify(result)
           })
-          throw new Error('Invalid response structure from OpenAI API')
+          throw new AIComplianceError('Invalid response structure from OpenAI API')
         }
 
         const duration = Date.now() - startTime
@@ -182,16 +185,20 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
 
         return result
       } catch (error) {
-        const duration = Date.now() - startTime
+        const errorMessage = errorMessageOrDefault(error, 'Unknown error')
 
         logger.error('Compliance validation failed', {
           requestId,
           name: request.name,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          durationMs: duration
+          error: errorMessage
         })
 
-        throw error
+        if (error instanceof AIComplianceError) {
+          throw error
+        }
+
+        // Wrap other errors as AIComplianceError
+        throw new AIComplianceError(`Unexpected error during compliance validation: ${errorMessage}`)
       }
     }
   }
