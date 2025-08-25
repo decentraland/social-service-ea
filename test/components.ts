@@ -33,7 +33,7 @@ import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
-import { mockPeersSynchronizer, mockCdnCacheInvalidator, mockSns } from './mocks/components'
+import { mockPeersSynchronizer, mockCdnCacheInvalidator, mockSns, createAIComplianceMock } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
@@ -192,7 +192,7 @@ async function initComponents(): Promise<TestComponents> {
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
-  const aiCompliance = await createAIComplianceComponent({ config, logs })
+  const aiCompliance = createAIComplianceMock({})
   const features = await createFeaturesComponent({ config, logs, fetch: fetcher }, 'https://social-service-ea.decentraland.test')
   const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
   const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
