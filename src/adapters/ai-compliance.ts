@@ -96,7 +96,6 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
 
         const completionParams = {
           model,
-          max_completion_tokens: 650,
           response_format: {
             type: 'json_schema' as const,
             json_schema: {

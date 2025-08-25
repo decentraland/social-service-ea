@@ -9,7 +9,7 @@ export enum FeatureFlag {
    * @example
    * Variant value: "true" or "false"
    */
-  COMMUNITIES_AI_COMPLIANCE = 'communities-ai-compliance'
+  COMMUNITIES_AI_COMPLIANCE = 'communities_ai_compliance'
 }
 
 export type IFeatureFlagsAdapter = IBaseComponent & {
