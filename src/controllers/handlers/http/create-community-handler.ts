@@ -62,22 +62,10 @@ export async function createCommunityHandler(
     if (
       error instanceof NotAuthorizedError ||
       error instanceof InvalidRequestError ||
-      error instanceof CommunityOwnerNotFoundError
+      error instanceof CommunityOwnerNotFoundError ||
+      error instanceof CommunityComplianceError
     ) {
       throw error
-    }
-
-    if (error instanceof CommunityComplianceError) {
-      return {
-        status: 400,
-        body: {
-          message: error.message,
-          data: {
-            issues: error.issues,
-            warnings: error.warnings
-          }
-        }
-      }
     }
 
     return {

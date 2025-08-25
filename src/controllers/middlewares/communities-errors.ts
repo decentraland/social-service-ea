@@ -5,7 +5,8 @@ import {
   CommunityOwnerNotFoundError,
   CommunityPlaceNotFoundError,
   CommunityRequestNotFoundError,
-  InvalidCommunityRequestError
+  InvalidCommunityRequestError,
+  CommunityComplianceError
 } from '../../logic/community/errors'
 import { ComponentsWithLogger } from '@dcl/platform-server-commons/dist/types'
 
@@ -38,6 +39,19 @@ export async function communitiesErrorsHandler(
         body: {
           error: 'Bad Request',
           message: error.message
+        }
+      }
+    }
+
+    if (error instanceof CommunityComplianceError) {
+      return {
+        status: 400,
+        body: {
+          message: error.message,
+          data: {
+            issues: error.issues,
+            warnings: error.warnings
+          }
         }
       }
     }
