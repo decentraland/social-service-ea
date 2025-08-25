@@ -42,7 +42,6 @@ Key compliance areas to evaluate:
 
 Be strict but fair. Flag any content that violates these principles. Return ONLY valid JSON matching the exact schema provided.`
 
-  // JSON Schema for structured outputs
   const COMPLIANCE_SCHEMA = {
     type: 'object',
     additionalProperties: false,
@@ -65,7 +64,6 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
         const { default: OpenAI } = await import('openai')
         const openai = new OpenAI({ apiKey })
 
-        // Build user content
         const userContent: any[] = [
           {
             type: 'text',
@@ -73,16 +71,14 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
           }
         ]
 
-        // Add image if provided
         if (request.thumbnailBuffer) {
           const dataUrl = `data:${request.thumbnailMime || 'image/png'};base64,${request.thumbnailBuffer.toString('base64')}`
           userContent.push({ type: 'image_url', image_url: { url: dataUrl } })
         }
 
-        // Production-optimized parameters
         const completionParams = {
           model,
-          // max_completion_tokens: 800, // Increased to allow reasoning + JSON output
+          max_completion_tokens: 650,
           response_format: {
             type: 'json_schema' as const,
             json_schema: {
@@ -109,7 +105,6 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
           messages
         })
 
-        // Production logging - only what's useful
         if (res.usage) {
           logger.info('OpenAI API usage', {
             requestId,
@@ -131,7 +126,6 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
           throw new Error('No content received from OpenAI API')
         }
 
-        // Parse and validate response
         let result: ComplianceValidationResult
         try {
           result = JSON.parse(content) as ComplianceValidationResult
@@ -144,7 +138,6 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
           throw new Error('Invalid JSON response from OpenAI API')
         }
 
-        // Validate response structure
         if (
           typeof result.isCompliant !== 'boolean' ||
           !Array.isArray(result.issues) ||
@@ -161,7 +154,6 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
 
         const duration = Date.now() - startTime
 
-        // Success logging with relevant metrics
         logger.info('Compliance validation completed', {
           requestId,
           name: request.name,
@@ -169,8 +161,7 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
           issuesCount: result.issues.length,
           warningsCount: result.warnings.length,
           confidence: result.confidence,
-          durationMs: duration,
-          totalTokens: res.usage?.total_tokens || 'unknown'
+          durationMs: duration
         })
 
         return result
