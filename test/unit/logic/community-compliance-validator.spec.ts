@@ -24,8 +24,8 @@ describe('CommunityComplianceValidator', () => {
     })
   })
   
-  describe('validateCommunityContent', () => {
-    describe('when compliance validation feature flag is disabled', () => {
+  describe('when validating community content', () => {
+    describe('and compliance validation feature flag is disabled', () => {
       beforeEach(() => {
         featureFlagsMock.isEnabled.mockReturnValue(false)
       })
@@ -41,12 +41,12 @@ describe('CommunityComplianceValidator', () => {
       })
     })
 
-    describe('when compliance validation feature flag is enabled', () => {
+    describe('and compliance validation feature flag is enabled', () => {
       beforeEach(() => {
         featureFlagsMock.isEnabled.mockReturnValue(true)
       })
 
-      describe('when content is compliant', () => {
+      describe('and content is compliant', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: true,
@@ -73,7 +73,7 @@ describe('CommunityComplianceValidator', () => {
         })
       })
 
-      describe('when content has warnings but is still compliant', () => {
+      describe('and content has warnings but is still compliant', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: true,
@@ -100,7 +100,7 @@ describe('CommunityComplianceValidator', () => {
         })
       })
 
-      describe('when content violates community guidelines', () => {
+      describe('and content violates community guidelines', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: false,
@@ -127,7 +127,7 @@ describe('CommunityComplianceValidator', () => {
         })
       })
       
-      describe('when validating content with thumbnails', () => {
+      describe('and validating content with thumbnails', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: true,
@@ -155,7 +155,7 @@ describe('CommunityComplianceValidator', () => {
         })
       })
       
-      describe('when AI compliance service fails', () => {
+      describe('and AI compliance service fails', () => {
         let failingValidator: ICommunityComplianceValidatorComponent
 
         beforeEach(() => {
