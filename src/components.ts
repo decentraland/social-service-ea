@@ -160,6 +160,10 @@ export async function initComponents(): Promise<AppComponents> {
     pubsub,
     analytics
   })
+
+  const slackToken = await config.requireString('SLACK_BOT_TOKEN')
+  const slack = await createSlackComponent({ logs }, { token: slackToken })
+
   // Community voice chat cache and polling
   const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })
   const communityVoiceChatPolling = createCommunityVoiceChatPollingComponent({
@@ -228,7 +232,9 @@ export async function initComponents(): Promise<AppComponents> {
     communityBroadcaster,
     commsGatekeeper,
     communityComplianceValidator,
-    logs
+    logs,
+    slack,
+    config
   })
   const communityRequests = createCommunityRequestsComponent({
     communitiesDb,
@@ -277,9 +283,6 @@ export async function initComponents(): Promise<AppComponents> {
   )
   const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
   const queue = sqsEndpoint ? await createSqsAdapter(sqsEndpoint) : createMemoryQueueAdapter()
-
-  const slackToken = await config.requireString('SLACK_BOT_TOKEN')
-  const slack = await createSlackComponent({ logs }, { token: slackToken })
 
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 

@@ -30,14 +30,14 @@ describe('CommunityComplianceValidator', () => {
         featureFlagsMock.isEnabled.mockReturnValue(false)
       })
 
-      it('should skip validation', async () => {
+      it('should skip validation and return needsManualReview: false', async () => {
         const name = 'Friendly Gaming Community'
         const description = 'A welcoming community for gamers to connect and play together'
 
         const result = await complianceValidator.validateCommunityContent({ name, description })
 
         expect(aiComplianceMock.validateCommunityContent).not.toHaveBeenCalled()
-        expect(result).toBeUndefined()
+        expect(result).toEqual({ needsManualReview: false })
       })
     })
 
@@ -57,7 +57,7 @@ describe('CommunityComplianceValidator', () => {
           })
         })
 
-        it('should pass validation successfully', async () => {
+        it('should pass validation successfully and return needsManualReview: false', async () => {
           const name = 'Friendly Gaming Community'
           const description = 'A welcoming community for gamers to connect and play together'
           
@@ -69,7 +69,7 @@ describe('CommunityComplianceValidator', () => {
             thumbnailBuffer: undefined
           })
           
-          expect(result).toBeUndefined()
+          expect(result).toEqual({ needsManualReview: false })
         })
       })
 
@@ -84,7 +84,7 @@ describe('CommunityComplianceValidator', () => {
           })
         })
 
-        it('should pass validation with warnings', async () => {
+        it('should pass validation with warnings and return needsManualReview: false', async () => {
           const name = 'A'.repeat(101) // Very long name
           const description = 'A'.repeat(1001) // Very long description
           
@@ -96,7 +96,7 @@ describe('CommunityComplianceValidator', () => {
             thumbnailBuffer: undefined
           })
           
-          expect(result).toBeUndefined()
+          expect(result).toEqual({ needsManualReview: false })
         })
       })
 
@@ -138,7 +138,7 @@ describe('CommunityComplianceValidator', () => {
           })
         })
 
-        it('should handle thumbnail validation successfully', async () => {
+        it('should handle thumbnail validation successfully and return needsManualReview: false', async () => {
           const name = 'Test Community'
           const description = 'Test description'
           const thumbnail = Buffer.from('fake-image-data')
@@ -151,11 +151,11 @@ describe('CommunityComplianceValidator', () => {
             thumbnailBuffer: thumbnail,
           })
           
-          expect(result).toBeUndefined()
+          expect(result).toEqual({ needsManualReview: false })
         })
       })
       
-      describe('and AI compliance service fails', () => {
+      describe('and AI compliance service fails with generic error', () => {
         let failingValidator: ICommunityComplianceValidatorComponent
 
         beforeEach(() => {
@@ -196,14 +196,25 @@ describe('CommunityComplianceValidator', () => {
           })
         })
         
-        it('should propagate AIComplianceError as-is', async () => {
-          await expect(
-            processFailingValidator.validateCommunityContent({ name: 'Test', description: 'Test description' })
-          ).rejects.toThrow(AIComplianceError)
+        it('should return needsManualReview: true for AIComplianceError', async () => {
+          const result = await processFailingValidator.validateCommunityContent({ 
+            name: 'Test', 
+            description: 'Test description' 
+          })
           
+          expect(result).toEqual({ 
+            needsManualReview: true, 
+            reason: 'Invalid JSON response from OpenAI API' 
+          })
+        })
+
+        it('should not throw an error for AIComplianceError', async () => {
           await expect(
             processFailingValidator.validateCommunityContent({ name: 'Test', description: 'Test description' })
-          ).rejects.toThrow('Invalid JSON response from OpenAI API')
+          ).resolves.toEqual({ 
+            needsManualReview: true, 
+            reason: 'Invalid JSON response from OpenAI API' 
+          })
         })
       })
     })

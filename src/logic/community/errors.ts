@@ -81,6 +81,26 @@ export class AIComplianceError extends Error {
 }
 
 /**
+ * This error is thrown when AI compliance validation fails and manual review is required
+ *
+ * @export
+ * @class CommunityComplianceManualReviewError
+ * @extends {Error}
+ */
+export class CommunityComplianceManualReviewError extends Error {
+  constructor(
+    message: string,
+    public readonly communityId: string,
+    public readonly communityName: string,
+    public readonly ownerAddress: string,
+    public readonly originalError: Error
+  ) {
+    super(message)
+    this.name = 'CommunityComplianceManualReviewError'
+  }
+}
+
+/**
  * This error is thrown when a community request (invite or request to join) is not found
  *
  * @export

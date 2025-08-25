@@ -31,6 +31,7 @@ import { Community } from '../../../src/logic/community/types'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { Events } from '@dcl/schemas'
 import { ICommunityComplianceValidatorComponent } from '../../../src/logic/community/compliance-validator'
+import { communityNeedsManualReviewMessage } from '../../../src/utils/slackMessages'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -45,6 +46,8 @@ describe('Community Component', () => {
   let mockCommunityComplianceValidator: jest.Mocked<ICommunityComplianceValidatorComponent>
 
   let mockUserAddress: string
+  let mockSlack: any
+  let mockConfigComponent: any
   
   const communityId = 'test-community'
   const cdnUrl = 'https://cdn.decentraland.org'
@@ -55,7 +58,8 @@ describe('Community Component', () => {
     ownerAddress: '0x1234567890123456789012345678901234567890',
     privacy: CommunityPrivacyEnum.Public,
     active: true,
-    thumbnails: undefined
+    thumbnails: undefined,
+    needsManualReview: false
   }
 
   beforeEach(async () => {
@@ -73,6 +77,23 @@ describe('Community Component', () => {
     mockCommunityThumbnail.buildThumbnailUrl.mockImplementation(
       (communityId: string) => `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
     )
+    
+    // Mock the new components
+    mockSlack = {
+      sendMessage: jest.fn().mockResolvedValue(undefined)
+    }
+    mockConfigComponent = {
+      getString: jest.fn().mockResolvedValue('dev')
+    }
+    
+    // Set up default mocks
+    mockCommunityComplianceValidator.validateCommunityContent.mockResolvedValue({
+      needsManualReview: false
+    })
+    mockCatalystClient.getOwnedNames.mockResolvedValue([
+      { id: '1', name: 'test-name', contractAddress: '0xcontract', tokenId: '1' }
+    ])
+    
     communityComponent = createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
@@ -85,7 +106,9 @@ describe('Community Component', () => {
       logs: mockLogs,
       communityBroadcaster: mockCommunityBroadcaster,
       communityThumbnail: mockCommunityThumbnail,
-      communityComplianceValidator: mockCommunityComplianceValidator
+      communityComplianceValidator: mockCommunityComplianceValidator,
+      slack: mockSlack as any,
+      config: mockConfigComponent as any
     })
   })
 
@@ -102,7 +125,8 @@ describe('Community Component', () => {
       beforeEach(() => {
         mockCommunitiesDB.getCommunity.mockResolvedValue({
           ...mockCommunity,
-          role: CommunityRole.Member
+          role: CommunityRole.Member,
+          needsManualReview: false
         })
         mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(10)
         mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(mockVoiceChatStatus)
@@ -120,6 +144,7 @@ describe('Community Component', () => {
           ownerAddress: mockCommunity.ownerAddress,
           privacy: mockCommunity.privacy,
           active: mockCommunity.active,
+          needsManualReview: false,
           thumbnails: undefined,
           role: CommunityRole.Member,
           membersCount: 10,
@@ -216,7 +241,8 @@ describe('Community Component', () => {
           isActive: true,
           participantCount: 3,
           moderatorCount: 1
-        }
+        },
+        needsManualReview: false
       }
     ]
     const mockProfiles = [createMockProfile('0xfriend1'), createMockProfile('0xfriend2')]
@@ -321,11 +347,13 @@ describe('Community Component', () => {
       const mockCommunitiesWithVoiceChat = [
         {
           ...mockCommunities[0],
-          id: 'community-with-voice-chat'
+          id: 'community-with-voice-chat',
+          needsManualReview: false
         },
         {
           ...mockCommunities[0],
-          id: 'community-without-voice-chat'
+          id: 'community-without-voice-chat',
+          needsManualReview: false
         }
       ]
 
@@ -411,7 +439,8 @@ describe('Community Component', () => {
           privacy: CommunityPrivacyEnum.Public,
           active: true,
           membersCount: 10,
-          isHostingLiveEvent: false
+          isHostingLiveEvent: false,
+          needsManualReview: false
         }
       ]
       mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunities)
@@ -485,11 +514,13 @@ describe('Community Component', () => {
       const mockCommunitiesWithVoiceChat: Omit<CommunityPublicInformation, 'ownerName'>[] = [
         {
           ...mockCommunities[0],
-          id: 'public-community-with-voice-chat'
+          id: 'public-community-with-voice-chat',
+          needsManualReview: false
         },
         {
           ...mockCommunities[0],
-          id: 'public-community-without-voice-chat'
+          id: 'public-community-without-voice-chat',
+          needsManualReview: false
         }
       ]
 
@@ -572,7 +603,8 @@ describe('Community Component', () => {
         privacy: CommunityPrivacyEnum.Public,
         active: true,
         role: CommunityRole.Member,
-        joinedAt: '2023-01-01T00:00:00Z'
+        joinedAt: '2023-01-01T00:00:00Z',
+        needsManualReview: false
       }
     ]
 
@@ -600,7 +632,8 @@ describe('Community Component', () => {
       name: 'New Community',
       description: 'New Description',
       ownerAddress,
-      privacy: CommunityPrivacyEnum.Public
+      privacy: CommunityPrivacyEnum.Public,
+      needsManualReview: false
     }
     const placeIds = ['place-1', 'place-2']
     const thumbnail = Buffer.from('fake-thumbnail')
@@ -608,11 +641,12 @@ describe('Community Component', () => {
     let createdCommunity: any
 
     beforeEach(() => {
-      ownedNames = []
+      ownedNames = [{ id: '1', name: 'test-name', contractAddress: '0xcontract', tokenId: '1' }]
       createdCommunity = {
         ...mockCommunity,
         ...communityData,
-        id: 'new-community-id'
+        id: 'new-community-id',
+        needsManualReview: false
       }
       mockCatalystClient.getOwnedNames.mockResolvedValue(ownedNames)
       mockCommunitiesDB.createCommunity.mockResolvedValue(createdCommunity)
@@ -625,11 +659,6 @@ describe('Community Component', () => {
     })
 
     describe('and the user has owned names', () => {
-      beforeEach(() => {
-        ownedNames = [{ id: '1', name: 'test-name', contractAddress: '0xcontract', tokenId: '1' }]
-        mockCatalystClient.getOwnedNames.mockResolvedValue(ownedNames)
-      })
-
       describe('and no places are provided', () => {
         beforeEach(() => {
           mockCommunityPlaces.validateOwnership.mockResolvedValue({
@@ -662,7 +691,8 @@ describe('Community Component', () => {
             ...communityData,
             owner_address: ownerAddress,
             private: false,
-            active: true
+            active: true,
+            needs_manual_review: false
           })
           expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
             communityId: 'new-community-id',
@@ -755,8 +785,7 @@ describe('Community Component', () => {
 
     describe('and the user has no owned names', () => {
       beforeEach(() => {
-        ownedNames = []
-        mockCatalystClient.getOwnedNames.mockResolvedValue(ownedNames)
+        mockCatalystClient.getOwnedNames.mockResolvedValue([])
       })
 
       it('should throw NotAuthorizedError before calling compliance validation', async () => {
@@ -767,6 +796,70 @@ describe('Community Component', () => {
         expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
         expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.createCommunity).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and AI compliance validation fails', () => {
+      beforeEach(async () => {
+        // Mock AI compliance to return needs manual review
+        mockCommunityComplianceValidator.validateCommunityContent.mockResolvedValue({
+          needsManualReview: true,
+          reason: 'AI compliance system failure'
+        })
+        
+        // Mock config values for Slack notifications
+        mockConfigComponent.getString.mockResolvedValueOnce('dev') // ENV
+        mockConfigComponent.getString.mockResolvedValueOnce('https://moderation.decentraland.org') // COMMUNITIES_MODERATION_TOOL_URL
+      })
+
+      it('should create community with manual review flag and inactive status', async () => {
+        const result = await communityComponent.createCommunity(communityData, thumbnail)
+
+        expect(result).toEqual({
+          ...mockCommunity,
+          ...communityData,
+          id: 'new-community-id',
+          ownerName: 'Test Owner Name',
+          isHostingLiveEvent: false,
+          thumbnails: {
+            raw: `https://cdn.decentraland.org/social/communities/new-community-id/raw-thumbnail.png`
+          }
+        })
+
+        expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+          name: communityData.name,
+          description: communityData.description,
+          thumbnailBuffer: thumbnail
+        })
+        
+        expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+          ...communityData,
+          owner_address: ownerAddress,
+          private: false,
+          active: false,
+          needs_manual_review: true
+        })
+      })
+
+      it('should send Slack notification when manual review is needed', async () => {
+        await communityComponent.createCommunity(communityData, thumbnail)
+
+        await new Promise(resolve => setImmediate(resolve))
+
+        const expectedMessage = communityNeedsManualReviewMessage(
+          'new-community-id',
+          'New Community',
+          '0x1234567890123456789012345678901234567890',
+          true,
+          'https://moderation.decentraland.org',
+          'AI compliance system failure'
+        )
+
+        expect(mockSlack.sendMessage).toHaveBeenCalledWith(expectedMessage)
+      })
+
+      it('should log info message when manual review is needed', async () => {
+        await communityComponent.createCommunity(communityData, thumbnail)
       })
     })
   })
@@ -783,7 +876,7 @@ describe('Community Component', () => {
 
     describe('and the community exists', () => {
       beforeEach(() => {
-        community = { ...mockCommunity }
+        community = { ...mockCommunity, needsManualReview: false }
         mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       })
 
@@ -868,7 +961,7 @@ describe('Community Component', () => {
 
     beforeEach(() => {
       community = null
-      updatedCommunity = { ...mockCommunity, ...updates }
+      updatedCommunity = { ...mockCommunity, ...updates, needsManualReview: false }
       mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       mockCommunitiesDB.updateCommunity.mockResolvedValue(updatedCommunity)
       mockCommunityRoles.validatePermissionToEditCommunity.mockResolvedValue()
@@ -886,7 +979,7 @@ describe('Community Component', () => {
 
     describe('and the community exists', () => {
       beforeEach(() => {
-        community = { ...mockCommunity }
+        community = { ...mockCommunity, needsManualReview: false }
         mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       })
 
@@ -918,7 +1011,11 @@ describe('Community Component', () => {
               userAddress
             )
             expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
-            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updates)
+            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+              ...updates,
+              needs_manual_review: false,
+              active: true
+            })
             expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(
               communityId,
               updates.thumbnailBuffer
@@ -1010,7 +1107,9 @@ describe('Community Component', () => {
             expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
               ...updatesWithOnlyPrivacy,
-              private: true
+              private: true,
+              needs_manual_review: false,
+              active: true
             })
           })
 
@@ -1068,7 +1167,9 @@ describe('Community Component', () => {
             })
             expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
               ...completeUpdate,
-              private: undefined
+              private: undefined,
+              needs_manual_review: false,
+              active: true
             })
             expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(
               communityId,
@@ -1131,7 +1232,76 @@ describe('Community Component', () => {
               ...simpleDescriptionUpdate
             })
 
-            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, simpleDescriptionUpdate)
+            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+              ...simpleDescriptionUpdate,
+              needs_manual_review: false,
+              active: true
+            })
+          })
+
+          describe('and AI compliance validation fails during update', () => {
+            beforeEach(async () => {
+              // Mock AI compliance to return needs manual review for updates
+              mockCommunityComplianceValidator.validateCommunityContent.mockResolvedValue({
+                needsManualReview: true,
+                reason: 'AI compliance system failure during update'
+              })
+              
+              // Mock config values for Slack notifications
+              mockConfigComponent.getString.mockResolvedValueOnce('dev') // ENV
+              mockConfigComponent.getString.mockResolvedValueOnce('https://moderation.decentraland.org') // COMMUNITIES_MODERATION_TOOL_URL
+            })
+
+            it('should update community with manual review flag and inactive status', async () => {
+              // Mock the update to return the updated community with new name
+              mockCommunitiesDB.updateCommunity.mockResolvedValueOnce({
+                ...mockCommunity,
+                name: 'Updated Name',
+                description: 'Updated Description'
+              })
+
+              const result = await communityComponent.updateCommunity(communityId, userAddress, {
+                name: 'Updated Name',
+                description: 'Updated Description'
+              })
+
+              expect(result.name).toBe('Updated Name')
+              expect(result.description).toBe('Updated Description')
+              expect(result.id).toBe(communityId)
+
+              expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+                name: 'Updated Name',
+                description: 'Updated Description',
+                thumbnailBuffer: undefined
+              })
+
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+                name: 'Updated Name',
+                description: 'Updated Description',
+                needs_manual_review: true,
+                active: false
+              })
+            })
+
+            it('should send Slack notification when manual review is needed during update', async () => {
+              await communityComponent.updateCommunity(communityId, userAddress, {
+                name: 'Updated Name',
+                description: 'Updated Description'
+              })
+
+              await new Promise(resolve => setImmediate(resolve))
+
+              const expectedMessage = communityNeedsManualReviewMessage(
+                communityId,
+                'Updated Community',
+                '0x1234567890123456789012345678901234567890',
+                true,
+                'https://moderation.decentraland.org',
+                'AI compliance system failure during update'
+              )
+
+              expect(mockSlack.sendMessage).toHaveBeenCalledWith(expectedMessage)
+            })
           })
 
           describe('and the user does not own all places', () => {
@@ -1196,7 +1366,8 @@ describe('Community Component', () => {
           description: mockCommunity.description,
           ownerAddress: mockCommunity.ownerAddress,
           privacy: mockCommunity.privacy,
-          active: mockCommunity.active
+          active: mockCommunity.active,
+          needsManualReview: false
         })
 
         expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()

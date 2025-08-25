@@ -117,7 +117,9 @@ test('Create Community Controller', async function ({ components, stubComponents
           describe('and AI compliance validation passes', () => {
             beforeEach(async () => {
               // Mock AI compliance to return compliant by default
-              stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+              stubComponents.communityComplianceValidator.validateCommunityContent.resolves({
+                needsManualReview: false
+              })
             })
 
             describe('and places are provided', () => {

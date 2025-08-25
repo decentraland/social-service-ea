@@ -218,6 +218,7 @@ export type CommunityDB = {
   owner_address: string
   private: boolean
   active: boolean
+  needs_manual_review?: boolean
   created_at?: string
   updated_at?: string
 }
@@ -243,6 +244,7 @@ export type Community = {
   ownerAddress: string
   privacy: CommunityPrivacyEnum
   active: boolean
+  needsManualReview: boolean
 }
 
 /*

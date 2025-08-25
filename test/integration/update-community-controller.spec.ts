@@ -24,7 +24,9 @@ test('Update Community Controller', async function ({ components, stubComponents
       identity = await createTestIdentity()
 
       // Mock AI compliance to return compliant by default for community creation
-      stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+      stubComponents.communityComplianceValidator.validateCommunityContent.resolves({
+        needsManualReview: false
+      })
 
       // Create a test community first
       stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([
@@ -87,7 +89,9 @@ test('Update Community Controller', async function ({ components, stubComponents
         describe('when AI compliance validation passes', () => {
           beforeEach(async () => {
             // Mock AI compliance to return compliant by default
-            stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+            stubComponents.communityComplianceValidator.validateCommunityContent.resolves({
+              needsManualReview: false
+            })
           })
 
           describe('when updating name only', () => {

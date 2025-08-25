@@ -444,9 +444,9 @@ export function createCommunitiesDBComponent(
     async createCommunity(community: CommunityDB): Promise<Community> {
       const id = randomUUID()
       const query = SQL`
-        INSERT INTO communities (id, name, description, owner_address, private, active)
-        VALUES (${id}, ${community.name}, ${community.description}, ${normalizeAddress(community.owner_address)}, ${community.private || false}, ${community.active || true})
-        RETURNING id, name, description, owner_address, private, active, created_at, updated_at
+        INSERT INTO communities (id, name, description, owner_address, private, active, needs_manual_review)
+        VALUES (${id}, ${community.name}, ${community.description}, ${normalizeAddress(community.owner_address)}, ${community.private || false}, ${community.active || true}, ${community.needs_manual_review || false})
+        RETURNING id, name, description, owner_address, private, active, needs_manual_review, created_at, updated_at
         `
       const result = await pg.query(query)
       const row = result.rows[0]
@@ -456,7 +456,8 @@ export function createCommunitiesDBComponent(
         description: row.description,
         ownerAddress: row.owner_address,
         privacy: row.private ? CommunityPrivacyEnum.Private : CommunityPrivacyEnum.Public,
-        active: row.active
+        active: row.active,
+        needsManualReview: row.needs_manual_review
       }
     },
 
@@ -576,7 +577,7 @@ export function createCommunitiesDBComponent(
 
     async updateCommunity(
       communityId: string,
-      updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private'>>
+      updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private' | 'needs_manual_review' | 'active'>>
     ): Promise<Community> {
       let query = SQL`UPDATE communities SET `
       const setClauses: ReturnType<typeof SQL>[] = []
@@ -593,6 +594,14 @@ export function createCommunitiesDBComponent(
         setClauses.push(SQL`private = ${updates.private}`)
       }
 
+      if (updates.needs_manual_review !== undefined) {
+        setClauses.push(SQL`needs_manual_review = ${updates.needs_manual_review}`)
+      }
+
+      if (updates.active !== undefined) {
+        setClauses.push(SQL`active = ${updates.active}`)
+      }
+
       setClauses.push(SQL`updated_at = now()`)
 
       // Join the SET clauses
@@ -605,7 +614,9 @@ export function createCommunitiesDBComponent(
 
       query = query
         .append(SQL` WHERE id = ${communityId} AND active = true`)
-        .append(SQL` RETURNING id, name, description, owner_address, private, active, created_at, updated_at`)
+        .append(
+          SQL` RETURNING id, name, description, owner_address, private, active, needs_manual_review, created_at, updated_at`
+        )
 
       const result = await pg.query<CommunityDB>(query)
       const row = result.rows[0]
@@ -620,7 +631,8 @@ export function createCommunitiesDBComponent(
         description: row.description,
         ownerAddress: row.owner_address,
         privacy: row.private ? CommunityPrivacyEnum.Private : CommunityPrivacyEnum.Public,
-        active: row.active
+        active: row.active,
+        needsManualReview: row.needs_manual_review ?? false
       }
     },
 
