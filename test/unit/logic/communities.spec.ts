@@ -1394,4 +1394,85 @@ describe('Community Component', () => {
       })
     })
   })
+
+  describe('when getting community invites', () => {
+    let inviterAddress: string
+    let inviteeAddress: string
+
+    beforeEach(() => {
+      inviterAddress = '0x1234567890123456789012345678901234567890'
+      inviteeAddress = '0x9876543210987654321098765432109876543210'
+    })
+
+    describe('and invites are available', () => {
+      let mockCommunityInvites: Community[]
+
+      beforeEach(() => {
+        mockCommunityInvites = [
+          {
+            id: communityId,
+            name: 'Test Community',
+            description: 'Test Description',
+            ownerAddress: '0x1111111111111111111111111111111111111111',
+            privacy: CommunityPrivacyEnum.Public,
+            active: true,
+            thumbnails: {
+              raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+            }
+          },
+          {
+            id: 'community-2',
+            name: 'Another Community',
+            description: 'Another Description',
+            ownerAddress: inviterAddress,
+            privacy: CommunityPrivacyEnum.Private,
+            active: true
+          }
+        ]
+        mockCommunitiesDB.getCommunityInvites.mockResolvedValue(mockCommunityInvites)
+      })
+
+      it('should return communities where inviter is member but invitee is not', async () => {
+        const result = await communityComponent.getCommunityInvites(inviterAddress, inviteeAddress)
+
+        expect(result).toEqual([
+          {
+            id: communityId,
+            name: 'Test Community',
+            description: 'Test Description',
+            ownerAddress: '0x1111111111111111111111111111111111111111',
+            privacy: CommunityPrivacyEnum.Public,
+            active: true,
+            thumbnails: {
+              raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+            }
+          },
+          {
+            id: 'community-2',
+            name: 'Another Community',
+            description: 'Another Description',
+            ownerAddress: inviterAddress,
+            privacy: CommunityPrivacyEnum.Private,
+            active: true,
+            thumbnails: undefined
+          }
+        ])
+
+        expect(mockCommunitiesDB.getCommunityInvites).toHaveBeenCalledWith(inviterAddress, inviteeAddress)
+      })
+    })
+
+    describe('and no invites are available', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityInvites.mockResolvedValue([])
+      })
+
+      it('should return empty array', async () => {
+        const result = await communityComponent.getCommunityInvites(inviterAddress, inviteeAddress)
+
+        expect(result).toEqual([])
+        expect(mockCommunitiesDB.getCommunityInvites).toHaveBeenCalledWith(inviterAddress, inviteeAddress)
+      })
+    })
+  })
 })

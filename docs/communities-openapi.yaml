@@ -1277,6 +1277,50 @@ paths:
       tags:
         - Communities
 
+  /v1/members/{address}/invites:
+    get:
+      summary: Get community invites for a user
+      description: |
+        Lists all communities where the authenticated user (inviter) is a member but the specified address (invitee) is not a member.
+        This is used to render a list of potential communities to invite the user to.
+        This endpoint requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the user to check invite possibilities for (invitee).
+      responses:
+        '200':
+          description: Community invites found
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityInvites200OkResponse'
+        '400':
+          description: Invalid request - Users cannot invite themselves
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
   /v1/community-voice-chats/active:
     get:
       summary: Get active community voice chats
