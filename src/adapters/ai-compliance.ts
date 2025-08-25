@@ -25,6 +25,22 @@ export async function createAIComplianceComponent(
   const { config, logs } = components
   const logger = logs.getLogger('ai-compliance')
 
+  const env = await config.getString('ENV')
+
+  if (env !== 'prd') {
+    return {
+      validateCommunityContent: async (_request: ComplianceValidationRequest): Promise<ComplianceValidationResult> => {
+        return {
+          isCompliant: true,
+          issues: [],
+          warnings: [],
+          confidence: 1,
+          reasoning: 'Non-production environment'
+        }
+      }
+    }
+  }
+
   const apiKey = await config.requireString('OPENAI_API_KEY')
   const model = (await config.getString('OPENAI_MODEL')) || 'gpt-5-nano'
 
