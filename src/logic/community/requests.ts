@@ -23,7 +23,8 @@ export function createCommunityRequestsComponent(
   async function createCommunityRequest(
     communityId: string,
     memberAddress: string,
-    type: CommunityRequestType
+    type: CommunityRequestType,
+    callerAddress: string
   ): Promise<MemberRequest> {
     let createdRequest: MemberRequest
     const community = await communitiesDb.getCommunity(communityId, memberAddress)
@@ -39,6 +40,12 @@ export function createCommunityRequestsComponent(
       throw new InvalidCommunityRequestError(
         `User cannot join since it is already a member of the community: ${community.name}`
       )
+    }
+
+    if (type === CommunityRequestType.Invite) {
+      await communityRoles.validatePermissionToInviteUsers(communityId, callerAddress)
+    } else if (memberAddress.toLowerCase() !== callerAddress.toLowerCase()) {
+      throw new InvalidCommunityRequestError(`User trying to impersonate another user`)
     }
 
     const existingMemberRequests = await communitiesDb.getCommunityRequests(communityId, {

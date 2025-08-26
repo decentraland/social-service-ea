@@ -94,6 +94,7 @@ export interface ICommunityRolesComponent {
   validatePermissionToLeaveCommunity: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToAcceptAndRejectRequests: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToViewRequests: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToInviteUsers: (communityId: string, memberAddress: string) => Promise<void>
 }
 
 export interface ICommunityEventsComponent {
@@ -185,7 +186,8 @@ export interface ICommunityRequestsComponent {
   createCommunityRequest(
     communityId: string,
     memberAddress: EthAddress,
-    type: CommunityRequestType
+    type: CommunityRequestType,
+    callerAddress: string
   ): Promise<MemberRequest>
   /**
    * Returns pending requests (invites received and requests sent) for a user, optionally filtered by type.

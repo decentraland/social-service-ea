@@ -87,6 +87,7 @@ export type CommunityPermission =
   | 'edit_settings'
   | 'delete_community'
   | 'assign_roles'
+  | 'invite_users'
 
 export enum CommunityRole {
   Owner = 'owner',
