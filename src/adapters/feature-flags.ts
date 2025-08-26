@@ -30,7 +30,7 @@ export async function createFeatureFlagsAdapter(
 
   async function refresh() {
     try {
-      const isEnabled = await features.getIsFeatureEnabled(ApplicationName.CORE, FeatureFlag.COMMUNITIES_AI_COMPLIANCE)
+      const isEnabled = await features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE)
       logger.debug(`Refreshed ${FeatureFlag.COMMUNITIES_AI_COMPLIANCE} feature flag`, {
         isEnabled: String(isEnabled)
       })
