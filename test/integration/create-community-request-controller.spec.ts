@@ -433,12 +433,18 @@ test('Create Community Request Controller', function ({ components, spyComponent
                 })
 
                 describe('and a pending request_to_join already exists', () => {
+                  let requestId: string
                   beforeEach(async () => {
-                    await components.communitiesDb.createCommunityRequest(
+                    const request = await components.communitiesDb.createCommunityRequest(
                       communityId,
                       identity.realAccount.address as EthAddress,
                       CommunityRequestType.RequestToJoin
                     )
+                    requestId = request.id
+                  })
+
+                  afterEach(async () => {
+                    await components.communitiesDbHelper.forceCommunityRequestRemoval(requestId)
                   })
 
                   it('should return 400 status code', async () => {
