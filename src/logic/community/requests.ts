@@ -25,6 +25,7 @@ export function createCommunityRequestsComponent(
     memberAddress: string,
     type: CommunityRequestType
   ): Promise<MemberRequest> {
+    let createdRequest: MemberRequest
     const community = await communitiesDb.getCommunity(communityId, memberAddress)
     if (!community) {
       throw new CommunityNotFoundError(communityId)
@@ -40,24 +41,50 @@ export function createCommunityRequestsComponent(
       )
     }
 
-    const existingRequest = await communitiesDb.getCommunityRequests(communityId, {
-      pagination: { limit: 1, offset: 0 },
+    const existingMemberRequests = await communitiesDb.getCommunityRequests(communityId, {
+      pagination: { limit: 2, offset: 0 }, // An user can have maximum 2 requests at the same time for a given community
       targetAddress: memberAddress,
-      status: CommunityRequestStatus.Pending,
-      type
+      status: CommunityRequestStatus.Pending
     })
 
-    if (existingRequest.length > 0) {
+    const isRequestDuplicated = existingMemberRequests.some((request) => request.type === type)
+
+    if (isRequestDuplicated) {
       throw new InvalidCommunityRequestError(`Request already exists`)
     }
 
-    const request = await communitiesDb.createCommunityRequest(communityId, memberAddress, type)
+    // if the request is a request to join and there is a invite already pending, we should automatically accept the invite
+    const shouldAutomaticallyJoin =
+      type === CommunityRequestType.RequestToJoin &&
+      existingMemberRequests.some((request) => request.type === CommunityRequestType.Invite)
 
-    logger.info(
-      `Created community request: ${type} (${request.id}) for community ${community.name} (${communityId}) for member ${memberAddress}`
-    )
+    if (shouldAutomaticallyJoin) {
+      const inviteRequest: MemberRequest = existingMemberRequests.find(
+        (request) => request.type === CommunityRequestType.Invite
+      )!
+      await communitiesDb.acceptCommunityRequestTransaction(inviteRequest.id, {
+        communityId,
+        memberAddress,
+        role: CommunityRole.Member
+      })
 
-    return request
+      createdRequest = {
+        ...inviteRequest,
+        type: CommunityRequestType.RequestToJoin,
+        status: CommunityRequestStatus.Accepted
+      }
+
+      logger.info(
+        `Automatically joined user ${memberAddress} to community ${community.name} (${communityId}) by accepting invite`
+      )
+    } else {
+      createdRequest = await communitiesDb.createCommunityRequest(communityId, memberAddress, type)
+      logger.info(
+        `Created community request: ${type} (${createdRequest.id}) for community ${community.name} (${communityId}) for member ${memberAddress}`
+      )
+    }
+
+    return createdRequest
   }
 
   async function getMemberRequests(

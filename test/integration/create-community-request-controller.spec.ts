@@ -379,7 +379,7 @@ test('Create Community Request Controller', function ({ components, spyComponent
                   })
                 })
 
-                describe('and a pending request already exists', () => {
+                describe('and a pending request_to_join already exists', () => {
                   beforeEach(async () => {
                     await components.communitiesDb.createCommunityRequest(
                       communityId,
@@ -398,6 +398,56 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     expect(response.status).toBe(400)
                     const body = await response.json()
                     expect(body.message).toBe('Request already exists')
+                  })
+                })
+
+                describe('and a pending invite already exists', () => {
+                  beforeEach(async () => {
+                    await components.communitiesDb.createCommunityRequest(
+                      communityId,
+                      targetAddress as EthAddress,
+                      CommunityRequestType.Invite
+                    )
+                  })
+
+                  it('should return 200 status code', async () => {
+                    const response = await makeRequest(
+                      identity,
+                      `/v1/communities/${communityId}/requests`,
+                      'POST',
+                      requestBody
+                    )
+                    expect(response.status).toBe(200)
+                  })
+
+                  it('should return the request as already accepted', async () => {
+                    const response = await makeRequest(
+                      identity,
+                      `/v1/communities/${communityId}/requests`,
+                      'POST',
+                      requestBody
+                    )
+                    const body = await response.json()
+                    expect(body.data).toMatchObject({
+                      id: expect.any(String),
+                      communityId,
+                      memberAddress: targetAddress,
+                      type: CommunityRequestType.RequestToJoin,
+                      status: CommunityRequestStatus.Accepted
+                    })
+                    
+                  })
+
+                  it('should automatically join the user to the community', async () => {
+                    await makeRequest(
+                      identity,
+                      `/v1/communities/${communityId}/requests`,
+                      'POST',
+                      requestBody
+                    )
+                    
+                    const memberRole = await components.communitiesDb.getCommunityMemberRole(communityId, targetAddress)
+                    expect(memberRole).toBe(CommunityRole.Member)
                   })
                 })
               })
