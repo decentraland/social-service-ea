@@ -436,12 +436,12 @@ test('Create Community Request Controller', function ({ components, spyComponent
                   beforeEach(async () => {
                     await components.communitiesDb.createCommunityRequest(
                       communityId,
-                      targetAddress as EthAddress,
+                      identity.realAccount.address as EthAddress,
                       CommunityRequestType.RequestToJoin
                     )
                   })
 
-                  it.only('should return 400 status code', async () => {
+                  it('should return 400 status code', async () => {
                     const response = await makeRequest(
                       identity,
                       `/v1/communities/${communityId}/requests`,
