@@ -179,7 +179,8 @@ describe('CommunityComplianceValidator', () => {
         })
       })
       
-      describe('and AI compliance process fails with AIComplianceError', () => {
+      // We are not going to handle the manual review status for now
+      describe.skip('and AI compliance process fails with AIComplianceError', () => {
         let processFailingValidator: ICommunityComplianceValidatorComponent
 
         beforeEach(() => {
@@ -196,7 +197,7 @@ describe('CommunityComplianceValidator', () => {
           })
         })
         
-        it('should return needsManualReview: true for AIComplianceError', async () => {
+        it('should return needsManualReview: true', async () => {
           const result = await processFailingValidator.validateCommunityContent({ 
             name: 'Test', 
             description: 'Test description' 
@@ -208,7 +209,7 @@ describe('CommunityComplianceValidator', () => {
           })
         })
 
-        it('should not throw an error for AIComplianceError', async () => {
+        it('should not throw an error', async () => {
           await expect(
             processFailingValidator.validateCommunityContent({ name: 'Test', description: 'Test description' })
           ).resolves.toEqual({ 

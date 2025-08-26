@@ -1,7 +1,7 @@
 import { FeatureFlag } from '../../adapters/feature-flags'
 import { AppComponents } from '../../types'
 import { errorMessageOrDefault } from '../../utils/errors'
-import { AIComplianceError, CommunityNotCompliantError } from './errors'
+import { CommunityNotCompliantError } from './errors'
 
 export interface ICommunityComplianceValidatorComponent {
   validateCommunityContent(request: {
@@ -86,9 +86,10 @@ export function createCommunityComplianceValidatorComponent(
           error: errorMessage
         })
 
-        if (error instanceof AIComplianceError) {
+        // We are not going to handle the manual review status for now
+        /* if (error instanceof AIComplianceError) {
           return { needsManualReview: true, reason: errorMessage }
-        }
+        } */
 
         throw error
       }
