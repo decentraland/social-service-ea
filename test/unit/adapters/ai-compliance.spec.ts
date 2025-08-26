@@ -26,7 +26,7 @@ describe('AIComplianceComponent', () => {
   
   beforeEach(() => {
     mockConfig.requireString.mockImplementation((key: string) => {
-      if (key === 'OPENAI_API_KEY') return Promise.resolve('test-api-key')
+      if (key === 'OPEN_AI_API_KEY') return Promise.resolve('test-api-key')
       return Promise.reject(new Error(`Unknown key: ${key}`))
     })
     
@@ -90,7 +90,7 @@ describe('AIComplianceComponent', () => {
           })
           
           expect(aiCompliance).toBeDefined()
-          expect(mockConfig.requireString).toHaveBeenCalledWith('OPENAI_API_KEY')
+          expect(mockConfig.requireString).toHaveBeenCalledWith('OPEN_AI_API_KEY')
           expect(mockConfig.getString).toHaveBeenCalledWith('OPENAI_MODEL')
           expect(mockConfig.getString).toHaveBeenCalledWith('ENV')
         })
@@ -115,10 +115,10 @@ describe('AIComplianceComponent', () => {
         })
       })
       
-      describe('and OPENAI_API_KEY is missing', () => {
+      describe('and OPEN_AI_API_KEY is missing', () => {
         beforeEach(() => {
           mockConfig.requireString.mockImplementation((key: string) => {
-            if (key === 'OPENAI_API_KEY') return Promise.reject(new Error('OPENAI_API_KEY not found'))
+            if (key === 'OPEN_AI_API_KEY') return Promise.reject(new Error('OPEN_AI_API_KEY not found'))
             return Promise.resolve(undefined)
           })
         })
@@ -129,7 +129,7 @@ describe('AIComplianceComponent', () => {
               config: mockConfig,
               logs: mockLogs
             })
-          ).rejects.toThrow('OPENAI_API_KEY not found')
+          ).rejects.toThrow('OPEN_AI_API_KEY not found')
         })
       })
     })

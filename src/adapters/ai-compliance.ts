@@ -43,7 +43,7 @@ export async function createAIComplianceComponent(
     }
   }
 
-  const apiKey = await config.requireString('OPENAI_API_KEY')
+  const apiKey = await config.requireString('OPEN_AI_API_KEY')
   const model = (await config.getString('OPENAI_MODEL')) || 'gpt-5-nano'
 
   // Comprehensive but focused prompt based on official Code of Ethics
