@@ -38,6 +38,16 @@ describe('Community Places Component', () => {
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockCommunityRoles = createMockCommunityRolesComponent({})
     mockPlacesApi = createPlacesApiAdapterMockComponent({}) as jest.Mocked<IPlacesApiComponent>
+    
+    // Re-setup mockLogs after creating mocks
+    mockLogs.getLogger.mockReturnValueOnce({
+      log: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn()
+    })
+    
     communityPlacesComponent = await createCommunityPlacesComponent({
       communitiesDb: mockCommunitiesDB,
       communityRoles: mockCommunityRoles,
@@ -47,12 +57,15 @@ describe('Community Places Component', () => {
   })
 
   describe('when getting places from a community', () => {
-    const userAddress = '0x1234567890123456789012345678901234567890'
-    const options = { userAddress, pagination: { limit: 10, offset: 0 } }
-    const mockPlaces = [{ id: 'place-1' }, { id: 'place-2' }]
+    let userAddress: string
+    let options: any
+    let mockPlaces: any[]
     let community: any
 
     beforeEach(() => {
+      userAddress = '0x1234567890123456789012345678901234567890'
+      options = { userAddress, pagination: { limit: 10, offset: 0 } }
+      mockPlaces = [{ id: 'place-1' }, { id: 'place-2' }]
       community = null
       mockCommunitiesDB.communityExists.mockResolvedValue(false)
       mockCommunitiesDB.getCommunity.mockResolvedValue(community)
@@ -60,9 +73,13 @@ describe('Community Places Component', () => {
       mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(2)
     })
 
+    afterEach(() => {
+      jest.resetAllMocks()
+    })
+
     describe('and the community exists', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
       })
 
       describe('and the community is public', () => {
@@ -76,10 +93,10 @@ describe('Community Places Component', () => {
             active: true,
             role: CommunityRole.Member
           }
-          mockCommunitiesDB.getCommunity.mockResolvedValue(community)
+          mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
         })
 
-        it('should return community places', async () => {
+        it('should return the community places with total count', async () => {
           const result = await communityPlacesComponent.getPlaces(communityId, options)
 
           expect(result).toEqual({
@@ -110,10 +127,10 @@ describe('Community Places Component', () => {
 
         describe('and the user is a member', () => {
           beforeEach(() => {
-            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
           })
 
-          it('should return community places', async () => {
+          it('should return the community places after validating member access', async () => {
             const result = await communityPlacesComponent.getPlaces(communityId, options)
 
             expect(result).toEqual({
@@ -131,10 +148,10 @@ describe('Community Places Component', () => {
 
         describe('and the user is not a member', () => {
           beforeEach(() => {
-            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.None)
           })
 
-          it('should throw NotAuthorizedError', async () => {
+          it('should throw NotAuthorizedError with permission denied message', async () => {
             await expect(communityPlacesComponent.getPlaces(communityId, options)).rejects.toThrow(
               new NotAuthorizedError(
                 `The user ${userAddress} doesn't have permission to get places from community ${communityId}`
@@ -151,9 +168,10 @@ describe('Community Places Component', () => {
       })
 
       describe('and called without user address (public access)', () => {
-        const publicOptions = { pagination: { limit: 10, offset: 0 } }
+        let publicOptions: any
 
         beforeEach(() => {
+          publicOptions = { pagination: { limit: 10, offset: 0 } }
           community = {
             id: communityId,
             name: 'Test Community',
@@ -163,10 +181,10 @@ describe('Community Places Component', () => {
             active: true,
             role: CommunityRole.Member
           }
-          mockCommunitiesDB.getCommunity.mockResolvedValue(community)
+          mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
         })
 
-        it('should return community places for public community', async () => {
+        it('should return community places without authentication for public community', async () => {
           const result = await communityPlacesComponent.getPlaces(communityId, publicOptions)
 
           expect(result).toEqual({
@@ -192,12 +210,12 @@ describe('Community Places Component', () => {
             active: true,
             role: CommunityRole.Member
           }
-          mockCommunitiesDB.getCommunity.mockResolvedValue(community)
-          mockCommunitiesDB.getCommunityPlaces.mockResolvedValue([{ id: 'place-1' }])
-          mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValue(1)
+          mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
+          mockCommunitiesDB.getCommunityPlaces.mockResolvedValueOnce([{ id: 'place-1' }])
+          mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValueOnce(1)
         })
 
-        it('should handle pagination correctly', async () => {
+        it('should apply the pagination parameters to the database query', async () => {
           const paginationOptions = { userAddress, pagination: { limit: 1, offset: 1 } }
 
           await communityPlacesComponent.getPlaces(communityId, paginationOptions)
@@ -213,10 +231,10 @@ describe('Community Places Component', () => {
 
     describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(false)
       })
 
-      it('should throw CommunityNotFoundError', async () => {
+      it('should throw CommunityNotFoundError with the community ID', async () => {
         await expect(communityPlacesComponent.getPlaces(communityId, options)).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
@@ -230,11 +248,11 @@ describe('Community Places Component', () => {
 
     describe('and the community exists but getCommunity returns null', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(true)
-        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
+        mockCommunitiesDB.getCommunity.mockResolvedValueOnce(null)
       })
 
-      it('should throw CommunityNotFoundError', async () => {
+      it('should throw CommunityNotFoundError despite exists check passing', async () => {
         await expect(communityPlacesComponent.getPlaces(communityId, options)).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
@@ -249,9 +267,10 @@ describe('Community Places Component', () => {
   })
 
   describe('when validating and adding places to a community', () => {
-    const placeIds = ['place-1', 'place-2']
+    let placeIds: string[]
 
     beforeEach(() => {
+      placeIds = ['place-1', 'place-2']
       mockCommunitiesDB.communityExists.mockResolvedValue(false)
       mockPlacesApi.getPlaces.mockResolvedValue(
         mockPlaces.map((place) => ({
@@ -266,19 +285,23 @@ describe('Community Places Component', () => {
       mockCommunitiesDB.addCommunityPlaces.mockResolvedValue()
     })
 
+    afterEach(() => {
+      jest.resetAllMocks()
+    })
+
     describe('and the community exists', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
       })
 
       describe('and the user has permission', () => {
         beforeEach(() => {
-          mockCommunityRoles.validatePermissionToAddPlacesToCommunity.mockResolvedValue()
+          mockCommunityRoles.validatePermissionToAddPlacesToCommunity.mockResolvedValueOnce()
         })
 
         describe('and the user owns all places', () => {
           beforeEach(() => {
-            mockPlacesApi.getPlaces.mockResolvedValue(
+            mockPlacesApi.getPlaces.mockResolvedValueOnce(
               mockPlaces.map((place) => ({
                 id: place.id,
                 title: place.id,
@@ -289,7 +312,7 @@ describe('Community Places Component', () => {
             )
           })
 
-          it('should validate and add places to the community successfully', async () => {
+          it('should validate permissions and ownership before adding places to the community', async () => {
             await communityPlacesComponent.validateAndAddPlaces(communityId, mockUserAddress, placeIds)
 
             expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
@@ -307,32 +330,39 @@ describe('Community Places Component', () => {
             )
           })
 
-          it('should handle duplicate place IDs by deduplicating them', async () => {
-            const duplicatePlaceIds = ['place-1', 'place-1', 'place-2']
-            const uniquePlaceIds = ['place-1', 'place-2']
+          describe('and there are duplicate place IDs', () => {
+            let duplicatePlaceIds: string[]
+            let uniquePlaceIds: string[]
 
-            await communityPlacesComponent.validateAndAddPlaces(communityId, mockUserAddress, duplicatePlaceIds)
+            beforeEach(() => {
+              duplicatePlaceIds = ['place-1', 'place-1', 'place-2']
+              uniquePlaceIds = ['place-1', 'place-2']
+            })
 
-            expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith(uniquePlaceIds)
-            expect(mockCommunitiesDB.addCommunityPlaces).toHaveBeenCalledWith(
-              uniquePlaceIds.map((id) => ({
-                id,
-                communityId,
-                addedBy: mockUserAddress
-              }))
-            )
+            it('should deduplicate the place IDs before processing', async () => {
+              await communityPlacesComponent.validateAndAddPlaces(communityId, mockUserAddress, duplicatePlaceIds)
+
+              expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith(uniquePlaceIds)
+              expect(mockCommunitiesDB.addCommunityPlaces).toHaveBeenCalledWith(
+                uniquePlaceIds.map((id) => ({
+                  id,
+                  communityId,
+                  addedBy: mockUserAddress
+                }))
+              )
+            })
           })
         })
 
         describe('and the user does not own all places', () => {
           beforeEach(() => {
-            mockPlacesApi.getPlaces.mockResolvedValue([
+            mockPlacesApi.getPlaces.mockResolvedValueOnce([
               { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
               { id: 'place-2', title: 'Place 2', positions: [], owner: '0xother-owner', ...defaultWorldData }
             ])
           })
 
-          it('should throw NotAuthorizedError', async () => {
+          it('should throw NotAuthorizedError with ownership validation message', async () => {
             await expect(
               communityPlacesComponent.validateAndAddPlaces(communityId, mockUserAddress, placeIds)
             ).rejects.toThrow(new NotAuthorizedError(`The user ${mockUserAddress} doesn't own all the places`))
@@ -353,10 +383,10 @@ describe('Community Places Component', () => {
           const permissionError = new NotAuthorizedError(
             `The user ${mockUserAddress} doesn't have permission to add places to the community`
           )
-          mockCommunityRoles.validatePermissionToAddPlacesToCommunity.mockRejectedValue(permissionError)
+          mockCommunityRoles.validatePermissionToAddPlacesToCommunity.mockRejectedValueOnce(permissionError)
         })
 
-        it('should throw NotAuthorizedError', async () => {
+        it('should throw NotAuthorizedError with permission denied message', async () => {
           await expect(
             communityPlacesComponent.validateAndAddPlaces(communityId, mockUserAddress, placeIds)
           ).rejects.toThrow(
@@ -376,10 +406,10 @@ describe('Community Places Component', () => {
 
     describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(false)
       })
 
-      it('should throw CommunityNotFoundError', async () => {
+      it('should throw CommunityNotFoundError before any validation', async () => {
         await expect(
           communityPlacesComponent.validateAndAddPlaces(communityId, mockUserAddress, placeIds)
         ).rejects.toThrow(new CommunityNotFoundError(communityId))
@@ -393,13 +423,18 @@ describe('Community Places Component', () => {
   })
 
   describe('when adding places to a community', () => {
-    const placeIds = ['place-1', 'place-2']
+    let placeIds: string[]
 
     beforeEach(() => {
+      placeIds = ['place-1', 'place-2']
       mockCommunitiesDB.addCommunityPlaces.mockResolvedValue()
     })
 
-    it('should add places to the community without validation', async () => {
+    afterEach(() => {
+      jest.resetAllMocks()
+    })
+
+    it('should add places to the community without any validation checks', async () => {
       await communityPlacesComponent.addPlaces(communityId, mockUserAddress, placeIds)
 
       expect(mockCommunitiesDB.addCommunityPlaces).toHaveBeenCalledWith(
@@ -411,50 +446,95 @@ describe('Community Places Component', () => {
       )
     })
 
-    it('should handle duplicate place IDs by deduplicating them', async () => {
-      const duplicatePlaceIds = ['place-1', 'place-1', 'place-2']
-      const uniquePlaceIds = ['place-1', 'place-2']
+    describe('and there are duplicate place IDs', () => {
+      let duplicatePlaceIds: string[]
+      let uniquePlaceIds: string[]
 
-      await communityPlacesComponent.addPlaces(communityId, mockUserAddress, duplicatePlaceIds)
+      beforeEach(() => {
+        duplicatePlaceIds = ['place-1', 'place-1', 'place-2']
+        uniquePlaceIds = ['place-1', 'place-2']
+      })
 
-      expect(mockCommunitiesDB.addCommunityPlaces).toHaveBeenCalledWith(
-        uniquePlaceIds.map((id) => ({
-          id,
-          communityId,
-          addedBy: mockUserAddress
-        }))
-      )
+      it('should deduplicate the place IDs before adding to database', async () => {
+        await communityPlacesComponent.addPlaces(communityId, mockUserAddress, duplicatePlaceIds)
+
+        expect(mockCommunitiesDB.addCommunityPlaces).toHaveBeenCalledWith(
+          uniquePlaceIds.map((id) => ({
+            id,
+            communityId,
+            addedBy: mockUserAddress
+          }))
+        )
+      })
     })
   })
 
   describe('when removing a place from a community', () => {
-    const placeId = 'place-1'
+    let placeId: string
     let placeExists: boolean
 
     beforeEach(() => {
+      placeId = 'place-1'
       placeExists = false
       mockCommunitiesDB.communityExists.mockResolvedValue(false)
       mockCommunitiesDB.communityPlaceExists.mockResolvedValue(placeExists)
+      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
       mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity.mockResolvedValue()
       mockCommunitiesDB.removeCommunityPlace.mockResolvedValue()
+      // Mock place ownership validation
+      mockPlacesApi.getPlaces.mockResolvedValue([
+        {
+          id: placeId,
+          owner: mockUserAddress,
+          title: 'Test Place',
+          positions: [],
+          ...defaultWorldData
+        }
+      ])
+    })
+
+    afterEach(() => {
+      jest.resetAllMocks()
     })
 
     describe('and the community exists', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
       })
 
       describe('and the place exists', () => {
+              beforeEach(() => {
+        placeExists = true
+        mockCommunitiesDB.communityPlaceExists.mockResolvedValueOnce(placeExists)
+      })
+
+      describe('and the user is the community owner', () => {
         beforeEach(() => {
-          placeExists = true
-          mockCommunitiesDB.communityPlaceExists.mockResolvedValue(placeExists)
+          mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Owner)
         })
 
-        it('should validate and remove the place from the community', async () => {
+        it('should remove the place bypassing permission validation for community owners', async () => {
           await communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)
 
           expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
           expect(mockCommunitiesDB.communityPlaceExists).toHaveBeenCalledWith(communityId, placeId)
+          expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, mockUserAddress)
+          expect(mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.removeCommunityPlace).toHaveBeenCalledWith(communityId, placeId)
+        })
+      })
+
+      describe('and the user is not the community owner', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator)
+        })
+
+        it('should validate permissions before removing the place for non-owners', async () => {
+          await communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)
+
+          expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+          expect(mockCommunitiesDB.communityPlaceExists).toHaveBeenCalledWith(communityId, placeId)
+          expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, mockUserAddress)
           expect(mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity).toHaveBeenCalledWith(
             communityId,
             mockUserAddress
@@ -462,14 +542,15 @@ describe('Community Places Component', () => {
           expect(mockCommunitiesDB.removeCommunityPlace).toHaveBeenCalledWith(communityId, placeId)
         })
       })
+      })
 
       describe('and the place does not exist', () => {
         beforeEach(() => {
           placeExists = false
-          mockCommunitiesDB.communityPlaceExists.mockResolvedValue(placeExists)
+          mockCommunitiesDB.communityPlaceExists.mockResolvedValueOnce(placeExists)
         })
 
-        it('should throw CommunityPlaceNotFoundError', async () => {
+        it('should throw CommunityPlaceNotFoundError with place and community identifiers', async () => {
           await expect(communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)).rejects.toThrow(
             new CommunityPlaceNotFoundError(`Place ${placeId} not found in community ${communityId}`)
           )
@@ -484,10 +565,10 @@ describe('Community Places Component', () => {
 
     describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(false)
       })
 
-      it('should throw CommunityNotFoundError', async () => {
+      it('should throw CommunityNotFoundError before checking place existence', async () => {
         await expect(communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
@@ -501,21 +582,26 @@ describe('Community Places Component', () => {
   })
 
   describe('when updating places in a community', () => {
-    const placeIds = ['place-1', 'place-2']
+    let placeIds: string[]
 
     beforeEach(() => {
+      placeIds = ['place-1', 'place-2']
       mockCommunitiesDB.communityExists.mockResolvedValue(false)
       mockCommunityRoles.validatePermissionToUpdatePlaces.mockResolvedValue()
       mockCommunitiesDB.removeCommunityPlacesWithExceptions.mockResolvedValue()
       mockCommunitiesDB.addCommunityPlaces.mockResolvedValue()
     })
 
+    afterEach(() => {
+      jest.resetAllMocks()
+    })
+
     describe('and the community exists', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(true)
       })
 
-      it('should validate and update places in the community', async () => {
+      it('should validate permissions and replace all community places with the new set', async () => {
         await communityPlacesComponent.updatePlaces(communityId, mockUserAddress, placeIds)
 
         expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
@@ -533,10 +619,10 @@ describe('Community Places Component', () => {
 
     describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+        mockCommunitiesDB.communityExists.mockResolvedValueOnce(false)
       })
 
-      it('should throw CommunityNotFoundError', async () => {
+      it('should throw CommunityNotFoundError before validating permissions', async () => {
         await expect(communityPlacesComponent.updatePlaces(communityId, mockUserAddress, placeIds)).rejects.toThrow(
           new CommunityNotFoundError(communityId)
         )
@@ -550,9 +636,10 @@ describe('Community Places Component', () => {
   })
 
   describe('when validating place ownership', () => {
-    const placeIds = ['place-1', 'place-2']
+    let placeIds: string[]
 
     beforeEach(() => {
+      placeIds = ['place-1', 'place-2']
       mockPlacesApi.getPlaces.mockResolvedValue(
         mockPlaces.map((place) => ({
           id: place.id,
@@ -562,6 +649,10 @@ describe('Community Places Component', () => {
           ...defaultWorldData
         }))
       )
+    })
+
+    afterEach(() => {
+      jest.resetAllMocks()
     })
 
     describe('and the user owns all places', () => {
@@ -577,7 +668,7 @@ describe('Community Places Component', () => {
         )
       })
 
-      it('should validate ownership successfully', async () => {
+      it('should return valid result with all places in owned list', async () => {
         const result = await communityPlacesComponent.validateOwnership(placeIds, mockUserAddress)
 
         expect(result.isValid).toBe(true)
@@ -586,47 +677,59 @@ describe('Community Places Component', () => {
         expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith(placeIds)
       })
 
-      it('should handle case-insensitive owner comparison', async () => {
-        const upperCaseUserAddress = mockUserAddress.toUpperCase()
-        mockPlacesApi.getPlaces.mockResolvedValue([
-          { id: 'place-1', title: 'Place 1', positions: [], owner: upperCaseUserAddress, ...defaultWorldData },
-          { id: 'place-2', title: 'Place 2', positions: [], owner: upperCaseUserAddress, ...defaultWorldData }
-        ])
+      describe('and owner addresses have different casing', () => {
+        let upperCaseUserAddress: string
 
-        const result = await communityPlacesComponent.validateOwnership(placeIds, mockUserAddress)
+        beforeEach(() => {
+          upperCaseUserAddress = mockUserAddress.toUpperCase()
+          mockPlacesApi.getPlaces.mockResolvedValueOnce([
+            { id: 'place-1', title: 'Place 1', positions: [], owner: upperCaseUserAddress, ...defaultWorldData },
+            { id: 'place-2', title: 'Place 2', positions: [], owner: upperCaseUserAddress, ...defaultWorldData }
+          ])
+        })
 
-        expect(result.isValid).toBe(true)
-        expect(result.ownedPlaces).toEqual(placeIds)
-        expect(result.notOwnedPlaces).toEqual([])
+        it('should handle case-insensitive owner address comparison', async () => {
+          const result = await communityPlacesComponent.validateOwnership(placeIds, mockUserAddress)
+
+          expect(result.isValid).toBe(true)
+          expect(result.ownedPlaces).toEqual(placeIds)
+          expect(result.notOwnedPlaces).toEqual([])
+        })
       })
 
-      it('should handle duplicate place IDs by deduplicating them', async () => {
-        const duplicatePlaceIds = ['place-1', 'place-1', 'place-2']
-        const uniquePlaceIds = ['place-1', 'place-2']
+      describe('and there are duplicate place IDs', () => {
+        let duplicatePlaceIds: string[]
+        let uniquePlaceIds: string[]
 
-        mockPlacesApi.getPlaces.mockResolvedValue([
-          { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
-          { id: 'place-2', title: 'Place 2', positions: [], owner: mockUserAddress, ...defaultWorldData }
-        ])
+        beforeEach(() => {
+          duplicatePlaceIds = ['place-1', 'place-1', 'place-2']
+          uniquePlaceIds = ['place-1', 'place-2']
+          mockPlacesApi.getPlaces.mockResolvedValueOnce([
+            { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
+            { id: 'place-2', title: 'Place 2', positions: [], owner: mockUserAddress, ...defaultWorldData }
+          ])
+        })
 
-        const result = await communityPlacesComponent.validateOwnership(duplicatePlaceIds, mockUserAddress)
+        it('should deduplicate place IDs and validate ownership correctly', async () => {
+          const result = await communityPlacesComponent.validateOwnership(duplicatePlaceIds, mockUserAddress)
 
-        expect(result.isValid).toBe(true)
-        expect(result.ownedPlaces).toEqual(uniquePlaceIds)
-        expect(result.notOwnedPlaces).toEqual([])
-        expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith(uniquePlaceIds)
+          expect(result.isValid).toBe(true)
+          expect(result.ownedPlaces).toEqual(uniquePlaceIds)
+          expect(result.notOwnedPlaces).toEqual([])
+          expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith(uniquePlaceIds)
+        })
       })
     })
 
     describe('and the user does not own all places', () => {
       beforeEach(() => {
-        mockPlacesApi.getPlaces.mockResolvedValue([
+        mockPlacesApi.getPlaces.mockResolvedValueOnce([
           { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
           { id: 'place-2', title: 'Place 2', positions: [], owner: '0xother-owner', ...defaultWorldData }
         ])
       })
 
-      it('should throw NotAuthorizedError', async () => {
+      it('should throw NotAuthorizedError with ownership validation message', async () => {
         await expect(communityPlacesComponent.validateOwnership(placeIds, mockUserAddress)).rejects.toThrow(
           new NotAuthorizedError(`The user ${mockUserAddress} doesn't own all the places`)
         )
@@ -637,10 +740,10 @@ describe('Community Places Component', () => {
 
     describe('and the placeIds array is empty', () => {
       beforeEach(() => {
-        mockPlacesApi.getPlaces.mockResolvedValue([])
+        mockPlacesApi.getPlaces.mockResolvedValueOnce([])
       })
 
-      it('should handle empty placeIds array', async () => {
+      it('should return valid result without calling API for empty array', async () => {
         const result = await communityPlacesComponent.validateOwnership([], mockUserAddress)
 
         expect(result.isValid).toBe(true)
@@ -652,13 +755,13 @@ describe('Community Places Component', () => {
 
     describe('and places have no owner', () => {
       beforeEach(() => {
-        mockPlacesApi.getPlaces.mockResolvedValue([
+        mockPlacesApi.getPlaces.mockResolvedValueOnce([
           { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, world: false, world_name: '' },
           { id: 'place-2', title: 'Place 2', positions: [], owner: null, world: false, world_name: '' }
         ])
       })
 
-      it('should throw NotAuthorizedError', async () => {
+      it('should throw NotAuthorizedError for places with null owner', async () => {
         await expect(communityPlacesComponent.validateOwnership(placeIds, mockUserAddress)).rejects.toThrow(
           new NotAuthorizedError(`The user ${mockUserAddress} doesn't own all the places`)
         )
@@ -667,10 +770,10 @@ describe('Community Places Component', () => {
 
     describe('and places API returns undefined', () => {
       beforeEach(() => {
-        mockPlacesApi.getPlaces.mockResolvedValue(undefined)
+        mockPlacesApi.getPlaces.mockResolvedValueOnce(undefined)
       })
 
-      it('should throw NotAuthorizedError', async () => {
+      it('should throw NotAuthorizedError when API returns undefined', async () => {
         await expect(communityPlacesComponent.validateOwnership(placeIds, mockUserAddress)).rejects.toThrow(
           new NotAuthorizedError(`The user ${mockUserAddress} doesn't own all the places`)
         )
@@ -679,10 +782,10 @@ describe('Community Places Component', () => {
 
     describe('and places API returns null', () => {
       beforeEach(() => {
-        mockPlacesApi.getPlaces.mockResolvedValue(null)
+        mockPlacesApi.getPlaces.mockResolvedValueOnce(null)
       })
 
-      it('should throw NotAuthorizedError', async () => {
+      it('should throw NotAuthorizedError when API returns null', async () => {
         await expect(communityPlacesComponent.validateOwnership(placeIds, mockUserAddress)).rejects.toThrow(
           new NotAuthorizedError(`The user ${mockUserAddress} doesn't own all the places`)
         )

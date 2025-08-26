@@ -135,7 +135,11 @@ export async function createCommunityPlacesComponent(
       await validateCommunityExists(communityId)
       await validatePlaceExists(communityId, placeId)
       await validateOwnership([placeId], userAddress)
-      await communityRoles.validatePermissionToRemovePlacesFromCommunity(communityId, userAddress)
+      const memberRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
+
+      if (memberRole !== CommunityRole.Owner) {
+        await communityRoles.validatePermissionToRemovePlacesFromCommunity(communityId, userAddress)
+      }
 
       await communitiesDb.removeCommunityPlace(communityId, placeId)
     },
