@@ -133,9 +133,8 @@ export async function createCommunityPlacesComponent(
 
     removePlace: async (communityId: string, userAddress: EthAddress, placeId: string): Promise<void> => {
       await validateCommunityExists(communityId)
-
       await validatePlaceExists(communityId, placeId)
-
+      await validateOwnership([placeId], userAddress)
       await communityRoles.validatePermissionToRemovePlacesFromCommunity(communityId, userAddress)
 
       await communitiesDb.removeCommunityPlace(communityId, placeId)

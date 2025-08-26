@@ -98,6 +98,7 @@ export interface ICommunityRolesComponent {
   validatePermissionToAcceptAndRejectRequests: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToViewRequests: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToInviteUsers: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToEditCommunityName: (communityId: string, memberAddress: string) => Promise<void>
 }
 
 export interface ICommunityEventsComponent {

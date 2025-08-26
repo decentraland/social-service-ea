@@ -999,6 +999,7 @@ describe('Community Component', () => {
           beforeEach(() => {
             mockCommunityRoles.validatePermissionToEditCommunity.mockResolvedValue()
             mockCommunityRoles.validatePermissionToUpdateCommunityPrivacy.mockResolvedValue()
+            mockCommunityRoles.validatePermissionToEditCommunityName.mockResolvedValue()
           })
 
           it('should update the community with all fields and call compliance validation', async () => {
@@ -1312,6 +1313,110 @@ describe('Community Component', () => {
 
               expect(mockCommunitiesDB.acceptAllRequestsToJoin).not.toHaveBeenCalled()
             })
+          })
+        })
+
+        describe('and the name is being changed', () => {
+          const nameUpdateOnly = { name: 'New Community Name' }
+          let existingCommunity: any
+
+          beforeEach(() => {
+            existingCommunity = { ...mockCommunity, name: 'Original Name' }
+            mockCommunitiesDB.getCommunity.mockResolvedValue(existingCommunity)
+            mockCommunitiesDB.updateCommunity.mockResolvedValue({ ...existingCommunity, ...nameUpdateOnly })
+          })
+
+          describe('and the user has permission to edit community names', () => {
+            beforeEach(() => {
+              mockCommunityRoles.validatePermissionToEditCommunityName.mockResolvedValue()
+            })
+
+            it('should call validatePermissionToEditCommunityName', async () => {
+              await communityComponent.updateCommunity(communityId, userAddress, nameUpdateOnly)
+
+              expect(mockCommunityRoles.validatePermissionToEditCommunityName).toHaveBeenCalledWith(
+                communityId,
+                userAddress
+              )
+            })
+
+            it('should update the community name successfully', async () => {
+              const result = await communityComponent.updateCommunity(communityId, userAddress, nameUpdateOnly)
+
+              expect(result).toEqual({ ...existingCommunity, ...nameUpdateOnly })
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, nameUpdateOnly)
+            })
+          })
+
+          describe('and the user does not have permission to edit community names', () => {
+            let permissionError: Error
+
+            beforeEach(() => {
+              permissionError = new Error('User does not have permission to edit community name')
+              mockCommunityRoles.validatePermissionToEditCommunityName.mockRejectedValue(permissionError)
+            })
+
+            it('should throw the permission error', async () => {
+              await expect(
+                communityComponent.updateCommunity(communityId, userAddress, nameUpdateOnly)
+              ).rejects.toThrow('User does not have permission to edit community name')
+            })
+
+            it('should not update the community', async () => {
+              await expect(
+                communityComponent.updateCommunity(communityId, userAddress, nameUpdateOnly)
+              ).rejects.toThrow()
+
+              expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
+            })
+          })
+        })
+
+        describe('and the name is not being changed', () => {
+          const updatesWithoutName = { description: 'Updated Description' }
+          let existingCommunity: any
+
+          beforeEach(() => {
+            existingCommunity = { ...mockCommunity, name: 'Original Name' }
+            mockCommunitiesDB.getCommunity.mockResolvedValue(existingCommunity)
+            mockCommunitiesDB.updateCommunity.mockResolvedValue({ ...existingCommunity, ...updatesWithoutName })
+          })
+
+          it('should not call validatePermissionToEditCommunityName', async () => {
+            await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutName)
+
+            expect(mockCommunityRoles.validatePermissionToEditCommunityName).not.toHaveBeenCalled()
+          })
+
+          it('should update the community successfully', async () => {
+            const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutName)
+
+            expect(result).toEqual({ ...existingCommunity, ...updatesWithoutName })
+            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutName)
+          })
+        })
+
+        describe('and the name provided is the same as existing (with whitespace differences)', () => {
+          const sameNameWithSpaces = { name: '  Test Community  ' }
+          let existingCommunity: any
+
+          beforeEach(() => {
+            existingCommunity = { ...mockCommunity, name: 'Test Community' }
+            mockCommunitiesDB.getCommunity.mockResolvedValue(existingCommunity)
+            mockCommunitiesDB.updateCommunity.mockResolvedValue({ ...existingCommunity, name: existingCommunity.name })
+          })
+
+          it('should not call validatePermissionToEditCommunityName when trimmed names are identical', async () => {
+            await communityComponent.updateCommunity(communityId, userAddress, sameNameWithSpaces)
+
+            expect(mockCommunityRoles.validatePermissionToEditCommunityName).not.toHaveBeenCalled()
+          })
+
+          it('should update the community successfully', async () => {
+            const result = await communityComponent.updateCommunity(communityId, userAddress, sameNameWithSpaces)
+
+            expect(result).toEqual({ ...existingCommunity, name: existingCommunity.name })
+            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, sameNameWithSpaces)
           })
         })
 
