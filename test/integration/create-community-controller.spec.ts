@@ -5,7 +5,7 @@ import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/
 import { makeAuthenticatedMultipartRequest } from './utils/auth'
 import { randomUUID } from 'crypto'
 import { Jimp, rgbaToInt } from 'jimp'
-import { CommunityNotCompliantError } from '../../src/logic/community/errors'
+import { AIComplianceError, CommunityNotCompliantError } from '../../src/logic/community/errors'
 
 export async function createLargeThumbnailBuffer(targetSize = 501 * 1024): Promise<Buffer> {
   let width = 1000
@@ -367,6 +367,19 @@ test('Create Community Controller', async function ({ components, stubComponents
               expect(body.message).toContain("Community content violates Decentraland's Code of Ethics")
               expect(body.data.issues).toEqual(['Contains inappropriate language', 'Promotes violence'])
               expect(body.data.warnings).toEqual(['Content is borderline'])
+            })
+          })
+
+          describe('and AI compliance validation fails with AIComplianceError', () => {
+            beforeEach(async () => {
+              stubComponents.communityComplianceValidator.validateCommunityContent.rejects(new AIComplianceError('AI compliance validation failed'))
+            })
+            
+            it('should respond with a 400 status code for AIComplianceError', async () => {
+              const response = await makeMultipartRequest(identity, '/v1/communities', validBody)
+
+              expect(response.status).toBe(400)
+              expect(await response.json()).toMatchObject({ message: 'AI compliance validation failed' })
             })
           })
 

@@ -6,7 +6,8 @@ import {
   CommunityPlaceNotFoundError,
   InvalidCommunityRequestError,
   CommunityNotCompliantError,
-  CommunityRequestNotFoundError
+  CommunityRequestNotFoundError,
+  AIComplianceError
 } from '../../logic/community'
 import { ComponentsWithLogger } from '@dcl/platform-server-commons/dist/types'
 
@@ -52,6 +53,16 @@ export async function communitiesErrorsHandler(
             issues: error.issues,
             warnings: error.warnings
           }
+        }
+      }
+    }
+
+    if (error instanceof AIComplianceError) {
+      return {
+        status: 400,
+        body: {
+          error: 'Bad Request',
+          message: error.message
         }
       }
     }

@@ -10,7 +10,7 @@ import {
 } from './utils/auth'
 import { randomUUID } from 'crypto'
 import FormData from 'form-data'
-import { CommunityNotCompliantError } from '../../src/logic/community/errors'
+import { AIComplianceError, CommunityNotCompliantError } from '../../src/logic/community/errors'
 
 test('Update Community Controller', async function ({ components, stubComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
@@ -405,6 +405,26 @@ test('Update Community Controller', async function ({ components, stubComponents
             expect(response.status).toBe(400)
             const body = await response.json()
             expect(body.message).toContain("Community content violates Decentraland's Code of Ethics")
+          })
+        })
+
+        describe('and AI compliance validation fails with AIComplianceError', () => {
+          beforeEach(async () => {
+            stubComponents.communityComplianceValidator.validateCommunityContent.rejects(new AIComplianceError('AI compliance validation failed'))
+          })
+
+          it('should respond with a 400 status code for AIComplianceError', async () => {
+            const response = await makeMultipartRequest(
+              identity,
+              `/v1/communities/${communityId}`,
+              {
+                name: 'Updated Name'
+              },
+              'PUT'
+            )
+
+            expect(response.status).toBe(400)
+            expect(await response.json()).toMatchObject({ message: 'AI compliance validation failed' })
           })
         })
       })
