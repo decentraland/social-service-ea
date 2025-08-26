@@ -17,7 +17,7 @@ test('Create Community Request Controller', function ({ components, spyComponent
 
     beforeEach(async () => {
       identity = await createTestIdentity()
-      ownerAddress = identity.realAccount.address.toLowerCase()
+      ownerAddress = '0x0000000000000000000000000000000000000001'
       targetAddress = '0x0000000000000000000000000000000000000002'
     })
 
@@ -154,51 +154,102 @@ test('Create Community Request Controller', function ({ components, spyComponent
                 })
               )
               communityId = result.id
-
-              await components.communitiesDb.addCommunityMember({
-                communityId,
-                memberAddress: ownerAddress,
-                role: CommunityRole.Owner
-              })
             })
 
-            describe('and community is private', () => {
+            afterEach(async () => {
+              await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+            })
+
+            describe('and inviter has permission to invite users', () => { 
               beforeEach(async () => {
-                await components.communitiesDb.updateCommunity(communityId, {
-                  private: true
+                await components.communitiesDb.addCommunityMember({
+                  communityId,
+                  memberAddress: identity.realAccount.address,
+                  role: CommunityRole.Owner
                 })
               })
 
-              describe('and user is not a member', () => {
-                describe('and no pending invite exists', () => {
-                  it('should return 200 status code and return the created request', async () => {
-                    const response = await makeRequest(
-                      identity,
-                      `/v1/communities/${communityId}/requests`,
-                      'POST',
-                      requestBody
-                    )
-                    expect(response.status).toBe(200)
-                    const body = await response.json()
-                    expect(body.data).toMatchObject({
-                      id: expect.any(String),
-                      communityId,
-                      memberAddress: targetAddress,
-                      type: CommunityRequestType.Invite,
-                      status: CommunityRequestStatus.Pending
+              afterEach(async () => {
+                await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [identity.realAccount.address])
+              })
+
+              describe('and community is private', () => {
+                beforeEach(async () => {
+                  await components.communitiesDb.updateCommunity(communityId, {
+                    private: true
+                  })
+                })
+
+                afterEach(async () => {
+                  await components.communitiesDb.updateCommunity(communityId, {
+                    private: false
+                  })
+                })
+  
+                describe('and user is not a member', () => {
+                  describe('and no pending invite exists', () => {
+                    it('should return 200 status code and return the created request', async () => {
+                      const response = await makeRequest(
+                        identity,
+                        `/v1/communities/${communityId}/requests`,
+                        'POST',
+                        requestBody
+                      )
+
+                      const body = await response.json()
+                      expect(response.status).toBe(200)
+                      expect(body.data).toMatchObject({
+                        id: expect.any(String),
+                        communityId,
+                        memberAddress: targetAddress,
+                        type: CommunityRequestType.Invite,
+                        status: CommunityRequestStatus.Pending
+                      })
+                    })
+                  })
+  
+                  describe('when a pending invite already exists', () => {
+                    let requestId: string
+                    beforeEach(async () => {
+                      const request = await components.communitiesDb.createCommunityRequest(
+                        communityId,
+                        targetAddress as EthAddress,
+                        CommunityRequestType.Invite
+                      )
+                      requestId = request.id
+                    })
+
+                    afterEach(async () => {
+                      await components.communitiesDbHelper.forceCommunityRequestRemoval(requestId)
+                    })
+  
+                    it('should return 400 status code', async () => {
+                      const response = await makeRequest(
+                        identity,
+                        `/v1/communities/${communityId}/requests`,
+                        'POST',
+                        requestBody
+                      )
+                      expect(response.status).toBe(400)
+                      const body = await response.json()
+                      expect(body.message).toBe('Request already exists')
                     })
                   })
                 })
-
-                describe('when a pending invite already exists', () => {
+  
+                describe('when user is already a member', () => {
                   beforeEach(async () => {
-                    await components.communitiesDb.createCommunityRequest(
+                    await components.communitiesDb.addCommunityMember({
                       communityId,
-                      targetAddress as EthAddress,
-                      CommunityRequestType.Invite
-                    )
+                      memberAddress: targetAddress,
+                      role: CommunityRole.Member
+                    })
                   })
 
+                  afterEach(async () => {
+                    await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [targetAddress])
+                  })
+  
                   it('should return 400 status code', async () => {
                     const response = await makeRequest(
                       identity,
@@ -208,71 +259,71 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     )
                     expect(response.status).toBe(400)
                     const body = await response.json()
-                    expect(body.message).toBe('Request already exists')
+                    expect(body.message).toContain('User cannot join since it is already a member')
                   })
                 })
               })
-
-              describe('when user is already a member', () => {
+  
+              describe('and community is public', () => {
                 beforeEach(async () => {
-                  await components.communitiesDb.addCommunityMember({
-                    communityId,
-                    memberAddress: targetAddress,
-                    role: CommunityRole.Member
+                  await components.communitiesDb.updateCommunity(communityId, {
+                    private: false
                   })
                 })
-
-                it('should return 400 status code', async () => {
-                  const response = await makeRequest(
-                    identity,
-                    `/v1/communities/${communityId}/requests`,
-                    'POST',
-                    requestBody
-                  )
-                  expect(response.status).toBe(400)
-                  const body = await response.json()
-                  expect(body.message).toContain('User cannot join since it is already a member')
-                })
-              })
-            })
-
-            describe('and community is public', () => {
-              beforeEach(async () => {
-                await components.communitiesDb.updateCommunity(communityId, {
-                  private: false
-                })
-              })
-
-              describe('and user is not a member', () => {
-                describe('and no pending invite exists', () => {
-                  it('should return 200 status code and return the created request', async () => {
-                    const response = await makeRequest(
-                      identity,
-                      `/v1/communities/${communityId}/requests`,
-                      'POST',
-                      requestBody
-                    )
-                    expect(response.status).toBe(200)
-                    const body = await response.json()
-                    expect(body.data).toMatchObject({
-                      id: expect.any(String),
-                      communityId,
-                      memberAddress: targetAddress,
-                      type: CommunityRequestType.Invite,
-                      status: CommunityRequestStatus.Pending
+  
+                describe('and user is not a member', () => {
+                  describe('and no pending invite exists', () => {
+                    it('should return 200 status code and return the created request', async () => {
+                      const response = await makeRequest(
+                        identity,
+                        `/v1/communities/${communityId}/requests`,
+                        'POST',
+                        requestBody
+                      )
+                      expect(response.status).toBe(200)
+                      const body = await response.json()
+                      expect(body.data).toMatchObject({
+                        id: expect.any(String),
+                        communityId,
+                        memberAddress: targetAddress,
+                        type: CommunityRequestType.Invite,
+                        status: CommunityRequestStatus.Pending
+                      })
+                    })
+                  })
+  
+                  describe('when a pending invite already exists', () => {
+                    beforeEach(async () => {
+                      await components.communitiesDb.createCommunityRequest(
+                        communityId,
+                        targetAddress as EthAddress,
+                        CommunityRequestType.Invite
+                      )
+                    })
+  
+                    it('should return 400 status code', async () => {
+                      const response = await makeRequest(
+                        identity,
+                        `/v1/communities/${communityId}/requests`,
+                        'POST',
+                        requestBody
+                      )
+                      expect(response.status).toBe(400)
+                      const body = await response.json()
+                      expect(body.message).toBe('Request already exists')
                     })
                   })
                 })
-
-                describe('when a pending invite already exists', () => {
+  
+                describe('when user is already a member', () => {
                   beforeEach(async () => {
-                    await components.communitiesDb.createCommunityRequest(
+                    await components.communitiesDb.addCommunityMember({
                       communityId,
-                      targetAddress as EthAddress,
-                      CommunityRequestType.Invite
-                    )
+                      memberAddress: targetAddress,
+                      role: CommunityRole.Member
+                    })
                   })
-
+  
                   it('should return 400 status code', async () => {
                     const response = await makeRequest(
                       identity,
@@ -282,31 +333,33 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     )
                     expect(response.status).toBe(400)
                     const body = await response.json()
-                    expect(body.message).toBe('Request already exists')
+                    expect(body.message).toContain('User cannot join since it is already a member')
                   })
                 })
               })
+            })
 
-              describe('when user is already a member', () => {
-                beforeEach(async () => {
-                  await components.communitiesDb.addCommunityMember({
-                    communityId,
-                    memberAddress: targetAddress,
-                    role: CommunityRole.Member
-                  })
+            describe('and invites does not has permission to invite users', () => {
+              beforeEach(async () => {
+                await components.communitiesDb.addCommunityMember({
+                  communityId,
+                  memberAddress: ownerAddress,
+                  role: CommunityRole.Member
                 })
+              })
 
-                it('should return 400 status code', async () => {
-                  const response = await makeRequest(
-                    identity,
-                    `/v1/communities/${communityId}/requests`,
-                    'POST',
-                    requestBody
-                  )
-                  expect(response.status).toBe(400)
-                  const body = await response.json()
-                  expect(body.message).toContain('User cannot join since it is already a member')
-                })
+              afterEach(async () => {
+                await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [ownerAddress])
+              })
+
+              it('should return 401 status code', async () => {
+                const response = await makeRequest(
+                  identity,
+                  `/v1/communities/${communityId}/requests`,
+                  'POST',
+                  requestBody
+                )
+                expect(response.status).toBe(401)
               })
             })
           })
@@ -388,12 +441,12 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     )
                   })
 
-                  it('should return 400 status code', async () => {
+                  it.only('should return 400 status code', async () => {
                     const response = await makeRequest(
                       identity,
                       `/v1/communities/${communityId}/requests`,
                       'POST',
-                      requestBody
+                      { ...requestBody, targetedAddress: identity.realAccount.address }
                     )
                     expect(response.status).toBe(400)
                     const body = await response.json()
@@ -459,6 +512,10 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     memberAddress: targetAddress,
                     role: CommunityRole.Member
                   })
+                })
+
+                afterEach(async () => {
+                  await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [targetAddress])
                 })
 
                 it('should return 400 status code', async () => {

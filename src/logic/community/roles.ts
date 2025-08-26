@@ -14,7 +14,8 @@ export const OWNER_PERMISSIONS: CommunityPermission[] = [
   'send_invitations',
   'edit_settings',
   'delete_community',
-  'assign_roles'
+  'assign_roles',
+  'invite_users'
 ]
 
 export const MODERATOR_PERMISSIONS: CommunityPermission[] = [
@@ -25,7 +26,8 @@ export const MODERATOR_PERMISSIONS: CommunityPermission[] = [
   'reject_requests',
   'view_requests',
   'ban_players',
-  'send_invitations'
+  'send_invitations',
+  'invite_users'
 ]
 
 export const COMMUNITY_ROLES: Record<CommunityRole, CommunityPermission[]> = {
@@ -184,6 +186,7 @@ export function createCommunityRolesComponent(
       ['accept_requests', 'reject_requests'],
       'accept and reject requests'
     ),
-    validatePermissionToViewRequests: validatePermission('view_requests', 'view requests')
+    validatePermissionToViewRequests: validatePermission('view_requests', 'view requests'),
+    validatePermissionToInviteUsers: validatePermission('invite_users', 'invite users')
   }
 }
