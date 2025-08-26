@@ -1542,7 +1542,7 @@ describe('Community Component', () => {
             it('should migrate all requests to join to members', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPublic)
 
-              expect(mockCommunitiesDB.migrateAllRequestsToJoinToMembers).toHaveBeenCalledWith(communityId)
+              expect(mockCommunitiesDB.acceptAllRequestsToJoin).toHaveBeenCalledWith(communityId)
             })
           })
 
@@ -1561,7 +1561,7 @@ describe('Community Component', () => {
             it('should not migrate all requests to join to members', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPrivate)
   
-              expect(mockCommunitiesDB.migrateAllRequestsToJoinToMembers).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptAllRequestsToJoin).not.toHaveBeenCalled()
             })
           })
         })

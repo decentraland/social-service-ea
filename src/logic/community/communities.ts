@@ -416,7 +416,7 @@ export function createCommunityComponent(
       }
 
       if (isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public) {
-        await communitiesDb.migrateAllRequestsToJoinToMembers(communityId)
+        await communitiesDb.acceptAllRequestsToJoin(communityId)
       }
 
       logger.info('Community updated successfully', {

@@ -42,7 +42,7 @@ export function createCommunityRequestsComponent(
     }
 
     const existingMemberRequests = await communitiesDb.getCommunityRequests(communityId, {
-      pagination: { limit: 1, offset: 0 },
+      pagination: { limit: 2, offset: 0 }, // An user can have maximum 2 requests at the same time for a given community
       targetAddress: memberAddress,
       status: CommunityRequestStatus.Pending
     })

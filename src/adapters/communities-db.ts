@@ -785,7 +785,7 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
-    async migrateAllRequestsToJoinToMembers(communityId: string): Promise<void> {
+    async acceptAllRequestsToJoin(communityId: string): Promise<void> {
       const query = SQL`
         INSERT INTO community_members (community_id, member_address, role)
         SELECT community_id, member_address, ${CommunityRole.Member}
