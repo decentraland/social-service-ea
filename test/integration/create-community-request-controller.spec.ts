@@ -256,16 +256,24 @@ test('Create Community Request Controller', function ({ components, spyComponent
                       await components.communitiesDbHelper.forceCommunityRequestRemoval(requestId)
                     })
 
-                    it('should return 400 status code with correct message', async () => {
+                    it('should return 200 status code with the existing request', async () => {
                       const response = await makeRequest(
                         identity,
                         `/v1/communities/${communityId}/requests`,
                         'POST',
                         requestBody
                       )
-                      expect(response.status).toBe(400)
+                      expect(response.status).toBe(200)
                       const body = await response.json()
-                      expect(body.message).toBe('Request already exists')
+                      expect(body.data).toEqual(
+                        expect.objectContaining({
+                          id: requestId,
+                          communityId,
+                          memberAddress: targetAddress,
+                          type: CommunityRequestType.Invite,
+                          status: CommunityRequestStatus.Pending
+                        })
+                      )
                     })
                   })
                 })
@@ -341,16 +349,24 @@ test('Create Community Request Controller', function ({ components, spyComponent
                       await components.communitiesDbHelper.forceCommunityRequestRemoval(requestId)
                     })
 
-                    it('should return 400 status code with correct message', async () => {
+                    it('should return 200 status code with the existing request', async () => {
                       const response = await makeRequest(
                         identity,
                         `/v1/communities/${communityId}/requests`,
                         'POST',
                         requestBody
                       )
-                      expect(response.status).toBe(400)
+                      expect(response.status).toBe(200)
                       const body = await response.json()
-                      expect(body.message).toBe('Request already exists')
+                      expect(body.data).toEqual(
+                        expect.objectContaining({
+                          id: requestId,
+                          communityId,
+                          memberAddress: targetAddress,
+                          type: CommunityRequestType.Invite,
+                          status: CommunityRequestStatus.Pending
+                        })
+                      )
                     })
                   })
                 })
@@ -508,16 +524,24 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     await components.communitiesDbHelper.forceCommunityRequestRemoval(requestId)
                   })
 
-                  it('should return 400 status code with correct message', async () => {
+                  it('should return 200 status code with the existing request', async () => {
                     const response = await makeRequest(
                       identity,
                       `/v1/communities/${communityId}/requests`,
                       'POST',
                       { ...requestBody, targetedAddress: identity.realAccount.address }
                     )
-                    expect(response.status).toBe(400)
+                    expect(response.status).toBe(200)
                     const body = await response.json()
-                    expect(body.message).toBe('Request already exists')
+                    expect(body.data).toEqual(
+                      expect.objectContaining({
+                        id: requestId,
+                        communityId,
+                        memberAddress: identity.realAccount.address.toLowerCase(),
+                        type: CommunityRequestType.RequestToJoin,
+                        status: CommunityRequestStatus.Pending
+                      })
+                    )
                   })
                 })
 

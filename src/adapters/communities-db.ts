@@ -420,7 +420,9 @@ export function createCommunitiesDBComponent(
           CASE WHEN c.private = true THEN ${CommunityPrivacyEnum.Private} ELSE ${CommunityPrivacyEnum.Public} END as privacy,
           c.active
         FROM communities c
-        JOIN community_members cm_inviter ON c.id = cm_inviter.community_id AND cm_inviter.member_address = ${normalizedInviterAddress}
+        JOIN community_members cm_inviter ON c.id = cm_inviter.community_id 
+          AND cm_inviter.member_address = ${normalizedInviterAddress}
+          AND cm_inviter.role IN ('owner', 'moderator')
         LEFT JOIN community_members cm_invitee ON c.id = cm_invitee.community_id AND cm_invitee.member_address = ${normalizedInviteeAddress}
         WHERE c.active = true
           AND cm_invitee.member_address IS NULL

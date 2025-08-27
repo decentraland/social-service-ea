@@ -129,22 +129,23 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
           })
 
           describe('and invitee is not a member of any community', () => {
-            it('should return 200 status code with all inviter communities', async () => {
+            it('should return 200 status code with only communities where inviter is owner or moderator', async () => {
               const response = await makeRequest(inviterIdentity, `/v1/members/${inviteeAddress}/invites`)
               const body = await response.json()
 
               expect(response.status).toBe(200)
-              expect(body.data).toHaveLength(2)
+              expect(body.data).toHaveLength(1)
               
+              // Should only return inviterCommunityId1 where inviter is owner
               expect(body.data).toContainEqual({
                 id: inviterCommunityId1,
                 name: 'Inviter Community 1'
               })
 
-              expect(body.data).toContainEqual({
-                id: inviterCommunityId2,
-                name: 'Inviter Community 2'
-              })
+              // Should NOT return inviterCommunityId2 where inviter is only a member
+              expect(body.data).not.toContainEqual(
+                expect.objectContaining({ id: inviterCommunityId2 })
+              )
             })
           })
 
@@ -176,27 +177,116 @@ test('Get Community Invites Controller', function ({ components, spyComponents }
               await components.communitiesDbHelper.forceCommunityMemberRemoval(inviterCommunityId1, [inviteeAddress])
             })
 
-            it('should return 200 status code with only communities where inviter is member but invitee is not', async () => {
+            it('should return 200 status code with only communities where inviter is owner/moderator but invitee is not', async () => {
               const response = await makeRequest(inviterIdentity, `/v1/members/${inviteeAddress}/invites`)
               const body = await response.json()
 
               expect(response.status).toBe(200)
-              expect(body.data).toHaveLength(1)
+              expect(body.data).toHaveLength(0)
               
-              // Should only return inviterCommunityId2 (invitee is not a member)
-              expect(body.data).toContainEqual({
-                id: inviterCommunityId2,
-                name: 'Inviter Community 2'
-              })
-
-              // Should NOT return inviterCommunityId1 or sharedCommunityId
+              // Should NOT return any communities because:
+              // - inviterCommunityId1: invitee is already a member
+              // - inviterCommunityId2: inviter is only a member (not owner/moderator)
+              // - sharedCommunityId: invitee is already a member
               expect(body.data).not.toContainEqual(
                 expect.objectContaining({ id: inviterCommunityId1 })
+              )
+              expect(body.data).not.toContainEqual(
+                expect.objectContaining({ id: inviterCommunityId2 })
               )
               expect(body.data).not.toContainEqual(
                 expect.objectContaining({ id: sharedCommunityId })
               )
             })
+          })
+        })
+
+        describe('and testing role-based filtering specifically', () => {
+          let moderatorCommunityId: string
+          let memberOnlyCommunityId: string
+          let ownerCommunityId: string
+
+          beforeEach(async () => {
+            // Create communities for role testing
+            const moderatorCommunity = await components.communitiesDb.createCommunity(
+              mockCommunity({
+                name: 'Moderator Community',
+                description: 'Community where inviter is moderator',
+                owner_address: '0x7777777777777777777777777777777777777777'
+              })
+            )
+            moderatorCommunityId = moderatorCommunity.id
+
+            const memberOnlyCommunity = await components.communitiesDb.createCommunity(
+              mockCommunity({
+                name: 'Member Only Community',
+                description: 'Community where inviter is only member',
+                owner_address: '0x6666666666666666666666666666666666666666'
+              })
+            )
+            memberOnlyCommunityId = memberOnlyCommunity.id
+
+            const ownerCommunity = await components.communitiesDb.createCommunity(
+              mockCommunity({
+                name: 'Owner Community',
+                description: 'Community where inviter is owner',
+                owner_address: inviterAddress
+              })
+            )
+            ownerCommunityId = ownerCommunity.id
+
+            // Add inviter with different roles
+            await components.communitiesDb.addCommunityMember({
+              communityId: moderatorCommunityId,
+              memberAddress: inviterAddress,
+              role: CommunityRole.Moderator
+            })
+
+            await components.communitiesDb.addCommunityMember({
+              communityId: memberOnlyCommunityId,
+              memberAddress: inviterAddress,
+              role: CommunityRole.Member
+            })
+
+            await components.communitiesDb.addCommunityMember({
+              communityId: ownerCommunityId,
+              memberAddress: inviterAddress,
+              role: CommunityRole.Owner
+            })
+          })
+
+          afterEach(async () => {
+            await components.communitiesDbHelper.forceCommunityRemoval(moderatorCommunityId)
+            await components.communitiesDbHelper.forceCommunityRemoval(memberOnlyCommunityId)
+            await components.communitiesDbHelper.forceCommunityRemoval(ownerCommunityId)
+          })
+
+          it('should only return communities where inviter is owner or moderator', async () => {
+            const response = await makeRequest(inviterIdentity, `/v1/members/${inviteeAddress}/invites`)
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+            expect(body.data).toHaveLength(2)
+            
+            // Should return communities where inviter is owner or moderator
+            expect(body.data).toContainEqual(
+              expect.objectContaining({
+                id: moderatorCommunityId,
+                name: 'Moderator Community'
+              })
+            )
+            
+            expect(body.data).toContainEqual(
+              expect.objectContaining({
+                id: ownerCommunityId,
+                name: 'Owner Community'
+              })
+            )
+
+            // Should NOT return community where inviter is only a member
+            expect(body.data).not.toContainEqual(
+              expect.objectContaining({ id: memberOnlyCommunityId })
+            )
           })
         })
       })

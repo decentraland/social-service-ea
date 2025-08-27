@@ -1642,7 +1642,7 @@ describe('Community Component', () => {
         mockCommunitiesDB.getCommunityInvites.mockResolvedValue(mockCommunityInvites)
       })
 
-      it('should return communities where inviter is member but invitee is not', async () => {
+      it('should return communities where inviter is owner/moderator but invitee is not', async () => {
         const result = await communityComponent.getCommunityInvites(inviterAddress, inviteeAddress)
 
         expect(result).toEqual([
