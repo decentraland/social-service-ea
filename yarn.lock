@@ -1268,16 +1268,6 @@
     ajv-keywords "^5.1.0"
     mitt "^3.0.1"
 
-"@dcl/schemas@^17.1.0":
-  version "17.1.0"
-  resolved "https://registry.npmjs.org/@dcl/schemas/-/schemas-17.1.0.tgz"
-  integrity sha512-DCn9YU9tfdwJFtX7XJyEQM5i5STUTDZRliI+6wmORnq63NvyX3Q+Ftz/McZPyxYAgorPZtgM4X+YROuPX7NmHQ==
-  dependencies:
-    ajv "^8.11.0"
-    ajv-errors "^3.0.0"
-    ajv-keywords "^5.1.0"
-    mitt "^3.0.1"
-
 "@dcl/schemas@^9.2.0":
   version "9.15.0"
   resolved "https://registry.npmjs.org/@dcl/schemas/-/schemas-9.15.0.tgz"
@@ -1286,6 +1276,24 @@
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
     ajv-keywords "^5.1.0"
+
+"@dcl/schemas@https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-requests-notifications-and-events/dcl-schemas-18.1.1-17274380955.commit-f469f8c.tgz":
+  version "18.1.1-17274380955.commit-f469f8c"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-requests-notifications-and-events/dcl-schemas-18.1.1-17274380955.commit-f469f8c.tgz#da6f842639542b6b13440518fc40fbbd9742dce4"
+  dependencies:
+    ajv "^8.11.0"
+    ajv-errors "^3.0.0"
+    ajv-keywords "^5.1.0"
+    mitt "^3.0.1"
+
+"@dcl/schemas@https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-requests-notifications-and-events/dcl-schemas-18.1.1-17278131691.commit-678606e.tgz":
+  version "18.1.1-17278131691.commit-678606e"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/communities-requests-notifications-and-events/dcl-schemas-18.1.1-17278131691.commit-678606e.tgz#0a9cbfeb40b05d6d04ca9fd5c8f8b4d47b25dced"
+  dependencies:
+    ajv "^8.11.0"
+    ajv-errors "^3.0.0"
+    ajv-keywords "^5.1.0"
+    mitt "^3.0.1"
 
 "@dcl/slack-component@^1.0.1":
   version "1.0.1"

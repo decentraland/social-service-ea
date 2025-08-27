@@ -1,11 +1,14 @@
 import {
   CommunityDeletedEvent,
+  CommunityInviteReceivedEvent,
   CommunityMemberBannedEvent,
   CommunityMemberRemovedEvent,
   CommunityRenamedEvent,
+  CommunityRequestToJoinAcceptedEvent,
+  CommunityRequestToJoinReceivedEvent,
   Events
 } from '@dcl/schemas'
-import { AppComponents } from '../../types'
+import { AppComponents, CommunityRole } from '../../types'
 import { ICommunityBroadcasterComponent } from './types'
 
 const MEMBER_BATCH_SIZE = 100
@@ -28,12 +31,27 @@ export type CommunityRenamedEventReducedMetadata = Omit<CommunityRenamedEvent, '
   }
 }
 
+export type CommunityRequestToJoinReceivedEventReducedMetadata = Omit<
+  CommunityRequestToJoinReceivedEvent,
+  'metadata'
+> & {
+  metadata: {
+    communityId: string
+    communityName: string
+    memberAddress: string
+    thumbnailUrl: string
+  }
+}
+
 export function createCommunityBroadcasterComponent(
   components: Pick<AppComponents, 'sns' | 'communitiesDb'>
 ): ICommunityBroadcasterComponent {
   const { sns, communitiesDb } = components
 
-  async function getAllCommunityMembers(communityId: string): Promise<string[]> {
+  async function getAllCommunityMembersAddresses(
+    communityId: string,
+    filters: { roles?: CommunityRole[] } = {}
+  ): Promise<string[]> {
     const allMemberAddresses: string[] = []
     let offset = 0
     let hasMore = true
@@ -43,7 +61,8 @@ export function createCommunityBroadcasterComponent(
         pagination: {
           limit: MEMBER_FETCH_BATCH_SIZE,
           offset
-        }
+        },
+        ...filters
       })
 
       const memberAddresses = communityMembers.map((member) => member.memberAddress)
@@ -75,7 +94,7 @@ export function createCommunityBroadcasterComponent(
   async function publishToAllMembers(
     event: CommunityDeletedEventReducedMetadata | CommunityRenamedEventReducedMetadata
   ): Promise<void> {
-    const allMemberAddresses = await getAllCommunityMembers(event.metadata.id)
+    const allMemberAddresses = await getAllCommunityMembersAddresses(event.metadata.id)
     const memberBatches = createMemberBatches(allMemberAddresses)
 
     for (let i = 0; i < memberBatches.length; i++) {
@@ -96,18 +115,49 @@ export function createCommunityBroadcasterComponent(
     }
   }
 
+  /**
+   * Publishes an event to all moderators and owners of a community.
+   * @param event - The event to publish.
+   * @returns A promise that resolves when the event is published.
+   */
+  async function publishToOwnersAndModerators(
+    event: CommunityRequestToJoinReceivedEventReducedMetadata
+  ): Promise<void> {
+    const moderatorsAndOwners: string[] = await getAllCommunityMembersAddresses(event.metadata.communityId, {
+      roles: [CommunityRole.Moderator, CommunityRole.Owner]
+    })
+
+    await sns.publishMessage({
+      type: Events.Type.COMMUNITY,
+      subType: event.subType,
+      key: event.key,
+      timestamp: event.timestamp,
+      metadata: {
+        ...event.metadata,
+        addressesToNotify: moderatorsAndOwners
+      }
+    } as CommunityRequestToJoinReceivedEvent)
+  }
+
   async function broadcast(
     event:
       | CommunityDeletedEventReducedMetadata
       | CommunityRenamedEventReducedMetadata
       | CommunityMemberRemovedEvent
       | CommunityMemberBannedEvent
+      | CommunityRequestToJoinAcceptedEvent
+      | CommunityRequestToJoinReceivedEventReducedMetadata
+      | CommunityInviteReceivedEvent
   ) {
     const shouldReportEventToAllMembers =
       event.subType === Events.SubType.Community.DELETED || event.subType === Events.SubType.Community.RENAMED
 
+    const shouldReportEventToOwnersAndModerators = event.subType === Events.SubType.Community.REQUEST_TO_JOIN_RECEIVED
+
     if (shouldReportEventToAllMembers) {
       await publishToAllMembers(event as CommunityDeletedEventReducedMetadata | CommunityRenamedEventReducedMetadata)
+    } else if (shouldReportEventToOwnersAndModerators) {
+      await publishToOwnersAndModerators(event as CommunityRequestToJoinReceivedEventReducedMetadata)
     } else {
       await sns.publishMessage(event)
     }

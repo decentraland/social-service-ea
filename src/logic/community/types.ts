@@ -3,7 +3,7 @@ import {
   FriendshipStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { CommunityRole, Action } from '../../types/entities'
-import { CommunityMemberBannedEvent, CommunityMemberRemovedEvent, EthAddress, PaginatedParameters } from '@dcl/schemas'
+import { CommunityInviteSentEvent, CommunityMemberBannedEvent, CommunityMemberRemovedEvent, CommunityRequestToJoinAcceptedEvent, CommunityRequestToJoinReceivedEvent, EthAddress, PaginatedParameters } from '@dcl/schemas'
 import { CommunityDeletedEventReducedMetadata, CommunityRenamedEventReducedMetadata } from './broadcaster'
 
 export interface ICommunitiesComponent {
@@ -160,6 +160,9 @@ export interface ICommunityBroadcasterComponent {
       | CommunityRenamedEventReducedMetadata
       | CommunityMemberRemovedEvent
       | CommunityMemberBannedEvent
+      | CommunityRequestToJoinAcceptedEvent
+      | CommunityRequestToJoinReceivedEvent
+      | CommunityInviteSentEvent
   ): Promise<void>
 }
 
