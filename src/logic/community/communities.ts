@@ -316,8 +316,6 @@ export function createCommunityComponent(
 
       await communitiesDb.deleteCommunity(id)
 
-      // TODO: should we still broadcast the event if a global moderator is deleting the community?
-
       setImmediate(async () => {
         await communityBroadcaster.broadcast({
           type: Events.Type.COMMUNITY,
