@@ -1174,7 +1174,7 @@ describe('Community Component', () => {
             })
           })
 
-          describe('and the community privacy is updated from publicto private', () => {
+          describe('and the community privacy is updated from public to private', () => {
             let updatesWithPrivacyPrivate: CommunityUpdates
 
             beforeEach(() => {
@@ -1226,7 +1226,7 @@ describe('Community Component', () => {
         })
       })
 
-      it('should return the existing community without calling compliance validation', async () => {
+      it('should return the existing community fields', async () => {
         const result = await communityComponent.updateCommunity(communityId, userAddress, emptyUpdates)
 
         expect(result).toEqual({
@@ -1240,7 +1240,8 @@ describe('Community Component', () => {
 
         expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunityRoles.validatePermissionToEditCommunity).not.toHaveBeenCalled()
+        expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
+        expect(mockCommunityRoles.validatePermissionToUpdateCommunityPrivacy).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
       })
     })
