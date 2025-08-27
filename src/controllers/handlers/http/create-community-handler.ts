@@ -37,8 +37,7 @@ export async function createCommunityHandler(
         name: name!,
         description: description!,
         ownerAddress: address,
-        privacy,
-        needsManualReview: false
+        privacy
       },
       thumbnailBuffer,
       placeIds ?? []

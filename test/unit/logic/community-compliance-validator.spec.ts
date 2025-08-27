@@ -1,6 +1,6 @@
 import { createCommunityComplianceValidatorComponent, ICommunityComplianceValidatorComponent } from '../../../src/logic/community/compliance-validator'
 import { createAIComplianceMock, createLogsMockedComponent } from '../../mocks/components'
-import { CommunityNotCompliantError, AIComplianceError } from '../../../src/logic/community/errors'
+import { CommunityNotCompliantError } from '../../../src/logic/community/errors'
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { createFeatureFlagsMockComponent } from '../../mocks/components/feature-flags'
@@ -30,14 +30,14 @@ describe('CommunityComplianceValidator', () => {
         featureFlagsMock.isEnabled.mockReturnValue(false)
       })
 
-      it('should skip validation and return needsManualReview: false', async () => {
+      it('should skip validation', async () => {
         const name = 'Friendly Gaming Community'
         const description = 'A welcoming community for gamers to connect and play together'
 
         const result = await complianceValidator.validateCommunityContent({ name, description })
 
         expect(aiComplianceMock.validateCommunityContent).not.toHaveBeenCalled()
-        expect(result).toEqual({ needsManualReview: false })
+        expect(result).toBeUndefined()
       })
     })
 
@@ -57,7 +57,7 @@ describe('CommunityComplianceValidator', () => {
           })
         })
 
-        it('should pass validation successfully and return needsManualReview: false', async () => {
+        it('should pass validation successfully', async () => {
           const name = 'Friendly Gaming Community'
           const description = 'A welcoming community for gamers to connect and play together'
           
@@ -69,7 +69,7 @@ describe('CommunityComplianceValidator', () => {
             thumbnailBuffer: undefined
           })
           
-          expect(result).toEqual({ needsManualReview: false })
+          expect(result).toBeUndefined()
         })
       })
 
@@ -84,7 +84,7 @@ describe('CommunityComplianceValidator', () => {
           })
         })
 
-        it('should pass validation with warnings and return needsManualReview: false', async () => {
+        it('should pass validation with warnings', async () => {
           const name = 'A'.repeat(101) // Very long name
           const description = 'A'.repeat(1001) // Very long description
           
@@ -96,7 +96,7 @@ describe('CommunityComplianceValidator', () => {
             thumbnailBuffer: undefined
           })
           
-          expect(result).toEqual({ needsManualReview: false })
+          expect(result).toBeUndefined()
         })
       })
 
@@ -138,7 +138,7 @@ describe('CommunityComplianceValidator', () => {
           })
         })
 
-        it('should handle thumbnail validation successfully and return needsManualReview: false', async () => {
+        it('should handle thumbnail validation successfully', async () => {
           const name = 'Test Community'
           const description = 'Test description'
           const thumbnail = Buffer.from('fake-image-data')
@@ -151,11 +151,11 @@ describe('CommunityComplianceValidator', () => {
             thumbnailBuffer: thumbnail,
           })
           
-          expect(result).toEqual({ needsManualReview: false })
+          expect(result).toBeUndefined()
         })
       })
       
-      describe('and AI compliance service fails with generic error', () => {
+      describe('and AI compliance service fails', () => {
         let failingValidator: ICommunityComplianceValidatorComponent
 
         beforeEach(() => {
@@ -176,46 +176,6 @@ describe('CommunityComplianceValidator', () => {
           await expect(
             failingValidator.validateCommunityContent({ name: 'Test', description: 'Test description' })
           ).rejects.toThrow('AI service unavailable')
-        })
-      })
-      
-      // We are not going to handle the manual review status for now
-      describe.skip('and AI compliance process fails with AIComplianceError', () => {
-        let processFailingValidator: ICommunityComplianceValidatorComponent
-
-        beforeEach(() => {
-          const processFailingAiCompliance = {
-            async validateCommunityContent() {
-              throw new AIComplianceError('Invalid JSON response from OpenAI API')
-            }
-          }
-          
-          processFailingValidator = createCommunityComplianceValidatorComponent({
-            aiCompliance: processFailingAiCompliance,
-            featureFlags: featureFlagsMock,
-            logs: logsMock
-          })
-        })
-        
-        it('should return needsManualReview: true', async () => {
-          const result = await processFailingValidator.validateCommunityContent({ 
-            name: 'Test', 
-            description: 'Test description' 
-          })
-          
-          expect(result).toEqual({ 
-            needsManualReview: true, 
-            reason: 'Invalid JSON response from OpenAI API' 
-          })
-        })
-
-        it('should not throw an error', async () => {
-          await expect(
-            processFailingValidator.validateCommunityContent({ name: 'Test', description: 'Test description' })
-          ).resolves.toEqual({ 
-            needsManualReview: true, 
-            reason: 'Invalid JSON response from OpenAI API' 
-          })
         })
       })
     })

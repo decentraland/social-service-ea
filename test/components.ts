@@ -163,13 +163,6 @@ async function initComponents(): Promise<TestComponents> {
   const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
 
-  const slack = await createSlackComponent(
-    { logs },
-    {
-      token: 'sometoken'
-    }
-  )
-
   // Community voice chat cache and polling components
   const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })
   const communityVoiceChatPolling = createCommunityVoiceChatPollingComponent({
@@ -215,9 +208,7 @@ async function initComponents(): Promise<TestComponents> {
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     logs,
     commsGatekeeper,
-    communityComplianceValidator,
-    slack,
-    config
+    communityComplianceValidator
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -263,6 +254,13 @@ async function initComponents(): Promise<TestComponents> {
   const rewards = await createRewardComponent({ fetcher, config })
 
   const email = await createEmailComponent({ fetcher, config })
+
+  const slack = await createSlackComponent(
+    { logs },
+    {
+      token: 'sometoken'
+    }
+  )
 
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 

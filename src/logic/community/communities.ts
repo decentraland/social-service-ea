@@ -21,9 +21,8 @@ import {
   toPublicCommunity,
   toPublicCommunityWithVoiceChat
 } from './utils'
-import { errorMessageOrDefault, isErrorWithMessage } from '../../utils/errors'
+import { isErrorWithMessage } from '../../utils/errors'
 import { EthAddress, Events } from '@dcl/schemas'
-import { communityNeedsManualReviewMessage } from '../../utils/slackMessages'
 
 export function createCommunityComponent(
   components: Pick<
@@ -41,8 +40,6 @@ export function createCommunityComponent(
     | 'commsGatekeeper'
     | 'logs'
     | 'communityComplianceValidator'
-    | 'slack'
-    | 'config'
   >
 ): ICommunitiesComponent {
   const {
@@ -57,44 +54,10 @@ export function createCommunityComponent(
     cdnCacheInvalidator,
     commsGatekeeper,
     logs,
-    communityComplianceValidator,
-    slack,
-    config
+    communityComplianceValidator
   } = components
 
   const logger = logs.getLogger('community-component')
-
-  /**
-   * Helper function to send Slack notification when community needs manual review
-   * @param communityId - The ID of the community
-   * @param communityName - The name of the community
-   * @param ownerAddress - The owner's address
-   * @param reason - The reason explaining why manual review is needed
-   */
-  async function sendManualReviewNotification(
-    communityId: string,
-    communityName: string,
-    ownerAddress: string,
-    reason?: string
-  ): Promise<void> {
-    try {
-      const isDev = (await config.getString('ENV')) !== 'prd'
-      const communitiesModerationToolUrl = await config.getString('COMMUNITIES_MODERATION_TOOL_URL')
-
-      const slackMessage = communityNeedsManualReviewMessage(
-        communityId,
-        communityName,
-        ownerAddress.toLowerCase(),
-        isDev,
-        communitiesModerationToolUrl,
-        reason
-      )
-
-      await slack.sendMessage(slackMessage)
-    } catch (error) {
-      logger.error(`Error sending slack message for community ${communityId}: ${errorMessageOrDefault(error)}`)
-    }
-  }
 
   /**
    * Helper function to filter communities with active voice chat using batch API
@@ -287,19 +250,17 @@ export function createCommunityComponent(
         await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
       }
 
-      const { needsManualReview, reason: manualReviewReason } =
-        await communityComplianceValidator.validateCommunityContent({
-          name: community.name,
-          description: community.description,
-          thumbnailBuffer: thumbnail
-        })
+      await communityComplianceValidator.validateCommunityContent({
+        name: community.name,
+        description: community.description,
+        thumbnailBuffer: thumbnail
+      })
 
       const newCommunity = await communitiesDb.createCommunity({
         ...community,
         owner_address: community.ownerAddress,
         private: community.privacy === CommunityPrivacyEnum.Private,
-        active: !needsManualReview,
-        needs_manual_review: needsManualReview
+        active: true
       })
 
       await communitiesDb.addCommunityMember({
@@ -326,21 +287,6 @@ export function createCommunityComponent(
         newCommunity.thumbnails = {
           raw: communityThumbnail.buildThumbnailUrl(newCommunity.id)
         }
-      }
-
-      try {
-        if (needsManualReview) {
-          setImmediate(async () =>
-            sendManualReviewNotification(
-              newCommunity.id,
-              newCommunity.name,
-              community.ownerAddress.toLowerCase(),
-              manualReviewReason
-            )
-          )
-        }
-      } catch (error) {
-        logger.error(`Error sending slack message for community ${newCommunity.id}: ${errorMessageOrDefault(error)}`)
       }
 
       return {
@@ -395,8 +341,7 @@ export function createCommunityComponent(
           description: existingCommunity.description,
           ownerAddress: existingCommunity.ownerAddress,
           privacy: existingCommunity.privacy,
-          active: existingCommunity.active,
-          needsManualReview: existingCommunity.needsManualReview
+          active: existingCommunity.active
         }
       }
 
@@ -415,21 +360,15 @@ export function createCommunityComponent(
         await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
       }
 
-      let needsManualReview: boolean = existingCommunity.needsManualReview
-      let manualReviewReason: string | undefined
-
       if (updates.name || updates.description || thumbnailBuffer) {
         const nameToValidate = updates.name || existingCommunity.name
         const descriptionToValidate = updates.description || existingCommunity.description
 
-        const complianceValidationResult = await communityComplianceValidator.validateCommunityContent({
+        await communityComplianceValidator.validateCommunityContent({
           name: nameToValidate,
           description: descriptionToValidate,
           thumbnailBuffer
         })
-
-        needsManualReview = complianceValidationResult.needsManualReview
-        manualReviewReason = complianceValidationResult.reason
       }
 
       logger.info('Updating community', {
@@ -442,9 +381,7 @@ export function createCommunityComponent(
 
       const updatedCommunity = await communitiesDb.updateCommunity(communityId, {
         ...updates,
-        private: updates.privacy ? updates.privacy === CommunityPrivacyEnum.Private : undefined,
-        needs_manual_review: needsManualReview,
-        active: !needsManualReview
+        private: updates.privacy ? updates.privacy === CommunityPrivacyEnum.Private : undefined
       })
 
       if (!!updates.name && updates.name.trim() !== existingCommunity.name.trim()) {
@@ -503,12 +440,6 @@ export function createCommunityComponent(
         hasThumbnail: thumbnailBuffer ? 'true' : 'false',
         hasPlacesUpdate: placeIds !== undefined ? 'true' : 'false'
       })
-
-      if (needsManualReview) {
-        setImmediate(async () =>
-          sendManualReviewNotification(communityId, updatedCommunity.name, userAddress, manualReviewReason)
-        )
-      }
 
       return updatedCommunity
     },

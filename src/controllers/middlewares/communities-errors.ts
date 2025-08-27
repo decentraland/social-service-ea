@@ -34,7 +34,7 @@ export async function communitiesErrorsHandler(
       }
     }
 
-    if (error instanceof InvalidCommunityRequestError) {
+    if (error instanceof InvalidCommunityRequestError || error instanceof AIComplianceError) {
       return {
         status: 400,
         body: {
@@ -53,16 +53,6 @@ export async function communitiesErrorsHandler(
             issues: error.issues,
             warnings: error.warnings
           }
-        }
-      }
-    }
-
-    if (error instanceof AIComplianceError) {
-      return {
-        status: 400,
-        body: {
-          error: 'Bad Request',
-          message: error.message
         }
       }
     }

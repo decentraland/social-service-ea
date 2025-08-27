@@ -4,11 +4,7 @@ import { errorMessageOrDefault } from '../../utils/errors'
 import { CommunityNotCompliantError } from './errors'
 
 export interface ICommunityComplianceValidatorComponent {
-  validateCommunityContent(request: {
-    name: string
-    description: string
-    thumbnailBuffer?: Buffer
-  }): Promise<{ needsManualReview: boolean; reason?: string }>
+  validateCommunityContent(request: { name: string; description: string; thumbnailBuffer?: Buffer }): Promise<void>
 }
 
 export function createCommunityComplianceValidatorComponent(
@@ -22,10 +18,10 @@ export function createCommunityComplianceValidatorComponent(
       name: string
       description: string
       thumbnailBuffer?: Buffer
-    }): Promise<{ needsManualReview: boolean; reason?: string }> {
+    }): Promise<void> {
       if (!featureFlags.isEnabled(FeatureFlag.COMMUNITIES_AI_COMPLIANCE)) {
         logger.info('Skipping AI compliance validation for communities because the feature flag is disabled')
-        return { needsManualReview: false }
+        return
       }
 
       const { name, description, thumbnailBuffer } = request
@@ -77,19 +73,12 @@ export function createCommunityComplianceValidatorComponent(
             duration
           })
         }
-
-        return { needsManualReview: false }
       } catch (error) {
-        const errorMessage = errorMessageOrDefault(error, 'Unknown error')
         logger.error('Community compliance validation failed', {
           name,
-          error: errorMessage
+          error: errorMessageOrDefault(error, 'Unknown error')
         })
 
-        // We are not going to handle the manual review status for now
-        /* if (error instanceof AIComplianceError) {
-          return { needsManualReview: true, reason: errorMessage }
-        } */
 
         throw error
       }
