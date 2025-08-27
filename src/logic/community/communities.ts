@@ -480,7 +480,23 @@ export function createCommunityComponent(
         communitiesDb.getAllCommunitiesForModerationCount({ search: options.search })
       ])
 
-      return { communities, total }
+      const communitiesWithThumbnails = await Promise.all(
+        communities.map(async (community) => {
+          const thumbnail = await communityThumbnail.getThumbnail(community.id)
+
+          const result = { ...community }
+
+          if (thumbnail) {
+            result.thumbnails = {
+              raw: thumbnail
+            }
+          }
+
+          return result
+        })
+      )
+
+      return { communities: communitiesWithThumbnails, total }
     }
   }
 }
