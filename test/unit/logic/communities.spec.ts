@@ -31,6 +31,8 @@ import { Community } from '../../../src/logic/community/types'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { Events } from '@dcl/schemas'
 import { ICommunityComplianceValidatorComponent } from '../../../src/logic/community/compliance-validator'
+import { createFeatureFlagsMockComponent } from '../../mocks/components/feature-flags'
+import { FeatureFlag } from '../../../src/adapters/feature-flags'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -43,6 +45,7 @@ describe('Community Component', () => {
   let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
   let mockCommsGatekeeper: jest.Mocked<ReturnType<typeof createCommsGatekeeperMockedComponent>>
   let mockCommunityComplianceValidator: jest.Mocked<ICommunityComplianceValidatorComponent>
+  let mockFeatureFlags: jest.Mocked<ReturnType<typeof createFeatureFlagsMockComponent>>
 
   let mockUserAddress: string
 
@@ -69,6 +72,7 @@ describe('Community Component', () => {
     mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
     mockCommunityComplianceValidator = createMockCommunityComplianceValidatorComponent({})
+    mockFeatureFlags = createFeatureFlagsMockComponent({})
     mockConfig.requireString.mockResolvedValue(cdnUrl)
     mockCommunityThumbnail.buildThumbnailUrl.mockImplementation(
       (communityId: string) => `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
@@ -77,7 +81,6 @@ describe('Community Component', () => {
     mockConfig.requireString.mockResolvedValue(cdnUrl)
 
     communityComponent = createCommunityComponent({
-      config: mockConfig,
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
@@ -89,7 +92,8 @@ describe('Community Component', () => {
       logs: mockLogs,
       communityBroadcaster: mockCommunityBroadcaster,
       communityThumbnail: mockCommunityThumbnail,
-      communityComplianceValidator: mockCommunityComplianceValidator
+      communityComplianceValidator: mockCommunityComplianceValidator,
+      featureFlags: mockFeatureFlags
     })
   })
 
@@ -832,7 +836,7 @@ describe('Community Component', () => {
           mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
             `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
           )
-          mockConfig.getString.mockResolvedValueOnce(`${userAddress},0xanother-moderator`)
+          mockFeatureFlags.getVariants.mockResolvedValueOnce([userAddress.toLowerCase(), '0xanother-moderator'])
         })
 
         it('should delete the community when user is a global moderator', async () => {
@@ -840,7 +844,7 @@ describe('Community Component', () => {
 
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommunitiesDB.deleteCommunity).toHaveBeenCalledWith(communityId)
-          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+          expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
         })
 
         it('should publish a community deleted event when deleted by global moderator', async () => {
@@ -866,7 +870,7 @@ describe('Community Component', () => {
         beforeEach(() => {
           community.role = CommunityRole.Member
           community.ownerAddress = '0xother-owner'
-          mockConfig.getString.mockResolvedValueOnce('0xanother-moderator,0xthird-moderator')
+          mockFeatureFlags.getVariants.mockResolvedValueOnce(['0xanother-moderator', '0xthird-moderator'])
         })
 
         it('should throw NotAuthorizedError', async () => {
@@ -876,7 +880,7 @@ describe('Community Component', () => {
 
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
-          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+          expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
         })
       })
 
@@ -884,8 +888,8 @@ describe('Community Component', () => {
         beforeEach(() => {
           community.role = CommunityRole.Member
           community.ownerAddress = '0xother-owner'
-          // Mock config to return empty global moderators list
-          mockConfig.getString.mockResolvedValueOnce('')
+          // Mock feature flags to return empty global moderators list
+          mockFeatureFlags.getVariants.mockResolvedValueOnce([])
         })
 
         it('should throw NotAuthorizedError', async () => {
@@ -895,7 +899,7 @@ describe('Community Component', () => {
 
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
-          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+          expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
         })
       })
 
@@ -903,27 +907,27 @@ describe('Community Component', () => {
         beforeEach(() => {
           community.role = CommunityRole.Moderator
           community.ownerAddress = '0xother-owner'
-          // Mock config to return empty global moderators list
-          mockConfig.getString.mockResolvedValueOnce('')
+          // Mock feature flags to return empty global moderators list
+          mockFeatureFlags.getVariants.mockResolvedValueOnce([])
         })
 
-        it('should throw NotAuthorizedError', async () => {
+        it('should throw NotAuthorizedError when user is not a global moderator', async () => {
           await expect(communityComponent.deleteCommunity(communityId, userAddress)).rejects.toThrow(
             new NotAuthorizedError("The user doesn't have permission to delete this community")
           )
 
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
-          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+          expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
         })
       })
 
-      describe('and global moderators config is malformed', () => {
+      describe('and global moderators feature flag returns malformed data', () => {
         beforeEach(() => {
           community.role = CommunityRole.Member
           community.ownerAddress = '0xother-owner'
-          // Mock config to return malformed global moderators list
-          mockConfig.getString.mockResolvedValueOnce('  ,  ,invalid-address,  ')
+          // Mock feature flags to return malformed global moderators list
+          mockFeatureFlags.getVariants.mockResolvedValueOnce(['  ', '  ', 'invalid-address', '  '])
         })
 
         it('should handle malformed global moderators config gracefully', async () => {
@@ -933,7 +937,7 @@ describe('Community Component', () => {
 
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommunitiesDB.deleteCommunity).not.toHaveBeenCalled()
-          expect(mockConfig.getString).toHaveBeenCalledWith('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')
+          expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
         })
       })
     })

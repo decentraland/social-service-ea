@@ -6,11 +6,21 @@ export enum FeatureFlag {
   // Feature flag to enable/disable AI compliance for communities.
   COMMUNITIES_AI_COMPLIANCE = 'communities_ai_compliance',
   // Feature flag to enable/disable AI compliance for communities in dev environment.
-  DEV_COMMUNITIES_AI_COMPLIANCE = 'dev_communities_ai_compliance'
+  DEV_COMMUNITIES_AI_COMPLIANCE = 'dev_communities_ai_compliance',
+  /*
+   * Feature flag to enable/disable global moderators for communities
+   * When enabled, the variant should contain a comma-separated list of wallet addresses
+   * that are global moderators.
+   *
+   * @example
+   * Variant value: "0x1234567890123456789012345678901234567890,0x1234567890123456789012345678901234567891"
+   */
+  COMMUNITIES_GLOBAL_MODERATORS = 'communities_global_moderators'
 }
 
 export type IFeatureFlagsAdapter = IBaseComponent & {
   isEnabled: (feature: FeatureFlag) => boolean
+  getVariants: <T>(feature: FeatureFlag) => Promise<T | undefined>
 }
 
 export async function createFeatureFlagsAdapter(
@@ -29,7 +39,8 @@ export async function createFeatureFlagsAdapter(
     try {
       const [isEnabled, isDevEnabled] = await Promise.all([
         features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE),
-        features.getIsFeatureEnabled(ApplicationName.TEST, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE)
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE),
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
       ])
 
       logger.debug(`Refreshed feature flags`, {
@@ -44,6 +55,24 @@ export async function createFeatureFlagsAdapter(
         error: error instanceof Error ? error.message : String(error)
       })
     }
+  }
+
+  async function getVariants<T>(
+    feature: FeatureFlag,
+    prefixAppName: ApplicationName = ApplicationName.DAPPS
+  ): Promise<T | undefined> {
+    const variant = await features.getFeatureVariant(prefixAppName, feature)
+
+    if (variant?.payload?.value) {
+      const values = variant.payload.value
+        .replace('\n', '')
+        .split(',')
+        .map((domain) => domain.toLowerCase().trim())
+
+      return values as T
+    }
+
+    return undefined
   }
 
   /**
@@ -80,6 +109,7 @@ export async function createFeatureFlagsAdapter(
   return {
     [START_COMPONENT]: start,
     [STOP_COMPONENT]: stop,
-    isEnabled: (feature: FeatureFlag) => featuresFlagMap.get(feature) ?? false
+    isEnabled: (feature: FeatureFlag) => featuresFlagMap.get(feature) ?? false,
+    getVariants
   }
 }

@@ -1,6 +1,7 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
+import { FeatureFlag } from '../../adapters/feature-flags'
 import {
   CommunityWithUserInformationAndVoiceChat,
   GetCommunitiesOptions,
@@ -27,7 +28,6 @@ import { EthAddress, Events } from '@dcl/schemas'
 export function createCommunityComponent(
   components: Pick<
     AppComponents,
-    | 'config'
     | 'communitiesDb'
     | 'catalystClient'
     | 'communityRoles'
@@ -41,10 +41,10 @@ export function createCommunityComponent(
     | 'commsGatekeeper'
     | 'logs'
     | 'communityComplianceValidator'
+    | 'featureFlags'
   >
 ): ICommunitiesComponent {
   const {
-    config,
     communitiesDb,
     catalystClient,
     communityRoles,
@@ -56,7 +56,8 @@ export function createCommunityComponent(
     cdnCacheInvalidator,
     commsGatekeeper,
     logs,
-    communityComplianceValidator
+    communityComplianceValidator,
+    featureFlags
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -306,11 +307,10 @@ export function createCommunityComponent(
         throw new CommunityNotFoundError(id)
       }
 
-      const globalModerators = ((await config.getString('COMMUNITIES_GLOBAL_MODERATORS_WALLETS')) || '')
-        .split(',')
-        .map((wallet) => wallet.trim().toLowerCase())
+      const globalModerators =
+        (await featureFlags.getVariants<string[]>(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)) || []
 
-      if (!isOwner(community, userAddress) && !globalModerators.includes(userAddress)) {
+      if (!isOwner(community, userAddress) && !globalModerators.includes(userAddress.toLowerCase())) {
         throw new NotAuthorizedError("The user doesn't have permission to delete this community")
       }
 
