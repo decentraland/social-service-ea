@@ -415,7 +415,7 @@ export function createCommunityComponent(
         await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
       }
 
-      let needsManualReview: boolean = existingCommunity.needsManualReview ?? false
+      let needsManualReview: boolean = existingCommunity.needsManualReview
       let manualReviewReason: string | undefined
 
       if (updates.name || updates.description || thumbnailBuffer) {
