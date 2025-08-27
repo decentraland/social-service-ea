@@ -34,7 +34,7 @@ export async function communitiesErrorsHandler(
       }
     }
 
-    if (error instanceof InvalidCommunityRequestError || error instanceof AIComplianceError) {
+    if (error instanceof InvalidCommunityRequestError) {
       return {
         status: 400,
         body: {
@@ -48,11 +48,23 @@ export async function communitiesErrorsHandler(
       return {
         status: 400,
         body: {
+          error: 'Community not compliant',
           message: error.message,
           data: {
             issues: error.issues,
             warnings: error.warnings
           }
+        }
+      }
+    }
+
+    if (error instanceof AIComplianceError) {
+      return {
+        status: 400,
+        body: {
+          error: 'Community content validation unavailable',
+          message: error.message,
+          communityContentValidationUnavailable: true
         }
       }
     }

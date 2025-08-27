@@ -362,6 +362,7 @@ test('Create Community Controller', async function ({ components, stubComponents
 
               expect(response.status).toBe(400)
               const body = await response.json()
+              expect(body.error).toBe('Community not compliant')
               expect(body.message).toContain("Community content violates Decentraland's Code of Ethics")
               expect(body.data.issues).toEqual(['Contains inappropriate language', 'Promotes violence'])
               expect(body.data.warnings).toEqual(['Content is borderline'])
@@ -370,14 +371,19 @@ test('Create Community Controller', async function ({ components, stubComponents
 
           describe('and AI compliance validation fails with AIComplianceError', () => {
             beforeEach(async () => {
-              stubComponents.communityComplianceValidator.validateCommunityContent.rejects(new AIComplianceError('AI compliance validation failed'))
+              stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
+                new AIComplianceError('AI compliance validation failed')
+              )
             })
-            
+
             it('should respond with a 400 status code for AIComplianceError', async () => {
               const response = await makeMultipartRequest(identity, '/v1/communities', validBody)
 
               expect(response.status).toBe(400)
-              expect(await response.json()).toMatchObject({ message: 'AI compliance validation failed' })
+              const body = await response.json()
+              expect(body.error).toBe('Community content validation unavailable')
+              expect(body.message).toBe('AI compliance validation failed')
+              expect(body.communityContentValidationUnavailable).toBe(true)
             })
           })
 
