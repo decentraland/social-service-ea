@@ -36,7 +36,8 @@ import {
   IUpdateHandlerComponent,
   IRewardComponent,
   IEmailComponent,
-  ICdnCacheInvalidatorComponent
+  ICdnCacheInvalidatorComponent,
+  IAIContentValidatorComponent
 } from './components'
 import { ICommunityVoiceChatCacheComponent } from '../logic/community-voice/community-voice-cache'
 import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/community-voice-polling'
@@ -74,6 +75,7 @@ export type MetricsDeclaration = keyof typeof metricDeclarations
 
 // components used in every environment
 export type BaseComponents = {
+  aiContentValidator: IAIContentValidatorComponent
   analytics: IAnalyticsComponent<AnalyticsEventPayload>
   archipelagoStats: IArchipelagoStatsComponent
   catalystClient: ICatalystClientComponent

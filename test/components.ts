@@ -66,6 +66,7 @@ import { AnalyticsEventPayload } from '../src/types/analytics'
 import { createRewardComponent } from '../src/adapters/rewards'
 import { createWsPoolComponent } from '../src/logic/ws-pool'
 import { createEmailComponent } from '../src/adapters/email'
+import { createAIContentValidatorComponent } from '../src/adapters/ai-content-validator'
 import { createFriendsComponent } from '../src/logic/friends'
 import { createSlackComponent } from '@dcl/slack-component'
 
@@ -243,6 +244,7 @@ async function initComponents(): Promise<TestComponents> {
   const rewards = await createRewardComponent({ fetcher, config })
 
   const email = await createEmailComponent({ fetcher, config })
+  const aiContentValidator = await createAIContentValidatorComponent({ config, logs })
 
   const slack = await createSlackComponent(
     { logs },
@@ -273,6 +275,7 @@ async function initComponents(): Promise<TestComponents> {
   const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
 
   return {
+    aiContentValidator,
     analytics,
     archipelagoStats,
     catalystClient,
