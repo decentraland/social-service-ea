@@ -13,7 +13,8 @@ import {
   Community,
   CommunityUpdates,
   AggregatedCommunity,
-  CommunityPrivacyEnum
+  CommunityPrivacyEnum,
+  CommunityForModeration
 } from './types'
 import {
   isOwner,
@@ -300,7 +301,6 @@ export function createCommunityComponent(
     },
 
     deleteCommunity: async (id: string, userAddress: string): Promise<void> => {
-      // TODO: maybe we need to include a reason and store the reason in the database
       const community = await communitiesDb.getCommunity(id, userAddress)
 
       if (!community) {
@@ -468,6 +468,33 @@ export function createCommunityComponent(
         active: community.active,
         thumbnails: community.thumbnails
       }))
+    },
+
+    getAllCommunitiesForModeration: async (
+      options: GetCommunitiesOptions
+    ): Promise<GetCommunitiesWithTotal<CommunityForModeration>> => {
+      const [communities, total] = await Promise.all([
+        communitiesDb.getAllCommunitiesForModeration(options),
+        communitiesDb.getAllCommunitiesForModerationCount({ search: options.search })
+      ])
+
+      const communitiesWithThumbnails = await Promise.all(
+        communities.map(async (community) => {
+          const thumbnail = await communityThumbnail.getThumbnail(community.id)
+
+          const result = { ...community }
+
+          if (thumbnail) {
+            result.thumbnails = {
+              raw: thumbnail
+            }
+          }
+
+          return result
+        })
+      )
+
+      return { communities: communitiesWithThumbnails, total }
     }
   }
 }

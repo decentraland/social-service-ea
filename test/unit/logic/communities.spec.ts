@@ -1441,4 +1441,112 @@ describe('Community Component', () => {
       })
     })
   })
+
+  describe('when getting all communities for moderation', () => {
+    const options = { pagination: { limit: 10, offset: 0 }, search: 'test' }
+    const mockModerationCommunities = [
+      {
+        id: 'community-1',
+        name: 'Test Community 1',
+        description: 'Test Description 1',
+        ownerAddress: '0x1234567890123456789012345678901234567890',
+        privacy: CommunityPrivacyEnum.Public,
+        active: true,
+        membersCount: 10,
+        createdAt: '2023-01-01T00:00:00Z'
+      },
+      {
+        id: 'community-2',
+        name: 'Test Community 2',
+        description: 'Test Description 2',
+        ownerAddress: '0x0987654321098765432109876543210987654321',
+        privacy: CommunityPrivacyEnum.Private,
+        active: true,
+        membersCount: 5,
+        createdAt: '2023-01-02T00:00:00Z'
+      }
+    ]
+
+    beforeEach(() => {
+      mockCommunitiesDB.getAllCommunitiesForModeration.mockResolvedValue(mockModerationCommunities)
+      mockCommunitiesDB.getAllCommunitiesForModerationCount.mockResolvedValue(2)
+      mockCommunityThumbnail.getThumbnail.mockResolvedValue(undefined)
+    })
+
+    describe('when getting communities without thumbnails', () => {
+      it('should return communities with total count for moderation purposes', async () => {
+        const result = await communityComponent.getAllCommunitiesForModeration(options)
+
+        expect(result).toEqual({
+          communities: mockModerationCommunities,
+          total: 2
+        })
+
+        expect(mockCommunitiesDB.getAllCommunitiesForModeration).toHaveBeenCalledWith(options)
+        expect(mockCommunitiesDB.getAllCommunitiesForModerationCount).toHaveBeenCalledWith({ search: 'test' })
+        expect(mockCommunityThumbnail.getThumbnail).toHaveBeenCalledWith('community-1')
+        expect(mockCommunityThumbnail.getThumbnail).toHaveBeenCalledWith('community-2')
+      })
+    })
+
+    describe('when getting communities with thumbnails', () => {
+      beforeEach(() => {
+        mockCommunityThumbnail.getThumbnail
+          .mockResolvedValueOnce(`${cdnUrl}/social/communities/community-1/raw-thumbnail.png`)
+          .mockResolvedValueOnce(`${cdnUrl}/social/communities/community-2/raw-thumbnail.png`)
+      })
+
+      it('should return communities with thumbnails when they exist', async () => {
+        const result = await communityComponent.getAllCommunitiesForModeration(options)
+
+        expect(result.communities[0].thumbnails).toEqual({
+          raw: `${cdnUrl}/social/communities/community-1/raw-thumbnail.png`
+        })
+        expect(result.communities[1].thumbnails).toEqual({
+          raw: `${cdnUrl}/social/communities/community-2/raw-thumbnail.png`
+        })
+        expect(result.total).toBe(2)
+      })
+    })
+
+    describe('when handling empty communities array', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getAllCommunitiesForModeration.mockResolvedValue([])
+        mockCommunitiesDB.getAllCommunitiesForModerationCount.mockResolvedValue(0)
+      })
+
+      it('should handle empty communities array gracefully', async () => {
+        const result = await communityComponent.getAllCommunitiesForModeration(options)
+
+        expect(result).toEqual({
+          communities: [],
+          total: 0
+        })
+
+        expect(mockCommunitiesDB.getAllCommunitiesForModeration).toHaveBeenCalledWith(options)
+        expect(mockCommunitiesDB.getAllCommunitiesForModerationCount).toHaveBeenCalledWith({ search: 'test' })
+        expect(mockCommunityThumbnail.getThumbnail).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when handling search options', () => {
+      it('should handle search options correctly', async () => {
+        const searchOptions = { pagination: { limit: 20, offset: 40 }, search: 'another' }
+
+        await communityComponent.getAllCommunitiesForModeration(searchOptions)
+
+        expect(mockCommunitiesDB.getAllCommunitiesForModeration).toHaveBeenCalledWith(searchOptions)
+        expect(mockCommunitiesDB.getAllCommunitiesForModerationCount).toHaveBeenCalledWith({ search: 'another' })
+      })
+
+      it('should handle options without search parameter', async () => {
+        const optionsWithoutSearch = { pagination: { limit: 15, offset: 0 } }
+
+        await communityComponent.getAllCommunitiesForModeration(optionsWithoutSearch)
+
+        expect(mockCommunitiesDB.getAllCommunitiesForModeration).toHaveBeenCalledWith(optionsWithoutSearch)
+        expect(mockCommunitiesDB.getAllCommunitiesForModerationCount).toHaveBeenCalledWith({})
+      })
+    })
+  })
 })

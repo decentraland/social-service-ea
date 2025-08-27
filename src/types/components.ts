@@ -49,7 +49,8 @@ import {
   CommunityPlace,
   CommunityRequestType,
   MemberRequest,
-  GetCommunityRequestsOptions
+  GetCommunityRequestsOptions,
+  CommunityForModeration
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -159,6 +160,8 @@ export interface ICommunitiesDatabaseComponent {
     options: GetCommunitiesOptions
   ): Promise<Omit<CommunityPublicInformation, 'ownerName'>[]>
   getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
+  getAllCommunitiesForModeration(options: GetCommunitiesOptions): Promise<CommunityForModeration[]>
+  getAllCommunitiesForModerationCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
   getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
