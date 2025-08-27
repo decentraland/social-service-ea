@@ -184,8 +184,13 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
           durationInSeconds
         })
 
+        metrics.increment('ai_compliance_validation_total', {
+          result: result.isCompliant ? 'compliant' : 'non-compliant'
+        })
+
         return result
       } catch (error) {
+        metrics.increment('ai_compliance_validation_total', { result: 'failed' })
         const errorMessage = errorMessageOrDefault(error, 'Unknown error')
 
         logger.error('Compliance validation failed', {

@@ -99,6 +99,11 @@ export const metricDeclarations = {
     type: IMetricsComponent.HistogramType,
     help: 'Duration of AI compliance validation in seconds',
     buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10, 30]
+  },
+  ai_compliance_validation_total: {
+    type: IMetricsComponent.CounterType,
+    help: 'Total number of AI compliance validations (compliant, non-compliant, failed)',
+    labelNames: ['result']
   }
 }
 

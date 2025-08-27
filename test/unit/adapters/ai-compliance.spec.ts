@@ -44,6 +44,9 @@ describe('AIComplianceComponent', () => {
     
     featureFlagsMock = createFeatureFlagsMockComponent({})
     mockMetrics = createTestMetricsComponent(metricDeclarations)
+
+    jest.spyOn(mockMetrics, 'observe')
+    jest.spyOn(mockMetrics, 'increment')
   })
   
   describe("when the environment is not production", () => {
@@ -228,8 +231,6 @@ describe('AIComplianceComponent', () => {
             }
           }
           mockOpenAICreate.mockResolvedValue(mockResponse)
-
-          jest.spyOn(mockMetrics, 'observe')
         })
         
         it('should validate content successfully', async () => {
@@ -283,6 +284,11 @@ describe('AIComplianceComponent', () => {
           await aiCompliance.validateCommunityContent({ name, description })
           expect(mockMetrics.observe).toHaveBeenCalledWith('ai_compliance_validation_duration_seconds', {}, expect.any(Number))
         })
+
+        it('should increment the total validation counter with compliant result', async () => {
+          await aiCompliance.validateCommunityContent({ name, description })
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ai_compliance_validation_total', { result: 'compliant' })
+        })
       })
       
       describe('and content has compliance issues', () => {
@@ -316,6 +322,11 @@ describe('AIComplianceComponent', () => {
           expect(result.warnings).toEqual(['Content may be borderline'])
           expect(result.confidence).toBe(0.85)
           expect(result.reasoning).toBe('Content violates ethical standards')
+        })
+
+        it('should increment the total validation counter with non-compliant result', async () => {
+          await aiCompliance.validateCommunityContent({ name, description })
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ai_compliance_validation_total', { result: 'non-compliant' })
         })
       })
       
@@ -428,6 +439,14 @@ describe('AIComplianceComponent', () => {
             aiCompliance.validateCommunityContent({ name, description })
           ).rejects.toThrow('No content received from OpenAI API')
         })
+
+        it('should increment the total validation counter with failed result for empty content', async () => {
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow(AIComplianceError)
+          
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ai_compliance_validation_total', { result: 'failed' })
+        })
       })
       
       describe('and OpenAI returns invalid JSON', () => {
@@ -455,6 +474,14 @@ describe('AIComplianceComponent', () => {
           await expect(
             aiCompliance.validateCommunityContent({ name, description })
           ).rejects.toThrow('Invalid JSON response from OpenAI API: Unexpected token')
+        })
+
+        it('should increment the total validation counter with failed result for invalid JSON', async () => {
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow(AIComplianceError)
+          
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ai_compliance_validation_total', { result: 'failed' })
         })
       })
       
@@ -489,6 +516,14 @@ describe('AIComplianceComponent', () => {
             aiCompliance.validateCommunityContent({ name, description })
           ).rejects.toThrow('Invalid response structure from OpenAI API')
         })
+
+        it('should increment the total validation counter with failed result for malformed response', async () => {
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow(AIComplianceError)
+          
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ai_compliance_validation_total', { result: 'failed' })
+        })
       })
       
       describe('and OpenAI API throws an error', () => {
@@ -505,6 +540,14 @@ describe('AIComplianceComponent', () => {
           await expect(
             aiCompliance.validateCommunityContent({ name, description })
           ).rejects.toThrow('Unexpected error during compliance validation: OpenAI API error')
+        })
+
+        it('should increment the total validation counter with failed result for API errors', async () => {
+          await expect(
+            aiCompliance.validateCommunityContent({ name, description })
+          ).rejects.toThrow(AIComplianceError)
+          
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ai_compliance_validation_total', { result: 'failed' })
         })
       })
       
