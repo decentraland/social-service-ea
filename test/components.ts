@@ -193,7 +193,10 @@ async function initComponents(): Promise<TestComponents> {
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
   const aiCompliance = createAIComplianceMock({})
-  const features = await createFeaturesComponent({ config, logs, fetch: fetcher }, 'https://social-service-ea.decentraland.test')
+  const features = await createFeaturesComponent(
+    { config, logs, fetch: fetcher },
+    'https://social-service-ea.decentraland.test'
+  )
   const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
   const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
   const communities = createCommunityComponent({
@@ -208,7 +211,8 @@ async function initComponents(): Promise<TestComponents> {
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     logs,
     commsGatekeeper,
-    communityComplianceValidator
+    communityComplianceValidator,
+    featureFlags
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,

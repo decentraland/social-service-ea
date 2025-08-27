@@ -1,6 +1,7 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
+import { FeatureFlag } from '../../adapters/feature-flags'
 import {
   CommunityWithUserInformationAndVoiceChat,
   GetCommunitiesOptions,
@@ -12,7 +13,8 @@ import {
   Community,
   CommunityUpdates,
   AggregatedCommunity,
-  CommunityPrivacyEnum
+  CommunityPrivacyEnum,
+  CommunityForModeration
 } from './types'
 import {
   isOwner,
@@ -40,6 +42,7 @@ export function createCommunityComponent(
     | 'commsGatekeeper'
     | 'logs'
     | 'communityComplianceValidator'
+    | 'featureFlags'
   >
 ): ICommunitiesComponent {
   const {
@@ -54,7 +57,8 @@ export function createCommunityComponent(
     cdnCacheInvalidator,
     commsGatekeeper,
     logs,
-    communityComplianceValidator
+    communityComplianceValidator,
+    featureFlags
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -303,7 +307,10 @@ export function createCommunityComponent(
         throw new CommunityNotFoundError(id)
       }
 
-      if (!isOwner(community, userAddress)) {
+      const globalModerators =
+        (await featureFlags.getVariants<string[]>(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)) || []
+
+      if (!isOwner(community, userAddress) && !globalModerators.includes(userAddress.toLowerCase())) {
         throw new NotAuthorizedError("The user doesn't have permission to delete this community")
       }
 
@@ -461,6 +468,33 @@ export function createCommunityComponent(
         active: community.active,
         thumbnails: community.thumbnails
       }))
+    },
+
+    getAllCommunitiesForModeration: async (
+      options: GetCommunitiesOptions
+    ): Promise<GetCommunitiesWithTotal<CommunityForModeration>> => {
+      const [communities, total] = await Promise.all([
+        communitiesDb.getAllCommunitiesForModeration(options),
+        communitiesDb.getAllCommunitiesForModerationCount({ search: options.search })
+      ])
+
+      const communitiesWithThumbnails = await Promise.all(
+        communities.map(async (community) => {
+          const thumbnail = await communityThumbnail.getThumbnail(community.id)
+
+          const result = { ...community }
+
+          if (thumbnail) {
+            result.thumbnails = {
+              raw: thumbnail
+            }
+          }
+
+          return result
+        })
+      )
+
+      return { communities: communitiesWithThumbnails, total }
     }
   }
 }

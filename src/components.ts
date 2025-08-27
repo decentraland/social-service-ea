@@ -228,7 +228,8 @@ export async function initComponents(): Promise<AppComponents> {
     communityBroadcaster,
     commsGatekeeper,
     communityComplianceValidator,
-    logs
+    logs,
+    featureFlags
   })
   const communityRequests = createCommunityRequestsComponent({
     communitiesDb,
