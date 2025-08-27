@@ -4,8 +4,8 @@ import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/
 import { mockCommunity } from '../mocks/communities'
 import { randomUUID } from 'crypto'
 
-test('Remove Community Place Controller', function ({ components, spyComponents }) {
-  const makeRequest = makeAuthenticatedRequest(components)
+test('Remove Community Place Controller', function ({ components, spyComponents, stubComponents }) {
+  let makeRequest: any
 
   describe('when removing a place from a community', () => {
     let identity: Identity
@@ -77,8 +77,13 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
     })
 
     describe('and the request is not signed', () => {
+      let localHttpFetch: (typeof components)['localHttpFetch']
+
+      beforeEach(async () => {
+        localHttpFetch = components.localHttpFetch
+      })
+
       it('should respond with a 400 status code', async () => {
-        const { localHttpFetch } = components
         const response = await localHttpFetch.fetch(`/v1/communities/${communityId}/places/${placeId}`, {
           method: 'DELETE'
         })
@@ -87,15 +92,39 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
     })
 
     describe('and the request is signed', () => {
+      beforeEach(async () => {
+        makeRequest = makeAuthenticatedRequest(components)
+      })
       describe('and the community does not exist', () => {
+        let nonExistentId: string
+
+        beforeEach(async () => {
+          nonExistentId = randomUUID()
+        })
+
         it('should respond with a 404 status code', async () => {
-          const nonExistentId = randomUUID()
           const response = await makeRequest(identity, `/v1/communities/${nonExistentId}/places/${placeId}`, 'DELETE')
           expect(response.status).toBe(404)
         })
       })
 
       describe('and the community exists', () => {
+        beforeEach(async () => {
+          stubComponents.placesApi.getPlaces.resolves([
+            {
+              id: placeId,
+              title: placeId,
+              positions: [],
+              owner: userAddress,
+              world: false,
+              world_name: ''
+            }
+          ])
+        })
+
+        afterEach(() => {
+          stubComponents.placesApi.getPlaces.reset()
+        })
         describe('and the user is not a member', () => {
           it('should respond with a 401 status code', async () => {
             const response = await makeRequest(identity, `/v1/communities/${communityId}/places/${placeId}`, 'DELETE')
@@ -155,6 +184,7 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
           it('should respond with a 204 status code when removing a place', async () => {
             const response = await makeRequest(identity, `/v1/communities/${communityId}/places/${placeId}`, 'DELETE')
             expect(response.status).toBe(204)
+            expect(spyComponents.communityRoles.validatePermissionToRemovePlacesFromCommunity).not.toHaveBeenCalled()
           })
         })
 
@@ -176,6 +206,7 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
           it('should remove place from first community without affecting second community', async () => {
             const response1 = await makeRequest(identity, `/v1/communities/${communityId}/places/${placeId}`, 'DELETE')
             expect(response1.status).toBe(204)
+            expect(spyComponents.communityRoles.validatePermissionToRemovePlacesFromCommunity).not.toHaveBeenCalled()
           })
 
           it('should remove place from second community without affecting first community', async () => {
@@ -185,6 +216,7 @@ test('Remove Community Place Controller', function ({ components, spyComponents 
               'DELETE'
             )
             expect(response1.status).toBe(204)
+            expect(spyComponents.communityRoles.validatePermissionToRemovePlacesFromCommunity).not.toHaveBeenCalled()
           })
         })
       })
