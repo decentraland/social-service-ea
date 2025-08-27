@@ -24,43 +24,66 @@ describe('Community Requests Component', () => {
   let communityRequestsComponent: ICommunityRequestsComponent
   let communitiesComponent: ICommunitiesComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
-  let type: CommunityRequestType
-  let userAddress: string
 
   beforeEach(() => {
     communitiesComponent = createMockCommunitiesComponent({})
     mockCommunityRoles = createMockCommunityRolesComponent({})
+    // Ensure logs.getLogger returns a valid logger after mock resets
+    mockLogs.getLogger.mockReturnValue({
+      log: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn()
+    })
     communityRequestsComponent = createCommunityRequestsComponent({
       communitiesDb: mockCommunitiesDB,
       communities: communitiesComponent,
       communityRoles: mockCommunityRoles,
       logs: mockLogs
     })
+  })
 
-    userAddress = '0x1234567890123456789012345678901234567890'
+  afterEach(() => {
+    jest.resetAllMocks()
+    // Clean up any registries or persistent state
   })
 
   describe('when creating a community request', () => {
     describe('when community does not exist', () => {
+      let communityId: string
+      let userAddress: string
+      let callerAddress: string
+      let type: CommunityRequestType
+
       beforeEach(() => {
+        communityId = randomUUID()
+        userAddress = '0x1234567890123456789012345678901234567890'
+        callerAddress = '0x1234567890123456789012345678901234567891'
+        type = CommunityRequestType.RequestToJoin
         mockCommunitiesDB.getCommunity.mockResolvedValueOnce(null)
       })
 
-      it('should throw a CommunityNotFoundError', () => {
-        expect(
+      it('should throw a CommunityNotFoundError', async () => {
+        await expect(
           communityRequestsComponent.createCommunityRequest(
-            randomUUID(),
+            communityId,
             userAddress,
-            CommunityRequestType.RequestToJoin
+            type,
+            callerAddress
           )
         ).rejects.toThrow(CommunityNotFoundError)
       })
     })
 
-    describe('when community exists', () => {
+    describe('when community exists and is public', () => {
       let community: Community & { role: CommunityRole }
-      let expectedCreatedRequest: MemberRequest
+      let userAddress: string
+      let callerAddress: string
+
       beforeEach(() => {
+        userAddress = '0x1234567890123456789012345678901234567890'
+        callerAddress = '0x1234567890123456789012345678901234567891'
         community = {
           id: randomUUID(),
           name: 'Mock Community',
@@ -71,47 +94,67 @@ describe('Community Requests Component', () => {
           role: CommunityRole.None
         }
         mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
-        mockCommunitiesDB.createCommunityRequest.mockImplementation(() => {
-          return Promise.resolve(expectedCreatedRequest)
+      })
+
+      describe('and request type is RequestToJoin', () => {
+        let type: CommunityRequestType
+
+        beforeEach(() => {
+          type = CommunityRequestType.RequestToJoin
+          callerAddress = userAddress
+        })
+
+        it('should throw an InvalidCommunityRequestError with correct message', async () => {
+          await expect(
+            communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+          ).rejects.toThrow('Public communities do not accept requests to join')
+        })
+
+        it('should throw an InvalidCommunityRequestError', async () => {
+          await expect(
+            communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+          ).rejects.toThrow(InvalidCommunityRequestError)
         })
       })
 
-      describe('and community is public', () => {
+      describe('and request type is Invite', () => {
+        let type: CommunityRequestType
+        let expectedCreatedRequest: MemberRequest
+
         beforeEach(() => {
-          community.privacy = CommunityPrivacyEnum.Public
-        })
-
-        describe('and request type is RequestToJoin', () => {
-          beforeEach(() => {
-            type = CommunityRequestType.RequestToJoin
-          })
-
-          it('should throw an InvalidCommunityRequestError with correct message', () => {
-            expect(communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)).rejects.toThrow(
-              `Public communities do not accept requests to join`
-            )
-          })
-
-          it('should throw an InvalidCommunityRequestError', () => {
-            expect(communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)).rejects.toThrow(
-              InvalidCommunityRequestError
-            )
+          type = CommunityRequestType.Invite
+          expectedCreatedRequest = {
+            id: randomUUID(),
+            communityId: community.id,
+            memberAddress: userAddress,
+            type,
+            status: CommunityRequestStatus.Pending
+          }
+          mockCommunitiesDB.createCommunityRequest.mockImplementationOnce(() => {
+            return Promise.resolve(expectedCreatedRequest)
           })
         })
 
-        describe('and request type is Invite', () => {
+        describe('and inviter does not have permission to invite users', () => {
           beforeEach(() => {
-            type = CommunityRequestType.Invite
-            expectedCreatedRequest = {
-              id: randomUUID(),
-              communityId: community.id,
-              memberAddress: userAddress,
-              type,
-              status: CommunityRequestStatus.Pending
-            }
+            mockCommunityRoles.validatePermissionToInviteUsers.mockRejectedValueOnce(
+              new NotAuthorizedError('User does not have permission')
+            )
           })
 
-          describe('and user do not belong to community', () => {
+          it('should throw an NotAuthorizedError', async () => {
+            await expect(
+              communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+            ).rejects.toThrow(NotAuthorizedError)
+          })
+        })
+
+        describe('and inviter has permission to invite users', () => {
+          beforeEach(() => {
+            mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
+          })
+
+          describe('and user does not belong to community', () => {
             beforeEach(() => {
               community.role = CommunityRole.None
             })
@@ -122,7 +165,7 @@ describe('Community Requests Component', () => {
               })
 
               it('should create and return the request as pending', async () => {
-                const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
+                const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
                 expect(result).toEqual({
                   id: expect.any(String),
                   communityId: community.id,
@@ -137,17 +180,18 @@ describe('Community Requests Component', () => {
             describe('and there is a pending invite for the user', () => {
               beforeEach(() => {
                 mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([expectedCreatedRequest])
+                callerAddress = userAddress
               })
 
-              it('should throw an InvalidCommunityRequestError with correct message', () => {
-                expect(
-                  communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
+              it('should throw an InvalidCommunityRequestError with correct message', async () => {
+                await expect(
+                  communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
                 ).rejects.toThrow('Request already exists')
               })
 
-              it('should throw an InvalidCommunityRequestError', () => {
-                expect(
-                  communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
+              it('should throw an InvalidCommunityRequestError', async () => {
+                await expect(
+                  communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
                 ).rejects.toThrow(InvalidCommunityRequestError)
               })
             })
@@ -158,169 +202,269 @@ describe('Community Requests Component', () => {
               community.role = CommunityRole.Member
             })
 
-            it('should throw an InvalidCommunityRequestError with correct message', () => {
-              expect(
-                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
+            it('should throw an InvalidCommunityRequestError with correct message', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               ).rejects.toThrow(`User cannot join since it is already a member of the community: ${community.name}`)
             })
 
-            it('should throw an InvalidCommunityRequestError', () => {
-              expect(
-                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
+            it('should throw an InvalidCommunityRequestError', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               ).rejects.toThrow(InvalidCommunityRequestError)
             })
           })
         })
       })
+    })
 
-      describe('and community is private', () => {
+    describe('when community exists and is private', () => {
+      let community: Community & { role: CommunityRole }
+      let userAddress: string
+      let callerAddress: string
+
+      beforeEach(() => {
+        userAddress = '0x1234567890123456789012345678901234567890'
+        callerAddress = '0x1234567890123456789012345678901234567891'
+        community = {
+          id: randomUUID(),
+          name: 'Mock Community',
+          description: 'Mock Description',
+          ownerAddress: userAddress,
+          privacy: CommunityPrivacyEnum.Private,
+          active: true,
+          role: CommunityRole.None
+        }
+        mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
+      })
+
+      describe('and request type is RequestToJoin', () => {
+        let type: CommunityRequestType
+        let expectedCreatedRequest: MemberRequest
+
         beforeEach(() => {
-          community.privacy = CommunityPrivacyEnum.Private
+          type = CommunityRequestType.RequestToJoin
+          callerAddress = userAddress
+          expectedCreatedRequest = {
+            id: randomUUID(),
+            communityId: community.id,
+            memberAddress: userAddress,
+            type,
+            status: CommunityRequestStatus.Pending
+          }
+          mockCommunitiesDB.createCommunityRequest.mockImplementationOnce(() => {
+            return Promise.resolve(expectedCreatedRequest)
+          })
         })
 
-        describe('and request type is RequestToJoin', () => {
+        describe('and user does not belong to community', () => {
           beforeEach(() => {
-            type = CommunityRequestType.RequestToJoin
-            expectedCreatedRequest = {
-              id: randomUUID(),
-              communityId: community.id,
-              memberAddress: userAddress,
-              type,
-              status: CommunityRequestStatus.Pending
-            }
+            community.role = CommunityRole.None
           })
 
-          describe('and user do not belong to community', () => {
+          describe('and there are no pending requests for the user', () => {
             beforeEach(() => {
-              community.role = CommunityRole.None
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
             })
 
-            describe('and there are no pending requests for the user', () => {
-              beforeEach(() => {
-                mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+            it('should create and return the request as pending', async () => {
+              const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(result).toEqual({
+                id: expect.any(String),
+                communityId: community.id,
+                memberAddress: userAddress,
+                type,
+                status: CommunityRequestStatus.Pending
               })
-
-              it('should create and return the request as pending', async () => {
-                const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
-                expect(result).toEqual({
-                  id: expect.any(String),
-                  communityId: community.id,
-                  memberAddress: userAddress,
-                  type,
-                  status: CommunityRequestStatus.Pending
-                })
-                expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledWith(community.id, userAddress, type)
-              })
-            })
-
-            describe('and there is a pending request_to_join for the user', () => {
-              beforeEach(() => {
-                mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([expectedCreatedRequest])
-              })
-
-              it('should throw an InvalidCommunityRequestError with correct message', () => {
-                expect(
-                  communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
-                ).rejects.toThrow('Request already exists')
-              })
-
-              it('should throw an InvalidCommunityRequestError', () => {
-                expect(
-                  communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
-                ).rejects.toThrow(InvalidCommunityRequestError)
-              })
+              expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledWith(community.id, userAddress, type)
             })
           })
 
-          describe('and user already belongs to community', () => {
+          describe('and the caller is different from the user', () => {
             beforeEach(() => {
-              community.role = CommunityRole.Member
+              callerAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabce'
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
             })
 
-            it('should throw an InvalidCommunityRequestError with correct message', () => {
-              expect(
-                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
-              ).rejects.toThrow(`User cannot join since it is already a member of the community: ${community.name}`)
+            it('should throw an InvalidCommunityRequestError with correct message', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              ).rejects.toThrow('User trying to impersonate another user')
             })
 
-            it('should throw an InvalidCommunityRequestError', () => {
-              expect(
-                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
+            it('should throw an InvalidCommunityRequestError', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              ).rejects.toThrow(InvalidCommunityRequestError)
+            })
+          })
+
+          describe('and there is a pending request_to_join for the user', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([expectedCreatedRequest])
+              callerAddress = userAddress
+            })
+
+            it('should throw an InvalidCommunityRequestError with correct message', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              ).rejects.toThrow('Request already exists')
+            })
+
+            it('should throw an InvalidCommunityRequestError', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              ).rejects.toThrow(InvalidCommunityRequestError)
+            })
+          })
+
+          describe('and there is a pending invite for the user', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([{
+                ...expectedCreatedRequest,
+                type: CommunityRequestType.Invite
+              }])
+              callerAddress = userAddress
+            })
+
+            it('should automatically join the user to the community', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(expectedCreatedRequest.id, {
+                communityId: community.id,
+                memberAddress: userAddress,
+                role: CommunityRole.Member
+              })
+            })
+
+            it('should return the request as accepted', async () => {
+              const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(result).toEqual({
+                id: expect.any(String),
+                communityId: community.id,
+                memberAddress: userAddress,
+                type: CommunityRequestType.RequestToJoin,
+                status: CommunityRequestStatus.Accepted
+              })
+            })
+
+            it('should not create the request to join', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(mockCommunitiesDB.createCommunityRequest).not.toHaveBeenCalled()
+            })
+          })
+        })
+
+        describe('and user already belongs to community', () => {
+          beforeEach(() => {
+            community.role = CommunityRole.Member
+          })
+
+          it('should throw an InvalidCommunityRequestError with correct message', async () => {
+            await expect(
+              communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+            ).rejects.toThrow(`User cannot join since it is already a member of the community: ${community.name}`)
+          })
+
+          it('should throw an InvalidCommunityRequestError', async () => {
+            await expect(
+              communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+            ).rejects.toThrow(InvalidCommunityRequestError)
+          })
+        })
+      })
+
+      describe('and request type is Invite', () => {
+        let type: CommunityRequestType
+        let expectedCreatedRequest: MemberRequest
+
+        beforeEach(() => {
+          type = CommunityRequestType.Invite
+          expectedCreatedRequest = {
+            id: randomUUID(),
+            communityId: community.id,
+            memberAddress: userAddress,
+            type,
+            status: CommunityRequestStatus.Pending
+          }
+          mockCommunitiesDB.createCommunityRequest.mockImplementationOnce(() => {
+            return Promise.resolve(expectedCreatedRequest)
+          })
+        })
+
+        describe('and inviter does not have permission to invite users', () => {
+          beforeEach(() => {
+            mockCommunityRoles.validatePermissionToInviteUsers.mockRejectedValueOnce(
+              new NotAuthorizedError('User does not have permission')
+            )
+          })
+
+          it('should throw an NotAuthorizedError', async () => {
+            await expect(
+              communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+            ).rejects.toThrow(NotAuthorizedError)
+          })
+        })
+
+        describe('and user does not belong to community', () => {
+          beforeEach(() => {
+            community.role = CommunityRole.None
+          })
+
+          describe('and there are no pending requests for the user', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+              mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
+            })
+
+            it('should create and return the request as pending', async () => {
+              const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(result).toEqual({
+                id: expect.any(String),
+                communityId: community.id,
+                memberAddress: userAddress,
+                type,
+                status: CommunityRequestStatus.Pending
+              })
+              expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledWith(community.id, userAddress, type)
+            })
+          })
+
+          describe('and there is a pending invite for the user', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([expectedCreatedRequest])
+              mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
+            })
+
+            it('should throw an InvalidCommunityRequestError with correct message', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              ).rejects.toThrow('Request already exists')
+            })
+
+            it('should throw an InvalidCommunityRequestError', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               ).rejects.toThrow(InvalidCommunityRequestError)
             })
           })
         })
 
-        describe('and request type is Invite', () => {
+        describe('and user already belongs to community', () => {
           beforeEach(() => {
-            type = CommunityRequestType.Invite
-            expectedCreatedRequest = {
-              id: randomUUID(),
-              communityId: community.id,
-              memberAddress: userAddress,
-              type,
-              status: CommunityRequestStatus.Pending
-            }
+            community.role = CommunityRole.Member
+            mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
           })
 
-          describe('and user do not belong to community', () => {
-            beforeEach(() => {
-              community.role = CommunityRole.None
-            })
-
-            describe('and there are no pending requests for the user', () => {
-              beforeEach(() => {
-                mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
-              })
-
-              it('should create and return the request as pending', async () => {
-                const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
-                expect(result).toEqual({
-                  id: expect.any(String),
-                  communityId: community.id,
-                  memberAddress: userAddress,
-                  type,
-                  status: CommunityRequestStatus.Pending
-                })
-                expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledWith(community.id, userAddress, type)
-              })
-            })
-
-            describe('and there is a pending invite for the user', () => {
-              beforeEach(() => {
-                mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([expectedCreatedRequest])
-              })
-
-              it('should throw an InvalidCommunityRequestError with correct message', () => {
-                expect(
-                  communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
-                ).rejects.toThrow('Request already exists')
-              })
-
-              it('should throw an InvalidCommunityRequestError', () => {
-                expect(
-                  communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
-                ).rejects.toThrow(InvalidCommunityRequestError)
-              })
-            })
+          it('should throw an InvalidCommunityRequestError with correct message', async () => {
+            await expect(
+              communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+            ).rejects.toThrow(`User cannot join since it is already a member of the community: ${community.name}`)
           })
 
-          describe('and user already belongs to community', () => {
-            beforeEach(() => {
-              community.role = CommunityRole.Member
-            })
-
-            it('should throw an InvalidCommunityRequestError with correct message', () => {
-              expect(
-                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
-              ).rejects.toThrow(`User cannot join since it is already a member of the community: ${community.name}`)
-            })
-
-            it('should throw an InvalidCommunityRequestError', () => {
-              expect(
-                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type)
-              ).rejects.toThrow(InvalidCommunityRequestError)
-            })
+          it('should throw an InvalidCommunityRequestError', async () => {
+            await expect(
+              communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+            ).rejects.toThrow(InvalidCommunityRequestError)
           })
         })
       })
@@ -330,7 +474,6 @@ describe('Community Requests Component', () => {
   describe('when getting member requests', () => {
     let memberAddress: string
     let pagination: { limit: number; offset: number }
-    let options: Pick<GetCommunityRequestsOptions, "status" | "type" | "pagination">
 
     beforeEach(() => {
       memberAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -339,8 +482,9 @@ describe('Community Requests Component', () => {
       mockCommunitiesDB.getCommunityRequestsCount.mockReset()
     })
 
-    describe('and there are requests stored in the database', () => {
+    describe('and no type filter is provided', () => {
       let requests: MemberRequest[]
+      let options: Pick<GetCommunityRequestsOptions, "status" | "type" | "pagination">
 
       beforeEach(() => {
         requests = [
@@ -359,97 +503,94 @@ describe('Community Requests Component', () => {
             status: CommunityRequestStatus.Pending
           }
         ]
-
-        mockCommunitiesDB.getMemberRequests.mockResolvedValue(requests)
-        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValue(2)
+        mockCommunitiesDB.getMemberRequests.mockResolvedValueOnce(requests)
+        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValueOnce(2)
+        options = {
+          pagination,
+          status: CommunityRequestStatus.Pending,
+          type: undefined
+        }
       })
-      
-      describe('and no type filter is provided', () => {
-        beforeEach(() => {
-          options = {
-            pagination,
-            status: CommunityRequestStatus.Pending,
-            type: undefined
-          }
-        })
-  
-        it('should return pending requests (invites and requests) with total, forwarding pagination and filters', async () => {
-          const result = await communityRequestsComponent.getMemberRequests(memberAddress, options)
-  
-          expect(result).toEqual({ requests, total: requests.length })
-          expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
-          expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, { ...options, pagination: undefined })
-        })
-      })
-  
-      describe('and filtering by type invite', () => {
-        beforeEach(() => {
-          requests = [
-            {
-              id: randomUUID(),
-              communityId: randomUUID(),
-              memberAddress,
-              type: CommunityRequestType.Invite,
-              status: CommunityRequestStatus.Pending
-            }
-          ]
-  
-          mockCommunitiesDB.getMemberRequests.mockResolvedValue(requests)
-          mockCommunitiesDB.getMemberRequestsCount.mockResolvedValue(1)
 
-          options = {
-            pagination,
-            status: CommunityRequestStatus.Pending,
-            type: CommunityRequestType.Invite
-          }
-        })
-  
-        it('should forward the invite type filter', async () => {
-          const result = await communityRequestsComponent.getMemberRequests(memberAddress, options)
-  
-          expect(result).toEqual({ requests, total: 1 })
-          expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
-          expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, { ...options, pagination: undefined })
-        })
-      })
-  
-      describe('and filtering by type request_to_join', () => {
-        beforeEach(() => {
-          requests = [
-            {
-              id: randomUUID(),
-              communityId: randomUUID(),
-              memberAddress,
-              type: CommunityRequestType.RequestToJoin,
-              status: CommunityRequestStatus.Pending
-            }
-          ]
-  
-          mockCommunitiesDB.getMemberRequests.mockResolvedValue(requests)
-          mockCommunitiesDB.getMemberRequestsCount.mockResolvedValue(1)
+      it('should return pending requests (invites and requests) with total, forwarding pagination and filters', async () => {
+        const result = await communityRequestsComponent.getMemberRequests(memberAddress, options)
 
-          options = {
-            pagination,
-            status: CommunityRequestStatus.Pending,
-            type: CommunityRequestType.RequestToJoin
+        expect(result).toEqual({ requests, total: requests.length })
+        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
+        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, { ...options, pagination: undefined })
+      })
+    })
+
+    describe('and filtering by type invite', () => {
+      let filteredRequests: MemberRequest[]
+      let options: Pick<GetCommunityRequestsOptions, "status" | "type" | "pagination">
+
+      beforeEach(() => {
+        filteredRequests = [
+          {
+            id: randomUUID(),
+            communityId: randomUUID(),
+            memberAddress,
+            type: CommunityRequestType.Invite,
+            status: CommunityRequestStatus.Pending
           }
-        })
-  
-        it('should forward the request_to_join type filter', async () => {
-          const result = await communityRequestsComponent.getMemberRequests(memberAddress, options)
-  
-          expect(result).toEqual({ requests, total: requests.length })
-          expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
-          expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, { ...options, pagination: undefined })
-        })
+        ]
+        mockCommunitiesDB.getMemberRequests.mockResolvedValueOnce(filteredRequests)
+        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValueOnce(1)
+        options = {
+          pagination,
+          status: CommunityRequestStatus.Pending,
+          type: CommunityRequestType.Invite
+        }
+      })
+
+      it('should forward the invite type filter', async () => {
+        const result = await communityRequestsComponent.getMemberRequests(memberAddress, options)
+
+        expect(result).toEqual({ requests: filteredRequests, total: 1 })
+        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
+        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, { ...options, pagination: undefined })
+      })
+    })
+
+    describe('and filtering by type request_to_join', () => {
+      let filteredRequests: MemberRequest[]
+      let options: Pick<GetCommunityRequestsOptions, "status" | "type" | "pagination">
+
+      beforeEach(() => {
+        filteredRequests = [
+          {
+            id: randomUUID(),
+            communityId: randomUUID(),
+            memberAddress,
+            type: CommunityRequestType.RequestToJoin,
+            status: CommunityRequestStatus.Pending
+          }
+        ]
+        mockCommunitiesDB.getMemberRequests.mockResolvedValueOnce(filteredRequests)
+        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValueOnce(1)
+        options = {
+          pagination,
+          status: CommunityRequestStatus.Pending,
+          type: CommunityRequestType.RequestToJoin
+        }
+      })
+
+      it('should forward the request_to_join type filter', async () => {
+        const result = await communityRequestsComponent.getMemberRequests(memberAddress, options)
+
+        expect(result).toEqual({ requests: filteredRequests, total: filteredRequests.length })
+        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
+        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, { ...options, pagination: undefined })
       })
     })
 
     describe('and there are no requests stored in the database', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.getMemberRequests.mockResolvedValue([])
-        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValue(0)
+      let options: Pick<GetCommunityRequestsOptions, "status" | "type" | "pagination">
 
+      beforeEach(() => {
+        mockCommunitiesDB.getMemberRequests.mockResolvedValueOnce([])
+        mockCommunitiesDB.getMemberRequestsCount.mockResolvedValueOnce(0)
         options = {
           pagination
         }
@@ -465,22 +606,18 @@ describe('Community Requests Component', () => {
 
   describe('when updating request status', () => {
     let requestId: string
-    let status: Exclude<CommunityRequestStatus, 'pending'>
     let callerAddress: string
 
     beforeEach(() => {
       requestId = randomUUID()
       callerAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
-      mockCommunitiesDB.getCommunityRequest.mockReset()
-      mockCommunitiesDB.addCommunityMember.mockReset()
-      mockCommunitiesDB.removeCommunityRequest.mockReset()
-      mockCommunitiesDB.acceptCommunityRequestTransaction.mockReset()
-      mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockReset()
     })
 
     describe('and the request does not exist', () => {
+      let status: Exclude<CommunityRequestStatus, 'pending'>
+
       beforeEach(() => {
-        mockCommunitiesDB.getCommunityRequest.mockResolvedValue(null)
+        mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(null)
         status = CommunityRequestStatus.Accepted
       })
 
@@ -492,16 +629,21 @@ describe('Community Requests Component', () => {
     })
 
     describe('and the request exists but is not pending', () => {
+      let status: Exclude<CommunityRequestStatus, 'pending'>
+      let userAddress: string
+      let nonPendingRequest: MemberRequest
+
       beforeEach(() => {
-        const nonPendingRequest: MemberRequest = {
+        userAddress = '0x1234567890123456789012345678901234567890'
+        status = CommunityRequestStatus.Rejected
+        nonPendingRequest = {
           id: requestId,
           communityId: randomUUID(),
           memberAddress: userAddress,
           type: CommunityRequestType.Invite,
           status: CommunityRequestStatus.Accepted
         }
-        mockCommunitiesDB.getCommunityRequest.mockResolvedValue(nonPendingRequest)
-        status = CommunityRequestStatus.Rejected
+        mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(nonPendingRequest)
       })
 
       it('should throw CommunityRequestNotFoundError', async () => {
@@ -524,7 +666,7 @@ describe('Community Requests Component', () => {
           type: CommunityRequestType.Invite,
           status: CommunityRequestStatus.Pending
         }
-        mockCommunitiesDB.getCommunityRequest.mockResolvedValue(inviteRequest)
+        mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(inviteRequest)
       })
 
       describe('and the caller is the invited user', () => {
@@ -533,9 +675,11 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is accepted', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Accepted
-            mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValue()
+            mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValueOnce()
           })
 
           it('should use transaction to add member and remove request', async () => {
@@ -553,9 +697,11 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is rejected', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Rejected
-            mockCommunitiesDB.removeCommunityRequest.mockResolvedValue()
+            mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
           })
 
           it('should remove the request', async () => {
@@ -569,6 +715,8 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is cancelled', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Cancelled
           })
@@ -588,10 +736,12 @@ describe('Community Requests Component', () => {
       describe('and the caller has community privileges', () => {
         beforeEach(() => {
           callerAddress = '0x2222222222222222222222222222222222222222' // Different from invited user
-          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockResolvedValue()
+          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockResolvedValueOnce()
         })
 
         describe('and the status is accepted', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Accepted
           })
@@ -608,6 +758,8 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is rejected', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Rejected
           })
@@ -624,9 +776,11 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is cancelled', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Cancelled
-            mockCommunitiesDB.removeCommunityRequest.mockResolvedValue()
+            mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
           })
 
           it('should remove the request', async () => {
@@ -646,12 +800,14 @@ describe('Community Requests Component', () => {
       describe('and the caller is neither the invited user nor has privileges', () => {
         beforeEach(() => {
           callerAddress = '0x3333333333333333333333333333333333333333' // Different from invited user
-          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockRejectedValue(
+          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockRejectedValueOnce(
             new NotAuthorizedError('User does not have permission')
           )
         })
 
         describe('and the status is accepted', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Accepted
           })
@@ -668,6 +824,8 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is rejected', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Rejected
           })
@@ -684,6 +842,8 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is cancelled', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Cancelled
           })
@@ -714,7 +874,7 @@ describe('Community Requests Component', () => {
           type: CommunityRequestType.RequestToJoin,
           status: CommunityRequestStatus.Pending
         }
-        mockCommunitiesDB.getCommunityRequest.mockResolvedValue(joinRequest)
+        mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(joinRequest)
       })
 
       describe('and the caller is the requesting user', () => {
@@ -723,6 +883,8 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is accepted', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Accepted
           })
@@ -739,6 +901,8 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is rejected', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Rejected
           })
@@ -755,9 +919,11 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is cancelled', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Cancelled
-            mockCommunitiesDB.removeCommunityRequest.mockResolvedValue()
+            mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
           })
 
           it('should remove the request and do not add user as member', async () => {
@@ -774,13 +940,15 @@ describe('Community Requests Component', () => {
       describe('and the caller has community privileges', () => {
         beforeEach(() => {
           callerAddress = '0x5555555555555555555555555555555555555555' // Different from requesting user
-          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockResolvedValue()
+          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockResolvedValueOnce()
         })
 
         describe('and the status is accepted', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Accepted
-            mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValue()
+            mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValueOnce()
           })
 
           it('should use transaction to add member and remove request', async () => {
@@ -801,9 +969,11 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is rejected', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Rejected
-            mockCommunitiesDB.removeCommunityRequest.mockResolvedValue()
+            mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
           })
 
           it('should remove the request and do not add user as member', async () => {
@@ -820,6 +990,8 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is cancelled', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Cancelled
           })
@@ -839,12 +1011,14 @@ describe('Community Requests Component', () => {
       describe('and the caller is neither the requesting user nor has privileges', () => {
         beforeEach(() => {
           callerAddress = '0x6666666666666666666666666666666666666666' // Different from requesting user
-          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockRejectedValue(
+          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockRejectedValueOnce(
             new NotAuthorizedError('User does not have permission')
           )
         })
 
         describe('and the status is accepted', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Accepted
           })
@@ -861,6 +1035,8 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is rejected', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Rejected
           })
@@ -877,6 +1053,8 @@ describe('Community Requests Component', () => {
         })
 
         describe('and the status is cancelled', () => {
+          let status: Exclude<CommunityRequestStatus, 'pending'>
+
           beforeEach(() => {
             status = CommunityRequestStatus.Cancelled
           })

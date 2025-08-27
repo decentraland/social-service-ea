@@ -334,6 +334,8 @@ export function createCommunityComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
+      await communityRoles.validatePermissionToEditCommunity(communityId, userAddress)
+
       if (Object.keys(updates).length === 0) {
         return {
           id: existingCommunity.id,
@@ -345,19 +347,18 @@ export function createCommunityComponent(
         }
       }
 
-      await communityRoles.validatePermissionToEditCommunity(communityId, userAddress)
-
-      if (updates.privacy && updates.privacy !== existingCommunity.privacy) {
-        await communityRoles.validatePermissionToUpdateCommunityPrivacy(communityId, userAddress)
-      }
-
       const { placeIds, thumbnailBuffer, ...restUpdates } = updates
+      const isUpdatingPrivacy = updates.privacy && updates.privacy !== existingCommunity.privacy
 
       if (placeIds && placeIds.length > 0) {
         const uniquePlaceIds = Array.from(new Set(placeIds))
         const currentPlaces = await communitiesDb.getCommunityPlaces(communityId)
         const placeIdsToValidate = uniquePlaceIds.filter((placeId) => !currentPlaces.some((p) => p.id === placeId))
         await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
+      }
+
+      if (isUpdatingPrivacy) {
+        await communityRoles.validatePermissionToUpdateCommunityPrivacy(communityId, userAddress)
       }
 
       if (updates.name || updates.description || thumbnailBuffer) {
@@ -431,6 +432,10 @@ export function createCommunityComponent(
           userAddress,
           placeIds: placeIds.length
         })
+      }
+
+      if (isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public) {
+        await communitiesDb.acceptAllRequestsToJoin(communityId)
       }
 
       logger.info('Community updated successfully', {

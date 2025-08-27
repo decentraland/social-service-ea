@@ -3,16 +3,20 @@ import { MemberRequest, CommunityRequestType } from '../../../logic/community/ty
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { CommunityNotFoundError, InvalidCommunityRequestError } from '../../../logic/community'
 import { errorMessageOrDefault } from '../../../utils/errors'
+import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 
 export async function createCommunityRequestHandler(
   context: Pick<
-    HandlerContextWithPath<'communityRequests' | 'logs', '/v1/communities/:id/requests'>,
-    'components' | 'request' | 'params'
+    HandlerContextWithPath<'communityRequests' | 'logs', '/v1/communities/:id/requests'> &
+      DecentralandSignatureContext<any>,
+    'components' | 'request' | 'params' | 'verification'
   >
 ): Promise<HTTPResponse<MemberRequest>> {
   const {
     components: { communityRequests, logs },
     params: { id: communityId },
+    verification,
     request
   } = context
 
@@ -32,6 +36,7 @@ export async function createCommunityRequestHandler(
   }
 
   try {
+    const callerAddress = verification!.auth.toLowerCase()
     if (!body.targetedAddress || !body.type) {
       throw new InvalidCommunityRequestError('Missing targetedAddress or type field')
     }
@@ -47,7 +52,8 @@ export async function createCommunityRequestHandler(
     const communityRequest = await communityRequests.createCommunityRequest(
       communityId,
       body.targetedAddress as EthAddress,
-      body.type
+      body.type,
+      callerAddress
     )
 
     return {
@@ -67,7 +73,11 @@ export async function createCommunityRequestHandler(
       type: body.type
     })
 
-    if (error instanceof InvalidCommunityRequestError || error instanceof CommunityNotFoundError) {
+    if (
+      error instanceof InvalidCommunityRequestError ||
+      error instanceof CommunityNotFoundError ||
+      error instanceof NotAuthorizedError
+    ) {
       throw error
     }
 

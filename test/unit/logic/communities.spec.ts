@@ -894,6 +894,7 @@ describe('Community Component', () => {
         describe('and the user has permission to edit', () => {
           beforeEach(() => {
             mockCommunityRoles.validatePermissionToEditCommunity.mockResolvedValue()
+            mockCommunityRoles.validatePermissionToUpdateCommunityPrivacy.mockResolvedValue()
           })
 
           it('should update the community with all fields and call compliance validation', async () => {
@@ -1151,6 +1152,44 @@ describe('Community Component', () => {
               expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
               expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
+            })
+          })
+
+          describe('and the community privacy is updated from private to public', () => {
+            let updatesWithPrivacyPublic: CommunityUpdates
+
+            beforeEach(() => {
+              updatesWithPrivacyPublic = { ...updates, privacy: CommunityPrivacyEnum.Public }
+              mockCommunitiesDB.getCommunity.mockResolvedValueOnce({
+                ...mockCommunity,
+                privacy: CommunityPrivacyEnum.Private,
+                role: CommunityRole.Owner
+              })
+            })
+
+            it('should migrate all requests to join to members', async () => {
+              await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPublic)
+
+              expect(mockCommunitiesDB.acceptAllRequestsToJoin).toHaveBeenCalledWith(communityId)
+            })
+          })
+
+          describe('and the community privacy is updated from publicto private', () => {
+            let updatesWithPrivacyPrivate: CommunityUpdates
+
+            beforeEach(() => {
+              updatesWithPrivacyPrivate = { ...updates, privacy: CommunityPrivacyEnum.Private }
+              mockCommunitiesDB.getCommunity.mockResolvedValueOnce({
+                ...mockCommunity,
+                privacy: CommunityPrivacyEnum.Public,
+                role: CommunityRole.Owner
+              })
+            })
+
+            it('should not migrate all requests to join to members', async () => {
+              await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPrivate)
+  
+              expect(mockCommunitiesDB.acceptAllRequestsToJoin).not.toHaveBeenCalled()
             })
           })
         })

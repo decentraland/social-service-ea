@@ -10,24 +10,17 @@ test('Create Community Request Controller', function ({ components, spyComponent
   const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when creating a community request', () => {
-    let identity: Identity
-    let communityId: string
-    let ownerAddress: string
-    let targetAddress: string
-
-    beforeEach(async () => {
-      identity = await createTestIdentity()
-      ownerAddress = identity.realAccount.address.toLowerCase()
-      targetAddress = '0x0000000000000000000000000000000000000002'
-    })
-
-    afterEach(async () => {
-      await components.communitiesDbHelper.forceCommunityRemoval(communityId)
-    })
-
     describe('when the request is not authenticated', () => {
+      let communityId: string
+
+      beforeEach(() => {
+        communityId = randomUUID()
+      })
+
       it('should return 400 status code', async () => {
         const { localHttpFetch } = components
+        const targetAddress = '0x0000000000000000000000000000000000000002'
+        
         const response = await localHttpFetch.fetch(`/v1/communities/${communityId}/requests`, {
           method: 'POST',
           headers: {
@@ -43,7 +36,19 @@ test('Create Community Request Controller', function ({ components, spyComponent
     })
 
     describe('when the request is authenticated', () => {
+      let identity: Identity
+
+      beforeEach(async () => {
+        identity = await createTestIdentity()
+      })
+
       describe('and targetedAddress is missing in body', () => {
+        let communityId: string
+
+        beforeEach(() => {
+          communityId = randomUUID()
+        })
+
         it('should return 400 status code', async () => {
           const response = await makeRequest(identity, `/v1/communities/${communityId}/requests`, 'POST', {
             type: CommunityRequestType.Invite
@@ -53,6 +58,14 @@ test('Create Community Request Controller', function ({ components, spyComponent
       })
 
       describe('and type is missing in body', () => {
+        let communityId: string
+        let targetAddress: string
+
+        beforeEach(() => {
+          communityId = randomUUID()
+          targetAddress = '0x0000000000000000000000000000000000000002'
+        })
+
         it('should return 400 status code', async () => {
           const response = await makeRequest(identity, `/v1/communities/${communityId}/requests`, 'POST', {
             targetedAddress: targetAddress
@@ -62,6 +75,12 @@ test('Create Community Request Controller', function ({ components, spyComponent
       })
 
       describe('and targetedAddress is not a valid EthAddress', () => {
+        let communityId: string
+
+        beforeEach(() => {
+          communityId = randomUUID()
+        })
+
         it('should return 400 status code', async () => {
           const response = await makeRequest(identity, `/v1/communities/${communityId}/requests`, 'POST', {
             targetedAddress: 'invalid-address',
@@ -74,6 +93,12 @@ test('Create Community Request Controller', function ({ components, spyComponent
       })
 
       describe('and targetedAddress is empty string', () => {
+        let communityId: string
+
+        beforeEach(() => {
+          communityId = randomUUID()
+        })
+
         it('should return 400 status code', async () => {
           const response = await makeRequest(identity, `/v1/communities/${communityId}/requests`, 'POST', {
             targetedAddress: '',
@@ -86,6 +111,14 @@ test('Create Community Request Controller', function ({ components, spyComponent
       })
 
       describe('and type is not a valid CommunityRequestType', () => {
+        let communityId: string
+        let targetAddress: string
+
+        beforeEach(() => {
+          communityId = randomUUID()
+          targetAddress = '0x0000000000000000000000000000000000000002'
+        })
+
         it('should return 400 status code', async () => {
           const response = await makeRequest(identity, `/v1/communities/${communityId}/requests`, 'POST', {
             targetedAddress: targetAddress,
@@ -96,6 +129,12 @@ test('Create Community Request Controller', function ({ components, spyComponent
       })
 
       describe('and the request body is not valid JSON', () => {
+        let communityId: string
+
+        beforeEach(() => {
+          communityId = randomUUID()
+        })
+
         it('should return 400 status code', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${communityId}/requests`, {
@@ -109,7 +148,7 @@ test('Create Community Request Controller', function ({ components, spyComponent
           expect(response.status).toBe(400)
         })
 
-        describe('when body is empty', () => {
+        describe('and body is empty', () => {
           it('should return 400 status code', async () => {
             const { localHttpFetch } = components
             const response = await localHttpFetch.fetch(`/v1/communities/${communityId}/requests`, {
@@ -126,25 +165,24 @@ test('Create Community Request Controller', function ({ components, spyComponent
       })
 
       describe('and the request body is valid', () => {
-        let requestBody: { targetedAddress: string; type: CommunityRequestType }
-
-        beforeEach(async () => {
-          requestBody = {
-            targetedAddress: targetAddress,
-            type: CommunityRequestType.Invite
-          }
-        })
-
         describe('and request type is invite', () => {
+          let targetAddress: string
+          let requestBody: { targetedAddress: string; type: CommunityRequestType }
+
           beforeEach(() => {
+            targetAddress = '0x0000000000000000000000000000000000000002'
             requestBody = {
-              ...requestBody,
+              targetedAddress: targetAddress,
               type: CommunityRequestType.Invite
             }
           })
 
           describe('when community exists', () => {
+            let communityId: string
+            let ownerAddress: string
+
             beforeEach(async () => {
+              ownerAddress = '0x0000000000000000000000000000000000000001'
               const result = await components.communitiesDb.createCommunity(
                 mockCommunity({
                   name: 'Test Community',
@@ -154,52 +192,98 @@ test('Create Community Request Controller', function ({ components, spyComponent
                 })
               )
               communityId = result.id
-
-              await components.communitiesDb.addCommunityMember({
-                communityId,
-                memberAddress: ownerAddress,
-                role: CommunityRole.Owner
-              })
             })
 
-            describe('and community is private', () => {
+            afterEach(async () => {
+              await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+            })
+
+            describe('and inviter has permission to invite users', () => {
               beforeEach(async () => {
-                await components.communitiesDb.updateCommunity(communityId, {
-                  private: true
+                await components.communitiesDb.addCommunityMember({
+                  communityId,
+                  memberAddress: identity.realAccount.address,
+                  role: CommunityRole.Owner
                 })
               })
 
-              describe('and user is not a member', () => {
-                describe('and no pending invite exists', () => {
-                  it('should return 200 status code and return the created request', async () => {
-                    const response = await makeRequest(
-                      identity,
-                      `/v1/communities/${communityId}/requests`,
-                      'POST',
-                      requestBody
-                    )
-                    expect(response.status).toBe(200)
-                    const body = await response.json()
-                    expect(body.data).toMatchObject({
-                      id: expect.any(String),
-                      communityId,
-                      memberAddress: targetAddress,
-                      type: CommunityRequestType.Invite,
-                      status: CommunityRequestStatus.Pending
+              afterEach(async () => {
+                await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [identity.realAccount.address])
+              })
+
+              describe('and community is private', () => {
+                beforeEach(async () => {
+                  await components.communitiesDb.updateCommunity(communityId, {
+                    private: true
+                  })
+                })
+
+                describe('and user is not a member', () => {
+                  describe('and no pending invite exists', () => {
+                    it('should return 200 status code and return the created request', async () => {
+                      const response = await makeRequest(
+                        identity,
+                        `/v1/communities/${communityId}/requests`,
+                        'POST',
+                        requestBody
+                      )
+
+                      const body = await response.json()
+                      expect(response.status).toBe(200)
+                      expect(body.data).toEqual(expect.objectContaining({
+                        id: expect.any(String),
+                        communityId,
+                        memberAddress: targetAddress,
+                        type: CommunityRequestType.Invite,
+                        status: CommunityRequestStatus.Pending
+                      }))
+                    })
+                  })
+
+                  describe('and a pending invite already exists', () => {
+                    let requestId: string
+
+                    beforeEach(async () => {
+                      const request = await components.communitiesDb.createCommunityRequest(
+                        communityId,
+                        targetAddress as EthAddress,
+                        CommunityRequestType.Invite
+                      )
+                      requestId = request.id
+                    })
+
+                    afterEach(async () => {
+                      await components.communitiesDbHelper.forceCommunityRequestRemoval(requestId)
+                    })
+
+                    it('should return 400 status code with correct message', async () => {
+                      const response = await makeRequest(
+                        identity,
+                        `/v1/communities/${communityId}/requests`,
+                        'POST',
+                        requestBody
+                      )
+                      expect(response.status).toBe(400)
+                      const body = await response.json()
+                      expect(body.message).toBe('Request already exists')
                     })
                   })
                 })
 
-                describe('when a pending invite already exists', () => {
+                describe('and user is already a member', () => {
                   beforeEach(async () => {
-                    await components.communitiesDb.createCommunityRequest(
+                    await components.communitiesDb.addCommunityMember({
                       communityId,
-                      targetAddress as EthAddress,
-                      CommunityRequestType.Invite
-                    )
+                      memberAddress: targetAddress,
+                      role: CommunityRole.Member
+                    })
                   })
 
-                  it('should return 400 status code', async () => {
+                  afterEach(async () => {
+                    await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [targetAddress])
+                  })
+
+                  it('should return 400 status code with correct message', async () => {
                     const response = await makeRequest(
                       identity,
                       `/v1/communities/${communityId}/requests`,
@@ -208,72 +292,83 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     )
                     expect(response.status).toBe(400)
                     const body = await response.json()
-                    expect(body.message).toBe('Request already exists')
+                    expect(body.message).toContain('User cannot join since it is already a member')
                   })
                 })
               })
 
-              describe('when user is already a member', () => {
+              describe('and community is public', () => {
                 beforeEach(async () => {
-                  await components.communitiesDb.addCommunityMember({
-                    communityId,
-                    memberAddress: targetAddress,
-                    role: CommunityRole.Member
+                  await components.communitiesDb.updateCommunity(communityId, {
+                    private: false
                   })
                 })
 
-                it('should return 400 status code', async () => {
-                  const response = await makeRequest(
-                    identity,
-                    `/v1/communities/${communityId}/requests`,
-                    'POST',
-                    requestBody
-                  )
-                  expect(response.status).toBe(400)
-                  const body = await response.json()
-                  expect(body.message).toContain('User cannot join since it is already a member')
-                })
-              })
-            })
+                describe('and user is not a member', () => {
+                  describe('and no pending invite exists', () => {
+                    it('should return 200 status code and return the created request', async () => {
+                      const response = await makeRequest(
+                        identity,
+                        `/v1/communities/${communityId}/requests`,
+                        'POST',
+                        requestBody
+                      )
+                      expect(response.status).toBe(200)
+                      const body = await response.json()
+                      expect(body.data).toEqual(expect.objectContaining({
+                        id: expect.any(String),
+                        communityId,
+                        memberAddress: targetAddress,
+                        type: CommunityRequestType.Invite,
+                        status: CommunityRequestStatus.Pending
+                      }))
+                    })
+                  })
 
-            describe('and community is public', () => {
-              beforeEach(async () => {
-                await components.communitiesDb.updateCommunity(communityId, {
-                  private: false
-                })
-              })
+                  describe('and a pending invite already exists', () => {
+                    let requestId: string
 
-              describe('and user is not a member', () => {
-                describe('and no pending invite exists', () => {
-                  it('should return 200 status code and return the created request', async () => {
-                    const response = await makeRequest(
-                      identity,
-                      `/v1/communities/${communityId}/requests`,
-                      'POST',
-                      requestBody
-                    )
-                    expect(response.status).toBe(200)
-                    const body = await response.json()
-                    expect(body.data).toMatchObject({
-                      id: expect.any(String),
-                      communityId,
-                      memberAddress: targetAddress,
-                      type: CommunityRequestType.Invite,
-                      status: CommunityRequestStatus.Pending
+                    beforeEach(async () => {
+                      const request = await components.communitiesDb.createCommunityRequest(
+                        communityId,
+                        targetAddress as EthAddress,
+                        CommunityRequestType.Invite
+                      )
+                      requestId = request.id
+                    })
+
+                    afterEach(async () => {
+                      await components.communitiesDbHelper.forceCommunityRequestRemoval(requestId)
+                    })
+
+                    it('should return 400 status code with correct message', async () => {
+                      const response = await makeRequest(
+                        identity,
+                        `/v1/communities/${communityId}/requests`,
+                        'POST',
+                        requestBody
+                      )
+                      expect(response.status).toBe(400)
+                      const body = await response.json()
+                      expect(body.message).toBe('Request already exists')
                     })
                   })
                 })
 
-                describe('when a pending invite already exists', () => {
+                describe('and user is already a member', () => {
                   beforeEach(async () => {
-                    await components.communitiesDb.createCommunityRequest(
+                    await components.communitiesDb.addCommunityMember({
                       communityId,
-                      targetAddress as EthAddress,
-                      CommunityRequestType.Invite
-                    )
+                      memberAddress: targetAddress,
+                      role: CommunityRole.Member
+                    })
                   })
 
-                  it('should return 400 status code', async () => {
+                  afterEach(async () => {
+                    await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [targetAddress])
+                  })
+
+                  it('should return 400 status code with correct message', async () => {
                     const response = await makeRequest(
                       identity,
                       `/v1/communities/${communityId}/requests`,
@@ -282,38 +377,45 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     )
                     expect(response.status).toBe(400)
                     const body = await response.json()
-                    expect(body.message).toBe('Request already exists')
+                    expect(body.message).toContain('User cannot join since it is already a member')
                   })
                 })
               })
+            })
 
-              describe('when user is already a member', () => {
-                beforeEach(async () => {
-                  await components.communitiesDb.addCommunityMember({
-                    communityId,
-                    memberAddress: targetAddress,
-                    role: CommunityRole.Member
-                  })
+            describe('and inviter does not have permission to invite users', () => {
+              beforeEach(async () => {
+                await components.communitiesDb.addCommunityMember({
+                  communityId,
+                  memberAddress: ownerAddress,
+                  role: CommunityRole.Member
                 })
+              })
 
-                it('should return 400 status code', async () => {
-                  const response = await makeRequest(
-                    identity,
-                    `/v1/communities/${communityId}/requests`,
-                    'POST',
-                    requestBody
-                  )
-                  expect(response.status).toBe(400)
-                  const body = await response.json()
-                  expect(body.message).toContain('User cannot join since it is already a member')
-                })
+              afterEach(async () => {
+                await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [ownerAddress])
+              })
+
+              it('should return 401 status code', async () => {
+                const response = await makeRequest(
+                  identity,
+                  `/v1/communities/${communityId}/requests`,
+                  'POST',
+                  requestBody
+                )
+                expect(response.status).toBe(401)
               })
             })
           })
 
           describe('when community does not exist', () => {
+            let nonExistentId: string
+
+            beforeEach(() => {
+              nonExistentId = randomUUID()
+            })
+
             it('should return 404 status code', async () => {
-              const nonExistentId = randomUUID()
               const response = await makeRequest(
                 identity,
                 `/v1/communities/${nonExistentId}/requests`,
@@ -326,14 +428,21 @@ test('Create Community Request Controller', function ({ components, spyComponent
         })
 
         describe('and request type is request_to_join', () => {
+          let requestBody: { targetedAddress: string; type: CommunityRequestType }
+
           beforeEach(() => {
             requestBody = {
-              ...requestBody,
+              targetedAddress: identity.realAccount.address,
               type: CommunityRequestType.RequestToJoin
             }
           })
+
           describe('when community exists', () => {
+            let communityId: string
+            let ownerAddress: string
+
             beforeEach(async () => {
+              ownerAddress = '0x0000000000000000000000000000000000000001'
               const result = await components.communitiesDb.createCommunity(
                 mockCommunity({
                   name: 'Test Community',
@@ -349,6 +458,10 @@ test('Create Community Request Controller', function ({ components, spyComponent
                 memberAddress: ownerAddress,
                 role: CommunityRole.Owner
               })
+            })
+
+            afterEach(async () => {
+              await components.communitiesDbHelper.forceCommunityRemoval(communityId)
             })
 
             describe('and community is private', () => {
@@ -369,35 +482,98 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     )
                     expect(response.status).toBe(200)
                     const body = await response.json()
-                    expect(body.data).toMatchObject({
+                    expect(body.data).toEqual(expect.objectContaining({
                       id: expect.any(String),
                       communityId,
-                      memberAddress: targetAddress,
                       type: CommunityRequestType.RequestToJoin,
                       status: CommunityRequestStatus.Pending
-                    })
+                    }))
+                    expect(body.data.memberAddress.toLowerCase()).toBe(identity.realAccount.address.toLowerCase())
                   })
                 })
 
-                describe('and a pending request already exists', () => {
+                describe('and a pending request_to_join already exists', () => {
+                  let requestId: string
+
                   beforeEach(async () => {
-                    await components.communitiesDb.createCommunityRequest(
+                    const request = await components.communitiesDb.createCommunityRequest(
                       communityId,
-                      targetAddress as EthAddress,
+                      identity.realAccount.address as EthAddress,
                       CommunityRequestType.RequestToJoin
                     )
+                    requestId = request.id
                   })
 
-                  it('should return 400 status code', async () => {
+                  afterEach(async () => {
+                    await components.communitiesDbHelper.forceCommunityRequestRemoval(requestId)
+                  })
+
+                  it('should return 400 status code with correct message', async () => {
+                    const response = await makeRequest(
+                      identity,
+                      `/v1/communities/${communityId}/requests`,
+                      'POST',
+                      { ...requestBody, targetedAddress: identity.realAccount.address }
+                    )
+                    expect(response.status).toBe(400)
+                    const body = await response.json()
+                    expect(body.message).toBe('Request already exists')
+                  })
+                })
+
+                describe('and a pending invite already exists', () => {
+                  let requestId: string
+
+                  beforeEach(async () => {
+                    const request = await components.communitiesDb.createCommunityRequest(
+                      communityId,
+                      identity.realAccount.address as EthAddress,
+                      CommunityRequestType.Invite
+                    )
+                    requestId = request.id
+                  })
+
+                  afterEach(async () => {
+                    await components.communitiesDbHelper.forceCommunityRequestRemoval(requestId)
+                  })
+
+                  it('should return 200 status code', async () => {
                     const response = await makeRequest(
                       identity,
                       `/v1/communities/${communityId}/requests`,
                       'POST',
                       requestBody
                     )
-                    expect(response.status).toBe(400)
+                    expect(response.status).toBe(200)
+                  })
+
+                  it('should return the request as already accepted', async () => {
+                    const response = await makeRequest(
+                      identity,
+                      `/v1/communities/${communityId}/requests`,
+                      'POST',
+                      requestBody
+                    )
                     const body = await response.json()
-                    expect(body.message).toBe('Request already exists')
+                    expect(body.data).toEqual(expect.objectContaining({
+                      id: expect.any(String),
+                      communityId,
+                      type: CommunityRequestType.RequestToJoin,
+                      status: CommunityRequestStatus.Accepted
+                    }))
+                    expect(body.data.memberAddress.toLowerCase()).toBe(identity.realAccount.address.toLowerCase())
+                  })
+
+                  it('should automatically join the user to the community', async () => {
+                    await makeRequest(
+                      identity,
+                      `/v1/communities/${communityId}/requests`,
+                      'POST',
+                      requestBody
+                    )
+                    
+                    const memberRole = await components.communitiesDb.getCommunityMemberRole(communityId, identity.realAccount.address)
+                    expect(memberRole).toBe(CommunityRole.Member)
                   })
                 })
               })
@@ -406,12 +582,16 @@ test('Create Community Request Controller', function ({ components, spyComponent
                 beforeEach(async () => {
                   await components.communitiesDb.addCommunityMember({
                     communityId,
-                    memberAddress: targetAddress,
+                    memberAddress: identity.realAccount.address,
                     role: CommunityRole.Member
                   })
                 })
 
-                it('should return 400 status code', async () => {
+                afterEach(async () => {
+                  await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [identity.realAccount.address])
+                })
+
+                it('should return 400 status code with correct message', async () => {
                   const response = await makeRequest(
                     identity,
                     `/v1/communities/${communityId}/requests`,
@@ -432,7 +612,7 @@ test('Create Community Request Controller', function ({ components, spyComponent
                 })
               })
 
-              it('should return 400 status code', async () => {
+              it('should return 400 status code with correct message', async () => {
                 const response = await makeRequest(
                   identity,
                   `/v1/communities/${communityId}/requests`,
@@ -447,7 +627,9 @@ test('Create Community Request Controller', function ({ components, spyComponent
           })
 
           describe('when community does not exist', () => {
-            beforeEach(async () => {
+            let communityId: string
+
+            beforeEach(() => {
               communityId = randomUUID()
             })
 
@@ -466,5 +648,3 @@ test('Create Community Request Controller', function ({ components, spyComponent
     })
   })
 })
-
-
