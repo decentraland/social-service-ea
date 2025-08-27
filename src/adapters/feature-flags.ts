@@ -3,12 +3,7 @@ import { AppComponents } from '../types'
 import { ApplicationName } from '@well-known-components/features-component'
 
 export enum FeatureFlag {
-  /**
-   * Feature flag to enable/disable AI compliance for communities.
-   *
-   * @example
-   * Variant value: "true" or "false"
-   */
+  // Feature flag to enable/disable AI compliance for communities.
   COMMUNITIES_AI_COMPLIANCE = 'communities_ai_compliance'
 }
 
