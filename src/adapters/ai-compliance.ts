@@ -23,9 +23,9 @@ export interface IAIComplianceComponent {
 }
 
 export async function createAIComplianceComponent(
-  components: Pick<AppComponents, 'config' | 'logs' | 'featureFlags'>
+  components: Pick<AppComponents, 'config' | 'logs' | 'featureFlags' | 'metrics'>
 ): Promise<IAIComplianceComponent> {
-  const { config, logs, featureFlags } = components
+  const { config, logs, featureFlags, metrics } = components
   const logger = logs.getLogger('ai-compliance')
 
   const env = await config.getString('ENV')
@@ -171,7 +171,8 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
           throw new AIComplianceError('Invalid response structure from OpenAI API')
         }
 
-        const duration = Date.now() - startTime
+        const durationInSeconds = (Date.now() - startTime) / 1000
+        metrics.observe('ai_compliance_validation_duration_seconds', {}, durationInSeconds)
 
         logger.info('Compliance validation completed', {
           requestId,
@@ -180,7 +181,7 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
           issuesCount: result.issues.length,
           warningsCount: result.warnings.length,
           confidence: result.confidence,
-          durationMs: duration
+          durationInSeconds
         })
 
         return result

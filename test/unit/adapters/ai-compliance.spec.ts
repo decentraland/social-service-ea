@@ -3,6 +3,9 @@ import { mockConfig, mockLogs, createFeatureFlagsMockComponent } from '../../moc
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { AIComplianceError } from '../../../src/logic/community/errors'
 import { FeatureFlag, IFeatureFlagsAdapter } from '../../../src/adapters/feature-flags'
+import { IMetricsComponent } from '@well-known-components/interfaces'
+import { createTestMetricsComponent } from '@well-known-components/metrics'
+import { metricDeclarations } from '../../../src/metrics'
 
 const mockOpenAICreate = jest.fn()
 
@@ -25,6 +28,7 @@ describe('AIComplianceComponent', () => {
   let aiCompliance: IAIComplianceComponent
   let mockResponse: any
   let featureFlagsMock: jest.Mocked<IFeatureFlagsAdapter>
+  let mockMetrics: IMetricsComponent<keyof typeof metricDeclarations>
   
   beforeEach(() => {
     mockConfig.requireString.mockImplementation((key: string) => {
@@ -39,6 +43,7 @@ describe('AIComplianceComponent', () => {
     })
     
     featureFlagsMock = createFeatureFlagsMockComponent({})
+    mockMetrics = createTestMetricsComponent(metricDeclarations)
   })
   
   describe("when the environment is not production", () => {
@@ -56,7 +61,8 @@ describe('AIComplianceComponent', () => {
         aiCompliance = await createAIComplianceComponent({
           config: mockConfig,
           logs: mockLogs,
-          featureFlags: featureFlagsMock
+          featureFlags: featureFlagsMock,
+          metrics: mockMetrics
         })
       })
       
@@ -95,7 +101,8 @@ describe('AIComplianceComponent', () => {
         aiCompliance = await createAIComplianceComponent({
           config: mockConfig,
           logs: mockLogs,
-          featureFlags: featureFlagsMock
+          featureFlags: featureFlagsMock,
+          metrics: mockMetrics
         })
       })
       
@@ -130,7 +137,8 @@ describe('AIComplianceComponent', () => {
           aiCompliance = await createAIComplianceComponent({
             config: mockConfig,
             logs: mockLogs,
-            featureFlags: featureFlagsMock
+            featureFlags: featureFlagsMock,
+            metrics: mockMetrics
           })
           
           expect(aiCompliance).toBeDefined()
@@ -153,7 +161,8 @@ describe('AIComplianceComponent', () => {
           aiCompliance = await createAIComplianceComponent({
             config: mockConfig,
             logs: mockLogs,
-            featureFlags: featureFlagsMock
+            featureFlags: featureFlagsMock,
+            metrics: mockMetrics
           })
           
           expect(aiCompliance).toBeDefined()
@@ -173,7 +182,8 @@ describe('AIComplianceComponent', () => {
             createAIComplianceComponent({
               config: mockConfig,
               logs: mockLogs,
-              featureFlags: featureFlagsMock
+              featureFlags: featureFlagsMock,
+              metrics: mockMetrics
             })
           ).rejects.toThrow('OPEN_AI_API_KEY not found')
         })
@@ -192,7 +202,8 @@ describe('AIComplianceComponent', () => {
         aiCompliance = await createAIComplianceComponent({
           config: mockConfig,
           logs: mockLogs,
-          featureFlags: featureFlagsMock
+          featureFlags: featureFlagsMock,
+          metrics: mockMetrics
         })
       })
       
@@ -217,6 +228,8 @@ describe('AIComplianceComponent', () => {
             }
           }
           mockOpenAICreate.mockResolvedValue(mockResponse)
+
+          jest.spyOn(mockMetrics, 'observe')
         })
         
         it('should validate content successfully', async () => {
@@ -263,8 +276,12 @@ describe('AIComplianceComponent', () => {
         
         it('should log usage information', async () => {
           await aiCompliance.validateCommunityContent({ name, description })
-          
           expect(mockLogs.getLogger).toHaveBeenCalledWith('ai-compliance')
+        })
+
+        it('should observe the duration of the validation', async () => {
+          await aiCompliance.validateCommunityContent({ name, description })
+          expect(mockMetrics.observe).toHaveBeenCalledWith('ai_compliance_validation_duration_seconds', {}, expect.any(Number))
         })
       })
       

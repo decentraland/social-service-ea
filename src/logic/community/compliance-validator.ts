@@ -25,7 +25,6 @@ export function createCommunityComplianceValidatorComponent(
       }
 
       const { name, description, thumbnailBuffer } = request
-      const startTime = Date.now()
 
       try {
         logger.info('Starting community content compliance validation', {
@@ -40,15 +39,12 @@ export function createCommunityComplianceValidatorComponent(
           thumbnailBuffer
         })
 
-        const duration = Date.now() - startTime
-
         if (!validationResult.isCompliant) {
           logger.warn('Community content is not compliant', {
             name,
             issues: validationResult.issues.join(', '),
             warnings: validationResult.warnings.join(', '),
-            confidence: validationResult.confidence,
-            duration
+            confidence: validationResult.confidence
           })
 
           throw new CommunityNotCompliantError(
@@ -63,14 +59,12 @@ export function createCommunityComplianceValidatorComponent(
           logger.info('Community content is compliant with warnings', {
             name,
             warnings: validationResult.warnings.join(', '),
-            confidence: validationResult.confidence,
-            duration
+            confidence: validationResult.confidence
           })
         } else {
           logger.info('Community content is compliant', {
             name,
-            confidence: validationResult.confidence,
-            duration
+            confidence: validationResult.confidence
           })
         }
       } catch (error) {
@@ -78,7 +72,6 @@ export function createCommunityComplianceValidatorComponent(
           name,
           error: errorMessageOrDefault(error, 'Unknown error')
         })
-
 
         throw error
       }
