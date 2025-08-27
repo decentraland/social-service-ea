@@ -213,7 +213,7 @@ export async function initComponents(): Promise<AppComponents> {
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
 
   // AI Compliance components
-  const aiCompliance = await createAIComplianceComponent({ config, logs })
+  const aiCompliance = await createAIComplianceComponent({ config, logs, featureFlags })
   const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
 
   const communities = createCommunityComponent({

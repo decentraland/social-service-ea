@@ -1,7 +1,8 @@
-import { ComplianceValidationResult, createAIComplianceComponent } from '../../../src/adapters/ai-compliance'
-import { mockConfig, mockLogs } from '../../mocks/components'
+import { createAIComplianceComponent } from '../../../src/adapters/ai-compliance'
+import { mockConfig, mockLogs, createFeatureFlagsMockComponent } from '../../mocks/components'
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { AIComplianceError } from '../../../src/logic/community/errors'
+import { FeatureFlag, IFeatureFlagsAdapter } from '../../../src/adapters/feature-flags'
 
 const mockOpenAICreate = jest.fn()
 
@@ -23,53 +24,95 @@ describe('AIComplianceComponent', () => {
   
   let aiCompliance: IAIComplianceComponent
   let mockResponse: any
+  let featureFlagsMock: jest.Mocked<IFeatureFlagsAdapter>
   
   beforeEach(() => {
     mockConfig.requireString.mockImplementation((key: string) => {
       if (key === 'OPEN_AI_API_KEY') return Promise.resolve('test-api-key')
-      return Promise.reject(new Error(`Unknown key: ${key}`))
+        return Promise.reject(new Error(`Unknown key: ${key}`))
     })
     
     mockConfig.getString.mockImplementation((key: string) => {
       if (key === 'ENV') return Promise.resolve('dev')
-      if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-      return Promise.resolve(undefined)
+        if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+          return Promise.resolve(undefined)
     })
+    
+    featureFlagsMock = createFeatureFlagsMockComponent({})
   })
   
   describe("when the environment is not production", () => {
     beforeEach(() => {
       mockConfig.getString.mockImplementation((key: string) => {
         if (key === 'ENV') return Promise.resolve('dev')
-        if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-        return Promise.resolve(undefined)
+          if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+            return Promise.resolve(undefined)
       })
     })
     
-    it("should return a mock response every time", async () => {
-      const aiCompliance = await createAIComplianceComponent({
-        config: mockConfig,
-        logs: mockLogs
+    describe('and the feature flag to enable AI compliance in dev is disabled', () => {
+      beforeEach(async () => {
+        featureFlagsMock.isEnabled.mockReturnValueOnce(false)
+        aiCompliance = await createAIComplianceComponent({
+          config: mockConfig,
+          logs: mockLogs,
+          featureFlags: featureFlagsMock
+        })
       })
       
-      const result = await aiCompliance.validateCommunityContent({ name, description })
-      
-      expect(result).toEqual({
-        isCompliant: true,
-        issues: [],
-        warnings: [],
-        confidence: 1,
-        reasoning: 'Non-production environment'
+      it("should return a mock response", async () => {
+        const result = await aiCompliance.validateCommunityContent({ name, description })
+        
+        expect(result).toEqual({
+          isCompliant: true,
+          issues: [],
+          warnings: [],
+          confidence: 1,
+          reasoning: 'AI Compliance disabled for non-production environment'
+        })
       })
     })
+    
+    describe('and the feature flag to enable AI compliance in dev is enabled', () => {
+      beforeEach(async () => {
+        featureFlagsMock.isEnabled.mockReturnValueOnce(true)
+        mockOpenAICreate.mockResolvedValue({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                isCompliant: true,
+                issues: [],
+                warnings: [],
+                confidence: 1,
+                reasoning: 'AI Compliance enabled for non-production environment'
+              })
+            }
+          }],
+          usage: {}
+        })
+        
+        
+        aiCompliance = await createAIComplianceComponent({
+          config: mockConfig,
+          logs: mockLogs,
+          featureFlags: featureFlagsMock
+        })
+      })
+      
+      it("should validate the community using the AI compliance service", async () => {
+        await aiCompliance.validateCommunityContent({ name, description })
+        expect(mockOpenAICreate).toHaveBeenCalled()
+      })
+    })
+    
   })
   
   describe("when the environment is production", () => {
     beforeEach(() => {
       mockConfig.getString.mockImplementation((key: string) => {
         if (key === 'ENV') return Promise.resolve('prd')
-        if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-        return Promise.resolve(undefined)
+          if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+            return Promise.resolve(undefined)
       })
     })
     
@@ -78,15 +121,16 @@ describe('AIComplianceComponent', () => {
         beforeEach(() => {
           mockConfig.getString.mockImplementation((key: string) => {
             if (key === 'ENV') return Promise.resolve('prd')
-            if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-            return Promise.resolve(undefined)
+              if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+                return Promise.resolve(undefined)
           })
         })
         
         it('should create component with default model', async () => {
           aiCompliance = await createAIComplianceComponent({
             config: mockConfig,
-            logs: mockLogs
+            logs: mockLogs,
+            featureFlags: featureFlagsMock
           })
           
           expect(aiCompliance).toBeDefined()
@@ -100,15 +144,16 @@ describe('AIComplianceComponent', () => {
         beforeEach(() => {
           mockConfig.getString.mockImplementation((key: string) => {
             if (key === 'ENV') return Promise.resolve('prd')
-            if (key === 'OPENAI_MODEL') return Promise.resolve('gpt-5')
-            return Promise.resolve(undefined)
+              if (key === 'OPENAI_MODEL') return Promise.resolve('gpt-5')
+                return Promise.resolve(undefined)
           })
         })
         
         it('should create component with custom model', async () => {
           aiCompliance = await createAIComplianceComponent({
             config: mockConfig,
-            logs: mockLogs
+            logs: mockLogs,
+            featureFlags: featureFlagsMock
           })
           
           expect(aiCompliance).toBeDefined()
@@ -119,7 +164,7 @@ describe('AIComplianceComponent', () => {
         beforeEach(() => {
           mockConfig.requireString.mockImplementation((key: string) => {
             if (key === 'OPEN_AI_API_KEY') return Promise.reject(new Error('OPEN_AI_API_KEY not found'))
-            return Promise.resolve(undefined)
+              return Promise.resolve(undefined)
           })
         })
         
@@ -127,7 +172,8 @@ describe('AIComplianceComponent', () => {
           await expect(
             createAIComplianceComponent({
               config: mockConfig,
-              logs: mockLogs
+              logs: mockLogs,
+              featureFlags: featureFlagsMock
             })
           ).rejects.toThrow('OPEN_AI_API_KEY not found')
         })
@@ -139,13 +185,14 @@ describe('AIComplianceComponent', () => {
         // Ensure we're in production mode for these tests
         mockConfig.getString.mockImplementation((key: string) => {
           if (key === 'ENV') return Promise.resolve('prd')
-          if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
-          return Promise.resolve(undefined)
+            if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+              return Promise.resolve(undefined)
         })
         
         aiCompliance = await createAIComplianceComponent({
           config: mockConfig,
-          logs: mockLogs
+          logs: mockLogs,
+          featureFlags: featureFlagsMock
         })
       })
       
@@ -182,7 +229,7 @@ describe('AIComplianceComponent', () => {
           expect(result.reasoning).toBe('Content is compliant with ethical standards')
         })
         
-        it('should call OpenAI with correct parameters', async () => {
+        it('should call OpenAI to validate the community content', async () => {
           await aiCompliance.validateCommunityContent({ name, description })
           
           expect(mockOpenAICreate).toHaveBeenCalledWith(

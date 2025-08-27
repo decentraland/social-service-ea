@@ -4,7 +4,9 @@ import { ApplicationName } from '@well-known-components/features-component'
 
 export enum FeatureFlag {
   // Feature flag to enable/disable AI compliance for communities.
-  COMMUNITIES_AI_COMPLIANCE = 'communities_ai_compliance'
+  COMMUNITIES_AI_COMPLIANCE = 'communities_ai_compliance',
+  // Feature flag to enable/disable AI compliance for communities in dev environment.
+  DEV_COMMUNITIES_AI_COMPLIANCE = 'dev_communities_ai_compliance'
 }
 
 export type IFeatureFlagsAdapter = IBaseComponent & {
@@ -25,11 +27,18 @@ export async function createFeatureFlagsAdapter(
 
   async function refresh() {
     try {
-      const isEnabled = await features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE)
-      logger.debug(`Refreshed ${FeatureFlag.COMMUNITIES_AI_COMPLIANCE} feature flag`, {
-        isEnabled: String(isEnabled)
+      const [isEnabled, isDevEnabled] = await Promise.all([
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE),
+        features.getIsFeatureEnabled(ApplicationName.TEST, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE)
+      ])
+
+      logger.debug(`Refreshed feature flags`, {
+        [FeatureFlag.COMMUNITIES_AI_COMPLIANCE]: String(isEnabled),
+        [FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE]: String(isDevEnabled)
       })
+
       featuresFlagMap.set(FeatureFlag.COMMUNITIES_AI_COMPLIANCE, isEnabled)
+      featuresFlagMap.set(FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE, isDevEnabled)
     } catch (error) {
       logger.error('Failed to refresh feature flags', {
         error: error instanceof Error ? error.message : String(error)

@@ -1,6 +1,7 @@
 import { AppComponents } from '../types'
 import { AIComplianceError } from '../logic/community/errors'
 import { errorMessageOrDefault } from '../utils/errors'
+import { FeatureFlag } from './feature-flags'
 
 export interface ComplianceValidationResult {
   isCompliant: boolean
@@ -22,14 +23,14 @@ export interface IAIComplianceComponent {
 }
 
 export async function createAIComplianceComponent(
-  components: Pick<AppComponents, 'config' | 'logs'>
+  components: Pick<AppComponents, 'config' | 'logs' | 'featureFlags'>
 ): Promise<IAIComplianceComponent> {
-  const { config, logs } = components
+  const { config, logs, featureFlags } = components
   const logger = logs.getLogger('ai-compliance')
 
   const env = await config.getString('ENV')
 
-  if (env !== 'prd') {
+  if (env !== 'prd' && !featureFlags.isEnabled(FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE)) {
     return {
       validateCommunityContent: async (_request: ComplianceValidationRequest): Promise<ComplianceValidationResult> => {
         return {
@@ -37,7 +38,7 @@ export async function createAIComplianceComponent(
           issues: [],
           warnings: [],
           confidence: 1,
-          reasoning: 'Non-production environment'
+          reasoning: 'AI Compliance disabled for non-production environment'
         }
       }
     }
