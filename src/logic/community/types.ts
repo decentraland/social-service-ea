@@ -19,6 +19,9 @@ export interface ICommunitiesComponent {
     memberAddress: string,
     options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
   ): Promise<GetCommunitiesWithTotal<MemberCommunity>>
+  getAllCommunitiesForModeration(
+    options: GetCommunitiesOptions
+  ): Promise<GetCommunitiesWithTotal<CommunityForModeration>>
   createCommunity(
     community: Omit<Community, 'id' | 'active' | 'thumbnails'>,
     thumbnail?: Buffer,
@@ -414,4 +417,8 @@ export interface ActiveCommunityVoiceChat {
   communityImage?: string
   positions: string[]
   worlds: string[]
+}
+
+export type CommunityForModeration = Community & {
+  membersCount: number
 }

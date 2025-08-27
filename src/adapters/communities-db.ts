@@ -14,7 +14,8 @@ import {
   CommunityRequestType,
   MemberRequest,
   CommunityRequestStatus,
-  GetCommunityRequestsOptions
+  GetCommunityRequestsOptions,
+  CommunityForModeration
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -813,6 +814,69 @@ export function createCommunitiesDBComponent(
         `
         await client.query(removeRequestQuery.text, removeRequestQuery.values)
       })
+    },
+
+    async getAllCommunitiesForModeration(options: GetCommunitiesOptions): Promise<CommunityForModeration[]> {
+      const { search, pagination, sortBy = 'membersCount' } = options ?? {}
+      const { limit, offset } = pagination ?? {}
+
+      let query = SQL`
+        SELECT 
+          c.id,
+          c.name,
+          c.description,
+          c.owner_address as "ownerAddress",
+          CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
+          c.active,
+          (COALESCE(COUNT(cm.member_address), 0) + 1)::int as "membersCount",
+          c.created_at as "createdAt"
+        FROM communities c
+        LEFT JOIN community_members cm ON c.id = cm.community_id
+        WHERE c.active = true`
+
+      if (search) {
+        query = query.append(SQL` AND (c.name ILIKE ${`%${search}%`} OR c.description ILIKE ${`%${search}%`})`)
+      }
+
+      query = query.append(
+        SQL` GROUP BY c.id, c.name, c.description, c.owner_address, c.private, c.active, c.created_at`
+      )
+
+      // Add sorting
+      switch (sortBy) {
+        case 'membersCount':
+          query = query.append(SQL` ORDER BY "membersCount" DESC, c.name ASC`)
+          break
+        default:
+          query = query.append(SQL` ORDER BY c.name ASC`)
+      }
+
+      // Add pagination
+      if (limit) {
+        query = query.append(SQL` LIMIT ${limit}`)
+      }
+      if (offset) {
+        query = query.append(SQL` OFFSET ${offset}`)
+      }
+
+      const result = await pg.query<CommunityForModeration>(query)
+      return result.rows
+    },
+
+    async getAllCommunitiesForModerationCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number> {
+      const { search } = options ?? {}
+
+      const query = SQL`
+        SELECT COUNT(1) as count
+        FROM communities c
+        WHERE c.active = true
+      `
+
+      if (search) {
+        query.append(searchCommunitiesQuery(search))
+      }
+
+      return pg.getCount(query)
     }
   }
 }
