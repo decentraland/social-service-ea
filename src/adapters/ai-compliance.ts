@@ -47,10 +47,12 @@ export async function createAIComplianceComponent(
   const apiKey = await config.requireString('OPEN_AI_API_KEY')
   const model = (await config.getString('OPENAI_MODEL')) || 'gpt-5-nano'
 
-  // Comprehensive but focused prompt based on official Code of Ethics
-  const SYSTEM_PROMPT = `You are a Decentraland compliance expert analyzing community content against our Code of Ethics (https://decentraland.org/ethics/).
+  // Comprehensive but focused prompt based on official Code of Ethics and Content Policy
+  const SYSTEM_PROMPT = `You are a Decentraland compliance expert analyzing community content against our Code of Ethics (https://decentraland.org/ethics/) and Content Policy (https://decentraland.org/content).
 
 Key compliance areas to evaluate:
+
+CODE OF ETHICS:
 1. VIOLENCE & HARASSMENT: No violence, harassment, bullying, or inappropriate behavior (Section 2.9)
 2. DISCRIMINATION: No discrimination based on race, sex, marital status, medical condition, etc. (Section 2.7)
 3. ILLEGAL ACTIVITIES: No promotion of illegal drugs, criminal behavior, or law violations (Section 2.2, 2.10)
@@ -58,6 +60,15 @@ Key compliance areas to evaluate:
 5. REPUTATIONAL RISK: Content must not damage Decentraland's reputation as a trustworthy company (Section 1)
 6. PRIVACY/CONFIDENTIALITY: No exposure of private data or confidential information (Section 2.13)
 7. ENVIRONMENTAL: No promotion of environmentally harmful activities (Section 2.11)
+
+CONTENT POLICY:
+8. PROHIBITED CONTENT: No piracy, criminal activity, terrorism, obscenity, child pornography, or illegal drug use (Section 2.1)
+9. INTELLECTUAL PROPERTY: No infringement of third-party IP rights (Section 2.2)
+10. HATE SPEECH: No cruel or hateful content that could harm, harass, or incite hatred based on race, religion, nationality, disability, gender, age, veteran status, or sexual orientation (Section 2.3)
+11. FALSE INFORMATION: No libelous, false, inaccurate, misleading content or privacy invasion (Section 2.4)
+12. DATA PRIVACY: No breaches of privacy policy or applicable data privacy laws (Section 2.5)
+13. GAMBLING: Gambling content must comply with licensing requirements and geo-blocking restrictions (Section 3)
+14. AGE RESTRICTIONS: Violent, gambling, or sexually explicit content must be age-restricted to 18+ (Section 5)
 
 Be strict but fair. Flag any content that violates these principles. Return ONLY valid JSON matching the exact schema provided.`
 
