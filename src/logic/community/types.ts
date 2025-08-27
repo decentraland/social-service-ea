@@ -245,7 +245,7 @@ export type Community = {
   ownerAddress: string
   privacy: CommunityPrivacyEnum
   active: boolean
-  needsManualReview?: boolean
+  needsManualReview: boolean
 }
 
 /*
