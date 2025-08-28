@@ -129,14 +129,14 @@ export async function createAIComplianceComponent(
 
         // Add image if provided
         if (request.thumbnailBuffer) {
-          const dataUrl = `data:${request.thumbnailMime || 'image/png'};base64,${request.thumbnailBuffer.toString('base64')}`
+          const imageDataUrl = `data:${request.thumbnailMime || 'image/png'};base64,${request.thumbnailBuffer.toString('base64')}`
           input = [
             {
               type: 'message',
               role: 'user',
               content: [
                 { type: 'input_text', text: textInput },
-                { type: 'input_image', image_url: dataUrl, detail: 'auto' }
+                { type: 'input_image', image_url: imageDataUrl, detail: 'auto' }
               ]
             }
           ]
