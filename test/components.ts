@@ -33,7 +33,7 @@ import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
-import { mockPeersSynchronizer, mockCdnCacheInvalidator, mockSns } from './mocks/components'
+import { mockPeersSynchronizer, mockCdnCacheInvalidator, mockSns, createAIComplianceMock } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
@@ -46,7 +46,8 @@ import {
   createCommunityOwnersComponent,
   createCommunityEventsComponent,
   createCommunityThumbnailComponent,
-  createCommunityBroadcasterComponent
+  createCommunityBroadcasterComponent,
+  createCommunityComplianceValidatorComponent
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
@@ -68,6 +69,11 @@ import { createWsPoolComponent } from '../src/logic/ws-pool'
 import { createEmailComponent } from '../src/adapters/email'
 import { createFriendsComponent } from '../src/logic/friends'
 import { createSlackComponent } from '@dcl/slack-component'
+import { createAIComplianceComponent } from '../src/adapters/ai-compliance'
+import { createFeatureFlagsMockComponent } from './mocks/components/feature-flags'
+import { createFeaturesMockComponent } from './mocks/components/features'
+import { createFeaturesComponent } from '@well-known-components/features-component'
+import { createFeatureFlagsAdapter } from '../src/adapters/feature-flags'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -186,6 +192,13 @@ async function initComponents(): Promise<TestComponents> {
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
+  const aiCompliance = createAIComplianceMock({})
+  const features = await createFeaturesComponent(
+    { config, logs, fetch: fetcher },
+    'https://social-service-ea.decentraland.test'
+  )
+  const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
+  const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
   const communities = createCommunityComponent({
     communitiesDb,
     catalystClient,
@@ -197,7 +210,9 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     logs,
-    commsGatekeeper
+    commsGatekeeper,
+    communityComplianceValidator,
+    featureFlags
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -273,25 +288,34 @@ async function initComponents(): Promise<TestComponents> {
   const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
 
   return {
+    aiCompliance,
     analytics,
     archipelagoStats,
     catalystClient,
+    cdnCacheInvalidator: mockCdnCacheInvalidator,
     commsGatekeeper,
     communities,
     communitiesDb,
     communitiesDbHelper,
     communityBans,
-    communityMembers,
-    communityPlaces,
-    communityOwners,
-    communityRoles,
-    communityEvents,
     communityBroadcaster,
-    communityThumbnail,
+    communityComplianceValidator,
+    communityEvents,
+    communityMembers,
+    communityOwners,
+    communityPlaces,
     communityRequests,
+    communityRoles,
+    communityThumbnail,
+    communityVoice,
+    communityVoiceChatCache,
+    communityVoiceChatPolling,
     config,
     email,
+    features,
+    featureFlags,
     fetcher,
+    friends,
     friendsDb,
     httpServer,
     localHttpFetch,
@@ -301,9 +325,9 @@ async function initComponents(): Promise<TestComponents> {
     messageProcessor,
     metrics,
     nats,
+    peerTracking,
     peersStats,
     peersSynchronizer: mockPeersSynchronizer,
-    peerTracking,
     pg,
     placesApi,
     pubsub,
@@ -315,6 +339,7 @@ async function initComponents(): Promise<TestComponents> {
     rpcClient,
     rpcServer,
     settings,
+    slack,
     sns,
     statusChecks,
     storage,
@@ -325,13 +350,7 @@ async function initComponents(): Promise<TestComponents> {
     uwsServer,
     voice,
     voiceDb,
-    communityVoice,
     worldsStats,
-    wsPool,
-    cdnCacheInvalidator: mockCdnCacheInvalidator,
-    friends,
-    communityVoiceChatCache,
-    communityVoiceChatPolling,
-    slack
+    wsPool
   }
 }

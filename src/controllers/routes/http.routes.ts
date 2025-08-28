@@ -28,7 +28,8 @@ import {
   getManagedCommunitiesHandler,
   createCommunityRequestHandler,
   updateCommunityRequestStatusHandler,
-  getCommunityInvitesHandler
+  getCommunityInvitesHandler,
+  getAllCommunitiesForModerationHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
@@ -95,6 +96,9 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)
+
+  // Moderation endpoints
+  router.get('/v1/moderation/communities', signedFetchMiddleware(), getAllCommunitiesForModerationHandler)
 
   return router
 }

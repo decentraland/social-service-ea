@@ -1,12 +1,14 @@
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import {
-  CommunityMemberNotFoundError,
   CommunityNotFoundError,
+  CommunityMemberNotFoundError,
   CommunityOwnerNotFoundError,
   CommunityPlaceNotFoundError,
+  InvalidCommunityRequestError,
+  CommunityNotCompliantError,
   CommunityRequestNotFoundError,
-  InvalidCommunityRequestError
-} from '../../logic/community/errors'
+  AIComplianceError
+} from '../../logic/community'
 import { ComponentsWithLogger } from '@dcl/platform-server-commons/dist/types'
 
 export async function communitiesErrorsHandler(
@@ -38,6 +40,31 @@ export async function communitiesErrorsHandler(
         body: {
           error: 'Bad Request',
           message: error.message
+        }
+      }
+    }
+
+    if (error instanceof CommunityNotCompliantError) {
+      return {
+        status: 400,
+        body: {
+          error: 'Community not compliant',
+          message: error.message,
+          data: {
+            issues: error.issues,
+            warnings: error.warnings
+          }
+        }
+      }
+    }
+
+    if (error instanceof AIComplianceError) {
+      return {
+        status: 400,
+        body: {
+          error: 'Community content validation unavailable',
+          message: error.message,
+          communityContentValidationUnavailable: true
         }
       }
     }

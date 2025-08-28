@@ -46,6 +46,47 @@ export class InvalidCommunityRequestError extends Error {
   }
 }
 
+/**
+ * This error is thrown when community content violates Decentraland's Code of Ethics
+ *
+ * @export
+ * @class CommunityNotCompliantError
+ * @extends {Error}
+ */
+export class CommunityNotCompliantError extends Error {
+  constructor(
+    message: string,
+    public readonly issues: string[],
+    public readonly warnings: string[],
+    public readonly confidence: number = 0
+  ) {
+    super(message)
+    this.name = 'CommunityNotCompliantError'
+  }
+}
+
+/**
+ * This error is thrown when the AI compliance validation process fails
+ * (e.g., API errors, parsing errors) rather than when content is found to be non-compliant
+ *
+ * @export
+ * @class AIComplianceError
+ * @extends {Error}
+ */
+export class AIComplianceError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AIComplianceError'
+  }
+}
+
+/**
+ * This error is thrown when a community request (invite or request to join) is not found
+ *
+ * @export
+ * @class CommunityRequestNotFoundError
+ * @extends {Error}
+ */
 export class CommunityRequestNotFoundError extends Error {
   constructor(public readonly id: string) {
     super(`Community request not found: ${id}`)

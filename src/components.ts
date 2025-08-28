@@ -62,6 +62,10 @@ import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/
 import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
 import { createSlackComponent } from '@dcl/slack-component'
 import { createCommunityRequestsComponent } from './logic/community/requests'
+import { createAIComplianceComponent } from './adapters/ai-compliance'
+import { createCommunityComplianceValidatorComponent } from './logic/community/compliance-validator'
+import { createFeaturesComponent } from '@well-known-components/features-component'
+import { createFeatureFlagsAdapter } from './adapters/feature-flags'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -127,6 +131,10 @@ export async function initComponents(): Promise<AppComponents> {
   const referralDb = await createReferralDBComponent({ pg, logs, config })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
+
+  const serviceBaseUrl = (await config.getString('SERVICE_BASE_URL')) || 'https://social-service-ea.decentraland.zone'
+  const features = await createFeaturesComponent({ config, logs, fetch: fetcher }, serviceBaseUrl)
+  const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
 
   const email = await createEmailComponent({ fetcher, config })
   const rewards = await createRewardComponent({ fetcher, config })
@@ -203,6 +211,11 @@ export async function initComponents(): Promise<AppComponents> {
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
+
+  // AI Compliance components
+  const aiCompliance = await createAIComplianceComponent({ config, logs, featureFlags, metrics })
+  const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
+
   const communities = createCommunityComponent({
     communitiesDb,
     catalystClient,
@@ -214,7 +227,9 @@ export async function initComponents(): Promise<AppComponents> {
     communityThumbnail,
     communityBroadcaster,
     commsGatekeeper,
-    logs
+    communityComplianceValidator,
+    logs,
+    featureFlags
   })
   const communityRequests = createCommunityRequestsComponent({
     communitiesDb,
@@ -278,6 +293,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   return {
+    aiCompliance,
     analytics,
     archipelagoStats,
     catalystClient,
@@ -287,6 +303,7 @@ export async function initComponents(): Promise<AppComponents> {
     communitiesDb,
     communityBans,
     communityBroadcaster,
+    communityComplianceValidator,
     communityEvents,
     communityMembers,
     communityOwners,
@@ -301,6 +318,8 @@ export async function initComponents(): Promise<AppComponents> {
     config,
     email,
     expirePrivateVoiceChatJob,
+    features,
+    featureFlags,
     fetcher,
     friends,
     friendsDb,

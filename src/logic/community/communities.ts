@@ -1,6 +1,7 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
+import { FeatureFlag } from '../../adapters/feature-flags'
 import {
   CommunityWithUserInformationAndVoiceChat,
   GetCommunitiesOptions,
@@ -12,7 +13,8 @@ import {
   Community,
   CommunityUpdates,
   AggregatedCommunity,
-  CommunityPrivacyEnum
+  CommunityPrivacyEnum,
+  CommunityForModeration
 } from './types'
 import {
   isOwner,
@@ -39,6 +41,8 @@ export function createCommunityComponent(
     | 'cdnCacheInvalidator'
     | 'commsGatekeeper'
     | 'logs'
+    | 'communityComplianceValidator'
+    | 'featureFlags'
   >
 ): ICommunitiesComponent {
   const {
@@ -52,7 +56,9 @@ export function createCommunityComponent(
     communityThumbnail,
     cdnCacheInvalidator,
     commsGatekeeper,
-    logs
+    logs,
+    communityComplianceValidator,
+    featureFlags
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -248,6 +254,12 @@ export function createCommunityComponent(
         await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
       }
 
+      await communityComplianceValidator.validateCommunityContent({
+        name: community.name,
+        description: community.description,
+        thumbnailBuffer: thumbnail
+      })
+
       const newCommunity = await communitiesDb.createCommunity({
         ...community,
         owner_address: community.ownerAddress,
@@ -295,7 +307,10 @@ export function createCommunityComponent(
         throw new CommunityNotFoundError(id)
       }
 
-      if (!isOwner(community, userAddress)) {
+      const globalModerators =
+        (await featureFlags.getVariants<string[]>(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)) || []
+
+      if (!isOwner(community, userAddress) && !globalModerators.includes(userAddress.toLowerCase())) {
         throw new NotAuthorizedError("The user doesn't have permission to delete this community")
       }
 
@@ -351,6 +366,17 @@ export function createCommunityComponent(
 
       if (isUpdatingPrivacy) {
         await communityRoles.validatePermissionToUpdateCommunityPrivacy(communityId, userAddress)
+      }
+
+      if (updates.name || updates.description || thumbnailBuffer) {
+        const nameToValidate = updates.name || existingCommunity.name
+        const descriptionToValidate = updates.description || existingCommunity.description
+
+        await communityComplianceValidator.validateCommunityContent({
+          name: nameToValidate,
+          description: descriptionToValidate,
+          thumbnailBuffer
+        })
       }
 
       logger.info('Updating community', {
@@ -442,6 +468,33 @@ export function createCommunityComponent(
         active: community.active,
         thumbnails: community.thumbnails
       }))
+    },
+
+    getAllCommunitiesForModeration: async (
+      options: GetCommunitiesOptions
+    ): Promise<GetCommunitiesWithTotal<CommunityForModeration>> => {
+      const [communities, total] = await Promise.all([
+        communitiesDb.getAllCommunitiesForModeration(options),
+        communitiesDb.getAllCommunitiesForModerationCount({ search: options.search })
+      ])
+
+      const communitiesWithThumbnails = await Promise.all(
+        communities.map(async (community) => {
+          const thumbnail = await communityThumbnail.getThumbnail(community.id)
+
+          const result = { ...community }
+
+          if (thumbnail) {
+            result.thumbnails = {
+              raw: thumbnail
+            }
+          }
+
+          return result
+        })
+      )
+
+      return { communities: communitiesWithThumbnails, total }
     }
   }
 }

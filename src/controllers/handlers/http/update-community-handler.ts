@@ -2,7 +2,7 @@ import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { FormHandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { CommunityNotFoundError } from '../../../logic/community'
+import { CommunityNotFoundError, CommunityNotCompliantError, AIComplianceError } from '../../../logic/community'
 import { validateCommunityFields } from '../../../utils/community-validation'
 
 export async function updateCommunityHandler(
@@ -61,7 +61,9 @@ export async function updateCommunityHandler(
     if (
       error instanceof CommunityNotFoundError ||
       error instanceof NotAuthorizedError ||
-      error instanceof InvalidRequestError
+      error instanceof InvalidRequestError ||
+      error instanceof CommunityNotCompliantError ||
+      error instanceof AIComplianceError
     ) {
       throw error
     }
