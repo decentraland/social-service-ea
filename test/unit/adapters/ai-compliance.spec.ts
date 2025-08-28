@@ -36,7 +36,7 @@ describe('AIComplianceComponent', () => {
 
     mockConfig.getString.mockImplementation((key: string) => {
       if (key === 'ENV') return Promise.resolve('dev')
-      if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+      if (key === 'OPEN_AI_MODEL') return Promise.resolve(undefined)
       return Promise.resolve(undefined)
     })
 
@@ -51,7 +51,7 @@ describe('AIComplianceComponent', () => {
     beforeEach(() => {
       mockConfig.getString.mockImplementation((key: string) => {
         if (key === 'ENV') return Promise.resolve('dev')
-        if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+        if (key === 'OPEN_AI_MODEL') return Promise.resolve(undefined)
         return Promise.resolve(undefined)
       })
     })
@@ -117,17 +117,17 @@ describe('AIComplianceComponent', () => {
     beforeEach(() => {
       mockConfig.getString.mockImplementation((key: string) => {
         if (key === 'ENV') return Promise.resolve('prd')
-        if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+        if (key === 'OPEN_AI_MODEL') return Promise.resolve(undefined)
         return Promise.resolve(undefined)
       })
     })
 
     describe('and initializing the component', () => {
-      describe('and OPENAI_MODEL is not set', () => {
+      describe('and OPEN_AI_MODEL is not set', () => {
         beforeEach(() => {
           mockConfig.getString.mockImplementation((key: string) => {
             if (key === 'ENV') return Promise.resolve('prd')
-            if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+            if (key === 'OPEN_AI_MODEL') return Promise.resolve(undefined)
             return Promise.resolve(undefined)
           })
         })
@@ -142,16 +142,16 @@ describe('AIComplianceComponent', () => {
 
           expect(aiCompliance).toBeDefined()
           expect(mockConfig.requireString).toHaveBeenCalledWith('OPEN_AI_API_KEY')
-          expect(mockConfig.getString).toHaveBeenCalledWith('OPENAI_MODEL')
+          expect(mockConfig.getString).toHaveBeenCalledWith('OPEN_AI_MODEL')
           expect(mockConfig.getString).toHaveBeenCalledWith('ENV')
         })
       })
 
-      describe('and OPENAI_MODEL is set', () => {
+      describe('and OPEN_AI_MODEL is set', () => {
         beforeEach(() => {
           mockConfig.getString.mockImplementation((key: string) => {
             if (key === 'ENV') return Promise.resolve('prd')
-            if (key === 'OPENAI_MODEL') return Promise.resolve('gpt-5')
+            if (key === 'OPEN_AI_MODEL') return Promise.resolve('gpt-5')
             return Promise.resolve(undefined)
           })
         })
@@ -194,7 +194,7 @@ describe('AIComplianceComponent', () => {
         // Ensure we're in production mode for these tests
         mockConfig.getString.mockImplementation((key: string) => {
           if (key === 'ENV') return Promise.resolve('prd')
-          if (key === 'OPENAI_MODEL') return Promise.resolve(undefined)
+          if (key === 'OPEN_AI_MODEL') return Promise.resolve(undefined)
           return Promise.resolve(undefined)
         })
 

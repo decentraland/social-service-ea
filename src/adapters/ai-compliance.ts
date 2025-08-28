@@ -93,28 +93,28 @@ export async function createAIComplianceComponent(
   const logger = logs.getLogger('ai-compliance')
 
   const env = await config.getString('ENV')
-
-  if (env !== 'prd' && !featureFlags.isEnabled(FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE)) {
-    return {
-      validateCommunityContent: async (_request: ComplianceValidationRequest): Promise<ComplianceValidationResult> => {
-        return {
-          isCompliant: true,
-          issues: {
-            name: [],
-            description: [],
-            image: []
-          },
-          confidence: 1
-        }
-      }
-    }
-  }
-
   const apiKey = await config.requireString('OPEN_AI_API_KEY')
-  const model = (await config.getString('OPENAI_MODEL')) || 'gpt-5-nano'
+  const model = (await config.getString('OPEN_AI_MODEL')) || 'gpt-5-nano'
 
   return {
     async validateCommunityContent(request: ComplianceValidationRequest): Promise<ComplianceValidationResult> {
+      const isDevEnabled = featureFlags.isEnabled(FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE)
+
+      if (env !== 'prd' && !isDevEnabled) {
+        logger.info('AI Compliance disabled for non-production environment', {
+          env: env || 'undefined',
+          isDevEnabled: String(isDevEnabled)
+        })
+
+        return {
+          isCompliant: true,
+          issues: [],
+          warnings: [],
+          confidence: 1,
+          reasoning: 'AI Compliance disabled for non-production environment'
+        }
+      }
+
       const startTime = Date.now()
       const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
