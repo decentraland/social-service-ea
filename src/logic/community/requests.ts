@@ -38,7 +38,7 @@ export function createCommunityRequestsComponent(
 
     if (community.role !== CommunityRole.None) {
       throw new InvalidCommunityRequestError(
-        `User cannot join since it is already a member of the community: ${community.name}`
+        `User cannot join since it is already a member of the community: ${community.name} (${community.id})`
       )
     }
 
@@ -54,35 +54,31 @@ export function createCommunityRequestsComponent(
       status: CommunityRequestStatus.Pending
     })
 
-    const isRequestDuplicated = existingMemberRequests.some((request) => request.type === type)
+    const duplicatedRequest = existingMemberRequests.find((request) => request.type === type)
 
-    if (isRequestDuplicated) {
-      throw new InvalidCommunityRequestError(`Request already exists`)
+    // Do not fail if the request is duplicated, just return it
+    if (duplicatedRequest) {
+      return duplicatedRequest
     }
 
-    // if the request is a request to join and there is a invite already pending, we should automatically accept the invite
-    const shouldAutomaticallyJoin =
-      type === CommunityRequestType.RequestToJoin &&
-      existingMemberRequests.some((request) => request.type === CommunityRequestType.Invite)
+    // Check for automatic join scenarios - if there's a request of the opposite type, auto-accept it
+    const oppositeTypeRequest = existingMemberRequests.find((request) => request.type !== type)
 
-    if (shouldAutomaticallyJoin) {
-      const inviteRequest: MemberRequest = existingMemberRequests.find(
-        (request) => request.type === CommunityRequestType.Invite
-      )!
-      await communitiesDb.acceptCommunityRequestTransaction(inviteRequest.id, {
+    if (oppositeTypeRequest) {
+      await communitiesDb.acceptCommunityRequestTransaction(oppositeTypeRequest.id, {
         communityId,
         memberAddress,
         role: CommunityRole.Member
       })
 
       createdRequest = {
-        ...inviteRequest,
-        type: CommunityRequestType.RequestToJoin,
+        ...oppositeTypeRequest,
+        type,
         status: CommunityRequestStatus.Accepted
       }
 
       logger.info(
-        `Automatically joined user ${memberAddress} to community ${community.name} (${communityId}) by accepting invite`
+        `Automatically joined user ${memberAddress} to community ${community.name} (${communityId}) by accepting ${oppositeTypeRequest.type}`
       )
     } else {
       createdRequest = await communitiesDb.createCommunityRequest(communityId, memberAddress, type)
