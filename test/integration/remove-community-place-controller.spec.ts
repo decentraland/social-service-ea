@@ -122,9 +122,6 @@ test('Remove Community Place Controller', function ({ components, spyComponents,
           ])
         })
 
-        afterEach(() => {
-          stubComponents.placesApi.getPlaces.reset()
-        })
         describe('and the user is not a member', () => {
           it('should respond with a 401 status code', async () => {
             const response = await makeRequest(identity, `/v1/communities/${communityId}/places/${placeId}`, 'DELETE')
