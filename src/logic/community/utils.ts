@@ -166,3 +166,16 @@ export const parseRequestTypeFilter = (searchParams: URLSearchParams): Community
     ? (typeParam as CommunityRequestType)
     : undefined
 }
+
+/**
+ * Compares two strings after converting them to lowercase and trimming whitespace
+ * @param str1 - First string to compare
+ * @param str2 - Second string to compare
+ * @returns true if the strings are different after normalization, false if they are the same
+ */
+export const isStringDifferentAfterNormalization = (str1: string | undefined | null, str2: string | undefined | null): boolean => {
+  if (!str1 || !str2) {
+    return false
+  }
+  return str1.toLowerCase().trim() !== str2.toLowerCase().trim()
+}

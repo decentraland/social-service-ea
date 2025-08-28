@@ -17,8 +17,8 @@ export type ComplianceValidationResult = {
 }
 
 export type ComplianceValidationRequest = {
-  name: string
-  description: string
+  name?: string
+  description?: string
   thumbnailBuffer?: Buffer
   thumbnailMime?: 'image/png' | 'image/jpeg' | 'image/gif'
 }
@@ -125,7 +125,7 @@ export async function createAIComplianceComponent(
         const openai = new OpenAI({ apiKey })
 
         // Create the request content
-        const textInput = `Analyze this community content:\nName: "${request.name}"\nDescription: "${request.description}"\n\nReturn JSON matching the schema.`
+        const textInput = `Analyze this community content:\n${request.name ? `Name: "${request.name}"` : ''}${request.description ? `\nDescription: "${request.description}"` : ''}${request.name || request.description ? '\n' : ''}Return JSON matching the schema.`
         let input: OpenAI.Responses.ResponseCreateParamsNonStreaming['input'] = textInput
 
         // Add image if provided
@@ -159,7 +159,6 @@ export async function createAIComplianceComponent(
 
         logger.info('Starting compliance validation...', {
           requestId,
-          name: request.name,
           hasImage: String(!!request.thumbnailBuffer),
           model
         })
@@ -215,7 +214,6 @@ export async function createAIComplianceComponent(
 
         logger.info('Compliance validation completed', {
           requestId,
-          name: request.name,
           isCompliant: String(result.isCompliant),
           issuesCount: Object.values(result.issues).flat().length,
           confidence: result.confidence,
@@ -233,7 +231,6 @@ export async function createAIComplianceComponent(
 
         logger.error('Compliance validation failed', {
           requestId,
-          name: request.name,
           error: errorMessage
         })
 

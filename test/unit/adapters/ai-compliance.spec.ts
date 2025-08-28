@@ -282,6 +282,119 @@ describe('AIComplianceComponent', () => {
         })
       })
 
+      describe('and only name is provided', () => {
+        beforeEach(() => {
+          mockResponse = {
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.95,
+              reasoning: 'Name is compliant'
+            }),
+            usage: {
+              input_tokens: 300,
+              output_tokens: 150,
+              total_tokens: 450
+            }
+          }
+          mockOpenAICreate.mockResolvedValue(mockResponse)
+        })
+
+        it('should validate only the name field', async () => {
+          const result = await aiCompliance.validateCommunityContent({ name })
+
+          expect(result.isCompliant).toBe(true)
+          expect(mockOpenAICreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              input: expect.stringContaining('Name: "Test Community"')
+            })
+          )
+        })
+      })
+
+      describe('and only description is provided', () => {
+        beforeEach(() => {
+          mockResponse = {
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.95,
+              reasoning: 'Description is compliant'
+            }),
+            usage: {
+              input_tokens: 300,
+              output_tokens: 150,
+              total_tokens: 450
+            }
+          }
+          mockOpenAICreate.mockResolvedValue(mockResponse)
+        })
+
+        it('should validate only the description field', async () => {
+          const result = await aiCompliance.validateCommunityContent({ description })
+
+          expect(result.isCompliant).toBe(true)
+          expect(mockOpenAICreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              input: expect.stringContaining('Description: "A test community for testing purposes"')
+            })
+          )
+        })
+      })
+
+      describe('and only thumbnail is provided', () => {
+        beforeEach(() => {
+          mockResponse = {
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.95,
+              reasoning: 'Thumbnail is compliant'
+            }),
+            usage: {
+              input_tokens: 200,
+              output_tokens: 150,
+              total_tokens: 350
+            }
+          }
+          mockOpenAICreate.mockResolvedValue(mockResponse)
+        })
+
+        it('should validate only the thumbnail field', async () => {
+          const result = await aiCompliance.validateCommunityContent({ thumbnailBuffer })
+
+          expect(result.isCompliant).toBe(true)
+          expect(mockOpenAICreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              input: expect.arrayContaining([
+                expect.objectContaining({
+                  type: 'message',
+                  role: 'user',
+                  content: expect.arrayContaining([
+                    expect.objectContaining({
+                      type: 'input_text',
+                      text: expect.stringContaining('Analyze this community content:')
+                    })
+                  ])
+                })
+              ])
+            })
+          )
+        })
+      })
+
       describe('and content has compliance issues', () => {
         beforeEach(() => {
           mockResponse = {

@@ -49,6 +49,102 @@ describe('CommunityComplianceValidator', () => {
         featureFlagsMock.isEnabled.mockReturnValue(true)
       })
 
+      describe('and no content is provided', () => {
+        it('should skip validation when no fields are provided', async () => {
+          const result = await complianceValidator.validateCommunityContent({})
+
+          expect(aiComplianceMock.validateCommunityContent).not.toHaveBeenCalled()
+          expect(result).toBeUndefined()
+        })
+      })
+
+      describe('and only name is provided', () => {
+        beforeEach(() => {
+          aiComplianceMock.validateCommunityContent.mockResolvedValue({
+            isCompliant: true,
+            issues: {
+              name: [],
+              description: [],
+              image: []
+            },
+            confidence: 1,
+            reasoning: 'Name is compliant'
+          })
+        })
+
+        it('should validate only the name field', async () => {
+          const name = 'Friendly Gaming Community'
+
+          const result = await complianceValidator.validateCommunityContent({ name })
+
+          expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
+            name,
+            description: undefined,
+            thumbnailBuffer: undefined
+          })
+
+          expect(result).toBeUndefined()
+        })
+      })
+
+      describe('and only description is provided', () => {
+        beforeEach(() => {
+          aiComplianceMock.validateCommunityContent.mockResolvedValue({
+            isCompliant: true,
+            issues: {
+              name: [],
+              description: [],
+              image: []
+            },
+            confidence: 1,
+            reasoning: 'Description is compliant'
+          })
+        })
+
+        it('should validate only the description field', async () => {
+          const description = 'A welcoming community for gamers to connect and play together'
+
+          const result = await complianceValidator.validateCommunityContent({ description })
+
+          expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
+            name: undefined,
+            description,
+            thumbnailBuffer: undefined
+          })
+
+          expect(result).toBeUndefined()
+        })
+      })
+
+      describe('and only thumbnail is provided', () => {
+        beforeEach(() => {
+          aiComplianceMock.validateCommunityContent.mockResolvedValue({
+            isCompliant: true,
+            issues: {
+              name: [],
+              description: [],
+              image: []
+            },
+            confidence: 1,
+            reasoning: 'Thumbnail is compliant'
+          })
+        })
+
+        it('should validate only the thumbnail field', async () => {
+          const thumbnail = Buffer.from('fake-image-data')
+
+          const result = await complianceValidator.validateCommunityContent({ thumbnailBuffer: thumbnail })
+
+          expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
+            name: undefined,
+            description: undefined,
+            thumbnailBuffer: thumbnail
+          })
+
+          expect(result).toBeUndefined()
+        })
+      })
+
       describe('and content is compliant', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
