@@ -174,7 +174,7 @@ test('Update Community Controller', async function ({ components, stubComponents
                   moderatorIdentity,
                   `/v1/communities/${communityId}`,
                   {
-                    name: 'Moderator Unauthorized Name Change'
+                    name: 'Mod Unauthorized Change'
                   },
                   'PUT'
                 )
