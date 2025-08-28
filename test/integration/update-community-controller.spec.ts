@@ -369,7 +369,7 @@ test('Update Community Controller', async function ({ components, stubComponents
             // Mock AI compliance to return non-compliant
             stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
               new CommunityNotCompliantError(
-                "Community content violates Decentraland's Code of Ethics: Content violates Decentraland Code of Ethics",
+                "Community content violates Decentraland's Code of Ethics",
                 { name: ['Contains inappropriate language', 'Promotes violence'] },
                 0.9
               )

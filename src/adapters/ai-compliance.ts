@@ -13,7 +13,6 @@ export type ComplianceValidationResult = {
     image: string[]
   }
   confidence: number
-  reasoning: string
 }
 
 export type ComplianceValidationRequest = {
@@ -31,7 +30,7 @@ export namespace ComplianceValidationResult {
   export const schema: JSONSchema<ComplianceValidationResult> = {
     type: 'object',
     additionalProperties: false,
-    required: ['isCompliant', 'issues', 'confidence', 'reasoning'],
+    required: ['isCompliant', 'issues', 'confidence'],
     properties: {
       isCompliant: { type: 'boolean' },
       issues: {
@@ -56,8 +55,7 @@ export namespace ComplianceValidationResult {
           }
         }
       },
-      confidence: { type: 'number', minimum: 0, maximum: 1 },
-      reasoning: { type: 'string', maxLength: 250 }
+      confidence: { type: 'number', minimum: 0, maximum: 1 }
     }
   } as any as JSONSchema<ComplianceValidationResult> // hack to avoid type errors, when using strictNullChecks in test/tsconfig.json 54 test files fail
 
@@ -106,8 +104,7 @@ export async function createAIComplianceComponent(
             description: [],
             image: []
           },
-          confidence: 1,
-          reasoning: 'AI Compliance disabled for non-production environment'
+          confidence: 1
         }
       }
     }

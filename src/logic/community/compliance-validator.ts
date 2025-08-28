@@ -52,7 +52,7 @@ export function createCommunityComplianceValidatorComponent(
           })
 
           throw new CommunityNotCompliantError(
-            `Community content violates Decentraland's Code of Ethics: ${validationResult.reasoning}`,
+            `Community content violates Decentraland's Code of Ethics`,
             validationResult.issues,
             validationResult.confidence
           )

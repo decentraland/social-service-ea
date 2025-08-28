@@ -77,8 +77,7 @@ describe('AIComplianceComponent', () => {
             description: [],
             image: []
           },
-          confidence: 1,
-          reasoning: 'AI Compliance disabled for non-production environment'
+          confidence: 1
         })
       })
     })
@@ -94,8 +93,7 @@ describe('AIComplianceComponent', () => {
               description: [],
               image: []
             },
-            confidence: 1,
-            reasoning: 'AI Compliance enabled for non-production environment'
+            confidence: 1
           }),
           usage: {}
         })
@@ -218,8 +216,7 @@ describe('AIComplianceComponent', () => {
                 description: [],
                 image: []
               },
-              confidence: 0.95,
-              reasoning: 'Content is compliant with ethical standards'
+              confidence: 0.95
             }),
             usage: {
               input_tokens: 500,
@@ -240,7 +237,6 @@ describe('AIComplianceComponent', () => {
             image: []
           })
           expect(result.confidence).toBe(0.95)
-          expect(result.reasoning).toBe('Content is compliant with ethical standards')
         })
 
         it('should call OpenAI to validate the community content', async () => {
@@ -292,8 +288,7 @@ describe('AIComplianceComponent', () => {
                 description: [],
                 image: []
               },
-              confidence: 0.95,
-              reasoning: 'Name is compliant'
+              confidence: 0.95
             }),
             usage: {
               input_tokens: 300,
@@ -326,8 +321,7 @@ describe('AIComplianceComponent', () => {
                 description: [],
                 image: []
               },
-              confidence: 0.95,
-              reasoning: 'Description is compliant'
+              confidence: 0.95
             }),
             usage: {
               input_tokens: 300,
@@ -360,8 +354,7 @@ describe('AIComplianceComponent', () => {
                 description: [],
                 image: []
               },
-              confidence: 0.95,
-              reasoning: 'Thumbnail is compliant'
+              confidence: 0.95
             }),
             usage: {
               input_tokens: 200,
@@ -405,8 +398,7 @@ describe('AIComplianceComponent', () => {
                 description: ['Illegal activities'],
                 image: []
               },
-              confidence: 0.85,
-              reasoning: 'Content violates ethical standards'
+              confidence: 0.85
             }),
             usage: {
               input_tokens: 500,
@@ -427,7 +419,6 @@ describe('AIComplianceComponent', () => {
             image: []
           })
           expect(result.confidence).toBe(0.85)
-          expect(result.reasoning).toBe('Content violates ethical standards')
         })
 
         it('should increment the total validation counter with non-compliant result', async () => {
@@ -448,8 +439,7 @@ describe('AIComplianceComponent', () => {
                 description: [],
                 image: []
               },
-              confidence: 0.8,
-              reasoning: 'Content is compliant with minor concerns'
+              confidence: 0.8
             }),
             usage: {
               input_tokens: 500,
@@ -483,8 +473,7 @@ describe('AIComplianceComponent', () => {
                 description: [],
                 image: []
               },
-              confidence: 0.95,
-              reasoning: 'Content with thumbnail is compliant'
+              confidence: 0.95
             }),
             usage: {
               input_tokens: 800,
@@ -590,7 +579,7 @@ describe('AIComplianceComponent', () => {
                 description: [],
                 image: []
               }
-              // confidence, reasoning missing
+              // confidence missing
             }),
             usage: {
               input_tokens: 500,
@@ -662,8 +651,7 @@ describe('AIComplianceComponent', () => {
                 description: [],
                 image: []
               },
-              confidence: 0.95,
-              reasoning: 'Content is compliant'
+              confidence: 0.95
             }),
             usage: {
               input_tokens: 500,

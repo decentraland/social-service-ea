@@ -67,8 +67,7 @@ describe('CommunityComplianceValidator', () => {
               description: [],
               image: []
             },
-            confidence: 1,
-            reasoning: 'Name is compliant'
+            confidence: 1
           })
         })
 
@@ -96,8 +95,7 @@ describe('CommunityComplianceValidator', () => {
               description: [],
               image: []
             },
-            confidence: 1,
-            reasoning: 'Description is compliant'
+            confidence: 1
           })
         })
 
@@ -125,8 +123,7 @@ describe('CommunityComplianceValidator', () => {
               description: [],
               image: []
             },
-            confidence: 1,
-            reasoning: 'Thumbnail is compliant'
+            confidence: 1
           })
         })
 
@@ -154,8 +151,7 @@ describe('CommunityComplianceValidator', () => {
               description: [],
               image: []
             },
-            confidence: 1,
-            reasoning: 'This community is compliant'
+            confidence: 1
           })
         })
 
@@ -184,8 +180,7 @@ describe('CommunityComplianceValidator', () => {
               description: [],
               image: []
             },
-            confidence: 0.8,
-            reasoning: 'Content is compliant with minor concerns'
+            confidence: 0.8
           })
         })
 
@@ -214,8 +209,7 @@ describe('CommunityComplianceValidator', () => {
               description: ['Promotes violence'],
               image: []
             },
-            confidence: 0.9,
-            reasoning: 'Content violates community guidelines'
+            confidence: 0.9
           })
         })
 
@@ -244,8 +238,7 @@ describe('CommunityComplianceValidator', () => {
               description: [],
               image: []
             },
-            confidence: 0.95,
-            reasoning: 'Content with thumbnail is compliant'
+            confidence: 0.95
           })
         })
 
