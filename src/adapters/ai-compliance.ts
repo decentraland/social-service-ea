@@ -108,10 +108,12 @@ export async function createAIComplianceComponent(
 
         return {
           isCompliant: true,
-          issues: [],
-          warnings: [],
-          confidence: 1,
-          reasoning: 'AI Compliance disabled for non-production environment'
+          issues: {
+            name: [],
+            description: [],
+            image: []
+          },
+          confidence: 1
         }
       }
 
