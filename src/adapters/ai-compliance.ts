@@ -1,19 +1,23 @@
+import OpenAI from 'openai'
+import { generateLazyValidator, JSONSchema, ValidateFunction } from '@dcl/schemas'
 import { AppComponents } from '../types'
 import { AIComplianceError } from '../logic/community/errors'
 import { errorMessageOrDefault } from '../utils/errors'
 import { FeatureFlag } from './feature-flags'
 
-export interface ComplianceValidationResult {
+export type ComplianceValidationResult = {
   isCompliant: boolean
-  issues: string[]
-  warnings: string[]
+  issues: {
+    name: string[]
+    description: string[]
+    image: string[]
+  }
   confidence: number
-  reasoning: string
 }
 
-export interface ComplianceValidationRequest {
-  name: string
-  description: string
+export type ComplianceValidationRequest = {
+  name?: string
+  description?: string
   thumbnailBuffer?: Buffer
   thumbnailMime?: 'image/png' | 'image/jpeg' | 'image/gif'
 }
@@ -21,6 +25,66 @@ export interface ComplianceValidationRequest {
 export interface IAIComplianceComponent {
   validateCommunityContent(request: ComplianceValidationRequest): Promise<ComplianceValidationResult>
 }
+
+export namespace ComplianceValidationResult {
+  export const schema: JSONSchema<ComplianceValidationResult> = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['isCompliant', 'issues', 'confidence'],
+    properties: {
+      isCompliant: { type: 'boolean' },
+      issues: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'description', 'image'],
+        properties: {
+          name: {
+            type: 'array',
+            maxItems: 3,
+            items: { type: 'string', maxLength: 25 }
+          },
+          description: {
+            type: 'array',
+            maxItems: 3,
+            items: { type: 'string', maxLength: 25 }
+          },
+          image: {
+            type: 'array',
+            maxItems: 3,
+            items: { type: 'string', maxLength: 25 }
+          }
+        }
+      },
+      confidence: { type: 'number', minimum: 0, maximum: 1 }
+    }
+  } as any as JSONSchema<ComplianceValidationResult> // hack to avoid type errors, when using strictNullChecks in test/tsconfig.json 54 test files fail
+
+  export const validate: ValidateFunction<ComplianceValidationResult> = generateLazyValidator(schema)
+}
+
+const SYSTEM_PROMPT = `You are a Decentraland compliance expert analyzing community content against our Code of Ethics (https://decentraland.org/ethics/) and Content Policy (https://decentraland.org/content).
+
+COMPLIANCE CHECKLIST:
+• VIOLENCE/HARASSMENT: No violence, bullying, discrimination, or inappropriate behavior
+• ILLEGAL ACTIVITIES: No drugs, criminal behavior, piracy, terrorism, obscenity, child pornography
+• HATE SPEECH: No content harming/harassing based on race, religion, nationality, disability, gender, age, veteran status, sexual orientation
+• BUSINESS INTEGRITY: No corruption, bribery, deceptive practices, conflicts of interest
+• PRIVACY: No exposure of private data, breaches of privacy policy
+• INTELLECTUAL PROPERTY: No IP rights infringement
+• FALSE INFORMATION: No libelous, misleading, or privacy-invading content
+• GAMBLING: Must comply with licensing and geo-blocking restrictions
+• AGE RESTRICTIONS: Violent/gambling/sexual content must be 18+ restricted
+• REPUTATIONAL RISK: Must not damage Decentraland's trustworthy reputation
+
+Be strict but fair. Flag any content that violates these principles.
+
+For issues, use field names as keys and provide SHORT issue types (max 25 chars) as arrays.
+Examples: 
+- "name": ["Phishing", "Hate speech"]
+- "description": ["Spam content", "Offensive"]
+- "image": ["Contains nudity"]
+
+Return ONLY valid JSON matching the schema.`
 
 export async function createAIComplianceComponent(
   components: Pick<AppComponents, 'config' | 'logs' | 'featureFlags' | 'metrics'>
@@ -31,44 +95,6 @@ export async function createAIComplianceComponent(
   const env = await config.getString('ENV')
   const apiKey = await config.requireString('OPEN_AI_API_KEY')
   const model = (await config.getString('OPEN_AI_MODEL')) || 'gpt-5-nano'
-
-  // Comprehensive but focused prompt based on official Code of Ethics and Content Policy
-  const SYSTEM_PROMPT = `You are a Decentraland compliance expert analyzing community content against our Code of Ethics (https://decentraland.org/ethics/) and Content Policy (https://decentraland.org/content).
-
-Key compliance areas to evaluate:
-
-CODE OF ETHICS:
-1. VIOLENCE & HARASSMENT: No violence, harassment, bullying, or inappropriate behavior (Section 2.9)
-2. DISCRIMINATION: No discrimination based on race, sex, marital status, medical condition, etc. (Section 2.7)
-3. ILLEGAL ACTIVITIES: No promotion of illegal drugs, criminal behavior, or law violations (Section 2.2, 2.10)
-4. BUSINESS INTEGRITY: No corruption, bribery, deceptive practices, or conflicts of interest (Section 5.3, 5.4)
-5. REPUTATIONAL RISK: Content must not damage Decentraland's reputation as a trustworthy company (Section 1)
-6. PRIVACY/CONFIDENTIALITY: No exposure of private data or confidential information (Section 2.13)
-7. ENVIRONMENTAL: No promotion of environmentally harmful activities (Section 2.11)
-
-CONTENT POLICY:
-8. PROHIBITED CONTENT: No piracy, criminal activity, terrorism, obscenity, child pornography, or illegal drug use (Section 2.1)
-9. INTELLECTUAL PROPERTY: No infringement of third-party IP rights (Section 2.2)
-10. HATE SPEECH: No cruel or hateful content that could harm, harass, or incite hatred based on race, religion, nationality, disability, gender, age, veteran status, or sexual orientation (Section 2.3)
-11. FALSE INFORMATION: No libelous, false, inaccurate, misleading content or privacy invasion (Section 2.4)
-12. DATA PRIVACY: No breaches of privacy policy or applicable data privacy laws (Section 2.5)
-13. GAMBLING: Gambling content must comply with licensing requirements and geo-blocking restrictions (Section 3)
-14. AGE RESTRICTIONS: Violent, gambling, or sexually explicit content must be age-restricted to 18+ (Section 5)
-
-Be strict but fair. Flag any content that violates these principles. Return ONLY valid JSON matching the exact schema provided.`
-
-  const COMPLIANCE_SCHEMA = {
-    type: 'object',
-    additionalProperties: false,
-    required: ['isCompliant', 'issues', 'warnings', 'confidence', 'reasoning'],
-    properties: {
-      isCompliant: { type: 'boolean' },
-      issues: { type: 'array', items: { type: 'string', maxLength: 200 } },
-      warnings: { type: 'array', items: { type: 'string', maxLength: 200 } },
-      confidence: { type: 'number', minimum: 0, maximum: 1 },
-      reasoning: { type: 'string', maxLength: 500 }
-    }
-  } as const
 
   return {
     async validateCommunityContent(request: ComplianceValidationRequest): Promise<ComplianceValidationResult> {
@@ -82,10 +108,12 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
 
         return {
           isCompliant: true,
-          issues: [],
-          warnings: [],
-          confidence: 1,
-          reasoning: 'AI Compliance disabled for non-production environment'
+          issues: {
+            name: [],
+            description: [],
+            image: []
+          },
+          confidence: 1
         }
       }
 
@@ -93,65 +121,65 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
       const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
       try {
-        const { default: OpenAI } = await import('openai')
         const openai = new OpenAI({ apiKey })
 
-        const userContent: any[] = [
-          {
-            type: 'text',
-            text: `Analyze this community content:\nName: "${request.name}"\nDescription: "${request.description}"\n\nReturn JSON matching the schema.`
-          }
-        ]
+        // Create the request content
+        const textInput = `Analyze this community content:\n${request.name ? `Name: "${request.name}"` : ''}${request.description ? `\nDescription: "${request.description}"` : ''}${request.name || request.description ? '\n' : ''}Return JSON matching the schema.`
+        let input: OpenAI.Responses.ResponseCreateParamsNonStreaming['input'] = textInput
 
+        // Add image if provided
         if (request.thumbnailBuffer) {
-          const dataUrl = `data:${request.thumbnailMime || 'image/png'};base64,${request.thumbnailBuffer.toString('base64')}`
-          userContent.push({ type: 'image_url', image_url: { url: dataUrl } })
+          const imageDataUrl = `data:${request.thumbnailMime || 'image/png'};base64,${request.thumbnailBuffer.toString('base64')}`
+          input = [
+            {
+              type: 'message',
+              role: 'user',
+              content: [
+                { type: 'input_text', text: textInput },
+                { type: 'input_image', image_url: imageDataUrl, detail: 'auto' }
+              ]
+            }
+          ]
         }
 
-        const completionParams = {
+        // Prepare the request using Responses API
+        const body: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
           model,
-          response_format: {
-            type: 'json_schema' as const,
-            json_schema: {
+          instructions: SYSTEM_PROMPT,
+          input,
+          text: {
+            format: {
+              type: 'json_schema' as const,
               name: 'ComplianceValidationResult',
-              schema: COMPLIANCE_SCHEMA
+              schema: ComplianceValidationResult.schema as any // hack to avoid type errors, when using strictNullChecks in test/tsconfig.json 54 test files fail
             }
           }
         }
 
-        const messages = [
-          { role: 'system' as const, content: SYSTEM_PROMPT },
-          { role: 'user' as const, content: userContent }
-        ]
-
-        logger.info('Starting compliance validation', {
+        logger.info('Starting compliance validation...', {
           requestId,
-          name: request.name,
           hasImage: String(!!request.thumbnailBuffer),
           model
         })
 
-        const res = await openai.chat.completions.create({
-          ...completionParams,
-          messages
-        })
+        const res = await openai.responses.create(body)
 
         if (res.usage) {
           logger.info('OpenAI API usage', {
             requestId,
-            promptTokens: res.usage.prompt_tokens,
-            completionTokens: res.usage.completion_tokens,
+            inputTokens: res.usage.input_tokens,
+            inputTokensDetails: JSON.stringify(res.usage.input_tokens_details),
+            outputTokens: res.usage.output_tokens,
+            outputTokensDetails: JSON.stringify(res.usage.output_tokens_details),
             totalTokens: res.usage.total_tokens,
-            estimatedCost: `$${((res.usage.total_tokens / 1000) * 0.0001).toFixed(4)}` // GPT-5-nano pricing
+            estimatedCost: `$${((res.usage.input_tokens / 1000000) * 0.05 + (res.usage.output_tokens / 1000000) * 0.4).toFixed(6)}` // GPT-5-nano pricing per 1M tokens
           })
         }
 
-        const content = res.choices[0]?.message?.content
+        const content = res.output_text
         if (!content) {
           logger.error('No content in OpenAI response', {
             requestId,
-            choices: JSON.stringify(res.choices),
-            finishReason: res.choices[0]?.finish_reason,
             response: JSON.stringify(res, null, 2)
           })
           throw new AIComplianceError('No content received from OpenAI API')
@@ -170,16 +198,12 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
           throw new AIComplianceError(`Invalid JSON response from OpenAI API: ${errorMessage}`)
         }
 
-        if (
-          typeof result.isCompliant !== 'boolean' ||
-          !Array.isArray(result.issues) ||
-          !Array.isArray(result.warnings) ||
-          typeof result.confidence !== 'number' ||
-          typeof result.reasoning !== 'string'
-        ) {
+        // Validate the response structure using the generated validator
+        if (!ComplianceValidationResult.validate(result)) {
           logger.error('Invalid response structure', {
             requestId,
-            result: JSON.stringify(result)
+            result: JSON.stringify(result),
+            validationErrors: JSON.stringify(ComplianceValidationResult.validate.errors || [])
           })
           throw new AIComplianceError('Invalid response structure from OpenAI API')
         }
@@ -189,10 +213,8 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
 
         logger.info('Compliance validation completed', {
           requestId,
-          name: request.name,
           isCompliant: String(result.isCompliant),
-          issuesCount: result.issues.length,
-          warningsCount: result.warnings.length,
+          issuesCount: Object.values(result.issues).flat().length,
           confidence: result.confidence,
           durationInSeconds
         })
@@ -208,7 +230,6 @@ Be strict but fair. Flag any content that violates these principles. Return ONLY
 
         logger.error('Compliance validation failed', {
           requestId,
-          name: request.name,
           error: errorMessage
         })
 

@@ -1127,8 +1127,32 @@ describe('Community Component', () => {
             })
 
             expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
-              name: mockCommunity.name, // Use existing community name
+              name: undefined,
               description: simpleUpdate.description,
+              thumbnailBuffer: undefined
+            })
+          })
+
+          it('should update the community with only name and call compliance validation', async () => {
+            const nameOnlyUpdate = {
+              name: 'Updated Name Only'
+            }
+
+            mockCommunitiesDB.updateCommunity.mockResolvedValueOnce({
+              ...mockCommunity,
+              ...nameOnlyUpdate
+            })
+
+            const result = await communityComponent.updateCommunity(communityId, userAddress, nameOnlyUpdate)
+
+            expect(result).toEqual({
+              ...mockCommunity,
+              ...nameOnlyUpdate
+            })
+
+            expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
+              name: nameOnlyUpdate.name,
+              description: undefined,
               thumbnailBuffer: undefined
             })
           })

@@ -51,8 +51,7 @@ export async function communitiesErrorsHandler(
           error: 'Community not compliant',
           message: error.message,
           data: {
-            issues: error.issues,
-            warnings: error.warnings
+            issues: error.issues
           }
         }
       }

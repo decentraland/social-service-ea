@@ -2,7 +2,7 @@ import { createAIComplianceComponent } from '../../../src/adapters/ai-compliance
 import { mockConfig, mockLogs, createFeatureFlagsMockComponent } from '../../mocks/components'
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { AIComplianceError } from '../../../src/logic/community/errors'
-import { FeatureFlag, IFeatureFlagsAdapter } from '../../../src/adapters/feature-flags'
+import { IFeatureFlagsAdapter } from '../../../src/adapters/feature-flags'
 import { IMetricsComponent } from '@well-known-components/interfaces'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { metricDeclarations } from '../../../src/metrics'
@@ -12,10 +12,8 @@ const mockOpenAICreate = jest.fn()
 jest.mock('openai', () => ({
   __esModule: true,
   default: jest.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: mockOpenAICreate
-      }
+    responses: {
+      create: mockOpenAICreate
     }
   }))
 }))
@@ -74,10 +72,12 @@ describe('AIComplianceComponent', () => {
 
         expect(result).toEqual({
           isCompliant: true,
-          issues: [],
-          warnings: [],
-          confidence: 1,
-          reasoning: 'AI Compliance disabled for non-production environment'
+          issues: {
+            name: [],
+            description: [],
+            image: []
+          },
+          confidence: 1
         })
       })
     })
@@ -86,19 +86,15 @@ describe('AIComplianceComponent', () => {
       beforeEach(async () => {
         featureFlagsMock.isEnabled.mockReturnValueOnce(true)
         mockOpenAICreate.mockResolvedValue({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  isCompliant: true,
-                  issues: [],
-                  warnings: [],
-                  confidence: 1,
-                  reasoning: 'AI Compliance enabled for non-production environment'
-                })
-              }
-            }
-          ],
+          output_text: JSON.stringify({
+            isCompliant: true,
+            issues: {
+              name: [],
+              description: [],
+              image: []
+            },
+            confidence: 1
+          }),
           usage: {}
         })
 
@@ -176,7 +172,7 @@ describe('AIComplianceComponent', () => {
         beforeEach(() => {
           mockConfig.requireString.mockImplementation((key: string) => {
             if (key === 'OPEN_AI_API_KEY') return Promise.reject(new Error('OPEN_AI_API_KEY not found'))
-            return Promise.resolve(undefined)
+            return Promise.reject(new Error('Unknown key: OPEN_AI_API_KEY'))
           })
         })
 
@@ -213,22 +209,18 @@ describe('AIComplianceComponent', () => {
       describe('and content is compliant', () => {
         beforeEach(() => {
           mockResponse = {
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    isCompliant: true,
-                    issues: [],
-                    warnings: [],
-                    confidence: 0.95,
-                    reasoning: 'Content is compliant with ethical standards'
-                  })
-                }
-              }
-            ],
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.95
+            }),
             usage: {
-              prompt_tokens: 500,
-              completion_tokens: 150,
+              input_tokens: 500,
+              output_tokens: 150,
               total_tokens: 650
             }
           }
@@ -239,10 +231,12 @@ describe('AIComplianceComponent', () => {
           const result = await aiCompliance.validateCommunityContent({ name, description })
 
           expect(result.isCompliant).toBe(true)
-          expect(result.issues).toEqual([])
-          expect(result.warnings).toEqual([])
+          expect(result.issues).toEqual({
+            name: [],
+            description: [],
+            image: []
+          })
           expect(result.confidence).toBe(0.95)
-          expect(result.reasoning).toBe('Content is compliant with ethical standards')
         })
 
         it('should call OpenAI to validate the community content', async () => {
@@ -251,28 +245,15 @@ describe('AIComplianceComponent', () => {
           expect(mockOpenAICreate).toHaveBeenCalledWith(
             expect.objectContaining({
               model: 'gpt-5-nano',
-              response_format: {
-                type: 'json_schema',
-                json_schema: {
+              text: {
+                format: {
+                  type: 'json_schema',
                   name: 'ComplianceValidationResult',
                   schema: expect.any(Object)
                 }
               },
-              messages: expect.arrayContaining([
-                expect.objectContaining({
-                  role: 'system',
-                  content: expect.stringContaining('Decentraland compliance expert')
-                }),
-                expect.objectContaining({
-                  role: 'user',
-                  content: expect.arrayContaining([
-                    expect.objectContaining({
-                      type: 'text',
-                      text: expect.stringContaining(name)
-                    })
-                  ])
-                })
-              ])
+              instructions: expect.stringContaining('Decentraland compliance expert'),
+              input: expect.stringContaining(name)
             })
           )
         })
@@ -297,25 +278,131 @@ describe('AIComplianceComponent', () => {
         })
       })
 
+      describe('and only name is provided', () => {
+        beforeEach(() => {
+          mockResponse = {
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.95
+            }),
+            usage: {
+              input_tokens: 300,
+              output_tokens: 150,
+              total_tokens: 450
+            }
+          }
+          mockOpenAICreate.mockResolvedValue(mockResponse)
+        })
+
+        it('should validate only the name field', async () => {
+          const result = await aiCompliance.validateCommunityContent({ name })
+
+          expect(result.isCompliant).toBe(true)
+          expect(mockOpenAICreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              input: expect.stringContaining('Name: "Test Community"')
+            })
+          )
+        })
+      })
+
+      describe('and only description is provided', () => {
+        beforeEach(() => {
+          mockResponse = {
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.95
+            }),
+            usage: {
+              input_tokens: 300,
+              output_tokens: 150,
+              total_tokens: 450
+            }
+          }
+          mockOpenAICreate.mockResolvedValue(mockResponse)
+        })
+
+        it('should validate only the description field', async () => {
+          const result = await aiCompliance.validateCommunityContent({ description })
+
+          expect(result.isCompliant).toBe(true)
+          expect(mockOpenAICreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              input: expect.stringContaining('Description: "A test community for testing purposes"')
+            })
+          )
+        })
+      })
+
+      describe('and only thumbnail is provided', () => {
+        beforeEach(() => {
+          mockResponse = {
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.95
+            }),
+            usage: {
+              input_tokens: 200,
+              output_tokens: 150,
+              total_tokens: 350
+            }
+          }
+          mockOpenAICreate.mockResolvedValue(mockResponse)
+        })
+
+        it('should validate only the thumbnail field', async () => {
+          const result = await aiCompliance.validateCommunityContent({ thumbnailBuffer })
+
+          expect(result.isCompliant).toBe(true)
+          expect(mockOpenAICreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              input: expect.arrayContaining([
+                expect.objectContaining({
+                  type: 'message',
+                  role: 'user',
+                  content: expect.arrayContaining([
+                    expect.objectContaining({
+                      type: 'input_text',
+                      text: expect.stringContaining('Analyze this community content:')
+                    })
+                  ])
+                })
+              ])
+            })
+          )
+        })
+      })
+
       describe('and content has compliance issues', () => {
         beforeEach(() => {
           mockResponse = {
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    isCompliant: false,
-                    issues: ['Contains inappropriate language', 'Promotes illegal activities'],
-                    warnings: ['Content may be borderline'],
-                    confidence: 0.85,
-                    reasoning: 'Content violates ethical standards'
-                  })
-                }
-              }
-            ],
+            output_text: JSON.stringify({
+              isCompliant: false,
+              issues: {
+                name: ['Inappropriate language'],
+                description: ['Illegal activities'],
+                image: []
+              },
+              confidence: 0.85
+            }),
             usage: {
-              prompt_tokens: 500,
-              completion_tokens: 200,
+              input_tokens: 500,
+              output_tokens: 200,
               total_tokens: 700
             }
           }
@@ -326,10 +413,12 @@ describe('AIComplianceComponent', () => {
           const result = await aiCompliance.validateCommunityContent({ name, description })
 
           expect(result.isCompliant).toBe(false)
-          expect(result.issues).toEqual(['Contains inappropriate language', 'Promotes illegal activities'])
-          expect(result.warnings).toEqual(['Content may be borderline'])
+          expect(result.issues).toEqual({
+            name: ['Inappropriate language'],
+            description: ['Illegal activities'],
+            image: []
+          })
           expect(result.confidence).toBe(0.85)
-          expect(result.reasoning).toBe('Content violates ethical standards')
         })
 
         it('should increment the total validation counter with non-compliant result', async () => {
@@ -343,22 +432,18 @@ describe('AIComplianceComponent', () => {
       describe('and content has warnings but is compliant', () => {
         beforeEach(() => {
           mockResponse = {
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    isCompliant: true,
-                    issues: [],
-                    warnings: ['Content is borderline but acceptable'],
-                    confidence: 0.8,
-                    reasoning: 'Content is compliant with minor concerns'
-                  })
-                }
-              }
-            ],
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.8
+            }),
             usage: {
-              prompt_tokens: 500,
-              completion_tokens: 180,
+              input_tokens: 500,
+              output_tokens: 180,
               total_tokens: 680
             }
           }
@@ -369,7 +454,11 @@ describe('AIComplianceComponent', () => {
           const result = await aiCompliance.validateCommunityContent({ name, description })
 
           expect(result.isCompliant).toBe(true)
-          expect(result.warnings).toEqual(['Content is borderline but acceptable'])
+          expect(result.issues).toEqual({
+            name: [],
+            description: [],
+            image: []
+          })
           expect(result.confidence).toBe(0.8)
         })
       })
@@ -377,22 +466,18 @@ describe('AIComplianceComponent', () => {
       describe('and validating content with thumbnails', () => {
         beforeEach(() => {
           mockResponse = {
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    isCompliant: true,
-                    issues: [],
-                    warnings: [],
-                    confidence: 0.95,
-                    reasoning: 'Content with thumbnail is compliant'
-                  })
-                }
-              }
-            ],
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.95
+            }),
             usage: {
-              prompt_tokens: 800,
-              completion_tokens: 150,
+              input_tokens: 800,
+              output_tokens: 150,
               total_tokens: 950
             }
           }
@@ -410,14 +495,14 @@ describe('AIComplianceComponent', () => {
           expect(result.isCompliant).toBe(true)
           expect(mockOpenAICreate).toHaveBeenCalledWith(
             expect.objectContaining({
-              messages: expect.arrayContaining([
+              input: expect.arrayContaining([
                 expect.objectContaining({
+                  type: 'message',
+                  role: 'user',
                   content: expect.arrayContaining([
                     expect.objectContaining({
-                      type: 'image_url',
-                      image_url: expect.objectContaining({
-                        url: expect.stringContaining('data:image/png;base64,')
-                      })
+                      type: 'input_image',
+                      image_url: expect.stringContaining('data:image/png;base64,')
                     })
                   ])
                 })
@@ -430,16 +515,10 @@ describe('AIComplianceComponent', () => {
       describe('and OpenAI returns empty content', () => {
         beforeEach(() => {
           mockResponse = {
-            choices: [
-              {
-                message: {
-                  content: null
-                }
-              }
-            ],
+            output_text: null,
             usage: {
-              prompt_tokens: 500,
-              completion_tokens: 0,
+              input_tokens: 500,
+              output_tokens: 0,
               total_tokens: 500
             }
           }
@@ -464,16 +543,10 @@ describe('AIComplianceComponent', () => {
       describe('and OpenAI returns invalid JSON', () => {
         beforeEach(() => {
           mockResponse = {
-            choices: [
-              {
-                message: {
-                  content: 'This is not valid JSON'
-                }
-              }
-            ],
+            output_text: 'This is not valid JSON',
             usage: {
-              prompt_tokens: 500,
-              completion_tokens: 50,
+              input_tokens: 500,
+              output_tokens: 50,
               total_tokens: 550
             }
           }
@@ -498,21 +571,19 @@ describe('AIComplianceComponent', () => {
       describe('and OpenAI returns malformed response structure', () => {
         beforeEach(() => {
           mockResponse = {
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    isCompliant: true,
-                    // Missing required fields
-                    issues: []
-                    // warnings, confidence, reasoning missing
-                  })
-                }
+            output_text: JSON.stringify({
+              isCompliant: true,
+              // Missing required fields
+              issues: {
+                name: [],
+                description: [],
+                image: []
               }
-            ],
+              // confidence missing
+            }),
             usage: {
-              prompt_tokens: 500,
-              completion_tokens: 100,
+              input_tokens: 500,
+              output_tokens: 100,
               total_tokens: 600
             }
           }
@@ -573,22 +644,18 @@ describe('AIComplianceComponent', () => {
       describe('and OpenAI API returns usage information', () => {
         beforeEach(() => {
           mockResponse = {
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    isCompliant: true,
-                    issues: [],
-                    warnings: [],
-                    confidence: 0.95,
-                    reasoning: 'Content is compliant'
-                  })
-                }
-              }
-            ],
+            output_text: JSON.stringify({
+              isCompliant: true,
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
+              confidence: 0.95
+            }),
             usage: {
-              prompt_tokens: 500,
-              completion_tokens: 150,
+              input_tokens: 500,
+              output_tokens: 150,
               total_tokens: 650
             }
           }

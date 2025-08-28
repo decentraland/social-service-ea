@@ -368,13 +368,16 @@ export function createCommunityComponent(
         await communityRoles.validatePermissionToUpdateCommunityPrivacy(communityId, userAddress)
       }
 
-      if (updates.name || updates.description || thumbnailBuffer) {
-        const nameToValidate = updates.name || existingCommunity.name
-        const descriptionToValidate = updates.description || existingCommunity.description
+      const nameChanged =
+        updates.name && updates.name.toLowerCase().trim() !== existingCommunity.name.toLowerCase().trim()
+      const descriptionChanged =
+        updates.description &&
+        updates.description.toLowerCase().trim() !== existingCommunity.description.toLowerCase().trim()
 
+      if (nameChanged || descriptionChanged || thumbnailBuffer) {
         await communityComplianceValidator.validateCommunityContent({
-          name: nameToValidate,
-          description: descriptionToValidate,
+          name: updates.name,
+          description: updates.description,
           thumbnailBuffer
         })
       }

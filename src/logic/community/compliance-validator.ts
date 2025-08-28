@@ -4,7 +4,7 @@ import { errorMessageOrDefault } from '../../utils/errors'
 import { CommunityNotCompliantError } from './errors'
 
 export interface ICommunityComplianceValidatorComponent {
-  validateCommunityContent(request: { name: string; description: string; thumbnailBuffer?: Buffer }): Promise<void>
+  validateCommunityContent(request: { name?: string; description?: string; thumbnailBuffer?: Buffer }): Promise<void>
 }
 
 export function createCommunityComplianceValidatorComponent(
@@ -15,8 +15,8 @@ export function createCommunityComplianceValidatorComponent(
 
   return {
     async validateCommunityContent(request: {
-      name: string
-      description: string
+      name?: string
+      description?: string
       thumbnailBuffer?: Buffer
     }): Promise<void> {
       if (!featureFlags.isEnabled(FeatureFlag.COMMUNITIES_AI_COMPLIANCE)) {
@@ -26,10 +26,15 @@ export function createCommunityComplianceValidatorComponent(
 
       const { name, description, thumbnailBuffer } = request
 
+      // Only validate if we have content to validate
+      if (!name && !description && !thumbnailBuffer) {
+        logger.info('No content to validate, skipping compliance check')
+        return
+      }
+
       try {
         logger.info('Starting community content compliance validation', {
-          name,
-          descriptionLength: description.length,
+          descriptionLength: description?.length || 0,
           hasThumbnail: String(!!thumbnailBuffer)
         })
 
@@ -41,35 +46,23 @@ export function createCommunityComplianceValidatorComponent(
 
         if (!validationResult.isCompliant) {
           logger.warn('Community content is not compliant', {
-            name,
-            issues: validationResult.issues.join(', '),
-            warnings: validationResult.warnings.join(', '),
+            name: name || 'undefined',
+            issues: JSON.stringify(validationResult.issues),
             confidence: validationResult.confidence
           })
 
           throw new CommunityNotCompliantError(
-            `Community content violates Decentraland's Code of Ethics: ${validationResult.reasoning}`,
+            `Community content violates Decentraland's Code of Ethics`,
             validationResult.issues,
-            validationResult.warnings,
             validationResult.confidence
           )
         }
 
-        if (validationResult.warnings.length > 0) {
-          logger.info('Community content is compliant with warnings', {
-            name,
-            warnings: validationResult.warnings.join(', '),
-            confidence: validationResult.confidence
-          })
-        } else {
-          logger.info('Community content is compliant', {
-            name,
-            confidence: validationResult.confidence
-          })
-        }
+        logger.info('Community content is compliant', {
+          confidence: validationResult.confidence
+        })
       } catch (error) {
         logger.error('Community compliance validation failed', {
-          name,
           error: errorMessageOrDefault(error, 'Unknown error')
         })
 
