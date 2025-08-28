@@ -376,8 +376,8 @@ export function createCommunityComponent(
 
       if (nameChanged || descriptionChanged || thumbnailBuffer) {
         await communityComplianceValidator.validateCommunityContent({
-          name: nameChanged ? updates.name : undefined,
-          description: descriptionChanged ? updates.description : undefined,
+          name: updates.name,
+          description: updates.description,
           thumbnailBuffer
         })
       }
