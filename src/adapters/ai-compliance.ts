@@ -30,7 +30,7 @@ export async function createAIComplianceComponent(
 
   const env = await config.getString('ENV')
   const apiKey = await config.requireString('OPEN_AI_API_KEY')
-  const model = (await config.getString('OPENAI_MODEL')) || 'gpt-5-nano'
+  const model = (await config.getString('OPEN_AI_MODEL')) || 'gpt-5-nano'
 
   // Comprehensive but focused prompt based on official Code of Ethics and Content Policy
   const SYSTEM_PROMPT = `You are a Decentraland compliance expert analyzing community content against our Code of Ethics (https://decentraland.org/ethics/) and Content Policy (https://decentraland.org/content).
