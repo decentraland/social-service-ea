@@ -9,7 +9,7 @@ import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   CommunityDeletedEvent,
-  CommunityInviteSentEvent,
+  CommunityInviteReceivedEvent,
   CommunityMemberBannedEvent,
   CommunityMemberRemovedEvent,
   CommunityRenamedEvent,
@@ -302,7 +302,7 @@ export type IPublisherComponent = {
       | CommunityMemberRemovedEvent
       | CommunityRequestToJoinAcceptedEvent
       | CommunityRequestToJoinReceivedEvent
-      | CommunityInviteSentEvent
+      | CommunityInviteReceivedEvent
   ): Promise<PublishCommandOutput>
 }
 

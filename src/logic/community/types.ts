@@ -3,8 +3,19 @@ import {
   FriendshipStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { CommunityRole, Action } from '../../types/entities'
-import { CommunityInviteSentEvent, CommunityMemberBannedEvent, CommunityMemberRemovedEvent, CommunityRequestToJoinAcceptedEvent, CommunityRequestToJoinReceivedEvent, EthAddress, PaginatedParameters } from '@dcl/schemas'
-import { CommunityDeletedEventReducedMetadata, CommunityRenamedEventReducedMetadata } from './broadcaster'
+import {
+  CommunityInviteReceivedEvent,
+  CommunityMemberBannedEvent,
+  CommunityMemberRemovedEvent,
+  CommunityRequestToJoinAcceptedEvent,
+  EthAddress,
+  PaginatedParameters
+} from '@dcl/schemas'
+import {
+  CommunityDeletedEventReducedMetadata,
+  CommunityRenamedEventReducedMetadata,
+  CommunityRequestToJoinReceivedEventReducedMetadata
+} from './broadcaster'
 
 export interface ICommunitiesComponent {
   getCommunity(id: string, options: { as?: EthAddress }): Promise<AggregatedCommunityWithMemberAndVoiceChatData>
@@ -161,8 +172,8 @@ export interface ICommunityBroadcasterComponent {
       | CommunityMemberRemovedEvent
       | CommunityMemberBannedEvent
       | CommunityRequestToJoinAcceptedEvent
-      | CommunityRequestToJoinReceivedEvent
-      | CommunityInviteSentEvent
+      | CommunityRequestToJoinReceivedEventReducedMetadata
+      | CommunityInviteReceivedEvent
   ): Promise<void>
 }
 
