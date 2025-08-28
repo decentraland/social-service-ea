@@ -53,7 +53,11 @@ describe('CommunityComplianceValidator', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: true,
-            issues: {},
+            issues: {
+              name: [],
+              description: [],
+              image: []
+            },
             confidence: 1,
             reasoning: 'This community is compliant'
           })
@@ -79,7 +83,11 @@ describe('CommunityComplianceValidator', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: true,
-            issues: {},
+            issues: {
+              name: [],
+              description: [],
+              image: []
+            },
             confidence: 0.8,
             reasoning: 'Content is compliant with minor concerns'
           })
@@ -107,7 +115,8 @@ describe('CommunityComplianceValidator', () => {
             isCompliant: false,
             issues: {
               name: ['Contains hate speech'],
-              description: ['Promotes violence']
+              description: ['Promotes violence'],
+              image: []
             },
             confidence: 0.9,
             reasoning: 'Content violates community guidelines'
@@ -134,7 +143,11 @@ describe('CommunityComplianceValidator', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: true,
-            issues: {},
+            issues: {
+              name: [],
+              description: [],
+              image: []
+            },
             confidence: 0.95,
             reasoning: 'Content with thumbnail is compliant'
           })

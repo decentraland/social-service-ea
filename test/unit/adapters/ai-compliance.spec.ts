@@ -72,7 +72,11 @@ describe('AIComplianceComponent', () => {
 
         expect(result).toEqual({
           isCompliant: true,
-          issues: {},
+          issues: {
+            name: [],
+            description: [],
+            image: []
+          },
           confidence: 1,
           reasoning: 'AI Compliance disabled for non-production environment'
         })
@@ -85,7 +89,11 @@ describe('AIComplianceComponent', () => {
         mockOpenAICreate.mockResolvedValue({
           output_text: JSON.stringify({
             isCompliant: true,
-            issues: {},
+            issues: {
+              name: [],
+              description: [],
+              image: []
+            },
             confidence: 1,
             reasoning: 'AI Compliance enabled for non-production environment'
           }),
@@ -205,7 +213,11 @@ describe('AIComplianceComponent', () => {
           mockResponse = {
             output_text: JSON.stringify({
               isCompliant: true,
-              issues: {},
+              issues: {
+                name: [],
+                description: [],
+                image: []
+              },
               confidence: 0.95,
               reasoning: 'Content is compliant with ethical standards'
             }),
@@ -222,7 +234,11 @@ describe('AIComplianceComponent', () => {
           const result = await aiCompliance.validateCommunityContent({ name, description })
 
           expect(result.isCompliant).toBe(true)
-          expect(result.issues).toEqual({})
+          expect(result.issues).toEqual({
+            name: [],
+            description: [],
+            image: []
+          })
           expect(result.confidence).toBe(0.95)
           expect(result.reasoning).toBe('Content is compliant with ethical standards')
         })
@@ -274,7 +290,7 @@ describe('AIComplianceComponent', () => {
               issues: {
                 name: ['Inappropriate language'],
                 description: ['Illegal activities'],
-                image: null
+                image: []
               },
               confidence: 0.85,
               reasoning: 'Content violates ethical standards'
@@ -295,7 +311,7 @@ describe('AIComplianceComponent', () => {
           expect(result.issues).toEqual({
             name: ['Inappropriate language'],
             description: ['Illegal activities'],
-            image: null
+            image: []
           })
           expect(result.confidence).toBe(0.85)
           expect(result.reasoning).toBe('Content violates ethical standards')
@@ -315,9 +331,9 @@ describe('AIComplianceComponent', () => {
             output_text: JSON.stringify({
               isCompliant: true,
               issues: {
-                name: null,
-                description: null,
-                image: null
+                name: [],
+                description: [],
+                image: []
               },
               confidence: 0.8,
               reasoning: 'Content is compliant with minor concerns'
@@ -336,9 +352,9 @@ describe('AIComplianceComponent', () => {
 
           expect(result.isCompliant).toBe(true)
           expect(result.issues).toEqual({
-            name: null,
-            description: null,
-            image: null
+            name: [],
+            description: [],
+            image: []
           })
           expect(result.confidence).toBe(0.8)
         })
@@ -350,9 +366,9 @@ describe('AIComplianceComponent', () => {
             output_text: JSON.stringify({
               isCompliant: true,
               issues: {
-                name: null,
-                description: null,
-                image: null
+                name: [],
+                description: [],
+                image: []
               },
               confidence: 0.95,
               reasoning: 'Content with thumbnail is compliant'
@@ -457,9 +473,9 @@ describe('AIComplianceComponent', () => {
               isCompliant: true,
               // Missing required fields
               issues: {
-                name: null,
-                description: null,
-                image: null
+                name: [],
+                description: [],
+                image: []
               }
               // confidence, reasoning missing
             }),
@@ -529,9 +545,9 @@ describe('AIComplianceComponent', () => {
             output_text: JSON.stringify({
               isCompliant: true,
               issues: {
-                name: null,
-                description: null,
-                image: null
+                name: [],
+                description: [],
+                image: []
               },
               confidence: 0.95,
               reasoning: 'Content is compliant'

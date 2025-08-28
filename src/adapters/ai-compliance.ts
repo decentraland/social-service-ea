@@ -8,9 +8,9 @@ import { FeatureFlag } from './feature-flags'
 export type ComplianceValidationResult = {
   isCompliant: boolean
   issues: {
-    name?: string[]
-    description?: string[]
-    image?: string[]
+    name: string[]
+    description: string[]
+    image: string[]
   }
   confidence: number
   reasoning: string
@@ -28,7 +28,7 @@ export interface IAIComplianceComponent {
 }
 
 export namespace ComplianceValidationResult {
-  export const schema = {
+  export const schema: JSONSchema<ComplianceValidationResult> = {
     type: 'object',
     additionalProperties: false,
     required: ['isCompliant', 'issues', 'confidence', 'reasoning'],
@@ -37,31 +37,29 @@ export namespace ComplianceValidationResult {
       issues: {
         type: 'object',
         additionalProperties: false,
+        required: ['name', 'description', 'image'],
         properties: {
           name: {
             type: 'array',
             maxItems: 3,
-            items: { type: 'string', maxLength: 25 },
-            nullable: true
+            items: { type: 'string', maxLength: 25 }
           },
           description: {
             type: 'array',
             maxItems: 3,
-            items: { type: 'string', maxLength: 25 },
-            nullable: true
+            items: { type: 'string', maxLength: 25 }
           },
           image: {
             type: 'array',
             maxItems: 3,
-            items: { type: 'string', maxLength: 25 },
-            nullable: true
+            items: { type: 'string', maxLength: 25 }
           }
         }
       },
       confidence: { type: 'number', minimum: 0, maximum: 1 },
       reasoning: { type: 'string', maxLength: 250 }
     }
-  } as any as JSONSchema<ComplianceValidationResult> // hacky way to avoid type errors since test/tsconfig.json is not strict (when strict it breaks 54 tests files)
+  } as any as JSONSchema<ComplianceValidationResult> // hack to avoid type errors, when using strictNullChecks in test/tsconfig.json 54 test files fail
 
   export const validate: ValidateFunction<ComplianceValidationResult> = generateLazyValidator(schema)
 }
@@ -103,7 +101,11 @@ export async function createAIComplianceComponent(
       validateCommunityContent: async (_request: ComplianceValidationRequest): Promise<ComplianceValidationResult> => {
         return {
           isCompliant: true,
-          issues: {},
+          issues: {
+            name: [],
+            description: [],
+            image: []
+          },
           confidence: 1,
           reasoning: 'AI Compliance disabled for non-production environment'
         }
@@ -150,7 +152,7 @@ export async function createAIComplianceComponent(
             format: {
               type: 'json_schema' as const,
               name: 'ComplianceValidationResult',
-              schema: ComplianceValidationResult
+              schema: ComplianceValidationResult.schema as any // hack to avoid type errors, when using strictNullChecks in test/tsconfig.json 54 test files fail
             }
           }
         }
