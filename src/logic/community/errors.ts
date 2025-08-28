@@ -56,8 +56,7 @@ export class InvalidCommunityRequestError extends Error {
 export class CommunityNotCompliantError extends Error {
   constructor(
     message: string,
-    public readonly issues: string[],
-    public readonly warnings: string[],
+    public readonly issues: Record<string, string[]>,
     public readonly confidence: number = 0
   ) {
     super(message)

@@ -1,4 +1,7 @@
-import { createCommunityComplianceValidatorComponent, ICommunityComplianceValidatorComponent } from '../../../src/logic/community/compliance-validator'
+import {
+  createCommunityComplianceValidatorComponent,
+  ICommunityComplianceValidatorComponent
+} from '../../../src/logic/community/compliance-validator'
 import { createAIComplianceMock, createLogsMockedComponent } from '../../mocks/components'
 import { CommunityNotCompliantError } from '../../../src/logic/community/errors'
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
@@ -23,7 +26,7 @@ describe('CommunityComplianceValidator', () => {
       logs: logsMock
     })
   })
-  
+
   describe('when validating community content', () => {
     describe('and compliance validation feature flag is disabled', () => {
       beforeEach(() => {
@@ -50,8 +53,7 @@ describe('CommunityComplianceValidator', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: true,
-            issues: [],
-            warnings: [],
+            issues: {},
             confidence: 1,
             reasoning: 'This community is compliant'
           })
@@ -60,7 +62,7 @@ describe('CommunityComplianceValidator', () => {
         it('should pass validation successfully', async () => {
           const name = 'Friendly Gaming Community'
           const description = 'A welcoming community for gamers to connect and play together'
-          
+
           const result = await complianceValidator.validateCommunityContent({ name, description })
 
           expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
@@ -68,7 +70,7 @@ describe('CommunityComplianceValidator', () => {
             description,
             thumbnailBuffer: undefined
           })
-          
+
           expect(result).toBeUndefined()
         })
       })
@@ -77,8 +79,7 @@ describe('CommunityComplianceValidator', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: true,
-            issues: [],
-            warnings: ['Content is borderline but acceptable'],
+            issues: {},
             confidence: 0.8,
             reasoning: 'Content is compliant with minor concerns'
           })
@@ -87,7 +88,7 @@ describe('CommunityComplianceValidator', () => {
         it('should pass validation with warnings', async () => {
           const name = 'A'.repeat(101) // Very long name
           const description = 'A'.repeat(1001) // Very long description
-          
+
           const result = await complianceValidator.validateCommunityContent({ name, description })
 
           expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
@@ -95,7 +96,7 @@ describe('CommunityComplianceValidator', () => {
             description,
             thumbnailBuffer: undefined
           })
-          
+
           expect(result).toBeUndefined()
         })
       })
@@ -104,20 +105,22 @@ describe('CommunityComplianceValidator', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: false,
-            issues: ['Contains hate speech and promotes violence'],
-            warnings: [],
+            issues: {
+              name: ['Contains hate speech'],
+              description: ['Promotes violence']
+            },
             confidence: 0.9,
             reasoning: 'Content violates community guidelines'
           })
         })
-        
+
         it('should throw CommunityNotCompliantError', async () => {
           const name = 'Hate Speech Community'
           const description = 'A community for spreading hate and violence'
-          
-          await expect(
-            complianceValidator.validateCommunityContent({ name, description })
-          ).rejects.toThrow(CommunityNotCompliantError)
+
+          await expect(complianceValidator.validateCommunityContent({ name, description })).rejects.toThrow(
+            CommunityNotCompliantError
+          )
 
           expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
             name,
@@ -126,13 +129,12 @@ describe('CommunityComplianceValidator', () => {
           })
         })
       })
-      
+
       describe('and validating content with thumbnails', () => {
         beforeEach(() => {
           aiComplianceMock.validateCommunityContent.mockResolvedValue({
             isCompliant: true,
-            issues: [],
-            warnings: [],
+            issues: {},
             confidence: 0.95,
             reasoning: 'Content with thumbnail is compliant'
           })
@@ -142,19 +144,23 @@ describe('CommunityComplianceValidator', () => {
           const name = 'Test Community'
           const description = 'Test description'
           const thumbnail = Buffer.from('fake-image-data')
-          
-          const result = await complianceValidator.validateCommunityContent({ name, description, thumbnailBuffer: thumbnail })
+
+          const result = await complianceValidator.validateCommunityContent({
+            name,
+            description,
+            thumbnailBuffer: thumbnail
+          })
 
           expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith({
             name,
             description,
-            thumbnailBuffer: thumbnail,
+            thumbnailBuffer: thumbnail
           })
-          
+
           expect(result).toBeUndefined()
         })
       })
-      
+
       describe('and AI compliance service fails', () => {
         let failingValidator: ICommunityComplianceValidatorComponent
 
@@ -164,14 +170,14 @@ describe('CommunityComplianceValidator', () => {
               throw new Error('AI service unavailable')
             }
           }
-          
+
           failingValidator = createCommunityComplianceValidatorComponent({
             aiCompliance: failingAiCompliance,
             featureFlags: featureFlagsMock,
             logs: logsMock
           })
         })
-        
+
         it('should propagate the original error', async () => {
           await expect(
             failingValidator.validateCommunityContent({ name: 'Test', description: 'Test description' })
@@ -180,4 +186,4 @@ describe('CommunityComplianceValidator', () => {
       })
     })
   })
-}) 
+})

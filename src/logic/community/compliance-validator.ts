@@ -42,31 +42,21 @@ export function createCommunityComplianceValidatorComponent(
         if (!validationResult.isCompliant) {
           logger.warn('Community content is not compliant', {
             name,
-            issues: validationResult.issues.join(', '),
-            warnings: validationResult.warnings.join(', '),
+            issues: JSON.stringify(validationResult.issues),
             confidence: validationResult.confidence
           })
 
           throw new CommunityNotCompliantError(
             `Community content violates Decentraland's Code of Ethics: ${validationResult.reasoning}`,
             validationResult.issues,
-            validationResult.warnings,
             validationResult.confidence
           )
         }
 
-        if (validationResult.warnings.length > 0) {
-          logger.info('Community content is compliant with warnings', {
-            name,
-            warnings: validationResult.warnings.join(', '),
-            confidence: validationResult.confidence
-          })
-        } else {
-          logger.info('Community content is compliant', {
-            name,
-            confidence: validationResult.confidence
-          })
-        }
+        logger.info('Community content is compliant', {
+          name,
+          confidence: validationResult.confidence
+        })
       } catch (error) {
         logger.error('Community compliance validation failed', {
           name,

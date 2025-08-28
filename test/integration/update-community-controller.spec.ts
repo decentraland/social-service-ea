@@ -370,8 +370,7 @@ test('Update Community Controller', async function ({ components, stubComponents
             stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
               new CommunityNotCompliantError(
                 "Community content violates Decentraland's Code of Ethics: Content violates Decentraland Code of Ethics",
-                ['Contains inappropriate language', 'Promotes violence'],
-                ['Content is borderline'],
+                { name: ['Contains inappropriate language', 'Promotes violence'] },
                 0.9
               )
             )
@@ -392,8 +391,9 @@ test('Update Community Controller', async function ({ components, stubComponents
             const body = await response.json()
             expect(body.error).toBe('Community not compliant')
             expect(body.message).toContain("Community content violates Decentraland's Code of Ethics")
-            expect(body.data.issues).toEqual(['Contains inappropriate language', 'Promotes violence'])
-            expect(body.data.warnings).toEqual(['Content is borderline'])
+            expect(body.data.issues).toEqual({
+              name: ['Contains inappropriate language', 'Promotes violence']
+            })
           })
 
           it('should respond with a 400 status code when updating thumbnail with non-compliant content', async () => {
