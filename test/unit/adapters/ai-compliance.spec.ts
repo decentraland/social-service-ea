@@ -1,12 +1,12 @@
 import { createAIComplianceComponent } from '../../../src/adapters/ai-compliance'
-import { mockConfig, mockLogs, createFeatureFlagsMockComponent, createMemoryCacheMock } from '../../mocks/components'
+import { mockConfig, mockLogs, createFeatureFlagsMockComponent, mockRedis } from '../../mocks/components'
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { AIComplianceError } from '../../../src/logic/community/errors'
 import { IFeatureFlagsAdapter } from '../../../src/adapters/feature-flags'
 import { IMetricsComponent } from '@well-known-components/interfaces'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { metricDeclarations } from '../../../src/metrics'
-import { ICacheComponent } from '../../../src/types'
+import { IRedisComponent, ICacheComponent } from '../../../src/types'
 
 const mockOpenAICreate = jest.fn()
 
@@ -28,7 +28,7 @@ describe('AIComplianceComponent', () => {
   let mockResponse: any
   let featureFlagsMock: jest.Mocked<IFeatureFlagsAdapter>
   let mockMetrics: IMetricsComponent<keyof typeof metricDeclarations>
-  let mockMemoryCache: jest.Mocked<ICacheComponent>
+  let mockRedisComponent: jest.Mocked<IRedisComponent & ICacheComponent>
 
   beforeEach(() => {
     mockConfig.requireString.mockImplementation((key: string) => {
@@ -44,7 +44,7 @@ describe('AIComplianceComponent', () => {
 
     featureFlagsMock = createFeatureFlagsMockComponent({})
     mockMetrics = createTestMetricsComponent(metricDeclarations)
-    mockMemoryCache = createMemoryCacheMock({})
+    mockRedisComponent = mockRedis
 
     jest.spyOn(mockMetrics, 'observe')
     jest.spyOn(mockMetrics, 'increment')
@@ -67,7 +67,7 @@ describe('AIComplianceComponent', () => {
           logs: mockLogs,
           featureFlags: featureFlagsMock,
           metrics: mockMetrics,
-          memoryCache: mockMemoryCache
+          redis: mockRedisComponent
         })
       })
 
@@ -107,7 +107,7 @@ describe('AIComplianceComponent', () => {
           logs: mockLogs,
           featureFlags: featureFlagsMock,
           metrics: mockMetrics,
-          memoryCache: mockMemoryCache
+          redis: mockRedisComponent
         })
       })
 
@@ -143,7 +143,7 @@ describe('AIComplianceComponent', () => {
             logs: mockLogs,
             featureFlags: featureFlagsMock,
             metrics: mockMetrics,
-            memoryCache: mockMemoryCache
+            redis: mockRedisComponent
           })
 
           expect(aiCompliance).toBeDefined()
@@ -168,7 +168,7 @@ describe('AIComplianceComponent', () => {
             logs: mockLogs,
             featureFlags: featureFlagsMock,
             metrics: mockMetrics,
-            memoryCache: mockMemoryCache
+            redis: mockRedisComponent
           })
 
           expect(aiCompliance).toBeDefined()
@@ -190,7 +190,7 @@ describe('AIComplianceComponent', () => {
               logs: mockLogs,
               featureFlags: featureFlagsMock,
               metrics: mockMetrics,
-              memoryCache: mockMemoryCache
+              redis: mockRedisComponent
             })
           ).rejects.toThrow('OPEN_AI_API_KEY not found')
         })
@@ -211,7 +211,7 @@ describe('AIComplianceComponent', () => {
           logs: mockLogs,
           featureFlags: featureFlagsMock,
           metrics: mockMetrics,
-          memoryCache: mockMemoryCache
+          redis: mockRedisComponent
         })
       })
 

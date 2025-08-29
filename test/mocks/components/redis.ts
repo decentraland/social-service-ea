@@ -39,3 +39,22 @@ export const mockRedis: jest.Mocked<IRedisComponent & ICacheComponent> = {
   get: jest.fn(),
   put: jest.fn()
 }
+
+export const createRedisMock = ({
+  get,
+  put
+}: Partial<jest.Mocked<IRedisComponent & ICacheComponent>>): jest.Mocked<IRedisComponent & ICacheComponent> => {
+  return {
+    client: createClient(),
+    get:
+      get ||
+      jest.fn(async (key: string) => {
+        return null // Default to cache miss for tests
+      }),
+    put:
+      put ||
+      jest.fn(async (key: string, value: any) => {
+        // Mock implementation
+      })
+  }
+}

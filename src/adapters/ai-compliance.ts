@@ -73,14 +73,27 @@ IMPORTANT:
 3) Output ONLY JSON that matches the provided schema.`
 
 export async function createAIComplianceComponent(
-  components: Pick<AppComponents, 'config' | 'logs' | 'featureFlags' | 'metrics' | 'memoryCache'>
+  components: Pick<AppComponents, 'config' | 'logs' | 'featureFlags' | 'metrics' | 'redis'>
 ): Promise<IAIComplianceComponent> {
-  const { config, logs, featureFlags, metrics, memoryCache } = components
+  const { config, logs, featureFlags, metrics, redis } = components
   const logger = logs.getLogger('ai-compliance')
 
   const env = await config.getString('ENV')
   const apiKey = await config.requireString('OPEN_AI_API_KEY')
   const model = (await config.getString('OPEN_AI_MODEL')) || 'gpt-5-nano'
+
+  const getCacheKey = (request: ComplianceValidationRequest) => {
+    const imageHash = request.thumbnailBuffer
+      ? crypto.createHash('sha256').update(request.thumbnailBuffer).digest('hex')
+      : 'no-img'
+
+    const cacheKey = `ai-compliance:${model}:${crypto
+      .createHash('sha256')
+      .update(`${request.name || ''}\n${request.description || ''}\n${imageHash}`)
+      .digest('hex')}`
+
+    return cacheKey
+  }
 
   return {
     async validateCommunityContent(request: ComplianceValidationRequest): Promise<ComplianceValidationResult> {
@@ -107,15 +120,8 @@ export async function createAIComplianceComponent(
       const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
       // Build a content hash to memoize identical inputs
-      const imageHash = request.thumbnailBuffer
-        ? crypto.createHash('sha256').update(request.thumbnailBuffer).digest('hex')
-        : 'no-img'
-      const cacheKey = `ai-compliance:${model}:${crypto
-        .createHash('sha256')
-        .update(`${request.name || ''}\n${request.description || ''}\n${imageHash}`)
-        .digest('hex')}`
-
-      const cached = await memoryCache.get<ComplianceValidationResult>(cacheKey)
+      const cacheKey = getCacheKey(request)
+      const cached = await redis.get<ComplianceValidationResult>(cacheKey)
       if (cached) {
         const ms = Date.now() - startTime
         metrics.increment('ai_compliance_validation_total', {
@@ -230,7 +236,7 @@ export async function createAIComplianceComponent(
         })
 
         // Memoize result for identical inputs
-        await memoryCache.put(cacheKey, result)
+        await redis.put(cacheKey, result)
         return result
       } catch (error) {
         metrics.increment('ai_compliance_validation_total', { result: 'failed' })
