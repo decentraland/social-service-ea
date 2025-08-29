@@ -36,12 +36,8 @@ jest.mock('redis', () => {
 
 export const mockRedis: jest.Mocked<IRedisComponent & ICacheComponent> = {
   client: createClient(),
-  get: jest.fn(async (key: string) => {
-    return null // Default to cache miss for tests
-  }),
-  put: jest.fn(async (key: string, value: any) => {
-    // Mock implementation
-  })
+  get: jest.fn(),
+  put: jest.fn()
 }
 
 export const createRedisMock = ({
