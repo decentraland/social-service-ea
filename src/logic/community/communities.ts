@@ -342,6 +342,9 @@ export function createCommunityComponent(
       }
 
       await communityRoles.validatePermissionToEditCommunity(communityId, userAddress)
+      if (updates.name && updates.name.trim() !== existingCommunity.name.trim()) {
+        await communityRoles.validatePermissionToEditCommunityName(communityId, userAddress)
+      }
 
       if (Object.keys(updates).length === 0) {
         return {

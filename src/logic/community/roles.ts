@@ -5,6 +5,7 @@ import { ICommunityRolesComponent } from './types'
 
 export const OWNER_PERMISSIONS: CommunityPermission[] = [
   'edit_info',
+  'edit_name',
   'add_places',
   'remove_places',
   'accept_requests',
@@ -187,6 +188,7 @@ export function createCommunityRolesComponent(
       'accept and reject requests'
     ),
     validatePermissionToViewRequests: validatePermission('view_requests', 'view requests'),
-    validatePermissionToInviteUsers: validatePermission('invite_users', 'invite users')
+    validatePermissionToInviteUsers: validatePermission('invite_users', 'invite users'),
+    validatePermissionToEditCommunityName: validatePermission('edit_name', 'edit the community name')
   }
 }
