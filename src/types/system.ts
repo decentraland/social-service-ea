@@ -105,6 +105,7 @@ export type BaseComponents = {
   friendsDb: IFriendsDatabaseComponent
   httpServer: IHttpServerComponent<GlobalContext>
   logs: ILoggerComponent
+  memoryCache: ICacheComponent
   messageConsumer: IMessageConsumerComponent
   messageProcessor: IMessageProcessorComponent
   metrics: IMetricsComponent<MetricsDeclaration>

@@ -74,6 +74,7 @@ import { createFeatureFlagsMockComponent } from './mocks/components/feature-flag
 import { createFeaturesMockComponent } from './mocks/components/features'
 import { createFeaturesComponent } from '@well-known-components/features-component'
 import { createFeatureFlagsAdapter } from '../src/adapters/feature-flags'
+import { createInMemoryCacheComponent } from '../src/adapters/memory-cache'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -114,6 +115,7 @@ async function initComponents(): Promise<TestComponents> {
     }
   )
   const fetcher = createFetchComponent()
+  const memoryCache = createInMemoryCacheComponent()
 
   const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 
@@ -321,6 +323,7 @@ async function initComponents(): Promise<TestComponents> {
     localHttpFetch,
     localUwsFetch,
     logs,
+    memoryCache,
     messageConsumer,
     messageProcessor,
     metrics,

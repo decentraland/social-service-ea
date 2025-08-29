@@ -1,11 +1,12 @@
 import { createAIComplianceComponent } from '../../../src/adapters/ai-compliance'
-import { mockConfig, mockLogs, createFeatureFlagsMockComponent } from '../../mocks/components'
+import { mockConfig, mockLogs, createFeatureFlagsMockComponent, createMemoryCacheMock } from '../../mocks/components'
 import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { AIComplianceError } from '../../../src/logic/community/errors'
 import { IFeatureFlagsAdapter } from '../../../src/adapters/feature-flags'
 import { IMetricsComponent } from '@well-known-components/interfaces'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { metricDeclarations } from '../../../src/metrics'
+import { ICacheComponent } from '../../../src/types'
 
 const mockOpenAICreate = jest.fn()
 
@@ -27,6 +28,7 @@ describe('AIComplianceComponent', () => {
   let mockResponse: any
   let featureFlagsMock: jest.Mocked<IFeatureFlagsAdapter>
   let mockMetrics: IMetricsComponent<keyof typeof metricDeclarations>
+  let mockMemoryCache: jest.Mocked<ICacheComponent>
 
   beforeEach(() => {
     mockConfig.requireString.mockImplementation((key: string) => {
@@ -42,6 +44,7 @@ describe('AIComplianceComponent', () => {
 
     featureFlagsMock = createFeatureFlagsMockComponent({})
     mockMetrics = createTestMetricsComponent(metricDeclarations)
+    mockMemoryCache = createMemoryCacheMock({})
 
     jest.spyOn(mockMetrics, 'observe')
     jest.spyOn(mockMetrics, 'increment')
@@ -63,7 +66,8 @@ describe('AIComplianceComponent', () => {
           config: mockConfig,
           logs: mockLogs,
           featureFlags: featureFlagsMock,
-          metrics: mockMetrics
+          metrics: mockMetrics,
+          memoryCache: mockMemoryCache
         })
       })
 
@@ -102,7 +106,8 @@ describe('AIComplianceComponent', () => {
           config: mockConfig,
           logs: mockLogs,
           featureFlags: featureFlagsMock,
-          metrics: mockMetrics
+          metrics: mockMetrics,
+          memoryCache: mockMemoryCache
         })
       })
 
@@ -137,7 +142,8 @@ describe('AIComplianceComponent', () => {
             config: mockConfig,
             logs: mockLogs,
             featureFlags: featureFlagsMock,
-            metrics: mockMetrics
+            metrics: mockMetrics,
+            memoryCache: mockMemoryCache
           })
 
           expect(aiCompliance).toBeDefined()
@@ -161,7 +167,8 @@ describe('AIComplianceComponent', () => {
             config: mockConfig,
             logs: mockLogs,
             featureFlags: featureFlagsMock,
-            metrics: mockMetrics
+            metrics: mockMetrics,
+            memoryCache: mockMemoryCache
           })
 
           expect(aiCompliance).toBeDefined()
@@ -182,7 +189,8 @@ describe('AIComplianceComponent', () => {
               config: mockConfig,
               logs: mockLogs,
               featureFlags: featureFlagsMock,
-              metrics: mockMetrics
+              metrics: mockMetrics,
+              memoryCache: mockMemoryCache
             })
           ).rejects.toThrow('OPEN_AI_API_KEY not found')
         })
@@ -202,7 +210,8 @@ describe('AIComplianceComponent', () => {
           config: mockConfig,
           logs: mockLogs,
           featureFlags: featureFlagsMock,
-          metrics: mockMetrics
+          metrics: mockMetrics,
+          memoryCache: mockMemoryCache
         })
       })
 
@@ -252,7 +261,7 @@ describe('AIComplianceComponent', () => {
                   schema: expect.any(Object)
                 }
               },
-              instructions: expect.stringContaining('Decentraland compliance expert'),
+              instructions: expect.stringContaining("You are Decentraland's compliance expert"),
               input: expect.stringContaining(name)
             })
           )
