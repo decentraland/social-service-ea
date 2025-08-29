@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import crypto from 'crypto'
 import { generateLazyValidator, JSONSchema, ValidateFunction } from '@dcl/schemas'
 import { AppComponents } from '../types'
 import { AIComplianceError } from '../logic/community/errors'
@@ -62,34 +63,19 @@ export namespace ComplianceValidationResult {
   export const validate: ValidateFunction<ComplianceValidationResult> = generateLazyValidator(schema)
 }
 
-const SYSTEM_PROMPT = `You are a Decentraland compliance expert analyzing community content against our Code of Ethics (https://decentraland.org/ethics/) and Content Policy (https://decentraland.org/content).
+const SYSTEM_PROMPT = `You are Decentraland's compliance expert. Analyze proposed community content against:
+• Code of Ethics (conduct, law, business integrity, confidentiality/privacy, no violence, drugs/alcohol limits, equal opportunity, conflicts of interest, KYC/legitimacy, reputational/legal risk).
+• Content Policy (no illegality: piracy/terrorism/obscenity/child sexual abuse, no IP infringement, no hate/harassment, no false/misleading/libel/privacy invasion, no data-privacy violations; gambling must be licensed & geo-blocked; age-restricted content (intense violence/gambling/sexual) must be 18+ with warnings).
 
-COMPLIANCE CHECKLIST:
-• VIOLENCE/HARASSMENT: No violence, bullying, discrimination, or inappropriate behavior
-• ILLEGAL ACTIVITIES: No drugs, criminal behavior, piracy, terrorism, obscenity, child pornography
-• HATE SPEECH: No content harming/harassing based on race, religion, nationality, disability, gender, age, veteran status, sexual orientation
-• BUSINESS INTEGRITY: No corruption, bribery, deceptive practices, conflicts of interest
-• PRIVACY: No exposure of private data, breaches of privacy policy
-• INTELLECTUAL PROPERTY: No IP rights infringement
-• FALSE INFORMATION: No libelous, misleading, or privacy-invading content
-• GAMBLING: Must comply with licensing and geo-blocking restrictions
-• AGE RESTRICTIONS: Violent/gambling/sexual content must be 18+ restricted
-• REPUTATIONAL RISK: Must not damage Decentraland's trustworthy reputation
-
-Be strict but fair. Flag any content that violates these principles.
-
-For issues, use field names as keys and provide SHORT issue types (max 25 chars) as arrays.
-Examples: 
-- "name": ["Phishing", "Hate speech"]
-- "description": ["Spam content", "Offensive"]
-- "image": ["Contains nudity"]
-
-Return ONLY valid JSON matching the schema.`
+IMPORTANT:
+1) Analyze each field INDEPENDENTLY (do NOT infer issues across fields).
+2) Be strict but fair. Return concise issue tags (≤25 chars) per field. Max 3 per field.
+3) Output ONLY JSON that matches the provided schema.`
 
 export async function createAIComplianceComponent(
-  components: Pick<AppComponents, 'config' | 'logs' | 'featureFlags' | 'metrics'>
+  components: Pick<AppComponents, 'config' | 'logs' | 'featureFlags' | 'metrics' | 'memoryCache'>
 ): Promise<IAIComplianceComponent> {
-  const { config, logs, featureFlags, metrics } = components
+  const { config, logs, featureFlags, metrics, memoryCache } = components
   const logger = logs.getLogger('ai-compliance')
 
   const env = await config.getString('ENV')
@@ -119,6 +105,26 @@ export async function createAIComplianceComponent(
 
       const startTime = Date.now()
       const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+      // Build a content hash to memoize identical inputs
+      const imageHash = request.thumbnailBuffer
+        ? crypto.createHash('sha256').update(request.thumbnailBuffer).digest('hex')
+        : 'no-img'
+      const cacheKey = `ai-compliance:${model}:${crypto
+        .createHash('sha256')
+        .update(`${request.name || ''}\n${request.description || ''}\n${imageHash}`)
+        .digest('hex')}`
+
+      const cached = await memoryCache.get<ComplianceValidationResult>(cacheKey)
+      if (cached) {
+        const ms = Date.now() - startTime
+        metrics.increment('ai_compliance_validation_total', {
+          result: cached.isCompliant ? 'compliant_cached' : 'non-compliant_cached'
+        })
+        metrics.observe('ai_compliance_validation_duration_seconds', {}, ms / 1000)
+        logger.info('Compliance validation cache hit', { requestId, ms, cacheKey: cacheKey.substring(0, 20) + '...' })
+        return cached
+      }
 
       try {
         const openai = new OpenAI({ apiKey })
@@ -223,6 +229,8 @@ export async function createAIComplianceComponent(
           result: result.isCompliant ? 'compliant' : 'non-compliant'
         })
 
+        // Memoize result for identical inputs
+        await memoryCache.put(cacheKey, result)
         return result
       } catch (error) {
         metrics.increment('ai_compliance_validation_total', { result: 'failed' })

@@ -1,4 +1,4 @@
-import { ICacheComponent } from '@well-known-components/interfaces'
+import { ICacheComponent } from '../types'
 import { LRUCache } from 'lru-cache'
 
 export function createInMemoryCacheComponent(): ICacheComponent {
@@ -7,11 +7,12 @@ export function createInMemoryCacheComponent(): ICacheComponent {
     ttl: 1000 * 60 * 60 * 2 // 2 hours
   })
 
-  async function get(key: string): Promise<any> {
-    return cache.get(key)
+  async function get<T>(key: string): Promise<T | null> {
+    const value = cache.get(key)
+    return value || null
   }
 
-  async function put(key: string, value: any): Promise<void> {
+  async function put<T>(key: string, value: T): Promise<void> {
     cache.set(key, value)
   }
 
