@@ -9,9 +9,12 @@ import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   CommunityDeletedEvent,
+  CommunityInviteReceivedEvent,
   CommunityMemberBannedEvent,
   CommunityMemberRemovedEvent,
   CommunityRenamedEvent,
+  CommunityRequestToJoinAcceptedEvent,
+  CommunityRequestToJoinReceivedEvent,
   EthAddress,
   FriendshipAcceptedEvent,
   FriendshipRequestEvent,
@@ -170,7 +173,7 @@ export interface ICommunitiesDatabaseComponent {
   kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
   getCommunityMembers(
     id: string,
-    options: { userAddress?: EthAddress; pagination: Pagination; filterByMembers?: string[] }
+    options: { userAddress?: EthAddress; pagination: Pagination; filterByMembers?: string[]; roles?: CommunityRole[] }
   ): Promise<CommunityMember[]>
   getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number>
   getMemberCommunities(
@@ -297,6 +300,9 @@ export type IPublisherComponent = {
       | CommunityRenamedEvent
       | CommunityMemberBannedEvent
       | CommunityMemberRemovedEvent
+      | CommunityRequestToJoinAcceptedEvent
+      | CommunityRequestToJoinReceivedEvent
+      | CommunityInviteReceivedEvent
   ): Promise<PublishCommandOutput>
 }
 

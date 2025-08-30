@@ -1,5 +1,5 @@
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { CommunityRequestNotFoundError, CommunityRequestStatus } from '../../../logic/community'
+import { CommunityNotFoundError, CommunityRequestNotFoundError, CommunityRequestStatus } from '../../../logic/community'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 
@@ -56,6 +56,7 @@ export async function updateCommunityRequestStatusHandler(
 
     if (
       error instanceof CommunityRequestNotFoundError ||
+      error instanceof CommunityNotFoundError ||
       error instanceof NotAuthorizedError ||
       error instanceof InvalidRequestError
     ) {
