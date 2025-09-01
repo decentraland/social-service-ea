@@ -77,6 +77,7 @@ export type Pagination = {
 
 export type CommunityPermission =
   | 'edit_info'
+  | 'edit_name'
   | 'add_places'
   | 'remove_places'
   | 'accept_requests'
