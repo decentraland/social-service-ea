@@ -2,17 +2,19 @@ import { CommunityRole } from '../../../src/types/entities'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, createPlacesApiAdapterMockComponent } from '../../mocks/components'
+import { createPlacesApiAdapterMockComponent, createLogsMockedComponent } from '../../mocks/components'
 import { createCommunityPlacesComponent } from '../../../src/logic/community/places'
 import { ICommunityPlacesComponent, CommunityPlace, ICommunityRolesComponent, CommunityPrivacyEnum } from '../../../src/logic/community'
 import { IPlacesApiComponent } from '../../../src/types/components'
 import { createMockCommunityRolesComponent } from '../../mocks/communities'
+import { ILoggerComponent } from '@well-known-components/interfaces/dist/components/logger'
 
 describe('Community Places Component', () => {
   let defaultWorldData: { world: boolean; world_name: string }
   let communityPlacesComponent: ICommunityPlacesComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
   let mockPlacesApi: jest.Mocked<IPlacesApiComponent>
+  let mockLogs: jest.Mocked<ILoggerComponent>
   let mockUserAddress: string
   const communityId = 'test-community'
   const mockPlaces: CommunityPlace[] = [
@@ -39,14 +41,7 @@ describe('Community Places Component', () => {
     mockCommunityRoles = createMockCommunityRolesComponent({})
     mockPlacesApi = createPlacesApiAdapterMockComponent({}) as jest.Mocked<IPlacesApiComponent>
     
-    // Re-setup mockLogs after creating mocks
-    mockLogs.getLogger.mockReturnValueOnce({
-      log: jest.fn(),
-      debug: jest.fn(),
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn()
-    })
+    mockLogs = createLogsMockedComponent({})
     
     communityPlacesComponent = await createCommunityPlacesComponent({
       communitiesDb: mockCommunitiesDB,
