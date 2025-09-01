@@ -241,6 +241,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityRoles,
     communityBroadcaster,
     communityThumbnail,
+    catalystClient,
     logs
   })
 

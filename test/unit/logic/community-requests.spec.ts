@@ -21,6 +21,8 @@ import { createCommunityRequestsComponent } from '../../../src/logic/community/r
 import { mockLogs } from '../../mocks/components'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { CommunityRole } from '../../../src/types'
+import { ICatalystClientComponent } from '../../../src/types'
+import { createMockCatalystClient } from '../../mocks/components/catalyst-client'
 import {
   createMockCommunitiesComponent,
   createMockCommunityBroadcasterComponent,
@@ -41,10 +43,13 @@ describe('Community Requests Component', () => {
   let mockCommunityBroadcaster: ICommunityBroadcasterComponent
   let mockCommunityThumbnail: ICommunityThumbnailComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
+  let mockCatalystClient: jest.Mocked<ICatalystClientComponent>
 
   beforeEach(() => {
     communitiesComponent = createMockCommunitiesComponent({})
     mockCommunityRoles = createMockCommunityRolesComponent({})
+    mockCatalystClient = createMockCatalystClient()
+    
     // Ensure logs.getLogger returns a valid logger after mock resets
     mockLogs.getLogger.mockReturnValue({
       log: jest.fn(),
@@ -61,6 +66,7 @@ describe('Community Requests Component', () => {
       communityRoles: mockCommunityRoles,
       communityBroadcaster: mockCommunityBroadcaster,
       communityThumbnail: mockCommunityThumbnail,
+      catalystClient: mockCatalystClient,
       logs: mockLogs
     })
   })
@@ -336,8 +342,19 @@ describe('Community Requests Component', () => {
           })
 
           describe('and there are no pending requests for the user', () => {
+            let mockProfile: any
+
             beforeEach(() => {
               mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+              mockProfile = {
+                avatars: [{
+                  name: 'TestUser',
+                  unclaimedName: 'test_user',
+                  userId: userAddress,
+                  hasClaimedName: true
+                }]
+              }
+              mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
             })
 
             it('should create and return the request as pending', async () => {
@@ -369,6 +386,40 @@ describe('Community Requests Component', () => {
                 metadata: {
                   communityId: community.id,
                   communityName: community.name,
+                  memberAddress: userAddress,
+                  memberName: 'TestUser',
+                  thumbnailUrl: mockCommunityThumbnail.buildThumbnailUrl(community.id)
+                }
+              } as CommunityRequestToJoinReceivedEvent)
+            })
+
+            it('should fetch member profile for request to join', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              expect(mockCatalystClient.getProfile).toHaveBeenCalledWith(userAddress)
+            })
+          })
+
+          describe('and profile fetch fails', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+              mockCatalystClient.getProfile.mockRejectedValueOnce(new Error('Profile not found'))
+            })
+
+            it('should still broadcast the request to join received event with Unknown as member name', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+                type: Events.Type.COMMUNITY,
+                subType: Events.SubType.Community.REQUEST_TO_JOIN_RECEIVED,
+                key: expect.any(String),
+                timestamp: expect.any(Number),
+                metadata: {
+                  communityId: community.id,
+                  communityName: community.name,
+                  memberName: 'Unknown',
                   memberAddress: userAddress,
                   thumbnailUrl: mockCommunityThumbnail.buildThumbnailUrl(community.id)
                 }
@@ -571,6 +622,21 @@ describe('Community Requests Component', () => {
                   thumbnailUrl: mockCommunityThumbnail.buildThumbnailUrl(community.id)
                 }
               } as CommunityInviteReceivedEvent)
+            })
+
+            it('should not fetch member profile for invites', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              expect(mockCatalystClient.getProfile).not.toHaveBeenCalled()
+            })
+
+            it('should not include member name in invite received event', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              const broadcastCall = (mockCommunityBroadcaster.broadcast as jest.Mock).mock.calls[0][0]
+              expect(broadcastCall.metadata).not.toHaveProperty('memberName')
             })
           })
 

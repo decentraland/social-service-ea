@@ -39,6 +39,7 @@ export type CommunityRequestToJoinReceivedEventReducedMetadata = Omit<
     communityId: string
     communityName: string
     memberAddress: string
+    memberName: string
     thumbnailUrl: string
   }
 }

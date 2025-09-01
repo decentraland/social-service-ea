@@ -12,20 +12,33 @@ import {
   ListCommunityRequestsOptions,
   RequestActionOptions
 } from './types'
+import { getProfileName } from '../profiles'
 
 export function createCommunityRequestsComponent(
   components: Pick<
     AppComponents,
-    'communitiesDb' | 'communities' | 'communityRoles' | 'communityThumbnail' | 'communityBroadcaster' | 'logs'
+    | 'communitiesDb'
+    | 'communities'
+    | 'communityRoles'
+    | 'communityThumbnail'
+    | 'communityBroadcaster'
+    | 'catalystClient'
+    | 'logs'
   >
 ): ICommunityRequestsComponent {
-  const { communitiesDb, communities, communityRoles, communityThumbnail, communityBroadcaster, logs } = components
+  const { communitiesDb, communities, communityRoles, communityThumbnail, communityBroadcaster, catalystClient, logs } =
+    components
 
   const logger = logs.getLogger('community-requests-component')
 
   async function notifyStakeholdersAboutRequest(
     request: MemberRequest,
-    { communityId, communityName, memberAddress }: { communityId: string; communityName: string; memberAddress: string }
+    {
+      communityId,
+      communityName,
+      memberAddress,
+      memberName
+    }: { communityId: string; communityName: string; memberAddress: string; memberName?: string }
   ) {
     if (request.type === CommunityRequestType.RequestToJoin) {
       if (request.status === CommunityRequestStatus.Pending) {
@@ -38,6 +51,7 @@ export function createCommunityRequestsComponent(
             communityId: communityId,
             communityName: communityName,
             memberAddress,
+            memberName: memberName || 'Unknown',
             thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
           }
         })
@@ -139,10 +153,25 @@ export function createCommunityRequestsComponent(
     }
 
     setImmediate(async () => {
+      let memberName: string | undefined
+
+      try {
+        if (
+          createdRequest.type === CommunityRequestType.RequestToJoin &&
+          createdRequest.status === CommunityRequestStatus.Pending
+        ) {
+          const memberProfile = await catalystClient.getProfile(createdRequest.memberAddress)
+          memberName = getProfileName(memberProfile)
+        }
+      } catch (error) {
+        logger.warn(`Failed to fetch profile for member ${createdRequest.memberAddress}: ${error}`)
+      }
+
       await notifyStakeholdersAboutRequest(createdRequest, {
         communityId,
         communityName: community.name,
-        memberAddress
+        memberAddress,
+        memberName
       })
     })
 
