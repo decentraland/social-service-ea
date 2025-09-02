@@ -307,10 +307,12 @@ export function createCommunityComponent(
         throw new CommunityNotFoundError(id)
       }
 
+      const ownerDeletingOwnedCommunity = isOwner(community, userAddress)
+
       const globalModerators =
         (await featureFlags.getVariants<string[]>(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)) || []
 
-      if (!isOwner(community, userAddress) && !globalModerators.includes(userAddress.toLowerCase())) {
+      if (!ownerDeletingOwnedCommunity && !globalModerators.includes(userAddress.toLowerCase())) {
         throw new NotAuthorizedError("The user doesn't have permission to delete this community")
       }
 
@@ -332,7 +334,7 @@ export function createCommunityComponent(
         })
       })
 
-      if (!isOwner(community, userAddress)) {
+      if (!ownerDeletingOwnedCommunity) {
         setImmediate(async () => {
           await communityBroadcaster.broadcast({
             type: Events.Type.COMMUNITY,
