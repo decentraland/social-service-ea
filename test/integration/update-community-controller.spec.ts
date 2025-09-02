@@ -543,6 +543,40 @@ test('Update Community Controller', async function ({ components, stubComponents
           })
         })
 
+        it('should respond with a 400 status code when name is restricted', async () => {
+          const response = await makeMultipartRequest(
+            identity,
+            `/v1/communities/${communityId}`,
+            {
+              name: 'Restricted name'
+            },
+            'PUT'
+          )
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'Name is not allowed'
+          })
+        })
+
+        it('should respond with a 400 status code when name is restricted (case insensitive)', async () => {
+          const response = await makeMultipartRequest(
+            identity,
+            `/v1/communities/${communityId}`,
+            {
+              name: 'ANOTHER NOT ALLOWED NAME'
+            },
+            'PUT'
+          )
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'Name is not allowed'
+          })
+        })
+
         it('should respond with a 400 status code for invalid placeIds JSON', async () => {
           const form = new FormData()
           form.append('placeIds', 'invalid json')

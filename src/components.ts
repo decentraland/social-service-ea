@@ -40,7 +40,10 @@ import {
   createCommunityPlacesComponent,
   createCommunityEventsComponent,
   createCommunityBroadcasterComponent,
-  createCommunityThumbnailComponent
+  createCommunityThumbnailComponent,
+  createCommunityComplianceValidatorComponent,
+  createCommunityFieldsValidatorComponent,
+  createCommunityRequestsComponent
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
@@ -61,13 +64,10 @@ import { createFriendsComponent } from './logic/friends'
 import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/community-voice-cache'
 import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
 import { createSlackComponent } from '@dcl/slack-component'
-import { createCommunityRequestsComponent } from './logic/community/requests'
 import { createAIComplianceComponent } from './adapters/ai-compliance'
-import { createCommunityComplianceValidatorComponent } from './logic/community/compliance-validator'
 import { createFeaturesComponent } from '@well-known-components/features-component'
 import { createFeatureFlagsAdapter } from './adapters/feature-flags'
 import { createInMemoryCacheComponent } from './adapters/memory-cache'
-import { createCommunityFieldsValidatorComponent } from './logic/community/fields-validator'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
