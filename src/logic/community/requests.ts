@@ -13,6 +13,8 @@ import {
   RequestActionOptions
 } from './types'
 import { getProfileName } from '../profiles'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export function createCommunityRequestsComponent(
   components: Pick<
@@ -23,11 +25,20 @@ export function createCommunityRequestsComponent(
     | 'communityThumbnail'
     | 'communityBroadcaster'
     | 'catalystClient'
+    | 'pubsub'
     | 'logs'
   >
 ): ICommunityRequestsComponent {
-  const { communitiesDb, communities, communityRoles, communityThumbnail, communityBroadcaster, catalystClient, logs } =
-    components
+  const {
+    communitiesDb,
+    communities,
+    communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
+    catalystClient,
+    pubsub,
+    logs
+  } = components
 
   const logger = logs.getLogger('community-requests-component')
 
@@ -142,6 +153,12 @@ export function createCommunityRequestsComponent(
         status: CommunityRequestStatus.Accepted
       }
 
+      await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+        communityId,
+        memberAddress,
+        status: ConnectivityStatus.ONLINE
+      })
+
       logger.info(
         `Automatically joined user ${memberAddress} to community ${community.name} (${communityId}) by accepting ${oppositeTypeRequest.type}`
       )
@@ -247,6 +264,12 @@ export function createCommunityRequestsComponent(
         communityId: request.communityId,
         memberAddress: request.memberAddress,
         role: CommunityRole.Member
+      })
+
+      await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+        communityId: request.communityId,
+        memberAddress: request.memberAddress,
+        status: ConnectivityStatus.ONLINE
       })
 
       logger.info('Community request accepted', {

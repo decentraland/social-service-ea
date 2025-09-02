@@ -18,9 +18,9 @@ import {
 } from '../../../src/logic/community'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { createCommunityRequestsComponent } from '../../../src/logic/community/requests'
-import { mockLogs } from '../../mocks/components'
+import { createMockedPubSubComponent, mockLogs } from '../../mocks/components'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { CommunityRole } from '../../../src/types'
+import { CommunityRole, IPubSubComponent } from '../../../src/types'
 import { ICatalystClientComponent } from '../../../src/types'
 import { createMockCatalystClient } from '../../mocks/components/catalyst-client'
 import {
@@ -36,6 +36,8 @@ import {
   CommunityRequestToJoinReceivedEvent,
   Events
 } from '@dcl/schemas'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 describe('Community Requests Component', () => {
   let communityRequestsComponent: ICommunityRequestsComponent
@@ -44,6 +46,7 @@ describe('Community Requests Component', () => {
   let mockCommunityThumbnail: ICommunityThumbnailComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
   let mockCatalystClient: jest.Mocked<ICatalystClientComponent>
+  let mockPubsub: jest.Mocked<IPubSubComponent>
 
   beforeEach(() => {
     communitiesComponent = createMockCommunitiesComponent({})
@@ -60,6 +63,7 @@ describe('Community Requests Component', () => {
     })
     mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
     mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
+    mockPubsub = createMockedPubSubComponent({})
     communityRequestsComponent = createCommunityRequestsComponent({
       communitiesDb: mockCommunitiesDB,
       communities: communitiesComponent,
@@ -67,6 +71,7 @@ describe('Community Requests Component', () => {
       communityBroadcaster: mockCommunityBroadcaster,
       communityThumbnail: mockCommunityThumbnail,
       catalystClient: mockCatalystClient,
+      pubsub: mockPubsub,
       logs: mockLogs
     })
   })
@@ -269,6 +274,15 @@ describe('Community Requests Component', () => {
                 })
               })
 
+              it('should publish the community member status updates', async () => {
+                await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+                expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+                  communityId: community.id,
+                  memberAddress: userAddress,
+                  status: ConnectivityStatus.ONLINE
+                })
+              })
+
               it('should not create the invite request', async () => {
                 await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
                 expect(mockCommunitiesDB.createCommunityRequest).not.toHaveBeenCalled()
@@ -372,6 +386,11 @@ describe('Community Requests Component', () => {
                 status: CommunityRequestStatus.Pending
               })
               expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledWith(community.id, userAddress, type)
+            })
+
+            it('should not publish the community member status updates', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(mockPubsub.publishInChannel).not.toHaveBeenCalled()
             })
 
             it('should broadcast the request to join received event', async () => {
@@ -502,6 +521,15 @@ describe('Community Requests Component', () => {
                   role: CommunityRole.Member
                 }
               )
+            })
+
+            it('should publish the community member status updates', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+                communityId: community.id,
+                memberAddress: userAddress,
+                status: ConnectivityStatus.ONLINE
+              })
             })
 
             it('should return the request as accepted', async () => {
@@ -673,6 +701,11 @@ describe('Community Requests Component', () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
             })
+
+            it('should not publish the community member status updates', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(mockPubsub.publishInChannel).not.toHaveBeenCalled()
+            })
           })
 
           describe('and there is a pending request_to_join for the user', () => {
@@ -707,6 +740,15 @@ describe('Community Requests Component', () => {
                 ...requestToJoinRequest,
                 type: CommunityRequestType.Invite,
                 status: CommunityRequestStatus.Accepted
+              })
+            })
+
+            it('should publish the community member status updates', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+                communityId: community.id,
+                memberAddress: userAddress,
+                status: ConnectivityStatus.ONLINE
               })
             })
 
@@ -987,6 +1029,16 @@ describe('Community Requests Component', () => {
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
               expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
             })
+
+            it('should publish the community member status updates', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+
+              expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+                communityId: inviteRequest.communityId,
+                memberAddress: invitedUserAddress,
+                status: ConnectivityStatus.ONLINE
+              })
+            })
           })
   
           describe('and the status is rejected', () => {
@@ -1004,6 +1056,11 @@ describe('Community Requests Component', () => {
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
               expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
+            })
+
+            it('should not publish the community member status updates', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              expect(mockPubsub.publishInChannel).not.toHaveBeenCalled()
             })
           })
   
@@ -1086,6 +1143,11 @@ describe('Community Requests Component', () => {
                 inviteRequest.communityId,
                 callerAddress
               )
+            })
+
+            it('should not publish the community member status updates', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              expect(mockPubsub.publishInChannel).not.toHaveBeenCalled()
             })
           })
         })
@@ -1227,6 +1289,11 @@ describe('Community Requests Component', () => {
               expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
               expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
             })
+
+            it('should not publish the community member status updates', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              expect(mockPubsub.publishInChannel).not.toHaveBeenCalled()
+            })
           })
         })
   
@@ -1258,6 +1325,15 @@ describe('Community Requests Component', () => {
                 joinRequest.communityId,
                 callerAddress
               )
+            })
+
+            it('should publish the community member status updates', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+                communityId: joinRequest.communityId,
+                memberAddress: requestingUserAddress,
+                status: ConnectivityStatus.ONLINE
+              })
             })
   
             it('should broadcast the request to join accepted event', async () => {
@@ -1297,6 +1373,11 @@ describe('Community Requests Component', () => {
                 joinRequest.communityId,
                 callerAddress
               )
+            })
+
+            it('should not publish the community member status updates', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              expect(mockPubsub.publishInChannel).not.toHaveBeenCalled()
             })
           })
   
