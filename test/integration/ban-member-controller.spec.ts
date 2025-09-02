@@ -186,7 +186,10 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
               'POST'
             )
             
-            expect(spyComponents.sns.publishMessage).toHaveBeenCalledWith({
+            // Wait for any setImmediate callbacks to complete
+            await new Promise(resolve => setImmediate(resolve))
+            
+            expect(spyComponents.communityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_BANNED,
               key: expect.stringContaining(`${communityId}-${targetMemberAddress}-`),

@@ -240,6 +240,9 @@ test('Create Community Controller', async function ({ components, stubComponents
                   const body = await response.json()
                   communityId = body.data.id
 
+                  // Wait for any setImmediate callbacks to complete
+                  await new Promise(resolve => setImmediate(resolve))
+
                   expect(response.status).toBe(201)
                   expect(body).toMatchObject({
                     data: {
@@ -300,6 +303,9 @@ test('Create Community Controller', async function ({ components, stubComponents
                 const body = await response.json()
                 communityId = body.data.id
 
+                // Wait for any setImmediate callbacks to complete
+                await new Promise(resolve => setImmediate(resolve))
+
                 expect(response.status).toBe(201)
                 expect(body).toMatchObject({
                   data: {
@@ -355,6 +361,9 @@ test('Create Community Controller', async function ({ components, stubComponents
                 const body = await response.json()
                 communityId = body.data.id
 
+                // Wait for any setImmediate callbacks to complete
+                await new Promise(resolve => setImmediate(resolve))
+
                 expect(response.status).toBe(201)
                 expect(body).toMatchObject({
                   data: {
@@ -379,6 +388,9 @@ test('Create Community Controller', async function ({ components, stubComponents
                 const response = await makeMultipartRequest(identity, '/v1/communities', validBody)
                 const body = await response.json()
                 communityId = body.data.id
+
+                // Wait for any setImmediate callbacks to complete
+                await new Promise(resolve => setImmediate(resolve))
 
                 expect(response.status).toBe(201)
                 expect(body).toMatchObject({
