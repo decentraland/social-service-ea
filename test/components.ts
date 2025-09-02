@@ -75,6 +75,7 @@ import { createFeaturesMockComponent } from './mocks/components/features'
 import { createFeaturesComponent } from '@well-known-components/features-component'
 import { createFeatureFlagsAdapter } from '../src/adapters/feature-flags'
 import { createInMemoryCacheComponent } from '../src/adapters/memory-cache'
+import { createCommunityFieldsValidatorComponent } from '../src/utils/community-validation'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -164,6 +165,7 @@ async function initComponents(): Promise<TestComponents> {
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
   const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
+  const communityFieldsValidator = await createCommunityFieldsValidatorComponent({ config })
 
   // Community voice chat cache and polling components
   const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })
@@ -303,6 +305,7 @@ async function initComponents(): Promise<TestComponents> {
     communityBroadcaster,
     communityComplianceValidator,
     communityEvents,
+    communityFieldsValidator,
     communityMembers,
     communityOwners,
     communityPlaces,

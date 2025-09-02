@@ -67,6 +67,7 @@ import { createCommunityComplianceValidatorComponent } from './logic/community/c
 import { createFeaturesComponent } from '@well-known-components/features-component'
 import { createFeatureFlagsAdapter } from './adapters/feature-flags'
 import { createInMemoryCacheComponent } from './adapters/memory-cache'
+import { createCommunityFieldsValidatorComponent } from './logic/community/fields-validator'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -233,6 +234,7 @@ export async function initComponents(): Promise<AppComponents> {
     logs,
     featureFlags
   })
+  const communityFieldsValidator = await createCommunityFieldsValidatorComponent({ config })
   const communityRequests = createCommunityRequestsComponent({
     communitiesDb,
     communities,
@@ -306,6 +308,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityBans,
     communityBroadcaster,
     communityComplianceValidator,
+    communityFieldsValidator,
     communityEvents,
     communityMembers,
     communityOwners,

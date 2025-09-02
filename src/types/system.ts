@@ -52,7 +52,8 @@ import {
   ICommunityEventsComponent,
   ICommunityThumbnailComponent,
   ICommunityRequestsComponent,
-  ICommunityComplianceValidatorComponent
+  ICommunityComplianceValidatorComponent,
+  ICommunityFieldsValidatorComponent
 } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
@@ -87,6 +88,7 @@ export type BaseComponents = {
   communitiesDb: ICommunitiesDatabaseComponent
   communityBans: ICommunityBansComponent
   communityComplianceValidator: ICommunityComplianceValidatorComponent
+  communityFieldsValidator: ICommunityFieldsValidatorComponent
   communityOwners: ICommunityOwnersComponent
   communityMembers: ICommunityMembersComponent
   communityPlaces: ICommunityPlacesComponent

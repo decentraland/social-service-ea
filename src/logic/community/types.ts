@@ -422,3 +422,24 @@ export interface ActiveCommunityVoiceChat {
 export type CommunityForModeration = Community & {
   membersCount: number
 }
+
+export type CommunityFieldsValidationFields = {
+  name?: string
+  description?: string
+  placeIds?: string[]
+  thumbnailBuffer?: Buffer
+  privacy: CommunityPrivacyEnum
+}
+
+export type CommunityFieldsValidationOptions = {
+  requireName?: boolean
+  requireDescription?: boolean
+}
+
+export interface ICommunityFieldsValidatorComponent {
+  validate(
+    formData: any,
+    thumbnailBuffer?: Buffer,
+    options?: CommunityFieldsValidationOptions
+  ): Promise<CommunityFieldsValidationFields>
+}

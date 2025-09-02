@@ -2,14 +2,14 @@ import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { FormHandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { validateCommunityFields } from '../../../utils/community-validation'
 import { CommunityOwnerNotFoundError, CommunityNotCompliantError, AIComplianceError } from '../../../logic/community'
 
 export async function createCommunityHandler(
-  context: FormHandlerContextWithPath<'communities' | 'logs', '/v1/communities'> & DecentralandSignatureContext<any>
+  context: FormHandlerContextWithPath<'communities' | 'communityFieldsValidator' | 'logs', '/v1/communities'> &
+    DecentralandSignatureContext<any>
 ): Promise<HTTPResponse> {
   const {
-    components: { communities, logs },
+    components: { communities, logs, communityFieldsValidator },
     verification,
     formData
   } = context
@@ -21,10 +21,14 @@ export async function createCommunityHandler(
     const thumbnailFile = formData?.files?.['thumbnail']
     const thumbnailBuffer = thumbnailFile?.value
 
-    const { name, description, placeIds, privacy } = await validateCommunityFields(formData, thumbnailBuffer, {
-      requireName: true,
-      requireDescription: true
-    })
+    const { name, description, placeIds, privacy } = await communityFieldsValidator.validate(
+      formData,
+      thumbnailBuffer,
+      {
+        requireName: true,
+        requireDescription: true
+      }
+    )
 
     logger.info('Creating community', {
       owner: address,
