@@ -274,7 +274,7 @@ describe('Community Requests Component', () => {
                 })
               })
 
-              it('should publish the community member status updates', async () => {
+              it('should notify member join through pubsub', async () => {
                 await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
                 expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
                   communityId: community.id,
@@ -523,7 +523,7 @@ describe('Community Requests Component', () => {
               )
             })
 
-            it('should publish the community member status updates', async () => {
+            it('should notify member join through pubsub', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
                 communityId: community.id,
@@ -743,7 +743,7 @@ describe('Community Requests Component', () => {
               })
             })
 
-            it('should publish the community member status updates', async () => {
+            it('should notify member join through pubsub', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
                 communityId: community.id,
@@ -1030,7 +1030,7 @@ describe('Community Requests Component', () => {
               expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
             })
 
-            it('should publish the community member status updates', async () => {
+            it('should notify member join through pubsub', async () => {
               await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
 
               expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
@@ -1327,7 +1327,7 @@ describe('Community Requests Component', () => {
               )
             })
 
-            it('should publish the community member status updates', async () => {
+            it('should notify member join through pubsub', async () => {
               await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
               expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
                 communityId: joinRequest.communityId,
