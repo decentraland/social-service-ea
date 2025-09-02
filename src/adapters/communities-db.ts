@@ -94,9 +94,9 @@ export function createCommunitiesDBComponent(
 
     async getCommunityMembers(
       id: string,
-      options: { userAddress: EthAddress; pagination: Pagination; filterByMembers?: string[] }
+      options: { userAddress?: EthAddress; pagination: Pagination; filterByMembers?: string[]; roles?: CommunityRole[] }
     ): Promise<CommunityMember[]> {
-      const { userAddress, pagination, filterByMembers } = options
+      const { userAddress, pagination, filterByMembers, roles } = options
       const normalizedUserAddress = userAddress ? normalizeAddress(userAddress) : null
 
       const ctes = [
@@ -119,6 +119,7 @@ export function createCommunitiesDBComponent(
         )
         .append(SQL` WHERE cm.community_id = ${id}`)
         .append(filterByMembers ? SQL` AND cm.member_address = ANY(${filterByMembers.map(normalizeAddress)})` : SQL``)
+        .append(roles ? SQL` AND cm.role = ANY(${roles})` : SQL``)
         .append(SQL` ORDER BY cm.joined_at ASC`)
         .append(SQL` LIMIT ${pagination.limit}`)
         .append(SQL` OFFSET ${pagination.offset}`)

@@ -233,7 +233,10 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
                 'DELETE'
               )
 
-              expect(spyComponents.sns.publishMessage).toHaveBeenCalledWith({
+              // Wait for any setImmediate callbacks to complete
+              await new Promise(resolve => setImmediate(resolve))
+
+              expect(spyComponents.communityBroadcaster.broadcast).toHaveBeenCalledWith({
                 type: Events.Type.COMMUNITY,
                 subType: Events.SubType.Community.MEMBER_REMOVED,
                 key: expect.stringContaining(`${communityId}-${targetMemberAddress}-`),
@@ -301,7 +304,10 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
                 'DELETE'
               )
 
-              expect(spyComponents.sns.publishMessage).toHaveBeenCalledWith({
+              // Wait for any setImmediate callbacks to complete
+              await new Promise(resolve => setImmediate(resolve))
+
+              expect(spyComponents.communityBroadcaster.broadcast).toHaveBeenCalledWith({
                 type: Events.Type.COMMUNITY,
                 subType: Events.SubType.Community.MEMBER_REMOVED,
                 key: expect.stringContaining(`${communityId}-${targetMemberAddress}-`),

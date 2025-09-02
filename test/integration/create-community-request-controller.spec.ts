@@ -229,6 +229,10 @@ test('Create Community Request Controller', function ({ components, spyComponent
                       )
 
                       const body = await response.json()
+                      
+                      // Wait for any setImmediate callbacks to complete
+                      await new Promise(resolve => setImmediate(resolve))
+                      
                       expect(response.status).toBe(200)
                       expect(body.data).toEqual(expect.objectContaining({
                         id: expect.any(String),

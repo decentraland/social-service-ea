@@ -11,23 +11,45 @@ import {
   ICommunityRequestsComponent,
   ICommunityRolesComponent,
   InvalidCommunityRequestError,
-  MemberRequest
+  MemberRequest,
+  ICommunityBroadcasterComponent,
+  ICommunityThumbnailComponent,
+  CommunityDB
 } from '../../../src/logic/community'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { createCommunityRequestsComponent } from '../../../src/logic/community/requests'
 import { mockLogs } from '../../mocks/components'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { CommunityRole } from '../../../src/types'
-import { createMockCommunitiesComponent, createMockCommunityRolesComponent } from '../../mocks/communities'
+import { ICatalystClientComponent } from '../../../src/types'
+import { createMockCatalystClient } from '../../mocks/components/catalyst-client'
+import {
+  createMockCommunitiesComponent,
+  createMockCommunityBroadcasterComponent,
+  createMockCommunityRolesComponent,
+  createMockCommunityThumbnailComponent,
+  mockCommunity
+} from '../../mocks/communities'
+import {
+  CommunityInviteReceivedEvent,
+  CommunityRequestToJoinAcceptedEvent,
+  CommunityRequestToJoinReceivedEvent,
+  Events
+} from '@dcl/schemas'
 
 describe('Community Requests Component', () => {
   let communityRequestsComponent: ICommunityRequestsComponent
   let communitiesComponent: ICommunitiesComponent
+  let mockCommunityBroadcaster: ICommunityBroadcasterComponent
+  let mockCommunityThumbnail: ICommunityThumbnailComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
+  let mockCatalystClient: jest.Mocked<ICatalystClientComponent>
 
   beforeEach(() => {
     communitiesComponent = createMockCommunitiesComponent({})
     mockCommunityRoles = createMockCommunityRolesComponent({})
+    mockCatalystClient = createMockCatalystClient()
+    
     // Ensure logs.getLogger returns a valid logger after mock resets
     mockLogs.getLogger.mockReturnValue({
       log: jest.fn(),
@@ -36,10 +58,15 @@ describe('Community Requests Component', () => {
       info: jest.fn(),
       warn: jest.fn()
     })
+    mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
+    mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     communityRequestsComponent = createCommunityRequestsComponent({
       communitiesDb: mockCommunitiesDB,
       communities: communitiesComponent,
       communityRoles: mockCommunityRoles,
+      communityBroadcaster: mockCommunityBroadcaster,
+      communityThumbnail: mockCommunityThumbnail,
+      catalystClient: mockCatalystClient,
       logs: mockLogs
     })
   })
@@ -66,12 +93,7 @@ describe('Community Requests Component', () => {
 
       it('should throw a CommunityNotFoundError', async () => {
         await expect(
-          communityRequestsComponent.createCommunityRequest(
-            communityId,
-            userAddress,
-            type,
-            callerAddress
-          )
+          communityRequestsComponent.createCommunityRequest(communityId, userAddress, type, callerAddress)
         ).rejects.toThrow(CommunityNotFoundError)
       })
     })
@@ -147,6 +169,17 @@ describe('Community Requests Component', () => {
               communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
             ).rejects.toThrow(NotAuthorizedError)
           })
+
+          it('should not broadcast the request to join received event', async () => {
+            try {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+            } catch (error) {
+              // Expected to throw, but still check broadcast wasn't called
+            }
+            // Wait for any potential async operations
+            await new Promise(resolve => setImmediate(resolve))
+            expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
+          })
         })
 
         describe('and inviter has permission to invite users', () => {
@@ -165,7 +198,12 @@ describe('Community Requests Component', () => {
               })
 
               it('should create and return the request as pending', async () => {
-                const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+                const result = await communityRequestsComponent.createCommunityRequest(
+                  community.id,
+                  userAddress,
+                  type,
+                  callerAddress
+                )
                 expect(result).toEqual({
                   id: expect.any(String),
                   communityId: community.id,
@@ -174,6 +212,24 @@ describe('Community Requests Component', () => {
                   status: CommunityRequestStatus.Pending
                 })
                 expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledWith(community.id, userAddress, type)
+              })
+
+              it('should broadcast the invite received event', async () => {
+                await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+                // Wait for async broadcast
+                await new Promise(resolve => setImmediate(resolve))
+                expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+                  type: Events.Type.COMMUNITY,
+                  subType: Events.SubType.Community.INVITE_RECEIVED,
+                  key: expect.any(String),
+                  timestamp: expect.any(Number),
+                  metadata: {
+                    communityId: community.id,
+                    communityName: community.name,
+                    memberAddress: userAddress,
+                    thumbnailUrl: mockCommunityThumbnail.buildThumbnailUrl(community.id)
+                  }
+                } as CommunityInviteReceivedEvent)
               })
             })
 
@@ -189,15 +245,23 @@ describe('Community Requests Component', () => {
 
               it('should automatically join the user to the community', async () => {
                 await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-                expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(requestToJoinRequest.id, {
-                  communityId: community.id,
-                  memberAddress: userAddress,
-                  role: CommunityRole.Member
-                })
+                expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(
+                  requestToJoinRequest.id,
+                  {
+                    communityId: community.id,
+                    memberAddress: userAddress,
+                    role: CommunityRole.Member
+                  }
+                )
               })
 
               it('should return the request as accepted with invite type', async () => {
-                const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+                const result = await communityRequestsComponent.createCommunityRequest(
+                  community.id,
+                  userAddress,
+                  type,
+                  callerAddress
+                )
                 expect(result).toEqual({
                   ...requestToJoinRequest,
                   type: CommunityRequestType.Invite,
@@ -278,12 +342,28 @@ describe('Community Requests Component', () => {
           })
 
           describe('and there are no pending requests for the user', () => {
+            let mockProfile: any
+
             beforeEach(() => {
               mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+              mockProfile = {
+                avatars: [{
+                  name: 'TestUser',
+                  unclaimedName: 'test_user',
+                  userId: userAddress,
+                  hasClaimedName: true
+                }]
+              }
+              mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
             })
 
             it('should create and return the request as pending', async () => {
-              const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              const result = await communityRequestsComponent.createCommunityRequest(
+                community.id,
+                userAddress,
+                type,
+                callerAddress
+              )
               expect(result).toEqual({
                 id: expect.any(String),
                 communityId: community.id,
@@ -292,6 +372,58 @@ describe('Community Requests Component', () => {
                 status: CommunityRequestStatus.Pending
               })
               expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledWith(community.id, userAddress, type)
+            })
+
+            it('should broadcast the request to join received event', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+                type: Events.Type.COMMUNITY,
+                subType: Events.SubType.Community.REQUEST_TO_JOIN_RECEIVED,
+                key: expect.any(String),
+                timestamp: expect.any(Number),
+                metadata: {
+                  communityId: community.id,
+                  communityName: community.name,
+                  memberAddress: userAddress,
+                  memberName: 'TestUser',
+                  thumbnailUrl: mockCommunityThumbnail.buildThumbnailUrl(community.id)
+                }
+              } as CommunityRequestToJoinReceivedEvent)
+            })
+
+            it('should fetch member profile for request to join', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              expect(mockCatalystClient.getProfile).toHaveBeenCalledWith(userAddress)
+            })
+          })
+
+          describe('and profile fetch fails', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+              mockCatalystClient.getProfile.mockRejectedValueOnce(new Error('Profile not found'))
+            })
+
+            it('should still broadcast the request to join received event with Unknown as member name', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+                type: Events.Type.COMMUNITY,
+                subType: Events.SubType.Community.REQUEST_TO_JOIN_RECEIVED,
+                key: expect.any(String),
+                timestamp: expect.any(Number),
+                metadata: {
+                  communityId: community.id,
+                  communityName: community.name,
+                  memberName: 'Unknown',
+                  memberAddress: userAddress,
+                  thumbnailUrl: mockCommunityThumbnail.buildThumbnailUrl(community.id)
+                }
+              } as CommunityRequestToJoinReceivedEvent)
             })
           })
 
@@ -324,7 +456,12 @@ describe('Community Requests Component', () => {
             })
 
             it('should return the existing request', async () => {
-              const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              const result = await communityRequestsComponent.createCommunityRequest(
+                community.id,
+                userAddress,
+                type,
+                callerAddress
+              )
               expect(result).toEqual(duplicatedRequest)
             })
 
@@ -337,28 +474,43 @@ describe('Community Requests Component', () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
             })
+
+            it('should not broadcast the request to join received event', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
+            })
           })
 
           describe('and there is a pending invite for the user', () => {
             beforeEach(() => {
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([{
-                ...expectedCreatedRequest,
-                type: CommunityRequestType.Invite
-              }])
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([
+                {
+                  ...expectedCreatedRequest,
+                  type: CommunityRequestType.Invite
+                }
+              ])
               callerAddress = userAddress
             })
 
             it('should automatically join the user to the community', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(expectedCreatedRequest.id, {
-                communityId: community.id,
-                memberAddress: userAddress,
-                role: CommunityRole.Member
-              })
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(
+                expectedCreatedRequest.id,
+                {
+                  communityId: community.id,
+                  memberAddress: userAddress,
+                  role: CommunityRole.Member
+                }
+              )
             })
 
             it('should return the request as accepted', async () => {
-              const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              const result = await communityRequestsComponent.createCommunityRequest(
+                community.id,
+                userAddress,
+                type,
+                callerAddress
+              )
               expect(result).toEqual({
                 id: expect.any(String),
                 communityId: community.id,
@@ -438,7 +590,12 @@ describe('Community Requests Component', () => {
             })
 
             it('should create and return the request as pending', async () => {
-              const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              const result = await communityRequestsComponent.createCommunityRequest(
+                community.id,
+                userAddress,
+                type,
+                callerAddress
+              )
               expect(result).toEqual({
                 id: expect.any(String),
                 communityId: community.id,
@@ -447,6 +604,39 @@ describe('Community Requests Component', () => {
                 status: CommunityRequestStatus.Pending
               })
               expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledWith(community.id, userAddress, type)
+            })
+
+            it('should broadcast the invite received event', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+                type: Events.Type.COMMUNITY,
+                subType: Events.SubType.Community.INVITE_RECEIVED,
+                key: expect.any(String),
+                timestamp: expect.any(Number),
+                metadata: {
+                  communityId: community.id,
+                  communityName: community.name,
+                  memberAddress: userAddress,
+                  thumbnailUrl: mockCommunityThumbnail.buildThumbnailUrl(community.id)
+                }
+              } as CommunityInviteReceivedEvent)
+            })
+
+            it('should not fetch member profile for invites', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              expect(mockCatalystClient.getProfile).not.toHaveBeenCalled()
+            })
+
+            it('should not include member name in invite received event', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              const broadcastCall = (mockCommunityBroadcaster.broadcast as jest.Mock).mock.calls[0][0]
+              expect(broadcastCall.metadata).not.toHaveProperty('memberName')
             })
           })
 
@@ -460,7 +650,12 @@ describe('Community Requests Component', () => {
             })
 
             it('should return the existing request', async () => {
-              const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              const result = await communityRequestsComponent.createCommunityRequest(
+                community.id,
+                userAddress,
+                type,
+                callerAddress
+              )
               expect(result).toEqual(duplicatedRequest)
             })
 
@@ -472,6 +667,11 @@ describe('Community Requests Component', () => {
             it('should not accept any request', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
+
+            it('should not broadcast the invite received event', async () => {
+              await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
             })
           })
 
@@ -486,15 +686,23 @@ describe('Community Requests Component', () => {
 
             it('should automatically join the user to the community', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(requestToJoinRequest.id, {
-                communityId: community.id,
-                memberAddress: userAddress,
-                role: CommunityRole.Member
-              })
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(
+                requestToJoinRequest.id,
+                {
+                  communityId: community.id,
+                  memberAddress: userAddress,
+                  role: CommunityRole.Member
+                }
+              )
             })
 
             it('should return the request as accepted with invite type', async () => {
-              const result = await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              const result = await communityRequestsComponent.createCommunityRequest(
+                community.id,
+                userAddress,
+                type,
+                callerAddress
+              )
               expect(result).toEqual({
                 ...requestToJoinRequest,
                 type: CommunityRequestType.Invite,
@@ -544,7 +752,7 @@ describe('Community Requests Component', () => {
 
     describe('and no type filter is provided', () => {
       let requests: MemberRequest[]
-      let options: Pick<GetCommunityRequestsOptions, "status" | "type" | "pagination">
+      let options: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
 
       beforeEach(() => {
         requests = [
@@ -577,13 +785,16 @@ describe('Community Requests Component', () => {
 
         expect(result).toEqual({ requests, total: requests.length })
         expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
-        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, { ...options, pagination: undefined })
+        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, {
+          ...options,
+          pagination: undefined
+        })
       })
     })
 
     describe('and filtering by type invite', () => {
       let filteredRequests: MemberRequest[]
-      let options: Pick<GetCommunityRequestsOptions, "status" | "type" | "pagination">
+      let options: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
 
       beforeEach(() => {
         filteredRequests = [
@@ -609,13 +820,16 @@ describe('Community Requests Component', () => {
 
         expect(result).toEqual({ requests: filteredRequests, total: 1 })
         expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
-        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, { ...options, pagination: undefined })
+        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, {
+          ...options,
+          pagination: undefined
+        })
       })
     })
 
     describe('and filtering by type request_to_join', () => {
       let filteredRequests: MemberRequest[]
-      let options: Pick<GetCommunityRequestsOptions, "status" | "type" | "pagination">
+      let options: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
 
       beforeEach(() => {
         filteredRequests = [
@@ -641,12 +855,15 @@ describe('Community Requests Component', () => {
 
         expect(result).toEqual({ requests: filteredRequests, total: filteredRequests.length })
         expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
-        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, { ...options, pagination: undefined })
+        expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, {
+          ...options,
+          pagination: undefined
+        })
       })
     })
 
     describe('and there are no requests stored in the database', () => {
-      let options: Pick<GetCommunityRequestsOptions, "status" | "type" | "pagination">
+      let options: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
 
       beforeEach(() => {
         mockCommunitiesDB.getMemberRequests.mockResolvedValueOnce([])
@@ -673,460 +890,495 @@ describe('Community Requests Component', () => {
       callerAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
     })
 
-    describe('and the request does not exist', () => {
-      let status: Exclude<CommunityRequestStatus, 'pending'>
+    describe('and the community involved exists', () => {
+      let community: Community & { role: CommunityRole; }
 
       beforeEach(() => {
-        mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(null)
-        status = CommunityRequestStatus.Accepted
-      })
-
-      it('should throw CommunityRequestNotFoundError', async () => {
-        await expect(
-          communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-        ).rejects.toThrow(CommunityRequestNotFoundError)
-      })
-    })
-
-    describe('and the request exists but is not pending', () => {
-      let status: Exclude<CommunityRequestStatus, 'pending'>
-      let userAddress: string
-      let nonPendingRequest: MemberRequest
-
-      beforeEach(() => {
-        userAddress = '0x1234567890123456789012345678901234567890'
-        status = CommunityRequestStatus.Rejected
-        nonPendingRequest = {
-          id: requestId,
-          communityId: randomUUID(),
-          memberAddress: userAddress,
-          type: CommunityRequestType.Invite,
-          status: CommunityRequestStatus.Accepted
+        community = {
+          active: true,
+          description: 'Mock Description',
+          name: 'Mock Community',
+          ownerAddress: '0x123',
+          privacy: CommunityPrivacyEnum.Public,
+          id: randomUUID(),
+          role: CommunityRole.None
         }
-        mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(nonPendingRequest)
+        mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
       })
-
-      it('should throw CommunityRequestNotFoundError', async () => {
-        await expect(
-          communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-        ).rejects.toThrow(CommunityRequestNotFoundError)
-      })
-    })
-
-    describe('and the invite request exists', () => {
-      let inviteRequest: MemberRequest
-      let invitedUserAddress: string
-
-      beforeEach(() => {
-        invitedUserAddress = '0x1111111111111111111111111111111111111111'
-        inviteRequest = {
-          id: requestId,
-          communityId: randomUUID(),
-          memberAddress: invitedUserAddress,
-          type: CommunityRequestType.Invite,
-          status: CommunityRequestStatus.Pending
-        }
-        mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(inviteRequest)
-      })
-
-      describe('and the caller is the invited user', () => {
+      
+      describe('and the request does not exist', () => {
+        let status: Exclude<CommunityRequestStatus, 'pending'>
+  
         beforeEach(() => {
-          callerAddress = invitedUserAddress
+          mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(null)
+          status = CommunityRequestStatus.Accepted
         })
-
-        describe('and the status is accepted', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
+  
+        it('should throw CommunityRequestNotFoundError', async () => {
+          await expect(
+            communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+          ).rejects.toThrow(CommunityRequestNotFoundError)
+        })
+      })
+  
+      describe('and the request exists but is not pending', () => {
+        let status: Exclude<CommunityRequestStatus, 'pending'>
+        let userAddress: string
+        let nonPendingRequest: MemberRequest
+  
+        beforeEach(() => {
+          userAddress = '0x1234567890123456789012345678901234567890'
+          status = CommunityRequestStatus.Rejected
+          nonPendingRequest = {
+            id: requestId,
+            communityId: community.id, // Use the same community ID from parent scope
+            memberAddress: userAddress,
+            type: CommunityRequestType.Invite,
+            status: CommunityRequestStatus.Accepted
+          }
+          mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(nonPendingRequest)
+        })
+  
+        it('should throw CommunityRequestNotFoundError', async () => {
+          await expect(
+            communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+          ).rejects.toThrow(CommunityRequestNotFoundError)
+        })
+      })
+  
+      describe('and the invite request exists', () => {
+        let inviteRequest: MemberRequest
+        let invitedUserAddress: string
+  
+        beforeEach(() => {
+          invitedUserAddress = '0x1111111111111111111111111111111111111111'
+          inviteRequest = {
+            id: requestId,
+            communityId: community.id, // Use the same community ID from parent scope
+            memberAddress: invitedUserAddress,
+            type: CommunityRequestType.Invite,
+            status: CommunityRequestStatus.Pending
+          }
+          mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(inviteRequest)
+        })
+  
+        describe('and the caller is the invited user', () => {
           beforeEach(() => {
-            status = CommunityRequestStatus.Accepted
-            mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValueOnce()
+            callerAddress = invitedUserAddress
           })
-
-          it('should use transaction to add member and remove request', async () => {
-            await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(requestId, {
-              communityId: inviteRequest.communityId,
-              memberAddress: invitedUserAddress,
-              role: CommunityRole.Member
+  
+          describe('and the status is accepted', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Accepted
+              mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValueOnce()
             })
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
-          })
-        })
-
-        describe('and the status is rejected', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Rejected
-            mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
-          })
-
-          it('should remove the request', async () => {
-            await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-
-            expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-            expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
-          })
-        })
-
-        describe('and the status is cancelled', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Cancelled
-          })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-          })
-        })
-      })
-
-      describe('and the caller has community privileges', () => {
-        beforeEach(() => {
-          callerAddress = '0x2222222222222222222222222222222222222222' // Different from invited user
-          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockResolvedValueOnce()
-        })
-
-        describe('and the status is accepted', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Accepted
-          })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-          })
-        })
-
-        describe('and the status is rejected', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Rejected
-          })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-          })
-        })
-
-        describe('and the status is cancelled', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Cancelled
-            mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
-          })
-
-          it('should remove the request', async () => {
-            await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-
-            expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-            expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).toHaveBeenCalledWith(
-              inviteRequest.communityId,
-              callerAddress
-            )
-          })
-        })
-      })
-
-      describe('and the caller is neither the invited user nor has privileges', () => {
-        beforeEach(() => {
-          callerAddress = '0x3333333333333333333333333333333333333333' // Different from invited user
-          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockRejectedValueOnce(
-            new NotAuthorizedError('User does not have permission')
-          )
-        })
-
-        describe('and the status is accepted', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Accepted
-          })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-          })
-        })
-
-        describe('and the status is rejected', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Rejected
-          })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-          })
-        })
-
-        describe('and the status is cancelled', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Cancelled
-          })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-          })
-        })
-      })
-    })
-
-    describe('and the request_to_join request exists', () => {
-      let joinRequest: MemberRequest
-      let requestingUserAddress: string
-
-      beforeEach(() => {
-        requestingUserAddress = '0x4444444444444444444444444444444444444444'
-        joinRequest = {
-          id: requestId,
-          communityId: randomUUID(),
-          memberAddress: requestingUserAddress,
-          type: CommunityRequestType.RequestToJoin,
-          status: CommunityRequestStatus.Pending
-        }
-        mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(joinRequest)
-      })
-
-      describe('and the caller is the requesting user', () => {
-        beforeEach(() => {
-          callerAddress = requestingUserAddress
-        })
-
-        describe('and the status is accepted', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Accepted
-          })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-          })
-        })
-
-        describe('and the status is rejected', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Rejected
-          })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-          })
-        })
-
-        describe('and the status is cancelled', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Cancelled
-            mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
-          })
-
-          it('should remove the request and do not add user as member', async () => {
-            await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-
-            expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-            expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
-          })
-        })
-      })
-
-      describe('and the caller has community privileges', () => {
-        beforeEach(() => {
-          callerAddress = '0x5555555555555555555555555555555555555555' // Different from requesting user
-          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockResolvedValueOnce()
-        })
-
-        describe('and the status is accepted', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
-          beforeEach(() => {
-            status = CommunityRequestStatus.Accepted
-            mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValueOnce()
-          })
-
-          it('should use transaction to add member and remove request', async () => {
-            await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(requestId, {
-              communityId: joinRequest.communityId,
-              memberAddress: requestingUserAddress,
-              role: CommunityRole.Member
+  
+            it('should use transaction to add member and remove request', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+  
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(requestId, {
+                communityId: inviteRequest.communityId,
+                memberAddress: invitedUserAddress,
+                role: CommunityRole.Member
+              })
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
             })
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).toHaveBeenCalledWith(
-              joinRequest.communityId,
-              callerAddress
-            )
+          })
+  
+          describe('and the status is rejected', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Rejected
+              mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
+            })
+  
+            it('should remove the request', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+  
+              expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
+            })
+          })
+  
+          describe('and the status is cancelled', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Cancelled
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
           })
         })
-
-        describe('and the status is rejected', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
+  
+        describe('and the caller has community privileges', () => {
           beforeEach(() => {
-            status = CommunityRequestStatus.Rejected
-            mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
+            callerAddress = '0x2222222222222222222222222222222222222222' // Different from invited user
+            mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockResolvedValueOnce()
           })
-
-          it('should remove the request and do not add user as member', async () => {
-            await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-
-            expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
-            expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).toHaveBeenCalledWith(
-              joinRequest.communityId,
-              callerAddress
-            )
+  
+          describe('and the status is accepted', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Accepted
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
+          })
+  
+          describe('and the status is rejected', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Rejected
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
+          })
+  
+          describe('and the status is cancelled', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Cancelled
+              mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
+            })
+  
+            it('should remove the request', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+  
+              expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).toHaveBeenCalledWith(
+                inviteRequest.communityId,
+                callerAddress
+              )
+            })
           })
         })
-
-        describe('and the status is cancelled', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
+  
+        describe('and the caller is neither the invited user nor has privileges', () => {
           beforeEach(() => {
-            status = CommunityRequestStatus.Cancelled
+            callerAddress = '0x3333333333333333333333333333333333333333' // Different from invited user
+            mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockRejectedValueOnce(
+              new NotAuthorizedError('User does not have permission')
+            )
           })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+  
+          describe('and the status is accepted', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Accepted
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
+          })
+  
+          describe('and the status is rejected', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Rejected
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
+          })
+  
+          describe('and the status is cancelled', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Cancelled
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
           })
         })
       })
-
-      describe('and the caller is neither the requesting user nor has privileges', () => {
+  
+      describe('and the request_to_join request exists', () => {
+        let joinRequest: MemberRequest
+        let requestingUserAddress: string
+  
         beforeEach(() => {
-          callerAddress = '0x6666666666666666666666666666666666666666' // Different from requesting user
-          mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockRejectedValueOnce(
-            new NotAuthorizedError('User does not have permission')
-          )
+          requestingUserAddress = '0x4444444444444444444444444444444444444444'
+          joinRequest = {
+            id: requestId,
+            communityId: community.id, // Use the same community ID from parent scope
+            memberAddress: requestingUserAddress,
+            type: CommunityRequestType.RequestToJoin,
+            status: CommunityRequestStatus.Pending
+          }
+          mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(joinRequest)
         })
-
-        describe('and the status is accepted', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
+  
+        describe('and the caller is the requesting user', () => {
           beforeEach(() => {
-            status = CommunityRequestStatus.Accepted
+            callerAddress = requestingUserAddress
           })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+  
+          describe('and the status is accepted', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Accepted
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
+          })
+  
+          describe('and the status is rejected', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Rejected
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
+          })
+  
+          describe('and the status is cancelled', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Cancelled
+              mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
+            })
+  
+            it('should remove the request and do not add user as member', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+  
+              expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
+            })
           })
         })
-
-        describe('and the status is rejected', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
+  
+        describe('and the caller has community privileges', () => {
           beforeEach(() => {
-            status = CommunityRequestStatus.Rejected
+            callerAddress = '0x5555555555555555555555555555555555555555' // Different from requesting user
+            mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockResolvedValueOnce()
           })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+  
+          describe('and the status is accepted', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Accepted
+              mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValueOnce()
+            })
+  
+            it('should use transaction to add member and remove request', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+  
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(requestId, {
+                communityId: joinRequest.communityId,
+                memberAddress: requestingUserAddress,
+                role: CommunityRole.Member
+              })
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).toHaveBeenCalledWith(
+                joinRequest.communityId,
+                callerAddress
+              )
+            })
+  
+            it('should broadcast the request to join accepted event', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              // Wait for async broadcast
+              await new Promise(resolve => setImmediate(resolve))
+              expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+                type: Events.Type.COMMUNITY,
+                subType: Events.SubType.Community.REQUEST_TO_JOIN_ACCEPTED,
+                key: expect.any(String),
+                timestamp: expect.any(Number),
+                metadata: {
+                  communityId: joinRequest.communityId,
+                  communityName: expect.any(String),
+                  memberAddress: requestingUserAddress,
+                  thumbnailUrl: mockCommunityThumbnail.buildThumbnailUrl(joinRequest.communityId)
+                }
+              } as CommunityRequestToJoinAcceptedEvent)
+            })
+          })
+  
+          describe('and the status is rejected', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Rejected
+              mockCommunitiesDB.removeCommunityRequest.mockResolvedValueOnce()
+            })
+  
+            it('should remove the request and do not add user as member', async () => {
+              await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+  
+              expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).toHaveBeenCalledWith(
+                joinRequest.communityId,
+                callerAddress
+              )
+            })
+          })
+  
+          describe('and the status is cancelled', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Cancelled
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
           })
         })
-
-        describe('and the status is cancelled', () => {
-          let status: Exclude<CommunityRequestStatus, 'pending'>
-
+  
+        describe('and the caller is neither the requesting user nor has privileges', () => {
           beforeEach(() => {
-            status = CommunityRequestStatus.Cancelled
+            callerAddress = '0x6666666666666666666666666666666666666666' // Different from requesting user
+            mockCommunityRoles.validatePermissionToAcceptAndRejectRequests.mockRejectedValueOnce(
+              new NotAuthorizedError('User does not have permission')
+            )
           })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(
-              communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
-            ).rejects.toThrow(NotAuthorizedError)
-
-            expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+  
+          describe('and the status is accepted', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Accepted
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
+          })
+  
+          describe('and the status is rejected', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Rejected
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
+          })
+  
+          describe('and the status is cancelled', () => {
+            let status: Exclude<CommunityRequestStatus, 'pending'>
+  
+            beforeEach(() => {
+              status = CommunityRequestStatus.Cancelled
+            })
+  
+            it('should throw NotAuthorizedError', async () => {
+              await expect(
+                communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
+              ).rejects.toThrow(NotAuthorizedError)
+  
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+            })
           })
         })
       })

@@ -1,4 +1,4 @@
-import { PaginatedParameters } from '@dcl/schemas'
+import { Events, PaginatedParameters } from '@dcl/schemas'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityRequestNotFoundError, InvalidCommunityRequestError } from './errors'
@@ -12,13 +12,78 @@ import {
   ListCommunityRequestsOptions,
   RequestActionOptions
 } from './types'
+import { getProfileName } from '../profiles'
 
 export function createCommunityRequestsComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'communities' | 'communityRoles' | 'logs'>
+  components: Pick<
+    AppComponents,
+    | 'communitiesDb'
+    | 'communities'
+    | 'communityRoles'
+    | 'communityThumbnail'
+    | 'communityBroadcaster'
+    | 'catalystClient'
+    | 'logs'
+  >
 ): ICommunityRequestsComponent {
-  const { communitiesDb, communities, communityRoles, logs } = components
+  const { communitiesDb, communities, communityRoles, communityThumbnail, communityBroadcaster, catalystClient, logs } =
+    components
 
   const logger = logs.getLogger('community-requests-component')
+
+  async function notifyStakeholdersAboutRequest(
+    request: MemberRequest,
+    {
+      communityId,
+      communityName,
+      memberAddress,
+      memberName
+    }: { communityId: string; communityName: string; memberAddress: string; memberName?: string }
+  ) {
+    if (request.type === CommunityRequestType.RequestToJoin) {
+      if (request.status === CommunityRequestStatus.Pending) {
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.REQUEST_TO_JOIN_RECEIVED,
+          key: `community-request-to-join-received-${communityId}-${request.id}`,
+          timestamp: Date.now(),
+          metadata: {
+            communityId: communityId,
+            communityName: communityName,
+            memberAddress,
+            memberName: memberName || 'Unknown',
+            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+          }
+        })
+      } else if (request.status === CommunityRequestStatus.Accepted) {
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.REQUEST_TO_JOIN_ACCEPTED,
+          key: `community-request-to-join-accepted-${communityId}-${request.id}`,
+          timestamp: Date.now(),
+          metadata: {
+            communityId: communityId,
+            communityName: communityName,
+            memberAddress,
+            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+          }
+        })
+      }
+    } else if (request.type === CommunityRequestType.Invite && request.status === CommunityRequestStatus.Pending) {
+      await communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.INVITE_RECEIVED,
+        key: `community-invite-received-${communityId}-${request.id}`,
+        timestamp: Date.now(),
+        metadata: {
+          communityId: communityId,
+          communityName: communityName,
+          memberAddress,
+          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+        }
+      })
+    }
+  }
 
   async function createCommunityRequest(
     communityId: string,
@@ -87,6 +152,29 @@ export function createCommunityRequestsComponent(
       )
     }
 
+    setImmediate(async () => {
+      let memberName: string | undefined
+
+      try {
+        if (
+          createdRequest.type === CommunityRequestType.RequestToJoin &&
+          createdRequest.status === CommunityRequestStatus.Pending
+        ) {
+          const memberProfile = await catalystClient.getProfile(createdRequest.memberAddress)
+          memberName = getProfileName(memberProfile)
+        }
+      } catch (error) {
+        logger.warn(`Failed to fetch profile for member ${createdRequest.memberAddress}: ${error}`)
+      }
+
+      await notifyStakeholdersAboutRequest(createdRequest, {
+        communityId,
+        communityName: community.name,
+        memberAddress,
+        memberName
+      })
+    })
+
     return createdRequest
   }
 
@@ -141,6 +229,12 @@ export function createCommunityRequestsComponent(
       throw new CommunityRequestNotFoundError(requestId)
     }
 
+    const community = await communitiesDb.getCommunity(request.communityId, request.memberAddress)
+
+    if (!community) {
+      throw new CommunityNotFoundError(request.communityId)
+    }
+
     if (request.type === CommunityRequestType.Invite) {
       await validateInvitePermissions(request, status, options.callerAddress)
     } else if (request.type === CommunityRequestType.RequestToJoin) {
@@ -175,6 +269,17 @@ export function createCommunityRequestsComponent(
 
       await communitiesDb.removeCommunityRequest(requestId)
     }
+
+    setImmediate(async () => {
+      await notifyStakeholdersAboutRequest(
+        { ...request, status },
+        {
+          communityId: community.id,
+          communityName: community.name,
+          memberAddress: request.memberAddress
+        }
+      )
+    })
   }
 
   /**

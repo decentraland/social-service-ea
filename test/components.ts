@@ -70,12 +70,10 @@ import { createWsPoolComponent } from '../src/logic/ws-pool'
 import { createEmailComponent } from '../src/adapters/email'
 import { createFriendsComponent } from '../src/logic/friends'
 import { createSlackComponent } from '@dcl/slack-component'
-import { createAIComplianceComponent } from '../src/adapters/ai-compliance'
-import { createFeatureFlagsMockComponent } from './mocks/components/feature-flags'
-import { createFeaturesMockComponent } from './mocks/components/features'
 import { createFeaturesComponent } from '@well-known-components/features-component'
 import { createFeatureFlagsAdapter } from '../src/adapters/feature-flags'
 import { createInMemoryCacheComponent } from '../src/adapters/memory-cache'
+import { createMockCommunityBroadcasterComponent } from './mocks/communities'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -163,7 +161,8 @@ async function initComponents(): Promise<TestComponents> {
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
-  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
+  // Use mock broadcaster to avoid database calls during async operations
+  const communityBroadcaster = createMockCommunityBroadcasterComponent({})
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
   const communityFieldsValidator = await createCommunityFieldsValidatorComponent({ config })
 
@@ -237,7 +236,7 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail,
     communityPlaces
   })
-  const communityRequests = createCommunityRequestsComponent({ communitiesDb, communities, communityRoles, logs })
+  const communityRequests = createCommunityRequestsComponent({ communitiesDb, communities, communityRoles, communityBroadcaster, communityThumbnail, catalystClient, logs })
   const rpcServer = await createRpcServerComponent({
     logs,
     pubsub,

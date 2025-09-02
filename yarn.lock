@@ -1268,10 +1268,10 @@
     ajv-keywords "^5.1.0"
     mitt "^3.0.1"
 
-"@dcl/schemas@^17.1.0":
-  version "17.1.0"
-  resolved "https://registry.npmjs.org/@dcl/schemas/-/schemas-17.1.0.tgz"
-  integrity sha512-DCn9YU9tfdwJFtX7XJyEQM5i5STUTDZRliI+6wmORnq63NvyX3Q+Ftz/McZPyxYAgorPZtgM4X+YROuPX7NmHQ==
+"@dcl/schemas@^18.2.0":
+  version "18.2.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-18.2.0.tgz#1e5bf37e9218123b2a886fb4f6eb8cbe81f5623c"
+  integrity sha512-8TbkY6MRfqcZxIZsm2aKgB1uoJCzWUwcKpKV13kCPoQ789JV8IycRWfm5M/WcaU/wUW99XX7mk9KykWWRC3yvg==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
