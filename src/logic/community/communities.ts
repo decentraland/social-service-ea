@@ -307,14 +307,18 @@ export function createCommunityComponent(
         throw new CommunityNotFoundError(id)
       }
 
+      const ownerDeletingOwnedCommunity = isOwner(community, userAddress)
+
       const globalModerators =
         (await featureFlags.getVariants<string[]>(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)) || []
 
-      if (!isOwner(community, userAddress) && !globalModerators.includes(userAddress.toLowerCase())) {
+      if (!ownerDeletingOwnedCommunity && !globalModerators.includes(userAddress.toLowerCase())) {
         throw new NotAuthorizedError("The user doesn't have permission to delete this community")
       }
 
       await communitiesDb.deleteCommunity(id)
+
+      const thumbnailUrl = (await communityThumbnail.getThumbnail(id)) || 'N/A'
 
       setImmediate(async () => {
         await communityBroadcaster.broadcast({
@@ -325,10 +329,27 @@ export function createCommunityComponent(
           metadata: {
             id,
             name: community.name,
-            thumbnailUrl: (await communityThumbnail.getThumbnail(id)) || 'N/A'
+            thumbnailUrl
           }
         })
       })
+
+      if (!ownerDeletingOwnedCommunity) {
+        setImmediate(async () => {
+          await communityBroadcaster.broadcast({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
+            key: id,
+            timestamp: Date.now(),
+            metadata: {
+              id,
+              name: community.name,
+              ownerAddress: community.ownerAddress,
+              thumbnailUrl
+            }
+          })
+        })
+      }
     },
 
     updateCommunity: async (
