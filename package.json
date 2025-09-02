@@ -50,7 +50,7 @@
     "@dcl/platform-server-commons": "^0.1.0",
     "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-17034239367.commit-2e8a0bd.tgz",
     "@dcl/rpc": "^1.1.2",
-    "@dcl/schemas": "^18.2.0",
+    "@dcl/schemas": "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/new-notification-community-deleted-content-violation/dcl-schemas-18.2.1-17407869569.commit-3f3620c.tgz",
     "@dcl/slack-component": "^1.0.1",
     "@sentry/node": "^9.12.0",
     "@well-known-components/env-config-provider": "^1.2.0",

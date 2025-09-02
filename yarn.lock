@@ -1287,6 +1287,15 @@
     ajv-errors "^3.0.0"
     ajv-keywords "^5.1.0"
 
+"@dcl/schemas@https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/new-notification-community-deleted-content-violation/dcl-schemas-18.2.1-17407869569.commit-3f3620c.tgz":
+  version "18.2.1-17407869569.commit-3f3620c"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/new-notification-community-deleted-content-violation/dcl-schemas-18.2.1-17407869569.commit-3f3620c.tgz#c3ab80ab098075fefb60aaea1944ad340d11628b"
+  dependencies:
+    ajv "^8.11.0"
+    ajv-errors "^3.0.0"
+    ajv-keywords "^5.1.0"
+    mitt "^3.0.1"
+
 "@dcl/slack-component@^1.0.1":
   version "1.0.1"
   resolved "https://registry.npmjs.org/@dcl/slack-component/-/slack-component-1.0.1.tgz"

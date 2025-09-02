@@ -316,6 +316,8 @@ export function createCommunityComponent(
 
       await communitiesDb.deleteCommunity(id)
 
+      const thumbnailUrl = (await communityThumbnail.getThumbnail(id)) || 'N/A'
+
       setImmediate(async () => {
         await communityBroadcaster.broadcast({
           type: Events.Type.COMMUNITY,
@@ -325,10 +327,27 @@ export function createCommunityComponent(
           metadata: {
             id,
             name: community.name,
-            thumbnailUrl: (await communityThumbnail.getThumbnail(id)) || 'N/A'
+            thumbnailUrl
           }
         })
       })
+
+      if (!isOwner(community, userAddress)) {
+        setImmediate(async () => {
+          await communityBroadcaster.broadcast({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
+            key: id,
+            timestamp: Date.now(),
+            metadata: {
+              id,
+              name: community.name,
+              ownerAddress: community.ownerAddress,
+              thumbnailUrl
+            }
+          })
+        })
+      }
     },
 
     updateCommunity: async (

@@ -787,6 +787,7 @@ describe('Community Component', () => {
       community = null
       mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       mockCommunitiesDB.deleteCommunity.mockResolvedValue()
+      mockCommunityBroadcaster.broadcast.mockResolvedValue()
     })
 
     describe('and the community exists', () => {
@@ -827,6 +828,24 @@ describe('Community Component', () => {
             }
           })
         })
+
+        it('should not publish a community deleted content violation event ', async () => {
+          await communityComponent.deleteCommunity(communityId, userAddress)
+
+          await new Promise((resolve) => setImmediate(resolve))
+          expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalledWith({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
+            key: expect.stringContaining(`${communityId}-${userAddress}`),
+            timestamp: expect.any(Number),
+            metadata: {
+              id: communityId,
+              name: community.name,
+              ownerAddress: userAddress,
+              thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+            }
+          })
+        })
       })
 
       describe('and the user is a global moderator', () => {
@@ -860,6 +879,24 @@ describe('Community Component', () => {
             metadata: {
               id: communityId,
               name: community.name,
+              thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+            }
+          })
+        })
+
+        it('should publish a community deleted content violation event ', async () => {
+          await communityComponent.deleteCommunity(communityId, userAddress)
+
+          await new Promise((resolve) => setImmediate(resolve))
+          expect(mockCommunityBroadcaster.broadcast).toHaveBeenLastCalledWith({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
+            key: communityId,
+            timestamp: expect.any(Number),
+            metadata: {
+              id: communityId,
+              name: community.name,
+              ownerAddress: community.ownerAddress,
               thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
             }
           })
