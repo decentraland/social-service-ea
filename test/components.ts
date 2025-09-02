@@ -47,14 +47,15 @@ import {
   createCommunityEventsComponent,
   createCommunityThumbnailComponent,
   createCommunityBroadcasterComponent,
-  createCommunityComplianceValidatorComponent
+  createCommunityComplianceValidatorComponent,
+  createCommunityFieldsValidatorComponent,
+  createCommunityRequestsComponent
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
 import { createCommunityVoiceComponent } from '../src/logic/community-voice'
 import { createCommunityVoiceChatCacheComponent } from '../src/logic/community-voice/community-voice-cache'
 import { createCommunityVoiceChatPollingComponent } from '../src/logic/community-voice/community-voice-polling'
-import { createCommunityRequestsComponent } from '../src/logic/community/requests'
 import { createSettingsComponent } from '../src/logic/settings'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from '../src/logic/sqs'
 import { createReferralDBComponent } from '../src/adapters/referral-db'
@@ -164,6 +165,7 @@ async function initComponents(): Promise<TestComponents> {
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
   const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
+  const communityFieldsValidator = await createCommunityFieldsValidatorComponent({ config })
 
   // Community voice chat cache and polling components
   const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })
@@ -303,6 +305,7 @@ async function initComponents(): Promise<TestComponents> {
     communityBroadcaster,
     communityComplianceValidator,
     communityEvents,
+    communityFieldsValidator,
     communityMembers,
     communityOwners,
     communityPlaces,

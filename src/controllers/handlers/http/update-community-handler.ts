@@ -3,13 +3,13 @@ import { FormHandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityNotFoundError, CommunityNotCompliantError, AIComplianceError } from '../../../logic/community'
-import { validateCommunityFields } from '../../../utils/community-validation'
 
 export async function updateCommunityHandler(
-  context: FormHandlerContextWithPath<'communities' | 'logs', '/v1/communities/:id'> & DecentralandSignatureContext<any>
+  context: FormHandlerContextWithPath<'communities' | 'communityFieldsValidator' | 'logs', '/v1/communities/:id'> &
+    DecentralandSignatureContext<any>
 ): Promise<HTTPResponse> {
   const {
-    components: { communities, logs },
+    components: { communities, logs, communityFieldsValidator },
     verification,
     formData,
     params
@@ -29,7 +29,7 @@ export async function updateCommunityHandler(
       placeIds,
       privacy,
       thumbnailBuffer: validatedThumbnail
-    } = await validateCommunityFields(formData, thumbnailBuffer)
+    } = await communityFieldsValidator.validate(formData, thumbnailBuffer)
 
     logger.info('Updating community', {
       communityId,

@@ -89,6 +89,34 @@ test('Create Community Controller', async function ({ components, stubComponents
           })
         })
 
+        it('should respond with a 400 status code when name is restricted', async () => {
+          const response = await makeMultipartRequest(identity, '/v1/communities', {
+            name: 'Restricted name',
+            description: 'Test Description',
+            thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+          })
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'Name is not allowed'
+          })
+        })
+
+        it('should respond with a 400 status code when name is restricted (case insensitive)', async () => {
+          const response = await makeMultipartRequest(identity, '/v1/communities', {
+            name: 'RESTRICTED NAME',
+            description: 'Test Description',
+            thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+          })
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'Name is not allowed'
+          })
+        })
+
         it('should respond with a 400 status code when description exceeds 500 characters', async () => {
           const longDescription = 'A'.repeat(501) // 501 characters, exceeds 500 limit
           const response = await makeMultipartRequest(identity, '/v1/communities', {
@@ -101,6 +129,34 @@ test('Create Community Controller', async function ({ components, stubComponents
           expect(await response.json()).toMatchObject({
             error: 'Bad request',
             message: 'Description must be less or equal to 500 characters'
+          })
+        })
+
+        it('should respond with a 400 status code for invalid placeIds JSON', async () => {
+          const response = await makeMultipartRequest(identity, '/v1/communities', {
+            name: 'Test Community',
+            description: 'Test Description',
+            placeIds: 'invalid json' as any,
+            thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+          })
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'placeIds must be a valid JSON array'
+          })
+        })
+
+        it('should respond with a 400 status code when placeIds is not an array', async () => {
+          const response = await makeMultipartRequest(identity, '/v1/communities', {
+            placeIds: '"not an array"' as any,
+            thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
+          })
+
+          expect(response.status).toBe(400)
+          expect(await response.json()).toMatchObject({
+            error: 'Bad request',
+            message: 'placeIds must be a valid JSON array'
           })
         })
       })
