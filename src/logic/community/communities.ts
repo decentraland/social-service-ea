@@ -14,7 +14,8 @@ import {
   CommunityUpdates,
   AggregatedCommunity,
   CommunityPrivacyEnum,
-  CommunityForModeration
+  CommunityForModeration,
+  CommunityMember
 } from './types'
 import {
   isOwner,
@@ -25,6 +26,8 @@ import {
 } from './utils'
 import { isErrorWithMessage } from '../../utils/errors'
 import { EthAddress, Events } from '@dcl/schemas'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 export function createCommunityComponent(
   components: Pick<
@@ -40,9 +43,10 @@ export function createCommunityComponent(
     | 'communityThumbnail'
     | 'cdnCacheInvalidator'
     | 'commsGatekeeper'
-    | 'logs'
     | 'communityComplianceValidator'
+    | 'pubsub'
     | 'featureFlags'
+    | 'logs'
   >
 ): ICommunitiesComponent {
   const {
@@ -56,9 +60,10 @@ export function createCommunityComponent(
     communityThumbnail,
     cdnCacheInvalidator,
     commsGatekeeper,
-    logs,
     communityComplianceValidator,
-    featureFlags
+    pubsub,
+    featureFlags,
+    logs
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -321,21 +326,19 @@ export function createCommunityComponent(
       const thumbnailUrl = (await communityThumbnail.getThumbnail(id)) || 'N/A'
 
       setImmediate(async () => {
-        await communityBroadcaster.broadcast({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.DELETED,
-          key: id,
-          timestamp: Date.now(),
-          metadata: {
-            id,
-            name: community.name,
-            thumbnailUrl
-          }
-        })
-      })
-
-      if (!ownerDeletingOwnedCommunity) {
-        setImmediate(async () => {
+        if (ownerDeletingOwnedCommunity) {
+          await communityBroadcaster.broadcast({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED,
+            key: id,
+            timestamp: Date.now(),
+            metadata: {
+              id,
+              name: community.name,
+              thumbnailUrl
+            }
+          })
+        } else {
           await communityBroadcaster.broadcast({
             type: Events.Type.COMMUNITY,
             subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
@@ -348,8 +351,31 @@ export function createCommunityComponent(
               thumbnailUrl
             }
           })
-        })
-      }
+        }
+
+        const members: CommunityMember[] = []
+        let hasMore = true
+        let offset = 0
+        while (hasMore) {
+          const membersBatch = await communitiesDb.getCommunityMembers(id, { pagination: { limit: 100, offset } })
+          members.push(...membersBatch)
+          if (membersBatch.length < 100) {
+            hasMore = false
+          } else {
+            offset += 100
+          }
+        }
+
+        await Promise.all(
+          members.map(async (member) =>
+            pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId: id,
+              memberAddress: member.memberAddress,
+              status: ConnectivityStatus.OFFLINE
+            })
+          )
+        )
+      })
     },
 
     updateCommunity: async (

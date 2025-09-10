@@ -212,10 +212,11 @@ async function initComponents(): Promise<TestComponents> {
     communityBroadcaster,
     communityThumbnail,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
-    logs,
     commsGatekeeper,
     communityComplianceValidator,
-    featureFlags
+    featureFlags,
+    pubsub,
+    logs,
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,

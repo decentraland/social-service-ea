@@ -2,7 +2,7 @@ import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, mockCatalystClient, mockConfig, mockCdnCacheInvalidator } from '../../mocks/components'
+import { mockCatalystClient, mockConfig, mockCdnCacheInvalidator, createMockedPubSubComponent, createLogsMockedComponent } from '../../mocks/components'
 import { createS3ComponentMock } from '../../mocks/components/s3'
 import { createCommunityComponent } from '../../../src/logic/community/communities'
 import {
@@ -15,7 +15,8 @@ import {
   ICommunityBroadcasterComponent,
   CommunityPrivacyEnum,
   CommunityPublicInformation,
-  CommunityUpdates
+  CommunityUpdates,
+  CommunityMember
 } from '../../../src/logic/community/types'
 import {
   createMockCommunityRolesComponent,
@@ -33,6 +34,10 @@ import { Events } from '@dcl/schemas'
 import { ICommunityComplianceValidatorComponent } from '../../../src/logic/community/compliance-validator'
 import { createFeatureFlagsMockComponent } from '../../mocks/components/feature-flags'
 import { FeatureFlag } from '../../../src/adapters/feature-flags'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { IPubSubComponent } from '../../../src/types'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -46,7 +51,8 @@ describe('Community Component', () => {
   let mockCommsGatekeeper: jest.Mocked<ReturnType<typeof createCommsGatekeeperMockedComponent>>
   let mockCommunityComplianceValidator: jest.Mocked<ICommunityComplianceValidatorComponent>
   let mockFeatureFlags: jest.Mocked<ReturnType<typeof createFeatureFlagsMockComponent>>
-
+  let mockPubSub: jest.Mocked<IPubSubComponent>
+  let mockLogs: jest.Mocked<ILoggerComponent>
   let mockUserAddress: string
 
   const communityId = 'test-community'
@@ -73,10 +79,12 @@ describe('Community Component', () => {
     mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
     mockCommunityComplianceValidator = createMockCommunityComplianceValidatorComponent({})
     mockFeatureFlags = createFeatureFlagsMockComponent({})
+    mockPubSub = createMockedPubSubComponent({})
     mockConfig.requireString.mockResolvedValue(cdnUrl)
     mockCommunityThumbnail.buildThumbnailUrl.mockImplementation(
       (communityId: string) => `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
     )
+    mockLogs = createLogsMockedComponent({})
 
     mockConfig.requireString.mockResolvedValue(cdnUrl)
 
@@ -93,7 +101,8 @@ describe('Community Component', () => {
       communityBroadcaster: mockCommunityBroadcaster,
       communityThumbnail: mockCommunityThumbnail,
       communityComplianceValidator: mockCommunityComplianceValidator,
-      featureFlags: mockFeatureFlags
+      featureFlags: mockFeatureFlags,
+      pubsub: mockPubSub
     })
   })
 
@@ -787,7 +796,13 @@ describe('Community Component', () => {
       community = null
       mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       mockCommunitiesDB.deleteCommunity.mockResolvedValue()
+      mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
       mockCommunityBroadcaster.broadcast.mockResolvedValue()
+      mockPubSub.publishInChannel.mockResolvedValue()
+    })
+
+    afterEach(() => {
+      jest.resetAllMocks()
     })
 
     describe('and the community exists', () => {
@@ -846,6 +861,49 @@ describe('Community Component', () => {
             }
           })
         })
+
+        describe('and the community has some members', () => {
+          let mockMembers: CommunityMember[]
+
+          beforeEach(() => {
+            mockMembers = [
+              { communityId, memberAddress: '0xmember1', role: CommunityRole.Member, joinedAt: new Date().toISOString() },
+              { communityId, memberAddress: '0xmember2', role: CommunityRole.Member, joinedAt: new Date().toISOString() }
+            ]
+            mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce(mockMembers)
+          })
+
+          it('should fetch all community members in batches', async () => {
+            await communityComponent.deleteCommunity(communityId, userAddress)
+
+            await new Promise((resolve) => setImmediate(resolve))
+            expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+              pagination: { limit: 100, offset: 0 }
+            })
+          })
+
+          it('should publish offline status updates for all community members', async () => {
+            await communityComponent.deleteCommunity(communityId, userAddress)
+
+            await new Promise((resolve) => setImmediate(resolve))
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
+              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+              {
+                communityId,
+                memberAddress: '0xmember1',
+                status: ConnectivityStatus.OFFLINE
+              }
+            )
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
+              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+              {
+                communityId,
+                memberAddress: '0xmember2',
+                status: ConnectivityStatus.OFFLINE
+              }
+            )
+          })
+        })
       })
 
       describe('and the user is a global moderator', () => {
@@ -866,12 +924,12 @@ describe('Community Component', () => {
           expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
         })
 
-        it('should publish a community deleted event when deleted by global moderator', async () => {
+        it('should not publish a community deleted event when deleted by global moderator', async () => {
           await communityComponent.deleteCommunity(communityId, userAddress)
 
           // Wait for setImmediate callback to execute
           await new Promise((resolve) => setImmediate(resolve))
-          expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+          expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalledWith({
             type: Events.Type.COMMUNITY,
             subType: Events.SubType.Community.DELETED,
             key: communityId,
@@ -899,6 +957,133 @@ describe('Community Component', () => {
               ownerAddress: community.ownerAddress,
               thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
             }
+          })
+        })
+
+        it('should not publish a community deleted event without content violation when deleted by global moderator', async () => {
+          await communityComponent.deleteCommunity(communityId, userAddress)
+
+          await new Promise((resolve) => setImmediate(resolve))
+          expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalledWith({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED,
+            key: communityId,
+            timestamp: expect.any(Number),
+            metadata: {
+              id: communityId,
+              name: community.name,
+              thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+            }
+          })
+        })
+
+        describe('and the community has some members', () => {
+          let mockMembers: CommunityMember[]
+
+          beforeEach(() => {
+            mockMembers = [
+              { communityId, memberAddress: '0xmember1', role: CommunityRole.Member, joinedAt: new Date().toISOString() },
+              { communityId, memberAddress: '0xmember2', role: CommunityRole.Member, joinedAt: new Date().toISOString() }
+            ]
+            mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce(mockMembers)
+          })
+
+          it('should fetch all community members in batches', async () => {
+            await communityComponent.deleteCommunity(communityId, userAddress)
+
+            await new Promise((resolve) => setImmediate(resolve))
+            expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+              pagination: { limit: 100, offset: 0 }
+            })
+          })
+
+          it('should publish offline status updates for all community members', async () => {
+            await communityComponent.deleteCommunity(communityId, userAddress)
+
+            await new Promise((resolve) => setImmediate(resolve))
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
+              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+              {
+                communityId,
+                memberAddress: '0xmember1',
+                status: ConnectivityStatus.OFFLINE
+              }
+            )
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
+              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+              {
+                communityId,
+                memberAddress: '0xmember2',
+                status: ConnectivityStatus.OFFLINE
+              }
+            )
+          })
+        })
+
+        describe('and the community has many members', () => {
+          let firstBatch: CommunityMember[]
+          let secondBatch: CommunityMember[]
+
+          beforeEach(() => {
+            // Create 100 members for first batch and 50 for second batch
+            firstBatch = Array.from({ length: 100 }, (_, i) => ({
+              communityId,
+              memberAddress: `0xmember${i}`,
+              role: CommunityRole.Member,
+              joinedAt: new Date().toISOString()
+            }))
+            secondBatch = Array.from({ length: 50 }, (_, i) => ({
+              communityId,
+              memberAddress: `0xmember${i + 100}`,
+              role: CommunityRole.Member,
+              joinedAt: new Date().toISOString()
+            }))
+
+            mockCommunitiesDB.getCommunityMembers
+              .mockResolvedValueOnce(firstBatch)
+              .mockResolvedValueOnce(secondBatch)
+          })
+
+          it('should handle pagination when fetching members', async () => {
+            await communityComponent.deleteCommunity(communityId, userAddress)
+
+            await new Promise((resolve) => setImmediate(resolve))
+            expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+              pagination: { limit: 100, offset: 0 }
+            })
+            expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
+              pagination: { limit: 100, offset: 100 }
+            })
+          })
+
+          it('should publish offline status for all members across multiple pages', async () => {
+            await communityComponent.deleteCommunity(communityId, userAddress)
+
+            await new Promise((resolve) => setImmediate(resolve))
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledTimes(150) // 100 + 50 members
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
+              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+              expect.objectContaining({
+                communityId,
+                status: ConnectivityStatus.OFFLINE
+              })
+            )
+          })
+        })
+
+        describe('and the community has no members', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce([])
+          })
+
+          it('should not publish any offline status updates', async () => {
+            await communityComponent.deleteCommunity(communityId, userAddress)
+
+            await new Promise((resolve) => setImmediate(resolve))
+            expect(mockPubSub.publishInChannel).not.toHaveBeenCalledWith(
+              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+              expect.any(Object)
+            )
           })
         })
       })

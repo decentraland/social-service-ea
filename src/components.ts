@@ -231,8 +231,9 @@ export async function initComponents(): Promise<AppComponents> {
     communityBroadcaster,
     commsGatekeeper,
     communityComplianceValidator,
-    logs,
-    featureFlags
+    featureFlags,
+    pubsub,
+    logs
   })
   const communityFieldsValidator = await createCommunityFieldsValidatorComponent({ config })
   const communityRequests = createCommunityRequestsComponent({
