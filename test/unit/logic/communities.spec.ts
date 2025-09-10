@@ -2,7 +2,7 @@ import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, mockCatalystClient, mockConfig, mockCdnCacheInvalidator, createMockedPubSubComponent } from '../../mocks/components'
+import { mockCatalystClient, mockConfig, mockCdnCacheInvalidator, createMockedPubSubComponent, createLogsMockedComponent } from '../../mocks/components'
 import { createS3ComponentMock } from '../../mocks/components/s3'
 import { createCommunityComponent } from '../../../src/logic/community/communities'
 import {
@@ -37,6 +37,7 @@ import { FeatureFlag } from '../../../src/adapters/feature-flags'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { IPubSubComponent } from '../../../src/types'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -51,7 +52,7 @@ describe('Community Component', () => {
   let mockCommunityComplianceValidator: jest.Mocked<ICommunityComplianceValidatorComponent>
   let mockFeatureFlags: jest.Mocked<ReturnType<typeof createFeatureFlagsMockComponent>>
   let mockPubSub: jest.Mocked<IPubSubComponent>
-
+  let mockLogs: jest.Mocked<ILoggerComponent>
   let mockUserAddress: string
 
   const communityId = 'test-community'
@@ -83,6 +84,7 @@ describe('Community Component', () => {
     mockCommunityThumbnail.buildThumbnailUrl.mockImplementation(
       (communityId: string) => `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
     )
+    mockLogs = createLogsMockedComponent({})
 
     mockConfig.requireString.mockResolvedValue(cdnUrl)
 
