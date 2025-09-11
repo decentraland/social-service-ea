@@ -2,10 +2,21 @@ import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockCatalystClient, mockPubSub } from '../../mocks/components'
+import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { createCommunityBansComponent } from '../../../src/logic/community/bans'
 import { ICommunityBansComponent } from '../../../src/logic/community'
-import { BannedMember, CommunityPrivacyEnum, ICommunityBroadcasterComponent, ICommunityRolesComponent, ICommunityThumbnailComponent } from '../../../src/logic/community/types'
-import { createMockCommunityBroadcasterComponent, createMockCommunityRolesComponent, createMockCommunityThumbnailComponent } from '../../mocks/communities'
+import {
+  BannedMember,
+  CommunityPrivacyEnum,
+  ICommunityBroadcasterComponent,
+  ICommunityRolesComponent,
+  ICommunityThumbnailComponent
+} from '../../../src/logic/community/types'
+import {
+  createMockCommunityBroadcasterComponent,
+  createMockCommunityRolesComponent,
+  createMockCommunityThumbnailComponent
+} from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
@@ -19,6 +30,7 @@ describe('Community Bans Component', () => {
   let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
   let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
   let mockUserAddress: string
+  let mockCommsGatekeeper: ReturnType<typeof createCommsGatekeeperMockedComponent>
   const communityId = 'test-community'
   const mockBannedMembers: BannedMember[] = [
     {
@@ -44,6 +56,7 @@ describe('Community Bans Component', () => {
     mockCommunityRoles = createMockCommunityRolesComponent({})
     mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
+    mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
     communityBansComponent = await createCommunityBansComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
@@ -51,7 +64,8 @@ describe('Community Bans Component', () => {
       communityThumbnail: mockCommunityThumbnail,
       communityBroadcaster: mockCommunityBroadcaster,
       logs: mockLogs,
-      pubsub: mockPubSub
+      pubsub: mockPubSub,
+      commsGatekeeper: mockCommsGatekeeper
     })
   })
 
@@ -95,7 +109,11 @@ describe('Community Bans Component', () => {
             )
             expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
-            expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(communityId, bannerAddress, targetAddress)
+            expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(
+              communityId,
+              bannerAddress,
+              targetAddress
+            )
           })
 
           it('should publish member status update to pubsub', async () => {
@@ -112,7 +130,7 @@ describe('Community Bans Component', () => {
             await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
 
             // Wait for setImmediate callback to execute
-            await new Promise(resolve => setImmediate(resolve))
+            await new Promise((resolve) => setImmediate(resolve))
             expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_BANNED,
@@ -144,7 +162,11 @@ describe('Community Bans Component', () => {
             )
             expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(communityId, bannerAddress, targetAddress)
+            expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(
+              communityId,
+              bannerAddress,
+              targetAddress
+            )
           })
 
           it('should publish member status update to pubsub', async () => {
@@ -161,7 +183,7 @@ describe('Community Bans Component', () => {
             await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
 
             // Wait for setImmediate callback to execute
-            await new Promise(resolve => setImmediate(resolve))
+            await new Promise((resolve) => setImmediate(resolve))
             expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_BANNED,
@@ -390,7 +412,10 @@ describe('Community Bans Component', () => {
             })
 
             expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
-            expect(mockCommunityRoles.validatePermissionToGetBannedMembers).toHaveBeenCalledWith(communityId, userAddress)
+            expect(mockCommunityRoles.validatePermissionToGetBannedMembers).toHaveBeenCalledWith(
+              communityId,
+              userAddress
+            )
             expect(mockCommunitiesDB.getBannedMembers).toHaveBeenCalledWith(communityId, userAddress, pagination)
             expect(mockCommunitiesDB.getBannedMembersCount).toHaveBeenCalledWith(communityId)
             expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(

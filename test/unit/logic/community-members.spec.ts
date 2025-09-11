@@ -3,9 +3,20 @@ import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockCatalystClient, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
+import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { createCommunityMembersComponent } from '../../../src/logic/community/members'
-import { CommunityPrivacyEnum, ICommunityBroadcasterComponent, ICommunityMembersComponent, ICommunityRolesComponent, ICommunityThumbnailComponent } from '../../../src/logic/community/types'
-import { createMockCommunityBroadcasterComponent, createMockCommunityRolesComponent, createMockCommunityThumbnailComponent } from '../../mocks/communities'
+import {
+  CommunityPrivacyEnum,
+  ICommunityBroadcasterComponent,
+  ICommunityMembersComponent,
+  ICommunityRolesComponent,
+  ICommunityThumbnailComponent
+} from '../../../src/logic/community/types'
+import {
+  createMockCommunityBroadcasterComponent,
+  createMockCommunityRolesComponent,
+  createMockCommunityThumbnailComponent
+} from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { CommunityMember, CommunityMemberProfile } from '../../../src/logic/community/types'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
@@ -20,6 +31,7 @@ describe('Community Members Component', () => {
   let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
   let mockUserAddress: string
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
+  let mockCommsGatekeeper: ReturnType<typeof createCommsGatekeeperMockedComponent>
 
   const communityId = 'test-community'
   const mockCommunityMembers: CommunityMember[] = [
@@ -47,6 +59,7 @@ describe('Community Members Component', () => {
     mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
     mockPeersStats = createMockPeersStatsComponent()
+    mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
     communityMembersComponent = await createCommunityMembersComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
@@ -55,7 +68,8 @@ describe('Community Members Component', () => {
       communityBroadcaster: mockCommunityBroadcaster,
       logs: mockLogs,
       peersStats: mockPeersStats,
-      pubsub: mockPubSub
+      pubsub: mockPubSub,
+      commsGatekeeper: mockCommsGatekeeper
     })
   })
 
@@ -101,7 +115,10 @@ describe('Community Members Component', () => {
 
         describe('and only online members are not requested', () => {
           it('should return community members with profiles', async () => {
-            const result = await communityMembersComponent.getCommunityMembers(communityId, { ...options, as: userAddress })
+            const result = await communityMembersComponent.getCommunityMembers(communityId, {
+              ...options,
+              as: userAddress
+            })
 
             expect(result).toEqual({
               members: expect.arrayContaining([
@@ -188,7 +205,10 @@ describe('Community Members Component', () => {
           })
 
           it('should return community members with profiles', async () => {
-            const result = await communityMembersComponent.getCommunityMembers(communityId, { ...options, as: userAddress })
+            const result = await communityMembersComponent.getCommunityMembers(communityId, {
+              ...options,
+              as: userAddress
+            })
 
             expect(result).toEqual({
               members: expect.arrayContaining([
@@ -241,9 +261,9 @@ describe('Community Members Component', () => {
       })
 
       it('should throw CommunityNotFoundError', async () => {
-        await expect(communityMembersComponent.getCommunityMembers(communityId, { ...options, as: userAddress })).rejects.toThrow(
-          new CommunityNotFoundError(communityId)
-        )
+        await expect(
+          communityMembersComponent.getCommunityMembers(communityId, { ...options, as: userAddress })
+        ).rejects.toThrow(new CommunityNotFoundError(communityId))
 
         expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId, { onlyPublic: false })
         expect(mockCommunitiesDB.getCommunity).not.toHaveBeenCalled()
@@ -651,7 +671,7 @@ describe('Community Members Component', () => {
             await communityMembersComponent.kickMember(communityId, kickerAddress, targetAddress)
 
             // Wait for setImmediate callback to execute
-            await new Promise(resolve => setImmediate(resolve))
+            await new Promise((resolve) => setImmediate(resolve))
             expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_REMOVED,

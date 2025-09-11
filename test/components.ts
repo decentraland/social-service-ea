@@ -182,7 +182,8 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     catalystClient,
     peersStats,
-    pubsub
+    pubsub,
+    commsGatekeeper
   })
   const communityBans = await createCommunityBansComponent({
     communitiesDb,
@@ -191,7 +192,8 @@ async function initComponents(): Promise<TestComponents> {
     communityBroadcaster,
     logs,
     catalystClient,
-    pubsub
+    pubsub,
+    commsGatekeeper
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
@@ -216,7 +218,7 @@ async function initComponents(): Promise<TestComponents> {
     communityComplianceValidator,
     featureFlags,
     pubsub,
-    logs,
+    logs
   })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -237,7 +239,16 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail,
     communityPlaces
   })
-  const communityRequests = createCommunityRequestsComponent({ communitiesDb, communities, communityRoles, communityBroadcaster, communityThumbnail, catalystClient, pubsub, logs })
+  const communityRequests = createCommunityRequestsComponent({
+    communitiesDb,
+    communities,
+    communityRoles,
+    communityBroadcaster,
+    communityThumbnail,
+    catalystClient,
+    pubsub,
+    logs
+  })
   const rpcServer = await createRpcServerComponent({
     logs,
     pubsub,

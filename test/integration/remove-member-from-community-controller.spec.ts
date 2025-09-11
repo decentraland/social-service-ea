@@ -227,14 +227,10 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
             })
 
             it('should publish event to notify member kick', async () => {
-              await makeRequest(
-                identity,
-                `/v1/communities/${communityId}/members/${targetMemberAddress}`,
-                'DELETE'
-              )
+              await makeRequest(identity, `/v1/communities/${communityId}/members/${targetMemberAddress}`, 'DELETE')
 
               // Wait for any setImmediate callbacks to complete
-              await new Promise(resolve => setImmediate(resolve))
+              await new Promise((resolve) => setImmediate(resolve))
 
               expect(spyComponents.communityBroadcaster.broadcast).toHaveBeenCalledWith({
                 type: Events.Type.COMMUNITY,
@@ -298,14 +294,10 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
             })
 
             it('should publish event to notify member kick', async () => {
-              await makeRequest(
-                identity,
-                `/v1/communities/${communityId}/members/${targetMemberAddress}`,
-                'DELETE'
-              )
+              await makeRequest(identity, `/v1/communities/${communityId}/members/${targetMemberAddress}`, 'DELETE')
 
               // Wait for any setImmediate callbacks to complete
-              await new Promise(resolve => setImmediate(resolve))
+              await new Promise((resolve) => setImmediate(resolve))
 
               expect(spyComponents.communityBroadcaster.broadcast).toHaveBeenCalledWith({
                 type: Events.Type.COMMUNITY,
@@ -343,6 +335,114 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
                 message: `The user ${kickerAddress} doesn't have permission to kick ${targetOwnerAddress} from community ${communityId}`
               })
             })
+          })
+        })
+
+        describe('and the community is private and user is in voice chat', () => {
+          beforeEach(async () => {
+            // Make the community private
+            await components.communitiesDb.updateCommunity(communityId, {
+              private: true
+            })
+
+            await components.communitiesDb.addCommunityMember({
+              communityId,
+              memberAddress: kickerAddress,
+              role: CommunityRole.Owner
+            })
+
+            // Mock commsGatekeeper to simulate successful voice chat kick
+            spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat.mockResolvedValue(undefined)
+          })
+
+          afterEach(async () => {
+            await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [kickerAddress])
+          })
+
+          it('should kick member from voice chat when removing from private community', async () => {
+            const response = await makeRequest(
+              identity,
+              `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+              'DELETE'
+            )
+
+            // Wait for any setImmediate callbacks to complete
+            await new Promise((resolve) => setImmediate(resolve))
+
+            expect(response.status).toBe(204)
+
+            // Verify that kickUserFromCommunityVoiceChat was called
+            expect(spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat).toHaveBeenCalledWith(
+              communityId,
+              targetMemberAddress
+            )
+          })
+
+          it('should still succeed even if voice chat kick fails', async () => {
+            // Mock voice chat kick to fail
+            spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat.mockRejectedValue(
+              new Error('Voice chat service unavailable')
+            )
+
+            const response = await makeRequest(
+              identity,
+              `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+              'DELETE'
+            )
+
+            // Wait for any setImmediate callbacks to complete
+            await new Promise((resolve) => setImmediate(resolve))
+
+            // Should still succeed (voice chat kick failure doesn't fail the entire operation)
+            expect(response.status).toBe(204)
+
+            // Verify that kick was attempted
+            expect(spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat).toHaveBeenCalledWith(
+              communityId,
+              targetMemberAddress
+            )
+
+            // Verify member was still removed from community
+            const isMember = await components.communitiesDb.isMemberOfCommunity(communityId, targetMemberAddress)
+            expect(isMember).toBe(false)
+          })
+        })
+
+        describe('and the community is public', () => {
+          beforeEach(async () => {
+            // Ensure community is public (default)
+            await components.communitiesDb.updateCommunity(communityId, {
+              private: false
+            })
+
+            await components.communitiesDb.addCommunityMember({
+              communityId,
+              memberAddress: kickerAddress,
+              role: CommunityRole.Owner
+            })
+
+            // Reset the mock to ensure clean state
+            spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat.mockClear()
+          })
+
+          afterEach(async () => {
+            await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [kickerAddress])
+          })
+
+          it('should NOT kick member from voice chat when removing from public community', async () => {
+            const response = await makeRequest(
+              identity,
+              `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+              'DELETE'
+            )
+
+            // Wait for any setImmediate callbacks to complete
+            await new Promise((resolve) => setImmediate(resolve))
+
+            expect(response.status).toBe(204)
+
+            // Verify that kickUserFromCommunityVoiceChat was NOT called for public communities
+            expect(spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat).not.toHaveBeenCalled()
           })
         })
 

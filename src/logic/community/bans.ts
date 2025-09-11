@@ -1,7 +1,7 @@
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { AppComponents } from '../../types'
 import { CommunityNotFoundError } from './errors'
-import { BannedMemberProfile, BannedMember, ICommunityBansComponent } from './types'
+import { BannedMemberProfile, BannedMember, ICommunityBansComponent, CommunityPrivacyEnum } from './types'
 import { mapMembersWithProfiles } from './utils'
 import { EthAddress, Events, PaginatedParameters } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
@@ -16,10 +16,19 @@ export async function createCommunityBansComponent(
     | 'communityBroadcaster'
     | 'logs'
     | 'pubsub'
+    | 'commsGatekeeper'
   >
 ): Promise<ICommunityBansComponent> {
-  const { communitiesDb, catalystClient, communityRoles, communityThumbnail, communityBroadcaster, logs, pubsub } =
-    components
+  const {
+    communitiesDb,
+    catalystClient,
+    communityRoles,
+    communityThumbnail,
+    communityBroadcaster,
+    logs,
+    pubsub,
+    commsGatekeeper
+  } = components
 
   const logger = logs.getLogger('community-bans-component')
 
@@ -40,6 +49,19 @@ export async function createCommunityBansComponent(
       }
 
       await communitiesDb.banMemberFromCommunity(communityId, bannerAddress, targetAddress)
+
+      // For private communities, also kick user from voice chat if they are in one
+      if (community.privacy === CommunityPrivacyEnum.Private) {
+        // Only for private communities
+        try {
+          await commsGatekeeper.kickUserFromCommunityVoiceChat(communityId, targetAddress)
+          logger.info(`Kicked user ${targetAddress} from voice chat in private community ${communityId} during ban`)
+        } catch (error) {
+          logger.warn(`Failed to kick user ${targetAddress} from voice chat in community ${communityId} during ban`, {
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+        }
+      }
 
       await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
         communityId,

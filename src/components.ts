@@ -201,7 +201,8 @@ export async function initComponents(): Promise<AppComponents> {
     logs,
     catalystClient,
     peersStats,
-    pubsub
+    pubsub,
+    commsGatekeeper
   })
   const communityBans = await createCommunityBansComponent({
     communitiesDb,
@@ -210,7 +211,8 @@ export async function initComponents(): Promise<AppComponents> {
     communityBroadcaster,
     logs,
     catalystClient,
-    pubsub
+    pubsub,
+    commsGatekeeper
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })

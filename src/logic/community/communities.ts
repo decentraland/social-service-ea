@@ -70,10 +70,15 @@ export function createCommunityComponent(
 
   /**
    * Helper function to filter communities with active voice chat using batch API
+   * Only returns communities with active voice chat that the user has permission to see:
+   * - Public communities with active voice chat
+   * - Private communities with active voice chat where user is a member
    * @param communities - Array of communities to filter
-   * @returns Promise<T[]> - Filtered array containing only communities with active voice chat
+   * @returns Promise<T[]> - Filtered array containing only communities with active voice chat that user can access
    */
-  async function filterCommunitiesWithActiveVoiceChat<T extends { id: string }>(communities: T[]): Promise<T[]> {
+  async function filterCommunitiesWithActiveVoiceChat<
+    T extends { id: string; privacy?: CommunityPrivacyEnum; role?: CommunityRole }
+  >(communities: T[]): Promise<T[]> {
     if (communities.length === 0) {
       return communities
     }
@@ -82,7 +87,25 @@ export function createCommunityComponent(
       const communityIds = communities.map((c) => c.id)
       const voiceChatStatuses = await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)
 
-      return communities.filter((community) => voiceChatStatuses[community.id]?.isActive ?? false)
+      return communities.filter((community) => {
+        const hasActiveVoiceChat = voiceChatStatuses[community.id]?.isActive ?? false
+
+        if (!hasActiveVoiceChat) {
+          return false
+        }
+
+        // If privacy/role info is available, check membership for private communities
+        if (community.privacy && community.role !== undefined) {
+          // For private communities, user must be a member to see them
+          if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
+            return false
+          }
+        }
+
+        // Public communities or private communities where user is a member
+        // (or communities without privacy info, which are treated as accessible)
+        return true
+      })
     } catch (error) {
       logger.warn('Error filtering communities by voice chat status', {
         error: isErrorWithMessage(error) ? error.message : 'Unknown error'
