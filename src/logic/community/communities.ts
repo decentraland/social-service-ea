@@ -95,11 +95,9 @@ export function createCommunityComponent(
         }
 
         // If privacy/role info is available, check membership for private communities
-        if (community.privacy && community.role !== undefined) {
+        if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
           // For private communities, user must be a member to see them
-          if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
-            return false
-          }
+          return false
         }
 
         // Public communities or private communities where user is a member
