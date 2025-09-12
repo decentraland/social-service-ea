@@ -44,7 +44,7 @@ describe('CommunityFieldsValidator', () => {
           expect(result.name).toBe('Valid Community Name')
           expect(result.description).toBeUndefined()
           expect(result.placeIds).toBeUndefined()
-          expect(result.privacy).toBe(CommunityPrivacyEnum.Public)
+          expect(result.privacy).toBeUndefined()
           expect(result.thumbnailBuffer).toBeUndefined()
         })
       })
@@ -126,7 +126,7 @@ describe('CommunityFieldsValidator', () => {
           expect(result.name).toBeUndefined()
           expect(result.description).toBe('A valid community description')
           expect(result.placeIds).toBeUndefined()
-          expect(result.privacy).toBe(CommunityPrivacyEnum.Public)
+          expect(result.privacy).toBeUndefined()
           expect(result.thumbnailBuffer).toBeUndefined()
         })
       })
@@ -245,7 +245,7 @@ describe('CommunityFieldsValidator', () => {
         expect(result.privacy).toBe(CommunityPrivacyEnum.Public)
       })
 
-      it('should default to Public when privacy is not provided', async () => {
+      it('should NOT default to Public when privacy is not provided', async () => {
         const formData = {
           fields: {
             name: { value: 'Test Community' }
@@ -254,7 +254,7 @@ describe('CommunityFieldsValidator', () => {
 
         const result = await fieldsValidator.validate(formData)
 
-        expect(result.privacy).toBe(CommunityPrivacyEnum.Public)
+        expect(result.privacy).toBeUndefined()
       })
     })
 
