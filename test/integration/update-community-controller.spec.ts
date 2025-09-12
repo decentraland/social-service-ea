@@ -547,6 +547,24 @@ test('Update Community Controller', async function ({ components, stubComponents
                   expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
                   expect(body.message).toBe('Community updated successfully')
                 })
+
+                it('should not update the community privacy if it contains a invalid value', async () => {
+                  const existingCommunity = await components.communitiesDb.getCommunity(communityId, identity.realAccount.address)
+                  const response = await makeMultipartRequest(
+                    identity,
+                    `/v1/communities/${communityId}`,
+                    {
+                      name: 'Provoke any change',
+                      privacy: 'invalid' as any
+                    },
+                    'PUT'
+                  )
+
+                  expect(response.status).toBe(200)
+                  const body = await response.json()
+                  expect(body.data.privacy).toBe(existingCommunity.privacy)
+                  expect(body.message).toBe('Community updated successfully')
+                })
               })
 
               describe('and the user is not the owner', () => {
