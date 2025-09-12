@@ -180,15 +180,11 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
           })
 
           it('should publish event to notify member ban', async () => {
-            await makeRequest(
-              identity,
-              `/v1/communities/${communityId}/members/${targetMemberAddress}/bans`,
-              'POST'
-            )
-            
+            await makeRequest(identity, `/v1/communities/${communityId}/members/${targetMemberAddress}/bans`, 'POST')
+
             // Wait for any setImmediate callbacks to complete
-            await new Promise(resolve => setImmediate(resolve))
-            
+            await new Promise((resolve) => setImmediate(resolve))
+
             expect(spyComponents.communityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_BANNED,
@@ -196,7 +192,7 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
               timestamp: expect.any(Number),
               metadata: {
                 id: communityId,
-                name: "Test Community",
+                name: 'Test Community',
                 memberAddress: targetMemberAddress,
                 thumbnailUrl: expect.stringContaining(`/social/communities/${communityId}/raw-thumbnail.png`)
               }
@@ -271,6 +267,114 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
               error: 'Not Authorized',
               message: `The user ${bannerAddress} doesn't have permission to ban ${targetOwnerAddress} from community ${communityId}`
             })
+          })
+        })
+
+        describe('and the community is private and user is in voice chat', () => {
+          beforeEach(async () => {
+            // Make the community private
+            await components.communitiesDb.updateCommunity(communityId, {
+              private: true
+            })
+
+            await components.communitiesDb.addCommunityMember({
+              communityId,
+              memberAddress: bannerAddress,
+              role: CommunityRole.Owner
+            })
+
+            // Mock commsGatekeeper to simulate successful voice chat kick
+            spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat.mockResolvedValue(undefined)
+          })
+
+          afterEach(async () => {
+            await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [bannerAddress])
+          })
+
+          it('should kick member from voice chat when banning from private community', async () => {
+            const response = await makeRequest(
+              identity,
+              `/v1/communities/${communityId}/members/${targetMemberAddress}/bans`,
+              'POST'
+            )
+
+            // Wait for any setImmediate callbacks to complete
+            await new Promise((resolve) => setImmediate(resolve))
+
+            expect(response.status).toBe(204)
+
+            // Verify that kickUserFromCommunityVoiceChat was called
+            expect(spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat).toHaveBeenCalledWith(
+              communityId,
+              targetMemberAddress
+            )
+          })
+
+          it('should still succeed even if voice chat kick fails', async () => {
+            // Mock voice chat kick to fail
+            spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat.mockRejectedValue(
+              new Error('Voice chat service unavailable')
+            )
+
+            const response = await makeRequest(
+              identity,
+              `/v1/communities/${communityId}/members/${targetMemberAddress}/bans`,
+              'POST'
+            )
+
+            // Wait for any setImmediate callbacks to complete
+            await new Promise((resolve) => setImmediate(resolve))
+
+            // Should still succeed (voice chat kick failure doesn't fail the entire operation)
+            expect(response.status).toBe(204)
+
+            // Verify that kick was attempted
+            expect(spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat).toHaveBeenCalledWith(
+              communityId,
+              targetMemberAddress
+            )
+
+            // Verify member was still banned from community
+            const isBanned = await components.communitiesDb.isMemberBanned(communityId, targetMemberAddress)
+            expect(isBanned).toBe(true)
+          })
+        })
+
+        describe('and the community is public', () => {
+          beforeEach(async () => {
+            // Ensure community is public (default)
+            await components.communitiesDb.updateCommunity(communityId, {
+              private: false
+            })
+
+            await components.communitiesDb.addCommunityMember({
+              communityId,
+              memberAddress: bannerAddress,
+              role: CommunityRole.Owner
+            })
+
+            // Reset the mock to ensure clean state
+            spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat.mockClear()
+          })
+
+          afterEach(async () => {
+            await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [bannerAddress])
+          })
+
+          it('should NOT kick member from voice chat when banning from public community', async () => {
+            const response = await makeRequest(
+              identity,
+              `/v1/communities/${communityId}/members/${targetMemberAddress}/bans`,
+              'POST'
+            )
+
+            // Wait for any setImmediate callbacks to complete
+            await new Promise((resolve) => setImmediate(resolve))
+
+            expect(response.status).toBe(204)
+
+            // Verify that kickUserFromCommunityVoiceChat was NOT called for public communities
+            expect(spyComponents.commsGatekeeper.kickUserFromCommunityVoiceChat).not.toHaveBeenCalled()
           })
         })
 

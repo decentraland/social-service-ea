@@ -458,6 +458,101 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             expect(body.data.total).toBe(1)
           })
         })
+
+        describe('when filtering private communities with active voice chat', () => {
+          let privateCommunityId: string
+          let publicCommunityId: string
+          let nonMemberIdentity: Identity
+
+          beforeEach(async () => {
+            nonMemberIdentity = await createTestIdentity()
+
+            // Create a private community
+            const privateResult = await components.communitiesDb.createCommunity(
+              mockCommunity({
+                name: 'Private Test Community',
+                description: 'Private Test Description',
+                owner_address: address,
+                private: true
+              })
+            )
+            privateCommunityId = privateResult.id
+
+            // Add current user as member of private community
+            await components.communitiesDb.addCommunityMember({
+              communityId: privateCommunityId,
+              memberAddress: address,
+              role: CommunityRole.Member
+            })
+
+            // Create a public community
+            const publicResult = await components.communitiesDb.createCommunity(
+              mockCommunity({
+                name: 'Public Test Community',
+                description: 'Public Test Description',
+                owner_address: address,
+                private: false
+              })
+            )
+            publicCommunityId = publicResult.id
+
+            // Mock both communities to have active voice chat
+            spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mockImplementation(
+              async (communityIds: string[]) => {
+                const result: Record<string, any> = {}
+                communityIds.forEach((communityId) => {
+                  result[communityId] = { isActive: true, participantCount: 3, moderatorCount: 1 }
+                })
+                return result
+              }
+            )
+          })
+
+          afterEach(async () => {
+            await components.communitiesDbHelper.forceCommunityMemberRemoval(privateCommunityId, [address])
+            await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
+            await components.communitiesDbHelper.forceCommunityRemoval(publicCommunityId)
+          })
+
+          it('should return both private and public communities for member when onlyWithActiveVoiceChat=true', async () => {
+            const response = await makeRequest(
+              identity,
+              '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=true'
+            )
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+            const communityIds = body.data.results.map((c: any) => c.id)
+            expect(communityIds).toContain(privateCommunityId)
+            expect(communityIds).toContain(publicCommunityId)
+          })
+
+          it('should return only public communities for non-member when onlyWithActiveVoiceChat=true', async () => {
+            const response = await makeRequest(
+              nonMemberIdentity,
+              '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=true'
+            )
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+            const communityIds = body.data.results.map((c: any) => c.id)
+            expect(communityIds).not.toContain(privateCommunityId)
+            expect(communityIds).toContain(publicCommunityId)
+          })
+
+          it('should return all communities (including private) for members when onlyWithActiveVoiceChat=false', async () => {
+            const response = await makeRequest(
+              identity,
+              '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=false'
+            )
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+            const communityIds = body.data.results.map((c: any) => c.id)
+            expect(communityIds).toContain(privateCommunityId)
+            expect(communityIds).toContain(publicCommunityId)
+          })
+        })
       })
 
       describe('when filtering by roles', () => {

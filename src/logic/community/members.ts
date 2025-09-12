@@ -23,6 +23,7 @@ export async function createCommunityMembersComponent(
     | 'logs'
     | 'peersStats'
     | 'pubsub'
+    | 'commsGatekeeper'
   >
 ): Promise<ICommunityMembersComponent> {
   const {
@@ -33,7 +34,8 @@ export async function createCommunityMembersComponent(
     communityBroadcaster,
     logs,
     peersStats,
-    pubsub
+    pubsub,
+    commsGatekeeper
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -165,6 +167,20 @@ export async function createCommunityMembersComponent(
       await communityRoles.validatePermissionToKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
 
       await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
+
+      // For private communities, also kick user from voice chat if they are in one
+      if (community.privacy === CommunityPrivacyEnum.Private) {
+        // Only for private communities
+        try {
+          await commsGatekeeper.kickUserFromCommunityVoiceChat(communityId, targetAddress)
+          logger.info(`Kicked user ${targetAddress} from voice chat in private community ${communityId}`)
+        } catch (error) {
+          // Don't fail the entire operation if voice chat kick fails
+          logger.warn(`Failed to kick user ${targetAddress} from voice chat in community ${communityId}`, {
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+        }
+      }
 
       await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
         communityId,
