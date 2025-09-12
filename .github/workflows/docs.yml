@@ -32,7 +32,7 @@ jobs:
         run: yarn redocly lint docs/communities-openapi.yaml
 
       - name: Validate OpenAPI specification
-        run: yarn redocly bundle docs/communities-openapi.yaml --ext json
+        run: yarn redocly bundle docs/communities-openapi.yaml -o docs/communities-openapi.json --ext json
 
       - name: Build documentation
         run: yarn redocly build-docs docs/communities-openapi.yaml -o docs/index.html
