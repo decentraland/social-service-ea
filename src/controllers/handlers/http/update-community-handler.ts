@@ -34,7 +34,7 @@ export async function updateCommunityHandler(
     logger.info('Updating community', {
       communityId,
       userAddress,
-      privacy,
+      privacy: privacy ?? 'N/A',
       updates: JSON.stringify({ name, description, placeIds: placeIds ? placeIds.length : 0 }),
       hasThumbnail: validatedThumbnail ? 'true' : 'false'
     })

@@ -2,7 +2,12 @@ import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { FormHandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { CommunityOwnerNotFoundError, CommunityNotCompliantError, AIComplianceError } from '../../../logic/community'
+import {
+  CommunityOwnerNotFoundError,
+  CommunityNotCompliantError,
+  AIComplianceError,
+  CommunityPrivacyEnum
+} from '../../../logic/community'
 
 export async function createCommunityHandler(
   context: FormHandlerContextWithPath<'communities' | 'communityFieldsValidator' | 'logs', '/v1/communities'> &
@@ -41,7 +46,7 @@ export async function createCommunityHandler(
         name: name!,
         description: description!,
         ownerAddress: address,
-        privacy
+        privacy: privacy ?? CommunityPrivacyEnum.Public
       },
       thumbnailBuffer,
       placeIds ?? []

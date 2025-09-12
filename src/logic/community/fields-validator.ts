@@ -89,7 +89,7 @@ export async function createCommunityFieldsValidatorComponent(
         name,
         description,
         placeIds,
-        privacy: privacy === 'private' ? CommunityPrivacyEnum.Private : CommunityPrivacyEnum.Public,
+        privacy: (privacy?.trim() as CommunityPrivacyEnum) ?? undefined,
         thumbnailBuffer
       }
     }
