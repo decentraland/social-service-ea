@@ -445,7 +445,7 @@ export type CommunityFieldsValidationFields = {
   description?: string
   placeIds?: string[]
   thumbnailBuffer?: Buffer
-  privacy: CommunityPrivacyEnum
+  privacy?: CommunityPrivacyEnum
 }
 
 export type CommunityFieldsValidationOptions = {
