@@ -305,7 +305,7 @@ describe('when muting speaker from community voice chat', () => {
 
     describe('and the voice chat is not found', () => {
       beforeEach(() => {
-        muteSpeakerMock.mockRejectedValue(new CommunityVoiceChatNotFoundError('Voice chat not found'))
+        muteSpeakerMock.mockRejectedValue(new CommunityVoiceChatNotFoundError(communityId))
       })
 
       it('should return not found error', async () => {
@@ -321,7 +321,7 @@ describe('when muting speaker from community voice chat', () => {
           response: {
             $case: 'notFoundError',
             notFoundError: {
-              message: 'Voice chat not found'
+              message: 'Community voice chat not found for community test-community-id'
             }
           }
         })
