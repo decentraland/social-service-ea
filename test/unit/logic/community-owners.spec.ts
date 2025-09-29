@@ -20,6 +20,261 @@ describe('community-owners', () => {
     })
   })
 
+  describe('when getting owners names', () => {
+    const ownerAddresses = [
+      '0x1234567890123456789012345678901234567890',
+      '0x9876543210987654321098765432109876543210',
+      '0x1111111111111111111111111111111111111111'
+    ]
+
+    describe('and all profiles exist with claimed names', () => {
+      const mockProfiles: Profile[] = [
+        {
+          avatars: [
+            {
+              ethAddress: ownerAddresses[0],
+              userId: ownerAddresses[0],
+              name: 'John Doe',
+              hasClaimedName: true,
+              unclaimedName: undefined,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar1.jpg'
+                }
+              }
+            }
+          ]
+        },
+        {
+          avatars: [
+            {
+              ethAddress: ownerAddresses[1],
+              userId: ownerAddresses[1],
+              name: 'Jane Smith',
+              hasClaimedName: true,
+              unclaimedName: undefined,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar2.jpg'
+                }
+              }
+            }
+          ]
+        },
+        {
+          avatars: [
+            {
+              ethAddress: ownerAddresses[2],
+              userId: ownerAddresses[2],
+              name: 'Bob Wilson',
+              hasClaimedName: true,
+              unclaimedName: undefined,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar3.jpg'
+                }
+              }
+            }
+          ]
+        }
+      ]
+
+      beforeEach(() => {
+        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+      })
+
+      it('should return a record mapping addresses to names', async () => {
+        const result = await communityOwners.getOwnersNames(ownerAddresses)
+
+        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
+        expect(result).toEqual({
+          [ownerAddresses[0]]: 'John Doe',
+          [ownerAddresses[1]]: 'Jane Smith',
+          [ownerAddresses[2]]: 'Bob Wilson'
+        })
+      })
+    })
+
+    describe('and profiles exist with mixed claimed and unclaimed names', () => {
+      const mockProfiles: Profile[] = [
+        {
+          avatars: [
+            {
+              ethAddress: ownerAddresses[0],
+              userId: ownerAddresses[0],
+              name: 'John Doe',
+              hasClaimedName: true,
+              unclaimedName: 'UnclaimedUser123',
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar1.jpg'
+                }
+              }
+            }
+          ]
+        },
+        {
+          avatars: [
+            {
+              ethAddress: ownerAddresses[1],
+              userId: ownerAddresses[1],
+              name: undefined,
+              hasClaimedName: false,
+              unclaimedName: 'UnclaimedUser456',
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar2.jpg'
+                }
+              }
+            }
+          ]
+        }
+      ]
+
+      beforeEach(() => {
+        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+      })
+
+      it('should prioritize claimed names over unclaimed names', async () => {
+        const result = await communityOwners.getOwnersNames(ownerAddresses.slice(0, 2))
+
+        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses.slice(0, 2))
+        expect(result).toEqual({
+          [ownerAddresses[0]]: 'John Doe', // claimed name takes priority
+          [ownerAddresses[1]]: 'UnclaimedUser456' // unclaimed name when no claimed name
+        })
+      })
+    })
+
+    describe('and some profiles are missing', () => {
+      const mockProfiles: Profile[] = [
+        {
+          avatars: [
+            {
+              ethAddress: ownerAddresses[0],
+              userId: ownerAddresses[0],
+              name: 'John Doe',
+              hasClaimedName: true,
+              unclaimedName: undefined,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar1.jpg'
+                }
+              }
+            }
+          ]
+        }
+        // Missing profiles for ownerAddresses[1] and ownerAddresses[2]
+      ]
+
+      beforeEach(() => {
+        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+      })
+
+      it('should only return names for profiles that exist', async () => {
+        const result = await communityOwners.getOwnersNames(ownerAddresses)
+
+        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
+        expect(result).toEqual({
+          [ownerAddresses[0]]: 'John Doe'
+        })
+      })
+    })
+
+    describe('and no profiles are found', () => {
+      beforeEach(() => {
+        mockCatalystClientInstance.getProfiles.mockResolvedValue([])
+      })
+
+      it('should return an empty record', async () => {
+        const result = await communityOwners.getOwnersNames(ownerAddresses)
+
+        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
+        expect(result).toEqual({})
+      })
+    })
+
+    describe('and empty address array is provided', () => {
+      beforeEach(() => {
+        mockCatalystClientInstance.getProfiles.mockResolvedValue([])
+      })
+
+      it('should return an empty record', async () => {
+        const result = await communityOwners.getOwnersNames([])
+
+        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith([])
+        expect(result).toEqual({})
+      })
+    })
+
+    describe('and a profile has no avatars', () => {
+      const mockProfiles: Profile[] = [
+        {
+          avatars: []
+        }
+      ]
+
+      beforeEach(() => {
+        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+      })
+
+      it('should skip profiles with no avatars', async () => {
+        const result = await communityOwners.getOwnersNames(ownerAddresses.slice(0, 1))
+
+        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses.slice(0, 1))
+        expect(result).toEqual({})
+      })
+    })
+
+    describe('and a profile avatar has no name information', () => {
+      const mockProfiles: Profile[] = [
+        {
+          avatars: [
+            {
+              ethAddress: ownerAddresses[0],
+              userId: ownerAddresses[0],
+              name: undefined,
+              hasClaimedName: false,
+              unclaimedName: undefined,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar1.jpg'
+                }
+              }
+            }
+          ]
+        }
+      ]
+
+      beforeEach(() => {
+        mockCatalystClientInstance.getProfiles.mockResolvedValue(mockProfiles)
+      })
+
+      it('should skip profiles with no name information', async () => {
+        const result = await communityOwners.getOwnersNames(ownerAddresses.slice(0, 1))
+
+        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses.slice(0, 1))
+        expect(result).toEqual({})
+      })
+    })
+
+    describe('and the catalyst client throws an error', () => {
+      const catalystError = new Error('Catalyst service unavailable')
+
+      beforeEach(() => {
+        mockCatalystClientInstance.getProfiles.mockRejectedValue(catalystError)
+      })
+
+      it('should propagate the catalyst client error', async () => {
+        await expect(communityOwners.getOwnersNames(ownerAddresses)).rejects.toThrow(
+          'Catalyst service unavailable'
+        )
+
+        expect(mockCatalystClientInstance.getProfiles).toHaveBeenCalledWith(ownerAddresses)
+      })
+    })
+  })
+
   describe('when getting owner name', () => {
     const ownerAddress = '0x1234567890123456789012345678901234567890'
     const communityId = 'test-community-123'

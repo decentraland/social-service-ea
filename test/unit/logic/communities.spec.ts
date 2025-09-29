@@ -242,7 +242,9 @@ describe('Community Component', () => {
       mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunities)
       mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
       mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
-      mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+      mockCommunityOwners.getOwnersNames.mockResolvedValue({
+        [mockCommunity.ownerAddress]: 'Test Owner Name'
+      })
       mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
         [mockCommunity.id]: {
           isActive: true,
@@ -285,7 +287,7 @@ describe('Community Component', () => {
       expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, options)
       expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, options)
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
-      expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
+      expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
 
     it('should handle empty communities array gracefully', async () => {
@@ -302,6 +304,7 @@ describe('Community Component', () => {
       expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, options)
       expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, options)
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+      expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([])
     })
 
     it('should handle error in getVoiceChatStatuses helper function gracefully', async () => {
@@ -351,7 +354,10 @@ describe('Community Component', () => {
         mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(2)
         mockStorage.exists.mockResolvedValue(false)
         mockCatalystClient.getProfiles.mockResolvedValue([])
-        mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+        mockCommunityOwners.getOwnersNames.mockResolvedValue({
+          [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name',
+          [mockCommunitiesWithVoiceChat[1].ownerAddress]: 'Test Owner Name'
+        })
 
         mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
           'community-with-voice-chat': { isActive: true, participantCount: 3, moderatorCount: 1 },
@@ -433,7 +439,9 @@ describe('Community Component', () => {
       ]
       mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunities)
       mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(1)
-      mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+      mockCommunityOwners.getOwnersNames.mockResolvedValue({
+        [mockCommunity.ownerAddress]: 'Test Owner Name'
+      })
       mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
         [communityId]: {
           isActive: false,
@@ -465,7 +473,7 @@ describe('Community Component', () => {
 
       expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
       expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
-      expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
+      expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
 
     it('should handle error in getVoiceChatStatuses helper function gracefully', async () => {
@@ -514,7 +522,10 @@ describe('Community Component', () => {
         mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunitiesWithVoiceChat)
         mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(2)
         mockStorage.exists.mockResolvedValue(false)
-        mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+        mockCommunityOwners.getOwnersNames.mockResolvedValue({
+          [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name',
+          [mockCommunitiesWithVoiceChat[1].ownerAddress]: 'Test Owner Name'
+        })
 
         mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
           'public-community-with-voice-chat': { isActive: true, participantCount: 5, moderatorCount: 2 },

@@ -32,12 +32,17 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         createMockProfile(friendAddress2)
       ])
 
-      // Mock the communityOwners.getOwnerName to return owner names
-      spyComponents.communityOwners.getOwnerName.mockImplementation(async (ownerAddress: string) => {
-        if (ownerAddress === address) {
-          return 'Test Owner'
-        }
-        return `Owner ${ownerAddress}`
+      // Mock the communityOwners.getOwnersNames to return owner names
+      spyComponents.communityOwners.getOwnersNames.mockImplementation(async (ownerAddresses: string[]) => {
+        const result: Record<string, string> = {}
+        ownerAddresses.forEach((ownerAddress) => {
+          if (ownerAddress === address) {
+            result[ownerAddress] = 'Test Owner'
+          } else {
+            result[ownerAddress] = `Owner ${ownerAddress}`
+          }
+        })
+        return result
       })
 
       const result1 = await components.communitiesDb.createCommunity(
@@ -825,7 +830,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
 
       describe('and owner profile retrieval fails', () => {
         beforeEach(() => {
-          spyComponents.communityOwners.getOwnerName.mockRejectedValue(
+          spyComponents.communityOwners.getOwnersNames.mockRejectedValue(
             new CommunityOwnerNotFoundError(communityId1, address)
           )
         })
@@ -842,14 +847,18 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
 
         beforeEach(async () => {
           // Mock different owner name for the new community
-          spyComponents.communityOwners.getOwnerName.mockImplementation(async (ownerAddress: string) => {
-            if (ownerAddress === address) {
-              return 'Test Owner'
-            }
-            if (ownerAddress === differentOwnerAddress) {
-              return 'Different Owner'
-            }
-            return `Owner ${ownerAddress}`
+          spyComponents.communityOwners.getOwnersNames.mockImplementation(async (ownerAddresses: string[]) => {
+            const result: Record<string, string> = {}
+            ownerAddresses.forEach((ownerAddress) => {
+              if (ownerAddress === address) {
+                result[ownerAddress] = 'Test Owner'
+              } else if (ownerAddress === differentOwnerAddress) {
+                result[ownerAddress] = 'Different Owner'
+              } else {
+                result[ownerAddress] = `Owner ${ownerAddress}`
+              }
+            })
+            return result
           })
 
           const result4 = await components.communitiesDb.createCommunity(
