@@ -281,7 +281,17 @@ async function initComponents(): Promise<TestComponents> {
     }
   )
 
-  const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
+  const referral = await createReferralComponent({
+    referralDb,
+    logs,
+    sns,
+    config,
+    rewards,
+    email,
+    slack,
+    redis,
+    fetcher
+  })
 
   const queue = createMemoryQueueAdapter()
 

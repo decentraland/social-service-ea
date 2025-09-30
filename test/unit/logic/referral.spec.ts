@@ -14,6 +14,7 @@ import {
   referral100InvitesReachedMessage,
   referralSuspiciousTimingMessage
 } from '../../../src/utils/slackMessages'
+import { mockFetcher } from '../../mocks/components'
 
 const MAX_IP_MATCHES = 2
 
@@ -106,7 +107,8 @@ describe('referral-component', () => {
       rewards: mockRewards,
       email: mockEmail,
       slack: mockSlack,
-      redis: mockRedis
+      redis: mockRedis,
+      fetcher: mockFetcher
     })
   })
 

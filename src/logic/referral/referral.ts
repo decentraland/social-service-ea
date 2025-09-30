@@ -29,9 +29,12 @@ function validateAddress(value: string, field: string): string {
 }
 
 export async function createReferralComponent(
-  components: Pick<AppComponents, 'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email' | 'slack' | 'redis'>
+  components: Pick<
+    AppComponents,
+    'referralDb' | 'logs' | 'sns' | 'config' | 'rewards' | 'email' | 'slack' | 'redis' | 'fetcher'
+  >
 ): Promise<IReferralComponent> {
-  const { referralDb, logs, sns, config, rewards, email: emailComponent, slack, redis } = components
+  const { referralDb, logs, sns, config, rewards, email: emailComponent, slack, redis, fetcher } = components
 
   const logger = logs.getLogger('referral-component')
 
@@ -49,7 +52,9 @@ export async function createReferralComponent(
     REFERRAL_METABASE_DASHBOARD,
     REFERRAL_MAX_IP_MATCHES,
     REFERRAL_MIN_LOGIN_DAYS,
-    REFERRAL_FIVE_MINUTES_IN_MS
+    REFERRAL_FIVE_MINUTES_IN_MS,
+    BOT_DETECTION_SERVICE_URL,
+    BOT_DETECTION_API_TOKEN
   ] = await Promise.all([
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5'),
     config.requireString('REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10'),
@@ -64,7 +69,9 @@ export async function createReferralComponent(
     config.requireString('REFERRAL_METABASE_DASHBOARD'),
     config.requireNumber('REFERRAL_MAX_IP_MATCHES'),
     config.requireNumber('REFERRAL_MIN_LOGIN_DAYS'),
-    config.requireNumber('REFERRAL_FIVE_MINUTES_IN_MS')
+    config.requireNumber('REFERRAL_FIVE_MINUTES_IN_MS'),
+    config.requireString('BOT_DETECTION_SERVICE_URL'),
+    config.requireString('BOT_DETECTION_API_TOKEN')
   ])
 
   const isDev = ENV === 'dev'
@@ -131,7 +138,7 @@ export async function createReferralComponent(
 
   async function fetchDenyList(): Promise<Set<string>> {
     try {
-      const response = await fetch('https://config.decentraland.org/denylist.json')
+      const response = await fetcher.fetch('https://config.decentraland.org/denylist.json')
       if (!response.ok) {
         throw new Error(`Failed to fetch deny list, status: ${response.status}`)
       }
@@ -145,6 +152,50 @@ export async function createReferralComponent(
     } catch (error) {
       logger.error(`Error fetching deny list: ${(error as Error).message}`)
       return new Set()
+    }
+  }
+
+  async function checkReferralDenyList(address: string): Promise<boolean> {
+    try {
+      const normalizedAddress = address.toLowerCase()
+      const url = `${BOT_DETECTION_SERVICE_URL}/v1/wallets/${normalizedAddress}`
+
+      logger.debug('Checking referral deny list for address', { address: normalizedAddress, url })
+
+      const response = await fetcher.fetch(url, {
+        headers: {
+          Authorization: `Bearer ${BOT_DETECTION_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Wallet not found in bot detection service, assume not in deny list
+          return false
+        }
+        throw new Error(`Bot detection service responded with status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // Check if the wallet is in the 'referral' deny list
+      const inReferralDenyList =
+        data.inDenylist && Array.isArray(data.inDenylist) && data.inDenylist.includes('referral')
+
+      logger.debug('Bot detection service response', {
+        address: normalizedAddress,
+        inDenylist: data.inDenylist,
+        inReferralDenyList
+      })
+
+      return inReferralDenyList
+    } catch (error) {
+      logger.warn(`Error checking referral deny list for address ${address}`, {
+        error: error instanceof Error ? error.message : String(error)
+      })
+      // On error, assume not in deny list to avoid blocking legitimate users
+      return false
     }
   }
 
@@ -169,10 +220,14 @@ export async function createReferralComponent(
         invitedUserIP
       })
 
-      const denyList = await fetchDenyList()
+      const [denyList, isInReferralDenyList] = await Promise.all([fetchDenyList(), checkReferralDenyList(referrer)])
 
       if (denyList.has(referrer.toLowerCase())) {
         throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer}, ${invitedUserIP}`)
+      }
+
+      if (isInReferralDenyList) {
+        throw new ReferralInvalidInputError(`Referrer is on the referral deny list ${referrer}, ${invitedUserIP}`)
       }
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
@@ -256,15 +311,24 @@ export async function createReferralComponent(
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
 
-      const denyList = await fetchDenyList()
-
       if (!progress.length) {
         throw new ReferralNotFoundError(invitedUser)
       }
 
+      const [denyList, isInReferralDenyList] = await Promise.all([
+        fetchDenyList(),
+        checkReferralDenyList(progress[0].referrer)
+      ])
+
       if (denyList.has(progress[0].referrer.toLowerCase())) {
         throw new ReferralInvalidInputError(
           `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
+        )
+      }
+
+      if (isInReferralDenyList) {
+        throw new ReferralInvalidInputError(
+          `Referrer is on the referral deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
         )
       }
 
@@ -295,11 +359,20 @@ export async function createReferralComponent(
         return
       }
 
-      const denyList = await fetchDenyList()
+      const [denyList, isInReferralDenyList] = await Promise.all([
+        fetchDenyList(),
+        checkReferralDenyList(progress[0].referrer)
+      ])
 
       if (denyList.has(progress[0].referrer.toLowerCase())) {
         throw new ReferralInvalidInputError(
           `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
+        )
+      }
+
+      if (isInReferralDenyList) {
+        throw new ReferralInvalidInputError(
+          `Referrer is on the referral deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
         )
       }
       if (
@@ -435,10 +508,14 @@ export async function createReferralComponent(
     setReferralEmail: async (referralEmailInput: Pick<ReferralEmail, 'referrer' | 'email'>) => {
       const referrer = validateAddress(referralEmailInput.referrer, 'referrer')
 
-      const denyList = await fetchDenyList()
+      const [denyList, isInReferralDenyList] = await Promise.all([fetchDenyList(), checkReferralDenyList(referrer)])
 
       if (denyList.has(referrer.toLowerCase())) {
         throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer.toLowerCase()}`)
+      }
+
+      if (isInReferralDenyList) {
+        throw new ReferralInvalidInputError(`Referrer is on the referral deny list ${referrer.toLowerCase()}`)
       }
 
       const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
