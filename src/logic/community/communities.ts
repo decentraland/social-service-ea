@@ -85,26 +85,15 @@ export function createCommunityComponent(
 
     try {
       const communitiesWithActiveVoiceChat = await commsGatekeeper.getAllActiveCommunityVoiceChats()
-      return communities.map((community) => {
+      return communities.filter((community) => {
         const isCommunityVoiceChatActive = !!communitiesWithActiveVoiceChat.find((c) => c.communityId === community.id)
-        let hasActiveVoiceChat = isCommunityVoiceChatActive
 
         // If privacy/role info is available, check membership for private communities
         if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
-          hasActiveVoiceChat = false
+          return false // Private community where user is not a member
         }
 
-        // Public communities or private communities where user is a member
-        // (or communities without privacy info, which are treated as accessible)
-        if (
-          (community.privacy === CommunityPrivacyEnum.Public ||
-            (community.privacy === CommunityPrivacyEnum.Private && community.role !== CommunityRole.None)) &&
-          isCommunityVoiceChatActive
-        ) {
-          hasActiveVoiceChat = true
-        }
-
-        return { ...community, hasActiveVoiceChat }
+        return isCommunityVoiceChatActive
       })
     } catch (error) {
       logger.warn('Error filtering communities by voice chat status', {
