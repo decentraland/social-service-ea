@@ -169,23 +169,27 @@ export function createCommunityComponent(
         communitiesDb.getCommunitiesCount(userAddress, options)
       ])
 
-      const communityOwnersNames = await communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress))
+      const [communityOwnersNames, communitiesWithThumbnails] = await Promise.all([
+        communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress)),
+        Promise.all(
+          communities.map(async (community) => {
+            const thumbnail = await communityThumbnail.getThumbnail(community.id)
+            return { community, thumbnail }
+          })
+        )
+      ])
 
-      const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
-        communities.map(async (community) => {
-          const result = { ...community, ownerName: communityOwnersNames[community.ownerAddress] }
+      const communitiesWithThumbnailsAndOwnerNames = communitiesWithThumbnails.map(({ community, thumbnail }) => {
+        const result = { ...community, ownerName: communityOwnersNames[community.ownerAddress] }
 
-          const thumbnail = await communityThumbnail.getThumbnail(community.id)
-
-          if (thumbnail) {
-            result.thumbnails = {
-              raw: thumbnail
-            }
+        if (thumbnail) {
+          result.thumbnails = {
+            raw: thumbnail
           }
+        }
 
-          return result
-        })
-      )
+        return result
+      })
 
       // Filter by active voice chat if requested
       const filteredCommunities = options.onlyWithActiveVoiceChat
@@ -214,23 +218,27 @@ export function createCommunityComponent(
         communitiesDb.getPublicCommunitiesCount({ search })
       ])
 
-      const communityOwnersNames = await communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress))
+      const [communityOwnersNames, communitiesWithThumbnails] = await Promise.all([
+        communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress)),
+        Promise.all(
+          communities.map(async (community) => {
+            const thumbnail = await communityThumbnail.getThumbnail(community.id)
+            return { community, thumbnail }
+          })
+        )
+      ])
 
-      const communitiesWithThumbnailsAndOwnerNames = await Promise.all(
-        communities.map(async (community) => {
-          const thumbnail = await communityThumbnail.getThumbnail(community.id)
+      const communitiesWithThumbnailsAndOwnerNames = communitiesWithThumbnails.map(({ community, thumbnail }) => {
+        const result = { ...community, ownerName: communityOwnersNames[community.ownerAddress] }
 
-          const result = { ...community, ownerName: communityOwnersNames[community.ownerAddress] }
-
-          if (thumbnail) {
-            result.thumbnails = {
-              raw: thumbnail
-            }
+        if (thumbnail) {
+          result.thumbnails = {
+            raw: thumbnail
           }
+        }
 
-          return result
-        })
-      )
+        return result
+      })
 
       // Filter by active voice chat if requested
       const filteredCommunities = options.onlyWithActiveVoiceChat
