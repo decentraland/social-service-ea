@@ -239,6 +239,7 @@ export interface IRedisComponent extends IBaseComponent {
 
 export interface ICacheComponent extends IBaseCacheComponent {
   get: <T>(key: string) => Promise<T | null>
+  mGet: <T>(keys: string[]) => Promise<T[]>
   put: <T>(key: string, value: T, options?: SetOptions & { noTTL?: boolean }) => Promise<void>
 }
 
@@ -390,6 +391,7 @@ export interface ICommunitiesDbHelperComponent {
 export interface IStorageComponent {
   storeFile: (file: Buffer, key: string) => Promise<string>
   exists: (key: string) => Promise<boolean>
+  existsMultiple: (keys: string[]) => Promise<Record<string, boolean>>
 }
 
 export interface IStorageHelperComponent {

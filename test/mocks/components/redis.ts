@@ -37,11 +37,13 @@ jest.mock('redis', () => {
 export const mockRedis: jest.Mocked<IRedisComponent & ICacheComponent> = {
   client: createClient(),
   get: jest.fn(),
+  mGet: jest.fn(),
   put: jest.fn()
 }
 
 export const createRedisMock = ({
   get,
+  mGet,
   put
 }: Partial<jest.Mocked<IRedisComponent & ICacheComponent>>): jest.Mocked<IRedisComponent & ICacheComponent> => {
   return {
@@ -50,6 +52,11 @@ export const createRedisMock = ({
       get ||
       jest.fn(async (key: string) => {
         return null // Default to cache miss for tests
+      }),
+    mGet:
+      mGet ||
+      jest.fn(async (keys: string[]) => {
+        return keys.map(() => null) // Default to cache miss for tests
       }),
     put:
       put ||

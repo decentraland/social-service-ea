@@ -68,15 +68,17 @@ describe('catalyst-client', () => {
 
     describe('and no profiles are cached', () => {
       beforeEach(() => {
-        mockRedis.get.mockResolvedValue(null)
+        mockRedis.mGet.mockResolvedValue([null, null])
         lambdasClientMock.getAvatarsDetailsByPost = jest.fn().mockResolvedValue(mockProfiles)
       })
 
-      it('should fetch all profiles from catalyst server', async () => {
+      it('should fetch all profiles from catalyst server using mGet', async () => {
         const result = await catalystClient.getProfiles(profileIds)
 
-        expect(mockRedis.get).toHaveBeenCalledWith('catalyst:profile:0x1234567890123456789012345678901234567890')
-        expect(mockRedis.get).toHaveBeenCalledWith('catalyst:profile:0x0987654321098765432109876543210987654321')
+        expect(mockRedis.mGet).toHaveBeenCalledWith([
+          'catalyst:profile:0x1234567890123456789012345678901234567890',
+          'catalyst:profile:0x0987654321098765432109876543210987654321'
+        ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({ ids: profileIds })
         expect(result).toEqual(mockProfiles)
       })
@@ -119,15 +121,17 @@ describe('catalyst-client', () => {
       const fetchedProfile = { avatars: [{ ethAddress: '0x0987654321098765432109876543210987654321', userId: '0x0987654321098765432109876543210987654321' }] }
 
       beforeEach(() => {
-        mockRedis.get
-          .mockResolvedValueOnce(JSON.stringify(cachedProfile))
-          .mockResolvedValueOnce(null)
+        mockRedis.mGet.mockResolvedValue([JSON.stringify(cachedProfile), null])
         lambdasClientMock.getAvatarsDetailsByPost = jest.fn().mockResolvedValue([fetchedProfile])
       })
 
-      it('should return cached profiles and fetch missing ones', async () => {
+      it('should return cached profiles and fetch missing ones using mGet', async () => {
         const result = await catalystClient.getProfiles(profileIds)
 
+        expect(mockRedis.mGet).toHaveBeenCalledWith([
+          'catalyst:profile:0x1234567890123456789012345678901234567890',
+          'catalyst:profile:0x0987654321098765432109876543210987654321'
+        ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({ 
           ids: ['0x0987654321098765432109876543210987654321'] 
         })
@@ -152,14 +156,16 @@ describe('catalyst-client', () => {
       const cachedProfile2 = { avatars: [{ ethAddress: '0x0987654321098765432109876543210987654321', userId: '0x0987654321098765432109876543210987654321' }] }
 
       beforeEach(() => {
-        mockRedis.get
-          .mockResolvedValueOnce(JSON.stringify(cachedProfile1))
-          .mockResolvedValueOnce(JSON.stringify(cachedProfile2))
+        mockRedis.mGet.mockResolvedValue([JSON.stringify(cachedProfile1), JSON.stringify(cachedProfile2)])
       })
 
-      it('should return all cached profiles without fetching from server', async () => {
+      it('should return all cached profiles without fetching from server using mGet', async () => {
         const result = await catalystClient.getProfiles(profileIds)
 
+        expect(mockRedis.mGet).toHaveBeenCalledWith([
+          'catalyst:profile:0x1234567890123456789012345678901234567890',
+          'catalyst:profile:0x0987654321098765432109876543210987654321'
+        ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).not.toHaveBeenCalled()
         expect(result).toEqual([cachedProfile1, cachedProfile2])
       })
@@ -170,15 +176,17 @@ describe('catalyst-client', () => {
       const fetchedProfile = { avatars: [{ ethAddress: '0x0987654321098765432109876543210987654321', userId: '0x0987654321098765432109876543210987654321' }] }
 
       beforeEach(() => {
-        mockRedis.get
-          .mockResolvedValueOnce(JSON.stringify(cachedProfile))
-          .mockResolvedValueOnce(null)
+        mockRedis.mGet.mockResolvedValue([JSON.stringify(cachedProfile), null])
         lambdasClientMock.getAvatarsDetailsByPost = jest.fn().mockResolvedValue([fetchedProfile])
       })
 
-      it('should match addresses case-insensitively', async () => {
+      it('should match addresses case-insensitively using mGet', async () => {
         const result = await catalystClient.getProfiles(profileIds)
 
+        expect(mockRedis.mGet).toHaveBeenCalledWith([
+          'catalyst:profile:0x1234567890123456789012345678901234567890',
+          'catalyst:profile:0x0987654321098765432109876543210987654321'
+        ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({ 
           ids: ['0x0987654321098765432109876543210987654321'] 
         })
@@ -190,9 +198,42 @@ describe('catalyst-client', () => {
       it('should return empty array without making any requests', async () => {
         const result = await catalystClient.getProfiles([])
 
-        expect(mockRedis.get).not.toHaveBeenCalled()
+        expect(mockRedis.mGet).not.toHaveBeenCalled()
         expect(lambdasClientMock.getAvatarsDetailsByPost).not.toHaveBeenCalled()
         expect(result).toEqual([])
+      })
+    })
+
+    describe('and duplicate profile IDs are provided', () => {
+      const duplicateProfileIds = ['0x1234567890123456789012345678901234567890', '0x1234567890123456789012345678901234567890', '0x0987654321098765432109876543210987654321']
+      const mockProfiles: Profile[] = [
+        {
+          avatars: [{ ethAddress: '0x1234567890123456789012345678901234567890', userId: '0x1234567890123456789012345678901234567890' }]
+        },
+        {
+          avatars: [{ ethAddress: '0x0987654321098765432109876543210987654321', userId: '0x0987654321098765432109876543210987654321' }]
+        }
+      ]
+
+      beforeEach(() => {
+        mockRedis.mGet.mockResolvedValue([null, null])
+        lambdasClientMock.getAvatarsDetailsByPost = jest.fn().mockResolvedValue(mockProfiles)
+      })
+
+      it('should deduplicate IDs and return profiles in original order', async () => {
+        const result = await catalystClient.getProfiles(duplicateProfileIds)
+
+        expect(mockRedis.mGet).toHaveBeenCalledWith([
+          'catalyst:profile:0x1234567890123456789012345678901234567890',
+          'catalyst:profile:0x0987654321098765432109876543210987654321'
+        ])
+        expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({ 
+          ids: ['0x1234567890123456789012345678901234567890', '0x0987654321098765432109876543210987654321'] 
+        })
+        expect(result).toHaveLength(3)
+        expect(result[0]).toEqual(mockProfiles[0])
+        expect(result[1]).toEqual(mockProfiles[0]) // duplicate
+        expect(result[2]).toEqual(mockProfiles[1])
       })
     })
   })

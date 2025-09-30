@@ -23,6 +23,22 @@ export async function createCommunityThumbnailComponent(
     return buildThumbnailUrl(communityId)
   }
 
+  async function getThumbnails(communityIds: string[]): Promise<Record<string, string | undefined>> {
+    if (communityIds.length === 0) return {}
+
+    const thumbnailKeys = communityIds.map((id) => `communities/${id}/raw-thumbnail.png`)
+    const thumbnailExists = await storage.existsMultiple(thumbnailKeys)
+
+    return communityIds.reduce(
+      (acc, communityId) => {
+        const key = `communities/${communityId}/raw-thumbnail.png`
+        acc[communityId] = thumbnailExists[key] ? buildThumbnailUrl(communityId) : undefined
+        return acc
+      },
+      {} as Record<string, string | undefined>
+    )
+  }
+
   async function uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string> {
     await storage.storeFile(thumbnail, `communities/${communityId}/raw-thumbnail.png`)
     return buildThumbnailUrl(communityId)
@@ -31,6 +47,7 @@ export async function createCommunityThumbnailComponent(
   return {
     buildThumbnailUrl,
     getThumbnail,
+    getThumbnails,
     uploadThumbnail
   }
 }

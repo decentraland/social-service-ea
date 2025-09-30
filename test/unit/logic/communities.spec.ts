@@ -245,6 +245,7 @@ describe('Community Component', () => {
       mockCommunityOwners.getOwnersNames.mockResolvedValue({
         [mockCommunity.ownerAddress]: 'Test Owner Name'
       })
+      mockCommunityThumbnail.getThumbnails.mockResolvedValue({})
       mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
         [mockCommunity.id]: {
           isActive: true,
@@ -320,16 +321,15 @@ describe('Community Component', () => {
 
     describe('and the communities have a thumbnail', () => {
       beforeEach(() => {
-        mockCommunities.forEach(() => {
-          mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
-            `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
-          )
+        mockCommunityThumbnail.getThumbnails.mockResolvedValue({
+          [communityId]: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
       })
 
-      it('should include thumbnails', async () => {
+      it('should include thumbnails using batch method', async () => {
         const result = await communityComponent.getCommunities(userAddress, options)
 
+        expect(mockCommunityThumbnail.getThumbnails).toHaveBeenCalledWith([communityId])
         expect(result.communities[0].thumbnails).toEqual({
           raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
@@ -358,6 +358,7 @@ describe('Community Component', () => {
           [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name',
           [mockCommunitiesWithVoiceChat[1].ownerAddress]: 'Test Owner Name'
         })
+        mockCommunityThumbnail.getThumbnails.mockResolvedValue({})
 
         mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
           'community-with-voice-chat': { isActive: true, participantCount: 3, moderatorCount: 1 },
@@ -442,6 +443,7 @@ describe('Community Component', () => {
       mockCommunityOwners.getOwnersNames.mockResolvedValue({
         [mockCommunity.ownerAddress]: 'Test Owner Name'
       })
+      mockCommunityThumbnail.getThumbnails.mockResolvedValue({})
       mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
         [communityId]: {
           isActive: false,
@@ -489,16 +491,15 @@ describe('Community Component', () => {
 
     describe('and the communities have a thumbnail', () => {
       beforeEach(() => {
-        mockCommunities.forEach(() => {
-          mockCommunityThumbnail.getThumbnail.mockResolvedValueOnce(
-            `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
-          )
+        mockCommunityThumbnail.getThumbnails.mockResolvedValue({
+          [communityId]: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
       })
 
-      it('should include thumbnails when they exist', async () => {
+      it('should include thumbnails when they exist using batch method', async () => {
         const result = await communityComponent.getCommunitiesPublicInformation(options)
 
+        expect(mockCommunityThumbnail.getThumbnails).toHaveBeenCalledWith([communityId])
         expect(result.communities[0].thumbnails).toEqual({
           raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
         })
@@ -526,6 +527,7 @@ describe('Community Component', () => {
           [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name',
           [mockCommunitiesWithVoiceChat[1].ownerAddress]: 'Test Owner Name'
         })
+        mockCommunityThumbnail.getThumbnails.mockResolvedValue({})
 
         mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
           'public-community-with-voice-chat': { isActive: true, participantCount: 5, moderatorCount: 2 },
@@ -1832,7 +1834,7 @@ describe('Community Component', () => {
     beforeEach(() => {
       mockCommunitiesDB.getAllCommunitiesForModeration.mockResolvedValue(mockModerationCommunities)
       mockCommunitiesDB.getAllCommunitiesForModerationCount.mockResolvedValue(2)
-      mockCommunityThumbnail.getThumbnail.mockResolvedValue(undefined)
+      mockCommunityThumbnail.getThumbnails.mockResolvedValue({})
     })
 
     describe('when getting communities without thumbnails', () => {
@@ -1846,21 +1848,22 @@ describe('Community Component', () => {
 
         expect(mockCommunitiesDB.getAllCommunitiesForModeration).toHaveBeenCalledWith(options)
         expect(mockCommunitiesDB.getAllCommunitiesForModerationCount).toHaveBeenCalledWith({ search: 'test' })
-        expect(mockCommunityThumbnail.getThumbnail).toHaveBeenCalledWith('community-1')
-        expect(mockCommunityThumbnail.getThumbnail).toHaveBeenCalledWith('community-2')
+        expect(mockCommunityThumbnail.getThumbnails).toHaveBeenCalledWith(['community-1', 'community-2'])
       })
     })
 
     describe('when getting communities with thumbnails', () => {
       beforeEach(() => {
-        mockCommunityThumbnail.getThumbnail
-          .mockResolvedValueOnce(`${cdnUrl}/social/communities/community-1/raw-thumbnail.png`)
-          .mockResolvedValueOnce(`${cdnUrl}/social/communities/community-2/raw-thumbnail.png`)
+        mockCommunityThumbnail.getThumbnails.mockResolvedValue({
+          'community-1': `${cdnUrl}/social/communities/community-1/raw-thumbnail.png`,
+          'community-2': `${cdnUrl}/social/communities/community-2/raw-thumbnail.png`
+        })
       })
 
-      it('should return communities with thumbnails when they exist', async () => {
+      it('should return communities with thumbnails when they exist using batch method', async () => {
         const result = await communityComponent.getAllCommunitiesForModeration(options)
 
+        expect(mockCommunityThumbnail.getThumbnails).toHaveBeenCalledWith(['community-1', 'community-2'])
         expect(result.communities[0].thumbnails).toEqual({
           raw: `${cdnUrl}/social/communities/community-1/raw-thumbnail.png`
         })
@@ -1887,7 +1890,7 @@ describe('Community Component', () => {
 
         expect(mockCommunitiesDB.getAllCommunitiesForModeration).toHaveBeenCalledWith(options)
         expect(mockCommunitiesDB.getAllCommunitiesForModerationCount).toHaveBeenCalledWith({ search: 'test' })
-        expect(mockCommunityThumbnail.getThumbnail).not.toHaveBeenCalled()
+        expect(mockCommunityThumbnail.getThumbnails).toHaveBeenCalledWith([])
       })
     })
 

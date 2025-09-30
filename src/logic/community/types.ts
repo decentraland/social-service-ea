@@ -192,6 +192,7 @@ export interface ICommunityBroadcasterComponent {
 export interface ICommunityThumbnailComponent {
   buildThumbnailUrl(communityId: string): string
   getThumbnail(communityId: string): Promise<string | undefined>
+  getThumbnails(communityIds: string[]): Promise<Record<string, string | undefined>>
   uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string>
 }
 

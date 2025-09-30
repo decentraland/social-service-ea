@@ -44,11 +44,17 @@ export async function createCatalystClient({
 
     let response: Profile[] = []
 
-    const cachedProfiles = (await Promise.all(ids.map((id) => redis.get(`catalyst:profile:${id}`))))
-      .filter((profile) => profile !== null)
-      .map((profile) => JSON.parse(profile as string)) as Profile[]
+    // Deduplicate IDs to avoid fetching the same profile multiple times
+    const uniqueIds = Array.from(new Set(ids))
+    const cacheKeys = uniqueIds.map((id) => `catalyst:profile:${id}`)
 
-    const idsToFetch = ids.filter(
+    // Use mGet for efficient batch Redis retrieval
+    const cachedValues = await redis.mGet(cacheKeys)
+    const cachedProfiles = cachedValues
+      .filter((value) => value !== null)
+      .map((value) => JSON.parse(value as string)) as Profile[]
+
+    const idsToFetch = uniqueIds.filter(
       (id) => !cachedProfiles.some((profile) => profile.avatars?.[0]?.ethAddress?.toLowerCase() === id.toLowerCase())
     )
 
@@ -70,7 +76,12 @@ export async function createCatalystClient({
       )
     }
 
-    return [...cachedProfiles, ...response]
+    // Combine cached and fetched profiles, maintaining original order
+    const allProfiles = [...cachedProfiles, ...response]
+    const profileMap = new Map(allProfiles.map((profile) => [profile.avatars?.[0]?.ethAddress?.toLowerCase(), profile]))
+
+    // Return profiles in the original order, handling duplicates
+    return ids.map((id) => profileMap.get(id.toLowerCase())).filter(Boolean) as Profile[]
   }
 
   async function getProfile(id: string, options: ICatalystClientRequestOptions = {}): Promise<Profile> {

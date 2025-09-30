@@ -169,15 +169,15 @@ export function createCommunityComponent(
         communitiesDb.getCommunitiesCount(userAddress, options)
       ])
 
-      const [communityOwnersNames, communitiesWithThumbnails] = await Promise.all([
+      const [communityOwnersNames, thumbnailMap] = await Promise.all([
         communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress)),
-        Promise.all(
-          communities.map(async (community) => {
-            const thumbnail = await communityThumbnail.getThumbnail(community.id)
-            return { community, thumbnail }
-          })
-        )
+        communityThumbnail.getThumbnails(communities.map((c) => c.id))
       ])
+
+      const communitiesWithThumbnails = communities.map((community) => ({
+        community,
+        thumbnail: thumbnailMap[community.id]
+      }))
 
       const communitiesWithThumbnailsAndOwnerNames = communitiesWithThumbnails.map(({ community, thumbnail }) => {
         const result = { ...community, ownerName: communityOwnersNames[community.ownerAddress] }
@@ -218,15 +218,15 @@ export function createCommunityComponent(
         communitiesDb.getPublicCommunitiesCount({ search })
       ])
 
-      const [communityOwnersNames, communitiesWithThumbnails] = await Promise.all([
+      const [communityOwnersNames, thumbnailMap] = await Promise.all([
         communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress)),
-        Promise.all(
-          communities.map(async (community) => {
-            const thumbnail = await communityThumbnail.getThumbnail(community.id)
-            return { community, thumbnail }
-          })
-        )
+        communityThumbnail.getThumbnails(communities.map((c) => c.id))
       ])
+
+      const communitiesWithThumbnails = communities.map((community) => ({
+        community,
+        thumbnail: thumbnailMap[community.id]
+      }))
 
       const communitiesWithThumbnailsAndOwnerNames = communitiesWithThumbnails.map(({ community, thumbnail }) => {
         const result = { ...community, ownerName: communityOwnersNames[community.ownerAddress] }
@@ -558,21 +558,20 @@ export function createCommunityComponent(
         communitiesDb.getAllCommunitiesForModerationCount({ search: options.search })
       ])
 
-      const communitiesWithThumbnails = await Promise.all(
-        communities.map(async (community) => {
-          const thumbnail = await communityThumbnail.getThumbnail(community.id)
+      const thumbnailMap = await communityThumbnail.getThumbnails(communities.map((c) => c.id))
 
-          const result = { ...community }
+      const communitiesWithThumbnails = communities.map((community) => {
+        const thumbnail = thumbnailMap[community.id]
+        const result = { ...community }
 
-          if (thumbnail) {
-            result.thumbnails = {
-              raw: thumbnail
-            }
+        if (thumbnail) {
+          result.thumbnails = {
+            raw: thumbnail
           }
+        }
 
-          return result
-        })
-      )
+        return result
+      })
 
       return { communities: communitiesWithThumbnails, total }
     }

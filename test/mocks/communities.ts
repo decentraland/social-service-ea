@@ -158,11 +158,13 @@ export function createMockCommunityBansComponent({
 export function createMockCommunityThumbnailComponent({
   buildThumbnailUrl = jest.fn(),
   getThumbnail = jest.fn(),
+  getThumbnails = jest.fn(),
   uploadThumbnail = jest.fn()
 }: Partial<jest.Mocked<ICommunityThumbnailComponent>>): jest.Mocked<ICommunityThumbnailComponent> {
   return {
     buildThumbnailUrl,
     getThumbnail,
+    getThumbnails,
     uploadThumbnail
   }
 }
