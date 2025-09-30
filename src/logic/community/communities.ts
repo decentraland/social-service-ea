@@ -197,7 +197,7 @@ export function createCommunityComponent(
 
       const [friendsProfiles, voiceChatStatuses] = await Promise.all([
         catalystClient.getProfiles(friendsAddresses),
-        getVoiceChatStatuses(communities.map((c) => c.id))
+        getVoiceChatStatuses(filteredCommunities.map((c) => c.id))
       ])
 
       return {
