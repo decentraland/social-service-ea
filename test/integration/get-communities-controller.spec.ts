@@ -333,6 +333,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               return result
             }
           )
+
+          // Mock getAllActiveCommunityVoiceChats method
+          spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats.mockImplementation(async () => {
+            return [{ communityId: communityId1, participantCount: 5, moderatorCount: 2 }]
+          })
         })
 
         it('should return only communities with active voice chat when onlyWithActiveVoiceChat=true', async () => {
@@ -344,11 +349,10 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(body.data.results[0].id).toBe(communityId1)
           expect(body.data.total).toBe(1)
 
-          // Verify that the comms gatekeeper was called to check voice chat status
-          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
-            communityId1,
-            communityId2
-          ])
+          // Verify that the comms gatekeeper was called to get active voice chats first
+          expect(spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats).toHaveBeenCalled()
+          // Then verify it was called to check voice chat status only for active communities
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([communityId1])
         })
 
         it('should return all communities when onlyWithActiveVoiceChat=false', async () => {
@@ -443,6 +447,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                 return result
               }
             )
+
+            // Mock getAllActiveCommunityVoiceChats to return only community1
+            spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats.mockImplementation(async () => {
+              return [{ communityId: communityId1, participantCount: 5, moderatorCount: 2 }]
+            })
           })
 
           it('should exclude communities where status check fails', async () => {
@@ -506,6 +515,14 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
                 return result
               }
             )
+
+            // Mock getAllActiveCommunityVoiceChats to return both communities
+            spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats.mockImplementation(async () => {
+              return [
+                { communityId: privateCommunityId, participantCount: 3, moderatorCount: 1 },
+                { communityId: publicCommunityId, participantCount: 3, moderatorCount: 1 }
+              ]
+            })
           })
 
           afterEach(async () => {
