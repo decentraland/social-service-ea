@@ -22,7 +22,8 @@ import {
   toCommunityWithMembersCount,
   toCommunityResultsWithVoiceChat,
   toPublicCommunity,
-  toPublicCommunityWithVoiceChat
+  toPublicCommunityWithVoiceChat,
+  toCommunityWithThumbnail
 } from './utils'
 import { isErrorWithMessage } from '../../utils/errors'
 import { EthAddress, Events } from '@dcl/schemas'
@@ -142,13 +143,11 @@ export function createCommunityComponent(
         communityEvents.isCurrentlyHostingEvents(community.id)
       ])
 
-      if (thumbnail) {
-        community.thumbnails = {
-          raw: thumbnail
-        }
-      }
-
-      return toCommunityWithMembersCount({ ...community, ownerName, isHostingLiveEvent }, membersCount, voiceChatStatus)
+      return toCommunityWithMembersCount(
+        { ...toCommunityWithThumbnail(community, thumbnail), ownerName, isHostingLiveEvent },
+        membersCount,
+        voiceChatStatus
+      )
     },
 
     getCommunities: async (
@@ -170,17 +169,10 @@ export function createCommunityComponent(
         thumbnail: thumbnailMap[community.id]
       }))
 
-      const communitiesWithThumbnailsAndOwnerNames = communitiesWithThumbnails.map(({ community, thumbnail }) => {
-        const result = { ...community, ownerName: communityOwnersNames[community.ownerAddress] }
-
-        if (thumbnail) {
-          result.thumbnails = {
-            raw: thumbnail
-          }
-        }
-
-        return result
-      })
+      const communitiesWithThumbnailsAndOwnerNames = communitiesWithThumbnails.map(({ community, thumbnail }) => ({
+        ...toCommunityWithThumbnail(community, thumbnail),
+        ownerName: communityOwnersNames[community.ownerAddress]
+      }))
 
       // Filter by active voice chat if requested
       const filteredCommunities = options.onlyWithActiveVoiceChat
@@ -219,17 +211,10 @@ export function createCommunityComponent(
         thumbnail: thumbnailMap[community.id]
       }))
 
-      const communitiesWithThumbnailsAndOwnerNames = communitiesWithThumbnails.map(({ community, thumbnail }) => {
-        const result = { ...community, ownerName: communityOwnersNames[community.ownerAddress] }
-
-        if (thumbnail) {
-          result.thumbnails = {
-            raw: thumbnail
-          }
-        }
-
-        return result
-      })
+      const communitiesWithThumbnailsAndOwnerNames = communitiesWithThumbnails.map(({ community, thumbnail }) => ({
+        ...toCommunityWithThumbnail(community, thumbnail),
+        ownerName: communityOwnersNames[community.ownerAddress]
+      }))
 
       // Filter by active voice chat if requested
       const filteredCommunities = options.onlyWithActiveVoiceChat
@@ -551,18 +536,9 @@ export function createCommunityComponent(
 
       const thumbnailMap = await communityThumbnail.getThumbnails(communities.map((c) => c.id))
 
-      const communitiesWithThumbnails = communities.map((community) => {
-        const thumbnail = thumbnailMap[community.id]
-        const result = { ...community }
-
-        if (thumbnail) {
-          result.thumbnails = {
-            raw: thumbnail
-          }
-        }
-
-        return result
-      })
+      const communitiesWithThumbnails = communities.map((community) =>
+        toCommunityWithThumbnail(community, thumbnailMap[community.id])
+      )
 
       return { communities: communitiesWithThumbnails, total }
     }
