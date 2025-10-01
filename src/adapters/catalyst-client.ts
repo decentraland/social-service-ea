@@ -76,12 +76,7 @@ export async function createCatalystClient({
       )
     }
 
-    // Combine cached and fetched profiles, maintaining original order
-    const allProfiles = [...cachedProfiles, ...response]
-    const profileMap = new Map(allProfiles.map((profile) => [profile.avatars?.[0]?.ethAddress?.toLowerCase(), profile]))
-
-    // Return profiles in the original order, handling duplicates
-    return ids.map((id) => profileMap.get(id.toLowerCase())).filter(Boolean) as Profile[]
+    return [...cachedProfiles, ...response]
   }
 
   async function getProfile(id: string, options: ICatalystClientRequestOptions = {}): Promise<Profile> {

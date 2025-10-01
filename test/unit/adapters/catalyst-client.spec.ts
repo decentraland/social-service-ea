@@ -230,10 +230,9 @@ describe('catalyst-client', () => {
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({ 
           ids: ['0x1234567890123456789012345678901234567890', '0x0987654321098765432109876543210987654321'] 
         })
-        expect(result).toHaveLength(3)
+        expect(result).toHaveLength(2)
         expect(result[0]).toEqual(mockProfiles[0])
-        expect(result[1]).toEqual(mockProfiles[0]) // duplicate
-        expect(result[2]).toEqual(mockProfiles[1])
+        expect(result[1]).toEqual(mockProfiles[1])
       })
     })
   })
