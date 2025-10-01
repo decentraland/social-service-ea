@@ -205,6 +205,26 @@ export function createUpdateHandlerComponent(
     }
   })
 
+  const communityDeletedUpdateHandler = handleUpdate<'communityDeletedUpdate'>(async (update) => {
+    const { communityId } = update
+
+    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    const batches = communityMembers.getOnlineMembersFromCommunity(communityId, onlineSubscribers)
+
+    for await (const batch of batches) {
+      batch.forEach(({ memberAddress }) => {
+        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('communityMemberConnectivityUpdate', {
+            communityId,
+            memberAddress,
+            status: ConnectivityStatus.OFFLINE
+          })
+        }
+      })
+    }
+  })
+
   const communityVoiceChatUpdateHandler = handleUpdate<'communityVoiceChatUpdate'>(async (update) => {
     logger.info('Community voice chat update', { update: JSON.stringify(update) })
 
@@ -328,6 +348,7 @@ export function createUpdateHandlerComponent(
     privateVoiceChatUpdateHandler,
     communityMemberStatusHandler,
     communityVoiceChatUpdateHandler,
+    communityDeletedUpdateHandler,
     handleSubscriptionUpdates
   }
 }
