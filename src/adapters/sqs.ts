@@ -14,7 +14,7 @@ export async function createSqsAdapter(endpoint: string): Promise<IQueueComponen
   async function send(message: QueueMessage): Promise<void> {
     const sendCommand = new SendMessageCommand({
       QueueUrl: endpoint,
-      MessageBody: JSON.stringify({ Message: JSON.stringify(message) }),
+      MessageBody: JSON.stringify(message),
       DelaySeconds: 10
     })
     await client.send(sendCommand)
