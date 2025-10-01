@@ -12,7 +12,8 @@ import {
   CommunityPublicInformationWithVoiceChat,
   AggregatedCommunity,
   CommunityVoiceChatStatus,
-  CommunityRequestType
+  CommunityRequestType,
+  CommunityPrivacyEnum
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friends'
@@ -71,9 +72,16 @@ export const toCommunityWithUserInformationAndVoiceChat = (
   voiceChatStatus: CommunityVoiceChatStatus | null
 ): CommunityWithUserInformationAndVoiceChat => {
   const baseResult = toCommunityWithUserInformation(community, profilesMap)
+
+  // If the community is private and the user is not a member, don't include voice chat status
+  // This prevents non-members from knowing if a private community has an active voice chat
+  const shouldIncludeVoiceChat = !(
+    community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None
+  )
+
   return {
     ...baseResult,
-    voiceChatStatus
+    voiceChatStatus: shouldIncludeVoiceChat ? voiceChatStatus : null
   }
 }
 
