@@ -574,6 +574,50 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             expect(communityIds).toContain(privateCommunityId)
             expect(communityIds).toContain(publicCommunityId)
           })
+
+          it('should include voiceChatStatus for private community when user is a member', async () => {
+            const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0')
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+
+            const privateCommunity = body.data.results.find((c: any) => c.id === privateCommunityId)
+            expect(privateCommunity).toBeDefined()
+            expect(privateCommunity.voiceChatStatus).toEqual({
+              isActive: true,
+              participantCount: 3,
+              moderatorCount: 1
+            })
+          })
+
+          it('should NOT include voiceChatStatus for private community when user is NOT a member', async () => {
+            const response = await makeRequest(nonMemberIdentity, '/v1/communities?limit=10&offset=0')
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+
+            // Private community should appear in results (if filtering allows it)
+            const privateCommunity = body.data.results.find((c: any) => c.id === privateCommunityId)
+            if (privateCommunity) {
+              // If the private community is returned, voiceChatStatus should be null
+              expect(privateCommunity.voiceChatStatus).toBeNull()
+            }
+          })
+
+          it('should include voiceChatStatus for public community regardless of membership', async () => {
+            const response = await makeRequest(nonMemberIdentity, '/v1/communities?limit=10&offset=0')
+            const body = await response.json()
+
+            expect(response.status).toBe(200)
+
+            const publicCommunity = body.data.results.find((c: any) => c.id === publicCommunityId)
+            expect(publicCommunity).toBeDefined()
+            expect(publicCommunity.voiceChatStatus).toEqual({
+              isActive: true,
+              participantCount: 3,
+              moderatorCount: 1
+            })
+          })
         })
       })
 
