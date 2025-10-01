@@ -163,6 +163,16 @@ export interface ICommunityOwnersComponent {
    * @memberof ICommunityOwnersComponent
    */
   getOwnerName: (ownerAddress: EthAddress, communityId?: string) => Promise<string>
+
+  /**
+   * Fetches the profiles from Catalyst and extracts the names.
+   * The names are cached in Redis for 10 minutes.
+   * Throws an error if the profiles are not found or the names are not available.
+   *
+   * @param ownerAddresses - The addresses of the owners of the community.
+   * @returns A record of owner addresses and their names.
+   */
+  getOwnersNames: (ownerAddresses: EthAddress[]) => Promise<Record<EthAddress, string>>
 }
 
 export interface ICommunityBroadcasterComponent {

@@ -84,10 +84,12 @@ export function createMockCommunityRolesComponent({
 }
 
 export function createMockCommunityOwnersComponent({
-  getOwnerName = jest.fn()
+  getOwnerName = jest.fn(),
+  getOwnersNames = jest.fn()
 }: Partial<jest.Mocked<ICommunityOwnersComponent>>): jest.Mocked<ICommunityOwnersComponent> {
   return {
-    getOwnerName
+    getOwnerName,
+    getOwnersNames
   }
 }
 

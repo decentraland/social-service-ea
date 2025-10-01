@@ -53,7 +53,9 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
           ownerAddress = identity.realAccount.address.toLowerCase()
 
           // Owner names are required by the aggregated response
-          spyComponents.communityOwners.getOwnerName.mockResolvedValue('Test Owner')
+          spyComponents.communityOwners.getOwnersNames.mockResolvedValue({
+            [ownerAddress]: 'Test Owner'
+          })
 
           const result1 = await components.communitiesDb.createCommunity(
             mockCommunity({

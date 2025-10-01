@@ -2,7 +2,7 @@ import { EthAddress } from '@dcl/schemas'
 import { AppComponents } from '../../types'
 import { ICommunityOwnersComponent } from './types'
 import { CommunityOwnerNotFoundError } from './errors'
-import { getProfileName } from '../profiles'
+import { getProfileName, getProfileUserId } from '../profiles'
 
 export function createCommunityOwnersComponent(
   components: Pick<AppComponents, 'catalystClient'>
@@ -22,7 +22,27 @@ export function createCommunityOwnersComponent(
     return fetchedName
   }
 
+  async function getOwnersNames(ownerAddresses: EthAddress[]): Promise<Record<EthAddress, string>> {
+    const ownersProfiles = await catalystClient.getProfiles(ownerAddresses)
+
+    return ownersProfiles.reduce(
+      (acc, profile) => {
+        try {
+          const userId = getProfileUserId(profile)
+          const name = getProfileName(profile)
+          acc[userId] = name
+        } catch (error) {
+          // Skip profiles that can't be processed (missing avatars, names, etc.)
+          // This ensures the function doesn't fail completely when some profiles are invalid
+        }
+        return acc
+      },
+      {} as Record<EthAddress, string>
+    )
+  }
+
   return {
-    getOwnerName
+    getOwnerName,
+    getOwnersNames
   }
 }
