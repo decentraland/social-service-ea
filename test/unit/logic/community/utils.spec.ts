@@ -36,92 +36,116 @@ describe('Community Utils', () => {
     ])
 
     describe('when community is public', () => {
-      it('should include voiceChatStatus for members', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.Member }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
+      describe('and the user is a member', () => {
+        it('should include voiceChatStatus', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.Member }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-        expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+          expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+        })
       })
 
-      it('should include voiceChatStatus for non-members', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.None }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
+      describe('and the user is not a member', () => {
+        it('should include voiceChatStatus', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.None }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-        expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+          expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+        })
       })
 
-      it('should include voiceChatStatus for moderators', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.Moderator }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
+      describe('and the user is a moderator', () => {
+        it('should include voiceChatStatus', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.Moderator }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-        expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+          expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+        })
       })
 
-      it('should include voiceChatStatus for owners', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.Owner }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
+      describe('and the user is an owner', () => {
+        it('should include voiceChatStatus', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.Owner }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-        expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+          expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+        })
       })
     })
 
     describe('when community is private', () => {
-      it('should include voiceChatStatus for members', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Member }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
+      describe('and the user is a member', () => {
+        it('should include voiceChatStatus', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Member }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-        expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+          expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+        })
       })
 
-      it('should include voiceChatStatus for moderators', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Moderator }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
+      describe('and the user is a moderator', () => {
+        it('should include voiceChatStatus', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Moderator }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-        expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+          expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+        })
       })
 
-      it('should include voiceChatStatus for owners', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Owner }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
+      describe('and the user is an owner', () => {
+        it('should include voiceChatStatus', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Owner }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-        expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+          expect(result.voiceChatStatus).toEqual(mockVoiceChatStatus)
+        })
       })
 
-      it('should NOT include voiceChatStatus for non-members', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
+      describe('and the user is not a member', () => {
+        it('should NOT include voiceChatStatus', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-        expect(result.voiceChatStatus).toBeNull()
-      })
+          expect(result.voiceChatStatus).toBeNull()
+        })
 
-      it('should return null voiceChatStatus for non-members even when status is null', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
+        it('should return null voiceChatStatus even when status is null', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-        expect(result.voiceChatStatus).toBeNull()
+          expect(result.voiceChatStatus).toBeNull()
+        })
       })
     })
 
     describe('when voiceChatStatus is null', () => {
-      it('should return null voiceChatStatus for public communities', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.None }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
+      describe('and community is public', () => {
+        it('should return null voiceChatStatus', () => {
+          const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.None }
+          const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-        expect(result.voiceChatStatus).toBeNull()
+          expect(result.voiceChatStatus).toBeNull()
+        })
       })
 
-      it('should return null voiceChatStatus for private community members', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Member }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
+      describe('and community is private', () => {
+        describe('and the user is a member', () => {
+          it('should return null voiceChatStatus', () => {
+            const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Member }
+            const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-        expect(result.voiceChatStatus).toBeNull()
-      })
+            expect(result.voiceChatStatus).toBeNull()
+          })
+        })
 
-      it('should return null voiceChatStatus for private community non-members', () => {
-        const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
-        const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
+        describe('and the user is not a member', () => {
+          it('should return null voiceChatStatus', () => {
+            const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
+            const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-        expect(result.voiceChatStatus).toBeNull()
+            expect(result.voiceChatStatus).toBeNull()
+          })
+        })
       })
     })
 
