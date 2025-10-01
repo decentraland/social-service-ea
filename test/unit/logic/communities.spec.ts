@@ -2,7 +2,13 @@ import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockCatalystClient, mockConfig, mockCdnCacheInvalidator, createMockedPubSubComponent, createLogsMockedComponent } from '../../mocks/components'
+import {
+  mockCatalystClient,
+  mockConfig,
+  mockCdnCacheInvalidator,
+  createMockedPubSubComponent,
+  createLogsMockedComponent
+} from '../../mocks/components'
 import { createS3ComponentMock } from '../../mocks/components/s3'
 import { createCommunityComponent } from '../../../src/logic/community/communities'
 import {
@@ -360,9 +366,11 @@ describe('Community Component', () => {
         })
         mockCommunityThumbnail.getThumbnails.mockResolvedValue({})
 
+        mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValue([
+          { communityId: 'community-with-voice-chat', participantCount: 3, moderatorCount: 1 }
+        ])
         mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
-          'community-with-voice-chat': { isActive: true, participantCount: 3, moderatorCount: 1 },
-          'community-without-voice-chat': { isActive: false, participantCount: 0, moderatorCount: 0 }
+          'community-with-voice-chat': { isActive: true, participantCount: 3, moderatorCount: 1 }
         })
       })
 
@@ -373,10 +381,8 @@ describe('Community Component', () => {
         expect(result.communities[0].id).toBe('community-with-voice-chat')
         expect(result.total).toBe(1)
 
-        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
-          'community-with-voice-chat',
-          'community-without-voice-chat'
-        ])
+        expect(mockCommsGatekeeper.getAllActiveCommunityVoiceChats).toHaveBeenCalled()
+        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith(['community-with-voice-chat'])
       })
 
       it('should handle empty communities array when filtering by voice chat', async () => {
@@ -393,7 +399,7 @@ describe('Community Component', () => {
 
       describe('when voice chat status check fails', () => {
         beforeEach(() => {
-          mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockRejectedValueOnce(
+          mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockRejectedValueOnce(
             new Error('Voice chat service unavailable')
           )
         })
@@ -408,7 +414,7 @@ describe('Community Component', () => {
 
       describe('when voice chat status check returns null/undefined', () => {
         beforeEach(() => {
-          mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValueOnce(null)
+          mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValueOnce(null)
         })
 
         it('should handle null response gracefully and return communities', async () => {
@@ -529,9 +535,11 @@ describe('Community Component', () => {
         })
         mockCommunityThumbnail.getThumbnails.mockResolvedValue({})
 
+        mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValue([
+          { communityId: 'public-community-with-voice-chat', participantCount: 5, moderatorCount: 2 }
+        ])
         mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
-          'public-community-with-voice-chat': { isActive: true, participantCount: 5, moderatorCount: 2 },
-          'public-community-without-voice-chat': { isActive: false, participantCount: 0, moderatorCount: 0 }
+          'public-community-with-voice-chat': { isActive: true, participantCount: 5, moderatorCount: 2 }
         })
       })
 
@@ -542,9 +550,9 @@ describe('Community Component', () => {
         expect(result.communities[0].id).toBe('public-community-with-voice-chat')
         expect(result.total).toBe(1)
 
+        expect(mockCommsGatekeeper.getAllActiveCommunityVoiceChats).toHaveBeenCalled()
         expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
-          'public-community-with-voice-chat',
-          'public-community-without-voice-chat'
+          'public-community-with-voice-chat'
         ])
       })
 
@@ -562,7 +570,7 @@ describe('Community Component', () => {
 
       describe('when voice chat status check fails', () => {
         beforeEach(() => {
-          mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockRejectedValueOnce(
+          mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockRejectedValueOnce(
             new Error('Voice chat service unavailable')
           )
         })
@@ -577,7 +585,7 @@ describe('Community Component', () => {
 
       describe('when voice chat status check returns null/undefined', () => {
         beforeEach(() => {
-          mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValueOnce(null)
+          mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValueOnce(null)
         })
 
         it('should handle null response gracefully and return communities', async () => {
@@ -880,8 +888,18 @@ describe('Community Component', () => {
 
           beforeEach(() => {
             mockMembers = [
-              { communityId, memberAddress: '0xmember1', role: CommunityRole.Member, joinedAt: new Date().toISOString() },
-              { communityId, memberAddress: '0xmember2', role: CommunityRole.Member, joinedAt: new Date().toISOString() }
+              {
+                communityId,
+                memberAddress: '0xmember1',
+                role: CommunityRole.Member,
+                joinedAt: new Date().toISOString()
+              },
+              {
+                communityId,
+                memberAddress: '0xmember2',
+                role: CommunityRole.Member,
+                joinedAt: new Date().toISOString()
+              }
             ]
             mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce(mockMembers)
           })
@@ -899,22 +917,16 @@ describe('Community Component', () => {
             await communityComponent.deleteCommunity(communityId, userAddress)
 
             await new Promise((resolve) => setImmediate(resolve))
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
-              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
-              {
-                communityId,
-                memberAddress: '0xmember1',
-                status: ConnectivityStatus.OFFLINE
-              }
-            )
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
-              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
-              {
-                communityId,
-                memberAddress: '0xmember2',
-                status: ConnectivityStatus.OFFLINE
-              }
-            )
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId,
+              memberAddress: '0xmember1',
+              status: ConnectivityStatus.OFFLINE
+            })
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId,
+              memberAddress: '0xmember2',
+              status: ConnectivityStatus.OFFLINE
+            })
           })
         })
       })
@@ -995,8 +1007,18 @@ describe('Community Component', () => {
 
           beforeEach(() => {
             mockMembers = [
-              { communityId, memberAddress: '0xmember1', role: CommunityRole.Member, joinedAt: new Date().toISOString() },
-              { communityId, memberAddress: '0xmember2', role: CommunityRole.Member, joinedAt: new Date().toISOString() }
+              {
+                communityId,
+                memberAddress: '0xmember1',
+                role: CommunityRole.Member,
+                joinedAt: new Date().toISOString()
+              },
+              {
+                communityId,
+                memberAddress: '0xmember2',
+                role: CommunityRole.Member,
+                joinedAt: new Date().toISOString()
+              }
             ]
             mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce(mockMembers)
           })
@@ -1014,22 +1036,16 @@ describe('Community Component', () => {
             await communityComponent.deleteCommunity(communityId, userAddress)
 
             await new Promise((resolve) => setImmediate(resolve))
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
-              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
-              {
-                communityId,
-                memberAddress: '0xmember1',
-                status: ConnectivityStatus.OFFLINE
-              }
-            )
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
-              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
-              {
-                communityId,
-                memberAddress: '0xmember2',
-                status: ConnectivityStatus.OFFLINE
-              }
-            )
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId,
+              memberAddress: '0xmember1',
+              status: ConnectivityStatus.OFFLINE
+            })
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+              communityId,
+              memberAddress: '0xmember2',
+              status: ConnectivityStatus.OFFLINE
+            })
           })
         })
 
@@ -1052,9 +1068,7 @@ describe('Community Component', () => {
               joinedAt: new Date().toISOString()
             }))
 
-            mockCommunitiesDB.getCommunityMembers
-              .mockResolvedValueOnce(firstBatch)
-              .mockResolvedValueOnce(secondBatch)
+            mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce(firstBatch).mockResolvedValueOnce(secondBatch)
           })
 
           it('should handle pagination when fetching members', async () => {

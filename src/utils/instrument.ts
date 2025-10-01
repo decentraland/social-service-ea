@@ -16,6 +16,6 @@ export function initSentry() {
     release: `${process.env.SENTRY_RELEASE_PREFIX || 'social-service-ea'}@${process.env.CURRENT_VERSION || 'development'}`,
     integrations: [Sentry.onUncaughtExceptionIntegration(), Sentry.onUnhandledRejectionIntegration()],
     debug: process.env.SENTRY_DEBUG === 'true',
-    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1
+    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.001
   })
 }

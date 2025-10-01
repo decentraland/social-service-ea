@@ -84,25 +84,16 @@ export function createCommunityComponent(
     }
 
     try {
-      const communityIds = communities.map((c) => c.id)
-      const voiceChatStatuses = await commsGatekeeper.getCommunitiesVoiceChatStatus(communityIds)
-
+      const communitiesWithActiveVoiceChat = await commsGatekeeper.getAllActiveCommunityVoiceChats()
       return communities.filter((community) => {
-        const hasActiveVoiceChat = voiceChatStatuses[community.id]?.isActive ?? false
-
-        if (!hasActiveVoiceChat) {
-          return false
-        }
+        const isCommunityVoiceChatActive = !!communitiesWithActiveVoiceChat.find((c) => c.communityId === community.id)
 
         // If privacy/role info is available, check membership for private communities
         if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
-          // For private communities, user must be a member to see them
-          return false
+          return false // Private community where user is not a member
         }
 
-        // Public communities or private communities where user is a member
-        // (or communities without privacy info, which are treated as accessible)
-        return true
+        return isCommunityVoiceChatActive
       })
     } catch (error) {
       logger.warn('Error filtering communities by voice chat status', {
@@ -200,7 +191,7 @@ export function createCommunityComponent(
 
       const [friendsProfiles, voiceChatStatuses] = await Promise.all([
         catalystClient.getProfiles(friendsAddresses),
-        getVoiceChatStatuses(communities.map((c) => c.id))
+        getVoiceChatStatuses(filteredCommunities.map((c) => c.id))
       ])
 
       return {
