@@ -1,244 +1,148 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { muteSpeakerFromCommunityVoiceChatService } from '../../../../../src/controllers/handlers/rpc/mute-speaker-from-community-voice-chat'
-import { ICommsGatekeeperComponent } from '../../../../../src/types/components'
 import { createLogsMockedComponent } from '../../../../mocks/components'
 import {
-  UserNotCommunityMemberError,
-  CommunityVoiceChatNotFoundError
+  CommunityVoiceChatPermissionError,
+  InvalidCommunityIdError,
+  InvalidUserAddressError
 } from '../../../../../src/logic/community-voice/errors'
-import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
-import { CommunityRole } from '../../../../../src/types/entities'
+import { ICommunityVoiceComponent } from '../../../../../src/logic/community-voice/types'
+import {
+  MuteSpeakerFromCommunityVoiceChatPayload,
+  MuteSpeakerFromCommunityVoiceChatResponse
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
-// Temporary types until they are generated from protocol
-type MuteSpeakerFromCommunityVoiceChatPayload = {
-  communityId: string
-  userAddress: string
-  muted: boolean
-}
+describe('MuteSpeakerFromCommunityVoiceChat RPC Service', () => {
+  let logs: ILoggerComponent
+  let mockCommunityVoice: jest.Mocked<ICommunityVoiceComponent>
+  let service: (
+    request: MuteSpeakerFromCommunityVoiceChatPayload,
+    context: any
+  ) => Promise<MuteSpeakerFromCommunityVoiceChatResponse>
+  let request: MuteSpeakerFromCommunityVoiceChatPayload
 
-describe('when muting speaker from community voice chat', () => {
-  let muteSpeakerMock: jest.MockedFn<ICommsGatekeeperComponent['muteSpeakerInCommunityVoiceChat']>
-  let logs: jest.Mocked<ILoggerComponent>
-  let commsGatekeeper: jest.Mocked<ICommsGatekeeperComponent>
-  let mockCommunitiesDB: {
-    getCommunityMemberRole: jest.MockedFunction<any>
-  }
-  let communityId: string
-  let userAddress: string
-  let targetUserAddress: string
-  let service: ReturnType<typeof muteSpeakerFromCommunityVoiceChatService>
+  const communityId = 'test-community-id'
+  const targetUserAddress = '0x1234567890abcdef'
+  const userAddress = '0xabcdef1234567890'
 
   beforeEach(() => {
-    communityId = 'test-community-id'
-    userAddress = '0x123456789abcdef'
-    targetUserAddress = '0x987654321fedcba'
-
-    muteSpeakerMock = jest.fn()
     logs = createLogsMockedComponent()
-    commsGatekeeper = createCommsGatekeeperMockedComponent({
-      muteSpeakerInCommunityVoiceChat: muteSpeakerMock
-    })
-
-    mockCommunitiesDB = {
-      getCommunityMemberRole: jest.fn()
+    mockCommunityVoice = {
+      startCommunityVoiceChat: jest.fn(),
+      endCommunityVoiceChat: jest.fn(),
+      joinCommunityVoiceChat: jest.fn(),
+      muteSpeakerInCommunityVoiceChat: jest.fn(),
+      getCommunityVoiceChat: jest.fn(),
+      getActiveCommunityVoiceChats: jest.fn(),
+      getActiveCommunityVoiceChatsForUser: jest.fn()
     }
 
     service = muteSpeakerFromCommunityVoiceChatService({
       components: {
-        commsGatekeeper,
-        logs,
-        communitiesDb: mockCommunitiesDB as any
+        communityVoice: mockCommunityVoice,
+        logs
       }
     })
+
+    request = {
+      communityId,
+      userAddress: targetUserAddress,
+      muted: true
+    }
   })
 
   describe('when the request is valid', () => {
-    describe('and the acting user is a moderator', () => {
+    beforeEach(() => {
+      mockCommunityVoice.muteSpeakerInCommunityVoiceChat.mockResolvedValue(undefined)
+    })
+
+    describe('when muting a user', () => {
       beforeEach(() => {
-        muteSpeakerMock.mockResolvedValue(undefined)
-        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+        request.muted = true
       })
 
-      it('should return successful response when muting a user', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId,
-          userAddress: targetUserAddress,
-          muted: true
-        }
-
+      it('should return successful response with muted=true', async () => {
         const result = await service(request, { address: userAddress } as any)
 
         expect(result).toEqual({
           response: {
             $case: 'ok',
             ok: {
-              message: 'User muted successfully'
+              muted: true
             }
           }
         })
-        expect(muteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress, true)
-        expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
-      })
-
-      it('should return successful response when unmuting a user', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
+        expect(mockCommunityVoice.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
           communityId,
-          userAddress: targetUserAddress,
-          muted: false
-        }
-
-        const result = await service(request, { address: userAddress } as any)
-
-        expect(result).toEqual({
-          response: {
-            $case: 'ok',
-            ok: {
-              message: 'User unmuted successfully'
-            }
-          }
-        })
-        expect(muteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress, false)
+          targetUserAddress,
+          userAddress,
+          true
+        )
       })
     })
 
-    describe('and the acting user is an owner', () => {
+    describe('when unmuting a user', () => {
       beforeEach(() => {
-        muteSpeakerMock.mockResolvedValue(undefined)
-        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+        request.muted = false
       })
 
-      it('should return successful response when owner mutes a user', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId,
-          userAddress: targetUserAddress,
-          muted: true
-        }
-
+      it('should return successful response with muted=false', async () => {
         const result = await service(request, { address: userAddress } as any)
 
         expect(result).toEqual({
           response: {
             $case: 'ok',
             ok: {
-              message: 'User muted successfully'
+              muted: false
             }
           }
         })
-        expect(muteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress, true)
-      })
-    })
-
-    describe('and the user is muting themselves', () => {
-      beforeEach(() => {
-        muteSpeakerMock.mockResolvedValue(undefined)
-      })
-
-      it('should return successful response when user mutes themselves', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
+        expect(mockCommunityVoice.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
           communityId,
-          userAddress: userAddress, // Same as acting user
-          muted: true
-        }
-
-        const result = await service(request, { address: userAddress } as any)
-
-        expect(result).toEqual({
-          response: {
-            $case: 'ok',
-            ok: {
-              message: 'User muted successfully'
-            }
-          }
-        })
-        expect(muteSpeakerMock).toHaveBeenCalledWith(communityId, userAddress, true)
-        expect(mockCommunitiesDB.getCommunityMemberRole).not.toHaveBeenCalled()
-      })
-
-      it('should return successful response when user unmutes themselves', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId,
-          userAddress: userAddress, // Same as acting user
-          muted: false
-        }
-
-        const result = await service(request, { address: userAddress } as any)
-
-        expect(result).toEqual({
-          response: {
-            $case: 'ok',
-            ok: {
-              message: 'User unmuted successfully'
-            }
-          }
-        })
-        expect(muteSpeakerMock).toHaveBeenCalledWith(communityId, userAddress, false)
+          targetUserAddress,
+          userAddress,
+          false
+        )
       })
     })
   })
 
   describe('when there are permission errors', () => {
-    describe('and the acting user is only a member', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
-      })
-
-      it('should return forbidden error when member tries to mute another user', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId,
-          userAddress: targetUserAddress,
-          muted: true
-        }
-
-        const result = await service(request, { address: userAddress } as any)
-
-        expect(result).toEqual({
-          response: {
-            $case: 'forbiddenError',
-            forbiddenError: {
-              message: 'Only community owners, moderators, or the user themselves can mute/unmute speakers'
-            }
-          }
-        })
-        expect(muteSpeakerMock).not.toHaveBeenCalled()
-      })
+    beforeEach(() => {
+      mockCommunityVoice.muteSpeakerInCommunityVoiceChat.mockRejectedValue(
+        new CommunityVoiceChatPermissionError(
+          'Only community owners, moderators, or the user themselves can mute/unmute speakers'
+        )
+      )
     })
 
-    describe('and the acting user has no role', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
-      })
+    it('should return forbidden error when user lacks permissions', async () => {
+      const result = await service(request, { address: userAddress } as any)
 
-      it('should return forbidden error when user with no role tries to mute another user', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId,
-          userAddress: targetUserAddress,
-          muted: true
-        }
-
-        const result = await service(request, { address: userAddress } as any)
-
-        expect(result).toEqual({
-          response: {
-            $case: 'forbiddenError',
-            forbiddenError: {
-              message: 'Only community owners, moderators, or the user themselves can mute/unmute speakers'
-            }
+      expect(result).toEqual({
+        response: {
+          $case: 'forbiddenError',
+          forbiddenError: {
+            message: 'Only community owners, moderators, or the user themselves can mute/unmute speakers'
           }
-        })
-        expect(muteSpeakerMock).not.toHaveBeenCalled()
+        }
       })
+      expect(mockCommunityVoice.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+        communityId,
+        targetUserAddress,
+        userAddress,
+        true
+      )
     })
   })
 
   describe('when there are validation errors', () => {
-    describe('and the community ID is missing', () => {
-      it('should return invalid request error', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId: '',
-          userAddress: targetUserAddress,
-          muted: true
-        }
+    describe('when community ID is invalid', () => {
+      beforeEach(() => {
+        mockCommunityVoice.muteSpeakerInCommunityVoiceChat.mockRejectedValue(new InvalidCommunityIdError())
+      })
 
+      it('should return invalid request error', async () => {
         const result = await service(request, { address: userAddress } as any)
 
         expect(result).toEqual({
@@ -249,18 +153,16 @@ describe('when muting speaker from community voice chat', () => {
             }
           }
         })
-        expect(muteSpeakerMock).not.toHaveBeenCalled()
+        expect(mockCommunityVoice.muteSpeakerInCommunityVoiceChat).toHaveBeenCalled()
       })
     })
 
-    describe('and the user address is missing', () => {
-      it('should return invalid request error', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId,
-          userAddress: '',
-          muted: true
-        }
+    describe('when user address is invalid', () => {
+      beforeEach(() => {
+        mockCommunityVoice.muteSpeakerInCommunityVoiceChat.mockRejectedValue(new InvalidUserAddressError())
+      })
 
+      it('should return invalid request error', async () => {
         const result = await service(request, { address: userAddress } as any)
 
         expect(result).toEqual({
@@ -271,110 +173,29 @@ describe('when muting speaker from community voice chat', () => {
             }
           }
         })
-        expect(muteSpeakerMock).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('and the muted value is invalid', () => {
-      it('should return internal server error', async () => {
-        const request = {
-          communityId,
-          userAddress: targetUserAddress,
-          muted: 'invalid' as any
-        }
-
-        const result = await service(request, { address: userAddress } as any)
-
-        expect(result).toEqual({
-          response: {
-            $case: 'internalServerError',
-            internalServerError: {
-              message: 'Failed to mute/unmute speaker from community voice chat'
-            }
-          }
-        })
-        expect(muteSpeakerMock).not.toHaveBeenCalled()
+        expect(mockCommunityVoice.muteSpeakerInCommunityVoiceChat).toHaveBeenCalled()
       })
     })
   })
 
   describe('when there are service errors', () => {
-    beforeEach(() => {
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
-    })
-
-    describe('and the voice chat is not found', () => {
+    describe('when an unknown error occurs', () => {
       beforeEach(() => {
-        muteSpeakerMock.mockRejectedValue(new CommunityVoiceChatNotFoundError(communityId))
+        mockCommunityVoice.muteSpeakerInCommunityVoiceChat.mockRejectedValue(new Error('Unexpected error'))
       })
 
-      it('should return not found error', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId,
-          userAddress: targetUserAddress,
-          muted: true
-        }
-
-        const result = await service(request, { address: userAddress } as any)
-
-        expect(result).toEqual({
-          response: {
-            $case: 'notFoundError',
-            notFoundError: {
-              message: 'Community voice chat not found for community test-community-id'
-            }
-          }
-        })
-      })
-    })
-
-    describe('and the user is not a community member', () => {
-      beforeEach(() => {
-        muteSpeakerMock.mockRejectedValue(new UserNotCommunityMemberError(targetUserAddress, communityId))
-      })
-
-      it('should return forbidden error', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId,
-          userAddress: targetUserAddress,
-          muted: true
-        }
-
-        const result = await service(request, { address: userAddress } as any)
-
-        expect(result).toEqual({
-          response: {
-            $case: 'forbiddenError',
-            forbiddenError: {
-              message: 'User 0x987654321fedcba is not a member of community test-community-id'
-            }
-          }
-        })
-      })
-    })
-
-    describe('and there is an unknown error', () => {
-      beforeEach(() => {
-        muteSpeakerMock.mockRejectedValue(new Error('Unknown error'))
-      })
-
-      it('should return internal server error', async () => {
-        const request: MuteSpeakerFromCommunityVoiceChatPayload = {
-          communityId,
-          userAddress: targetUserAddress,
-          muted: true
-        }
-
+      it('should return internal server error with error details', async () => {
         const result = await service(request, { address: userAddress } as any)
 
         expect(result).toEqual({
           response: {
             $case: 'internalServerError',
             internalServerError: {
-              message: 'Failed to mute/unmute speaker from community voice chat'
+              message: 'Failed to mute/unmute speaker from community voice chat: Unexpected error'
             }
           }
         })
+        expect(mockCommunityVoice.muteSpeakerInCommunityVoiceChat).toHaveBeenCalled()
       })
     })
   })
