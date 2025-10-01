@@ -5,9 +5,12 @@ import { retry } from '../utils/retrier'
 import { shuffleArray } from '../utils/array'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { EthAddress } from '@dcl/schemas'
+import { getProfileUserId } from '../logic/profiles'
 
 const L1_MAINNET = 'mainnet'
 const L1_TESTNET = 'sepolia'
+
+const PROFILE_CACHE_PREFIX = 'catalyst:profile:'
 
 export async function createCatalystClient({
   fetcher,
@@ -39,6 +42,10 @@ export async function createCatalystClient({
     }
   }
 
+  function getProfileCacheKey(id: string): string {
+    return `${PROFILE_CACHE_PREFIX}${id}`
+  }
+
   async function getProfiles(ids: string[], options: ICatalystClientRequestOptions = {}): Promise<Profile[]> {
     if (ids.length === 0) return []
 
@@ -46,7 +53,7 @@ export async function createCatalystClient({
 
     // Deduplicate IDs to avoid fetching the same profile multiple times
     const uniqueIds = Array.from(new Set(ids))
-    const cacheKeys = uniqueIds.map((id) => `catalyst:profile:${id}`)
+    const cacheKeys = uniqueIds.map((id) => getProfileCacheKey(id))
 
     // Use mGet for efficient batch Redis retrieval
     const cachedValues = await redis.mGet(cacheKeys)
@@ -68,7 +75,8 @@ export async function createCatalystClient({
 
       await Promise.all(
         response.map((profile) => {
-          const cacheKey = `catalyst:profile:${profile.avatars?.[0]?.ethAddress}`
+          const id = getProfileUserId(profile)
+          const cacheKey = getProfileCacheKey(id)
           return redis.put(cacheKey, JSON.stringify(profile), {
             EX: 60 * 10 // 10 minutes
           })
@@ -82,7 +90,7 @@ export async function createCatalystClient({
   async function getProfile(id: string, options: ICatalystClientRequestOptions = {}): Promise<Profile> {
     const { retries = 3, waitTime = 300, lambdasServerUrl } = options
 
-    const cachedProfile = await redis.get(`catalyst:profile:${id}`)
+    const cachedProfile = await redis.get(getProfileCacheKey(id))
     if (cachedProfile) {
       return JSON.parse(cachedProfile as string) as Profile
     }
@@ -94,7 +102,7 @@ export async function createCatalystClient({
 
     const response = await retry(executeClientRequest, retries, waitTime)
 
-    await redis.put(`catalyst:profile:${id}`, JSON.stringify(response), {
+    await redis.put(getProfileCacheKey(id), JSON.stringify(response), {
       EX: 60 * 10 // 10 minutes
     })
 
