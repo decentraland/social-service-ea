@@ -44,7 +44,16 @@ export async function createCatalystClient({
 
     let response: Profile[] = []
 
-    const cachedProfiles = (await Promise.all(ids.map((id) => redis.get(`catalyst:profile:${id}`))))
+    const cachedProfiles = (
+      await Promise.all(
+        ids.map(async (id) => {
+          console.time(`get:catalyst:profile:${id}`)
+          const profile = await redis.get(`catalyst:profile:${id}`)
+          console.timeEnd(`get:catalyst:profile:${id}`)
+          return profile
+        })
+      )
+    )
       .filter((profile) => profile !== null)
       .map((profile) => JSON.parse(profile as string)) as Profile[]
 
