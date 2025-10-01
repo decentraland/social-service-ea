@@ -88,12 +88,22 @@ export const test = createRunner<TestComponents>({
 })
 
 async function initComponents(): Promise<TestComponents> {
+  // Generate unique ports for each test run to avoid conflicts
+  const basePort = 3000 + (process.pid % 1000) // Use process ID to generate unique base port
+  const httpPort = basePort + 1
+  const uwsPort = basePort + 2
+  const rpcPort = basePort + 3
+
   const config = await createDotEnvConfigComponent(
     {
       path: ['.env.default', '.env.test']
     },
     {
-      ARCHIPELAGO_STATS_URL
+      ARCHIPELAGO_STATS_URL,
+      // Override ports with unique values to avoid conflicts
+      HTTP_SERVER_PORT: httpPort.toString(),
+      UWS_HTTP_SERVER_PORT: uwsPort.toString(),
+      RPC_SERVER_PORT: rpcPort.toString()
     }
   )
   const uwsHttpServerConfig = await createConfigComponent({
@@ -127,7 +137,8 @@ async function initComponents(): Promise<TestComponents> {
         dir: resolve(__dirname, '../src/migrations'),
         migrationsTable: 'pgmigrations',
         ignorePattern: '.*\\.map',
-        direction: 'up'
+        direction: 'up',
+        verbose: false
       }
     }
   )
