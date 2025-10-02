@@ -106,7 +106,7 @@ describe('Community Utils', () => {
           const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
           const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-          expect(result.voiceChatStatus).toBe({
+          expect(result.voiceChatStatus).toEqual({
             isActive: false,
             participantCount: 0,
             moderatorCount: 0
@@ -117,7 +117,7 @@ describe('Community Utils', () => {
           const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
           const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-          expect(result.voiceChatStatus).toBe({
+          expect(result.voiceChatStatus).toEqual({
             isActive: false,
             participantCount: 0,
             moderatorCount: 0
@@ -132,7 +132,7 @@ describe('Community Utils', () => {
           const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.None }
           const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-          expect(result.voiceChatStatus).toBe({
+          expect(result.voiceChatStatus).toEqual({
             isActive: false,
             participantCount: 0,
             moderatorCount: 0
@@ -146,7 +146,7 @@ describe('Community Utils', () => {
             const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Member }
             const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-            expect(result.voiceChatStatus).toBe({
+            expect(result.voiceChatStatus).toEqual({
               isActive: false,
               participantCount: 0,
               moderatorCount: 0
@@ -159,7 +159,7 @@ describe('Community Utils', () => {
             const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
             const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-            expect(result.voiceChatStatus).toBe({
+            expect(result.voiceChatStatus).toEqual({
               isActive: false,
               participantCount: 0,
               moderatorCount: 0
