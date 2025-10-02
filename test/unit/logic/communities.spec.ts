@@ -181,7 +181,7 @@ describe('Community Component', () => {
           mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
         })
 
-        it('should return null for voice chat status', async () => {
+        it('should return default values for voice chat status', async () => {
           const result = await communityComponent.getCommunity(communityId, {
             as: userAddress
           })

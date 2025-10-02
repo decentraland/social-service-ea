@@ -600,7 +600,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             const privateCommunity = body.data.results.find((c: any) => c.id === privateCommunityId)
             if (privateCommunity) {
               // If the private community is returned, voiceChatStatus should be null
-              expect(privateCommunity.voiceChatStatus).toBeNull()
+              expect(privateCommunity.voiceChatStatus).toEqual({
+                isActive: false,
+                participantCount: 0,
+                moderatorCount: 0
+              })
             }
           })
 
