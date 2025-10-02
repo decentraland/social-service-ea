@@ -78,14 +78,15 @@ export const toCommunityWithUserInformationAndVoiceChat = (
 
   return {
     ...baseResult,
-    voiceChatStatus: shouldIncludeVoiceChat
-      ? voiceChatStatus
-      : // If voice chat is not included, return default values
-        {
-          isActive: false,
-          participantCount: 0,
-          moderatorCount: 0
-        }
+    voiceChatStatus:
+      shouldIncludeVoiceChat && !!voiceChatStatus
+        ? voiceChatStatus
+        : // If voice chat is not included, return default values
+          {
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          }
   }
 }
 
