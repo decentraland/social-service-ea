@@ -186,7 +186,11 @@ describe('Community Component', () => {
             as: userAddress
           })
 
-          expect(result.voiceChatStatus).toBeNull()
+          expect(result.voiceChatStatus).toBe({
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          })
         })
       })
 

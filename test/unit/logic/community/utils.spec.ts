@@ -106,14 +106,22 @@ describe('Community Utils', () => {
           const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
           const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, mockVoiceChatStatus)
 
-          expect(result.voiceChatStatus).toBeNull()
+          expect(result.voiceChatStatus).toBe({
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          })
         })
 
         it('should return null voiceChatStatus even when status is null', () => {
           const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
           const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-          expect(result.voiceChatStatus).toBeNull()
+          expect(result.voiceChatStatus).toBe({
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          })
         })
       })
     })
@@ -124,7 +132,11 @@ describe('Community Utils', () => {
           const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Public, role: CommunityRole.None }
           const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-          expect(result.voiceChatStatus).toBeNull()
+          expect(result.voiceChatStatus).toBe({
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          })
         })
       })
 
@@ -134,7 +146,11 @@ describe('Community Utils', () => {
             const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.Member }
             const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-            expect(result.voiceChatStatus).toBeNull()
+            expect(result.voiceChatStatus).toBe({
+              isActive: false,
+              participantCount: 0,
+              moderatorCount: 0
+            })
           })
         })
 
@@ -143,7 +159,11 @@ describe('Community Utils', () => {
             const community = { ...mockCommunity, privacy: CommunityPrivacyEnum.Private, role: CommunityRole.None }
             const result = toCommunityWithUserInformationAndVoiceChat(community, profilesMap, null)
 
-            expect(result.voiceChatStatus).toBeNull()
+            expect(result.voiceChatStatus).toBe({
+              isActive: false,
+              participantCount: 0,
+              moderatorCount: 0
+            })
           })
         })
       })
