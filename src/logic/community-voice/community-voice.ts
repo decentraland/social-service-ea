@@ -11,7 +11,9 @@ import {
   CommunityVoiceChatAlreadyActiveError,
   CommunityVoiceChatPermissionError,
   UserNotCommunityMemberError,
-  CommunityVoiceChatCreationError
+  CommunityVoiceChatCreationError,
+  InvalidCommunityIdError,
+  InvalidUserAddressError
 } from './errors'
 import { CommunityVoiceChatProfileData, ICommunityVoiceComponent } from './types'
 import { getProfileInfo } from '../profiles'
@@ -461,10 +463,86 @@ export async function createCommunityVoiceComponent({
     }
   }
 
+  async function muteSpeakerInCommunityVoiceChat(
+    communityId: string,
+    targetUserAddress: string,
+    actingUserAddress: string,
+    muted: boolean
+  ): Promise<void> {
+    try {
+      logger.info('Processing mute/unmute request', {
+        communityId,
+        targetUserAddress,
+        actingUserAddress,
+        muted: muted.toString()
+      })
+
+      const targetUserAddressLower = targetUserAddress.toLowerCase()
+      const actingUserAddressLower = actingUserAddress.toLowerCase()
+
+      // Validate community ID
+      if (!communityId || communityId.trim() === '') {
+        throw new InvalidCommunityIdError()
+      }
+
+      // Validate user address
+      if (!targetUserAddressLower || targetUserAddressLower.trim() === '') {
+        throw new InvalidUserAddressError()
+      }
+
+      // Check if it's a self-mute operation
+      const isSelfMute = targetUserAddressLower === actingUserAddressLower
+
+      if (!isSelfMute) {
+        // Check permissions: only owners and moderators can mute/unmute other players
+        const actingUserRole = await communitiesDb.getCommunityMemberRole(communityId, actingUserAddressLower)
+        if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
+          throw new CommunityVoiceChatPermissionError(
+            'Only community owners, moderators, or the user themselves can mute/unmute speakers'
+          )
+        }
+
+        logger.info('Permission check passed: moderator/owner muting player', {
+          communityId,
+          actingUserRole,
+          targetUserAddress: targetUserAddressLower,
+          actingUserAddress: actingUserAddressLower
+        })
+      } else {
+        logger.info('Self-mute operation', {
+          communityId,
+          userAddress: targetUserAddressLower
+        })
+      }
+
+      // Call the comms gatekeeper to perform the actual mute/unmute
+      await commsGatekeeper.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddressLower, muted)
+
+      const action = muted ? 'muted' : 'unmuted'
+      logger.info(`Speaker ${action} successfully`, {
+        communityId,
+        targetUserAddress: targetUserAddressLower,
+        actingUserAddress: actingUserAddressLower,
+        muted: muted.toString()
+      })
+    } catch (error) {
+      const errorMessage = errorMessageOrDefault(error)
+      logger.error('Failed to mute/unmute speaker in community voice chat', {
+        error: errorMessage,
+        communityId,
+        targetUserAddress,
+        actingUserAddress,
+        muted: muted.toString()
+      })
+      throw error
+    }
+  }
+
   return {
     startCommunityVoiceChat,
     endCommunityVoiceChat,
     joinCommunityVoiceChat,
+    muteSpeakerInCommunityVoiceChat,
     getCommunityVoiceChat,
     getActiveCommunityVoiceChats,
     getActiveCommunityVoiceChatsForUser

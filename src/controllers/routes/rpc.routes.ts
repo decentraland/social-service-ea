@@ -31,6 +31,7 @@ import {
   promoteSpeakerInCommunityVoiceChatService,
   demoteSpeakerInCommunityVoiceChatService,
   kickPlayerFromCommunityVoiceChatService,
+  muteSpeakerFromCommunityVoiceChatService,
   subscribeToCommunityVoiceChatUpdatesService
 } from '../handlers/rpc'
 import { ServiceType, StreamEvent } from '../../adapters/rpc-server/metrics-wrapper'
@@ -172,6 +173,10 @@ export async function setupRpcRoutes(components: AppComponents): Promise<RpcServ
     },
     kickPlayerFromCommunityVoiceChat: {
       creator: kickPlayerFromCommunityVoiceChatService({ components }),
+      type: ServiceType.CALL
+    },
+    muteSpeakerFromCommunityVoiceChat: {
+      creator: muteSpeakerFromCommunityVoiceChatService({ components }),
       type: ServiceType.CALL
     },
     subscribeToCommunityVoiceChatUpdates: {

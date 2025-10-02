@@ -609,6 +609,40 @@ export const createCommsGatekeeperComponent = async ({
     }
   }
 
+  /**
+   * Mutes or unmutes a speaker in a community voice chat.
+   * @param communityId - The ID of the community
+   * @param userAddress - The address of the user to mute/unmute
+   * @param muted - True to mute, false to unmute
+   */
+  async function muteSpeakerInCommunityVoiceChat(
+    communityId: string,
+    userAddress: string,
+    muted: boolean
+  ): Promise<void> {
+    try {
+      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/users/${userAddress}/mute`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
+        },
+        body: JSON.stringify({
+          muted
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to ${muted ? 'mute' : 'unmute'} user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+      )
+      throw error
+    }
+  }
+
   return {
     endPrivateVoiceChat,
     updateUserPrivateMessagePrivacyMetadata,
@@ -626,6 +660,7 @@ export const createCommsGatekeeperComponent = async ({
     getCommunitiesVoiceChatStatus,
     getAllActiveCommunityVoiceChats,
     kickUserFromCommunityVoiceChat,
-    isUserInCommunityVoiceChat
+    isUserInCommunityVoiceChat,
+    muteSpeakerInCommunityVoiceChat
   }
 }
