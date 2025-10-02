@@ -270,7 +270,7 @@ async function initComponents(): Promise<TestComponents> {
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
-  const localHttpFetch = await createLocalFetchComponent(config)
+  const localHttpFetch = await createLocalFetchComponent(apiSeverConfig)
 
   const rpcClient = await createRpcClientComponent({ config, logs })
 
