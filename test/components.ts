@@ -88,34 +88,31 @@ export const test = createRunner<TestComponents>({
 })
 
 async function initComponents(): Promise<TestComponents> {
-  // Generate unique ports for each test run to avoid conflicts
-  const basePort = 3000 + (process.pid % 1000) // Use process ID to generate unique base port
-  const httpPort = basePort + 1
-  const uwsPort = basePort + 2
-  const rpcPort = basePort + 3
-
   const config = await createDotEnvConfigComponent(
     {
       path: ['.env.default', '.env.test']
     },
     {
-      ARCHIPELAGO_STATS_URL,
-      // Override ports with unique values to avoid conflicts
-      HTTP_SERVER_PORT: httpPort.toString(),
-      UWS_HTTP_SERVER_PORT: uwsPort.toString(),
-      RPC_SERVER_PORT: rpcPort.toString()
+      ARCHIPELAGO_STATS_URL
     }
   )
-  const uwsHttpServerConfig = await createConfigComponent({
-    HTTP_SERVER_PORT: await config.requireString('UWS_HTTP_SERVER_PORT'),
+
+  const uwsHttpServerConfig = createConfigComponent({
+    HTTP_SERVER_PORT: await config.requireString('UWS_SERVER_PORT'), // 5000
     HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
   })
+
+  const apiSeverConfig = createConfigComponent({
+    HTTP_SERVER_PORT: await config.requireString('API_HTTP_SERVER_PORT'), // 5001
+    HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
+  })
+
   const metrics = createTestMetricsComponent(metricDeclarations)
   const logs = await createLogComponent({ metrics, config })
 
   const uwsServer = await createUWsComponent({ config: uwsHttpServerConfig, logs })
   const httpServer = await createServerComponent<GlobalContext>(
-    { config, logs },
+    { config: apiSeverConfig, logs },
     {
       cors: {
         methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT', 'PATCH'],
