@@ -119,6 +119,18 @@ describe('redis', () => {
       })
     })
 
+    describe('when JSON parsing fails for some values', () => {
+      beforeEach(() => {
+        mockClient.mGet = jest.fn().mockResolvedValueOnce([JSON.stringify('value1'), 'invalid-json', null])
+      })
+
+      it('should filter out invalid values and return only valid parsed values', async () => {
+        const values = await redis.mGet(['key1', 'key2', 'key3'])
+        expect(mockClient.mGet).toHaveBeenCalledWith(['key1', 'key2', 'key3'])
+        expect(values).toEqual(['value1'])
+      })
+    })
+
     describe('when mGet fails', () => {
       beforeEach(() => {
         mockClient.mGet = jest.fn().mockRejectedValueOnce(new Error('MGet failed'))

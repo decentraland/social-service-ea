@@ -52,7 +52,17 @@ export async function createRedisComponent(
 
   async function mGet<T>(keys: string[]): Promise<T[]> {
     const values = await client.mGet(keys)
-    return values.map((value) => JSON.parse(value as string)).filter((value) => value !== null) as T[]
+    return values
+      .map((value) => {
+        try {
+          if (!value) return null
+          return JSON.parse(value) as T
+        } catch (err: any) {
+          logger.error(`Error parsing value "${value}"`, err)
+          return null
+        }
+      })
+      .filter(Boolean) as T[]
   }
 
   async function put<T>(key: string, value: T, options?: SetOptions & { noTTL?: boolean }): Promise<void> {
