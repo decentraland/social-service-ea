@@ -40,7 +40,7 @@ import { Events } from '@dcl/schemas'
 import { ICommunityComplianceValidatorComponent } from '../../../src/logic/community/compliance-validator'
 import { createFeatureFlagsMockComponent } from '../../mocks/components/feature-flags'
 import { FeatureFlag } from '../../../src/adapters/feature-flags'
-import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, COMMUNITY_DELETED_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { IPubSubComponent } from '../../../src/types'
 import { ILoggerComponent } from '@well-known-components/interfaces'
@@ -181,7 +181,7 @@ describe('Community Component', () => {
           mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
         })
 
-        it('should return null for voice chat status', async () => {
+        it('should return default values for voice chat status', async () => {
           const result = await communityComponent.getCommunity(communityId, {
             as: userAddress
           })
@@ -883,50 +883,12 @@ describe('Community Component', () => {
           })
         })
 
-        describe('and the community has some members', () => {
-          let mockMembers: CommunityMember[]
+        it('should publish a community deleted event to notify all members', async () => {
+          await communityComponent.deleteCommunity(communityId, userAddress)
 
-          beforeEach(() => {
-            mockMembers = [
-              {
-                communityId,
-                memberAddress: '0xmember1',
-                role: CommunityRole.Member,
-                joinedAt: new Date().toISOString()
-              },
-              {
-                communityId,
-                memberAddress: '0xmember2',
-                role: CommunityRole.Member,
-                joinedAt: new Date().toISOString()
-              }
-            ]
-            mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce(mockMembers)
-          })
-
-          it('should fetch all community members in batches', async () => {
-            await communityComponent.deleteCommunity(communityId, userAddress)
-
-            await new Promise((resolve) => setImmediate(resolve))
-            expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
-              pagination: { limit: 100, offset: 0 }
-            })
-          })
-
-          it('should publish offline status updates for all community members', async () => {
-            await communityComponent.deleteCommunity(communityId, userAddress)
-
-            await new Promise((resolve) => setImmediate(resolve))
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-              communityId,
-              memberAddress: '0xmember1',
-              status: ConnectivityStatus.OFFLINE
-            })
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-              communityId,
-              memberAddress: '0xmember2',
-              status: ConnectivityStatus.OFFLINE
-            })
+          await new Promise((resolve) => setImmediate(resolve))
+          expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_DELETED_UPDATES_CHANNEL, {
+            communityId
           })
         })
       })
@@ -1002,117 +964,15 @@ describe('Community Component', () => {
           })
         })
 
-        describe('and the community has some members', () => {
-          let mockMembers: CommunityMember[]
+        it('should publish a community deleted event to notify all members', async () => {
+          await communityComponent.deleteCommunity(communityId, userAddress)
 
-          beforeEach(() => {
-            mockMembers = [
-              {
-                communityId,
-                memberAddress: '0xmember1',
-                role: CommunityRole.Member,
-                joinedAt: new Date().toISOString()
-              },
-              {
-                communityId,
-                memberAddress: '0xmember2',
-                role: CommunityRole.Member,
-                joinedAt: new Date().toISOString()
-              }
-            ]
-            mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce(mockMembers)
-          })
-
-          it('should fetch all community members in batches', async () => {
-            await communityComponent.deleteCommunity(communityId, userAddress)
-
-            await new Promise((resolve) => setImmediate(resolve))
-            expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
-              pagination: { limit: 100, offset: 0 }
-            })
-          })
-
-          it('should publish offline status updates for all community members', async () => {
-            await communityComponent.deleteCommunity(communityId, userAddress)
-
-            await new Promise((resolve) => setImmediate(resolve))
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-              communityId,
-              memberAddress: '0xmember1',
-              status: ConnectivityStatus.OFFLINE
-            })
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-              communityId,
-              memberAddress: '0xmember2',
-              status: ConnectivityStatus.OFFLINE
-            })
+          await new Promise((resolve) => setImmediate(resolve))
+          expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_DELETED_UPDATES_CHANNEL, {
+            communityId
           })
         })
 
-        describe('and the community has many members', () => {
-          let firstBatch: CommunityMember[]
-          let secondBatch: CommunityMember[]
-
-          beforeEach(() => {
-            // Create 100 members for first batch and 50 for second batch
-            firstBatch = Array.from({ length: 100 }, (_, i) => ({
-              communityId,
-              memberAddress: `0xmember${i}`,
-              role: CommunityRole.Member,
-              joinedAt: new Date().toISOString()
-            }))
-            secondBatch = Array.from({ length: 50 }, (_, i) => ({
-              communityId,
-              memberAddress: `0xmember${i + 100}`,
-              role: CommunityRole.Member,
-              joinedAt: new Date().toISOString()
-            }))
-
-            mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce(firstBatch).mockResolvedValueOnce(secondBatch)
-          })
-
-          it('should handle pagination when fetching members', async () => {
-            await communityComponent.deleteCommunity(communityId, userAddress)
-
-            await new Promise((resolve) => setImmediate(resolve))
-            expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
-              pagination: { limit: 100, offset: 0 }
-            })
-            expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith(communityId, {
-              pagination: { limit: 100, offset: 100 }
-            })
-          })
-
-          it('should publish offline status for all members across multiple pages', async () => {
-            await communityComponent.deleteCommunity(communityId, userAddress)
-
-            await new Promise((resolve) => setImmediate(resolve))
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledTimes(150) // 100 + 50 members
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(
-              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
-              expect.objectContaining({
-                communityId,
-                status: ConnectivityStatus.OFFLINE
-              })
-            )
-          })
-        })
-
-        describe('and the community has no members', () => {
-          beforeEach(() => {
-            mockCommunitiesDB.getCommunityMembers.mockResolvedValueOnce([])
-          })
-
-          it('should not publish any offline status updates', async () => {
-            await communityComponent.deleteCommunity(communityId, userAddress)
-
-            await new Promise((resolve) => setImmediate(resolve))
-            expect(mockPubSub.publishInChannel).not.toHaveBeenCalledWith(
-              COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
-              expect.any(Object)
-            )
-          })
-        })
       })
 
       describe('and the user is not the owner and not a global moderator', () => {

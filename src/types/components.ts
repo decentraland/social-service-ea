@@ -364,6 +364,7 @@ export type ICommsGatekeeperComponent = {
   >
   kickUserFromCommunityVoiceChat: (communityId: string, userAddress: string) => Promise<void>
   isUserInCommunityVoiceChat: (userAddress: string) => Promise<boolean>
+  muteSpeakerInCommunityVoiceChat: (communityId: string, userAddress: string, muted: boolean) => Promise<void>
 }
 
 export type IWebSocketComponent = IBaseComponent & {
@@ -411,6 +412,7 @@ export interface IUpdateHandlerComponent {
   privateVoiceChatUpdateHandler: UpdatesMessageHandler
   communityMemberStatusHandler: UpdatesMessageHandler
   communityVoiceChatUpdateHandler: UpdatesMessageHandler
+  communityDeletedUpdateHandler: UpdatesMessageHandler
   handleSubscriptionUpdates: <T, U>(params: SubscriptionHandlerParams<T, U>) => AsyncGenerator<T>
 }
 

@@ -9,7 +9,8 @@ import {
   PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
-  COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL
+  COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
+  COMMUNITY_DELETED_UPDATES_CHANNEL
 } from '../pubsub'
 import { createRpcServerMetricsWrapper } from './metrics-wrapper'
 import { RpcServiceCreators } from '../../controllers/routes/rpc.routes'
@@ -48,6 +49,7 @@ export async function createRpcServerComponent({
     [FRIEND_STATUS_UPDATES_CHANNEL]: [updateHandler.friendConnectivityUpdateHandler],
     [COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL]: [updateHandler.communityMemberConnectivityUpdateHandler],
     [COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL]: [updateHandler.communityMemberStatusHandler],
+    [COMMUNITY_DELETED_UPDATES_CHANNEL]: [updateHandler.communityDeletedUpdateHandler],
     [BLOCK_UPDATES_CHANNEL]: [updateHandler.blockUpdateHandler],
     [PRIVATE_VOICE_CHAT_UPDATES_CHANNEL]: [updateHandler.privateVoiceChatUpdateHandler],
     [COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL]: [updateHandler.communityVoiceChatUpdateHandler]

@@ -6,6 +6,7 @@ import {
   BLOCK_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+  COMMUNITY_DELETED_UPDATES_CHANNEL,
   FRIEND_STATUS_UPDATES_CHANNEL,
   FRIENDSHIP_UPDATES_CHANNEL,
   PRIVATE_VOICE_CHAT_UPDATES_CHANNEL,
@@ -134,12 +135,13 @@ describe('createRpcServerComponent', () => {
             channel: COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
             handler: mockUpdateHandler.communityMemberConnectivityUpdateHandler
           },
-          { channel: BLOCK_UPDATES_CHANNEL, handler: mockUpdateHandler.blockUpdateHandler },
-          { channel: PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, handler: mockUpdateHandler.privateVoiceChatUpdateHandler },
           {
             channel: COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
             handler: mockUpdateHandler.communityMemberStatusHandler
           },
+          { channel: COMMUNITY_DELETED_UPDATES_CHANNEL, handler: mockUpdateHandler.communityDeletedUpdateHandler },
+          { channel: BLOCK_UPDATES_CHANNEL, handler: mockUpdateHandler.blockUpdateHandler },
+          { channel: PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, handler: mockUpdateHandler.privateVoiceChatUpdateHandler },
           {
             channel: COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL,
             handler: mockUpdateHandler.communityVoiceChatUpdateHandler

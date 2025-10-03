@@ -96,16 +96,23 @@ async function initComponents(): Promise<TestComponents> {
       ARCHIPELAGO_STATS_URL
     }
   )
-  const uwsHttpServerConfig = await createConfigComponent({
-    HTTP_SERVER_PORT: await config.requireString('UWS_HTTP_SERVER_PORT'),
+
+  const uwsHttpServerConfig = createConfigComponent({
+    HTTP_SERVER_PORT: await config.requireString('UWS_SERVER_PORT'),
     HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
   })
+
+  const apiSeverConfig = createConfigComponent({
+    HTTP_SERVER_PORT: await config.requireString('API_HTTP_SERVER_PORT'),
+    HTTP_SERVER_HOST: await config.requireString('HTTP_SERVER_HOST')
+  })
+
   const metrics = createTestMetricsComponent(metricDeclarations)
   const logs = await createLogComponent({ metrics, config })
 
   const uwsServer = await createUWsComponent({ config: uwsHttpServerConfig, logs })
   const httpServer = await createServerComponent<GlobalContext>(
-    { config, logs },
+    { config: apiSeverConfig, logs },
     {
       cors: {
         methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT', 'PATCH'],
@@ -127,7 +134,8 @@ async function initComponents(): Promise<TestComponents> {
         dir: resolve(__dirname, '../src/migrations'),
         migrationsTable: 'pgmigrations',
         ignorePattern: '.*\\.map',
-        direction: 'up'
+        direction: 'up',
+        verbose: false
       }
     }
   )
@@ -262,7 +270,7 @@ async function initComponents(): Promise<TestComponents> {
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
-  const localHttpFetch = await createLocalFetchComponent(config)
+  const localHttpFetch = await createLocalFetchComponent(apiSeverConfig)
 
   const rpcClient = await createRpcClientComponent({ config, logs })
 

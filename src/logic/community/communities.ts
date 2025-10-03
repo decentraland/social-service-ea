@@ -14,8 +14,7 @@ import {
   CommunityUpdates,
   AggregatedCommunity,
   CommunityPrivacyEnum,
-  CommunityForModeration,
-  CommunityMember
+  CommunityForModeration
 } from './types'
 import {
   isOwner,
@@ -27,8 +26,7 @@ import {
 } from './utils'
 import { isErrorWithMessage } from '../../utils/errors'
 import { EthAddress, Events } from '@dcl/schemas'
-import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { COMMUNITY_DELETED_UPDATES_CHANNEL } from '../../adapters/pubsub'
 
 export function createCommunityComponent(
   components: Pick<
@@ -356,28 +354,9 @@ export function createCommunityComponent(
           })
         }
 
-        const members: CommunityMember[] = []
-        let hasMore = true
-        let offset = 0
-        while (hasMore) {
-          const membersBatch = await communitiesDb.getCommunityMembers(id, { pagination: { limit: 100, offset } })
-          members.push(...membersBatch)
-          if (membersBatch.length < 100) {
-            hasMore = false
-          } else {
-            offset += 100
-          }
-        }
-
-        await Promise.all(
-          members.map(async (member) =>
-            pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-              communityId: id,
-              memberAddress: member.memberAddress,
-              status: ConnectivityStatus.OFFLINE
-            })
-          )
-        )
+        await pubsub.publishInChannel(COMMUNITY_DELETED_UPDATES_CHANNEL, {
+          communityId: id
+        })
       })
     },
 

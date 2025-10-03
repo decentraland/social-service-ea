@@ -1353,4 +1353,106 @@ describe('Updates Handlers', () => {
       })
     })
   })
+
+  describe('when handling community deleted updates', () => {
+    const communityId = 'test-community-123'
+    const mockMembers = [
+      { communityId, memberAddress: '0xmember1' },
+      { communityId, memberAddress: '0xmember2' },
+      { communityId, memberAddress: '0xmember3' }
+    ]
+
+    beforeEach(() => {
+      // Mock the community members component to return batches of members
+      mockCommunityMembers.getOnlineMembersFromCommunity.mockReturnValue(
+        (async function* () {
+          yield mockMembers
+        })()
+      )
+    })
+
+    describe('and there are online community members', () => {
+      beforeEach(() => {
+        subscribersContext.addSubscriber('0xmember1', mitt<SubscriptionEventsEmitter>())
+        subscribersContext.addSubscriber('0xmember2', mitt<SubscriptionEventsEmitter>())
+        subscribersContext.addSubscriber('0xmember3', mitt<SubscriptionEventsEmitter>())
+      })
+
+      it('should notify all online community members about the deletion', async () => {
+        const member1Emitter = subscribersContext.getOrAddSubscriber('0xmember1')
+        const member2Emitter = subscribersContext.getOrAddSubscriber('0xmember2')
+        const member3Emitter = subscribersContext.getOrAddSubscriber('0xmember3')
+
+        const emitSpy1 = jest.spyOn(member1Emitter, 'emit')
+        const emitSpy2 = jest.spyOn(member2Emitter, 'emit')
+        const emitSpy3 = jest.spyOn(member3Emitter, 'emit')
+
+        const update = { communityId }
+
+        await updateHandler.communityDeletedUpdateHandler(JSON.stringify(update))
+
+        expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith(
+          communityId,
+          expect.any(Array)
+        )
+
+        expect(emitSpy1).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+          communityId,
+          memberAddress: '0xmember1',
+          status: ConnectivityStatus.OFFLINE
+        })
+        expect(emitSpy2).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+          communityId,
+          memberAddress: '0xmember2',
+          status: ConnectivityStatus.OFFLINE
+        })
+        expect(emitSpy3).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
+          communityId,
+          memberAddress: '0xmember3',
+          status: ConnectivityStatus.OFFLINE
+        })
+      })
+    })
+
+    describe('and there are no online community members', () => {
+      beforeEach(() => {
+        mockCommunityMembers.getOnlineMembersFromCommunity.mockReturnValue(
+          (async function* () {
+            yield []
+          })()
+        )
+      })
+
+      it('should not emit any updates when no members are online', async () => {
+        const update = { communityId }
+
+        await updateHandler.communityDeletedUpdateHandler(JSON.stringify(update))
+
+        expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith(
+          communityId,
+          expect.any(Array)
+        )
+
+        // Verify no emit calls were made
+        const allSubscribers = subscribersContext.getSubscribers()
+        Object.values(allSubscribers).forEach((emitter) => {
+          const emitSpy = jest.spyOn(emitter, 'emit')
+          expect(emitSpy).not.toHaveBeenCalled()
+        })
+      })
+    })
+
+    describe('and the update format is invalid', () => {
+      it('should log an error with invalid JSON message', () => {
+        const errorSpy = jest.spyOn(logger, 'error')
+
+        updateHandler.communityDeletedUpdateHandler('invalid json')
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Error handling update:'),
+          expect.objectContaining({ message: 'invalid json' })
+        )
+      })
+    })
+  })
 })

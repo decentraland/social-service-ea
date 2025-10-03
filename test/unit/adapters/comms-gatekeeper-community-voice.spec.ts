@@ -582,4 +582,70 @@ describe('Comms Gatekeeper Community Voice Chat', () => {
       })
     })
   })
+
+  describe('when muting speaker in community voice chat', () => {
+    const testCommunityId = 'test-community-id'
+    const testUserAddress = '0x1234567890abcdef'
+
+    describe('and the request is successful', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          status: 200
+        })
+      })
+
+      it('should mute speaker successfully', async () => {
+        await commsGatekeeper.muteSpeakerInCommunityVoiceChat(testCommunityId, testUserAddress, true)
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          `${gatekeeperUrl}/community-voice-chat/${testCommunityId}/users/${testUserAddress}/mute`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${gatekeeperToken}`
+            },
+            body: JSON.stringify({
+              muted: true
+            })
+          }
+        )
+      })
+
+      it('should unmute speaker successfully', async () => {
+        await commsGatekeeper.muteSpeakerInCommunityVoiceChat(testCommunityId, testUserAddress, false)
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          `${gatekeeperUrl}/community-voice-chat/${testCommunityId}/users/${testUserAddress}/mute`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${gatekeeperToken}`
+            },
+            body: JSON.stringify({
+              muted: false
+            })
+          }
+        )
+      })
+    })
+
+    describe('and the request fails', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValue({
+          ok: false,
+          status: 500,
+          text: () => Promise.resolve('Internal Server Error')
+        })
+      })
+
+      it('should throw an error', async () => {
+        await expect(
+          commsGatekeeper.muteSpeakerInCommunityVoiceChat(testCommunityId, testUserAddress, true)
+        ).rejects.toThrow('Server responded with status 500')
+      })
+    })
+  })
 })

@@ -12,7 +12,8 @@ import {
   CommunityPublicInformationWithVoiceChat,
   AggregatedCommunity,
   CommunityVoiceChatStatus,
-  CommunityRequestType
+  CommunityRequestType,
+  CommunityPrivacyEnum
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friends'
@@ -71,9 +72,21 @@ export const toCommunityWithUserInformationAndVoiceChat = (
   voiceChatStatus: CommunityVoiceChatStatus | null
 ): CommunityWithUserInformationAndVoiceChat => {
   const baseResult = toCommunityWithUserInformation(community, profilesMap)
+
+  const shouldIncludeVoiceChat =
+    community.privacy !== CommunityPrivacyEnum.Private || community.role !== CommunityRole.None
+
   return {
     ...baseResult,
-    voiceChatStatus
+    voiceChatStatus:
+      shouldIncludeVoiceChat && !!voiceChatStatus
+        ? voiceChatStatus
+        : // If voice chat is not included, return default values
+          {
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          }
   }
 }
 

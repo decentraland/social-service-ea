@@ -15,7 +15,9 @@ import {
   CommunityVoiceChatCreationError,
   CommunityVoiceChatNotFoundError,
   CommunityVoiceChatPermissionError,
-  UserNotCommunityMemberError
+  UserNotCommunityMemberError,
+  InvalidCommunityIdError,
+  InvalidUserAddressError
 } from '../../../src/logic/community-voice/errors'
 import { CommunityRole } from '../../../src/types'
 import { AnalyticsEvent, AnalyticsEventPayload } from '../../../src/types/analytics'
@@ -36,6 +38,8 @@ describe('Community Voice Logic', () => {
   let mockCommunityVoiceChatCache: jest.Mocked<ICommunityVoiceChatCacheComponent>
   let mockPlacesApi: jest.Mocked<any>
   let mockCommunityThumbnail: jest.Mocked<any>
+
+  const communityId = 'test-community-id'
 
   beforeEach(async () => {
     logger = {
@@ -853,6 +857,233 @@ describe('Community Voice Logic', () => {
         const result = await communityVoice.getCommunityVoiceChat(communityId)
 
         expect(result).toBeNull()
+      })
+    })
+  })
+
+  describe('when muting speaker in community voice chat', () => {
+    const targetUserAddress = '0x1234567890abcdef'
+    const actingUserAddress = '0xabcdef1234567890'
+
+    describe('when acting user is a moderator', () => {
+      beforeEach(() => {
+        mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+        mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat.mockResolvedValue(undefined)
+      })
+
+      it('should mute another user successfully', async () => {
+        await communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(
+          communityId,
+          actingUserAddress.toLowerCase()
+        )
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+          communityId,
+          targetUserAddress.toLowerCase(),
+          true
+        )
+      })
+
+      it('should unmute another user successfully', async () => {
+        await communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, false)
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(
+          communityId,
+          actingUserAddress.toLowerCase()
+        )
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+          communityId,
+          targetUserAddress.toLowerCase(),
+          false
+        )
+      })
+    })
+
+    describe('when acting user is an owner', () => {
+      beforeEach(() => {
+        mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+        mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat.mockResolvedValue(undefined)
+      })
+
+      it('should mute another user successfully', async () => {
+        await communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(
+          communityId,
+          actingUserAddress.toLowerCase()
+        )
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+          communityId,
+          targetUserAddress.toLowerCase(),
+          true
+        )
+      })
+    })
+
+    describe('when user is muting themselves', () => {
+      beforeEach(() => {
+        mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat.mockResolvedValue(undefined)
+      })
+
+      it('should mute themselves without checking permissions', async () => {
+        await communityVoice.muteSpeakerInCommunityVoiceChat(
+          communityId,
+          targetUserAddress,
+          targetUserAddress, // Same address for self-mute
+          true
+        )
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+          communityId,
+          targetUserAddress.toLowerCase(),
+          true
+        )
+      })
+
+      it('should unmute themselves without checking permissions', async () => {
+        await communityVoice.muteSpeakerInCommunityVoiceChat(
+          communityId,
+          targetUserAddress,
+          targetUserAddress, // Same address for self-mute
+          false
+        )
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+          communityId,
+          targetUserAddress.toLowerCase(),
+          false
+        )
+      })
+    })
+
+    describe('when acting user is a regular member', () => {
+      beforeEach(() => {
+        mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      })
+
+      it('should throw permission error when trying to mute another user', async () => {
+        await expect(
+          communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
+        ).rejects.toThrow(CommunityVoiceChatPermissionError)
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(
+          communityId,
+          actingUserAddress.toLowerCase()
+        )
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when acting user has no role', () => {
+      beforeEach(() => {
+        mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      })
+
+      it('should throw permission error when trying to mute another user', async () => {
+        await expect(
+          communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
+        ).rejects.toThrow(CommunityVoiceChatPermissionError)
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(
+          communityId,
+          actingUserAddress.toLowerCase()
+        )
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when community ID is invalid', () => {
+      it('should throw InvalidCommunityIdError for empty community ID', async () => {
+        await expect(
+          communityVoice.muteSpeakerInCommunityVoiceChat('', targetUserAddress, actingUserAddress, true)
+        ).rejects.toThrow(InvalidCommunityIdError)
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).not.toHaveBeenCalled()
+      })
+
+      it('should throw InvalidCommunityIdError for whitespace-only community ID', async () => {
+        await expect(
+          communityVoice.muteSpeakerInCommunityVoiceChat('   ', targetUserAddress, actingUserAddress, true)
+        ).rejects.toThrow(InvalidCommunityIdError)
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when user address is invalid', () => {
+      it('should throw InvalidUserAddressError for empty user address', async () => {
+        await expect(
+          communityVoice.muteSpeakerInCommunityVoiceChat(communityId, '', actingUserAddress, true)
+        ).rejects.toThrow(InvalidUserAddressError)
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).not.toHaveBeenCalled()
+      })
+
+      it('should throw InvalidUserAddressError for whitespace-only user address', async () => {
+        await expect(
+          communityVoice.muteSpeakerInCommunityVoiceChat(communityId, '   ', actingUserAddress, true)
+        ).rejects.toThrow(InvalidUserAddressError)
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when comms gatekeeper fails', () => {
+      beforeEach(() => {
+        mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+        mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat.mockRejectedValue(new Error('Comms gatekeeper error'))
+      })
+
+      it('should propagate the error from comms gatekeeper', async () => {
+        await expect(
+          communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
+        ).rejects.toThrow('Comms gatekeeper error')
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(
+          communityId,
+          actingUserAddress.toLowerCase()
+        )
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+          communityId,
+          targetUserAddress.toLowerCase(),
+          true
+        )
+      })
+    })
+
+    describe('when handling case sensitivity', () => {
+      beforeEach(() => {
+        mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+        mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat.mockResolvedValue(undefined)
+      })
+
+      it('should convert addresses to lowercase', async () => {
+        const upperCaseTargetAddress = '0X1234567890ABCDEF'
+        const upperCaseActingAddress = '0XABCDEF1234567890'
+
+        await communityVoice.muteSpeakerInCommunityVoiceChat(
+          communityId,
+          upperCaseTargetAddress,
+          upperCaseActingAddress,
+          true
+        )
+
+        expect(mockCommunitiesDb.getCommunityMemberRole).toHaveBeenCalledWith(
+          communityId,
+          upperCaseActingAddress.toLowerCase()
+        )
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+          communityId,
+          upperCaseTargetAddress.toLowerCase(),
+          true
+        )
       })
     })
   })
