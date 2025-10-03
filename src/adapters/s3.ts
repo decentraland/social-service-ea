@@ -39,5 +39,17 @@ export async function createS3Adapter({ config }: Pick<AppComponents, 'config'>)
     }
   }
 
-  return { storeFile, exists }
+  async function existsMultiple(keys: string[]): Promise<Record<string, boolean>> {
+    const results = await Promise.all(keys.map(async (key) => ({ key, exists: await exists(key) })))
+
+    return results.reduce(
+      (acc, { key, exists }) => {
+        acc[key] = exists
+        return acc
+      },
+      {} as Record<string, boolean>
+    )
+  }
+
+  return { storeFile, exists, existsMultiple }
 }

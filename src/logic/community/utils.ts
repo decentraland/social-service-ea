@@ -179,3 +179,17 @@ export const parseRequestTypeFilter = (searchParams: URLSearchParams): Community
     ? (typeParam as CommunityRequestType)
     : undefined
 }
+
+export const toCommunityWithThumbnail = <T extends Omit<Community, 'thumbnails'>>(
+  community: T,
+  thumbnail?: string
+): T & { thumbnails?: { raw: string } } => {
+  if (!thumbnail) return community
+
+  return {
+    ...community,
+    thumbnails: {
+      raw: thumbnail
+    }
+  }
+}

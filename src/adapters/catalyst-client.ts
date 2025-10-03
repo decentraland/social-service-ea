@@ -5,9 +5,12 @@ import { retry } from '../utils/retrier'
 import { shuffleArray } from '../utils/array'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { EthAddress } from '@dcl/schemas'
+import { getProfileUserId } from '../logic/profiles'
 
 const L1_MAINNET = 'mainnet'
 const L1_TESTNET = 'sepolia'
+
+const PROFILE_CACHE_PREFIX = 'catalyst:profile:'
 
 export async function createCatalystClient({
   fetcher,
@@ -39,26 +42,35 @@ export async function createCatalystClient({
     }
   }
 
+  function getProfileCacheKey(id: string): string {
+    return `${PROFILE_CACHE_PREFIX}${id}`
+  }
+
   async function getProfiles(ids: string[], options: ICatalystClientRequestOptions = {}): Promise<Profile[]> {
     if (ids.length === 0) return []
 
     let response: Profile[] = []
 
-    const cachedProfiles = (
-      await Promise.all(
-        ids.map(async (id) => {
-          console.time(`get:catalyst:profile:${id}`)
-          const profile = await redis.get(`catalyst:profile:${id}`)
-          console.timeEnd(`get:catalyst:profile:${id}`)
-          return profile
-        })
-      )
-    )
-      .filter((profile) => profile !== null)
-      .map((profile) => JSON.parse(profile as string)) as Profile[]
+    // Deduplicate IDs to avoid fetching the same profile multiple times
+    const uniqueIds = Array.from(new Set(ids))
+    const cacheKeys = uniqueIds.map((id) => getProfileCacheKey(id))
 
-    const idsToFetch = ids.filter(
-      (id) => !cachedProfiles.some((profile) => profile.avatars?.[0]?.ethAddress?.toLowerCase() === id.toLowerCase())
+    // Use mGet for efficient batch Redis retrieval
+    console.time(`mGet:catalyst:profiles:${cacheKeys.length}`)
+    const cachedProfiles = (await redis.mGet<Profile>(cacheKeys)).filter(Boolean) as Profile[]
+    console.timeEnd(`mGet:catalyst:profiles:${cacheKeys.length}`)
+
+    const idsToFetch = uniqueIds.filter(
+      (id) =>
+        !cachedProfiles.some((profile) => {
+          try {
+            return getProfileUserId(profile) === id.toLowerCase()
+          } catch (err: any) {
+            // Skip profiles that can't be processed (missing avatars, names, etc.)
+            // This ensures the function doesn't fail completely when some profiles are invalid
+            return false
+          }
+        })
     )
 
     if (idsToFetch.length > 0) {
@@ -71,10 +83,17 @@ export async function createCatalystClient({
 
       await Promise.all(
         response.map((profile) => {
-          const cacheKey = `catalyst:profile:${profile.avatars?.[0]?.ethAddress}`
-          return redis.put(cacheKey, JSON.stringify(profile), {
-            EX: 60 * 10 // 10 minutes
-          })
+          try {
+            const id = getProfileUserId(profile)
+            const cacheKey = getProfileCacheKey(id)
+            return redis.put(cacheKey, profile, {
+              EX: 60 * 10 // 10 minutes
+            })
+          } catch (err: any) {
+            // Skip profiles that can't be processed (missing avatars, names, etc.)
+            // This ensures the function doesn't fail completely when some profiles are invalid
+            return
+          }
         })
       )
     }
@@ -85,9 +104,9 @@ export async function createCatalystClient({
   async function getProfile(id: string, options: ICatalystClientRequestOptions = {}): Promise<Profile> {
     const { retries = 3, waitTime = 300, lambdasServerUrl } = options
 
-    const cachedProfile = await redis.get(`catalyst:profile:${id}`)
+    const cachedProfile = await redis.get<Profile>(getProfileCacheKey(id))
     if (cachedProfile) {
-      return JSON.parse(cachedProfile as string) as Profile
+      return cachedProfile
     }
 
     const executeClientRequest = rotateLambdasServerClient(
@@ -97,7 +116,7 @@ export async function createCatalystClient({
 
     const response = await retry(executeClientRequest, retries, waitTime)
 
-    await redis.put(`catalyst:profile:${id}`, JSON.stringify(response), {
+    await redis.put(getProfileCacheKey(id), response, {
       EX: 60 * 10 // 10 minutes
     })
 

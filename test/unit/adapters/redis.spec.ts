@@ -9,6 +9,7 @@ jest.mock('redis', () => ({
     connect: jest.fn(),
     disconnect: jest.fn(),
     get: jest.fn(),
+    mGet: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
     quit: jest.fn()
@@ -34,59 +35,156 @@ describe('redis', () => {
       expect(mockClient.connect).toHaveBeenCalled()
     })
 
-    it('when connect fails, should throw an error', async () => {
-      mockClient.connect = jest.fn().mockRejectedValueOnce(new Error('Connection failed'))
-      await expect(redis.start({} as any)).rejects.toThrow('Connection failed')
+    describe('when connect fails', () => {
+      beforeEach(() => {
+        mockClient.connect = jest.fn().mockRejectedValueOnce(new Error('Connection failed'))
+      })
+
+      it('should throw an error', async () => {
+        await expect(redis.start({} as any)).rejects.toThrow('Connection failed')
+      })
     })
   })
 
   describe('get()', () => {
-    it('should get a value from the redis client and return null if it was not found', async () => {
-      const value = await redis.get('key')
-      expect(mockClient.get).toHaveBeenCalledWith('key')
-      expect(value).toBe(null)
+    describe('when key is not found', () => {
+      beforeEach(() => {
+        mockClient.get = jest.fn().mockResolvedValueOnce(null)
+      })
+
+      it('should return null', async () => {
+        const value = await redis.get('key')
+        expect(mockClient.get).toHaveBeenCalledWith('key')
+        expect(value).toBe(null)
+      })
     })
 
-    it('should get a value from the redis client and parse it correctly', async () => {
-      mockClient.get = jest.fn().mockResolvedValueOnce(JSON.stringify('value'))
-      const value = await redis.get('key')
-      expect(mockClient.get).toHaveBeenCalledWith('key')
-      expect(value).toBe('value')
+    describe('when key is found', () => {
+      beforeEach(() => {
+        mockClient.get = jest.fn().mockResolvedValueOnce(JSON.stringify('value'))
+      })
+
+      it('should parse and return the value', async () => {
+        const value = await redis.get('key')
+        expect(mockClient.get).toHaveBeenCalledWith('key')
+        expect(value).toBe('value')
+      })
     })
 
-    it('when get fails, should throw an error', async () => {
-      mockClient.get = jest.fn().mockRejectedValueOnce(new Error('Get failed'))
-      await expect(redis.get('key')).rejects.toThrow('Get failed')
+    describe('when get fails', () => {
+      beforeEach(() => {
+        mockClient.get = jest.fn().mockRejectedValueOnce(new Error('Get failed'))
+      })
+
+      it('should throw an error', async () => {
+        await expect(redis.get('key')).rejects.toThrow('Get failed')
+      })
+    })
+  })
+
+  describe('mGet()', () => {
+    describe('when no keys are found', () => {
+      beforeEach(() => {
+        mockClient.mGet = jest.fn().mockResolvedValueOnce([null, null])
+      })
+
+      it('should return empty array', async () => {
+        const values = await redis.mGet(['key1', 'key2'])
+        expect(mockClient.mGet).toHaveBeenCalledWith(['key1', 'key2'])
+        expect(values).toEqual([])
+      })
+    })
+
+    describe('when all keys are found', () => {
+      beforeEach(() => {
+        mockClient.mGet = jest.fn().mockResolvedValueOnce([JSON.stringify('value1'), JSON.stringify('value2')])
+      })
+
+      it('should parse and return all values', async () => {
+        const values = await redis.mGet(['key1', 'key2'])
+        expect(mockClient.mGet).toHaveBeenCalledWith(['key1', 'key2'])
+        expect(values).toEqual(['value1', 'value2'])
+      })
+    })
+
+    describe('when some keys are found', () => {
+      beforeEach(() => {
+        mockClient.mGet = jest.fn().mockResolvedValueOnce([JSON.stringify('value1'), null, JSON.stringify('value3')])
+      })
+
+      it('should filter out null values and return only valid parsed values', async () => {
+        const values = await redis.mGet(['key1', 'key2', 'key3'])
+        expect(mockClient.mGet).toHaveBeenCalledWith(['key1', 'key2', 'key3'])
+        expect(values).toEqual(['value1', 'value3'])
+      })
+    })
+
+    describe('when JSON parsing fails for some values', () => {
+      beforeEach(() => {
+        mockClient.mGet = jest.fn().mockResolvedValueOnce([JSON.stringify('value1'), 'invalid-json', null])
+      })
+
+      it('should filter out invalid values and return only valid parsed values', async () => {
+        const values = await redis.mGet(['key1', 'key2', 'key3'])
+        expect(mockClient.mGet).toHaveBeenCalledWith(['key1', 'key2', 'key3'])
+        expect(values).toEqual(['value1'])
+      })
+    })
+
+    describe('when mGet fails', () => {
+      beforeEach(() => {
+        mockClient.mGet = jest.fn().mockRejectedValueOnce(new Error('MGet failed'))
+      })
+
+      it('should throw an error', async () => {
+        await expect(redis.mGet(['key1', 'key2'])).rejects.toThrow('MGet failed')
+      })
     })
   })
 
   describe('put()', () => {
-    it('should set a value in the redis client', async () => {
-      await redis.put('key', 'value')
-      expect(mockClient.set).toHaveBeenCalledWith('key', JSON.stringify('value'), { EX: 7200 })
+    describe('when setting a value with default options', () => {
+      it('should call set with default expiration', async () => {
+        await redis.put('key', 'value')
+        expect(mockClient.set).toHaveBeenCalledWith('key', JSON.stringify('value'), { EX: 7200 })
+      })
     })
 
-    it('should set a value in the redis client with the given options', async () => {
-      await redis.put('key', [], { EX: 3600 })
-      expect(mockClient.set).toHaveBeenCalledWith('key', JSON.stringify([]), { EX: 3600 })
+    describe('when setting a value with custom options', () => {
+      it('should call set with custom expiration', async () => {
+        await redis.put('key', [], { EX: 3600 })
+        expect(mockClient.set).toHaveBeenCalledWith('key', JSON.stringify([]), { EX: 3600 })
+      })
     })
 
-    it('when put fails, should throw an error', async () => {
-      mockClient.set = jest.fn().mockRejectedValueOnce(new Error('Set failed'))
-      await expect(redis.put('key', 'value')).rejects.toThrow('Set failed')
+    describe('when put fails', () => {
+      beforeEach(() => {
+        mockClient.set = jest.fn().mockRejectedValueOnce(new Error('Set failed'))
+      })
+
+      it('should throw an error', async () => {
+        await expect(redis.put('key', 'value')).rejects.toThrow('Set failed')
+      })
     })
   })
 
   describe('stop()', () => {
-    it('should stop the redis client', async () => {
-      await redis.stop()
-      expect(mockClient.quit).toHaveBeenCalled()
+    describe('when stopping successfully', () => {
+      it('should call quit on the client', async () => {
+        await redis.stop()
+        expect(mockClient.quit).toHaveBeenCalled()
+      })
     })
 
-    it('when disconnect fails, should throw an error', async () => {
-      mockClient.disconnect = jest.fn().mockRejectedValueOnce(new Error('Disconnection failed'))
-      await redis.stop()
-      expect(mockClient.quit).toHaveBeenCalled()
+    describe('when disconnect fails', () => {
+      beforeEach(() => {
+        mockClient.disconnect = jest.fn().mockRejectedValueOnce(new Error('Disconnection failed'))
+      })
+
+      it('should still call quit on the client', async () => {
+        await redis.stop()
+        expect(mockClient.quit).toHaveBeenCalled()
+      })
     })
   })
 })

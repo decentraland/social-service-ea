@@ -16,8 +16,13 @@ export function createInMemoryCacheComponent(): ICacheComponent {
     cache.set(key, value)
   }
 
+  async function mGet<T>(keys: string[]): Promise<T[]> {
+    return keys.map((key) => get(key)).filter((value) => value !== null) as T[]
+  }
+
   return {
     get,
-    put
+    put,
+    mGet
   }
 }

@@ -25,12 +25,14 @@ export async function getManagedCommunitiesHandler(
       roles: [CommunityRole.Owner, CommunityRole.Moderator]
     })
 
-    const managedCommunitiesWithThumbnails = await Promise.all(
-      managedCommunities.communities.map(async (community) => {
-        const thumbnail = await communityThumbnail.getThumbnail(community.id)
-        return { ...community, thumbnails: { raw: thumbnail || '' } }
-      })
+    const thumbnailMap = await communityThumbnail.getThumbnails(
+      managedCommunities.communities.map((community) => community.id)
     )
+
+    const managedCommunitiesWithThumbnails = managedCommunities.communities.map((community) => {
+      const thumbnail = thumbnailMap[community.id] || ''
+      return { ...community, thumbnails: { raw: thumbnail } }
+    })
 
     return {
       status: 200,
