@@ -53,6 +53,12 @@ describe('catalyst-client', () => {
       logs: mockLogs
     })
     lambdasClientMock = createLambdasClient({ fetcher: mockFetcher, url: CATALYST_LAMBDAS_LOAD_BALANCER_URL })
+
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
   })
 
   describe('when getting profiles', () => {
@@ -149,6 +155,8 @@ describe('catalyst-client', () => {
 
       it('should cache fetched profiles as minimal profiles with correct expiration', async () => {
         await catalystClient.getProfiles(profileIds)
+
+        jest.runOnlyPendingTimers()
 
         expect(mockRedis.put).toHaveBeenCalledTimes(2)
 
@@ -315,6 +323,8 @@ describe('catalyst-client', () => {
 
       it('should cache only the newly fetched profiles as minimal profiles', async () => {
         await catalystClient.getProfiles(profileIds)
+
+        jest.runOnlyPendingTimers()
 
         expect(mockRedis.put).toHaveBeenCalledTimes(1)
         expect(mockRedis.put).toHaveBeenCalledWith(
@@ -543,6 +553,64 @@ describe('catalyst-client', () => {
         })
       })
     })
+
+    describe('and getProfileUserId throws error in cached profile filter', () => {
+      const invalidCachedProfile = {
+        avatars: [] // This will cause getProfileUserId to throw
+      }
+
+      beforeEach(() => {
+        mockRedis.mGet.mockResolvedValue([invalidCachedProfile, null])
+        lambdasClientMock.getAvatarsDetailsByPost = jest.fn().mockResolvedValue([mockProfile])
+      })
+
+      it('should skip invalid cached profiles and fetch from server', async () => {
+        const result = await catalystClient.getProfiles([profileIds[0], '0x0987654321098765432109876543210987654321'])
+
+        expect(mockRedis.mGet).toHaveBeenCalled()
+        expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({
+          ids: [profileIds[0], '0x0987654321098765432109876543210987654321']
+        })
+        // The invalid cached profile should be filtered out, but the fetched profile should be returned
+        expect(result).toHaveLength(2)
+        expect(result).toContainEqual(invalidCachedProfile) // Invalid profile is still returned as-is
+        expect(result).toContainEqual(mockProfile) // Fetched profile is also returned
+      })
+    })
+
+    describe('and batch caching Promise.all fails', () => {
+      beforeEach(() => {
+        jest.useRealTimers()
+        mockRedis.mGet.mockResolvedValue([null])
+        // Mock getProfileUserId to throw an error, which will cause the Promise.all to fail
+        jest.spyOn(require('../../../src/logic/profiles'), 'getProfileUserId').mockImplementation(() => {
+          throw new Error('Batch cache failed')
+        })
+        lambdasClientMock.getAvatarsDetailsByPost = jest.fn().mockResolvedValue([mockProfile])
+      })
+
+      afterEach(() => {
+        jest.useFakeTimers()
+        jest.restoreAllMocks()
+      })
+
+      it('should log error for batch failure', async () => {
+        const logger = mockLogs.getLogger('catalyst-client')
+        const result = await catalystClient.getProfiles([profileIds[0]])
+
+        // Wait for setImmediate to complete
+        await new Promise((resolve) => setImmediate(resolve))
+
+        expect(logger.error).toHaveBeenCalledWith(
+          'Profile caching batch failed',
+          expect.objectContaining({
+            error: 'Batch cache failed'
+          })
+        )
+        expect(result).toHaveLength(1)
+        expect(result[0]).toEqual(mockProfile)
+      })
+    })
   })
 
   describe('when getting a single profile', () => {
@@ -570,7 +638,59 @@ describe('catalyst-client', () => {
       it('should cache the fetched profile with correct expiration', async () => {
         await catalystClient.getProfile(profileId)
 
+        jest.runOnlyPendingTimers()
+
         expect(mockRedis.put).toHaveBeenCalledWith(getProfileCacheKey(profileId), mockProfile, { EX: 60 * 10 })
+      })
+
+      describe('and Redis put fails', () => {
+        beforeEach(() => {
+          jest.useRealTimers()
+          mockRedis.put.mockRejectedValue(new Error('Redis connection failed'))
+        })
+
+        afterEach(() => {
+          jest.useFakeTimers()
+        })
+
+        it('should log warning but not throw error', async () => {
+          const logger = mockLogs.getLogger('catalyst-client')
+          const result = await catalystClient.getProfile(profileId)
+
+          // Wait for setImmediate to complete
+          await new Promise((resolve) => setImmediate(resolve))
+
+          expect(mockRedis.put).toHaveBeenCalled()
+          expect(logger.warn).toHaveBeenCalledWith(
+            'Failed to cache profile',
+            expect.objectContaining({
+              error: 'Redis connection failed',
+              profileId
+            })
+          )
+          expect(result).toEqual(mockProfile)
+        })
+      })
+
+      describe('and extractMinimalProfile returns null', () => {
+        const invalidProfile = {
+          avatars: [] // This will cause extractMinimalProfile to return null
+        }
+
+        beforeEach(() => {
+          lambdasClientMock.getAvatarDetails = jest.fn().mockResolvedValue(invalidProfile)
+        })
+
+        it('should log warning and return original profile without caching', async () => {
+          const logger = mockLogs.getLogger('catalyst-client')
+          const result = await catalystClient.getProfile(profileId)
+
+          expect(logger.warn).toHaveBeenCalledWith(
+            'Invalid profile received from Catalyst, not caching: {"avatars":[]}'
+          )
+          expect(mockRedis.put).not.toHaveBeenCalled()
+          expect(result).toEqual(invalidProfile)
+        })
       })
 
       describe('and the catalyst server fails', () => {

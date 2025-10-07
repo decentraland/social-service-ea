@@ -48,6 +48,20 @@ export async function createCatalystClient({
     return `${PROFILE_CACHE_PREFIX}${id}`
   }
 
+  async function cacheProfile(profileId: string, profile: Profile): Promise<void> {
+    try {
+      const cacheKey = getProfileCacheKey(profileId)
+      await redis.put(cacheKey, profile, {
+        EX: 60 * 10 // 10 minutes
+      })
+    } catch (error: any) {
+      logger.warn('Failed to cache profile', {
+        error: error.message,
+        profileId
+      })
+    }
+  }
+
   async function getProfiles(ids: string[], options: ICatalystClientRequestOptions = {}): Promise<Profile[]> {
     if (ids.length === 0) return []
 
@@ -73,7 +87,7 @@ export async function createCatalystClient({
         })
     )
 
-    const validProfiles: Profile[] = []
+    let validProfiles: Profile[] = []
 
     if (idsToFetch.length > 0) {
       const { retries = 3, waitTime = 300, lambdasServerUrl } = options
@@ -83,25 +97,22 @@ export async function createCatalystClient({
       )
       const fetchedProfiles = await retry(executeClientRequest, retries, waitTime)
 
-      // Extract and cache only valid minimal profiles
-      await Promise.all(
-        fetchedProfiles.map(async (profile) => {
-          const minimalProfile = extractMinimalProfile(profile)
-          if (!minimalProfile) {
-            logger.warn(`Skipping invalid profile during caching: ${JSON.stringify(profile)}`)
-            return
-          }
+      // Extract minimal profiles and cache them asynchronously (fire-and-forget)
+      const minimalProfiles = fetchedProfiles.map(extractMinimalProfile).filter(Boolean) as Profile[]
 
-          validProfiles.push(minimalProfile)
+      validProfiles = minimalProfiles
 
-          const userId = getProfileUserId(minimalProfile)
-          const cacheKey = getProfileCacheKey(userId)
-
-          await redis.put(cacheKey, minimalProfile, {
-            EX: 60 * 10 // 10 minutes
+      // Cache profiles asynchronously without blocking the response
+      setImmediate(() => {
+        Promise.all(
+          minimalProfiles.map(async (minimalProfile) => {
+            await cacheProfile(getProfileUserId(minimalProfile), minimalProfile)
           })
+        ).catch((error) => {
+          // Catch any unhandled promise rejections
+          logger.error('Profile caching batch failed', { error: error.message })
         })
-      )
+      })
     }
 
     return [...cachedProfiles, ...validProfiles]
@@ -129,9 +140,11 @@ export async function createCatalystClient({
       return response
     }
 
-    await redis.put(getProfileCacheKey(id), minimalProfile, {
-      EX: 60 * 10 // 10 minutes
+    // Cache profile asynchronously without blocking the response
+    setImmediate(async () => {
+      await cacheProfile(id, minimalProfile)
     })
+
     return minimalProfile
   }
 
