@@ -10,7 +10,7 @@ import { extractMinimalProfile, getProfileUserId } from '../logic/profiles'
 const L1_MAINNET = 'mainnet'
 const L1_TESTNET = 'sepolia'
 
-export const PROFILE_CACHE_PREFIX = 'catalyst:profile:minimal:'
+export const PROFILE_CACHE_PREFIX = 'catalyst:minimal:profile:'
 
 export async function createCatalystClient({
   fetcher,
@@ -55,7 +55,7 @@ export async function createCatalystClient({
         EX: 60 * 10 // 10 minutes
       })
     } catch (error: any) {
-      logger.warn('Failed to cache profile', {
+      logger.warn('Failed to store profile in cache', {
         error: error.message,
         profileId
       })
@@ -110,7 +110,7 @@ export async function createCatalystClient({
           })
         ).catch((error) => {
           // Catch any unhandled promise rejections
-          logger.error('Profile caching batch failed', { error: error.message })
+          logger.error('Profile cache storing in batch failed', { error: error.message })
         })
       })
     }
