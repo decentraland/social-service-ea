@@ -149,7 +149,7 @@ export async function initComponents(): Promise<AppComponents> {
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
-  const catalystClient = await createCatalystClient({ config, fetcher, redis })
+  const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
   const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })

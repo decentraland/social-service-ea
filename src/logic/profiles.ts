@@ -52,3 +52,36 @@ export function getProfileInfo(profile: Profile) {
     profilePictureUrl
   }
 }
+
+/**
+ * Extracts a minimal Profile structure containing only the properties we actually use.
+ * This reduces Redis storage size while maintaining full compatibility with existing code.
+ */
+export function extractMinimalProfile(profile: Profile): Profile | null {
+  try {
+    const avatar = getProfileAvatarItem(profile)
+    const { userId, name, unclaimedName, hasClaimedName = false, avatar: { snapshots: { face256 } = {} } = {} } = avatar
+
+    if (!userId || (!name && !unclaimedName) || !face256) {
+      return null
+    }
+
+    return {
+      avatars: [
+        {
+          userId,
+          name,
+          unclaimedName,
+          hasClaimedName,
+          avatar: {
+            snapshots: {
+              face256
+            }
+          }
+        }
+      ]
+    } as Profile
+  } catch (error) {
+    return null
+  }
+}

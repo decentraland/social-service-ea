@@ -5,19 +5,21 @@ import { retry } from '../utils/retrier'
 import { shuffleArray } from '../utils/array'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { EthAddress } from '@dcl/schemas'
-import { getProfileUserId } from '../logic/profiles'
+import { extractMinimalProfile, getProfileUserId } from '../logic/profiles'
 
 const L1_MAINNET = 'mainnet'
 const L1_TESTNET = 'sepolia'
 
-const PROFILE_CACHE_PREFIX = 'catalyst:profile:'
+export const PROFILE_CACHE_PREFIX = 'catalyst:minimal:profile:'
 
 export async function createCatalystClient({
   fetcher,
   config,
-  redis
-}: Pick<AppComponents, 'fetcher' | 'config' | 'redis'>): Promise<ICatalystClientComponent> {
+  redis,
+  logs
+}: Pick<AppComponents, 'fetcher' | 'config' | 'redis' | 'logs'>): Promise<ICatalystClientComponent> {
   const loadBalancer = await config.requireString('CATALYST_LAMBDAS_URL_LOADBALANCER')
+  const logger = logs.getLogger('catalyst-client')
   const env = await config.getString('ENV')
   const contractNetwork = env === 'prd' ? L1_MAINNET : L1_TESTNET
 
@@ -46,19 +48,31 @@ export async function createCatalystClient({
     return `${PROFILE_CACHE_PREFIX}${id}`
   }
 
+  async function cacheProfile(profileId: string, profile: Profile): Promise<void> {
+    try {
+      const cacheKey = getProfileCacheKey(profileId)
+      await redis.put(cacheKey, profile, {
+        EX: 60 * 10 // 10 minutes
+      })
+    } catch (error: any) {
+      logger.warn('Failed to store profile in cache', {
+        error: error.message,
+        profileId
+      })
+    }
+  }
+
   async function getProfiles(ids: string[], options: ICatalystClientRequestOptions = {}): Promise<Profile[]> {
     if (ids.length === 0) return []
-
-    let response: Profile[] = []
 
     // Deduplicate IDs to avoid fetching the same profile multiple times
     const uniqueIds = Array.from(new Set(ids))
     const cacheKeys = uniqueIds.map((id) => getProfileCacheKey(id))
 
     // Use mGet for efficient batch Redis retrieval
-    console.time(`mGet:catalyst:profiles:${cacheKeys.length}`)
+    console.time(`mGet:${PROFILE_CACHE_PREFIX}:${cacheKeys.length}`)
     const cachedProfiles = (await redis.mGet<Profile>(cacheKeys)).filter(Boolean) as Profile[]
-    console.timeEnd(`mGet:catalyst:profiles:${cacheKeys.length}`)
+    console.timeEnd(`mGet:${PROFILE_CACHE_PREFIX}:${cacheKeys.length}`)
 
     const idsToFetch = uniqueIds.filter(
       (id) =>
@@ -73,37 +87,41 @@ export async function createCatalystClient({
         })
     )
 
+    let validProfiles: Profile[] = []
+
     if (idsToFetch.length > 0) {
       const { retries = 3, waitTime = 300, lambdasServerUrl } = options
       const executeClientRequest = rotateLambdasServerClient(
         (lambdasClientToUse) => lambdasClientToUse.getAvatarsDetailsByPost({ ids: idsToFetch }),
         lambdasServerUrl
       )
-      response = await retry(executeClientRequest, retries, waitTime)
+      const fetchedProfiles = await retry(executeClientRequest, retries, waitTime)
 
-      await Promise.all(
-        response.map((profile) => {
-          try {
-            const id = getProfileUserId(profile)
-            const cacheKey = getProfileCacheKey(id)
-            return redis.put(cacheKey, profile, {
-              EX: 60 * 10 // 10 minutes
-            })
-          } catch (err: any) {
-            // Skip profiles that can't be processed (missing avatars, names, etc.)
-            // This ensures the function doesn't fail completely when some profiles are invalid
-            return
-          }
+      // Extract minimal profiles and cache them asynchronously (fire-and-forget)
+      const minimalProfiles = fetchedProfiles.map(extractMinimalProfile).filter(Boolean) as Profile[]
+
+      validProfiles = minimalProfiles
+
+      // Cache profiles asynchronously without blocking the response
+      setImmediate(() => {
+        Promise.all(
+          minimalProfiles.map(async (minimalProfile) => {
+            await cacheProfile(getProfileUserId(minimalProfile), minimalProfile)
+          })
+        ).catch((error) => {
+          // Catch any unhandled promise rejections
+          logger.error('Profile cache storing in batch failed', { error: error.message })
         })
-      )
+      })
     }
 
-    return [...cachedProfiles, ...response]
+    return [...cachedProfiles, ...validProfiles]
   }
 
   async function getProfile(id: string, options: ICatalystClientRequestOptions = {}): Promise<Profile> {
     const { retries = 3, waitTime = 300, lambdasServerUrl } = options
 
+    // Try to get cached minimal profile
     const cachedProfile = await redis.get<Profile>(getProfileCacheKey(id))
     if (cachedProfile) {
       return cachedProfile
@@ -115,12 +133,19 @@ export async function createCatalystClient({
     )
 
     const response = await retry(executeClientRequest, retries, waitTime)
+    const minimalProfile = extractMinimalProfile(response)
 
-    await redis.put(getProfileCacheKey(id), response, {
-      EX: 60 * 10 // 10 minutes
+    if (!minimalProfile) {
+      logger.warn(`Invalid profile received from Catalyst, not caching: ${JSON.stringify(response)}`)
+      return response
+    }
+
+    // Cache profile asynchronously without blocking the response
+    setImmediate(async () => {
+      await cacheProfile(id, minimalProfile)
     })
 
-    return response
+    return minimalProfile
   }
 
   async function getOwnedNames(

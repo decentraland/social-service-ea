@@ -1,7 +1,7 @@
-import { createCatalystClient } from '../../../src/adapters/catalyst-client'
+import { createCatalystClient, PROFILE_CACHE_PREFIX } from '../../../src/adapters/catalyst-client'
 import { ICatalystClientComponent } from '../../../src/types'
 import { createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
-import { mockConfig, mockFetcher, mockRedis } from '../../mocks/components'
+import { mockConfig, mockFetcher, mockRedis, mockLogs } from '../../mocks/components'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { mockProfile } from '../../mocks/profile'
 
@@ -38,6 +38,10 @@ describe('catalyst-client', () => {
   let catalystClient: ICatalystClientComponent
   let lambdasClientMock: LambdasClient
 
+  function getProfileCacheKey(id: string): string {
+    return `${PROFILE_CACHE_PREFIX}${id}`
+  }
+
   beforeEach(async () => {
     mockConfig.requireString.mockResolvedValue(CATALYST_LAMBDAS_LOAD_BALANCER_URL)
     mockConfig.getString.mockResolvedValue('test') // ENV
@@ -45,9 +49,16 @@ describe('catalyst-client', () => {
     catalystClient = await createCatalystClient({
       fetcher: mockFetcher,
       config: mockConfig,
-      redis: mockRedis
+      redis: mockRedis,
+      logs: mockLogs
     })
     lambdasClientMock = createLambdasClient({ fetcher: mockFetcher, url: CATALYST_LAMBDAS_LOAD_BALANCER_URL })
+
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
   })
 
   describe('when getting profiles', () => {
@@ -57,7 +68,15 @@ describe('catalyst-client', () => {
         avatars: [
           {
             ethAddress: '0x1234567890123456789012345678901234567890',
-            userId: '0x1234567890123456789012345678901234567890'
+            userId: '0x1234567890123456789012345678901234567890',
+            name: 'TestUser1',
+            unclaimedName: undefined,
+            hasClaimedName: true,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/avatar1.jpg'
+              }
+            }
           }
         ]
       },
@@ -65,7 +84,15 @@ describe('catalyst-client', () => {
         avatars: [
           {
             ethAddress: '0x0987654321098765432109876543210987654321',
-            userId: '0x0987654321098765432109876543210987654321'
+            userId: '0x0987654321098765432109876543210987654321',
+            name: 'TestUser2',
+            unclaimedName: undefined,
+            hasClaimedName: false,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/avatar2.jpg'
+              }
+            }
           }
         ]
       }
@@ -86,27 +113,91 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(profileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({ ids: profileIds })
-        expect(result).toEqual(mockProfiles)
+
+        // Expect minimal profiles (without ethAddress)
+        expect(result).toEqual([
+          {
+            avatars: [
+              {
+                userId: '0x1234567890123456789012345678901234567890',
+                name: 'TestUser1',
+                unclaimedName: undefined,
+                hasClaimedName: true,
+                avatar: {
+                  snapshots: {
+                    face256: 'https://example.com/avatar1.jpg'
+                  }
+                }
+              }
+            ]
+          },
+          {
+            avatars: [
+              {
+                userId: '0x0987654321098765432109876543210987654321',
+                name: 'TestUser2',
+                unclaimedName: undefined,
+                hasClaimedName: false,
+                avatar: {
+                  snapshots: {
+                    face256: 'https://example.com/avatar2.jpg'
+                  }
+                }
+              }
+            ]
+          }
+        ])
       })
 
-      it('should cache fetched profiles with correct expiration', async () => {
+      it('should cache fetched profiles as minimal profiles with correct expiration', async () => {
         await catalystClient.getProfiles(profileIds)
 
+        jest.runOnlyPendingTimers()
+
         expect(mockRedis.put).toHaveBeenCalledTimes(2)
-        expect(mockRedis.put).toHaveBeenCalledWith(
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          mockProfiles[0],
-          { EX: 60 * 10 }
-        )
-        expect(mockRedis.put).toHaveBeenCalledWith(
-          'catalyst:profile:0x0987654321098765432109876543210987654321',
-          mockProfiles[1],
-          { EX: 60 * 10 }
-        )
+
+        // Check that minimal profiles are cached (only essential properties)
+        const firstCall = mockRedis.put.mock.calls[0]
+        expect(firstCall[0]).toBe(getProfileCacheKey('0x1234567890123456789012345678901234567890'))
+        expect(firstCall[2]).toEqual({ EX: 60 * 10 })
+        expect(firstCall[1]).toEqual({
+          avatars: [
+            {
+              userId: '0x1234567890123456789012345678901234567890',
+              name: 'TestUser1',
+              unclaimedName: undefined,
+              hasClaimedName: true,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar1.jpg'
+                }
+              }
+            }
+          ]
+        })
+
+        const secondCall = mockRedis.put.mock.calls[1]
+        expect(secondCall[0]).toBe(getProfileCacheKey('0x0987654321098765432109876543210987654321'))
+        expect(secondCall[2]).toEqual({ EX: 60 * 10 })
+        expect(secondCall[1]).toEqual({
+          avatars: [
+            {
+              userId: '0x0987654321098765432109876543210987654321',
+              name: 'TestUser2',
+              unclaimedName: undefined,
+              hasClaimedName: false,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar2.jpg'
+                }
+              }
+            }
+          ]
+        })
       })
 
       describe('and the catalyst server fails', () => {
@@ -121,7 +212,40 @@ describe('catalyst-client', () => {
           const result = await catalystClient.getProfiles(profileIds)
 
           expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledTimes(2)
-          expect(result).toEqual(mockProfiles)
+
+          // Expect minimal profiles (without ethAddress)
+          expect(result).toEqual([
+            {
+              avatars: [
+                {
+                  userId: '0x1234567890123456789012345678901234567890',
+                  name: 'TestUser1',
+                  unclaimedName: undefined,
+                  hasClaimedName: true,
+                  avatar: {
+                    snapshots: {
+                      face256: 'https://example.com/avatar1.jpg'
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              avatars: [
+                {
+                  userId: '0x0987654321098765432109876543210987654321',
+                  name: 'TestUser2',
+                  unclaimedName: undefined,
+                  hasClaimedName: false,
+                  avatar: {
+                    snapshots: {
+                      face256: 'https://example.com/avatar2.jpg'
+                    }
+                  }
+                }
+              ]
+            }
+          ])
         })
       })
     })
@@ -131,7 +255,15 @@ describe('catalyst-client', () => {
         avatars: [
           {
             ethAddress: '0x1234567890123456789012345678901234567890',
-            userId: '0x1234567890123456789012345678901234567890'
+            userId: '0x1234567890123456789012345678901234567890',
+            name: 'CachedUser',
+            unclaimedName: undefined,
+            hasClaimedName: true,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/cached.jpg'
+              }
+            }
           }
         ]
       }
@@ -139,7 +271,15 @@ describe('catalyst-client', () => {
         avatars: [
           {
             ethAddress: '0x0987654321098765432109876543210987654321',
-            userId: '0x0987654321098765432109876543210987654321'
+            userId: '0x0987654321098765432109876543210987654321',
+            name: 'FetchedUser',
+            unclaimedName: undefined,
+            hasClaimedName: false,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/fetched.jpg'
+              }
+            }
           }
         ]
       }
@@ -153,23 +293,57 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(profileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({
           ids: ['0x0987654321098765432109876543210987654321']
         })
         expect(result).toHaveLength(2)
-        expect(result).toEqual(expect.arrayContaining([cachedProfile, fetchedProfile]))
+
+        // Cached profile keeps original structure, fetched profile becomes minimal
+        const expectedFetchedProfile = {
+          avatars: [
+            {
+              userId: '0x0987654321098765432109876543210987654321',
+              name: 'FetchedUser',
+              unclaimedName: undefined,
+              hasClaimedName: false,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/fetched.jpg'
+                }
+              }
+            }
+          ]
+        }
+
+        expect(result).toEqual(expect.arrayContaining([cachedProfile, expectedFetchedProfile]))
       })
 
-      it('should cache only the newly fetched profiles', async () => {
+      it('should cache only the newly fetched profiles as minimal profiles', async () => {
         await catalystClient.getProfiles(profileIds)
+
+        jest.runOnlyPendingTimers()
 
         expect(mockRedis.put).toHaveBeenCalledTimes(1)
         expect(mockRedis.put).toHaveBeenCalledWith(
-          'catalyst:profile:0x0987654321098765432109876543210987654321',
-          fetchedProfile,
+          getProfileCacheKey('0x0987654321098765432109876543210987654321'),
+          {
+            avatars: [
+              {
+                userId: '0x0987654321098765432109876543210987654321',
+                name: 'FetchedUser',
+                unclaimedName: undefined,
+                hasClaimedName: false,
+                avatar: {
+                  snapshots: {
+                    face256: 'https://example.com/fetched.jpg'
+                  }
+                }
+              }
+            ]
+          },
           { EX: 60 * 10 }
         )
       })
@@ -180,7 +354,15 @@ describe('catalyst-client', () => {
         avatars: [
           {
             ethAddress: '0x1234567890123456789012345678901234567890',
-            userId: '0x1234567890123456789012345678901234567890'
+            userId: '0x1234567890123456789012345678901234567890',
+            name: 'CachedUser1',
+            unclaimedName: undefined,
+            hasClaimedName: true,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/cached1.jpg'
+              }
+            }
           }
         ]
       }
@@ -188,7 +370,15 @@ describe('catalyst-client', () => {
         avatars: [
           {
             ethAddress: '0x0987654321098765432109876543210987654321',
-            userId: '0x0987654321098765432109876543210987654321'
+            userId: '0x0987654321098765432109876543210987654321',
+            name: 'CachedUser2',
+            unclaimedName: undefined,
+            hasClaimedName: false,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/cached2.jpg'
+              }
+            }
           }
         ]
       }
@@ -201,8 +391,8 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(profileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).not.toHaveBeenCalled()
         expect(result).toEqual([cachedProfile1, cachedProfile2])
@@ -214,7 +404,15 @@ describe('catalyst-client', () => {
         avatars: [
           {
             ethAddress: '0X1234567890123456789012345678901234567890',
-            userId: '0X1234567890123456789012345678901234567890'
+            userId: '0X1234567890123456789012345678901234567890',
+            name: 'CachedUser',
+            unclaimedName: undefined,
+            hasClaimedName: true,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/cached.jpg'
+              }
+            }
           }
         ]
       }
@@ -222,7 +420,15 @@ describe('catalyst-client', () => {
         avatars: [
           {
             ethAddress: '0x0987654321098765432109876543210987654321',
-            userId: '0x0987654321098765432109876543210987654321'
+            userId: '0x0987654321098765432109876543210987654321',
+            name: 'FetchedUser',
+            unclaimedName: undefined,
+            hasClaimedName: false,
+            avatar: {
+              snapshots: {
+                face256: 'https://example.com/fetched.jpg'
+              }
+            }
           }
         ]
       }
@@ -236,8 +442,8 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(profileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({
           ids: ['0x0987654321098765432109876543210987654321']
@@ -267,7 +473,15 @@ describe('catalyst-client', () => {
           avatars: [
             {
               ethAddress: '0x1234567890123456789012345678901234567890',
-              userId: '0x1234567890123456789012345678901234567890'
+              userId: '0x1234567890123456789012345678901234567890',
+              name: 'TestUser1',
+              unclaimedName: undefined,
+              hasClaimedName: true,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar1.jpg'
+                }
+              }
             }
           ]
         },
@@ -275,7 +489,15 @@ describe('catalyst-client', () => {
           avatars: [
             {
               ethAddress: '0x0987654321098765432109876543210987654321',
-              userId: '0x0987654321098765432109876543210987654321'
+              userId: '0x0987654321098765432109876543210987654321',
+              name: 'TestUser2',
+              unclaimedName: undefined,
+              hasClaimedName: false,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar2.jpg'
+                }
+              }
             }
           ]
         }
@@ -290,15 +512,103 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(duplicateProfileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({
           ids: ['0x1234567890123456789012345678901234567890', '0x0987654321098765432109876543210987654321']
         })
         expect(result).toHaveLength(2)
-        expect(result[0]).toEqual(mockProfiles[0])
-        expect(result[1]).toEqual(mockProfiles[1])
+
+        // Expect minimal profiles (without ethAddress)
+        expect(result[0]).toEqual({
+          avatars: [
+            {
+              userId: '0x1234567890123456789012345678901234567890',
+              name: 'TestUser1',
+              unclaimedName: undefined,
+              hasClaimedName: true,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar1.jpg'
+                }
+              }
+            }
+          ]
+        })
+        expect(result[1]).toEqual({
+          avatars: [
+            {
+              userId: '0x0987654321098765432109876543210987654321',
+              name: 'TestUser2',
+              unclaimedName: undefined,
+              hasClaimedName: false,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar2.jpg'
+                }
+              }
+            }
+          ]
+        })
+      })
+    })
+
+    describe('and getProfileUserId throws error in cached profile filter', () => {
+      const invalidCachedProfile = {
+        avatars: [] // This will cause getProfileUserId to throw
+      }
+
+      beforeEach(() => {
+        mockRedis.mGet.mockResolvedValue([invalidCachedProfile, null])
+        lambdasClientMock.getAvatarsDetailsByPost = jest.fn().mockResolvedValue([mockProfile])
+      })
+
+      it('should skip invalid cached profiles and fetch from server', async () => {
+        const result = await catalystClient.getProfiles([profileIds[0], '0x0987654321098765432109876543210987654321'])
+
+        expect(mockRedis.mGet).toHaveBeenCalled()
+        expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({
+          ids: [profileIds[0], '0x0987654321098765432109876543210987654321']
+        })
+        // The invalid cached profile should be filtered out, but the fetched profile should be returned
+        expect(result).toHaveLength(2)
+        expect(result).toContainEqual(invalidCachedProfile) // Invalid profile is still returned as-is
+        expect(result).toContainEqual(mockProfile) // Fetched profile is also returned
+      })
+    })
+
+    describe('and batch caching Promise.all fails', () => {
+      beforeEach(() => {
+        jest.useRealTimers()
+        mockRedis.mGet.mockResolvedValue([null])
+        // Mock getProfileUserId to throw an error, which will cause the Promise.all to fail
+        jest.spyOn(require('../../../src/logic/profiles'), 'getProfileUserId').mockImplementation(() => {
+          throw new Error('Batch cache failed')
+        })
+        lambdasClientMock.getAvatarsDetailsByPost = jest.fn().mockResolvedValue([mockProfile])
+      })
+
+      afterEach(() => {
+        jest.useFakeTimers()
+        jest.restoreAllMocks()
+      })
+
+      it('should log error for batch failure', async () => {
+        const logger = mockLogs.getLogger('catalyst-client')
+        const result = await catalystClient.getProfiles([profileIds[0]])
+
+        // Wait for setImmediate to complete
+        await new Promise((resolve) => setImmediate(resolve))
+
+        expect(logger.error).toHaveBeenCalledWith(
+          'Profile cache storing in batch failed',
+          expect.objectContaining({
+            error: 'Batch cache failed'
+          })
+        )
+        expect(result).toHaveLength(1)
+        expect(result[0]).toEqual(mockProfile)
       })
     })
   })
@@ -320,7 +630,7 @@ describe('catalyst-client', () => {
       it('should fetch profile from catalyst server', async () => {
         const result = await catalystClient.getProfile(profileId)
 
-        expect(mockRedis.get).toHaveBeenCalledWith(`catalyst:profile:${profileId}`)
+        expect(mockRedis.get).toHaveBeenCalledWith(getProfileCacheKey(profileId))
         expect(lambdasClientMock.getAvatarDetails).toHaveBeenCalledWith(profileId)
         expect(result).toEqual(mockProfile)
       })
@@ -328,7 +638,59 @@ describe('catalyst-client', () => {
       it('should cache the fetched profile with correct expiration', async () => {
         await catalystClient.getProfile(profileId)
 
-        expect(mockRedis.put).toHaveBeenCalledWith(`catalyst:profile:${profileId}`, mockProfile, { EX: 60 * 10 })
+        jest.runOnlyPendingTimers()
+
+        expect(mockRedis.put).toHaveBeenCalledWith(getProfileCacheKey(profileId), mockProfile, { EX: 60 * 10 })
+      })
+
+      describe('and Redis put fails', () => {
+        beforeEach(() => {
+          jest.useRealTimers()
+          mockRedis.put.mockRejectedValue(new Error('Redis connection failed'))
+        })
+
+        afterEach(() => {
+          jest.useFakeTimers()
+        })
+
+        it('should log warning but not throw error', async () => {
+          const logger = mockLogs.getLogger('catalyst-client')
+          const result = await catalystClient.getProfile(profileId)
+
+          // Wait for setImmediate to complete
+          await new Promise((resolve) => setImmediate(resolve))
+
+          expect(mockRedis.put).toHaveBeenCalled()
+          expect(logger.warn).toHaveBeenCalledWith(
+            'Failed to store profile in cache',
+            expect.objectContaining({
+              error: 'Redis connection failed',
+              profileId
+            })
+          )
+          expect(result).toEqual(mockProfile)
+        })
+      })
+
+      describe('and extractMinimalProfile returns null', () => {
+        const invalidProfile = {
+          avatars: [] // This will cause extractMinimalProfile to return null
+        }
+
+        beforeEach(() => {
+          lambdasClientMock.getAvatarDetails = jest.fn().mockResolvedValue(invalidProfile)
+        })
+
+        it('should log warning and return original profile without caching', async () => {
+          const logger = mockLogs.getLogger('catalyst-client')
+          const result = await catalystClient.getProfile(profileId)
+
+          expect(logger.warn).toHaveBeenCalledWith(
+            'Invalid profile received from Catalyst, not caching: {"avatars":[]}'
+          )
+          expect(mockRedis.put).not.toHaveBeenCalled()
+          expect(result).toEqual(invalidProfile)
+        })
       })
 
       describe('and the catalyst server fails', () => {
