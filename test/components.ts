@@ -146,7 +146,7 @@ async function initComponents(): Promise<TestComponents> {
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
-  const catalystClient = await createCatalystClient({ config, fetcher, redis })
+  const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
   const sns = mockSns
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
