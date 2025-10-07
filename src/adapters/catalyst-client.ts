@@ -70,9 +70,9 @@ export async function createCatalystClient({
     const cacheKeys = uniqueIds.map((id) => getProfileCacheKey(id))
 
     // Use mGet for efficient batch Redis retrieval
-    console.time(`mGet:catalyst:profiles:${cacheKeys.length}`)
+    console.time(`mGet:${PROFILE_CACHE_PREFIX}:${cacheKeys.length}`)
     const cachedProfiles = (await redis.mGet<Profile>(cacheKeys)).filter(Boolean) as Profile[]
-    console.timeEnd(`mGet:catalyst:profiles:${cacheKeys.length}`)
+    console.timeEnd(`mGet:${PROFILE_CACHE_PREFIX}:${cacheKeys.length}`)
 
     const idsToFetch = uniqueIds.filter(
       (id) =>
