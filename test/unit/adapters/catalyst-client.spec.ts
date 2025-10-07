@@ -1,4 +1,4 @@
-import { createCatalystClient } from '../../../src/adapters/catalyst-client'
+import { createCatalystClient, PROFILE_CACHE_PREFIX } from '../../../src/adapters/catalyst-client'
 import { ICatalystClientComponent } from '../../../src/types'
 import { createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
 import { mockConfig, mockFetcher, mockRedis, mockLogs } from '../../mocks/components'
@@ -37,6 +37,10 @@ const CATALYST_LAMBDAS_LOAD_BALANCER_URL = 'http://catalyst-server.com/lambdas'
 describe('catalyst-client', () => {
   let catalystClient: ICatalystClientComponent
   let lambdasClientMock: LambdasClient
+
+  function getProfileCacheKey(id: string): string {
+    return `${PROFILE_CACHE_PREFIX}${id}`
+  }
 
   beforeEach(async () => {
     mockConfig.requireString.mockResolvedValue(CATALYST_LAMBDAS_LOAD_BALANCER_URL)
@@ -103,8 +107,8 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(profileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({ ids: profileIds })
 
@@ -150,7 +154,7 @@ describe('catalyst-client', () => {
 
         // Check that minimal profiles are cached (only essential properties)
         const firstCall = mockRedis.put.mock.calls[0]
-        expect(firstCall[0]).toBe('catalyst:profile:0x1234567890123456789012345678901234567890')
+        expect(firstCall[0]).toBe(getProfileCacheKey('0x1234567890123456789012345678901234567890'))
         expect(firstCall[2]).toEqual({ EX: 60 * 10 })
         expect(firstCall[1]).toEqual({
           avatars: [
@@ -169,7 +173,7 @@ describe('catalyst-client', () => {
         })
 
         const secondCall = mockRedis.put.mock.calls[1]
-        expect(secondCall[0]).toBe('catalyst:profile:0x0987654321098765432109876543210987654321')
+        expect(secondCall[0]).toBe(getProfileCacheKey('0x0987654321098765432109876543210987654321'))
         expect(secondCall[2]).toEqual({ EX: 60 * 10 })
         expect(secondCall[1]).toEqual({
           avatars: [
@@ -281,8 +285,8 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(profileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({
           ids: ['0x0987654321098765432109876543210987654321']
@@ -314,7 +318,7 @@ describe('catalyst-client', () => {
 
         expect(mockRedis.put).toHaveBeenCalledTimes(1)
         expect(mockRedis.put).toHaveBeenCalledWith(
-          'catalyst:profile:0x0987654321098765432109876543210987654321',
+          getProfileCacheKey('0x0987654321098765432109876543210987654321'),
           {
             avatars: [
               {
@@ -377,8 +381,8 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(profileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).not.toHaveBeenCalled()
         expect(result).toEqual([cachedProfile1, cachedProfile2])
@@ -428,8 +432,8 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(profileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({
           ids: ['0x0987654321098765432109876543210987654321']
@@ -498,8 +502,8 @@ describe('catalyst-client', () => {
         const result = await catalystClient.getProfiles(duplicateProfileIds)
 
         expect(mockRedis.mGet).toHaveBeenCalledWith([
-          'catalyst:profile:0x1234567890123456789012345678901234567890',
-          'catalyst:profile:0x0987654321098765432109876543210987654321'
+          getProfileCacheKey('0x1234567890123456789012345678901234567890'),
+          getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(lambdasClientMock.getAvatarsDetailsByPost).toHaveBeenCalledWith({
           ids: ['0x1234567890123456789012345678901234567890', '0x0987654321098765432109876543210987654321']
@@ -558,7 +562,7 @@ describe('catalyst-client', () => {
       it('should fetch profile from catalyst server', async () => {
         const result = await catalystClient.getProfile(profileId)
 
-        expect(mockRedis.get).toHaveBeenCalledWith(`catalyst:profile:${profileId}`)
+        expect(mockRedis.get).toHaveBeenCalledWith(getProfileCacheKey(profileId))
         expect(lambdasClientMock.getAvatarDetails).toHaveBeenCalledWith(profileId)
         expect(result).toEqual(mockProfile)
       })
@@ -566,7 +570,7 @@ describe('catalyst-client', () => {
       it('should cache the fetched profile with correct expiration', async () => {
         await catalystClient.getProfile(profileId)
 
-        expect(mockRedis.put).toHaveBeenCalledWith(`catalyst:profile:${profileId}`, mockProfile, { EX: 60 * 10 })
+        expect(mockRedis.put).toHaveBeenCalledWith(getProfileCacheKey(profileId), mockProfile, { EX: 60 * 10 })
       })
 
       describe('and the catalyst server fails', () => {

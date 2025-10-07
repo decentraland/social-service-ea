@@ -10,7 +10,7 @@ import { extractMinimalProfile, getProfileUserId } from '../logic/profiles'
 const L1_MAINNET = 'mainnet'
 const L1_TESTNET = 'sepolia'
 
-const PROFILE_CACHE_PREFIX = 'catalyst:profile:'
+export const PROFILE_CACHE_PREFIX = 'catalyst:profile:minimal:'
 
 export async function createCatalystClient({
   fetcher,
