@@ -602,7 +602,7 @@ describe('catalyst-client', () => {
         await new Promise((resolve) => setImmediate(resolve))
 
         expect(logger.error).toHaveBeenCalledWith(
-          'Profile caching batch failed',
+          'Profile cache storing in batch failed',
           expect.objectContaining({
             error: 'Batch cache failed'
           })
@@ -662,7 +662,7 @@ describe('catalyst-client', () => {
 
           expect(mockRedis.put).toHaveBeenCalled()
           expect(logger.warn).toHaveBeenCalledWith(
-            'Failed to cache profile',
+            'Failed to store profile in cache',
             expect.objectContaining({
               error: 'Redis connection failed',
               profileId
