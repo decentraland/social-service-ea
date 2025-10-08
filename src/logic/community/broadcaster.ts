@@ -6,6 +6,7 @@ import {
   CommunityRenamedEvent,
   CommunityRequestToJoinAcceptedEvent,
   CommunityRequestToJoinReceivedEvent,
+  CommunityDeletedContentViolationEvent,
   Events
 } from '@dcl/schemas'
 import { AppComponents, CommunityRole } from '../../types'
@@ -98,22 +99,19 @@ export function createCommunityBroadcasterComponent(
     const allMemberAddresses = await getAllCommunityMembersAddresses(event.metadata.id)
     const memberBatches = createMemberBatches(allMemberAddresses)
 
-    for (let i = 0; i < memberBatches.length; i++) {
-      const batch = memberBatches[i]
-
-      const eventKey = `${event.key}-batch-${i + 1}`
-
-      await sns.publishMessage({
-        type: Events.Type.COMMUNITY,
-        subType: event.subType,
-        key: eventKey,
-        timestamp: event.timestamp,
-        metadata: {
-          ...event.metadata,
-          memberAddresses: batch
-        }
-      } as CommunityDeletedEvent | CommunityRenamedEvent)
-    }
+    await sns.publishMessagesInBatch(
+      memberBatches.map(
+        (batch, i) =>
+          ({
+            ...event,
+            key: `${event.key}-batch-${i + 1}`,
+            metadata: {
+              ...event.metadata,
+              memberAddresses: batch
+            }
+          }) as CommunityDeletedEvent | CommunityRenamedEvent
+      )
+    )
   }
 
   /**
@@ -140,6 +138,29 @@ export function createCommunityBroadcasterComponent(
     } as CommunityRequestToJoinReceivedEvent)
   }
 
+  /**
+   * Publishes an event to all members of a community but the owner.
+   * @param event - The event to publish.
+   * @returns A promise that resolves when the event is published.
+   */
+  async function publishToAllMembersButOwner(event: CommunityDeletedEventReducedMetadata): Promise<void> {
+    const addressesToNotify = await getAllCommunityMembersAddresses(event.metadata.id, {
+      roles: [CommunityRole.Moderator, CommunityRole.Member]
+    })
+
+    const memberBatches = createMemberBatches(addressesToNotify)
+    await sns.publishMessagesInBatch(
+      memberBatches.map((batch, i) => ({
+        ...event,
+        key: `${event.key}-batch-${i + 1}`,
+        metadata: {
+          ...event.metadata,
+          memberAddresses: batch
+        }
+      }))
+    )
+  }
+
   async function broadcast(
     event:
       | CommunityDeletedEventReducedMetadata
@@ -149,6 +170,7 @@ export function createCommunityBroadcasterComponent(
       | CommunityRequestToJoinAcceptedEvent
       | CommunityRequestToJoinReceivedEventReducedMetadata
       | CommunityInviteReceivedEvent
+      | CommunityDeletedContentViolationEvent
   ) {
     const shouldReportEventToAllMembers =
       event.subType === Events.SubType.Community.DELETED || event.subType === Events.SubType.Community.RENAMED
@@ -159,6 +181,21 @@ export function createCommunityBroadcasterComponent(
       await publishToAllMembers(event as CommunityDeletedEventReducedMetadata | CommunityRenamedEventReducedMetadata)
     } else if (shouldReportEventToOwnersAndModerators) {
       await publishToOwnersAndModerators(event as CommunityRequestToJoinReceivedEventReducedMetadata)
+    } else if (event.subType === Events.SubType.Community.DELETED_CONTENT_VIOLATION) {
+      // Notify the owner
+      await sns.publishMessage(event)
+
+      // Send a different notification to the rest of the community members
+      const communityDeletedEvent = {
+        ...event,
+        subType: Events.SubType.Community.DELETED,
+        metadata: {
+          id: event.metadata.id,
+          name: event.metadata.name,
+          thumbnailUrl: event.metadata.thumbnailUrl
+        }
+      } as CommunityDeletedEventReducedMetadata
+      await publishToAllMembersButOwner(communityDeletedEvent)
     } else {
       await sns.publishMessage(event)
     }
