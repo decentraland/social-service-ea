@@ -484,34 +484,33 @@ export const createCommsGatekeeperComponent = async ({
     }
 
     try {
-      const statuses = await Promise.all(
-        communityIds.map(async (communityId) => {
-          try {
-            const status = await getCommunityVoiceChatStatus(communityId)
-            return {
-              communityId,
-              status:
-                status || ({ isActive: false, participantCount: 0, moderatorCount: 0 } as CommunityVoiceChatStatus)
-            }
-          } catch (error) {
-            logger.warn(`Could not get voice chat status for community ${communityId}`, {
-              error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-            })
-            return {
-              communityId,
-              status: { isActive: false, participantCount: 0, moderatorCount: 0 } as CommunityVoiceChatStatus
-            }
-          }
-        })
-      )
-
-      return statuses.reduce(
-        (acc, { communityId, status }) => {
-          acc[communityId] = status
-          return acc
+      const response = await fetch(`${commsUrl}/community-voice-chat/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${commsGateKeeperToken}`
         },
-        {} as Record<string, CommunityVoiceChatStatus>
-      )
+        body: JSON.stringify({
+          community_ids: communityIds
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`)
+      }
+
+      const responseData = await response.json()
+      const statuses = responseData.data || []
+
+      // Map the response data to the expected format
+      return statuses.reduce((acc: Record<string, CommunityVoiceChatStatus>, status: any) => {
+        acc[status.community_id] = {
+          isActive: status.active,
+          participantCount: status.participant_count,
+          moderatorCount: status.moderator_count
+        }
+        return acc
+      }, {})
     } catch (error) {
       logger.error(
         `Failed to get multiple community voice chat statuses: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
