@@ -38,7 +38,7 @@ export async function createSnsComponent({ config }: Pick<AppComponents, 'config
     const command = new PublishBatchCommand({
       TopicArn: snsArn,
       PublishBatchRequestEntries: events.map((event) => ({
-        Id: event.key,
+        Id: `msg-${Date.now()}`,
         Message: JSON.stringify(event),
         MessageAttributes: {
           type: {

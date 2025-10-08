@@ -188,7 +188,7 @@ describe('SNS Component', () => {
         {
           type: Events.Type.COMMUNITY,
           subType: Events.SubType.Community.DELETED,
-          key: 'batch-event-1',
+          key: 'msg-1',
           timestamp: Date.now(),
           metadata: {
             id: 'community-1',
@@ -213,8 +213,8 @@ describe('SNS Component', () => {
 
       const mockResponse = {
         Successful: [
-          { Id: 'batch-event-1', MessageId: 'msg-1' },
-          { Id: 'batch-event-2', MessageId: 'msg-2' }
+          { Id: 'msg-1', MessageId: 'msg-1' },
+          { Id: 'msg-2', MessageId: 'msg-2' }
         ],
         Failed: []
       }
@@ -230,7 +230,7 @@ describe('SNS Component', () => {
             TopicArn: 'arn:aws:sns:region:account:topic',
             PublishBatchRequestEntries: [
               {
-                Id: 'batch-event-1',
+                Id: expect.any(String),
                 Message: JSON.stringify(testEvents[0]),
                 MessageAttributes: {
                   type: {
@@ -244,7 +244,7 @@ describe('SNS Component', () => {
                 }
               },
               {
-                Id: 'batch-event-2',
+                Id: expect.any(String),
                 Message: JSON.stringify(testEvents[1]),
                 MessageAttributes: {
                   type: {
