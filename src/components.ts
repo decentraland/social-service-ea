@@ -48,7 +48,6 @@ import {
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
-import { createSqsAdapter } from './adapters/sqs'
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
@@ -68,6 +67,7 @@ import { createAIComplianceComponent } from './adapters/ai-compliance'
 import { createFeaturesComponent } from '@well-known-components/features-component'
 import { createFeatureFlagsAdapter } from './adapters/feature-flags'
 import { createInMemoryCacheComponent } from './adapters/memory-cache'
+import { createSqsComponent } from '@dcl/sqs-component'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -288,7 +288,7 @@ export async function initComponents(): Promise<AppComponents> {
     { repeat: true }
   )
   const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
-  const queue = sqsEndpoint ? await createSqsAdapter(sqsEndpoint) : createMemoryQueueAdapter()
+  const queue = sqsEndpoint ? await createSqsComponent(config) : createMemoryQueueAdapter()
 
   const slackToken = await config.requireString('SLACK_BOT_TOKEN')
   const slack = await createSlackComponent({ logs }, { token: slackToken })
