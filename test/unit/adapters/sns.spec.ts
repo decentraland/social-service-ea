@@ -1,6 +1,7 @@
-import { PublishCommand, PublishCommandOutput, SNSClient } from '@aws-sdk/client-sns'
+import { SNSClient } from '@aws-sdk/client-sns'
 import { createSnsComponent } from '../../../src/adapters/sns'
 import { mockConfig } from '../../mocks/components'
+import { SnsEvent } from '../../../src/types/sns'
 import {
   Events,
   FriendshipAcceptedEvent,
@@ -115,6 +116,7 @@ describe('SNS Component', () => {
         endpoint: undefined
       })
       expect(snsComponent).toHaveProperty('publishMessage')
+      expect(snsComponent).toHaveProperty('publishMessagesInBatch')
     })
 
     it('should create an SNS component with custom endpoint', async () => {
@@ -174,6 +176,138 @@ describe('SNS Component', () => {
       const snsComponent = await createSnsComponent({ config: mockConfig })
 
       await expect(snsComponent.publishMessage(mockRequestEvent)).rejects.toThrow('SNS publish error')
+    })
+  })
+
+  describe('publishMessagesInBatch', () => {
+    it('should publish batch messages with correct parameters', async () => {
+      mockConfig.requireString.mockResolvedValueOnce('arn:aws:sns:region:account:topic')
+      mockConfig.getString.mockResolvedValueOnce(undefined)
+
+      const testEvents: SnsEvent[] = [
+        {
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.DELETED,
+          key: 'batch-event-1',
+          timestamp: Date.now(),
+          metadata: {
+            id: 'community-1',
+            name: 'Community 1',
+            thumbnailUrl: 'https://example.com/thumbnail.jpg',
+            memberAddresses: ['0x1111111111111111111111111111111111111111']
+          }
+        },
+        {
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.DELETED,
+          key: 'batch-event-2',
+          timestamp: Date.now(),
+          metadata: {
+            id: 'community-1',
+            name: 'Community 1',
+            thumbnailUrl: 'https://example.com/thumbnail.jpg',
+            memberAddresses: ['0x2222222222222222222222222222222222222222']
+          }
+        }
+      ]
+
+      const mockResponse = {
+        Successful: [
+          { Id: 'batch-event-1', MessageId: 'msg-1' },
+          { Id: 'batch-event-2', MessageId: 'msg-2' }
+        ],
+        Failed: []
+      }
+      mockClient.send = jest.fn().mockResolvedValueOnce(mockResponse)
+
+      const snsComponent = await createSnsComponent({ config: mockConfig })
+
+      const result = await snsComponent.publishMessagesInBatch(testEvents)
+
+      expect(mockClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: {
+            TopicArn: 'arn:aws:sns:region:account:topic',
+            PublishBatchRequestEntries: [
+              {
+                Id: 'batch-event-1',
+                Message: JSON.stringify(testEvents[0]),
+                MessageAttributes: {
+                  type: {
+                    DataType: 'String',
+                    StringValue: Events.Type.COMMUNITY
+                  },
+                  subType: {
+                    DataType: 'String',
+                    StringValue: Events.SubType.Community.DELETED
+                  }
+                }
+              },
+              {
+                Id: 'batch-event-2',
+                Message: JSON.stringify(testEvents[1]),
+                MessageAttributes: {
+                  type: {
+                    DataType: 'String',
+                    StringValue: Events.Type.COMMUNITY
+                  },
+                  subType: {
+                    DataType: 'String',
+                    StringValue: Events.SubType.Community.DELETED
+                  }
+                }
+              }
+            ]
+          }
+        })
+      )
+
+      expect(result).toBe(mockResponse)
+    })
+
+    it('should handle empty batch', async () => {
+      mockConfig.requireString.mockResolvedValueOnce('arn:aws:sns:region:account:topic')
+      mockConfig.getString.mockResolvedValueOnce(undefined)
+
+      const mockResponse = { Successful: [], Failed: [] }
+      mockClient.send = jest.fn().mockResolvedValueOnce(mockResponse)
+
+      const snsComponent = await createSnsComponent({ config: mockConfig })
+
+      const result = await snsComponent.publishMessagesInBatch([])
+
+      expect(mockClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: {
+            TopicArn: 'arn:aws:sns:region:account:topic',
+            PublishBatchRequestEntries: []
+          }
+        })
+      )
+
+      expect(result).toBe(mockResponse)
+    })
+
+    it('should handle SNS batch publish errors', async () => {
+      mockConfig.requireString.mockResolvedValueOnce('arn:aws:sns:region:account:topic')
+      mockConfig.getString.mockResolvedValueOnce(undefined)
+
+      const testEvents: SnsEvent[] = [
+        {
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.DELETED,
+          key: 'batch-error-1',
+          timestamp: Date.now(),
+          metadata: { id: '1', name: 'Test', thumbnailUrl: 'https://example.com/thumb.jpg', memberAddresses: [] }
+        }
+      ]
+
+      const error = new Error('SNS batch publish failed')
+      mockClient.send = jest.fn().mockRejectedValueOnce(error)
+
+      const snsComponent = await createSnsComponent({ config: mockConfig })
+
+      await expect(snsComponent.publishMessagesInBatch(testEvents)).rejects.toThrow('SNS batch publish failed')
     })
   })
 })

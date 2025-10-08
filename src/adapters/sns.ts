@@ -1,15 +1,12 @@
-import { PublishCommand, PublishCommandOutput, SNSClient } from '@aws-sdk/client-sns'
-import { AppComponents, IPublisherComponent } from '../types'
 import {
-  CommunityDeletedEvent,
-  CommunityMemberBannedEvent,
-  CommunityMemberRemovedEvent,
-  CommunityRenamedEvent,
-  FriendshipAcceptedEvent,
-  FriendshipRequestEvent,
-  ReferralInvitedUsersAcceptedEvent,
-  ReferralNewTierReachedEvent
-} from '@dcl/schemas'
+  PublishBatchCommand,
+  PublishBatchCommandOutput,
+  PublishCommand,
+  PublishCommandOutput,
+  SNSClient
+} from '@aws-sdk/client-sns'
+import type { AppComponents, IPublisherComponent } from '../types'
+import type { SnsEvent } from '../types/sns'
 
 export async function createSnsComponent({ config }: Pick<AppComponents, 'config'>): Promise<IPublisherComponent> {
   const snsArn = await config.requireString('AWS_SNS_ARN')
@@ -19,17 +16,7 @@ export async function createSnsComponent({ config }: Pick<AppComponents, 'config
     endpoint: optionalEndpoint ? optionalEndpoint : undefined
   })
 
-  async function publishMessage(
-    event:
-      | FriendshipRequestEvent
-      | FriendshipAcceptedEvent
-      | ReferralNewTierReachedEvent
-      | ReferralInvitedUsersAcceptedEvent
-      | CommunityDeletedEvent
-      | CommunityRenamedEvent
-      | CommunityMemberBannedEvent
-      | CommunityMemberRemovedEvent
-  ): Promise<PublishCommandOutput> {
+  async function publishMessage(event: SnsEvent): Promise<PublishCommandOutput> {
     const command = new PublishCommand({
       TopicArn: snsArn,
       Message: JSON.stringify(event),
@@ -47,5 +34,27 @@ export async function createSnsComponent({ config }: Pick<AppComponents, 'config
     return client.send(command)
   }
 
-  return { publishMessage }
+  async function publishMessagesInBatch(events: SnsEvent[]): Promise<PublishBatchCommandOutput> {
+    const command = new PublishBatchCommand({
+      TopicArn: snsArn,
+      PublishBatchRequestEntries: events.map((event) => ({
+        Id: event.key,
+        Message: JSON.stringify(event),
+        MessageAttributes: {
+          type: {
+            DataType: 'String',
+            StringValue: event.type
+          },
+          subType: {
+            DataType: 'String',
+            StringValue: event.subType
+          }
+        }
+      }))
+    })
+
+    return client.send(command)
+  }
+
+  return { publishMessage, publishMessagesInBatch }
 }
