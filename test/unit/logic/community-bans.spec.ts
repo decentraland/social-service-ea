@@ -20,15 +20,17 @@ import {
 import { createMockProfile } from '../../mocks/profile'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
-import { mockSns } from '../../mocks/components/sns'
+import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { Events } from '@dcl/schemas'
 import { CommunityRole } from '../../../src/types'
+import { IPublisherComponent } from '@dcl/sns-component'
 
 describe('Community Bans Component', () => {
   let communityBansComponent: ICommunityBansComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
   let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
   let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
+  let mockSns: jest.Mocked<IPublisherComponent>
   let mockUserAddress: string
   let mockCommsGatekeeper: ReturnType<typeof createCommsGatekeeperMockedComponent>
   const communityId = 'test-community'
@@ -52,6 +54,7 @@ describe('Community Bans Component', () => {
   ]
 
   beforeEach(async () => {
+    mockSns = createSNSMockedComponent({})
     mockUserAddress = '0x1234567890123456789012345678901234567890'
     mockCommunityRoles = createMockCommunityRolesComponent({})
     mockCommunityThumbnail = createMockCommunityThumbnailComponent({})

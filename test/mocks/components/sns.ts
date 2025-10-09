@@ -1,9 +1,4 @@
-import { IPublisherComponent } from '../../../src/types'
-
-export const mockSns: jest.Mocked<IPublisherComponent> = {
-  publishMessage: jest.fn(),
-  publishMessages: jest.fn()
-}
+import { IPublisherComponent } from '@dcl/sns-component'
 
 export const createSNSMockedComponent = ({
   publishMessage = jest.fn(),

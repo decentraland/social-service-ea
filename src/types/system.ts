@@ -20,7 +20,6 @@ import {
   IPeersSynchronizer,
   IPeerTrackingComponent,
   ICatalystClientComponent,
-  IPublisherComponent,
   ISubscribersContext,
   ITracingComponent,
   ICommsGatekeeperComponent,
@@ -70,6 +69,7 @@ import { IFriendsComponent } from '../logic/friends'
 import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
 import { IFeatureFlagsAdapter } from '../adapters/feature-flags'
+import { IPublisherComponent } from '@dcl/sns-component'
 
 export type GlobalContext = {
   components: BaseComponents

@@ -8,7 +8,6 @@ import { createClient, SetOptions } from 'redis'
 import { Subscription } from '@well-known-components/nats-component/dist/types'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
-import { PublishBatchCommandOutput, PublishCommandOutput } from '@aws-sdk/client-sns'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
 import { SQLStatement } from 'sql-template-strings'
@@ -48,7 +47,6 @@ import { SubscriptionHandlerParams, UpdatesMessageHandler } from '../logic/updat
 import { PlacesApiResponse } from '../adapters/places-api'
 import { RewardAttributes } from '../logic/referral/types'
 import { CommunityVoiceChatProfileData } from '../logic/community-voice/types'
-import type { SnsEvent } from './sns'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -275,11 +273,6 @@ export type ICatalystClientComponent = {
 
 export interface ICdnCacheInvalidatorComponent {
   invalidateThumbnail(communityId: string): Promise<void>
-}
-
-export type IPublisherComponent = {
-  publishMessage(event: SnsEvent): Promise<PublishCommandOutput>
-  publishMessages(event: SnsEvent[]): Promise<PublishBatchCommandOutput>
 }
 
 export type ISubscribersContext = {

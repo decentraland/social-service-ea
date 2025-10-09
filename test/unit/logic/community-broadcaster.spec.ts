@@ -10,10 +10,12 @@ import { createCommunityBroadcasterComponent } from '../../../src/logic/communit
 import { ICommunityBroadcasterComponent } from '../../../src/logic/community/types'
 import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
+import { IPublisherComponent } from '@dcl/sns-component'
 
 describe('Community Broadcaster Component', () => {
   let broadcasterComponent: ICommunityBroadcasterComponent
-  let mockSns: ReturnType<typeof createSNSMockedComponent>
+  let mockSns: jest.Mocked<IPublisherComponent>
+
   beforeEach(() => {
     mockSns = createSNSMockedComponent({})
     broadcasterComponent = createCommunityBroadcasterComponent({
