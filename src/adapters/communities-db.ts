@@ -790,30 +790,36 @@ export function createCommunitiesDBComponent(
     },
 
     async acceptAllRequestsToJoin(communityId: string): Promise<void> {
-      const query = SQL`
-        INSERT INTO community_members (community_id, member_address, role)
-        SELECT community_id, member_address, ${CommunityRole.Member}
-        FROM community_requests
-        WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
-      `
-      await pg.query(query)
+      await pg.withTransaction(async (client) => {
+        const addMembersQuery = SQL`
+          INSERT INTO community_members (community_id, member_address, role)
+          SELECT community_id, member_address, ${CommunityRole.Member}
+          FROM community_requests
+          WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
+        `
+        await client.query(addMembersQuery.text, addMembersQuery.values)
+
+        const removeRequestsToJoinQuery = SQL`
+          DELETE FROM community_requests WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
+        `
+        await client.query(removeRequestsToJoinQuery.text, removeRequestsToJoinQuery.values)
+      })
     },
 
-    async acceptCommunityRequestTransaction(
-      requestId: string,
-      member: Omit<CommunityMember, 'joinedAt'>
-    ): Promise<void> {
+    async joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<void> {
+      const normalizedMemberAddress = normalizeAddress(member.memberAddress)
       await pg.withTransaction(async (client) => {
         // Add member to community
         const addMemberQuery = SQL`
           INSERT INTO community_members (community_id, member_address, role)
-          VALUES (${member.communityId}, ${normalizeAddress(member.memberAddress)}, ${member.role})
+          VALUES (${member.communityId}, ${normalizedMemberAddress}, ${member.role})
+          ON CONFLICT (community_id, member_address) DO NOTHING
         `
         await client.query(addMemberQuery.text, addMemberQuery.values)
 
         // Remove the request
         const removeRequestQuery = SQL`
-          DELETE FROM community_requests WHERE id = ${requestId}
+          DELETE FROM community_requests WHERE community_id = ${member.communityId} AND member_address = ${normalizedMemberAddress}
         `
         await client.query(removeRequestQuery.text, removeRequestQuery.values)
       })

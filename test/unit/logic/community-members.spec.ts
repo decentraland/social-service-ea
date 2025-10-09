@@ -790,7 +790,7 @@ describe('Community Members Component', () => {
             expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
             expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
             expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, memberAddress)
-            expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
+            expect(mockCommunitiesDB.joinMemberAndRemoveRequests).toHaveBeenCalledWith({
               communityId,
               memberAddress,
               role: CommunityRole.Member

@@ -225,7 +225,7 @@ export async function createCommunityMembersComponent(
         throw new NotAuthorizedError(`The user ${memberAddress} is banned from community ${communityId}`)
       }
 
-      await communitiesDb.addCommunityMember({
+      await communitiesDb.joinMemberAndRemoveRequests({
         communityId,
         memberAddress,
         role: CommunityRole.Member
