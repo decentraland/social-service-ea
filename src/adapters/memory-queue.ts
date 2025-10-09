@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Message } from '@aws-sdk/client-sqs'
-import { sleep } from '../utils/timer'
 import { IQueueComponent } from '@dcl/sqs-component'
+import { sleep } from '../utils/timer'
 
 type QueueMessage = Record<string, string | number | object>
 
