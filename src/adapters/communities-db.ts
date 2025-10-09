@@ -815,13 +815,13 @@ export function createCommunitiesDBComponent(
           VALUES (${member.communityId}, ${normalizedMemberAddress}, ${member.role})
           ON CONFLICT (community_id, member_address) DO NOTHING
         `
-        await client.query(addMemberQuery.text, addMemberQuery.values)
+        await client.query(addMemberQuery)
 
         // Remove the request
         const removeRequestQuery = SQL`
           DELETE FROM community_requests WHERE community_id = ${member.communityId} AND member_address = ${normalizedMemberAddress}
         `
-        await client.query(removeRequestQuery.text, removeRequestQuery.values)
+        await client.query(removeRequestQuery)
       })
     },
 
