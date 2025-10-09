@@ -52,7 +52,7 @@
     "@dcl/rpc": "^1.1.2",
     "@dcl/schemas": "^18.3.0",
     "@dcl/slack-component": "^1.0.1",
-    "@dcl/sns-component": "^2.0.3",
+    "@dcl/sns-component": "^2.1.0",
     "@dcl/sqs-component": "^2.0.3",
     "@sentry/node": "^9.12.0",
     "@well-known-components/env-config-provider": "^1.2.0",

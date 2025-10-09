@@ -1,10 +1,11 @@
 import { Events } from '@dcl/schemas'
-import { AppComponents, IPublisherComponent } from '../types'
+import { AppComponents } from '../types'
 import { Action } from '../types'
 import { FriendshipRequestEvent, FriendshipAcceptedEvent } from '@dcl/schemas'
 import { getProfileHasClaimedName, getProfileName, getProfilePictureUrl } from './profiles'
 import { retry } from '../utils/retrier'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import { IPublisherComponent } from '@dcl/sns-component'
 
 type NotificationContext = {
   requestId: string

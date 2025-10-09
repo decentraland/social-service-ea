@@ -1737,10 +1737,10 @@
     "@slack/web-api" "^6.8.1"
     "@slack/webhook" "^6.0.0"
 
-"@dcl/sns-component@^2.0.3":
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/@dcl/sns-component/-/sns-component-2.0.3.tgz#c4db1f1040bab0fbde8aa8588377119b468fc2d7"
-  integrity sha512-HY6eF3oBe9NbYxiDJAMiclg1usKmVQ4s12S0NwB2GbvlWGITbxf+BWeGnIVXW3IURKi06UT/rxoeF/yGZuduMQ==
+"@dcl/sns-component@^2.1.0":
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/@dcl/sns-component/-/sns-component-2.1.0.tgz#c0150366de2113791e1bcec5a0925c236eb391fc"
+  integrity sha512-R2aqpydxC9MSM/yDjYK0JlcM9ah+FnsaeLZSkUwThSDvAqTr2Vh0m1uHpJgtMGqIox+BqYQJmGRyCeV3De7THA==
   dependencies:
     "@aws-sdk/client-sns" "^3.782.0"
     "@dcl/core-commons" "0.5.0"

@@ -22,7 +22,6 @@ import { createPeersSynchronizerComponent } from './adapters/peers-synchronizer'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
-import { createSnsComponent } from './adapters/sns'
 import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
@@ -68,6 +67,7 @@ import { createFeaturesComponent } from '@well-known-components/features-compone
 import { createFeatureFlagsAdapter } from './adapters/feature-flags'
 import { createInMemoryCacheComponent } from './adapters/memory-cache'
 import { createSqsComponent } from '@dcl/sqs-component'
+import { createSnsComponent } from '@dcl/sns-component'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {

@@ -33,7 +33,12 @@ import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
-import { mockPeersSynchronizer, mockCdnCacheInvalidator, mockSns, createAIComplianceMock } from './mocks/components'
+import {
+  mockPeersSynchronizer,
+  mockCdnCacheInvalidator,
+  createSNSMockedComponent,
+  createAIComplianceMock
+} from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
@@ -46,7 +51,6 @@ import {
   createCommunityOwnersComponent,
   createCommunityEventsComponent,
   createCommunityThumbnailComponent,
-  createCommunityBroadcasterComponent,
   createCommunityComplianceValidatorComponent,
   createCommunityFieldsValidatorComponent,
   createCommunityRequestsComponent
@@ -147,7 +151,7 @@ async function initComponents(): Promise<TestComponents> {
   const pubsub = createPubSubComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
   const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
-  const sns = mockSns
+  const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
