@@ -141,7 +141,7 @@ export function createCommunityRequestsComponent(
     const oppositeTypeRequest = existingMemberRequests.find((request) => request.type !== type)
 
     if (oppositeTypeRequest) {
-      await communitiesDb.acceptCommunityRequestTransaction(oppositeTypeRequest.id, {
+      await communitiesDb.joinMemberAndRemoveRequests({
         communityId,
         memberAddress,
         role: CommunityRole.Member
@@ -260,7 +260,7 @@ export function createCommunityRequestsComponent(
 
     // User accepts invite or member with privileges accepts request to join
     if (status === CommunityRequestStatus.Accepted) {
-      await communitiesDb.acceptCommunityRequestTransaction(requestId, {
+      await communitiesDb.joinMemberAndRemoveRequests({
         communityId: request.communityId,
         memberAddress: request.memberAddress,
         role: CommunityRole.Member

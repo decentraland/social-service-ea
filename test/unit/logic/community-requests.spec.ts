@@ -250,8 +250,7 @@ describe('Community Requests Component', () => {
 
               it('should automatically join the user to the community', async () => {
                 await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-                expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(
-                  requestToJoinRequest.id,
+                expect(mockCommunitiesDB.joinMemberAndRemoveRequests).toHaveBeenCalledWith(
                   {
                     communityId: community.id,
                     memberAddress: userAddress,
@@ -491,7 +490,7 @@ describe('Community Requests Component', () => {
 
             it('should not accept any request', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
 
             it('should not broadcast the request to join received event', async () => {
@@ -513,8 +512,7 @@ describe('Community Requests Component', () => {
 
             it('should automatically join the user to the community', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(
-                expectedCreatedRequest.id,
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).toHaveBeenCalledWith(
                 {
                   communityId: community.id,
                   memberAddress: userAddress,
@@ -694,7 +692,7 @@ describe('Community Requests Component', () => {
 
             it('should not accept any request', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
 
             it('should not broadcast the invite received event', async () => {
@@ -719,8 +717,7 @@ describe('Community Requests Component', () => {
 
             it('should automatically join the user to the community', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(
-                requestToJoinRequest.id,
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).toHaveBeenCalledWith(
                 {
                   communityId: community.id,
                   memberAddress: userAddress,
@@ -1014,13 +1011,13 @@ describe('Community Requests Component', () => {
   
             beforeEach(() => {
               status = CommunityRequestStatus.Accepted
-              mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValueOnce()
+              mockCommunitiesDB.joinMemberAndRemoveRequests.mockResolvedValueOnce()
             })
   
             it('should use transaction to add member and remove request', async () => {
               await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
   
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(requestId, {
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).toHaveBeenCalledWith({
                 communityId: inviteRequest.communityId,
                 memberAddress: invitedUserAddress,
                 role: CommunityRole.Member
@@ -1054,7 +1051,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
               expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
             })
 
@@ -1078,7 +1075,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
         })
@@ -1103,7 +1100,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
   
@@ -1121,7 +1118,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
   
@@ -1138,7 +1135,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
               expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).toHaveBeenCalledWith(
                 inviteRequest.communityId,
                 callerAddress
@@ -1174,7 +1171,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
   
@@ -1192,7 +1189,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
   
@@ -1210,7 +1207,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
         })
@@ -1251,7 +1248,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
   
@@ -1269,7 +1266,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
   
@@ -1286,7 +1283,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
               expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).not.toHaveBeenCalled()
             })
 
@@ -1308,13 +1305,13 @@ describe('Community Requests Component', () => {
   
             beforeEach(() => {
               status = CommunityRequestStatus.Accepted
-              mockCommunitiesDB.acceptCommunityRequestTransaction.mockResolvedValueOnce()
+              mockCommunitiesDB.joinMemberAndRemoveRequests.mockResolvedValueOnce()
             })
   
             it('should use transaction to add member and remove request', async () => {
               await communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
   
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).toHaveBeenCalledWith(requestId, {
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).toHaveBeenCalledWith({
                 communityId: joinRequest.communityId,
                 memberAddress: requestingUserAddress,
                 role: CommunityRole.Member
@@ -1368,7 +1365,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.removeCommunityRequest).toHaveBeenCalledWith(requestId)
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
               expect(mockCommunityRoles.validatePermissionToAcceptAndRejectRequests).toHaveBeenCalledWith(
                 joinRequest.communityId,
                 callerAddress
@@ -1395,7 +1392,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
         })
@@ -1422,7 +1419,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
   
@@ -1440,7 +1437,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
   
@@ -1458,7 +1455,7 @@ describe('Community Requests Component', () => {
   
               expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
               expect(mockCommunitiesDB.removeCommunityRequest).not.toHaveBeenCalled()
-              expect(mockCommunitiesDB.acceptCommunityRequestTransaction).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
             })
           })
         })
