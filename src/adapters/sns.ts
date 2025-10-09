@@ -34,7 +34,7 @@ export async function createSnsComponent({ config }: Pick<AppComponents, 'config
     return client.send(command)
   }
 
-  async function publishMessagesInBatch(events: SnsEvent[]): Promise<PublishBatchCommandOutput> {
+  async function publishMessages(events: SnsEvent[]): Promise<PublishBatchCommandOutput> {
     const command = new PublishBatchCommand({
       TopicArn: snsArn,
       PublishBatchRequestEntries: events.map((event) => ({
@@ -56,5 +56,5 @@ export async function createSnsComponent({ config }: Pick<AppComponents, 'config
     return client.send(command)
   }
 
-  return { publishMessage, publishMessagesInBatch }
+  return { publishMessage, publishMessages }
 }

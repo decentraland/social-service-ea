@@ -116,7 +116,7 @@ describe('SNS Component', () => {
         endpoint: undefined
       })
       expect(snsComponent).toHaveProperty('publishMessage')
-      expect(snsComponent).toHaveProperty('publishMessagesInBatch')
+      expect(snsComponent).toHaveProperty('publishMessages')
     })
 
     it('should create an SNS component with custom endpoint', async () => {
@@ -179,7 +179,7 @@ describe('SNS Component', () => {
     })
   })
 
-  describe('publishMessagesInBatch', () => {
+  describe('publishMessages', () => {
     it('should publish batch messages with correct parameters', async () => {
       mockConfig.requireString.mockResolvedValueOnce('arn:aws:sns:region:account:topic')
       mockConfig.getString.mockResolvedValueOnce(undefined)
@@ -222,7 +222,7 @@ describe('SNS Component', () => {
 
       const snsComponent = await createSnsComponent({ config: mockConfig })
 
-      const result = await snsComponent.publishMessagesInBatch(testEvents)
+      const result = await snsComponent.publishMessages(testEvents)
 
       expect(mockClient.send).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -274,7 +274,7 @@ describe('SNS Component', () => {
 
       const snsComponent = await createSnsComponent({ config: mockConfig })
 
-      const result = await snsComponent.publishMessagesInBatch([])
+      const result = await snsComponent.publishMessages([])
 
       expect(mockClient.send).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -307,7 +307,7 @@ describe('SNS Component', () => {
 
       const snsComponent = await createSnsComponent({ config: mockConfig })
 
-      await expect(snsComponent.publishMessagesInBatch(testEvents)).rejects.toThrow('SNS batch publish failed')
+      await expect(snsComponent.publishMessages(testEvents)).rejects.toThrow('SNS batch publish failed')
     })
   })
 })

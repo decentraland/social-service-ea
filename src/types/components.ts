@@ -279,7 +279,7 @@ export interface ICdnCacheInvalidatorComponent {
 
 export type IPublisherComponent = {
   publishMessage(event: SnsEvent): Promise<PublishCommandOutput>
-  publishMessagesInBatch(event: SnsEvent[]): Promise<PublishBatchCommandOutput>
+  publishMessages(event: SnsEvent[]): Promise<PublishBatchCommandOutput>
 }
 
 export type ISubscribersContext = {
