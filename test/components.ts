@@ -139,7 +139,8 @@ async function initComponents(): Promise<TestComponents> {
         migrationsTable: 'pgmigrations',
         ignorePattern: '.*\\.map',
         direction: 'up',
-        verbose: false
+        verbose: false,
+        log: () => {} // Disable migration logging in tests
       }
     }
   )
