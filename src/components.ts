@@ -25,6 +25,7 @@ import { createCatalystClient } from './adapters/catalyst-client'
 import { createSnsComponent } from './adapters/sns'
 import { createWorldsStatsComponent } from './adapters/worlds-stats'
 import { createTracingComponent } from './adapters/tracing'
+import { createProfilingComponent } from './adapters/profiling'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
 import { createVoiceComponent } from './logic/voice'
 import { createCommunityVoiceComponent } from './logic/community-voice'
@@ -86,6 +87,7 @@ export async function initComponents(): Promise<AppComponents> {
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ metrics, config })
   const tracing = await createTracingComponent({ config, logs })
+  const profiling = await createProfilingComponent({ logs })
 
   const httpServer = await createServerComponent<GlobalContext>(
     { config: apiSeverConfig, logs },
@@ -347,6 +349,7 @@ export async function initComponents(): Promise<AppComponents> {
     peersSynchronizer,
     pg,
     placesApi,
+    profiling,
     pubsub,
     queue,
     redis,

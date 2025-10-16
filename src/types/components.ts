@@ -294,6 +294,12 @@ export type ITracingComponent = IBaseComponent & {
   captureException(error: Error, context?: Record<string, any>): void
 }
 
+export type IProfilingComponent = IBaseComponent & {
+  startProfiler(name: string, context?: Record<string, any>): void
+  stopProfiler(name: string): void
+  withProfiling<T>(name: string, fn: () => Promise<T>, context?: Record<string, any>): Promise<T>
+}
+
 export type ICommsGatekeeperComponent = {
   getPrivateVoiceChatCredentials: (
     roomId: string,

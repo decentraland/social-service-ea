@@ -23,6 +23,7 @@ import {
   IPublisherComponent,
   ISubscribersContext,
   ITracingComponent,
+  IProfilingComponent,
   ICommsGatekeeperComponent,
   IRpcClient,
   ICacheComponent,
@@ -130,6 +131,7 @@ export type BaseComponents = {
   storage: IStorageComponent
   subscribersContext: ISubscribersContext
   tracing: ITracingComponent
+  profiling: IProfilingComponent
   updateHandler: IUpdateHandlerComponent
   uwsServer: IUWsComponent
   voice: IVoiceComponent

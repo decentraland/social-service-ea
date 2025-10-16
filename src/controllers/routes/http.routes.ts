@@ -34,6 +34,7 @@ import {
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
+import { profilingMiddleware } from '../middlewares/profiling'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -55,6 +56,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
     })
 
   router.use(errorHandler)
+  router.use(profilingMiddleware)
   router.use(communitiesErrorsHandler)
 
   if (API_ADMIN_TOKEN) {
