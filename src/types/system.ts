@@ -20,6 +20,7 @@ import {
   IPeersSynchronizer,
   IPeerTrackingComponent,
   ICatalystClientComponent,
+  IPublisherComponent,
   ISubscribersContext,
   ITracingComponent,
   ICommsGatekeeperComponent,
@@ -59,7 +60,7 @@ import { IVoiceComponent } from '../logic/voice'
 import { ICommunityVoiceComponent } from '../logic/community-voice'
 import { IReferralComponent } from '../logic/referral'
 import { IReferralDatabaseComponent } from './referral-db.type'
-import { IQueueComponent } from '@dcl/sqs-component'
+import { IQueueComponent } from './sqs.type'
 import { IMessageProcessorComponent, IMessageConsumerComponent } from '../logic/sqs'
 import { IPeersStatsComponent } from '../logic/peers-stats'
 import { IJobComponent } from '../logic/job'
@@ -69,7 +70,6 @@ import { IFriendsComponent } from '../logic/friends'
 import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
 import { IFeatureFlagsAdapter } from '../adapters/feature-flags'
-import { IPublisherComponent } from '@dcl/sns-component'
 
 export type GlobalContext = {
   components: BaseComponents

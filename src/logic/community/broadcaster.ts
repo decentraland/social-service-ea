@@ -99,7 +99,7 @@ export function createCommunityBroadcasterComponent(
     const allMemberAddresses = await getAllCommunityMembersAddresses(event.metadata.id)
     const memberBatches = createMemberBatches(allMemberAddresses)
 
-    await sns.publishMessages(
+    await sns.publishMessagesInBatch(
       memberBatches.map(
         (batch, i) =>
           ({
@@ -149,7 +149,7 @@ export function createCommunityBroadcasterComponent(
     })
 
     const memberBatches = createMemberBatches(addressesToNotify)
-    await sns.publishMessages(
+    await sns.publishMessagesInBatch(
       memberBatches.map((batch, i) => ({
         ...event,
         key: `${event.key}-batch-${i + 1}`,

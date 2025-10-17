@@ -1,14 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { Message } from '@aws-sdk/client-sqs'
-import { IQueueComponent } from '@dcl/sqs-component'
+import { IQueueComponent, QueueMessage } from '../types/sqs.type'
 import { sleep } from '../utils/timer'
-
-type QueueMessage = Record<string, string | number | object>
 
 export function createMemoryQueueAdapter(): IQueueComponent {
   const queue: Map<string, Message> = new Map()
 
-  async function sendMessage(message: QueueMessage): Promise<void> {
+  async function send(message: QueueMessage): Promise<void> {
     const receiptHandle = randomUUID().toString()
     queue.set(receiptHandle, {
       MessageId: randomUUID().toString(),
@@ -29,23 +27,5 @@ export function createMemoryQueueAdapter(): IQueueComponent {
     queue.delete(receiptHandle)
   }
 
-  async function deleteMessages(receiptHandles: string[]): Promise<void> {
-    receiptHandles.forEach((receiptHandle) => {
-      queue.delete(receiptHandle)
-    })
-  }
-
-  async function getStatus(): Promise<{
-    ApproximateNumberOfMessages: string
-    ApproximateNumberOfMessagesNotVisible: string
-    ApproximateNumberOfMessagesDelayed: string
-  }> {
-    return {
-      ApproximateNumberOfMessages: queue.size.toString(),
-      ApproximateNumberOfMessagesNotVisible: '0',
-      ApproximateNumberOfMessagesDelayed: '0'
-    }
-  }
-
-  return { sendMessage, receiveMessages, deleteMessage, deleteMessages, getStatus }
+  return { send, receiveMessages, deleteMessage }
 }

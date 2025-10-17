@@ -14,20 +14,18 @@ import {
   referral100InvitesReachedMessage,
   referralSuspiciousTimingMessage
 } from '../../../src/utils/slackMessages'
-import { IPublisherComponent } from '@dcl/sns-component'
-import { createSNSMockedComponent } from '../../mocks/components'
 
 const MAX_IP_MATCHES = 2
 
 describe('referral-component', () => {
   let mockReferralDb: any
   let mockLogger: any
+  let mockSns: any
   let mockConfig: any
   let mockRewards: any
   let mockEmail: any
   let mockSlack: any
   let mockRedis: any
-  let mockSns: jest.Mocked<IPublisherComponent>
   let referralComponent: IReferralComponent
 
   beforeEach(async () => {
@@ -52,9 +50,9 @@ describe('referral-component', () => {
       warn: jest.fn()
     }
 
-    mockSns = createSNSMockedComponent({
+    mockSns = {
       publishMessage: jest.fn().mockResolvedValue({ MessageId: 'mock-message-id' })
-    })
+    }
 
     mockConfig = {
       requireString: jest.fn().mockImplementation((key: string) => {

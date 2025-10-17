@@ -88,17 +88,6 @@ export async function createRpcServerComponent({
         )
       )
     },
-    async stop() {
-      logger.info(`[RPC] Stopping RPC Server on port ${rpcServerPort}`)
-      try {
-        // Close the UWS server
-        uwsServer.app.close()
-        logger.info(`[RPC] RPC Server stopped successfully`)
-      } catch (error: any) {
-        logger.error('Error stopping RPC server:', error)
-        // Don't throw - we want cleanup to continue even if this fails
-      }
-    },
     attachUser({ transport, address }) {
       const eventEmitter = subscribersContext.getOrAddSubscriber(address)
       subscribersContext.addSubscriber(address, eventEmitter)
