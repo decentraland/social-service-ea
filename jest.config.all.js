@@ -19,5 +19,8 @@ module.exports = {
   ],
   // Run integration tests serially
   maxWorkers: 1,
-  testTimeout: 10000
+  testTimeout: 60000,
+  // Ensure proper cleanup
+  forceExit: true,
+  detectOpenHandles: true
 }

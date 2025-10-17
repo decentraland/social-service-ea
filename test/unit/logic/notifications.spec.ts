@@ -1,15 +1,16 @@
-import { Action } from '../../../src/types'
+import { Action, AppComponents } from '../../../src/types'
 import { Events } from '@dcl/schemas'
 import { sendNotification, shouldNotify } from '../../../src/logic/notifications'
-import { mockSns } from '../../mocks/components/sns'
-import { mockLogs } from '../../mocks/components'
+import { createSNSMockedComponent } from '../../mocks/components/sns'
+import { createLogsMockedComponent } from '../../mocks/components'
 import { createMockProfile } from '../../mocks/profile'
 import { getProfileHasClaimedName, getProfileName, getProfilePictureUrl } from '../../../src/logic/profiles'
+import { IPublisherComponent } from '@dcl/sns-component'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('Notifications', () => {
   const mockSenderProfile = createMockProfile('0x123')
   const mockReceiverProfile = createMockProfile('0x456')
-
   const mockContext = {
     requestId: 'request-id',
     senderAddress: '0x123',
@@ -32,10 +33,20 @@ describe('Notifications', () => {
   })
 
   describe('sendNotification', () => {
-    const components = {
-      sns: mockSns,
-      logs: mockLogs
-    }
+    let components: Pick<AppComponents, 'sns' | 'logs'>
+
+    let mockSns: jest.Mocked<IPublisherComponent>
+    let mockLogs: jest.Mocked<ILoggerComponent>
+
+    beforeEach(() => {
+      mockSns = createSNSMockedComponent({})
+      mockLogs = createLogsMockedComponent()
+
+      components = {
+        sns: mockSns,
+        logs: mockLogs
+      }
+    })
 
     it('should send friendship request notification', async () => {
       await sendNotification(Action.REQUEST, mockContext, components)

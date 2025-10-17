@@ -10,10 +10,12 @@ import { createCommunityBroadcasterComponent } from '../../../src/logic/communit
 import { ICommunityBroadcasterComponent } from '../../../src/logic/community/types'
 import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
+import { IPublisherComponent } from '@dcl/sns-component'
 
 describe('Community Broadcaster Component', () => {
   let broadcasterComponent: ICommunityBroadcasterComponent
-  let mockSns: ReturnType<typeof createSNSMockedComponent>
+  let mockSns: jest.Mocked<IPublisherComponent>
+
   beforeEach(() => {
     mockSns = createSNSMockedComponent({})
     broadcasterComponent = createCommunityBroadcasterComponent({
@@ -65,8 +67,8 @@ describe('Community Broadcaster Component', () => {
       })
 
       // Should create 1 batch (5 members / 100 batch size = 1 batch)
-      expect(mockSns.publishMessagesInBatch).toHaveBeenCalledTimes(1)
-      const batchCall = mockSns.publishMessagesInBatch.mock.calls[0][0]
+      expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
+      const batchCall = mockSns.publishMessages.mock.calls[0][0]
       expect(batchCall).toHaveLength(1)
 
       // Check the batch
@@ -159,8 +161,8 @@ describe('Community Broadcaster Component', () => {
     it('should publish renamed event to all members in a single batch', async () => {
       await broadcasterComponent.broadcast(communityRenamedEvent)
 
-      expect(mockSns.publishMessagesInBatch).toHaveBeenCalledTimes(1)
-      const batchCall = mockSns.publishMessagesInBatch.mock.calls[0][0]
+      expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
+      const batchCall = mockSns.publishMessages.mock.calls[0][0]
       expect(batchCall).toHaveLength(1)
 
       expect(batchCall[0]).toMatchObject({
@@ -288,8 +290,8 @@ describe('Community Broadcaster Component', () => {
       expect(mockSns.publishMessage).toHaveBeenCalledWith(deletedContentViolationEvent)
 
       // Should notify other members with a community deleted event
-      expect(mockSns.publishMessagesInBatch).toHaveBeenCalledTimes(1)
-      const batchCall = mockSns.publishMessagesInBatch.mock.calls[0][0]
+      expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
+      const batchCall = mockSns.publishMessages.mock.calls[0][0]
       expect(batchCall).toHaveLength(1) // 4 members (excluding owner) in 1 batch
 
       // Check that the event sent to members is a DELETED event, not DELETED_CONTENT_VIOLATION
@@ -347,7 +349,7 @@ describe('Community Broadcaster Component', () => {
 
       expect(mockSns.publishMessage).toHaveBeenCalledTimes(1)
       expect(mockSns.publishMessage).toHaveBeenCalledWith(memberRemovedEvent)
-      expect(mockSns.publishMessagesInBatch).not.toHaveBeenCalled()
+      expect(mockSns.publishMessages).not.toHaveBeenCalled()
       expect(mockCommunitiesDB.getCommunityMembers).not.toHaveBeenCalled()
     })
   })
@@ -371,8 +373,8 @@ describe('Community Broadcaster Component', () => {
 
       await broadcasterComponent.broadcast(communityDeletedEvent)
 
-      expect(mockSns.publishMessagesInBatch).toHaveBeenCalledTimes(1)
-      const batchCall = mockSns.publishMessagesInBatch.mock.calls[0][0]
+      expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
+      const batchCall = mockSns.publishMessages.mock.calls[0][0]
       expect(batchCall).toHaveLength(0) // No batches for empty member list
     })
 
@@ -402,8 +404,8 @@ describe('Community Broadcaster Component', () => {
 
       await broadcasterComponent.broadcast(communityDeletedEvent)
 
-      expect(mockSns.publishMessagesInBatch).toHaveBeenCalledTimes(1)
-      const batchCall = mockSns.publishMessagesInBatch.mock.calls[0][0]
+      expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
+      const batchCall = mockSns.publishMessages.mock.calls[0][0]
       expect(batchCall).toHaveLength(1)
       expect((batchCall[0].metadata as any).memberAddresses).toHaveLength(3)
     })
