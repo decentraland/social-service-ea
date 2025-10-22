@@ -1,5 +1,3 @@
-name: API Documentation Validation and Deployment
-
 on:
   pull_request:
     paths:
@@ -11,48 +9,12 @@ on:
       - 'docs/**'
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'yarn'
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Install Redocly CLI
-        run: yarn add -D @redocly/cli
-
-      - name: Validate OpenAPI specification
-        run: yarn redocly lint docs/communities-openapi.yaml
-
-      - name: Build documentation
-        run: yarn redocly build-docs docs/communities-openapi.yaml -o docs/index.html
-
-      - name: Upload Pages artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./docs
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        with:
-          preview: true
+  build-and-deploy:
+    uses: decentraland/platform-actions/.github/workflows/apps-docs.yml@feat/upsert-api-spec-on-gitbook
+    with:
+      api-spec-file: 'docs/social-service-openapi.yaml'
+      api-spec-name: 'social-service-api'
+      output-file: 'docs/index.html'
+      output-directory: './docs'
+      output-bundle-file: 'docs/api-reference.yaml'
+      node-version: '20'
