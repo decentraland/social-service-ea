@@ -868,30 +868,6 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         })
       })
 
-      describe('and communities have thumbnails', () => {
-        beforeEach(async () => {
-          await components.storage.storeFile(Buffer.from('test'), `communities/${communityId1}/raw-thumbnail.png`)
-          await components.storage.storeFile(Buffer.from('test'), `communities/${communityId2}/raw-thumbnail.png`)
-        })
-
-        afterEach(async () => {
-          await components.storageHelper.removeFile(`communities/${communityId1}/raw-thumbnail.png`)
-          await components.storageHelper.removeFile(`communities/${communityId2}/raw-thumbnail.png`)
-        })
-
-        it('should return the thumbnail raw url and owner names in the response', async () => {
-          const response = await makeRequest(identity, '/v1/communities')
-          const body = await response.json()
-          expect(body.data.results[0].thumbnails.raw).toBe(
-            `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId1}/raw-thumbnail.png`
-          )
-          expect(body.data.results[0].ownerName).toBe('Test Owner')
-          expect(body.data.results[1].thumbnails.raw).toBe(
-            `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId2}/raw-thumbnail.png`
-          )
-          expect(body.data.results[1].ownerName).toBe('Test Owner')
-        })
-      })
 
       describe('and owner profile retrieval fails', () => {
         beforeEach(() => {

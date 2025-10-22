@@ -480,35 +480,6 @@ test('Update Community Controller', async function ({ components, stubComponents
               })
             })
 
-            describe('when updating with thumbnail', () => {
-              beforeEach(async () => {
-                stubComponents.fetcher.fetch.onFirstCall().resolves({
-                  ok: true,
-                  status: 200,
-                  json: () => Promise.resolve({})
-                } as any)
-              })
-
-              it('should update the community with new thumbnail and invalidate CDN cache', async () => {
-                const response = await makeMultipartRequest(
-                  identity,
-                  `/v1/communities/${communityId}`,
-                  {
-                    name: 'Thumbnail Updated',
-                    thumbnailPath: require('path').join(__dirname, 'fixtures/example.png')
-                  },
-                  'PUT'
-                )
-
-                expect(response.status).toBe(200)
-                const body = await response.json()
-                expect(body.data.name).toBe('Thumbnail Updated')
-                expect(body.data.thumbnails).toBeDefined()
-                expect(body.data.thumbnails.raw).toBeDefined()
-                expect(body.message).toBe('Community updated successfully')
-                expect(stubComponents.cdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
-              })
-            })
 
             describe('when updating multiple fields', () => {
               it('should update all provided fields', async () => {
