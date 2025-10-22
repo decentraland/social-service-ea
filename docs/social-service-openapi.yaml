@@ -70,13 +70,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetCommunities200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetCommunities200OkResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     post:
@@ -113,19 +113,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/CreateCommunity201OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/CreateCommunity201OkResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
   /v1/communities/{id}:
@@ -149,25 +149,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityById200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetCommunityById200OkResponse'
         '404':
           description: Community not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     put:
@@ -210,31 +210,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/UpdateCommunity200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/UpdateCommunity200OkResponse'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required or not owner
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '404':
           description: Community not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     delete:
@@ -259,19 +259,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -316,25 +316,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityMembers200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetCommunityMembers200OkResponse'
         '404':
           description: Community not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     post:
@@ -359,19 +359,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
   /v1/communities/{id}/members/{memberAddress}:
@@ -403,19 +403,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     patch:
@@ -459,19 +459,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
   /v1/members/{address}/communities:
@@ -507,19 +507,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetMemberCommunities200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetMemberCommunities200OkResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -556,25 +556,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetBannedMembers200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetBannedMembers200OkResponse'
         '404':
           description: Community not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
   /v1/communities/{id}/members/{memberAddress}/bans:
@@ -606,19 +606,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     delete:
@@ -649,19 +649,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -700,25 +700,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityPlaces200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetCommunityPlaces200OkResponse'
         '404':
           description: Community not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -760,25 +760,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '404':
           description: Community not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -812,19 +812,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '404':
           description: Community or place not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -861,19 +861,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetManagedCommunities200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetManagedCommunities200OkResponse'
         '401':
           description: Unauthorized - Admin token required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -905,19 +905,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Referrals
     patch:
@@ -935,25 +935,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '404':
           description: Referral not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Referrals
     get:
@@ -969,25 +969,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetReferralStats200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetReferralStats200OkResponse'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Referrals
 
@@ -1020,19 +1020,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Referrals
 
@@ -1076,25 +1076,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityRequests200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetCommunityRequests200OkResponse'
         '401':
           description: Unauthorized - Signed Fetch required or insufficient permissions
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '404':
           description: Community not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
     post:
@@ -1134,31 +1134,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/CreateCommunityRequest200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/CreateCommunityRequest200OkResponse'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '404':
           description: Community not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -1190,7 +1190,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: './communities-schemas.yaml#/components/schemas/UpdateCommunityRequestStatusRequest'
+              $ref: './social-service-schemas.yaml#/components/schemas/UpdateCommunityRequestStatusRequest'
       responses:
         '204':
           description: Community request status updated successfully
@@ -1199,25 +1199,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required or insufficient permissions
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '404':
           description: Community or request not found
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -1261,19 +1261,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetMemberRequests200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetMemberRequests200OkResponse'
         '401':
           description: Unauthorized - Signed Fetch required or accessing another user's requests
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -1299,25 +1299,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetCommunityInvites200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetCommunityInvites200OkResponse'
         '400':
           description: Invalid request - Users cannot invite themselves
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
 
@@ -1335,18 +1335,18 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/GetActiveCommunityVoiceChats200OkResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/GetActiveCommunityVoiceChats200OkResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: './communities-schemas.yaml#/components/schemas/ErrorResponse'
+                $ref: './social-service-schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Community Voice Chats
