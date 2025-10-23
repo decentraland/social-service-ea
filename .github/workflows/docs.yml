@@ -14,7 +14,6 @@ jobs:
     with:
       api-spec-file: 'docs/social-service-openapi.yaml'
       api-spec-name: 'social-service-api'
-      output-file: 'docs/index.html'
       output-directory: './docs'
       output-bundle-file: 'docs/api-reference.yaml'
       node-version: '20'

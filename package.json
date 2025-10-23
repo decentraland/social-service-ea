@@ -17,11 +17,15 @@
     "test:integration:watch": "jest --watch --verbose -c jest.integration.config.js --runInBand --coverage",
     "migrate": "node-pg-migrate --database-url-var PG_COMPONENT_PSQL_CONNECTION_STRING --envPath .env -j ts --tsconfig tsconfig.json -m ./src/migrations",
     "lint:check": "eslint '**/*.{js,ts}'",
-    "lint:fix": "eslint '**/*.{js,ts}' --fix"
+    "lint:fix": "eslint '**/*.{js,ts}' --fix",
+    "docs:build": "yarn redocly build-docs ./docs/social-service-openapi.yaml -o ./docs/index.html",
+    "predocs:preview": "yarn docs:build",
+    "docs:preview": "yarn redocly preview -d ./docs"
   },
   "devDependencies": {
     "@dcl/eslint-config": "^2.2.1",
     "@protobuf-ts/protoc": "^2.9.4",
+    "@redocly/cli": "^2.7.0",
     "@types/file-type": "^10.9.3",
     "@types/node": "^20.12.7",
     "@types/redis": "^4.0.11",
