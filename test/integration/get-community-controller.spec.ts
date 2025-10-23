@@ -187,26 +187,6 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                 expect(body.data.isHostingLiveEvent).toBe(false)
               })
             })
-
-            describe('and the community has a thumbnail', () => {
-              let expectedCdn: string
-              beforeEach(async () => {
-                expectedCdn = await components.config.requireString('CDN_URL')
-                await components.storage.storeFile(Buffer.from('test'), `communities/${communityId}/raw-thumbnail.png`)
-              })
-
-              afterEach(async () => {
-                await components.storageHelper.removeFile(`communities/${communityId}/raw-thumbnail.png`)
-              })
-
-              it('should return the thumbnail raw url in the response', async () => {
-                const response = await makeRequest(identity, `/v1/communities/${communityId}`)
-                const body = await response.json()
-                expect(body.data.thumbnails.raw).toBe(
-                  `${expectedCdn}/social/communities/${communityId}/raw-thumbnail.png`
-                )
-              })
-            })
           })
 
           describe('and the owner has a profile with an unclaimed name', () => {

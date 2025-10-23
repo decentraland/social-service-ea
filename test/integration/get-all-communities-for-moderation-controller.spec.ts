@@ -162,38 +162,6 @@ test('Get All Communities For Moderation Controller', function ({ components, sp
           })
         })
 
-        describe('when communities have thumbnails', () => {
-          beforeEach(async () => {
-            // Store test thumbnail files
-            await components.storage.storeFile(Buffer.from('test'), `communities/${communityId1}/raw-thumbnail.png`)
-            await components.storage.storeFile(Buffer.from('test'), `communities/${communityId2}/raw-thumbnail.png`)
-          })
-
-          afterEach(async () => {
-            // Clean up test thumbnail files
-            await components.storageHelper.removeFile(`communities/${communityId1}/raw-thumbnail.png`)
-            await components.storageHelper.removeFile(`communities/${communityId2}/raw-thumbnail.png`)
-          })
-
-          it('should return communities with thumbnail URLs', async () => {
-            const response = await makeRequest(identity, '/v1/moderation/communities')
-            expect(response.status).toBe(200)
-
-            const body = await response.json()
-            expect(body.data.results).toHaveLength(3)
-
-            // Check that communities with thumbnails have the correct URL structure
-            const community1 = body.data.results.find((c: any) => c.id === communityId1)
-            const community2 = body.data.results.find((c: any) => c.id === communityId2)
-
-            expect(community1.thumbnails.raw).toBe(
-              `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId1}/raw-thumbnail.png`
-            )
-            expect(community2.thumbnails.raw).toBe(
-              `http://0.0.0.0:4566/social-service-ea/social/communities/${communityId2}/raw-thumbnail.png`
-            )
-          })
-        })
 
         describe('when filtering by search', () => {
           it('should return communities with search functionality', async () => {

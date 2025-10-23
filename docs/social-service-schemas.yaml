@@ -67,7 +67,6 @@ components:
                       - privacy
                       - active
                       - membersCount
-                      - thumbnails
                     properties:
                       id:
                         type: string
@@ -84,11 +83,6 @@ components:
                         type: boolean
                       membersCount:
                         type: integer
-                      thumbnails:
-                        type: object
-                        additionalProperties:
-                          type: string
-                        description: 'A map of thumbnail types to URLs. The key is the thumbnail type (e.g. "raw") and the value is the URL.'
                       friends:
                         type: array
                         items:
@@ -210,11 +204,6 @@ components:
             membersCount:
               type: integer
               description: 'Number of members in the community'
-            thumbnails:
-              type: object
-              additionalProperties:
-                type: string
-              description: 'A map of thumbnail types to URLs. The key is the thumbnail type (e.g. "raw") and the value is the URL.'
     GetCommunityMembers200OkResponse:
       type: object
       required:
@@ -353,7 +342,6 @@ components:
                       - ownerAddress
                       - active
                       - role
-                      - thumbnails
                     properties:
                       id:
                         type: string
@@ -366,11 +354,6 @@ components:
                       role:
                         type: string
                         enum: [Owner, Moderator]
-                      thumbnails:
-                        type: object
-                        additionalProperties:
-                          type: string
-                        description: 'A map of thumbnail types to URLs. The key is the thumbnail type (e.g. "raw") and the value is the URL.'
 
     GetReferralStats200OkResponse:
       type: object
@@ -630,11 +613,6 @@ components:
                             type: integer
                             description: 'Number of moderators in the voice chat'
                         description: 'Voice chat status information for the community'
-                      thumbnails:
-                        type: object
-                        additionalProperties:
-                          type: string
-                        description: 'A map of thumbnail types to URLs for the community'
 
     UpdateCommunityRequestStatusRequest:
       type: object
