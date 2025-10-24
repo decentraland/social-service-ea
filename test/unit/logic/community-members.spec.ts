@@ -23,6 +23,7 @@ import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { Events } from '@dcl/schemas'
+import { createMockedAnalyticsComponent } from '../../mocks/components/analytics'
 
 describe('Community Members Component', () => {
   let communityMembersComponent: ICommunityMembersComponent
@@ -32,6 +33,7 @@ describe('Community Members Component', () => {
   let mockUserAddress: string
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   let mockCommsGatekeeper: ReturnType<typeof createCommsGatekeeperMockedComponent>
+  let mockAnalytics: ReturnType<typeof createMockedAnalyticsComponent>
 
   const communityId = 'test-community'
   const mockCommunityMembers: CommunityMember[] = [
@@ -60,6 +62,7 @@ describe('Community Members Component', () => {
     mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
     mockPeersStats = createMockPeersStatsComponent()
     mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
+    mockAnalytics = createMockedAnalyticsComponent({})
     communityMembersComponent = await createCommunityMembersComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
@@ -69,7 +72,8 @@ describe('Community Members Component', () => {
       logs: mockLogs,
       peersStats: mockPeersStats,
       pubsub: mockPubSub,
-      commsGatekeeper: mockCommsGatekeeper
+      commsGatekeeper: mockCommsGatekeeper,
+      analytics: mockAnalytics
     })
   })
 
