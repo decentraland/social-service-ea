@@ -24,6 +24,7 @@ import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { Events } from '@dcl/schemas'
 import { CommunityRole } from '../../../src/types'
 import { IPublisherComponent } from '@dcl/sns-component'
+import { createMockedAnalyticsComponent } from '../../mocks/components/analytics'
 
 describe('Community Bans Component', () => {
   let communityBansComponent: ICommunityBansComponent
@@ -33,6 +34,7 @@ describe('Community Bans Component', () => {
   let mockSns: jest.Mocked<IPublisherComponent>
   let mockUserAddress: string
   let mockCommsGatekeeper: ReturnType<typeof createCommsGatekeeperMockedComponent>
+  let mockAnalytics: ReturnType<typeof createMockedAnalyticsComponent>
   const communityId = 'test-community'
   const mockBannedMembers: BannedMember[] = [
     {
@@ -60,6 +62,7 @@ describe('Community Bans Component', () => {
     mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
     mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
+    mockAnalytics = createMockedAnalyticsComponent({})
     communityBansComponent = await createCommunityBansComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
@@ -68,7 +71,8 @@ describe('Community Bans Component', () => {
       communityBroadcaster: mockCommunityBroadcaster,
       logs: mockLogs,
       pubsub: mockPubSub,
-      commsGatekeeper: mockCommsGatekeeper
+      commsGatekeeper: mockCommsGatekeeper,
+      analytics: mockAnalytics
     })
   })
 

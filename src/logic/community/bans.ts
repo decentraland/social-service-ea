@@ -5,6 +5,7 @@ import { BannedMemberProfile, BannedMember, ICommunityBansComponent, CommunityPr
 import { mapMembersWithProfiles } from './utils'
 import { EthAddress, Events, PaginatedParameters } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
+import { AnalyticsEvent } from '../../types/analytics'
 
 export async function createCommunityBansComponent(
   components: Pick<
@@ -17,6 +18,7 @@ export async function createCommunityBansComponent(
     | 'logs'
     | 'pubsub'
     | 'commsGatekeeper'
+    | 'analytics'
   >
 ): Promise<ICommunityBansComponent> {
   const {
@@ -27,7 +29,8 @@ export async function createCommunityBansComponent(
     communityBroadcaster,
     logs,
     pubsub,
-    commsGatekeeper
+    commsGatekeeper,
+    analytics
   } = components
 
   const logger = logs.getLogger('community-bans-component')
@@ -46,6 +49,11 @@ export async function createCommunityBansComponent(
 
       if (doesTargetUserBelongsToCommunity) {
         await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
+        analytics.fireEvent(AnalyticsEvent.BAN_MEMBER_FROM_COMMUNITY, {
+          community_id: communityId,
+          banner_user_id: bannerAddress.toLowerCase(),
+          target_user_id: targetAddress.toLowerCase()
+        })
       }
 
       await communitiesDb.banMemberFromCommunity(communityId, bannerAddress, targetAddress)
