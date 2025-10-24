@@ -18,7 +18,7 @@
     "migrate": "node-pg-migrate --database-url-var PG_COMPONENT_PSQL_CONNECTION_STRING --envPath .env -j ts --tsconfig tsconfig.json -m ./src/migrations",
     "lint:check": "eslint '**/*.{js,ts}'",
     "lint:fix": "eslint '**/*.{js,ts}' --fix",
-    "docs:build": "yarn redocly build-docs ./docs/social-service-openapi.yaml -o ./docs/index.html",
+    "docs:build": "yarn redocly build-docs ./docs/openapi.yaml -o ./docs/index.html",
     "predocs:preview": "yarn docs:build",
     "docs:preview": "yarn redocly preview -d ./docs"
   },

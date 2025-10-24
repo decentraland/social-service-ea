@@ -12,7 +12,7 @@ jobs:
   build-and-deploy:
     uses: decentraland/platform-actions/.github/workflows/apps-docs.yml@feat/upsert-api-spec-on-gitbook
     with:
-      api-spec-file: 'docs/social-service-openapi.yaml'
+      api-spec-file: 'docs/openapi.yaml'
       api-spec-name: 'social-service-api'
       output-directory: './docs'
       output-bundle-file: 'docs/api-reference.yaml'
