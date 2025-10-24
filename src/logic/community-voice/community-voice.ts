@@ -68,13 +68,17 @@ export async function createCommunityVoiceComponent({
         }
       } catch (error) {
         logger.warn(
-          `Failed to extract profile info for user ${userAddress}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+          `Failed to extract profile info for user ${userAddress}: ${
+            isErrorWithMessage(error) ? error.message : 'Unknown error'
+          }`
         )
         return null
       }
     } catch (error) {
       logger.warn(
-        `Failed to fetch profile for user ${userAddress}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+        `Failed to fetch profile for user ${userAddress}: ${
+          isErrorWithMessage(error) ? error.message : 'Unknown error'
+        }`
       )
       return null
     }
@@ -164,7 +168,9 @@ export async function createCommunityVoiceComponent({
         }
       } catch (error) {
         logger.warn(
-          `Failed to fetch community information for community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+          `Failed to fetch community information for community ${communityId}: ${
+            isErrorWithMessage(error) ? error.message : 'Unknown error'
+          }`
         )
         // Continue without community info - non-critical error
       }
@@ -243,6 +249,12 @@ export async function createCommunityVoiceComponent({
       userRole,
       profileData
     )
+
+    // Analytics event
+    analytics.fireEvent(AnalyticsEvent.JOIN_COMMUNITY_CALL, {
+      call_id: communityId,
+      user_id: userAddress
+    })
 
     return credentials
   }
@@ -413,7 +425,9 @@ export async function createCommunityVoiceComponent({
             worlds = separatedWorlds
           } else {
             logger.warn(
-              `Failed to fetch positions and worlds for community ${communityId}: ${errorMessageOrDefault(placesResult.reason)}`
+              `Failed to fetch positions and worlds for community ${communityId}: ${errorMessageOrDefault(
+                placesResult.reason
+              )}`
             )
           }
 
@@ -524,6 +538,13 @@ export async function createCommunityVoiceComponent({
         targetUserAddress: targetUserAddressLower,
         actingUserAddress: actingUserAddressLower,
         muted: muted.toString()
+      })
+
+      // Analytics event
+      analytics.fireEvent(AnalyticsEvent.MUTE_SPEAKER_IN_COMMUNITY_CALL, {
+        call_id: communityId,
+        user_id: actingUserAddress,
+        target_user_id: targetUserAddress
       })
     } catch (error) {
       const errorMessage = errorMessageOrDefault(error)
