@@ -73,7 +73,7 @@ export function createCommunityComponent(
    * - Private communities with active voice chat where user is a member
    * @returns Promise<Record<string, CommunityVoiceChatStatus>> - Voice chat statuses for active communities
    */
-  async function getCommunitiesWithActiveVoiceChat(): Promise<Record<string, CommunityVoiceChatStatus>> {
+  async function getVoiceChatStatusFromActiveCommunities(): Promise<Record<string, CommunityVoiceChatStatus>> {
     try {
       const communitiesWithActiveVoiceChat = await commsGatekeeper.getAllActiveCommunityVoiceChats()
       return communitiesWithActiveVoiceChat.reduce(
@@ -141,7 +141,7 @@ export function createCommunityComponent(
       options: GetCommunitiesOptions
     ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformationAndVoiceChat, 'isHostingLiveEvent'>>> => {
       const voiceChatStatusesFromFilter = options.onlyWithActiveVoiceChat
-        ? await getCommunitiesWithActiveVoiceChat()
+        ? await getVoiceChatStatusFromActiveCommunities()
         : {}
 
       const communityIds = Object.keys(voiceChatStatusesFromFilter)
@@ -152,9 +152,13 @@ export function createCommunityComponent(
         communitiesDb.getCommunitiesCount(userAddress, dbOptions)
       ])
 
-      const communityOwnersNames = await communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress))
+      const filteredCommunities = options.onlyWithActiveVoiceChat
+        ? communities.filter((c) => c.privacy === CommunityPrivacyEnum.Public || c.role !== CommunityRole.None)
+        : communities
 
-      const communitiesWithOwnerNames = communities.map((community) => ({
+      const communityOwnersNames = await communityOwners.getOwnersNames(filteredCommunities.map((c) => c.ownerAddress))
+
+      const communitiesWithOwnerNames = filteredCommunities.map((community) => ({
         ...community,
         ownerName: communityOwnersNames[community.ownerAddress]
       }))
@@ -178,7 +182,7 @@ export function createCommunityComponent(
       options: GetCommunitiesOptions
     ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>> => {
       const voiceChatStatusesFromFilter = options.onlyWithActiveVoiceChat
-        ? await getCommunitiesWithActiveVoiceChat()
+        ? await getVoiceChatStatusFromActiveCommunities()
         : {}
 
       const communityIds = Object.keys(voiceChatStatusesFromFilter)
