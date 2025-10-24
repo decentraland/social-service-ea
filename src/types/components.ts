@@ -142,12 +142,12 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>[]>
   getCommunitiesCount(
     memberAddress: EthAddress,
-    options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles'>
+    options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds'>
   ): Promise<number>
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
   ): Promise<Omit<CommunityPublicInformation, 'ownerName'>[]>
-  getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
+  getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search' | 'communityIds'>): Promise<number>
   getAllCommunitiesForModeration(options: GetCommunitiesOptions): Promise<CommunityForModeration[]>
   getAllCommunitiesForModerationCount(options: Pick<GetCommunitiesOptions, 'search'>): Promise<number>
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>

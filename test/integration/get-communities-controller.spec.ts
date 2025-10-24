@@ -356,8 +356,8 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
 
           // Verify that the comms gatekeeper was called to get active voice chats first
           expect(spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats).toHaveBeenCalled()
-          // Then verify it was called to check voice chat status only for active communities
-          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([communityId1])
+          // Verify getCommunitiesVoiceChatStatus is NOT called when filtering (we reuse the data)
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
         })
 
         it('should return all communities when onlyWithActiveVoiceChat=false', async () => {
@@ -370,6 +370,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(response.status).toBe(200)
           expect(body.data.results).toHaveLength(2)
           expect(body.data.total).toBe(2)
+
+          // Verify getAllActiveCommunityVoiceChats is NOT called when not filtering
+          expect(spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats).not.toHaveBeenCalled()
+          // Verify getCommunitiesVoiceChatStatus IS called when not filtering
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([communityId1, communityId2])
         })
 
         it('should return all communities when onlyWithActiveVoiceChat is not provided', async () => {
@@ -379,6 +384,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(response.status).toBe(200)
           expect(body.data.results).toHaveLength(2)
           expect(body.data.total).toBe(2)
+
+          // Verify getAllActiveCommunityVoiceChats is NOT called when not filtering
+          expect(spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats).not.toHaveBeenCalled()
+          // Verify getCommunitiesVoiceChatStatus IS called when not filtering
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([communityId1, communityId2])
         })
 
         it('should include voiceChatStatus in all community responses', async () => {
