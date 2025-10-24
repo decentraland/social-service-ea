@@ -14,7 +14,8 @@ import {
   CommunityUpdates,
   AggregatedCommunity,
   CommunityPrivacyEnum,
-  CommunityForModeration
+  CommunityForModeration,
+  CommunityVoiceChatStatus
 } from './types'
 import {
   isOwner,
@@ -70,18 +71,27 @@ export function createCommunityComponent(
    * Only returns communities with active voice chat that the user has permission to see:
    * - Public communities with active voice chat
    * - Private communities with active voice chat where user is a member
-   * @param communities - Array of communities to filter
-   * @returns Promise<T[]> - Filtered array containing only communities with active voice chat that user can access
+   * @returns Promise<Record<string, CommunityVoiceChatStatus>> - Voice chat statuses for active communities
    */
-  async function getCommunitiesWithActiveVoiceChat(): Promise<string[]> {
+  async function getCommunitiesWithActiveVoiceChat(): Promise<Record<string, CommunityVoiceChatStatus>> {
     try {
       const communitiesWithActiveVoiceChat = await commsGatekeeper.getAllActiveCommunityVoiceChats()
-      return communitiesWithActiveVoiceChat.map((c) => c.communityId)
+      return communitiesWithActiveVoiceChat.reduce(
+        (acc, community) => {
+          acc[community.communityId] = {
+            isActive: true,
+            participantCount: community.participantCount,
+            moderatorCount: community.moderatorCount
+          }
+          return acc
+        },
+        {} as Record<string, CommunityVoiceChatStatus>
+      )
     } catch (error) {
       logger.warn('Error getting communities with active voice chat', {
         error: isErrorWithMessage(error) ? error.message : 'Unknown error'
       })
-      return []
+      return {}
     }
   }
 
@@ -130,11 +140,16 @@ export function createCommunityComponent(
       userAddress: string,
       options: GetCommunitiesOptions
     ): Promise<GetCommunitiesWithTotal<Omit<CommunityWithUserInformationAndVoiceChat, 'isHostingLiveEvent'>>> => {
-      const idsWithActiveVoiceChat = options.onlyWithActiveVoiceChat ? await getCommunitiesWithActiveVoiceChat() : []
+      const voiceChatStatusesFromFilter = options.onlyWithActiveVoiceChat
+        ? await getCommunitiesWithActiveVoiceChat()
+        : {}
+
+      const communityIds = Object.keys(voiceChatStatusesFromFilter)
+      const dbOptions = { ...options, communityIds }
 
       const [communities, total] = await Promise.all([
-        communitiesDb.getCommunities(userAddress, { ...options, communityIds: idsWithActiveVoiceChat }),
-        communitiesDb.getCommunitiesCount(userAddress, { ...options, communityIds: idsWithActiveVoiceChat })
+        communitiesDb.getCommunities(userAddress, dbOptions),
+        communitiesDb.getCommunitiesCount(userAddress, dbOptions)
       ])
 
       const communityOwnersNames = await communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress))
@@ -148,7 +163,9 @@ export function createCommunityComponent(
 
       const [friendsProfiles, voiceChatStatuses] = await Promise.all([
         catalystClient.getProfiles(friendsAddresses),
-        getVoiceChatStatuses(communitiesWithOwnerNames.map((c) => c.id))
+        options.onlyWithActiveVoiceChat
+          ? Promise.resolve(voiceChatStatusesFromFilter)
+          : getVoiceChatStatuses(communitiesWithOwnerNames.map((c) => c.id))
       ])
 
       return {
@@ -160,12 +177,16 @@ export function createCommunityComponent(
     getCommunitiesPublicInformation: async (
       options: GetCommunitiesOptions
     ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>> => {
-      const { search } = options
-      const idsWithActiveVoiceChat = options.onlyWithActiveVoiceChat ? await getCommunitiesWithActiveVoiceChat() : []
+      const voiceChatStatusesFromFilter = options.onlyWithActiveVoiceChat
+        ? await getCommunitiesWithActiveVoiceChat()
+        : {}
+
+      const communityIds = Object.keys(voiceChatStatusesFromFilter)
+      const dbOptions = { ...options, communityIds }
 
       const [communities, total] = await Promise.all([
-        communitiesDb.getCommunitiesPublicInformation({ ...options, communityIds: idsWithActiveVoiceChat }),
-        communitiesDb.getPublicCommunitiesCount({ search, communityIds: idsWithActiveVoiceChat })
+        communitiesDb.getCommunitiesPublicInformation(dbOptions),
+        communitiesDb.getPublicCommunitiesCount({ search: options.search, communityIds })
       ])
 
       const communityOwnersNames = await communityOwners.getOwnersNames(communities.map((c) => c.ownerAddress))
@@ -175,7 +196,9 @@ export function createCommunityComponent(
         ownerName: communityOwnersNames[community.ownerAddress]
       }))
 
-      const voiceChatStatuses = await getVoiceChatStatuses(communitiesWithOwnerNames.map((c) => c.id))
+      const voiceChatStatuses = options.onlyWithActiveVoiceChat
+        ? voiceChatStatusesFromFilter
+        : await getVoiceChatStatuses(communitiesWithOwnerNames.map((c) => c.id))
 
       return {
         communities: communitiesWithOwnerNames.map((community) =>
