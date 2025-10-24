@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-and-deploy:
-    uses: decentraland/platform-actions/.github/workflows/apps-docs.yml@feat/upsert-api-spec-on-gitbook
+    uses: decentraland/platform-actions/.github/workflows/apps-docs.yml@main
     with:
       api-spec-file: 'docs/openapi.yaml'
       api-spec-name: 'social-service-api'
