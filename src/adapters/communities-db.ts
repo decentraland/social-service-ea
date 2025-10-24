@@ -325,9 +325,9 @@ export function createCommunitiesDBComponent(
 
     async getCommunitiesCount(
       memberAddress: EthAddress,
-      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles'>
+      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds'>
     ): Promise<number> {
-      const { search, onlyMemberOf, roles } = options ?? {}
+      const { search, onlyMemberOf, roles, communityIds } = options ?? {}
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
@@ -341,10 +341,17 @@ export function createCommunitiesDBComponent(
         query.append(searchCommunitiesQuery(search))
       }
 
+      // Filter by specific community IDs if provided
+      if (communityIds && communityIds.length > 0) {
+        query.append(SQL` AND c.id = ANY(${communityIds})`)
+      }
+
       return pg.getCount(query)
     },
 
     async getCommunitiesPublicInformation(options: GetCommunitiesOptions) {
+      const { communityIds } = options
+
       const baseQuery = useCTEs([getCommunitiesWithMembersCountCTE({ onlyPublic: true })]).append(
         SQL`
         SELECT 
@@ -360,14 +367,18 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true AND c.private = false`
       )
 
+      if (communityIds && communityIds.length > 0) {
+        baseQuery.append(SQL` AND c.id = ANY(${communityIds})`)
+      }
+
       const query = withSearchAndPagination(baseQuery, options)
 
       const result = await pg.query<Omit<CommunityPublicInformation, 'ownerName'>>(query)
       return result.rows
     },
 
-    async getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search'>) {
-      const { search } = options ?? {}
+    async getPublicCommunitiesCount(options: Pick<GetCommunitiesOptions, 'search' | 'communityIds'>) {
+      const { search, communityIds } = options
 
       const query = SQL`
         SELECT COUNT(1) as count
@@ -377,6 +388,10 @@ export function createCommunitiesDBComponent(
 
       if (search) {
         query.append(searchCommunitiesQuery(search))
+      }
+
+      if (communityIds && communityIds.length > 0) {
+        query.append(SQL` AND c.id = ANY(${communityIds})`)
       }
 
       return pg.getCount(query)
