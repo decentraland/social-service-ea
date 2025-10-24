@@ -886,6 +886,29 @@ export function createCommunitiesDBComponent(
       }
 
       return pg.getCount(query)
+    },
+
+    async getCommunityRequestByMemberAddress(
+      communityId: string,
+      memberAddress: EthAddress
+    ): Promise<MemberRequest | undefined> {
+      const query = SQL`
+        SELECT id, community_id AS "communityId", member_address AS "memberAddress", type, status
+        FROM community_requests
+        WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
+      `
+      const result = await pg.query<MemberRequest>(query)
+      return result.rows[0]
+    },
+
+    async getCommunityRequestsByCommunityId(communityId: string): Promise<MemberRequest[]> {
+      const query = SQL`
+        SELECT id, community_id AS "communityId", member_address AS "memberAddress", type, status
+        FROM community_requests
+        WHERE community_id = ${communityId}
+      `
+      const result = await pg.query<MemberRequest>(query)
+      return result.rows
     }
   }
 }
