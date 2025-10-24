@@ -596,6 +596,10 @@ describe('Community Voice Logic', () => {
                 profile_picture_url: 'https://profile-images.decentraland.org/entities/bafybeiasdfqwer/face.png'
               }
             )
+            expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.JOIN_COMMUNITY_CALL, {
+              call_id: communityId,
+              user_id: userAddress
+            })
           })
         })
 
@@ -617,6 +621,10 @@ describe('Community Voice Logic', () => {
               CommunityRole.Member,
               null
             )
+            expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.JOIN_COMMUNITY_CALL, {
+              call_id: communityId,
+              user_id: userAddress
+            })
           })
         })
       })
@@ -675,6 +683,10 @@ describe('Community Voice Logic', () => {
                 profile_picture_url: 'https://example.com/public-face.png'
               }
             )
+            expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.JOIN_COMMUNITY_CALL, {
+              call_id: communityId,
+              user_id: userAddress
+            })
           })
         })
 
@@ -697,6 +709,10 @@ describe('Community Voice Logic', () => {
               CommunityRole.None,
               null
             )
+            expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.JOIN_COMMUNITY_CALL, {
+              call_id: communityId,
+              user_id: userAddress
+            })
           })
         })
       })
@@ -883,6 +899,11 @@ describe('Community Voice Logic', () => {
           targetUserAddress.toLowerCase(),
           true
         )
+        expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.MUTE_SPEAKER_IN_COMMUNITY_CALL, {
+          call_id: communityId,
+          user_id: actingUserAddress,
+          target_user_id: targetUserAddress
+        })
       })
 
       it('should unmute another user successfully', async () => {
@@ -897,6 +918,11 @@ describe('Community Voice Logic', () => {
           targetUserAddress.toLowerCase(),
           false
         )
+        expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.MUTE_SPEAKER_IN_COMMUNITY_CALL, {
+          call_id: communityId,
+          user_id: actingUserAddress,
+          target_user_id: targetUserAddress
+        })
       })
     })
 
@@ -918,6 +944,11 @@ describe('Community Voice Logic', () => {
           targetUserAddress.toLowerCase(),
           true
         )
+        expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.MUTE_SPEAKER_IN_COMMUNITY_CALL, {
+          call_id: communityId,
+          user_id: actingUserAddress,
+          target_user_id: targetUserAddress
+        })
       })
     })
 
@@ -940,6 +971,11 @@ describe('Community Voice Logic', () => {
           targetUserAddress.toLowerCase(),
           true
         )
+        expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.MUTE_SPEAKER_IN_COMMUNITY_CALL, {
+          call_id: communityId,
+          user_id: targetUserAddress,
+          target_user_id: targetUserAddress
+        })
       })
 
       it('should unmute themselves without checking permissions', async () => {
@@ -956,6 +992,11 @@ describe('Community Voice Logic', () => {
           targetUserAddress.toLowerCase(),
           false
         )
+        expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.MUTE_SPEAKER_IN_COMMUNITY_CALL, {
+          call_id: communityId,
+          user_id: targetUserAddress,
+          target_user_id: targetUserAddress
+        })
       })
     })
 
@@ -1084,6 +1125,11 @@ describe('Community Voice Logic', () => {
           upperCaseTargetAddress.toLowerCase(),
           true
         )
+        expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.MUTE_SPEAKER_IN_COMMUNITY_CALL, {
+          call_id: communityId,
+          user_id: upperCaseActingAddress,
+          target_user_id: upperCaseTargetAddress
+        })
       })
     })
   })

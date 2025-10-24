@@ -5,6 +5,8 @@ export enum AnalyticsEvent {
   END_CALL = 'END_CALL',
   EXPIRE_CALL = 'EXPIRE_CALL',
   START_COMMUNITY_CALL = 'START_COMMUNITY_CALL',
+  JOIN_COMMUNITY_CALL = 'JOIN_COMMUNITY_CALL',
+  MUTE_SPEAKER_IN_COMMUNITY_CALL = 'MUTE_SPEAKER_IN_COMMUNITY_CALL',
   END_COMMUNITY_CALL = 'END_COMMUNITY_CALL'
 }
 
@@ -17,6 +19,15 @@ export type AnalyticsEventPayload = {
   [AnalyticsEvent.START_COMMUNITY_CALL]: {
     call_id: string
     user_id: string
+  }
+  [AnalyticsEvent.JOIN_COMMUNITY_CALL]: {
+    call_id: string
+    user_id: string
+  }
+  [AnalyticsEvent.MUTE_SPEAKER_IN_COMMUNITY_CALL]: {
+    call_id: string
+    user_id: string
+    target_user_id: string
   }
   [AnalyticsEvent.END_COMMUNITY_CALL]: {
     call_id: string
