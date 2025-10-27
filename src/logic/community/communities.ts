@@ -144,9 +144,18 @@ export function createCommunityComponent(
         ? await getVoiceChatStatusFromActiveCommunities()
         : {}
 
-      const communityIds = options.onlyWithActiveVoiceChat
-        ? Object.keys(voiceChatStatusesFromFilter)
-        : options.communityIds
+      const communityIdsWithActiveVoiceChat = Object.keys(voiceChatStatusesFromFilter)
+
+      const communityIds = options.onlyWithActiveVoiceChat ? communityIdsWithActiveVoiceChat : options.communityIds
+
+      // If filtering by active voice chat and no communities have active voice chat, return empty results
+      if (options.onlyWithActiveVoiceChat && communityIdsWithActiveVoiceChat.length === 0) {
+        return {
+          communities: [],
+          total: 0
+        }
+      }
+
       const dbOptions = { ...options, communityIds }
 
       const [communities, total] = await Promise.all([
@@ -187,9 +196,18 @@ export function createCommunityComponent(
         ? await getVoiceChatStatusFromActiveCommunities()
         : {}
 
-      const communityIds = options.onlyWithActiveVoiceChat
-        ? Object.keys(voiceChatStatusesFromFilter)
-        : options.communityIds
+      const communityIdsWithActiveVoiceChat = Object.keys(voiceChatStatusesFromFilter)
+
+      const communityIds = options.onlyWithActiveVoiceChat ? communityIdsWithActiveVoiceChat : options.communityIds
+
+      // If filtering by active voice chat and no communities have active voice chat, return empty results
+      if (options.onlyWithActiveVoiceChat && communityIdsWithActiveVoiceChat.length === 0) {
+        return {
+          communities: [],
+          total: 0
+        }
+      }
+
       const dbOptions = { ...options, communityIds }
 
       const [communities, total] = await Promise.all([
