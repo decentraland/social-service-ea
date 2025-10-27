@@ -273,8 +273,8 @@ describe('Community Component', () => {
         total: 1
       })
 
-      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, { ...options, communityIds: [] })
-      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, { ...options, communityIds: [] })
+      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, options)
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, options)
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
@@ -290,8 +290,8 @@ describe('Community Component', () => {
         total: 0
       })
 
-      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, { ...options, communityIds: [] })
-      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, { ...options, communityIds: [] })
+      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, options)
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, options)
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([])
     })
@@ -477,8 +477,8 @@ describe('Community Component', () => {
         total: 1
       })
 
-      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith({ ...options, communityIds: [] })
-      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test', communityIds: [] })
+      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
+      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
 
