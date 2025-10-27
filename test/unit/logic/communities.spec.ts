@@ -122,6 +122,10 @@ describe('Community Component', () => {
     })
   })
 
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
   describe('when getting a community', () => {
     const userAddress = '0x1234567890123456789012345678901234567890'
 
@@ -282,8 +286,14 @@ describe('Community Component', () => {
         total: 1
       })
 
-      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, options)
-      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, options)
+      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, {
+        ...options,
+        communityIds: undefined
+      })
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, {
+        ...options,
+        communityIds: undefined
+      })
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
@@ -299,8 +309,14 @@ describe('Community Component', () => {
         total: 0
       })
 
-      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, options)
-      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, options)
+      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, {
+        ...options,
+        communityIds: undefined
+      })
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, {
+        ...options,
+        communityIds: undefined
+      })
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([])
     })
@@ -382,17 +398,23 @@ describe('Community Component', () => {
         expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
       })
 
-      it('should handle empty communities array when filtering by voice chat', async () => {
-        mockCommunitiesDB.getCommunities.mockResolvedValueOnce([])
-        mockCommunitiesDB.getCommunitiesCount.mockResolvedValueOnce(0)
+      describe('when there are no communities with active voice chat', () => {
+        beforeEach(() => {
+          mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValueOnce([])
+        })
 
-        const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+        it('should return empty results without calling the database', async () => {
+          const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
 
-        expect(result.communities).toHaveLength(0)
-        expect(result.total).toBe(0)
+          expect(result.communities).toHaveLength(0)
+          expect(result.total).toBe(0)
 
-        // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
-        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
+          // Verify DB is NOT called because of early return
+          expect(mockCommunitiesDB.getCommunities).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getCommunitiesCount).not.toHaveBeenCalled()
+          expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
+          expect(mockCommsGatekeeper.getAllActiveCommunityVoiceChats).toHaveBeenCalled()
+        })
       })
 
       describe('when voice chat status check fails', () => {
@@ -400,18 +422,21 @@ describe('Community Component', () => {
           mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockRejectedValueOnce(
             new Error('Voice chat service unavailable')
           )
-          // Mock DB to return empty results when voice chat service fails
-          mockCommunitiesDB.getCommunities.mockResolvedValueOnce([])
-          mockCommunitiesDB.getCommunitiesCount.mockResolvedValueOnce(0)
+          // When service fails, getVoiceChatStatusFromActiveCommunities returns empty object
+          // which results in empty array, triggering early return
         })
 
-        it('should return no communities when status check fails and onlyWithActiveVoiceChat is true', async () => {
+        it('should return empty results without calling the database when service fails', async () => {
           const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
 
           expect(result.communities).toHaveLength(0)
           expect(result.total).toBe(0)
 
           // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
+
+          // Verify DB is NOT called because of early return
+          expect(mockCommunitiesDB.getCommunities).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getCommunitiesCount).not.toHaveBeenCalled()
           expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
         })
       })
@@ -488,8 +513,14 @@ describe('Community Component', () => {
         total: 1
       })
 
-      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(options)
-      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test' })
+      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith({
+        ...options,
+        communityIds: undefined
+      })
+      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({
+        search: 'test',
+        communityIds: undefined
+      })
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
 
@@ -556,17 +587,23 @@ describe('Community Component', () => {
         expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
       })
 
-      it('should handle empty communities array when filtering by voice chat', async () => {
-        mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValueOnce([])
-        mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValueOnce(0)
+      describe('when there are no communities with active voice chat', () => {
+        beforeEach(() => {
+          mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValueOnce([])
+        })
 
-        const result = await communityComponent.getCommunitiesPublicInformation(optionsWithVoiceChat)
+        it('should return empty results without calling the database', async () => {
+          const result = await communityComponent.getCommunitiesPublicInformation(optionsWithVoiceChat)
 
-        expect(result.communities).toHaveLength(0)
-        expect(result.total).toBe(0)
+          expect(result.communities).toHaveLength(0)
+          expect(result.total).toBe(0)
 
-        // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
-        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
+          // Verify DB is NOT called because of early return
+          expect(mockCommunitiesDB.getCommunitiesPublicInformation).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getPublicCommunitiesCount).not.toHaveBeenCalled()
+          expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
+          expect(mockCommsGatekeeper.getAllActiveCommunityVoiceChats).toHaveBeenCalled()
+        })
       })
 
       describe('when voice chat status check fails', () => {
@@ -574,32 +611,36 @@ describe('Community Component', () => {
           mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockRejectedValueOnce(
             new Error('Voice chat service unavailable')
           )
-          // Mock DB to return empty results when voice chat service fails
-          mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValueOnce([])
-          mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValueOnce(0)
         })
 
-        it('should return communities with null voice chat status when status check fails', async () => {
+        it('should return empty results without calling the database when service fails', async () => {
           const result = await communityComponent.getCommunitiesPublicInformation(optionsWithVoiceChat)
 
           expect(result.communities).toHaveLength(0)
           expect(result.total).toBe(0)
+
+          // Verify DB is NOT called because of early return
+          expect(mockCommunitiesDB.getCommunitiesPublicInformation).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getPublicCommunitiesCount).not.toHaveBeenCalled()
+          expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
         })
       })
 
       describe('when voice chat status check returns null/undefined', () => {
         beforeEach(() => {
           mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValueOnce(null)
-          // Mock DB to return empty results when voice chat service returns null
-          mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValueOnce([])
-          mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValueOnce(0)
         })
 
-        it('should handle null response gracefully and return communities', async () => {
+        it('should return empty results without calling the database', async () => {
           const result = await communityComponent.getCommunitiesPublicInformation(optionsWithVoiceChat)
 
           expect(result.communities).toHaveLength(0)
           expect(result.total).toBe(0)
+
+          // Verify DB is NOT called because of early return
+          expect(mockCommunitiesDB.getCommunitiesPublicInformation).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getPublicCommunitiesCount).not.toHaveBeenCalled()
+          expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
         })
       })
     })
@@ -827,10 +868,6 @@ describe('Community Component', () => {
       mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
       mockCommunityBroadcaster.broadcast.mockResolvedValue()
       mockPubSub.publishInChannel.mockResolvedValue()
-    })
-
-    afterEach(() => {
-      jest.resetAllMocks()
     })
 
     describe('and the community exists', () => {
