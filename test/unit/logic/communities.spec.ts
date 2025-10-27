@@ -316,6 +316,18 @@ describe('Community Component', () => {
       expect(result.total).toBe(1)
     })
 
+    it('should call getCommunitiesVoiceChatStatus when onlyWithActiveVoiceChat is false', async () => {
+      const result = await communityComponent.getCommunities(userAddress, options)
+
+      expect(result.communities).toHaveLength(1)
+      expect(result.total).toBe(1)
+
+      // Verify getCommunitiesVoiceChatStatus IS called when not filtering
+      expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([mockCommunity.id])
+      // Verify getAllActiveCommunityVoiceChats is NOT called when not filtering
+      expect(mockCommsGatekeeper.getAllActiveCommunityVoiceChats).not.toHaveBeenCalled()
+    })
+
     describe('when filtering by active voice chat', () => {
       const optionsWithVoiceChat = { ...options, onlyWithActiveVoiceChat: true }
       const mockCommunitiesWithVoiceChat = [
@@ -330,21 +342,25 @@ describe('Community Component', () => {
       ]
 
       beforeEach(() => {
-        mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunitiesWithVoiceChat)
-        mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(2)
+        // Mock DB to return only the community with active voice chat when filtering
+        mockCommunitiesDB.getCommunities.mockResolvedValue([
+          {
+            ...mockCommunitiesWithVoiceChat[0],
+            id: 'community-with-voice-chat'
+          }
+        ])
+        mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
         mockStorage.exists.mockResolvedValue(false)
         mockCatalystClient.getProfiles.mockResolvedValue([])
         mockCommunityOwners.getOwnersNames.mockResolvedValue({
-          [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name',
-          [mockCommunitiesWithVoiceChat[1].ownerAddress]: 'Test Owner Name'
+          [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name'
         })
 
         mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValue([
           { communityId: 'community-with-voice-chat', participantCount: 3, moderatorCount: 1 }
         ])
-        mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
-          'community-with-voice-chat': { isActive: true, participantCount: 3, moderatorCount: 1 }
-        })
+        // This should NOT be called when filtering by active voice chat
+        mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({})
       })
 
       it('should return only communities with active voice chat when onlyWithActiveVoiceChat is true', async () => {
@@ -355,7 +371,15 @@ describe('Community Component', () => {
         expect(result.total).toBe(1)
 
         expect(mockCommsGatekeeper.getAllActiveCommunityVoiceChats).toHaveBeenCalled()
-        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith(['community-with-voice-chat'])
+        // Verify DB was called with the filtered community IDs
+        expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(
+          userAddress,
+          expect.objectContaining({
+            communityIds: ['community-with-voice-chat']
+          })
+        )
+        // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
+        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
       })
 
       it('should handle empty communities array when filtering by voice chat', async () => {
@@ -367,7 +391,8 @@ describe('Community Component', () => {
         expect(result.communities).toHaveLength(0)
         expect(result.total).toBe(0)
 
-        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([])
+        // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
+        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
       })
 
       describe('when voice chat status check fails', () => {
@@ -375,6 +400,9 @@ describe('Community Component', () => {
           mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockRejectedValueOnce(
             new Error('Voice chat service unavailable')
           )
+          // Mock DB to return empty results when voice chat service fails
+          mockCommunitiesDB.getCommunities.mockResolvedValueOnce([])
+          mockCommunitiesDB.getCommunitiesCount.mockResolvedValueOnce(0)
         })
 
         it('should return no communities when status check fails and onlyWithActiveVoiceChat is true', async () => {
@@ -382,12 +410,18 @@ describe('Community Component', () => {
 
           expect(result.communities).toHaveLength(0)
           expect(result.total).toBe(0)
+
+          // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
+          expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
         })
       })
 
       describe('when voice chat status check returns null/undefined', () => {
         beforeEach(() => {
           mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValueOnce(null)
+          // Mock DB to return empty results when voice chat service returns null
+          mockCommunitiesDB.getCommunities.mockResolvedValueOnce([])
+          mockCommunitiesDB.getCommunitiesCount.mockResolvedValueOnce(0)
         })
 
         it('should handle null response gracefully and return communities', async () => {
@@ -395,6 +429,9 @@ describe('Community Component', () => {
 
           expect(result.communities).toHaveLength(0)
           expect(result.total).toBe(0)
+
+          // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
+          expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
         })
       })
     })
@@ -481,20 +518,24 @@ describe('Community Component', () => {
       ]
 
       beforeEach(() => {
-        mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue(mockCommunitiesWithVoiceChat)
-        mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(2)
+        // Mock DB to return only the community with active voice chat when filtering
+        mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValue([
+          {
+            ...mockCommunitiesWithVoiceChat[0],
+            id: 'public-community-with-voice-chat'
+          }
+        ])
+        mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValue(1)
         mockStorage.exists.mockResolvedValue(false)
         mockCommunityOwners.getOwnersNames.mockResolvedValue({
-          [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name',
-          [mockCommunitiesWithVoiceChat[1].ownerAddress]: 'Test Owner Name'
+          [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name'
         })
 
         mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValue([
           { communityId: 'public-community-with-voice-chat', participantCount: 5, moderatorCount: 2 }
         ])
-        mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({
-          'public-community-with-voice-chat': { isActive: true, participantCount: 5, moderatorCount: 2 }
-        })
+        // This should NOT be called when filtering by active voice chat
+        mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockResolvedValue({})
       })
 
       it('should return only public communities with active voice chat when onlyWithActiveVoiceChat is true', async () => {
@@ -505,9 +546,14 @@ describe('Community Component', () => {
         expect(result.total).toBe(1)
 
         expect(mockCommsGatekeeper.getAllActiveCommunityVoiceChats).toHaveBeenCalled()
-        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
-          'public-community-with-voice-chat'
-        ])
+        // Verify DB was called with the filtered community IDs
+        expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(
+          expect.objectContaining({
+            communityIds: ['public-community-with-voice-chat']
+          })
+        )
+        // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
+        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
       })
 
       it('should handle empty communities array when filtering by voice chat', async () => {
@@ -519,7 +565,8 @@ describe('Community Component', () => {
         expect(result.communities).toHaveLength(0)
         expect(result.total).toBe(0)
 
-        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([])
+        // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
+        expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
       })
 
       describe('when voice chat status check fails', () => {
@@ -527,6 +574,9 @@ describe('Community Component', () => {
           mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockRejectedValueOnce(
             new Error('Voice chat service unavailable')
           )
+          // Mock DB to return empty results when voice chat service fails
+          mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValueOnce([])
+          mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValueOnce(0)
         })
 
         it('should return communities with null voice chat status when status check fails', async () => {
@@ -540,6 +590,9 @@ describe('Community Component', () => {
       describe('when voice chat status check returns null/undefined', () => {
         beforeEach(() => {
           mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValueOnce(null)
+          // Mock DB to return empty results when voice chat service returns null
+          mockCommunitiesDB.getCommunitiesPublicInformation.mockResolvedValueOnce([])
+          mockCommunitiesDB.getPublicCommunitiesCount.mockResolvedValueOnce(0)
         })
 
         it('should handle null response gracefully and return communities', async () => {
