@@ -457,7 +457,7 @@ export function createCommunityComponent(
       }
 
       if (isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public) {
-        const requests = await communitiesDb.getCommunityRequestsByCommunityId(communityId)
+        const requests = (await communitiesDb.getCommunityRequestsByCommunityId(communityId)) ?? []
 
         await communitiesDb.acceptAllRequestsToJoin(communityId)
 
