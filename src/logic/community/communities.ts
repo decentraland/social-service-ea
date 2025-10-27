@@ -411,7 +411,7 @@ export function createCommunityComponent(
 
       const updatedCommunity = await communitiesDb.updateCommunity(communityId, {
         ...updates,
-        private: updates?.privacy === CommunityPrivacyEnum.Private || undefined
+        private: isUpdatingPrivacy ? updates.privacy === CommunityPrivacyEnum.Private : undefined
       })
 
       if (!!updates.name && updates.name.trim() !== existingCommunity.name.trim()) {

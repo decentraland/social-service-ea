@@ -1381,6 +1381,24 @@ describe('Community Component', () => {
             })
           })
 
+          describe('and the community privacy is not set', () => {
+            let updatesWithoutPrivacy: CommunityUpdates
+
+            beforeEach(() => {
+              updatesWithoutPrivacy = { ...updates, privacy: undefined }
+              mockCommunitiesDB.getCommunity.mockResolvedValueOnce({
+                ...mockCommunity,
+                privacy: CommunityPrivacyEnum.Private,
+                role: CommunityRole.Owner
+              })
+            })
+
+            it('should not update the community privacy', async () => {
+              await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutPrivacy)
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, { ...updatesWithoutPrivacy, private: undefined })
+            })
+          })
+
           describe('and the community privacy is updated from private to public', () => {
             let updatesWithPrivacyPublic: CommunityUpdates
 
@@ -1393,9 +1411,13 @@ describe('Community Component', () => {
               })
             })
 
+            it('should update the community privacy successfully', async () => {
+              await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPublic)
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, { ...updatesWithPrivacyPublic, private: false })
+            })
+
             it('should migrate all requests to join to members', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPublic)
-
               expect(mockCommunitiesDB.acceptAllRequestsToJoin).toHaveBeenCalledWith(communityId)
             })
           })
@@ -1412,9 +1434,13 @@ describe('Community Component', () => {
               })
             })
 
+            it('should update the community privacy successfully', async () => {
+              await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPrivate)
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, { ...updatesWithPrivacyPrivate, private: true })
+            })
+
             it('should not migrate all requests to join to members', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPrivate)
-
               expect(mockCommunitiesDB.acceptAllRequestsToJoin).not.toHaveBeenCalled()
             })
           })
