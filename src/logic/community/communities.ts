@@ -144,7 +144,9 @@ export function createCommunityComponent(
         ? await getVoiceChatStatusFromActiveCommunities()
         : {}
 
-      const communityIds = Object.keys(voiceChatStatusesFromFilter)
+      const communityIds = options.onlyWithActiveVoiceChat
+        ? Object.keys(voiceChatStatusesFromFilter)
+        : options.communityIds
       const dbOptions = { ...options, communityIds }
 
       const [communities, total] = await Promise.all([
@@ -185,7 +187,9 @@ export function createCommunityComponent(
         ? await getVoiceChatStatusFromActiveCommunities()
         : {}
 
-      const communityIds = Object.keys(voiceChatStatusesFromFilter)
+      const communityIds = options.onlyWithActiveVoiceChat
+        ? Object.keys(voiceChatStatusesFromFilter)
+        : options.communityIds
       const dbOptions = { ...options, communityIds }
 
       const [communities, total] = await Promise.all([
