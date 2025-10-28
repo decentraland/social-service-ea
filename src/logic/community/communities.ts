@@ -458,16 +458,16 @@ export function createCommunityComponent(
       }
 
       if (isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public) {
-        const requests =
-          (await communitiesDb.getCommunityRequests(communityId, {
-            status: CommunityRequestStatus.Pending
-          })) ?? []
+        // const requests =
+        //   (await communitiesDb.getCommunityRequests(communityId, {
+        //     status: CommunityRequestStatus.Pending
+        //   })) ?? []
 
-        await communitiesDb.acceptAllRequestsToJoin(communityId)
+        const requestsAccepted = await communitiesDb.acceptAllRequestsToJoin(communityId)
 
         analytics.fireEvent(AnalyticsEvent.ACCEPT_ALL_REQUESTS_TO_JOIN, {
           community_id: communityId,
-          requests_ids: requests.map((request) => request.id)
+          requests_ids: requestsAccepted ?? []
         })
       }
 

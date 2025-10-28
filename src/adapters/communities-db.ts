@@ -793,8 +793,21 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
-    async acceptAllRequestsToJoin(communityId: string): Promise<void> {
-      await pg.withTransaction(async (client) => {
+    async acceptAllRequestsToJoin(communityId: string): Promise<string[]> {
+      return pg.withTransaction(async (client) => {
+        // First, get the member addresses that will be accepted
+        const getMembersQuery = SQL`
+          SELECT member_address
+          FROM community_requests
+          WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
+        `
+        const membersResult = await client.query<{ member_address: string }>(
+          getMembersQuery.text,
+          getMembersQuery.values
+        )
+        const acceptedMemberAddresses = membersResult.rows.map((row) => row.member_address)
+
+        // Then, insert the members and delete the requests
         const addMembersQuery = SQL`
           INSERT INTO community_members (community_id, member_address, role)
           SELECT community_id, member_address, ${CommunityRole.Member}
@@ -807,6 +820,8 @@ export function createCommunitiesDBComponent(
           DELETE FROM community_requests WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
         `
         await client.query(removeRequestsToJoinQuery.text, removeRequestsToJoinQuery.values)
+
+        return acceptedMemberAddresses
       })
     },
 
