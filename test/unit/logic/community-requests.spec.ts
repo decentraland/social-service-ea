@@ -1020,7 +1020,7 @@ describe('Community Requests Component', () => {
 
             beforeEach(() => {
               status = CommunityRequestStatus.Accepted
-              mockCommunitiesDB.joinMemberAndRemoveRequests.mockResolvedValueOnce()
+              mockCommunitiesDB.joinMemberAndRemoveRequests.mockResolvedValueOnce(undefined)
             })
 
             it('should use transaction to add member and remove request', async () => {
@@ -1314,7 +1314,7 @@ describe('Community Requests Component', () => {
 
             beforeEach(() => {
               status = CommunityRequestStatus.Accepted
-              mockCommunitiesDB.joinMemberAndRemoveRequests.mockResolvedValueOnce()
+              mockCommunitiesDB.joinMemberAndRemoveRequests.mockResolvedValueOnce(undefined)
             })
 
             it('should use transaction to add member and remove request', async () => {
