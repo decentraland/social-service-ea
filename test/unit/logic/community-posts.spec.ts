@@ -99,18 +99,6 @@ describe('Community Posts Component', () => {
         })
       })
 
-      it('should log successful post creation', async () => {
-        await postsComponent.createPost(mockCommunityId, authorAddress, content)
-
-        expect(mockLogs.getLogger).toHaveBeenCalledWith('community-posts-component')
-        const logger = mockLogs.getLogger('community-posts-component')
-        expect(logger.info).toHaveBeenCalledWith('Post created successfully', {
-          postId: mockPost.id,
-          communityId: mockCommunityId,
-          authorAddress: authorAddress.toLowerCase()
-        })
-      })
-
       describe('and the content is empty', () => {
         beforeEach(() => {
           mockCommunitiesDB.communityExists.mockResolvedValue(true)

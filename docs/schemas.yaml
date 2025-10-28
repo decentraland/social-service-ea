@@ -99,12 +99,8 @@ components:
     CreateCommunity201OkResponse:
       type: object
       required:
-        - message
         - data
       properties:
-        message:
-          type: string
-          description: 'A message describing the result'
         data:
           type: object
           required:
@@ -719,11 +715,7 @@ components:
     CreatePost201OkResponse:
       type: object
       required:
-        - message
         - data
       properties:
-        message:
-          type: string
-          description: 'A message describing the result'
         data:
           $ref: '#/components/schemas/CommunityPost'

@@ -1,6 +1,7 @@
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types/http'
+import { CommunityPost } from '../../../logic/community/types'
 
 export type CreatePostRequestBody = {
   content: string
@@ -9,7 +10,7 @@ export type CreatePostRequestBody = {
 export async function createCommunityPostHandler(
   context: HandlerContextWithPath<'communityPosts' | 'logs', '/v1/communities/:id/posts'> &
     DecentralandSignatureContext<any>
-): Promise<HTTPResponse> {
+): Promise<HTTPResponse<CommunityPost>> {
   const { components, params, verification, request } = context
   const { communityPosts, logs } = components
   const logger = logs.getLogger('create-community-post-handler')
@@ -34,7 +35,6 @@ export async function createCommunityPostHandler(
   return {
     status: 201,
     body: {
-      message: 'Post created successfully',
       data: post
     }
   }

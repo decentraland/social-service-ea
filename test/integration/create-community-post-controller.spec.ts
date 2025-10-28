@@ -102,7 +102,6 @@ test('Create Community Post Controller', async function ({ components, stubCompo
 
         expect(response.status).toBe(201)
         const body = await response.json()
-        expect(body.message).toBe('Post created successfully')
         expect(body.data).toMatchObject({
           communityId,
           authorAddress: ownerIdentity.realAccount.address.toLowerCase(),
@@ -130,7 +129,6 @@ test('Create Community Post Controller', async function ({ components, stubCompo
 
         expect(response.status).toBe(201)
         const body = await response.json()
-        expect(body.message).toBe('Post created successfully')
         expect(body.data).toMatchObject({
           communityId,
           authorAddress: moderatorIdentity.realAccount.address.toLowerCase(),
