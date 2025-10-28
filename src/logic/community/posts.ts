@@ -7,13 +7,8 @@ import {
   GetCommunityPostsOptions,
   CommunityPrivacyEnum
 } from './types'
-import {
-  CommunityNotFoundError,
-  CommunityPostNotFoundError,
-  PostContentTooLongError,
-  PostContentEmptyError
-} from './errors'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { CommunityNotFoundError, CommunityPostNotFoundError } from './errors'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { normalizeAddress } from '../../utils/address'
 import { getProfileName, getProfileUserId, getProfileHasClaimedName, getProfilePictureUrl } from '../profiles'
 
@@ -30,11 +25,11 @@ export function createCommunityPostsComponent(
     const trimmedContent = content.trim()
 
     if (trimmedContent.length < MIN_POST_CONTENT_LENGTH) {
-      throw new PostContentEmptyError()
+      throw new InvalidRequestError('Post content is too short')
     }
 
     if (trimmedContent.length > MAX_POST_CONTENT_LENGTH) {
-      throw new PostContentTooLongError(trimmedContent.length, MAX_POST_CONTENT_LENGTH)
+      throw new InvalidRequestError('Post content is too long')
     }
   }
 

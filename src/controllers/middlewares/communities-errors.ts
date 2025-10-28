@@ -8,9 +8,7 @@ import {
   CommunityNotCompliantError,
   CommunityRequestNotFoundError,
   AIComplianceError,
-  CommunityPostNotFoundError,
-  PostContentTooLongError,
-  PostContentEmptyError
+  CommunityPostNotFoundError
 } from '../../logic/community'
 import { ComponentsWithLogger } from '@dcl/platform-server-commons/dist/types'
 
@@ -38,11 +36,7 @@ export async function communitiesErrorsHandler(
       }
     }
 
-    if (
-      error instanceof InvalidCommunityRequestError ||
-      error instanceof PostContentTooLongError ||
-      error instanceof PostContentEmptyError
-    ) {
+    if (error instanceof InvalidCommunityRequestError) {
       return {
         status: 400,
         body: {
