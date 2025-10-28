@@ -11,6 +11,7 @@ import { CommunityNotFoundError, CommunityPostNotFoundError } from './errors'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { normalizeAddress } from '../../utils/address'
 import { getProfileName, getProfileUserId, getProfileHasClaimedName, getProfilePictureUrl } from '../profiles'
+import { isErrorWithMessage } from '../../utils/errors'
 
 const MAX_POST_CONTENT_LENGTH = 1000
 const MIN_POST_CONTENT_LENGTH = 1
@@ -99,7 +100,7 @@ export function createCommunityPostsComponent(
         return post
       } catch (error) {
         logger.error('Failed to create post', {
-          error: error instanceof Error ? error.message : String(error),
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
           communityId,
           authorAddress: authorAddress.toLowerCase()
         })
@@ -142,7 +143,7 @@ export function createCommunityPostsComponent(
         }
       } catch (error) {
         logger.error('Failed to get posts', {
-          error: error instanceof Error ? error.message : String(error),
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
           communityId
         })
         throw error
@@ -167,7 +168,7 @@ export function createCommunityPostsComponent(
         })
       } catch (error) {
         logger.error('Failed to delete post', {
-          error: error instanceof Error ? error.message : String(error),
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
           postId,
           deleterAddress: deleterAddress.toLowerCase()
         })
@@ -203,7 +204,7 @@ export function createCommunityPostsComponent(
         })
       } catch (error) {
         logger.error('Failed to like post', {
-          error: error instanceof Error ? error.message : String(error),
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
           postId,
           userAddress: userAddress.toLowerCase()
         })
@@ -227,7 +228,7 @@ export function createCommunityPostsComponent(
         })
       } catch (error) {
         logger.error('Failed to unlike post', {
-          error: error instanceof Error ? error.message : String(error),
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
           postId,
           userAddress: userAddress.toLowerCase()
         })
