@@ -50,6 +50,7 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { IPubSubComponent } from '../../../src/types'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { createMockedAnalyticsComponent } from '../../mocks/components/analytics'
+import { AnalyticsEvent } from '../../../src/types/analytics'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -1364,6 +1365,10 @@ describe('Community Component', () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPublic)
 
               expect(mockCommunitiesDB.acceptAllRequestsToJoin).toHaveBeenCalledWith(communityId)
+              expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.ACCEPT_ALL_REQUESTS_TO_JOIN, {
+                community_id: communityId,
+                requests_ids: ['request-1']
+              })
             })
           })
 

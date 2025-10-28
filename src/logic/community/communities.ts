@@ -460,20 +460,14 @@ export function createCommunityComponent(
 
       const isUpdatingPrivacyToPublic = isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public
 
-      const requestsToAccept = isUpdatingPrivacyToPublic
-        ? ((await communitiesDb.getCommunityRequests(communityId, {
-            status: CommunityRequestStatus.Pending,
-            type: CommunityRequestType.RequestToJoin
-          })) ?? [])
-        : []
-
-      if (requestsToAccept?.length > 0) {
+      if (isUpdatingPrivacyToPublic) {
         const requestsAccepted = await communitiesDb.acceptAllRequestsToJoin(communityId)
 
-        analytics.fireEvent(AnalyticsEvent.ACCEPT_ALL_REQUESTS_TO_JOIN, {
-          community_id: communityId,
-          requests_ids: requestsAccepted ?? []
-        })
+        requestsAccepted?.length > 0 &&
+          analytics.fireEvent(AnalyticsEvent.ACCEPT_ALL_REQUESTS_TO_JOIN, {
+            community_id: communityId,
+            requests_ids: requestsAccepted ?? []
+          })
       }
 
       logger.info('Community updated successfully', {
