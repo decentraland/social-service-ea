@@ -38,16 +38,12 @@ export function createCommunityPostsComponent(
       return []
     }
 
-    // Extract unique author addresses
     const authorAddresses = [...new Set(posts.map((post) => post.authorAddress))]
 
-    // Fetch profiles from Catalyst
     const list = await catalystClient.getProfiles(authorAddresses)
 
-    // Build map from profiles array using userId as key
     const byAddr = new Map(list.map((p) => [getProfileUserId(p), p]))
 
-    // Map posts with profile data
     return posts.map((post) => {
       const profile = byAddr.get(normalizeAddress(post.authorAddress))
 
@@ -62,16 +58,13 @@ export function createCommunityPostsComponent(
 
   return {
     async createPost(communityId: string, authorAddress: EthAddress, content: string): Promise<CommunityPost> {
-      // Validate community exists
       const communityExists = await communitiesDb.communityExists(communityId)
       if (!communityExists) {
         throw new CommunityNotFoundError(communityId)
       }
 
-      // Validate user has permission to create posts
       await communityRoles.validatePermissionToCreatePost(communityId, authorAddress)
 
-      // Validate content
       validatePostContent(content)
 
       try {
@@ -102,13 +95,11 @@ export function createCommunityPostsComponent(
       communityId: string,
       options: GetCommunityPostsOptions
     ): Promise<{ posts: CommunityPostWithProfile[]; total: number }> {
-      // Fetch community to get privacy information
       const community = await communitiesDb.getCommunity(communityId)
       if (!community) {
         throw new CommunityNotFoundError(communityId)
       }
 
-      // Branch on privacy
       if (community.privacy === CommunityPrivacyEnum.Private) {
         if (!options.userAddress) {
           throw new NotAuthorizedError('Membership required for private communities')
@@ -120,16 +111,13 @@ export function createCommunityPostsComponent(
           )
         }
       }
-      // If community.privacy === 'public': do not perform membership checks
 
       try {
-        // Fetch posts and total count in parallel
         const [posts, total] = await Promise.all([
           communitiesDb.getPosts(communityId, options.pagination),
           communitiesDb.getPostsCount(communityId)
         ])
 
-        // Aggregate posts with author profiles
         const postsWithProfiles = await aggregatePostsWithProfiles(posts)
 
         return {
@@ -146,13 +134,11 @@ export function createCommunityPostsComponent(
     },
 
     async deletePost(postId: string, deleterAddress: EthAddress): Promise<void> {
-      // Fetch post to get community ID
       const post = await communitiesDb.getPost(postId)
       if (!post) {
         throw new CommunityPostNotFoundError(postId)
       }
 
-      // Validate user has permission to delete posts
       await communityRoles.validatePermissionToDeletePost(post.communityId, deleterAddress)
 
       try {
