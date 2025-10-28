@@ -30,12 +30,13 @@ export const up = (pgm: MigrationBuilder): void => {
 
   // Indexes for efficient queries
   pgm.createIndex('community_posts', 'community_id')
-  pgm.createIndex('community_posts', 'author_address')
   pgm.createIndex('community_posts', ['community_id', 'created_at'], {
     name: 'community_posts_community_created_idx'
   })
 }
 
 export const down = (pgm: MigrationBuilder): void => {
+  pgm.dropIndex('community_posts', 'community_id')
+  pgm.dropIndex('community_posts', 'community_posts_community_created_idx')
   pgm.dropTable('community_posts')
 }
