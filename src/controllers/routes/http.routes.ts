@@ -92,6 +92,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   // Community Posts
   router.get('/v1/communities/:id/posts', signedFetchMiddleware({ optional: true }), getCommunityPostsHandler)
+  // TODO: use schema validator component
   router.post('/v1/communities/:id/posts', signedFetchMiddleware(), createCommunityPostHandler)
   router.delete('/v1/communities/:id/posts/:postId', signedFetchMiddleware(), deleteCommunityPostHandler)
 
