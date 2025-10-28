@@ -11,6 +11,7 @@ import {
   ICommunityRequestsComponent,
   ICommunityRolesComponent,
   InvalidCommunityRequestError,
+  ListCommunityRequestsOptions,
   MemberRequest,
   ICommunityBroadcasterComponent,
   ICommunityThumbnailComponent,
@@ -790,7 +791,7 @@ describe('Community Requests Component', () => {
 
     describe('and no type filter is provided', () => {
       let requests: MemberRequest[]
-      let options: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
+      let options: ListCommunityRequestsOptions
 
       beforeEach(() => {
         requests = [
@@ -813,7 +814,6 @@ describe('Community Requests Component', () => {
         mockCommunitiesDB.getMemberRequestsCount.mockResolvedValueOnce(2)
         options = {
           pagination,
-          status: CommunityRequestStatus.Pending,
           type: undefined
         }
       })
@@ -822,17 +822,21 @@ describe('Community Requests Component', () => {
         const result = await communityRequestsComponent.getMemberRequests(memberAddress, options)
 
         expect(result).toEqual({ requests, total: requests.length })
-        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
+        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, {
+          pagination: options.pagination,
+          status: CommunityRequestStatus.Pending,
+          type: options.type
+        })
         expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, {
-          ...options,
-          pagination: undefined
+          status: CommunityRequestStatus.Pending,
+          type: options.type
         })
       })
     })
 
     describe('and filtering by type invite', () => {
       let filteredRequests: MemberRequest[]
-      let options: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
+      let options: ListCommunityRequestsOptions
 
       beforeEach(() => {
         filteredRequests = [
@@ -848,7 +852,6 @@ describe('Community Requests Component', () => {
         mockCommunitiesDB.getMemberRequestsCount.mockResolvedValueOnce(1)
         options = {
           pagination,
-          status: CommunityRequestStatus.Pending,
           type: CommunityRequestType.Invite
         }
       })
@@ -857,17 +860,21 @@ describe('Community Requests Component', () => {
         const result = await communityRequestsComponent.getMemberRequests(memberAddress, options)
 
         expect(result).toEqual({ requests: filteredRequests, total: 1 })
-        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
+        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, {
+          pagination: options.pagination,
+          status: CommunityRequestStatus.Pending,
+          type: options.type
+        })
         expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, {
-          ...options,
-          pagination: undefined
+          status: CommunityRequestStatus.Pending,
+          type: options.type
         })
       })
     })
 
     describe('and filtering by type request_to_join', () => {
       let filteredRequests: MemberRequest[]
-      let options: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
+      let options: ListCommunityRequestsOptions
 
       beforeEach(() => {
         filteredRequests = [
@@ -883,7 +890,6 @@ describe('Community Requests Component', () => {
         mockCommunitiesDB.getMemberRequestsCount.mockResolvedValueOnce(1)
         options = {
           pagination,
-          status: CommunityRequestStatus.Pending,
           type: CommunityRequestType.RequestToJoin
         }
       })
@@ -892,16 +898,20 @@ describe('Community Requests Component', () => {
         const result = await communityRequestsComponent.getMemberRequests(memberAddress, options)
 
         expect(result).toEqual({ requests: filteredRequests, total: filteredRequests.length })
-        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, options)
+        expect(mockCommunitiesDB.getMemberRequests).toHaveBeenCalledWith(memberAddress, {
+          pagination: options.pagination,
+          status: CommunityRequestStatus.Pending,
+          type: options.type
+        })
         expect(mockCommunitiesDB.getMemberRequestsCount).toHaveBeenCalledWith(memberAddress, {
-          ...options,
-          pagination: undefined
+          status: CommunityRequestStatus.Pending,
+          type: options.type
         })
       })
     })
 
     describe('and there are no requests stored in the database', () => {
-      let options: Pick<GetCommunityRequestsOptions, 'status' | 'type' | 'pagination'>
+      let options: ListCommunityRequestsOptions
 
       beforeEach(() => {
         mockCommunitiesDB.getMemberRequests.mockResolvedValueOnce([])
