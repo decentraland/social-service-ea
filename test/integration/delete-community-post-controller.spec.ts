@@ -144,8 +144,10 @@ test('Delete Community Post Controller', async function ({ components, stubCompo
         )
 
         expect(response.status).toBe(404)
-        const body = await response.json()
-        expect(body.error).toBe('Not Found')
+        expect(await response.json()).toMatchObject({
+          error: 'Not Found',
+          message: `Community post not found: ${fakePostId}`
+        })
       })
     })
 
@@ -158,8 +160,10 @@ test('Delete Community Post Controller', async function ({ components, stubCompo
         const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts/${postId}`, 'DELETE')
 
         expect(response.status).toBe(404)
-        const body = await response.json()
-        expect(body.error).toBe('Not Found')
+        expect(await response.json()).toMatchObject({
+          error: 'Not Found',
+          message: `Community post not found: ${postId}`
+        })
       })
     })
   })

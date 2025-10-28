@@ -107,13 +107,18 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
         expect(response.status).toBe(200)
         expect(body.data.posts).toHaveLength(2)
         expect(body.data.total).toBe(2)
-        expect(body.data.posts[0].content).toBe('Second post in public community')
-        expect(body.data.posts[1].content).toBe('First post in public community')
-        expect(body.data.posts[0].authorName).toBe('OwnerName')
-        expect(body.data.posts[0].authorProfilePictureUrl).toMatch(
-          /^https:\/\/profile-images\.decentraland\.org\/entities\/0x[a-f0-9]+\/face\.png$/
-        )
-        expect(body.data.posts[0].authorHasClaimedName).toBe(true)
+        expect(body.data.posts[0]).toMatchObject({
+          content: 'Second post in public community',
+          authorName: 'OwnerName',
+          authorProfilePictureUrl: /^https:\/\/profile-images\.decentraland\.org\/entities\/0x[a-f0-9]+\/face\.png$/,
+          authorHasClaimedName: true
+        })
+        expect(body.data.posts[1]).toMatchObject({
+          content: 'First post in public community',
+          authorName: 'OwnerName',
+          authorProfilePictureUrl: /^https:\/\/profile-images\.decentraland\.org\/entities\/0x[a-f0-9]+\/face\.png$/,
+          authorHasClaimedName: true
+        })
       })
     })
 

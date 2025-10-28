@@ -144,8 +144,10 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         })
 
         expect(response.status).toBe(400)
-        const body = await response.json()
-        expect(body.error).toBe('Bad request')
+        expect(await response.json()).toMatchObject({
+          error: 'Bad request',
+          message: 'Content is required'
+        })
       })
     })
 
@@ -156,8 +158,10 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         })
 
         expect(response.status).toBe(400)
-        const body = await response.json()
-        expect(body.error).toBe('Bad Request')
+        expect(await response.json()).toMatchObject({
+          error: 'Bad request',
+          message: 'Post content is too short'
+        })
       })
     })
 
@@ -169,8 +173,10 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         })
 
         expect(response.status).toBe(400)
-        const body = await response.json()
-        expect(body.error).toBe('Bad Request')
+        expect(await response.json()).toMatchObject({
+          error: 'Bad request',
+          message: 'Post content is too long'
+        })
       })
     })
 
@@ -195,8 +201,10 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         })
 
         expect(response.status).toBe(404)
-        const body = await response.json()
-        expect(body.error).toBe('Not Found')
+        expect(await response.json()).toMatchObject({
+          error: 'Not Found',
+          message: `Community not found: ${fakeCommunityId}`
+        })
       })
     })
   })
