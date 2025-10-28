@@ -7,7 +7,10 @@ import {
   InvalidCommunityRequestError,
   CommunityNotCompliantError,
   CommunityRequestNotFoundError,
-  AIComplianceError
+  AIComplianceError,
+  CommunityPostNotFoundError,
+  PostContentTooLongError,
+  PostContentEmptyError
 } from '../../logic/community'
 import { ComponentsWithLogger } from '@dcl/platform-server-commons/dist/types'
 
@@ -23,7 +26,8 @@ export async function communitiesErrorsHandler(
       error instanceof CommunityMemberNotFoundError ||
       error instanceof CommunityOwnerNotFoundError ||
       error instanceof CommunityPlaceNotFoundError ||
-      error instanceof CommunityRequestNotFoundError
+      error instanceof CommunityRequestNotFoundError ||
+      error instanceof CommunityPostNotFoundError
     ) {
       return {
         status: 404,
@@ -34,7 +38,7 @@ export async function communitiesErrorsHandler(
       }
     }
 
-    if (error instanceof InvalidCommunityRequestError) {
+    if (error instanceof InvalidCommunityRequestError || error instanceof PostContentTooLongError || error instanceof PostContentEmptyError) {
       return {
         status: 400,
         body: {

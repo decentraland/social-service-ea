@@ -42,7 +42,8 @@ import {
   createCommunityThumbnailComponent,
   createCommunityComplianceValidatorComponent,
   createCommunityFieldsValidatorComponent,
-  createCommunityRequestsComponent
+  createCommunityRequestsComponent,
+  createCommunityPostsComponent
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
@@ -249,6 +250,13 @@ export async function initComponents(): Promise<AppComponents> {
     logs
   })
 
+  const communityPosts = createCommunityPostsComponent({
+    communitiesDb,
+    communityRoles,
+    catalystClient,
+    logs
+  })
+
   const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -320,6 +328,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityMembers,
     communityOwners,
     communityPlaces,
+    communityPosts,
     communityRoles,
     communityRequests,
     communityThumbnail,

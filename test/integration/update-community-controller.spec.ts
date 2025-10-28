@@ -108,7 +108,7 @@ test('Update Community Controller', async function ({ components, stubComponents
                 expect(body.message).toBe('Community updated successfully')
               })
 
-              describe('and the communiy is private', () => { 
+              describe('and the communiy is private', () => {
                 beforeEach(async () => {
                   await components.communitiesDb.updateCommunity(communityId, {
                     private: true
@@ -134,7 +134,7 @@ test('Update Community Controller', async function ({ components, stubComponents
                   expect(response.status).toBe(200)
                   const body = await response.json()
                   expect(body.data.description).toBe('Updated Description')
-                  expect(body.data.privacy).toBe('private')
+                  expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
                 })
               })
             })
@@ -151,7 +151,7 @@ test('Update Community Controller', async function ({ components, stubComponents
                 await components.communitiesDb.addCommunityMember({
                   communityId,
                   memberAddress: nonAdminAddress,
-                  role: 'member' as any
+                  role: CommunityRole.Member
                 })
               })
 
@@ -189,7 +189,7 @@ test('Update Community Controller', async function ({ components, stubComponents
                 await components.communitiesDb.addCommunityMember({
                   communityId,
                   memberAddress: moderatorAddress,
-                  role: 'moderator' as any
+                  role: CommunityRole.Moderator
                 })
               })
 
@@ -246,7 +246,7 @@ test('Update Community Controller', async function ({ components, stubComponents
                 await components.communitiesDb.addCommunityMember({
                   communityId,
                   memberAddress: moderatorAddress,
-                  role: 'moderator' as any // Moderators can edit info but not names
+                  role: CommunityRole.Moderator // Moderators can edit info but not names
                 })
               })
 
@@ -315,7 +315,7 @@ test('Update Community Controller', async function ({ components, stubComponents
                 expect(body.message).toBe('Community updated successfully')
               })
 
-              describe('and the communiy is private', () => { 
+              describe('and the communiy is private', () => {
                 beforeEach(async () => {
                   await components.communitiesDb.updateCommunity(communityId, {
                     private: true
@@ -341,7 +341,7 @@ test('Update Community Controller', async function ({ components, stubComponents
                   expect(response.status).toBe(200)
                   const body = await response.json()
                   expect(body.data.description).toBe('Updated Description')
-                  expect(body.data.privacy).toBe('private')
+                  expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
                 })
               })
             })
@@ -480,7 +480,6 @@ test('Update Community Controller', async function ({ components, stubComponents
               })
             })
 
-
             describe('when updating multiple fields', () => {
               it('should update all provided fields', async () => {
                 const response = await makeMultipartRequest(
@@ -520,7 +519,10 @@ test('Update Community Controller', async function ({ components, stubComponents
                 })
 
                 it('should not update the community privacy if it contains a invalid value', async () => {
-                  const existingCommunity = await components.communitiesDb.getCommunity(communityId, identity.realAccount.address)
+                  const existingCommunity = await components.communitiesDb.getCommunity(
+                    communityId,
+                    identity.realAccount.address
+                  )
                   const response = await makeMultipartRequest(
                     identity,
                     `/v1/communities/${communityId}`,

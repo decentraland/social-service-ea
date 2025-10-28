@@ -1,0 +1,210 @@
+import { CommunityPrivacyEnum } from '../../src/logic/community'
+import { test } from '../components'
+import { createMockProfile } from '../mocks/profile'
+import { createTestIdentity, Identity, makeAuthenticatedRequest, makeAuthenticatedMultipartRequest } from './utils/auth'
+import { CommunityRole } from '../../src/types/entities'
+
+test('Create Community Post Controller', async function ({ components, stubComponents }) {
+  const makeRequest = makeAuthenticatedRequest(components)
+  const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
+
+  describe('when creating a community post', () => {
+    let ownerIdentity: Identity
+    let moderatorIdentity: Identity
+    let memberIdentity: Identity
+    let nonMemberIdentity: Identity
+    let communityId: string
+
+    beforeEach(async () => {
+      ownerIdentity = await createTestIdentity()
+      moderatorIdentity = await createTestIdentity()
+      memberIdentity = await createTestIdentity()
+      nonMemberIdentity = await createTestIdentity()
+
+      // Stub Catalyst client responses
+      stubComponents.catalystClient.getOwnedNames.resolves([
+        { id: '1', name: 'OwnerName', contractAddress: '0x123', tokenId: '1' },
+        { id: '2', name: 'ModeratorName', contractAddress: '0x123', tokenId: '2' },
+        { id: '3', name: 'MemberName', contractAddress: '0x123', tokenId: '3' },
+        { id: '4', name: 'NonMemberName', contractAddress: '0x123', tokenId: '4' }
+      ])
+
+      stubComponents.catalystClient.getProfile.resolves(
+        createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
+      )
+
+      stubComponents.catalystClient.getProfiles.resolves([
+        createMockProfile(ownerIdentity.realAccount.address.toLowerCase()),
+        createMockProfile(moderatorIdentity.realAccount.address.toLowerCase()),
+        createMockProfile(memberIdentity.realAccount.address.toLowerCase()),
+        createMockProfile(nonMemberIdentity.realAccount.address.toLowerCase())
+      ])
+
+      // Create a test community
+      const createCommunityResponse = await makeMultipartRequest(ownerIdentity, '/v1/communities', {
+        name: 'Test Community',
+        description: 'A test community for posts',
+        privacy: CommunityPrivacyEnum.Public
+      })
+      const createBody = await createCommunityResponse.json()
+      communityId = createBody.data.id
+
+      // Add moderator and member
+      await makeRequest(ownerIdentity, `/v1/communities/${communityId}/members`, 'POST', {
+        memberAddress: moderatorIdentity.realAccount.address
+      })
+
+      await makeRequest(ownerIdentity, `/v1/communities/${communityId}/members`, 'POST', {
+        memberAddress: memberIdentity.realAccount.address
+      })
+
+      // Update moderator role
+      await makeRequest(
+        ownerIdentity,
+        `/v1/communities/${communityId}/members/${moderatorIdentity.realAccount.address}`,
+        'PATCH',
+        {
+          role: CommunityRole.Moderator
+        }
+      )
+    })
+
+    afterEach(async () => {
+      if (communityId) {
+        await components.communitiesDb.deleteCommunity(communityId)
+      }
+    })
+
+    describe('and the request is not signed', () => {
+      it('should respond with a 400 status code', async () => {
+        const { localHttpFetch } = components
+        const response = await localHttpFetch.fetch(`/v1/communities/${communityId}/posts`, {
+          method: 'POST',
+          body: JSON.stringify({ content: 'Test post content' }),
+          headers: { 'Content-Type': 'application/json' }
+        })
+
+        expect(response.status).toBe(400)
+      })
+    })
+
+    describe('and the user is not a member', () => {
+      it('should respond with a 401 status code', async () => {
+        const response = await makeRequest(nonMemberIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: 'Test post content'
+        })
+
+        expect(response.status).toBe(401)
+      })
+    })
+
+    describe('and the user is a member but not owner or moderator', () => {
+      it('should respond with a 401 status code', async () => {
+        const response = await makeRequest(memberIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: 'Test post content'
+        })
+
+        expect(response.status).toBe(401)
+      })
+    })
+
+    describe('and the user is the owner', () => {
+      it('should create post successfully', async () => {
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: 'Test post content from owner'
+        })
+
+        expect(response.status).toBe(201)
+        const body = await response.json()
+        expect(body.message).toBe('Post created successfully')
+        expect(body.data).toMatchObject({
+          communityId,
+          authorAddress: ownerIdentity.realAccount.address.toLowerCase(),
+          content: 'Test post content from owner'
+        })
+        expect(body.data.id).toBeDefined()
+        expect(body.data.createdAt).toBeDefined()
+      })
+    })
+
+    describe('and the user is a moderator', () => {
+      it('should create post successfully', async () => {
+        const response = await makeRequest(moderatorIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: 'Test post content from moderator'
+        })
+
+        expect(response.status).toBe(201)
+        const body = await response.json()
+        expect(body.message).toBe('Post created successfully')
+        expect(body.data).toMatchObject({
+          communityId,
+          authorAddress: moderatorIdentity.realAccount.address.toLowerCase(),
+          content: 'Test post content from moderator'
+        })
+      })
+    })
+
+    describe('and the content is empty', () => {
+      it('should respond with a 400 status code', async () => {
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: ''
+        })
+
+        expect(response.status).toBe(400)
+        const body = await response.json()
+        expect(body.error).toBe('Bad request')
+      })
+    })
+
+    describe('and the content is only whitespace', () => {
+      it('should respond with a 400 status code', async () => {
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: '   \n\t   '
+        })
+
+        expect(response.status).toBe(400)
+        const body = await response.json()
+        expect(body.error).toBe('Bad request')
+      })
+    })
+
+    describe('and the content exceeds 1000 characters', () => {
+      it('should respond with a 400 status code', async () => {
+        const longContent = 'a'.repeat(1001)
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: longContent
+        })
+
+        expect(response.status).toBe(400)
+        const body = await response.json()
+        expect(body.error).toBe('Bad request')
+      })
+    })
+
+    describe('and the content is exactly 1000 characters', () => {
+      it('should create post successfully', async () => {
+        const exactContent = 'a'.repeat(1000)
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: exactContent
+        })
+
+        expect(response.status).toBe(201)
+        const body = await response.json()
+        expect(body.data.content).toBe(exactContent)
+      })
+    })
+
+    describe('and the community does not exist', () => {
+      it('should respond with a 404 status code', async () => {
+        const fakeCommunityId = '00000000-0000-0000-0000-000000000000'
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${fakeCommunityId}/posts`, 'POST', {
+          content: 'Test post content'
+        })
+
+        expect(response.status).toBe(404)
+        const body = await response.json()
+        expect(body.error).toBe('Not Found')
+      })
+    })
+  })
+})

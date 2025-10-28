@@ -9,6 +9,7 @@ import {
 } from '../../../../../src/logic/community-voice/errors'
 import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 import { CommunityRole } from '../../../../../src/types/entities'
+import { CommunityPrivacyEnum } from '../../../../../src/logic/community/types'
 
 describe('when demoting speaker in community voice chat', () => {
   let demoteSpeakerMock: jest.MockedFn<ICommsGatekeeperComponent['demoteSpeakerInCommunityVoiceChat']>
@@ -43,7 +44,7 @@ describe('when demoting speaker in community voice chat', () => {
     // Setup default mocks
     mockCommunitiesDB.getCommunity.mockResolvedValue({
       id: communityId,
-      privacy: 'public' // Default to public community
+      privacy: CommunityPrivacyEnum.Public // Default to public community
     })
     mockCommunitiesDB.isMemberBanned.mockResolvedValue(false) // Default to not banned
 
@@ -417,7 +418,7 @@ describe('when demoting speaker in community voice chat', () => {
         // Setup public community
         mockCommunitiesDB.getCommunity.mockResolvedValue({
           id: communityId,
-          privacy: 'public'
+          privacy: CommunityPrivacyEnum.Public
         })
       })
 
@@ -453,7 +454,7 @@ describe('when demoting speaker in community voice chat', () => {
         // Setup private community
         mockCommunitiesDB.getCommunity.mockResolvedValue({
           id: communityId,
-          privacy: 'private'
+          privacy: CommunityPrivacyEnum.Private
         })
       })
 

@@ -135,7 +135,7 @@ test('Get All Communities For Moderation Controller', function ({ components, sp
                   name: 'Public Community 1',
                   description: 'Test Description 1',
                   ownerAddress: '0xde615d3d992ff17ec563ee4387a10d7affcd33c1',
-                  privacy: 'public',
+                  privacy: CommunityPrivacyEnum.Public,
                   active: true,
                   membersCount: 2
                 }),
@@ -144,7 +144,7 @@ test('Get All Communities For Moderation Controller', function ({ components, sp
                   name: 'Private Community 2',
                   description: 'Test Description 2',
                   ownerAddress: '0x1234567890123456789012345678901234567890',
-                  privacy: 'private',
+                  privacy: CommunityPrivacyEnum.Private,
                   active: true,
                   membersCount: 2
                 }),
@@ -153,7 +153,7 @@ test('Get All Communities For Moderation Controller', function ({ components, sp
                   name: 'Another Public Community',
                   description: 'Test Description 3',
                   ownerAddress: '0x0987654321098765432109876543210987654321',
-                  privacy: 'public',
+                  privacy: CommunityPrivacyEnum.Public,
                   active: true,
                   membersCount: 2
                 })
@@ -161,7 +161,6 @@ test('Get All Communities For Moderation Controller', function ({ components, sp
             )
           })
         })
-
 
         describe('when filtering by search', () => {
           it('should return communities with search functionality', async () => {

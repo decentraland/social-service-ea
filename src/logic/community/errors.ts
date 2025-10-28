@@ -92,3 +92,24 @@ export class CommunityRequestNotFoundError extends Error {
     this.name = 'CommunityRequestNotFoundError'
   }
 }
+
+export class CommunityPostNotFoundError extends Error {
+  constructor(public readonly postId: string) {
+    super(`Community post not found: ${postId}`)
+    this.name = 'CommunityPostNotFoundError'
+  }
+}
+
+export class PostContentTooLongError extends Error {
+  constructor(public readonly length: number, public readonly maxLength: number) {
+    super(`Post content exceeds maximum length. Got ${length} characters, maximum is ${maxLength}`)
+    this.name = 'PostContentTooLongError'
+  }
+}
+
+export class PostContentEmptyError extends Error {
+  constructor() {
+    super(`Post content cannot be empty`)
+    this.name = 'PostContentEmptyError'
+  }
+}

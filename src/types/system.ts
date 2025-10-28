@@ -47,6 +47,7 @@ import {
   ICommunityMembersComponent,
   ICommunityOwnersComponent,
   ICommunityPlacesComponent,
+  ICommunityPostsComponent,
   ICommunityRolesComponent,
   ICommunityEventsComponent,
   ICommunityThumbnailComponent,
@@ -92,6 +93,7 @@ export type BaseComponents = {
   communityOwners: ICommunityOwnersComponent
   communityMembers: ICommunityMembersComponent
   communityPlaces: ICommunityPlacesComponent
+  communityPosts: ICommunityPostsComponent
   communityRoles: ICommunityRolesComponent
   communityVoice: ICommunityVoiceComponent
   communityEvents: ICommunityEventsComponent
