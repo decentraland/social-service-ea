@@ -22,7 +22,9 @@ import {
   CommunityPrivacyEnum,
   CommunityPublicInformation,
   CommunityUpdates,
-  CommunityMember
+  CommunityMember,
+  CommunityRequestType,
+  CommunityRequestStatus
 } from '../../../src/logic/community/types'
 import {
   createMockCommunityRolesComponent,
@@ -1346,6 +1348,16 @@ describe('Community Component', () => {
                 privacy: CommunityPrivacyEnum.Private,
                 role: CommunityRole.Owner
               })
+
+              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([
+                {
+                  id: 'request-1',
+                  communityId: communityId,
+                  memberAddress: userAddress,
+                  type: CommunityRequestType.RequestToJoin,
+                  status: CommunityRequestStatus.Pending
+                }
+              ])
             })
 
             it('should migrate all requests to join to members', async () => {
