@@ -15,7 +15,8 @@ import {
   AggregatedCommunity,
   CommunityPrivacyEnum,
   CommunityForModeration,
-  CommunityRequestStatus
+  CommunityRequestStatus,
+  CommunityRequestType
 } from './types'
 import {
   isOwner,
@@ -457,12 +458,16 @@ export function createCommunityComponent(
         })
       }
 
-      if (isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public) {
-        // const requests =
-        //   (await communitiesDb.getCommunityRequests(communityId, {
-        //     status: CommunityRequestStatus.Pending
-        //   })) ?? []
+      const isUpdatingPrivacyToPublic = isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public
 
+      const requestsToAccept = isUpdatingPrivacyToPublic
+        ? await communitiesDb.getCommunityRequests(communityId, {
+            status: CommunityRequestStatus.Pending,
+            type: CommunityRequestType.RequestToJoin
+          })
+        : []
+
+      if (requestsToAccept.length > 0) {
         const requestsAccepted = await communitiesDb.acceptAllRequestsToJoin(communityId)
 
         analytics.fireEvent(AnalyticsEvent.ACCEPT_ALL_REQUESTS_TO_JOIN, {
