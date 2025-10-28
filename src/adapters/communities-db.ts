@@ -954,6 +954,43 @@ export function createCommunitiesDBComponent(
         DELETE FROM community_posts
         WHERE id = ${postId}
       `)
+    },
+
+    async likePost(postId: string, userAddress: EthAddress): Promise<void> {
+      const normalizedAddress = normalizeAddress(userAddress)
+      await pg.query(SQL`
+        INSERT INTO community_post_likes (post_id, user_address)
+        VALUES (${postId}, ${normalizedAddress})
+        ON CONFLICT (post_id, user_address) DO NOTHING
+      `)
+    },
+
+    async unlikePost(postId: string, userAddress: EthAddress): Promise<void> {
+      const normalizedAddress = normalizeAddress(userAddress)
+      await pg.query(SQL`
+        DELETE FROM community_post_likes
+        WHERE post_id = ${postId} AND user_address = ${normalizedAddress}
+      `)
+    },
+
+    async getPostLikesCount(postId: string): Promise<number> {
+      const query = SQL`
+        SELECT COUNT(*) as count
+        FROM community_post_likes
+        WHERE post_id = ${postId}
+      `
+      return pg.getCount(query)
+    },
+
+    async isPostLikedByUser(postId: string, userAddress: EthAddress): Promise<boolean> {
+      const normalizedAddress = normalizeAddress(userAddress)
+      const query = SQL`
+        SELECT EXISTS (
+          SELECT 1 FROM community_post_likes
+          WHERE post_id = ${postId} AND user_address = ${normalizedAddress}
+        ) AS "exists"
+      `
+      return pg.exists(query, 'exists')
     }
   }
 }

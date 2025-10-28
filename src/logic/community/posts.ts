@@ -33,7 +33,10 @@ export function createCommunityPostsComponent(
     }
   }
 
-  async function aggregatePostsWithProfiles(posts: CommunityPost[]): Promise<CommunityPostWithProfile[]> {
+  async function aggregatePostsWithProfiles(
+    posts: CommunityPost[],
+    userAddress?: EthAddress
+  ): Promise<CommunityPostWithProfile[]> {
     if (posts.length === 0) {
       return []
     }
@@ -44,6 +47,17 @@ export function createCommunityPostsComponent(
 
     const byAddr = new Map(list.map((p) => [getProfileUserId(p), p]))
 
+    const postIds = posts.map((post) => post.id)
+    const [likesCounts, userLikes] = await Promise.all([
+      Promise.all(postIds.map((postId) => communitiesDb.getPostLikesCount(postId))),
+      userAddress
+        ? Promise.all(postIds.map((postId) => communitiesDb.isPostLikedByUser(postId, userAddress)))
+        : Promise.resolve([])
+    ])
+
+    const likesCountMap = new Map(postIds.map((postId, index) => [postId, likesCounts[index]]))
+    const userLikesMap = userAddress ? new Map(postIds.map((postId, index) => [postId, userLikes[index]])) : new Map()
+
     return posts.map((post) => {
       const profile = byAddr.get(normalizeAddress(post.authorAddress))
 
@@ -51,7 +65,9 @@ export function createCommunityPostsComponent(
         ...post,
         authorName: profile ? getProfileName(profile) : post.authorAddress,
         authorProfilePictureUrl: profile ? getProfilePictureUrl(profile) : '',
-        authorHasClaimedName: profile ? getProfileHasClaimedName(profile) : false
+        authorHasClaimedName: profile ? getProfileHasClaimedName(profile) : false,
+        likesCount: likesCountMap.get(post.id) || 0,
+        isLikedByUser: userAddress ? userLikesMap.get(post.id) : undefined
       }
     })
   }
@@ -118,7 +134,7 @@ export function createCommunityPostsComponent(
           communitiesDb.getPostsCount(communityId)
         ])
 
-        const postsWithProfiles = await aggregatePostsWithProfiles(posts)
+        const postsWithProfiles = await aggregatePostsWithProfiles(posts, options.userAddress)
 
         return {
           posts: postsWithProfiles,
@@ -154,6 +170,66 @@ export function createCommunityPostsComponent(
           error: error instanceof Error ? error.message : String(error),
           postId,
           deleterAddress: deleterAddress.toLowerCase()
+        })
+        throw error
+      }
+    },
+
+    async likePost(postId: string, userAddress: EthAddress): Promise<void> {
+      try {
+        const post = await communitiesDb.getPost(postId)
+        if (!post) {
+          throw new CommunityPostNotFoundError(postId)
+        }
+
+        const community = await communitiesDb.getCommunity(post.communityId)
+        if (!community) {
+          throw new CommunityNotFoundError(post.communityId)
+        }
+
+        if (community.privacy === CommunityPrivacyEnum.Private) {
+          const isMember = await communitiesDb.isMemberOfCommunity(post.communityId, userAddress)
+          if (!isMember) {
+            throw new NotAuthorizedError(`User ${userAddress} is not a member of private community ${post.communityId}`)
+          }
+        }
+
+        await communitiesDb.likePost(postId, userAddress)
+
+        logger.info('Post liked successfully', {
+          postId,
+          userAddress: userAddress.toLowerCase(),
+          communityId: post.communityId
+        })
+      } catch (error) {
+        logger.error('Failed to like post', {
+          error: error instanceof Error ? error.message : String(error),
+          postId,
+          userAddress: userAddress.toLowerCase()
+        })
+        throw error
+      }
+    },
+
+    async unlikePost(postId: string, userAddress: EthAddress): Promise<void> {
+      try {
+        const post = await communitiesDb.getPost(postId)
+        if (!post) {
+          throw new CommunityPostNotFoundError(postId)
+        }
+
+        await communitiesDb.unlikePost(postId, userAddress)
+
+        logger.info('Post unliked successfully', {
+          postId,
+          userAddress: userAddress.toLowerCase(),
+          communityId: post.communityId
+        })
+      } catch (error) {
+        logger.error('Failed to unlike post', {
+          error: error instanceof Error ? error.message : String(error),
+          postId,
+          userAddress: userAddress.toLowerCase()
         })
         throw error
       }

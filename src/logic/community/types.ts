@@ -487,6 +487,8 @@ export type CommunityPostWithProfile = CommunityPost & {
   authorName: string
   authorProfilePictureUrl: string
   authorHasClaimedName: boolean
+  likesCount: number
+  isLikedByUser?: boolean
 }
 
 export type GetCommunityPostsOptions = {
@@ -501,4 +503,6 @@ export interface ICommunityPostsComponent {
     options: GetCommunityPostsOptions
   ): Promise<{ posts: CommunityPostWithProfile[]; total: number }>
   deletePost(postId: string, deleterAddress: EthAddress): Promise<void>
+  likePost(postId: string, userAddress: EthAddress): Promise<void>
+  unlikePost(postId: string, userAddress: EthAddress): Promise<void>
 }

@@ -523,4 +523,192 @@ describe('Community Posts Component', () => {
       })
     })
   })
+
+  describe('when liking a post', () => {
+    const likerAddress = '0x1234567890123456789012345678901234567890'
+
+    describe('and the post exists', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getPost.mockResolvedValue(mockPost)
+        mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
+        mockCommunitiesDB.likePost.mockResolvedValue()
+      })
+
+      describe('and the community is public', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Public
+          })
+        })
+
+        it('should like post successfully', async () => {
+          await postsComponent.likePost(mockPostId, likerAddress)
+
+          expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId)
+          expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.likePost).toHaveBeenCalledWith(mockPostId, likerAddress)
+        })
+      })
+
+      describe('and the community is private', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Private
+          })
+        })
+
+        describe('and user is a member', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(true)
+          })
+
+          it('should like post successfully for members', async () => {
+            await postsComponent.likePost(mockPostId, likerAddress)
+
+            expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId)
+            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
+            expect(mockCommunitiesDB.likePost).toHaveBeenCalledWith(mockPostId, likerAddress)
+          })
+        })
+
+        describe('and user is not a member', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(false)
+          })
+
+          it('should throw NotAuthorizedError for non-members', async () => {
+            await expect(postsComponent.likePost(mockPostId, likerAddress)).rejects.toThrow(
+              new NotAuthorizedError(
+                `User ${likerAddress} is not a member of private community ${mockPost.communityId}`
+              )
+            )
+
+            expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId)
+            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
+            expect(mockCommunitiesDB.likePost).not.toHaveBeenCalled()
+          })
+        })
+      })
+
+      describe('and database operation fails', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Public
+          })
+          mockCommunitiesDB.likePost.mockRejectedValue(new Error('Database error'))
+        })
+
+        it('should log error and rethrow', async () => {
+          await expect(postsComponent.likePost(mockPostId, likerAddress)).rejects.toThrow('Database error')
+
+          const logger = mockLogs.getLogger('community-posts-component')
+          expect(logger.error).toHaveBeenCalledWith('Failed to like post', {
+            error: 'Database error',
+            postId: mockPostId,
+            userAddress: likerAddress.toLowerCase()
+          })
+        })
+      })
+    })
+
+    describe('and the post does not exist', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getPost.mockResolvedValue(null)
+      })
+
+      it('should throw CommunityPostNotFoundError', async () => {
+        await expect(postsComponent.likePost(mockPostId, likerAddress)).rejects.toThrow(
+          new CommunityPostNotFoundError(mockPostId)
+        )
+
+        expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+        expect(mockCommunitiesDB.getCommunity).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.likePost).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the community does not exist', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getPost.mockResolvedValue(mockPost)
+        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
+      })
+
+      it('should throw CommunityNotFoundError', async () => {
+        await expect(postsComponent.likePost(mockPostId, likerAddress)).rejects.toThrow(
+          new CommunityNotFoundError(mockPost.communityId)
+        )
+
+        expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId)
+        expect(mockCommunitiesDB.likePost).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when unliking a post', () => {
+    const unlikerAddress = '0x1234567890123456789012345678901234567890'
+
+    describe('and the post exists', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getPost.mockResolvedValue(mockPost)
+        mockCommunitiesDB.unlikePost.mockResolvedValue()
+      })
+
+      it('should unlike post successfully', async () => {
+        await postsComponent.unlikePost(mockPostId, unlikerAddress)
+
+        expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+        expect(mockCommunitiesDB.unlikePost).toHaveBeenCalledWith(mockPostId, unlikerAddress)
+      })
+
+      it('should log successful post unlike', async () => {
+        await postsComponent.unlikePost(mockPostId, unlikerAddress)
+
+        const logger = mockLogs.getLogger('community-posts-component')
+        expect(logger.info).toHaveBeenCalledWith('Post unliked successfully', {
+          postId: mockPostId,
+          userAddress: unlikerAddress.toLowerCase(),
+          communityId: mockPost.communityId
+        })
+      })
+
+      describe('and database operation fails', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.unlikePost.mockRejectedValue(new Error('Database error'))
+        })
+
+        it('should log error and rethrow', async () => {
+          await expect(postsComponent.unlikePost(mockPostId, unlikerAddress)).rejects.toThrow('Database error')
+
+          const logger = mockLogs.getLogger('community-posts-component')
+          expect(logger.error).toHaveBeenCalledWith('Failed to unlike post', {
+            error: 'Database error',
+            postId: mockPostId,
+            userAddress: unlikerAddress.toLowerCase()
+          })
+        })
+      })
+    })
+
+    describe('and the post does not exist', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getPost.mockResolvedValue(null)
+      })
+
+      it('should throw CommunityPostNotFoundError', async () => {
+        await expect(postsComponent.unlikePost(mockPostId, unlikerAddress)).rejects.toThrow(
+          new CommunityPostNotFoundError(mockPostId)
+        )
+
+        expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+        expect(mockCommunitiesDB.unlikePost).not.toHaveBeenCalled()
+      })
+    })
+  })
 })

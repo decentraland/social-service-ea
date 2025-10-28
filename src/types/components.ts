@@ -212,6 +212,10 @@ export interface ICommunitiesDatabaseComponent {
   getPosts(communityId: string, pagination: Pagination): Promise<CommunityPost[]>
   getPostsCount(communityId: string): Promise<number>
   deletePost(postId: string): Promise<void>
+  likePost(postId: string, userAddress: EthAddress): Promise<void>
+  unlikePost(postId: string, userAddress: EthAddress): Promise<void>
+  getPostLikesCount(postId: string): Promise<number>
+  isPostLikedByUser(postId: string, userAddress: EthAddress): Promise<boolean>
 }
 
 export interface IVoiceDatabaseComponent {

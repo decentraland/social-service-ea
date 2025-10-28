@@ -32,7 +32,9 @@ import {
   getAllCommunitiesForModerationHandler,
   createCommunityPostHandler,
   getCommunityPostsHandler,
-  deleteCommunityPostHandler
+  deleteCommunityPostHandler,
+  likeCommunityPostHandler,
+  unlikeCommunityPostHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
@@ -95,6 +97,8 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   // TODO: use schema validator component
   router.post('/v1/communities/:id/posts', signedFetchMiddleware(), createCommunityPostHandler)
   router.delete('/v1/communities/:id/posts/:postId', signedFetchMiddleware(), deleteCommunityPostHandler)
+  router.post('/v1/communities/:id/posts/:postId/like', signedFetchMiddleware(), likeCommunityPostHandler)
+  router.delete('/v1/communities/:id/posts/:postId/like', signedFetchMiddleware(), unlikeCommunityPostHandler)
 
   router.post('/v1/referral-progress', signedFetchMiddleware(), createReferralHandler)
   router.patch('/v1/referral-progress', signedFetchMiddleware(), updateReferralSignedUpHandler)
