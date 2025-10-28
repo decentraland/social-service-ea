@@ -461,13 +461,13 @@ export function createCommunityComponent(
       const isUpdatingPrivacyToPublic = isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public
 
       const requestsToAccept = isUpdatingPrivacyToPublic
-        ? await communitiesDb.getCommunityRequests(communityId, {
+        ? ((await communitiesDb.getCommunityRequests(communityId, {
             status: CommunityRequestStatus.Pending,
             type: CommunityRequestType.RequestToJoin
-          })
+          })) ?? [])
         : []
 
-      if (requestsToAccept.length > 0) {
+      if (requestsToAccept?.length > 0) {
         const requestsAccepted = await communitiesDb.acceptAllRequestsToJoin(communityId)
 
         analytics.fireEvent(AnalyticsEvent.ACCEPT_ALL_REQUESTS_TO_JOIN, {
