@@ -1321,6 +1321,96 @@ paths:
       tags:
         - Communities
 
+  /v1/communities/{id}/posts/{postId}/like:
+    post:
+      summary: Like a community post
+      description: |
+        Likes a post in a community.
+        This endpoint requires Signed Fetch authentication.
+        Users can only like posts from communities they are members of.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the post.
+      responses:
+        '201':
+          description: Post liked successfully
+        '401':
+          description: Unauthorized - Signed Fetch required or not a member of the community
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community or post not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+    delete:
+      summary: Unlike a community post
+      description: |
+        Unlikes a post in a community.
+        This endpoint requires Signed Fetch authentication.
+        Users can only unlike posts they have previously liked.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the post.
+      responses:
+        '204':
+          description: Post unliked successfully
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community or post not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
   /v1/community-voice-chats/active:
     get:
       summary: Get active community voice chats
