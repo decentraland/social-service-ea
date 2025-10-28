@@ -1,11 +1,11 @@
 import { CommunityPrivacyEnum } from '../../src/logic/community'
+import { CommunityRole } from '../../src/types/entities'
 import { test } from '../components'
-import { createMockProfile } from '../mocks/profile'
-import { createTestIdentity, Identity, makeAuthenticatedRequest, makeAuthenticatedMultipartRequest } from './utils/auth'
+import { createMockProfileWithDetails } from '../mocks/profile'
+import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 
 test('Get Community Posts Controller', async function ({ components, stubComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
-  const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
 
   describe('when getting community posts', () => {
     let ownerIdentity: Identity
@@ -27,54 +27,74 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
       ])
 
       stubComponents.catalystClient.getProfiles.resolves([
-        createMockProfile(ownerIdentity.realAccount.address.toLowerCase()),
-        createMockProfile(memberIdentity.realAccount.address.toLowerCase()),
-        createMockProfile(nonMemberIdentity.realAccount.address.toLowerCase())
+        createMockProfileWithDetails(ownerIdentity.realAccount.address.toLowerCase(), { name: 'OwnerName' }),
+        createMockProfileWithDetails(memberIdentity.realAccount.address.toLowerCase(), { name: 'MemberName' }),
+        createMockProfileWithDetails(nonMemberIdentity.realAccount.address.toLowerCase(), { name: 'NonMemberName' })
       ])
 
-      // Create public community
-      const publicCommunityResponse = await makeMultipartRequest(ownerIdentity, '/v1/communities', {
+      // Create public community directly in database
+      const publicCommunity = await components.communitiesDb.createCommunity({
         name: 'Public Community',
         description: 'A public community',
-        privacy: CommunityPrivacyEnum.Public
+        owner_address: ownerIdentity.realAccount.address.toLowerCase(),
+        private: false,
+        active: true
       })
-      const publicBody = await publicCommunityResponse.json()
-      publicCommunityId = publicBody.data.id
+      publicCommunityId = publicCommunity.id
 
-      // Create private community
-      const privateCommunityResponse = await makeMultipartRequest(ownerIdentity, '/v1/communities', {
+      // Create private community directly in database
+      const privateCommunity = await components.communitiesDb.createCommunity({
         name: 'Private Community',
         description: 'A private community',
-        privacy: CommunityPrivacyEnum.Private
+        owner_address: ownerIdentity.realAccount.address.toLowerCase(),
+        private: true,
+        active: true
       })
-      const privateBody = await privateCommunityResponse.json()
-      privateCommunityId = privateBody.data.id
+      privateCommunityId = privateCommunity.id
 
       // Add member to private community
-      await makeRequest(ownerIdentity, `/v1/communities/${privateCommunityId}/members`, 'POST', {
-        memberAddress: memberIdentity.realAccount.address
+      await components.communitiesDb.addCommunityMember({
+        communityId: privateCommunityId,
+        memberAddress: memberIdentity.realAccount.address.toLowerCase(),
+        role: CommunityRole.Member
       })
 
-      // Create some test posts
-      await makeRequest(ownerIdentity, `/v1/communities/${publicCommunityId}/posts`, 'POST', {
+      // Create some test posts directly in database
+      await components.communitiesDb.createPost({
+        communityId: publicCommunityId,
+        authorAddress: ownerIdentity.realAccount.address.toLowerCase(),
         content: 'First post in public community'
       })
 
-      await makeRequest(ownerIdentity, `/v1/communities/${publicCommunityId}/posts`, 'POST', {
+      await components.communitiesDb.createPost({
+        communityId: publicCommunityId,
+        authorAddress: ownerIdentity.realAccount.address.toLowerCase(),
         content: 'Second post in public community'
       })
 
-      await makeRequest(ownerIdentity, `/v1/communities/${privateCommunityId}/posts`, 'POST', {
+      await components.communitiesDb.createPost({
+        communityId: privateCommunityId,
+        authorAddress: ownerIdentity.realAccount.address.toLowerCase(),
         content: 'Post in private community'
       })
     })
 
     afterEach(async () => {
       if (publicCommunityId) {
-        await components.communitiesDb.deleteCommunity(publicCommunityId)
+        await components.communitiesDbHelper.forceCommunityMemberRemoval(publicCommunityId, [
+          ownerIdentity.realAccount.address.toLowerCase(),
+          memberIdentity.realAccount.address.toLowerCase(),
+          nonMemberIdentity.realAccount.address.toLowerCase()
+        ])
+        await components.communitiesDbHelper.forceCommunityRemoval(publicCommunityId)
       }
       if (privateCommunityId) {
-        await components.communitiesDb.deleteCommunity(privateCommunityId)
+        await components.communitiesDbHelper.forceCommunityMemberRemoval(privateCommunityId, [
+          ownerIdentity.realAccount.address.toLowerCase(),
+          memberIdentity.realAccount.address.toLowerCase(),
+          nonMemberIdentity.realAccount.address.toLowerCase()
+        ])
+        await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
       }
     })
 
@@ -90,7 +110,9 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
         expect(body.data.posts[0].content).toBe('Second post in public community')
         expect(body.data.posts[1].content).toBe('First post in public community')
         expect(body.data.posts[0].authorName).toBe('OwnerName')
-        expect(body.data.posts[0].authorProfilePictureUrl).toBe('https://example.com/avatar.jpg')
+        expect(body.data.posts[0].authorProfilePictureUrl).toMatch(
+          /^https:\/\/profile-images\.decentraland\.org\/entities\/0x[a-f0-9]+\/face\.png$/
+        )
         expect(body.data.posts[0].authorHasClaimedName).toBe(true)
       })
     })
@@ -145,18 +167,22 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
       let emptyCommunityId: string
 
       beforeEach(async () => {
-        const emptyCommunityResponse = await makeMultipartRequest(ownerIdentity, '/v1/communities', {
+        const emptyCommunity = await components.communitiesDb.createCommunity({
           name: 'Empty Community',
           description: 'A community with no posts',
-          privacy: CommunityPrivacyEnum.Public
+          owner_address: ownerIdentity.realAccount.address.toLowerCase(),
+          private: false,
+          active: true
         })
-        const emptyBody = await emptyCommunityResponse.json()
-        emptyCommunityId = emptyBody.data.id
+        emptyCommunityId = emptyCommunity.id
       })
 
       afterEach(async () => {
         if (emptyCommunityId) {
-          await components.communitiesDb.deleteCommunity(emptyCommunityId)
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(emptyCommunityId, [
+            ownerIdentity.realAccount.address.toLowerCase()
+          ])
+          await components.communitiesDbHelper.forceCommunityRemoval(emptyCommunityId)
         }
       })
 

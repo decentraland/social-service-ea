@@ -1,6 +1,6 @@
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
-import { HandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types/http'
 
 export type CreatePostRequestBody = {
   content: string

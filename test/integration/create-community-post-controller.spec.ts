@@ -21,24 +21,16 @@ test('Create Community Post Controller', async function ({ components, stubCompo
       memberIdentity = await createTestIdentity()
       nonMemberIdentity = await createTestIdentity()
 
-      // Stub Catalyst client responses
-      stubComponents.catalystClient.getOwnedNames.resolves([
-        { id: '1', name: 'OwnerName', contractAddress: '0x123', tokenId: '1' },
-        { id: '2', name: 'ModeratorName', contractAddress: '0x123', tokenId: '2' },
-        { id: '3', name: 'MemberName', contractAddress: '0x123', tokenId: '3' },
-        { id: '4', name: 'NonMemberName', contractAddress: '0x123', tokenId: '4' }
-      ])
+      // Mock AI compliance validator
+      stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
 
+      // Mock catalyst client for community creation
+      stubComponents.catalystClient.getOwnedNames.resolves([
+        { id: '1', name: 'OwnerName', contractAddress: '0x123', tokenId: '1' }
+      ])
       stubComponents.catalystClient.getProfile.resolves(
         createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
       )
-
-      stubComponents.catalystClient.getProfiles.resolves([
-        createMockProfile(ownerIdentity.realAccount.address.toLowerCase()),
-        createMockProfile(moderatorIdentity.realAccount.address.toLowerCase()),
-        createMockProfile(memberIdentity.realAccount.address.toLowerCase()),
-        createMockProfile(nonMemberIdentity.realAccount.address.toLowerCase())
-      ])
 
       // Create a test community
       const createCommunityResponse = await makeMultipartRequest(ownerIdentity, '/v1/communities', {
@@ -48,30 +40,17 @@ test('Create Community Post Controller', async function ({ components, stubCompo
       })
       const createBody = await createCommunityResponse.json()
       communityId = createBody.data.id
-
-      // Add moderator and member
-      await makeRequest(ownerIdentity, `/v1/communities/${communityId}/members`, 'POST', {
-        memberAddress: moderatorIdentity.realAccount.address
-      })
-
-      await makeRequest(ownerIdentity, `/v1/communities/${communityId}/members`, 'POST', {
-        memberAddress: memberIdentity.realAccount.address
-      })
-
-      // Update moderator role
-      await makeRequest(
-        ownerIdentity,
-        `/v1/communities/${communityId}/members/${moderatorIdentity.realAccount.address}`,
-        'PATCH',
-        {
-          role: CommunityRole.Moderator
-        }
-      )
     })
 
     afterEach(async () => {
       if (communityId) {
-        await components.communitiesDb.deleteCommunity(communityId)
+        await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
+          ownerIdentity.realAccount.address.toLowerCase(),
+          moderatorIdentity.realAccount.address.toLowerCase(),
+          memberIdentity.realAccount.address.toLowerCase(),
+          nonMemberIdentity.realAccount.address.toLowerCase()
+        ])
+        await components.communitiesDbHelper.forceCommunityRemoval(communityId)
       }
     })
 
@@ -99,6 +78,13 @@ test('Create Community Post Controller', async function ({ components, stubCompo
     })
 
     describe('and the user is a member but not owner or moderator', () => {
+      beforeEach(async () => {
+        // Add member
+        await makeRequest(ownerIdentity, `/v1/communities/${communityId}/members`, 'POST', {
+          memberAddress: memberIdentity.realAccount.address
+        })
+      })
+
       it('should respond with a 401 status code', async () => {
         const response = await makeRequest(memberIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
           content: 'Test post content'
@@ -128,6 +114,15 @@ test('Create Community Post Controller', async function ({ components, stubCompo
     })
 
     describe('and the user is a moderator', () => {
+      beforeEach(async () => {
+        // Add moderator directly to database with Moderator role
+        await components.communitiesDb.addCommunityMember({
+          communityId,
+          memberAddress: moderatorIdentity.realAccount.address.toLowerCase(),
+          role: CommunityRole.Moderator
+        })
+      })
+
       it('should create post successfully', async () => {
         const response = await makeRequest(moderatorIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
           content: 'Test post content from moderator'
@@ -164,7 +159,7 @@ test('Create Community Post Controller', async function ({ components, stubCompo
 
         expect(response.status).toBe(400)
         const body = await response.json()
-        expect(body.error).toBe('Bad request')
+        expect(body.error).toBe('Bad Request')
       })
     })
 
@@ -177,7 +172,7 @@ test('Create Community Post Controller', async function ({ components, stubCompo
 
         expect(response.status).toBe(400)
         const body = await response.json()
-        expect(body.error).toBe('Bad request')
+        expect(body.error).toBe('Bad Request')
       })
     })
 

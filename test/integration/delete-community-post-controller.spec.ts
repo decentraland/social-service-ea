@@ -2,11 +2,10 @@ import { CommunityPrivacyEnum } from '../../src/logic/community'
 import { CommunityRole } from '../../src/types/entities'
 import { test } from '../components'
 import { createMockProfile } from '../mocks/profile'
-import { createTestIdentity, Identity, makeAuthenticatedRequest, makeAuthenticatedMultipartRequest } from './utils/auth'
+import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 
 test('Delete Community Post Controller', async function ({ components, stubComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
-  const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
 
   describe('when deleting a community post', () => {
     let ownerIdentity: Identity
@@ -33,45 +32,52 @@ test('Delete Community Post Controller', async function ({ components, stubCompo
         createMockProfile(memberIdentity.realAccount.address.toLowerCase())
       ])
 
-      // Create community
-      const communityResponse = await makeMultipartRequest(ownerIdentity, '/v1/communities', {
+      // Create community directly in database
+      const community = await components.communitiesDb.createCommunity({
         name: 'Test Community',
         description: 'A test community',
-        privacy: CommunityPrivacyEnum.Public
+        owner_address: ownerIdentity.realAccount.address.toLowerCase(),
+        private: false,
+        active: true
       })
-      const communityBody = await communityResponse.json()
-      communityId = communityBody.data.id
+      communityId = community.id
 
-      // Add moderator and member
-      await makeRequest(ownerIdentity, `/v1/communities/${communityId}/members`, 'POST', {
-        memberAddress: moderatorIdentity.realAccount.address
+      // Add owner, moderator and member directly to database
+      await components.communitiesDb.addCommunityMember({
+        communityId,
+        memberAddress: ownerIdentity.realAccount.address.toLowerCase(),
+        role: CommunityRole.Owner
       })
 
-      await makeRequest(ownerIdentity, `/v1/communities/${communityId}/members`, 'POST', {
-        memberAddress: memberIdentity.realAccount.address
+      await components.communitiesDb.addCommunityMember({
+        communityId,
+        memberAddress: moderatorIdentity.realAccount.address.toLowerCase(),
+        role: CommunityRole.Moderator
       })
 
-      // Update moderator role
-      await makeRequest(
-        ownerIdentity,
-        `/v1/communities/${communityId}/members/${moderatorIdentity.realAccount.address}`,
-        'PATCH',
-        {
-          role: CommunityRole.Moderator
-        }
-      )
+      await components.communitiesDb.addCommunityMember({
+        communityId,
+        memberAddress: memberIdentity.realAccount.address.toLowerCase(),
+        role: CommunityRole.Member
+      })
 
-      // Create a test post
-      const postResponse = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+      // Create a test post directly in database
+      const post = await components.communitiesDb.createPost({
+        communityId,
+        authorAddress: ownerIdentity.realAccount.address.toLowerCase(),
         content: 'Test post to delete'
       })
-      const postBody = await postResponse.json()
-      postId = postBody.data.id
+      postId = post.id
     })
 
     afterEach(async () => {
       if (communityId) {
-        await components.communitiesDb.deleteCommunity(communityId)
+        await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
+          ownerIdentity.realAccount.address.toLowerCase(),
+          moderatorIdentity.realAccount.address.toLowerCase(),
+          memberIdentity.realAccount.address.toLowerCase()
+        ])
+        await components.communitiesDbHelper.forceCommunityRemoval(communityId)
       }
     })
 
