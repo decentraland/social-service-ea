@@ -1350,15 +1350,7 @@ describe('Community Component', () => {
                 role: CommunityRole.Owner
               })
 
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([
-                {
-                  id: 'request-1',
-                  communityId: communityId,
-                  memberAddress: userAddress,
-                  type: CommunityRequestType.RequestToJoin,
-                  status: CommunityRequestStatus.Pending
-                }
-              ])
+              mockCommunitiesDB.acceptAllRequestsToJoin.mockResolvedValueOnce(['request-1'])
             })
 
             it('should migrate all requests to join to members', async () => {
