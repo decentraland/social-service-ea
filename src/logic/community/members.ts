@@ -235,11 +235,12 @@ export async function createCommunityMembersComponent(
         throw new NotAuthorizedError(`The user ${memberAddress} is banned from community ${communityId}`)
       }
 
-      const requests = await communitiesDb.getCommunityRequests(communityId, {
-        pagination: { limit: 1, offset: 0 },
-        targetAddress: memberAddress,
-        status: CommunityRequestStatus.Pending
-      })
+      const requests =
+        (await communitiesDb.getCommunityRequests(communityId, {
+          pagination: { limit: 1, offset: 0 },
+          targetAddress: memberAddress,
+          status: CommunityRequestStatus.Pending
+        })) ?? []
 
       await communitiesDb.joinMemberAndRemoveRequests({
         communityId,
