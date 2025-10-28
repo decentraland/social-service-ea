@@ -206,8 +206,6 @@ export interface ICommunitiesDatabaseComponent {
   joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
   getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
   acceptAllRequestsToJoin(communityId: string): Promise<void>
-  getCommunityRequestByMemberAddress(communityId: string, memberAddress: EthAddress): Promise<MemberRequest | undefined>
-  getCommunityRequestsByCommunityId(communityId: string): Promise<MemberRequest[]>
 }
 
 export interface IVoiceDatabaseComponent {

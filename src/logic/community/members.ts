@@ -5,7 +5,8 @@ import {
   CommunityMemberProfile,
   GetCommunityMembersOptions,
   ICommunityMembersComponent,
-  CommunityPrivacyEnum
+  CommunityPrivacyEnum,
+  CommunityRequestStatus
 } from './types'
 import { mapMembersWithProfiles } from './utils'
 import { EthAddress, Events } from '@dcl/schemas'
@@ -234,7 +235,11 @@ export async function createCommunityMembersComponent(
         throw new NotAuthorizedError(`The user ${memberAddress} is banned from community ${communityId}`)
       }
 
-      const request = await communitiesDb.getCommunityRequestByMemberAddress(communityId, memberAddress)
+      const requests = await communitiesDb.getCommunityRequests(communityId, {
+        pagination: { limit: 1, offset: 0 },
+        targetAddress: memberAddress,
+        status: CommunityRequestStatus.Pending
+      })
 
       await communitiesDb.joinMemberAndRemoveRequests({
         communityId,
@@ -245,7 +250,7 @@ export async function createCommunityMembersComponent(
       analytics.fireEvent(AnalyticsEvent.JOIN_COMMUNITY, {
         community_id: communityId,
         user_id: memberAddress,
-        request_id: request?.id
+        request_id: requests[0]?.id
       })
 
       await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {

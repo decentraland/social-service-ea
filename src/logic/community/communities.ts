@@ -14,7 +14,8 @@ import {
   CommunityUpdates,
   AggregatedCommunity,
   CommunityPrivacyEnum,
-  CommunityForModeration
+  CommunityForModeration,
+  CommunityRequestStatus
 } from './types'
 import {
   isOwner,
@@ -457,7 +458,10 @@ export function createCommunityComponent(
       }
 
       if (isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public) {
-        const requests = (await communitiesDb.getCommunityRequestsByCommunityId(communityId)) ?? []
+        const requests =
+          (await communitiesDb.getCommunityRequests(communityId, {
+            status: CommunityRequestStatus.Pending
+          })) ?? []
 
         await communitiesDb.acceptAllRequestsToJoin(communityId)
 
