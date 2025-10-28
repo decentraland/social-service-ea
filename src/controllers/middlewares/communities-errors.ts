@@ -38,7 +38,11 @@ export async function communitiesErrorsHandler(
       }
     }
 
-    if (error instanceof InvalidCommunityRequestError || error instanceof PostContentTooLongError || error instanceof PostContentEmptyError) {
+    if (
+      error instanceof InvalidCommunityRequestError ||
+      error instanceof PostContentTooLongError ||
+      error instanceof PostContentEmptyError
+    ) {
       return {
         status: 400,
         body: {

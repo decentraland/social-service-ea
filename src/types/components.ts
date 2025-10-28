@@ -207,7 +207,7 @@ export interface ICommunitiesDatabaseComponent {
   joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
   getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
   acceptAllRequestsToJoin(communityId: string): Promise<void>
-  
+
   // Community Posts Methods
   createPost(post: { communityId: string; authorAddress: string; content: string }): Promise<CommunityPost>
   getPost(postId: string): Promise<CommunityPost | null>

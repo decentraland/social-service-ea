@@ -101,7 +101,10 @@ export class CommunityPostNotFoundError extends Error {
 }
 
 export class PostContentTooLongError extends Error {
-  constructor(public readonly length: number, public readonly maxLength: number) {
+  constructor(
+    public readonly length: number,
+    public readonly maxLength: number
+  ) {
     super(`Post content exceeds maximum length. Got ${length} characters, maximum is ${maxLength}`)
     this.name = 'PostContentTooLongError'
   }
