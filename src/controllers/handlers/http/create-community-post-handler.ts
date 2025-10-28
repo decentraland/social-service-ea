@@ -14,10 +14,8 @@ export async function createCommunityPostHandler(
   const { communityPosts, logs } = components
   const logger = logs.getLogger('create-community-post-handler')
 
-  // Get authenticated user address
   const userAddress = verification!.auth.toLowerCase()
 
-  // Parse request body
   const body = (await request.json()) as CreatePostRequestBody
   const { content } = body
 
@@ -25,7 +23,6 @@ export async function createCommunityPostHandler(
     throw new InvalidRequestError('Content is required')
   }
 
-  // Create the post
   const post = await communityPosts.createPost(params.id, userAddress, content)
 
   logger.info('Post created successfully', {

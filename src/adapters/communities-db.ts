@@ -904,7 +904,6 @@ export function createCommunitiesDBComponent(
       return pg.getCount(query)
     },
 
-    // Community Posts Methods
     async createPost(post: { communityId: string; authorAddress: string; content: string }): Promise<CommunityPost> {
       const postId = randomUUID()
       const normalizedAuthorAddress = normalizeAddress(post.authorAddress)

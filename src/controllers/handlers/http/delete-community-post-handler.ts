@@ -9,10 +9,8 @@ export async function deleteCommunityPostHandler(
   const { communityPosts, logs } = components
   const logger = logs.getLogger('delete-community-post-handler')
 
-  // Get authenticated user address
   const userAddress = verification!.auth.toLowerCase()
 
-  // Delete the post
   await communityPosts.deletePost(params.postId, userAddress)
 
   logger.info('Post deleted successfully', {
@@ -22,7 +20,6 @@ export async function deleteCommunityPostHandler(
   })
 
   return {
-    status: 204,
-    body: undefined
+    status: 204
   }
 }
