@@ -10,7 +10,7 @@ export async function unlikeCommunityPostHandler(
 ): Promise<HTTPResponse> {
   const {
     components: { communityPosts, logs },
-    params: { id, postId },
+    params: { id: communityId, postId },
     verification
   } = context
 
@@ -18,12 +18,12 @@ export async function unlikeCommunityPostHandler(
   const userAddress = verification!.auth.toLowerCase()
 
   try {
-    await communityPosts.unlikePost(postId, userAddress)
+    await communityPosts.unlikePost(communityId, postId, userAddress)
 
     return { status: 204 }
   } catch (error) {
     const message = errorMessageOrDefault(error)
-    logger.error(`Error unliking post: ${postId} in community: ${id}, error: ${message}`)
+    logger.error(`Error unliking post: ${postId} in community: ${communityId}, error: ${message}`)
 
     if (error instanceof CommunityPostNotFoundError) {
       throw error

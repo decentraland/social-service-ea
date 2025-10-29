@@ -74,26 +74,25 @@ export function createCommunityPostsComponent(
   }
 
   async function validatePermissionsToLikeAndUnlikePost(
+    communityId: string,
     postId: string,
     userAddress: EthAddress
-  ): Promise<CommunityPost> {
-    const post = await communitiesDb.getPost(postId)
-    if (!post) {
-      throw new CommunityPostNotFoundError(postId)
-    }
-
-    const community = await communitiesDb.getCommunity(post.communityId, userAddress)
+  ): Promise<void> {
+    const community = await communitiesDb.getCommunity(communityId, userAddress)
     if (!community) {
-      throw new CommunityNotFoundError(post.communityId)
+      throw new CommunityNotFoundError(communityId)
     }
 
     if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
       throw new NotAuthorizedError(
-        `${userAddress} is not a member of private community ${post.communityId}. You need to be a member to like/unlike posts in this community.`
+        `${userAddress} is not a member of private community ${communityId}. You need to be a member to like/unlike posts in this community.`
       )
     }
 
-    return post
+    const post = await communitiesDb.getPost(postId)
+    if (!post) {
+      throw new CommunityPostNotFoundError(postId)
+    }
   }
 
   return {
@@ -168,27 +167,29 @@ export function createCommunityPostsComponent(
       })
     },
 
-    async likePost(postId: string, userAddress: EthAddress): Promise<void> {
-      const post = await validatePermissionsToLikeAndUnlikePost(postId, userAddress)
+    async likePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void> {
+      const normalizedUserAddress = normalizeAddress(userAddress)
+      await validatePermissionsToLikeAndUnlikePost(communityId, postId, normalizedUserAddress)
 
-      await communitiesDb.likePost(postId, userAddress)
+      await communitiesDb.likePost(postId, normalizedUserAddress)
 
       logger.info('Post liked successfully', {
         postId,
-        userAddress: userAddress.toLowerCase(),
-        communityId: post.communityId
+        userAddress: normalizedUserAddress,
+        communityId
       })
     },
 
-    async unlikePost(postId: string, userAddress: EthAddress): Promise<void> {
-      const post = await validatePermissionsToLikeAndUnlikePost(postId, userAddress)
+    async unlikePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void> {
+      const normalizedUserAddress = normalizeAddress(userAddress)
+      await validatePermissionsToLikeAndUnlikePost(communityId, postId, normalizedUserAddress)
 
-      await communitiesDb.unlikePost(postId, userAddress)
+      await communitiesDb.unlikePost(postId, normalizedUserAddress)
 
       logger.info('Post unliked successfully', {
         postId,
-        userAddress: userAddress.toLowerCase(),
-        communityId: post.communityId
+        userAddress: normalizedUserAddress,
+        communityId
       })
     }
   }

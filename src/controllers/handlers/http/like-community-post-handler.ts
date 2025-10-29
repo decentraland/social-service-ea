@@ -11,7 +11,7 @@ export async function likeCommunityPostHandler(
 ): Promise<HTTPResponse> {
   const {
     components: { communityPosts, logs },
-    params: { id, postId },
+    params: { id: communityId, postId },
     verification
   } = context
 
@@ -19,14 +19,14 @@ export async function likeCommunityPostHandler(
   const userAddress = verification!.auth.toLowerCase()
 
   try {
-    await communityPosts.likePost(postId, userAddress)
+    await communityPosts.likePost(communityId, postId, userAddress)
 
     return {
       status: 201
     }
   } catch (error) {
     const message = errorMessageOrDefault(error)
-    logger.error(`Error liking post: ${postId} in community: ${id}, error: ${message}`)
+    logger.error(`Error liking post: ${postId} in community: ${communityId}, error: ${message}`)
 
     if (error instanceof CommunityPostNotFoundError || error instanceof NotAuthorizedError) {
       throw error

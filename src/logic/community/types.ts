@@ -503,6 +503,6 @@ export interface ICommunityPostsComponent {
     options: GetCommunityPostsOptions
   ): Promise<{ posts: CommunityPostWithProfile[]; total: number }>
   deletePost(postId: string, deleterAddress: EthAddress): Promise<void>
-  likePost(postId: string, userAddress: EthAddress): Promise<void>
-  unlikePost(postId: string, userAddress: EthAddress): Promise<void>
+  likePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void>
+  unlikePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void>
 }
