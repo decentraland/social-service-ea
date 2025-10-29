@@ -5,7 +5,7 @@ import { mockCommunity } from '../mocks/communities'
 import { createMockProfile } from '../mocks/profile'
 import { randomUUID } from 'crypto'
 
-test('Unlike Community Post Controller', function ({ components, stubComponents }) {
+test('Unlike Community Post Controller', function ({ components, stubComponents, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when unliking a post', () => {
@@ -138,6 +138,25 @@ test('Unlike Community Post Controller', function ({ components, stubComponents 
         )
 
         expect(response.status).toBe(404)
+      })
+    })
+
+    describe('and an unhandled error is propagated', () => {
+      beforeEach(() => {
+        spyComponents.communitiesDb.unlikePost.mockRejectedValueOnce(new Error('Unhandled error'))
+      })
+
+      it('should respond with a 500 status code', async () => {
+        const response = await makeRequest(
+          memberIdentity,
+          `/v1/communities/${communityId}/posts/${postId}/like`,
+          'DELETE'
+        )
+        const body = await response.json()
+
+        expect(response.status).toBe(500)
+        expect(body).toHaveProperty('message')
+        expect(body.message).toBe('Unhandled error')
       })
     })
   })

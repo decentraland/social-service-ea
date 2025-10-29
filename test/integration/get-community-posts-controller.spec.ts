@@ -5,7 +5,7 @@ import { createMockProfileWithDetails, createMockProfile } from '../mocks/profil
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { mockCommunity } from '../mocks/communities'
 
-test('Get Community Posts Controller', async function ({ components, stubComponents }) {
+test('Get Community Posts Controller', async function ({ components, stubComponents, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when getting community posts', () => {
@@ -203,6 +203,21 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
       })
     })
 
+    describe('and an unhandled error is propagated', () => {
+      beforeEach(() => {
+        spyComponents.communitiesDb.getPosts.mockRejectedValueOnce(new Error('Unhandled error'))
+      })
+
+      it('should respond with a 500 status code', async () => {
+        const response = await components.localHttpFetch.fetch(`/v1/communities/${publicCommunityId}/posts`)
+        const body = await response.json()
+
+        expect(response.status).toBe(500)
+        expect(body).toHaveProperty('message')
+        expect(body.message).toBe('Unhandled error')
+      })
+    })
+
     describe('and listing posts with likes', () => {
       let likesCommunityId: string
       let likesPostId: string
@@ -333,25 +348,6 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
           const body = await response.json()
           expect(body.data.posts[0].likesCount).toBe(0)
           expect(body.data.posts[0].isLikedByUser).toBe(false)
-        })
-      })
-
-      describe('and the user unlikes the post via API', () => {
-        it('should update the likes count and isLikedByUser status', async () => {
-          // Unlike the post
-          await makeRequest(memberIdentity, `/v1/communities/${likesCommunityId}/posts/${likesPostId}/like`, 'DELETE')
-
-          // Check the post listing
-          const response = await makeRequest(memberIdentity, `/v1/communities/${likesCommunityId}/posts`, 'GET')
-
-          expect(response.status).toBe(200)
-          const body = await response.json()
-          expect(body.data.posts).toHaveLength(1)
-          expect(body.data.posts[0]).toMatchObject({
-            id: likesPostId,
-            likesCount: 0,
-            isLikedByUser: false
-          })
         })
       })
     })

@@ -4,7 +4,7 @@ import { createMockProfile } from '../mocks/profile'
 import { createTestIdentity, Identity, makeAuthenticatedRequest, makeAuthenticatedMultipartRequest } from './utils/auth'
 import { CommunityRole } from '../../src/types/entities'
 
-test('Create Community Post Controller', async function ({ components, stubComponents }) {
+test('Create Community Post Controller', async function ({ components, stubComponents, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
 
@@ -205,6 +205,23 @@ test('Create Community Post Controller', async function ({ components, stubCompo
           error: 'Not Found',
           message: `Community not found: ${fakeCommunityId}`
         })
+      })
+    })
+
+    describe('and an unhandled error is propagated', () => {
+      beforeEach(() => {
+        spyComponents.communitiesDb.createPost.mockRejectedValueOnce(new Error('Unhandled error'))
+      })
+
+      it('should respond with a 500 status code', async () => {
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: 'Test post content'
+        })
+        const body = await response.json()
+
+        expect(response.status).toBe(500)
+        expect(body).toHaveProperty('message')
+        expect(body.message).toBe('Unhandled error')
       })
     })
   })
