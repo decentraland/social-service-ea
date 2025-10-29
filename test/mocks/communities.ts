@@ -19,7 +19,8 @@ export const mockCommunity = (community: Partial<CommunityDB> = {}): CommunityDB
   description: community.description || 'Mock Description',
   owner_address: community.owner_address || '0x123',
   private: community.private || false,
-  active: community.active || true
+  active: community.active || true,
+  unlisted: community.unlisted || false
 })
 
 export function createMockCommunitiesComponent({
@@ -55,7 +56,7 @@ export function createMockCommunityRolesComponent({
   validatePermissionToAddPlacesToCommunity = jest.fn(),
   validatePermissionToRemovePlacesFromCommunity = jest.fn(),
   validatePermissionToEditCommunity = jest.fn(),
-  validatePermissionToUpdateCommunityPrivacy = jest.fn(),
+  validatePermissionToEditCommunitySettings = jest.fn(),
   validatePermissionToDeleteCommunity = jest.fn(),
   validatePermissionToUpdatePlaces = jest.fn(),
   validatePermissionToLeaveCommunity = jest.fn(),
@@ -75,7 +76,7 @@ export function createMockCommunityRolesComponent({
     validatePermissionToAddPlacesToCommunity,
     validatePermissionToRemovePlacesFromCommunity,
     validatePermissionToEditCommunity,
-    validatePermissionToUpdateCommunityPrivacy,
+    validatePermissionToEditCommunitySettings,
     validatePermissionToDeleteCommunity,
     validatePermissionToUpdatePlaces,
     validatePermissionToLeaveCommunity,

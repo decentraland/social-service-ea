@@ -20,6 +20,7 @@ import {
   ICommunityThumbnailComponent,
   ICommunityBroadcasterComponent,
   CommunityPrivacyEnum,
+  CommunityVisibilityEnum,
   CommunityPublicInformation,
   CommunityUpdates,
   CommunityMember,
@@ -77,6 +78,7 @@ describe('Community Component', () => {
     description: 'Test Description',
     ownerAddress: '0x1234567890123456789012345678901234567890',
     privacy: CommunityPrivacyEnum.Public,
+    visibility: CommunityVisibilityEnum.All,
     active: true,
     thumbnails: undefined
   }
@@ -156,6 +158,7 @@ describe('Community Component', () => {
           description: mockCommunity.description,
           ownerAddress: mockCommunity.ownerAddress,
           privacy: mockCommunity.privacy,
+          visibility: mockCommunity.visibility,
           active: mockCommunity.active,
           thumbnails: undefined,
           role: CommunityRole.Member,
@@ -294,14 +297,6 @@ describe('Community Component', () => {
         ...options,
         communityIds: undefined
       })
-      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, {
-        ...options,
-        communityIds: undefined
-      })
-      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, {
-        ...options,
-        communityIds: undefined
-      })
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
@@ -317,14 +312,6 @@ describe('Community Component', () => {
         total: 0
       })
 
-      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, {
-        ...options,
-        communityIds: undefined
-      })
-      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, {
-        ...options,
-        communityIds: undefined
-      })
       expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, {
         ...options,
         communityIds: undefined
@@ -410,12 +397,6 @@ describe('Community Component', () => {
             communityIds: ['community-with-voice-chat']
           })
         )
-        expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(
-          userAddress,
-          expect.objectContaining({
-            communityIds: ['community-with-voice-chat']
-          })
-        )
         // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
         expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
       })
@@ -453,8 +434,6 @@ describe('Community Component', () => {
 
           expect(result.communities).toHaveLength(0)
           expect(result.total).toBe(0)
-
-          // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
 
           // Verify DB is NOT called because of early return
           expect(mockCommunitiesDB.getCommunities).not.toHaveBeenCalled()
@@ -496,6 +475,7 @@ describe('Community Component', () => {
           description: 'Test Description',
           ownerAddress: '0x1234567890123456789012345678901234567890',
           privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
           active: true,
           membersCount: 10,
           isHostingLiveEvent: false
@@ -535,14 +515,6 @@ describe('Community Component', () => {
         total: 1
       })
 
-      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith({
-        ...options,
-        communityIds: undefined
-      })
-      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({
-        search: 'test',
-        communityIds: undefined
-      })
       expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith({
         ...options,
         communityIds: undefined
@@ -608,11 +580,6 @@ describe('Community Component', () => {
 
         expect(mockCommsGatekeeper.getAllActiveCommunityVoiceChats).toHaveBeenCalled()
         // Verify DB was called with the filtered community IDs
-        expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(
-          expect.objectContaining({
-            communityIds: ['public-community-with-voice-chat']
-          })
-        )
         expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(
           expect.objectContaining({
             communityIds: ['public-community-with-voice-chat']
@@ -761,11 +728,15 @@ describe('Community Component', () => {
         })
 
         it('should create community successfully without places and thumbnail', async () => {
-          const result = await communityComponent.createCommunity(communityData)
+          const communityDataWithVisibility = {
+            ...communityData,
+            visibility: CommunityVisibilityEnum.All
+          }
+          const result = await communityComponent.createCommunity(communityDataWithVisibility)
 
           expect(result).toEqual({
             ...mockCommunity,
-            ...communityData,
+            ...communityDataWithVisibility,
             id: 'new-community-id',
             ownerName: 'Test Owner Name',
             isHostingLiveEvent: false
@@ -775,14 +746,15 @@ describe('Community Component', () => {
           expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
           expect(mockCommunityPlaces.validateOwnership).not.toHaveBeenCalled()
           expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
-            name: communityData.name,
-            description: communityData.description,
+            name: communityDataWithVisibility.name,
+            description: communityDataWithVisibility.description,
             thumbnailBuffer: undefined
           })
           expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
-            ...communityData,
+            ...communityDataWithVisibility,
             owner_address: ownerAddress,
             private: false,
+            unlisted: false, // Default visibility is 'all', so unlisted should be false
             active: true
           })
           expect(mockCommunitiesDB.addCommunityMember).toHaveBeenCalledWith({
@@ -796,11 +768,15 @@ describe('Community Component', () => {
 
         it('should create community successfully with thumbnail', async () => {
           const newCommunityId = 'new-community-id'
-          const result = await communityComponent.createCommunity(communityData, thumbnail)
+          const communityDataWithVisibility = {
+            ...communityData,
+            visibility: CommunityVisibilityEnum.All
+          }
+          const result = await communityComponent.createCommunity(communityDataWithVisibility, thumbnail)
 
           expect(result).toEqual({
             ...mockCommunity,
-            ...communityData,
+            ...communityDataWithVisibility,
             id: newCommunityId,
             ownerName: 'Test Owner Name',
             isHostingLiveEvent: false,
@@ -810,11 +786,89 @@ describe('Community Component', () => {
           })
 
           expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
-            name: communityData.name,
-            description: communityData.description,
+            name: communityDataWithVisibility.name,
+            description: communityDataWithVisibility.description,
             thumbnailBuffer: thumbnail
           })
           expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(newCommunityId, thumbnail)
+        })
+
+        it('should create community with visibility all by default', async () => {
+          const communityDataWithDefaultVisibility = {
+            ...communityData,
+            visibility: CommunityVisibilityEnum.All
+          }
+          const result = await communityComponent.createCommunity(communityDataWithDefaultVisibility)
+
+          expect(result).toEqual({
+            ...mockCommunity,
+            ...communityDataWithDefaultVisibility,
+            id: 'new-community-id',
+            ownerName: 'Test Owner Name',
+            isHostingLiveEvent: false
+          })
+
+          expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+            ...communityDataWithDefaultVisibility,
+            owner_address: ownerAddress,
+            private: false,
+            unlisted: false, // Default visibility is 'all', so unlisted should be false
+            active: true
+          })
+        })
+
+        it('should create community with visibility unlisted', async () => {
+          const communityDataWithVisibility = {
+            ...communityData,
+            visibility: CommunityVisibilityEnum.Unlisted
+          }
+          const createdCommunityWithVisibility = {
+            ...createdCommunity,
+            visibility: CommunityVisibilityEnum.Unlisted
+          }
+          mockCommunitiesDB.createCommunity.mockResolvedValueOnce(createdCommunityWithVisibility)
+
+          const result = await communityComponent.createCommunity(communityDataWithVisibility)
+
+          expect(result).toEqual({
+            ...mockCommunity,
+            ...communityDataWithVisibility,
+            id: 'new-community-id',
+            ownerName: 'Test Owner Name',
+            isHostingLiveEvent: false
+          })
+
+          expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+            ...communityDataWithVisibility,
+            owner_address: ownerAddress,
+            private: false,
+            unlisted: true, // Visibility unlisted translates to unlisted = true
+            active: true
+          })
+        })
+
+        it('should create community with visibility all explicitly', async () => {
+          const communityDataWithVisibility = {
+            ...communityData,
+            visibility: CommunityVisibilityEnum.All
+          }
+          const result = await communityComponent.createCommunity(communityDataWithVisibility)
+
+          expect(result).toEqual({
+            ...mockCommunity,
+            ...communityDataWithVisibility,
+            id: 'new-community-id',
+            ownerName: 'Test Owner Name',
+            isHostingLiveEvent: false
+          })
+
+          expect(mockCommunitiesDB.createCommunity).toHaveBeenCalledWith({
+            ...communityDataWithVisibility,
+            owner_address: ownerAddress,
+            private: false,
+            unlisted: false, // Visibility all translates to unlisted = false
+            active: true
+          })
         })
       })
 
@@ -829,11 +883,15 @@ describe('Community Component', () => {
 
         it('should create community successfully with places and thumbnail', async () => {
           const newCommunityId = 'new-community-id'
-          const result = await communityComponent.createCommunity(communityData, thumbnail, placeIds)
+          const communityDataWithVisibility = {
+            ...communityData,
+            visibility: CommunityVisibilityEnum.All
+          }
+          const result = await communityComponent.createCommunity(communityDataWithVisibility, thumbnail, placeIds)
 
           expect(result).toEqual({
             ...mockCommunity,
-            ...communityData,
+            ...communityDataWithVisibility,
             id: newCommunityId,
             ownerName: 'Test Owner Name',
             isHostingLiveEvent: false,
@@ -844,8 +902,8 @@ describe('Community Component', () => {
 
           expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(placeIds, ownerAddress)
           expect(mockCommunityComplianceValidator.validateCommunityContent).toHaveBeenCalledWith({
-            name: communityData.name,
-            description: communityData.description,
+            name: communityDataWithVisibility.name,
+            description: communityDataWithVisibility.description,
             thumbnailBuffer: thumbnail
           })
           expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith(newCommunityId, ownerAddress, placeIds)
@@ -860,9 +918,13 @@ describe('Community Component', () => {
           })
 
           it('should throw NotAuthorizedError before calling compliance validation', async () => {
-            await expect(communityComponent.createCommunity(communityData, undefined, placeIds)).rejects.toThrow(
-              new NotAuthorizedError(`The user ${ownerAddress} doesn't own all the places`)
-            )
+            const communityDataWithVisibility = {
+              ...communityData,
+              visibility: CommunityVisibilityEnum.All
+            }
+            await expect(
+              communityComponent.createCommunity(communityDataWithVisibility, undefined, placeIds)
+            ).rejects.toThrow(new NotAuthorizedError(`The user ${ownerAddress} doesn't own all the places`))
 
             expect(mockCatalystClient.getOwnedNames).toHaveBeenCalledWith(ownerAddress, { pageSize: '1' })
             expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(ownerAddress)
@@ -881,7 +943,11 @@ describe('Community Component', () => {
       })
 
       it('should throw NotAuthorizedError before calling compliance validation', async () => {
-        await expect(communityComponent.createCommunity(communityData)).rejects.toThrow(
+        const communityDataWithVisibility = {
+          ...communityData,
+          visibility: CommunityVisibilityEnum.All
+        }
+        await expect(communityComponent.createCommunity(communityDataWithVisibility)).rejects.toThrow(
           new NotAuthorizedError(`The user ${ownerAddress} doesn't have any names`)
         )
 
@@ -1185,7 +1251,7 @@ describe('Community Component', () => {
         describe('and the user has permission to edit', () => {
           beforeEach(() => {
             mockCommunityRoles.validatePermissionToEditCommunity.mockResolvedValue()
-            mockCommunityRoles.validatePermissionToUpdateCommunityPrivacy.mockResolvedValue()
+            mockCommunityRoles.validatePermissionToEditCommunitySettings.mockResolvedValue()
             mockCommunityRoles.validatePermissionToEditCommunityName.mockResolvedValue()
           })
 
@@ -1208,7 +1274,12 @@ describe('Community Component', () => {
             expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
             expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
             expect(mockCommunityPlaces.validateOwnership).toHaveBeenCalledWith(updates.placeIds, userAddress)
-            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updates)
+            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+              name: updates.name,
+              description: updates.description,
+              private: undefined,
+              unlisted: undefined
+            })
             expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(communityId, updates.thumbnailBuffer)
             expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
             expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, updates.placeIds)
@@ -1292,8 +1363,147 @@ describe('Community Component', () => {
 
             expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
-              ...updatesWithOnlyPrivacy,
-              private: true
+              name: undefined,
+              description: undefined,
+              private: true,
+              unlisted: undefined
+            })
+          })
+
+          describe('when updating visibility', () => {
+            beforeEach(() => {
+              mockCommunityRoles.validatePermissionToEditCommunitySettings.mockResolvedValue()
+            })
+
+            it('should update the community visibility from all to unlisted', async () => {
+              const updatesWithVisibility = {
+                visibility: CommunityVisibilityEnum.Unlisted
+              }
+              const updatedCommunity = {
+                ...mockCommunity,
+                visibility: CommunityVisibilityEnum.Unlisted
+              }
+
+              // Mock getCommunity to return existing community with visibility 'all'
+              mockCommunitiesDB.getCommunity.mockResolvedValueOnce({
+                ...mockCommunity,
+                visibility: CommunityVisibilityEnum.All,
+                role: CommunityRole.Owner
+              })
+
+              // Mock the update call
+              mockCommunitiesDB.updateCommunity.mockResolvedValueOnce(updatedCommunity)
+
+              const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithVisibility)
+
+              expect(result).toEqual(updatedCommunity)
+
+              expect(mockCommunityRoles.validatePermissionToEditCommunitySettings).toHaveBeenCalledWith(
+                communityId,
+                userAddress
+              )
+              expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledTimes(1)
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+                name: undefined,
+                description: undefined,
+                private: undefined,
+                unlisted: true // Visibility unlisted translates to unlisted = true
+              })
+            })
+
+            it('should update the community visibility from unlisted to all', async () => {
+              const updatesWithVisibility = {
+                visibility: CommunityVisibilityEnum.All
+              }
+              const updatedCommunity = {
+                ...mockCommunity,
+                visibility: CommunityVisibilityEnum.All
+              }
+
+              // Mock getCommunity to return existing community with visibility 'unlisted'
+              mockCommunitiesDB.getCommunity.mockResolvedValueOnce({
+                ...mockCommunity,
+                visibility: CommunityVisibilityEnum.Unlisted,
+                role: CommunityRole.Owner
+              })
+
+              // Mock the update call
+              mockCommunitiesDB.updateCommunity.mockResolvedValueOnce(updatedCommunity)
+
+              const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithVisibility)
+
+              expect(result).toEqual(updatedCommunity)
+
+              expect(mockCommunityRoles.validatePermissionToEditCommunitySettings).toHaveBeenCalledWith(
+                communityId,
+                userAddress
+              )
+              expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledTimes(1)
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+                name: undefined,
+                description: undefined,
+                private: undefined,
+                unlisted: false // Visibility all translates to unlisted = false
+              })
+            })
+
+            it('should validate permissions when updating visibility', async () => {
+              const updatesWithVisibility = {
+                visibility: CommunityVisibilityEnum.Unlisted
+              }
+
+              // Mock getCommunity to return existing community
+              mockCommunitiesDB.getCommunity.mockResolvedValueOnce({
+                ...mockCommunity,
+                visibility: CommunityVisibilityEnum.All,
+                role: CommunityRole.Owner
+              })
+
+              const permissionError = new NotAuthorizedError('Not authorized to update visibility')
+              mockCommunityRoles.validatePermissionToEditCommunitySettings.mockRejectedValue(permissionError)
+
+              await expect(
+                communityComponent.updateCommunity(communityId, userAddress, updatesWithVisibility)
+              ).rejects.toThrow(permissionError)
+
+              expect(mockCommunityRoles.validatePermissionToEditCommunitySettings).toHaveBeenCalledWith(
+                communityId,
+                userAddress
+              )
+              // updateCommunity should not be called if permission check fails
+              expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
+            })
+
+            it('should not update visibility when undefined', async () => {
+              const updatesWithoutVisibility = {
+                name: 'Updated Name'
+              }
+
+              mockCommunitiesDB.updateCommunity.mockResolvedValueOnce({
+                ...mockCommunity,
+                ...updatesWithoutVisibility
+              })
+
+              const result = await communityComponent.updateCommunity(
+                communityId,
+                userAddress,
+                updatesWithoutVisibility
+              )
+
+              expect(result).toEqual({
+                ...mockCommunity,
+                ...updatesWithoutVisibility
+              })
+
+              expect(mockCommunityRoles.validatePermissionToEditCommunitySettings).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+                name: updatesWithoutVisibility.name,
+                description: undefined,
+                private: undefined,
+                unlisted: undefined
+              })
             })
           })
 
@@ -1374,8 +1584,10 @@ describe('Community Component', () => {
               thumbnailBuffer: completeUpdate.thumbnailBuffer
             })
             expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
-              ...completeUpdate,
-              private: undefined
+              name: completeUpdate.name,
+              description: completeUpdate.description,
+              private: undefined,
+              unlisted: undefined
             })
             expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(
               communityId,
@@ -1438,7 +1650,12 @@ describe('Community Component', () => {
               ...simpleDescriptionUpdate
             })
 
-            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, simpleDescriptionUpdate)
+            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+              name: undefined,
+              description: simpleDescriptionUpdate.description,
+              private: undefined,
+              unlisted: undefined
+            })
           })
 
           describe('and the user does not own all places', () => {
@@ -1580,7 +1797,12 @@ describe('Community Component', () => {
               const result = await communityComponent.updateCommunity(communityId, userAddress, nameUpdateOnly)
 
               expect(result).toEqual({ ...existingCommunity, ...nameUpdateOnly })
-              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, nameUpdateOnly)
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+                name: nameUpdateOnly.name,
+                description: undefined,
+                private: undefined,
+                unlisted: undefined
+              })
             })
           })
 
@@ -1628,7 +1850,12 @@ describe('Community Component', () => {
             const result = await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutName)
 
             expect(result).toEqual({ ...existingCommunity, ...updatesWithoutName })
-            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, updatesWithoutName)
+            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+              name: undefined,
+              description: updatesWithoutName.description,
+              private: undefined,
+              unlisted: undefined
+            })
           })
         })
 
@@ -1652,7 +1879,12 @@ describe('Community Component', () => {
             const result = await communityComponent.updateCommunity(communityId, userAddress, sameNameWithSpaces)
 
             expect(result).toEqual({ ...existingCommunity, name: existingCommunity.name })
-            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, sameNameWithSpaces)
+            expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
+              name: sameNameWithSpaces.name,
+              description: undefined,
+              private: undefined,
+              unlisted: undefined
+            })
           })
         })
 
@@ -1697,13 +1929,14 @@ describe('Community Component', () => {
           description: mockCommunity.description,
           ownerAddress: mockCommunity.ownerAddress,
           privacy: mockCommunity.privacy,
+          visibility: mockCommunity.visibility,
           active: mockCommunity.active
         })
 
         expect(mockCommunityComplianceValidator.validateCommunityContent).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
         expect(mockCommunityRoles.validatePermissionToEditCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunityRoles.validatePermissionToUpdateCommunityPrivacy).not.toHaveBeenCalled()
+        expect(mockCommunityRoles.validatePermissionToEditCommunitySettings).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
       })
     })
@@ -1746,6 +1979,7 @@ describe('Community Component', () => {
             description: 'Test Description',
             ownerAddress: '0x1111111111111111111111111111111111111111',
             privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All,
             active: true,
             thumbnails: {
               raw: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
@@ -1757,6 +1991,7 @@ describe('Community Component', () => {
             description: 'Another Description',
             ownerAddress: inviterAddress,
             privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All,
             active: true
           }
         ]
@@ -1773,6 +2008,7 @@ describe('Community Component', () => {
             description: 'Test Description',
             ownerAddress: '0x1111111111111111111111111111111111111111',
             privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All,
             active: true
           },
           {
@@ -1781,6 +2017,7 @@ describe('Community Component', () => {
             description: 'Another Description',
             ownerAddress: inviterAddress,
             privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All,
             active: true,
             thumbnails: undefined
           }
@@ -1813,6 +2050,7 @@ describe('Community Component', () => {
         description: 'Test Description 1',
         ownerAddress: '0x1234567890123456789012345678901234567890',
         privacy: CommunityPrivacyEnum.Public,
+        visibility: CommunityVisibilityEnum.All,
         active: true,
         membersCount: 10,
         createdAt: '2023-01-01T00:00:00Z'
@@ -1823,6 +2061,7 @@ describe('Community Component', () => {
         description: 'Test Description 2',
         ownerAddress: '0x0987654321098765432109876543210987654321',
         privacy: CommunityPrivacyEnum.Private,
+        visibility: CommunityVisibilityEnum.All,
         active: true,
         membersCount: 5,
         createdAt: '2023-01-02T00:00:00Z'

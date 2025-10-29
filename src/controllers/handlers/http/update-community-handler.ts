@@ -28,6 +28,7 @@ export async function updateCommunityHandler(
       description,
       placeIds,
       privacy,
+      visibility,
       thumbnailBuffer: validatedThumbnail
     } = await communityFieldsValidator.validate(formData, thumbnailBuffer)
 
@@ -35,6 +36,7 @@ export async function updateCommunityHandler(
       communityId,
       userAddress,
       privacy: privacy ?? 'N/A',
+      visibility: visibility ?? 'N/A',
       updates: JSON.stringify({ name, description, placeIds: placeIds ? placeIds.length : 0 }),
       hasThumbnail: validatedThumbnail ? 'true' : 'false'
     })
@@ -44,7 +46,8 @@ export async function updateCommunityHandler(
       description,
       placeIds,
       thumbnailBuffer: validatedThumbnail,
-      privacy
+      privacy,
+      visibility
     })
 
     return {

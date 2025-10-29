@@ -1,4 +1,4 @@
-import { CommunityPrivacyEnum } from '../../src/logic/community'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../src/logic/community'
 import { test } from '../components'
 import { createMockProfile } from '../mocks/profile'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
@@ -36,7 +36,7 @@ export async function createLargeThumbnailBuffer(targetSize = 501 * 1024): Promi
   return buffer
 }
 
-test('Create Community Controller', async function ({ components, stubComponents }) {
+test('Create Community Controller', async function ({ components, stubComponents, spyComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
   const makeRequest = makeAuthenticatedRequest(components)
 
@@ -167,6 +167,7 @@ test('Create Community Controller', async function ({ components, stubComponents
           name: string
           description: string
           privacy: CommunityPrivacyEnum
+          visibility?: CommunityVisibilityEnum
           thumbnailPath?: string
           placeIds?: string[]
         }
@@ -187,7 +188,7 @@ test('Create Community Controller', async function ({ components, stubComponents
 
         describe('when the user owns a name', () => {
           beforeEach(async () => {
-            stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([
+            spyComponents.catalystClient.getOwnedNames.mockResolvedValue([
               {
                 id: '1',
                 name: 'testOwnedName',
@@ -195,9 +196,9 @@ test('Create Community Controller', async function ({ components, stubComponents
                 tokenId: '1'
               }
             ])
-            stubComponents.catalystClient.getProfile
-              .onFirstCall()
-              .resolves(createMockProfile(identity.realAccount.address.toLowerCase()))
+            spyComponents.catalystClient.getProfile.mockResolvedValue(
+              createMockProfile(identity.realAccount.address.toLowerCase())
+            )
           })
 
           describe('and AI compliance validation passes', () => {
@@ -239,9 +240,6 @@ test('Create Community Controller', async function ({ components, stubComponents
                   const response = await makeMultipartRequest(identity, '/v1/communities', validBodyWithPlaces)
                   const body = await response.json()
                   communityId = body.data.id
-
-                  // Wait for any setImmediate callbacks to complete
-                  await new Promise(resolve => setImmediate(resolve))
 
                   expect(response.status).toBe(201)
                   expect(body).toMatchObject({
@@ -303,9 +301,6 @@ test('Create Community Controller', async function ({ components, stubComponents
                 const body = await response.json()
                 communityId = body.data.id
 
-                // Wait for any setImmediate callbacks to complete
-                await new Promise(resolve => setImmediate(resolve))
-
                 expect(response.status).toBe(201)
                 expect(body).toMatchObject({
                   data: {
@@ -361,9 +356,6 @@ test('Create Community Controller', async function ({ components, stubComponents
                 const body = await response.json()
                 communityId = body.data.id
 
-                // Wait for any setImmediate callbacks to complete
-                await new Promise(resolve => setImmediate(resolve))
-
                 expect(response.status).toBe(201)
                 expect(body).toMatchObject({
                   data: {
@@ -389,9 +381,6 @@ test('Create Community Controller', async function ({ components, stubComponents
                 const body = await response.json()
                 communityId = body.data.id
 
-                // Wait for any setImmediate callbacks to complete
-                await new Promise(resolve => setImmediate(resolve))
-
                 expect(response.status).toBe(201)
                 expect(body).toMatchObject({
                   data: {
@@ -401,6 +390,56 @@ test('Create Community Controller', async function ({ components, stubComponents
                     active: true,
                     ownerAddress: identity.realAccount.address.toLowerCase(),
                     privacy: CommunityPrivacyEnum.Private
+                  },
+                  message: 'Community created successfully'
+                })
+              })
+            })
+
+            describe('and the community visibility is all', () => {
+              beforeEach(() => {
+                validBody.visibility = CommunityVisibilityEnum.All
+              })
+
+              it('should respond with a 201 and create community with visibility all', async () => {
+                const response = await makeMultipartRequest(identity, '/v1/communities', validBody)
+                const body = await response.json()
+                communityId = body.data.id
+
+                expect(response.status).toBe(201)
+                expect(body).toMatchObject({
+                  data: {
+                    id: expect.any(String),
+                    name: 'Test Community',
+                    description: 'Test Description',
+                    active: true,
+                    ownerAddress: identity.realAccount.address.toLowerCase(),
+                    privacy: CommunityPrivacyEnum.Public
+                  },
+                  message: 'Community created successfully'
+                })
+              })
+            })
+
+            describe('and the community visibility is unlisted', () => {
+              beforeEach(() => {
+                validBody.visibility = CommunityVisibilityEnum.Unlisted
+              })
+
+              it('should respond with a 201 and create community with visibility unlisted', async () => {
+                const response = await makeMultipartRequest(identity, '/v1/communities', validBody)
+                const body = await response.json()
+                communityId = body.data.id
+
+                expect(response.status).toBe(201)
+                expect(body).toMatchObject({
+                  data: {
+                    id: expect.any(String),
+                    name: 'Test Community',
+                    description: 'Test Description',
+                    active: true,
+                    ownerAddress: identity.realAccount.address.toLowerCase(),
+                    privacy: CommunityPrivacyEnum.Public
                   },
                   message: 'Community created successfully'
                 })
@@ -457,7 +496,7 @@ test('Create Community Controller', async function ({ components, stubComponents
 
           describe('and names cannot be fetched', () => {
             beforeEach(async () => {
-              stubComponents.catalystClient.getOwnedNames.onFirstCall().rejects(new Error('Failed to fetch names'))
+              spyComponents.catalystClient.getOwnedNames.mockRejectedValue(new Error('Failed to fetch names'))
             })
 
             it('should respond with a 500 status code', async () => {
@@ -471,7 +510,7 @@ test('Create Community Controller', async function ({ components, stubComponents
 
         describe('when the user does not own a name', () => {
           beforeEach(async () => {
-            stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([])
+            spyComponents.catalystClient.getOwnedNames.mockResolvedValue([])
           })
 
           it('should respond with a 401 status code', async () => {

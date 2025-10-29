@@ -37,6 +37,7 @@ paths:
         Lists all communities.
         This endpoint has optional Signed Fetch authentication.
         When signed, it includes properties related to the authenticated user in its response.
+        This endpoint excludes unlisted communities from results. Use direct community access (GET `/v1/communities/{id}`) to retrieve unlisted communities.
       security:
         - SignedFetch: []
       parameters:
@@ -84,6 +85,8 @@ paths:
       description: |
         Creates a new community with the provided details.
         This endpoint requires Signed Fetch authentication.
+        The `unlisted` field controls whether the community appears in public listings.
+        Unlisted communities remain accessible via direct links and appear in invitation lists.
       security:
         - SignedFetch: []
       requestBody:
@@ -103,6 +106,16 @@ paths:
                 placeIds:
                   type: string
                   description: 'JSON array of place IDs to add to the community'
+                privacy:
+                  type: string
+                  enum: [public, private]
+                  description: 'Community privacy setting'
+                unlisted:
+                  type: boolean
+                  description: |
+                    Whether the community should be hidden from public listings.
+                    Unlisted communities can still be accessed via direct links or invitations.
+                    Defaults to false.
                 thumbnail:
                   type: string
                   format: binary
@@ -173,8 +186,9 @@ paths:
     put:
       summary: Update a community
       description: |
-        Updates a community's details including name, description, privacy settings, and thumbnail.
+        Updates a community's details including name, description, privacy settings, unlisted status, and thumbnail.
         This endpoint requires Signed Fetch authentication and only community owners can update.
+        Only community owners can change the `unlisted` status. Attempting to change it as a non-owner will result in a 401 Unauthorized error.
       security:
         - SignedFetch: []
       parameters:
@@ -200,6 +214,15 @@ paths:
                 placeIds:
                   type: string
                   description: 'JSON array of place IDs to replace all current community places'
+                privacy:
+                  type: string
+                  enum: [public, private]
+                  description: 'Community privacy setting'
+                unlisted:
+                  type: boolean
+                  description: |
+                    Whether the community should be hidden from public listings.
+                    Only owners can change this setting.
                 thumbnail:
                   type: string
                   format: binary

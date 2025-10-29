@@ -1,4 +1,4 @@
-import { CommunityPrivacyEnum } from '../../src/logic/community'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../src/logic/community'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import {
@@ -12,7 +12,7 @@ import { randomUUID } from 'crypto'
 import FormData from 'form-data'
 import { AIComplianceError, CommunityNotCompliantError } from '../../src/logic/community/errors'
 
-test('Update Community Controller', async function ({ components, stubComponents }) {
+test('Update Community Controller', async function ({ components, stubComponents, spyComponents }) {
   const makeMultipartRequest = makeAuthenticatedMultipartRequest(components)
   const makeRequest = makeAuthenticatedRequest(components)
 
@@ -26,8 +26,8 @@ test('Update Community Controller', async function ({ components, stubComponents
       // Mock AI compliance to return compliant by default for community creation
       stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
 
-      // Create a test community first
-      stubComponents.catalystClient.getOwnedNames.onFirstCall().resolves([
+      // Mock catalyst client for community creation
+      spyComponents.catalystClient.getOwnedNames.mockResolvedValue([
         {
           id: '1',
           name: 'testOwnedName',
@@ -36,7 +36,7 @@ test('Update Community Controller', async function ({ components, stubComponents
         }
       ])
 
-      stubComponents.catalystClient.getProfile.onFirstCall().resolves({
+      spyComponents.catalystClient.getProfile.mockResolvedValue({
         avatars: [{ name: 'Owner Test Name' }]
       })
 
@@ -55,6 +55,11 @@ test('Update Community Controller', async function ({ components, stubComponents
       })
 
       const createBody = await createResponse.json()
+      if (!createBody || !createBody.data || !createBody.data.id) {
+        throw new Error(
+          `Failed to create community in beforeEach. Status: ${createResponse.status}, Body: ${JSON.stringify(createBody)}`
+        )
+      }
       communityId = createBody.data.id
     })
 
@@ -88,6 +93,9 @@ test('Update Community Controller', async function ({ components, stubComponents
           beforeEach(async () => {
             // Mock AI compliance to return compliant by default
             stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+
+            // Mock owner name - needed for the update flow when querying current community
+            spyComponents.communityOwners.getOwnerName.mockResolvedValue('Test Owner')
           })
           describe('when updating name only', () => {
             describe('and the user is the community owner', () => {
@@ -234,6 +242,36 @@ test('Update Community Controller', async function ({ components, stubComponents
               expect(body.message).toBe('Community updated successfully')
             })
 
+            describe('and the communiy is private', () => {
+              beforeEach(async () => {
+                await components.communitiesDb.updateCommunity(communityId, {
+                  private: true
+                })
+              })
+
+              afterEach(async () => {
+                await components.communitiesDb.updateCommunity(communityId, {
+                  private: false
+                })
+              })
+
+              it('should not switch the community to public', async () => {
+                const response = await makeMultipartRequest(
+                  identity,
+                  `/v1/communities/${communityId}`,
+                  {
+                    description: 'Updated Description'
+                  },
+                  'PUT'
+                )
+
+                expect(response.status).toBe(200)
+                const body = await response.json()
+                expect(body.data.description).toBe('Updated Description')
+                expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
+              })
+            })
+
             describe('and the user is a moderator', () => {
               let moderatorIdentity: Identity
               let moderatorAddress: string
@@ -278,297 +316,298 @@ test('Update Community Controller', async function ({ components, stubComponents
           describe('when updating placeIds', () => {
             let newPlaceIds: string[]
 
-            describe('when updating name only', () => {
-              it('should update the community name', async () => {
+            beforeEach(async () => {
+              newPlaceIds = [randomUUID(), randomUUID()]
+
+              stubComponents.fetcher.fetch.onFirstCall().resolves({
+                ok: true,
+                status: 200,
+                json: () =>
+                  Promise.resolve({
+                    data: newPlaceIds.map((id) => ({
+                      id,
+                      title: 'Test Place',
+                      positions: ['0,0,0'],
+                      owner: identity.realAccount.address.toLowerCase()
+                    }))
+                  })
+              } as any)
+            })
+
+            afterEach(async () => {
+              await components.communitiesDb.removeCommunityPlace(communityId, newPlaceIds[0])
+              await components.communitiesDb.removeCommunityPlace(communityId, newPlaceIds[1])
+            })
+
+            it('should replace all community places with new ones', async () => {
+              const response = await makeMultipartRequest(
+                identity,
+                `/v1/communities/${communityId}`,
+                {
+                  placeIds: newPlaceIds
+                },
+                'PUT'
+              )
+
+              expect(response.status).toBe(200)
+              const body = await response.json()
+              expect(body.message).toBe('Community updated successfully')
+
+              const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
+              expect(placesResponse.status).toBe(200)
+              const placesResult = await placesResponse.json()
+              expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
+                expect.arrayContaining(newPlaceIds)
+              )
+            })
+
+            it('should remove all places when empty array is provided', async () => {
+              const response = await makeMultipartRequest(
+                identity,
+                `/v1/communities/${communityId}`,
+                {
+                  placeIds: []
+                },
+                'PUT'
+              )
+
+              expect(response.status).toBe(200)
+              const body = await response.json()
+              expect(body.message).toBe('Community updated successfully')
+
+              const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
+              expect(placesResponse.status).toBe(200)
+              const placesResult = await placesResponse.json()
+              expect(placesResult.data.results).toHaveLength(0)
+            })
+          })
+
+          describe('when updating without placeIds field', () => {
+            it('should not modify places when placeIds field is not provided', async () => {
+              // First, add some places to the community
+              const initialPlaceIds = [randomUUID(), randomUUID()]
+
+              stubComponents.fetcher.fetch.onFirstCall().resolves({
+                ok: true,
+                status: 200,
+                json: () =>
+                  Promise.resolve({
+                    data: initialPlaceIds.map((id) => ({
+                      id,
+                      title: 'Test Place',
+                      positions: ['0,0,0'],
+                      owner: identity.realAccount.address.toLowerCase()
+                    }))
+                  })
+              } as any)
+
+              await makeMultipartRequest(
+                identity,
+                `/v1/communities/${communityId}`,
+                {
+                  placeIds: initialPlaceIds
+                },
+                'PUT'
+              )
+
+              // Verify places were added
+              let placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
+              expect(placesResponse.status).toBe(200)
+              let placesResult = await placesResponse.json()
+              expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
+                expect.arrayContaining(initialPlaceIds)
+              )
+
+              // Now update without placeIds field
+              const response = await makeMultipartRequest(
+                identity,
+                `/v1/communities/${communityId}`,
+                {
+                  name: 'Updated Without Places'
+                },
+                'PUT'
+              )
+
+              expect(response.status).toBe(200)
+              const body = await response.json()
+              expect(body.data.name).toBe('Updated Without Places')
+              expect(body.message).toBe('Community updated successfully')
+
+              // Verify places remain unchanged
+              placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
+              expect(placesResponse.status).toBe(200)
+              placesResult = await placesResponse.json()
+              expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
+                expect.arrayContaining(initialPlaceIds)
+              )
+
+              // Cleanup
+              for (const placeId of initialPlaceIds) {
+                await components.communitiesDb.removeCommunityPlace(communityId, placeId)
+              }
+            })
+          })
+
+          describe('when updating multiple fields', () => {
+            it('should update all provided fields', async () => {
+              const response = await makeMultipartRequest(
+                identity,
+                `/v1/communities/${communityId}`,
+                {
+                  name: 'Multi Updated Name',
+                  description: 'Multi Updated Description'
+                },
+                'PUT'
+              )
+
+              expect(response.status).toBe(200)
+              const body = await response.json()
+              expect(body.data.name).toBe('Multi Updated Name')
+              expect(body.data.description).toBe('Multi Updated Description')
+              expect(body.message).toBe('Community updated successfully')
+            })
+          })
+
+          describe('when updating privacy', () => {
+            describe('and the user is the owner', () => {
+              it('should update the community privacy', async () => {
                 const response = await makeMultipartRequest(
                   identity,
                   `/v1/communities/${communityId}`,
                   {
-                    name: 'Updated Community Name'
+                    privacy: CommunityPrivacyEnum.Private
                   },
                   'PUT'
                 )
 
                 expect(response.status).toBe(200)
                 const body = await response.json()
-                expect(body.data.name).toBe('Updated Community Name')
-                expect(body.data.description).toBe('Original Description')
+                expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
                 expect(body.message).toBe('Community updated successfully')
               })
-            })
 
-            describe('when updating description only', () => {
-              it('should update the community description', async () => {
+              it('should not update the community privacy if it contains a invalid value', async () => {
+                const existingCommunity = await components.communitiesDb.getCommunity(
+                  communityId,
+                  identity.realAccount.address
+                )
                 const response = await makeMultipartRequest(
                   identity,
                   `/v1/communities/${communityId}`,
                   {
-                    description: 'Updated Description'
+                    name: 'Provoke any change',
+                    privacy: 'invalid' as any
                   },
                   'PUT'
                 )
 
                 expect(response.status).toBe(200)
                 const body = await response.json()
-                expect(body.data.name).toBe('Original Community')
-                expect(body.data.description).toBe('Updated Description')
+                expect(body.data.privacy).toBe(existingCommunity.privacy)
                 expect(body.message).toBe('Community updated successfully')
-              })
-
-              describe('and the communiy is private', () => {
-                beforeEach(async () => {
-                  await components.communitiesDb.updateCommunity(communityId, {
-                    private: true
-                  })
-                })
-
-                afterEach(async () => {
-                  await components.communitiesDb.updateCommunity(communityId, {
-                    private: false
-                  })
-                })
-
-                it('should not switch the community to public', async () => {
-                  const response = await makeMultipartRequest(
-                    identity,
-                    `/v1/communities/${communityId}`,
-                    {
-                      description: 'Updated Description'
-                    },
-                    'PUT'
-                  )
-
-                  expect(response.status).toBe(200)
-                  const body = await response.json()
-                  expect(body.data.description).toBe('Updated Description')
-                  expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
-                })
               })
             })
 
-            describe('when updating placeIds', () => {
-              let newPlaceIds: string[]
+            describe('and the user is not the owner', () => {
               beforeEach(async () => {
-                newPlaceIds = [randomUUID(), randomUUID()]
-
-                stubComponents.fetcher.fetch.onFirstCall().resolves({
-                  ok: true,
-                  status: 200,
-                  json: () =>
-                    Promise.resolve({
-                      data: newPlaceIds.map((id) => ({
-                        id,
-                        title: 'Test Place',
-                        positions: ['0,0,0'],
-                        owner: identity.realAccount.address.toLowerCase()
-                      }))
-                    })
-                } as any)
+                await components.communitiesDb.updateMemberRole(
+                  communityId,
+                  identity.realAccount.address,
+                  CommunityRole.Moderator
+                )
               })
 
               afterEach(async () => {
-                await components.communitiesDb.removeCommunityPlace(communityId, newPlaceIds[0])
-                await components.communitiesDb.removeCommunityPlace(communityId, newPlaceIds[1])
+                await components.communitiesDb.updateMemberRole(
+                  communityId,
+                  identity.realAccount.address,
+                  CommunityRole.Owner
+                )
               })
 
-              it('should replace all community places with new ones', async () => {
+              it('should respond with a 401 status code', async () => {
                 const response = await makeMultipartRequest(
                   identity,
                   `/v1/communities/${communityId}`,
                   {
-                    placeIds: newPlaceIds
+                    privacy: CommunityPrivacyEnum.Private
                   },
                   'PUT'
                 )
 
-                expect(response.status).toBe(200)
-                const body = await response.json()
-                expect(body.message).toBe('Community updated successfully')
-
-                const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
-                expect(placesResponse.status).toBe(200)
-                const placesResult = await placesResponse.json()
-                expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
-                  expect.arrayContaining(newPlaceIds)
-                )
-              })
-
-              it('should remove all places when empty array is provided', async () => {
-                const response = await makeMultipartRequest(
-                  identity,
-                  `/v1/communities/${communityId}`,
-                  {
-                    placeIds: []
-                  },
-                  'PUT'
-                )
-
-                expect(response.status).toBe(200)
-                const body = await response.json()
-                expect(body.message).toBe('Community updated successfully')
-
-                const placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
-                expect(placesResponse.status).toBe(200)
-                const placesResult = await placesResponse.json()
-                expect(placesResult.data.results).toHaveLength(0)
+                expect(response.status).toBe(401)
               })
             })
+          })
 
-            describe('when updating without placeIds field', () => {
-              it('should not modify places when placeIds field is not provided', async () => {
-                // First, add some places to the community
-                const initialPlaceIds = [randomUUID(), randomUUID()]
-
-                stubComponents.fetcher.fetch.onFirstCall().resolves({
-                  ok: true,
-                  status: 200,
-                  json: () =>
-                    Promise.resolve({
-                      data: initialPlaceIds.map((id) => ({
-                        id,
-                        title: 'Test Place',
-                        positions: ['0,0,0'],
-                        owner: identity.realAccount.address.toLowerCase()
-                      }))
-                    })
-                } as any)
-
-                await makeMultipartRequest(
-                  identity,
-                  `/v1/communities/${communityId}`,
-                  {
-                    placeIds: initialPlaceIds
-                  },
-                  'PUT'
-                )
-
-                // Verify places were added
-                let placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
-                expect(placesResponse.status).toBe(200)
-                let placesResult = await placesResponse.json()
-                expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
-                  expect.arrayContaining(initialPlaceIds)
-                )
-
-                // Now update without placeIds field
+          describe('when updating visibility', () => {
+            describe('and the user is the owner', () => {
+              it('should update the community visibility', async () => {
                 const response = await makeMultipartRequest(
                   identity,
                   `/v1/communities/${communityId}`,
                   {
-                    name: 'Updated Without Places'
+                    visibility: CommunityVisibilityEnum.Unlisted
                   },
                   'PUT'
                 )
 
                 expect(response.status).toBe(200)
                 const body = await response.json()
-                expect(body.data.name).toBe('Updated Without Places')
+                expect(body.data.visibility).toBe(CommunityVisibilityEnum.Unlisted)
                 expect(body.message).toBe('Community updated successfully')
-
-                // Verify places remain unchanged
-                placesResponse = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'GET')
-                expect(placesResponse.status).toBe(200)
-                placesResult = await placesResponse.json()
-                expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
-                  expect.arrayContaining(initialPlaceIds)
-                )
-
-                // Cleanup
-                for (const placeId of initialPlaceIds) {
-                  await components.communitiesDb.removeCommunityPlace(communityId, placeId)
-                }
               })
-            })
 
-            describe('when updating multiple fields', () => {
-              it('should update all provided fields', async () => {
+              it('should not update the community visibility if it contains a invalid value', async () => {
+                const existingCommunity = await components.communitiesDb.getCommunity(
+                  communityId,
+                  identity.realAccount.address
+                )
                 const response = await makeMultipartRequest(
                   identity,
                   `/v1/communities/${communityId}`,
                   {
-                    name: 'Multi Updated Name',
-                    description: 'Multi Updated Description'
+                    name: 'Provoke any change',
+                    visibility: 'invalid' as any
                   },
                   'PUT'
                 )
 
                 expect(response.status).toBe(200)
                 const body = await response.json()
-                expect(body.data.name).toBe('Multi Updated Name')
-                expect(body.data.description).toBe('Multi Updated Description')
+                expect(body.data.visibility).toBe(existingCommunity.visibility)
                 expect(body.message).toBe('Community updated successfully')
               })
             })
 
-            describe('when updating privacy', () => {
-              describe('and the user is the owner', () => {
-                it('should update the community privacy', async () => {
-                  const response = await makeMultipartRequest(
-                    identity,
-                    `/v1/communities/${communityId}`,
-                    {
-                      privacy: CommunityPrivacyEnum.Private
-                    },
-                    'PUT'
-                  )
-
-                  expect(response.status).toBe(200)
-                  const body = await response.json()
-                  expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
-                  expect(body.message).toBe('Community updated successfully')
-                })
-
-                it('should not update the community privacy if it contains a invalid value', async () => {
-                  const existingCommunity = await components.communitiesDb.getCommunity(
-                    communityId,
-                    identity.realAccount.address
-                  )
-                  const response = await makeMultipartRequest(
-                    identity,
-                    `/v1/communities/${communityId}`,
-                    {
-                      name: 'Provoke any change',
-                      privacy: 'invalid' as any
-                    },
-                    'PUT'
-                  )
-
-                  expect(response.status).toBe(200)
-                  const body = await response.json()
-                  expect(body.data.privacy).toBe(existingCommunity.privacy)
-                  expect(body.message).toBe('Community updated successfully')
-                })
+            describe('and the user is not the owner', () => {
+              beforeEach(async () => {
+                await components.communitiesDb.updateMemberRole(
+                  communityId,
+                  identity.realAccount.address,
+                  CommunityRole.Moderator
+                )
               })
 
-              describe('and the user is not the owner', () => {
-                beforeEach(async () => {
-                  await components.communitiesDb.updateMemberRole(
-                    communityId,
-                    identity.realAccount.address,
-                    CommunityRole.Moderator
-                  )
-                })
+              afterEach(async () => {
+                await components.communitiesDb.updateMemberRole(
+                  communityId,
+                  identity.realAccount.address,
+                  CommunityRole.Owner
+                )
+              })
 
-                afterEach(async () => {
-                  await components.communitiesDb.updateMemberRole(
-                    communityId,
-                    identity.realAccount.address,
-                    CommunityRole.Owner
-                  )
-                })
+              it('should respond with a 401 status code', async () => {
+                const response = await makeMultipartRequest(
+                  identity,
+                  `/v1/communities/${communityId}`,
+                  {
+                    visibility: CommunityVisibilityEnum.Unlisted
+                  },
+                  'PUT'
+                )
 
-                it('should respond with a 401 status code', async () => {
-                  const response = await makeMultipartRequest(
-                    identity,
-                    `/v1/communities/${communityId}`,
-                    {
-                      privacy: CommunityPrivacyEnum.Private
-                    },
-                    'PUT'
-                  )
-
-                  expect(response.status).toBe(401)
-                })
+                expect(response.status).toBe(401)
               })
             })
           })
