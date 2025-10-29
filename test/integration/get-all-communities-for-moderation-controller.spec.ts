@@ -24,7 +24,8 @@ test('Get All Communities For Moderation Controller', function ({ components, sp
         description: 'Test Description 1',
         owner_address: '0xde615d3d992ff17ec563ee4387a10d7affcd33c1',
         private: false,
-        active: true
+        active: true,
+        unlisted: false
       })
       communityId1 = result1.id
 
@@ -33,7 +34,8 @@ test('Get All Communities For Moderation Controller', function ({ components, sp
         description: 'Test Description 2',
         owner_address: '0x1234567890123456789012345678901234567890',
         private: true,
-        active: true
+        active: true,
+        unlisted: false
       })
       communityId2 = result2.id
 
@@ -42,7 +44,8 @@ test('Get All Communities For Moderation Controller', function ({ components, sp
         description: 'Test Description 3',
         owner_address: '0x0987654321098765432109876543210987654321',
         private: false,
-        active: true
+        active: true,
+        unlisted: false
       })
       communityId3 = result3.id
 

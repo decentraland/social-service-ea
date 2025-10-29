@@ -43,7 +43,8 @@ test('Get Banned Members Controller', function ({ components, spyComponents }) {
           description: 'Test Description',
           private: false,
           active: true,
-          owner_address: ownerAddress
+          owner_address: ownerAddress,
+          unlisted: false
         })
       ).id
 

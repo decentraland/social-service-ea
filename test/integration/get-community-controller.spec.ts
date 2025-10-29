@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
-import { CommunityOwnerNotFoundError, CommunityPrivacyEnum } from '../../src/logic/community'
+import { CommunityOwnerNotFoundError, CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../src/logic/community'
 
 test('Get Community Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -40,7 +40,8 @@ test('Get Community Controller', function ({ components, spyComponents }) {
             description: 'Test Description',
             owner_address: address,
             private: false,
-            active: true
+            active: true,
+            unlisted: false
           })
           communityId = id
         })
@@ -65,12 +66,12 @@ test('Get Community Controller', function ({ components, spyComponents }) {
             expect(response.status).toBe(200)
             expect(body.data).toMatchObject({
               id: communityId,
-              name: 'Test Community', 
+              name: 'Test Community',
               active: true,
               description: 'Test Description',
               ownerAddress: address,
               ownerName: 'Test Owner',
-              privacy: CommunityPrivacyEnum.Public,
+              privacy: CommunityPrivacyEnum.Public
             })
           })
         })
@@ -94,7 +95,8 @@ test('Get Community Controller', function ({ components, spyComponents }) {
             description: 'Test Description',
             owner_address: address,
             private: false,
-            active: true
+            active: true,
+            unlisted: false
           })
           communityId = id
         })
@@ -136,6 +138,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                   active: true,
                   isHostingLiveEvent: false,
                   role: CommunityRole.None,
+                  visibility: CommunityVisibilityEnum.All,
                   membersCount: 0,
                   voiceChatStatus: {
                     isActive: true,
@@ -209,6 +212,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
                   ownerAddress: address,
                   ownerName: 'Test Owner Unclaimed',
                   privacy: CommunityPrivacyEnum.Public,
+                  visibility: CommunityVisibilityEnum.All,
                   active: true,
                   isHostingLiveEvent: false,
                   role: CommunityRole.None,
