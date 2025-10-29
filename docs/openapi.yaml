@@ -85,8 +85,6 @@ paths:
       description: |
         Creates a new community with the provided details.
         This endpoint requires Signed Fetch authentication.
-        The `unlisted` field controls whether the community appears in public listings.
-        Unlisted communities remain accessible via direct links and appear in invitation lists.
       security:
         - SignedFetch: []
       requestBody:
@@ -110,12 +108,10 @@ paths:
                   type: string
                   enum: [public, private]
                   description: 'Community privacy setting'
-                unlisted:
-                  type: boolean
-                  description: |
-                    Whether the community should be hidden from public listings.
-                    Unlisted communities can still be accessed via direct links or invitations.
-                    Defaults to false.
+                visibility:
+                  type: string
+                  enum: [all, unlisted]
+                  description: 'Community visibility setting'
                 thumbnail:
                   type: string
                   format: binary
@@ -188,7 +184,6 @@ paths:
       description: |
         Updates a community's details including name, description, privacy settings, unlisted status, and thumbnail.
         This endpoint requires Signed Fetch authentication and only community owners can update.
-        Only community owners can change the `unlisted` status. Attempting to change it as a non-owner will result in a 401 Unauthorized error.
       security:
         - SignedFetch: []
       parameters:
@@ -218,11 +213,10 @@ paths:
                   type: string
                   enum: [public, private]
                   description: 'Community privacy setting'
-                unlisted:
-                  type: boolean
-                  description: |
-                    Whether the community should be hidden from public listings.
-                    Only owners can change this setting.
+                visibility:
+                  type: string
+                  enum: [all, unlisted]
+                  description: 'Community visibility setting'
                 thumbnail:
                   type: string
                   format: binary
