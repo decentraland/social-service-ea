@@ -363,7 +363,7 @@ export type GetCommunityMembersOptions = {
 }
 
 export type GetCommunityRequestsOptions = {
-  pagination?: PaginatedParameters
+  pagination?: Required<PaginatedParameters>
   targetAddress?: EthAddress
   status?: CommunityRequestStatus
   type?: CommunityRequestType

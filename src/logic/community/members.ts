@@ -235,14 +235,7 @@ export async function createCommunityMembersComponent(
         throw new NotAuthorizedError(`The user ${memberAddress} is banned from community ${communityId}`)
       }
 
-      const requests =
-        (await communitiesDb.getCommunityRequests(communityId, {
-          pagination: { limit: 1, offset: 0 },
-          targetAddress: memberAddress,
-          status: CommunityRequestStatus.Pending
-        })) ?? []
-
-      await communitiesDb.joinMemberAndRemoveRequests({
+      const requestId = await communitiesDb.joinMemberAndRemoveRequests({
         communityId,
         memberAddress,
         role: CommunityRole.Member
@@ -251,7 +244,7 @@ export async function createCommunityMembersComponent(
       analytics.fireEvent(AnalyticsEvent.JOIN_COMMUNITY, {
         community_id: communityId,
         user_id: memberAddress,
-        request_id: requests[0]?.id
+        request_id: requestId
       })
 
       await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {

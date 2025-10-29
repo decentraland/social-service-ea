@@ -14,9 +14,7 @@ import {
   CommunityUpdates,
   AggregatedCommunity,
   CommunityPrivacyEnum,
-  CommunityForModeration,
-  CommunityRequestStatus,
-  CommunityRequestType
+  CommunityForModeration
 } from './types'
 import {
   isOwner,
