@@ -24,7 +24,7 @@ import { AnalyticsEvent, AnalyticsEventPayload } from '../../../src/types/analyt
 import { ICommunityVoiceComponent } from '../../../src/logic/community-voice'
 import { ICommunityVoiceChatCacheComponent } from '../../../src/logic/community-voice/community-voice-cache'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
-import { CommunityPrivacyEnum } from '../../../src/logic/community'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../../src/logic/community'
 
 describe('Community Voice Logic', () => {
   let mockLogs: jest.Mocked<ILoggerComponent>
@@ -149,6 +149,7 @@ describe('Community Voice Logic', () => {
             description: 'Test Description',
             ownerAddress: '0x123',
             privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All,
             active: true,
             role: CommunityRole.Owner
           })
@@ -246,6 +247,7 @@ describe('Community Voice Logic', () => {
             description: 'Test Description',
             ownerAddress: '0x123',
             privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All,
             active: true,
             role: CommunityRole.Owner
           })
@@ -564,6 +566,7 @@ describe('Community Voice Logic', () => {
             description: 'Test Description',
             ownerAddress: '0x123',
             privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All,
             active: true,
             role: CommunityRole.Member
           })
@@ -637,6 +640,7 @@ describe('Community Voice Logic', () => {
             description: 'Public community for testing',
             ownerAddress: '0x123',
             privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All,
             active: true,
             role: CommunityRole.None
           })
@@ -735,6 +739,7 @@ describe('Community Voice Logic', () => {
             description: 'Private community for testing',
             ownerAddress: '0x123',
             privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All,
             active: true,
             role: CommunityRole.None
           })
@@ -760,6 +765,7 @@ describe('Community Voice Logic', () => {
             description: 'Test Description',
             ownerAddress: '0x123',
             privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All,
             active: true,
             role: CommunityRole.None
           })
@@ -785,6 +791,7 @@ describe('Community Voice Logic', () => {
             description: 'Test Description',
             ownerAddress: '0x123',
             privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All,
             active: true,
             role: CommunityRole.Member
           })

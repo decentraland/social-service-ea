@@ -383,9 +383,10 @@ test('Update Community Controller', async function ({ components, stubComponents
           })
 
           describe('when updating without placeIds field', () => {
-            it('should not modify places when placeIds field is not provided', async () => {
-              // First, add some places to the community
-              const initialPlaceIds = [randomUUID(), randomUUID()]
+            let initialPlaceIds: string[]
+
+            beforeEach(() => {
+              initialPlaceIds = [randomUUID(), randomUUID()]
 
               stubComponents.fetcher.fetch.onFirstCall().resolves({
                 ok: true,
@@ -400,7 +401,18 @@ test('Update Community Controller', async function ({ components, stubComponents
                     }))
                   })
               } as any)
+            })
 
+            afterEach(async () => {
+              if (initialPlaceIds) {
+                for (const placeId of initialPlaceIds) {
+                  await components.communitiesDb.removeCommunityPlace(communityId, placeId)
+                }
+              }
+            })
+
+            it('should not modify places when placeIds field is not provided', async () => {
+              // First, add some places to the community
               await makeMultipartRequest(
                 identity,
                 `/v1/communities/${communityId}`,
@@ -440,11 +452,6 @@ test('Update Community Controller', async function ({ components, stubComponents
               expect(placesResult.data.results.map((p: { id: string }) => p.id)).toEqual(
                 expect.arrayContaining(initialPlaceIds)
               )
-
-              // Cleanup
-              for (const placeId of initialPlaceIds) {
-                await components.communitiesDb.removeCommunityPlace(communityId, placeId)
-              }
             })
           })
 

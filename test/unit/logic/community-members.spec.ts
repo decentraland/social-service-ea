@@ -7,6 +7,7 @@ import { createCommsGatekeeperMockedComponent } from '../../mocks/components/com
 import { createCommunityMembersComponent } from '../../../src/logic/community/members'
 import {
   CommunityPrivacyEnum,
+  CommunityVisibilityEnum,
   ICommunityBroadcasterComponent,
   ICommunityMembersComponent,
   ICommunityRolesComponent,
@@ -622,6 +623,7 @@ describe('Community Members Component', () => {
         active: true,
         ownerAddress: kickerAddress,
         privacy: CommunityPrivacyEnum.Public,
+        visibility: CommunityVisibilityEnum.All,
         role: CommunityRole.Owner
       })
       mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(isMember)
@@ -638,6 +640,7 @@ describe('Community Members Component', () => {
           active: true,
           ownerAddress: kickerAddress,
           privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
           role: CommunityRole.Owner
         })
       })

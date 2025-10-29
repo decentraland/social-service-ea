@@ -301,38 +301,46 @@ describe('Community Component', () => {
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
 
-    it('should handle empty communities array gracefully', async () => {
-      mockCommunitiesDB.getCommunities.mockResolvedValueOnce([])
-      mockCommunitiesDB.getCommunitiesCount.mockResolvedValueOnce(0)
-
-      const result = await communityComponent.getCommunities(userAddress, options)
-
-      expect(result).toEqual({
-        communities: [],
-        total: 0
+    describe('when handling empty communities array', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunities.mockResolvedValue([])
+        mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(0)
       })
 
-      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, {
-        ...options,
-        communityIds: undefined
+      it('should handle empty communities array gracefully', async () => {
+        const result = await communityComponent.getCommunities(userAddress, options)
+
+        expect(result).toEqual({
+          communities: [],
+          total: 0
+        })
+
+        expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, {
+          ...options,
+          communityIds: undefined
+        })
+        expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, {
+          ...options,
+          communityIds: undefined
+        })
+        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+        expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([])
       })
-      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, {
-        ...options,
-        communityIds: undefined
-      })
-      expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
-      expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([])
     })
 
-    it('should handle error in getVoiceChatStatuses helper function gracefully', async () => {
-      mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockRejectedValueOnce(
-        new Error('Network error in voice chat service')
-      )
+    describe('when handling error in getVoiceChatStatuses helper function', () => {
+      beforeEach(() => {
+        mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockRejectedValue(
+          new Error('Network error in voice chat service')
+        )
+      })
 
-      const result = await communityComponent.getCommunities(userAddress, options)
+      it('should handle error in getVoiceChatStatuses helper function gracefully', async () => {
+        const result = await communityComponent.getCommunities(userAddress, options)
 
-      expect(result.communities).toHaveLength(1)
-      expect(result.total).toBe(1)
+        expect(result.communities).toHaveLength(1)
+        expect(result.total).toBe(1)
+      })
     })
 
     it('should call getCommunitiesVoiceChatStatus when onlyWithActiveVoiceChat is false', async () => {
@@ -526,15 +534,19 @@ describe('Community Component', () => {
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
 
-    it('should handle error in getVoiceChatStatuses helper function gracefully', async () => {
-      mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockRejectedValueOnce(
-        new Error('Network error in voice chat service')
-      )
+    describe('when handling error in getVoiceChatStatuses helper function', () => {
+      beforeEach(() => {
+        mockCommsGatekeeper.getCommunitiesVoiceChatStatus.mockRejectedValue(
+          new Error('Network error in voice chat service')
+        )
+      })
 
-      const result = await communityComponent.getCommunitiesPublicInformation(options)
+      it('should handle error in getVoiceChatStatuses helper function gracefully', async () => {
+        const result = await communityComponent.getCommunitiesPublicInformation(options)
 
-      expect(result.communities).toHaveLength(1)
-      expect(result.total).toBe(1)
+        expect(result.communities).toHaveLength(1)
+        expect(result.total).toBe(1)
+      })
     })
 
     describe('when filtering by active voice chat', () => {
