@@ -660,6 +660,7 @@ describe('Community Members Component', () => {
               targetAddress
             )
             expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
               communityId,
               memberAddress: targetAddress,
@@ -711,6 +712,7 @@ describe('Community Members Component', () => {
               targetAddress
             )
             expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
             expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
           })
         })
@@ -729,6 +731,7 @@ describe('Community Members Component', () => {
           expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
           expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
           expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
         })
       })
@@ -748,6 +751,7 @@ describe('Community Members Component', () => {
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
         expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })
@@ -898,6 +902,7 @@ describe('Community Members Component', () => {
               memberAddress
             )
             expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, memberAddress)
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).toHaveBeenCalledWith(communityId, memberAddress)
             expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
               communityId,
               memberAddress,
@@ -924,6 +929,7 @@ describe('Community Members Component', () => {
               memberAddress
             )
             expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
             expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
           })
         })
@@ -942,6 +948,7 @@ describe('Community Members Component', () => {
           expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
           expect(mockCommunityRoles.validatePermissionToLeaveCommunity).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
           expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
         })
       })
@@ -961,6 +968,7 @@ describe('Community Members Component', () => {
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunityRoles.validatePermissionToLeaveCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
         expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
       })
     })

@@ -216,6 +216,7 @@ export interface ICommunitiesDatabaseComponent {
   deletePost(postId: string): Promise<void>
   likePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePost(postId: string, userAddress: EthAddress): Promise<void>
+  unlikePostsFromCommunity(communityId: string, userAddress: EthAddress): Promise<void>
 }
 
 export interface IVoiceDatabaseComponent {

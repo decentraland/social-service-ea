@@ -168,6 +168,8 @@ export async function createCommunityMembersComponent(
 
       await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
 
+      await communitiesDb.unlikePostsFromCommunity(communityId, targetAddress)
+
       // For private communities, also kick user from voice chat if they are in one
       if (community.privacy === CommunityPrivacyEnum.Private) {
         // Only for private communities
@@ -255,6 +257,8 @@ export async function createCommunityMembersComponent(
       await communityRoles.validatePermissionToLeaveCommunity(communityId, memberAddress)
 
       await communitiesDb.kickMemberFromCommunity(communityId, memberAddress)
+
+      await communitiesDb.unlikePostsFromCommunity(communityId, memberAddress)
 
       await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
         communityId,

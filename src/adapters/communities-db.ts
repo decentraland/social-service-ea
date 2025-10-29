@@ -1007,6 +1007,14 @@ export function createCommunitiesDBComponent(
         DELETE FROM community_post_likes
         WHERE post_id = ${postId} AND user_address = ${normalizedAddress}
       `)
+    },
+
+    async unlikePostsFromCommunity(communityId: string, userAddress: EthAddress): Promise<void> {
+      const normalizedAddress = normalizeAddress(userAddress)
+      await pg.query(SQL`
+        DELETE FROM community_post_likes
+        WHERE post_id IN (SELECT id FROM community_posts WHERE community_id = ${communityId}) AND user_address = ${normalizedAddress}
+      `)
     }
   }
 }
