@@ -1,3 +1,4 @@
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityPostNotFoundError } from '../../../logic/community/errors'
@@ -25,7 +26,7 @@ export async function unlikeCommunityPostHandler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error unliking post: ${postId} in community: ${communityId}, error: ${message}`)
 
-    if (error instanceof CommunityPostNotFoundError) {
+    if (error instanceof CommunityPostNotFoundError || error instanceof NotAuthorizedError) {
       throw error
     }
 

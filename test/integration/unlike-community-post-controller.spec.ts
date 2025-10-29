@@ -83,6 +83,41 @@ test('Unlike Community Post Controller', function ({ components, stubComponents,
       })
     })
 
+    describe('and the user is banned from the community', () => {
+      beforeEach(async () => {
+        await components.communitiesDb.banMemberFromCommunity(
+          communityId,
+          ownerIdentity.realAccount.address.toLowerCase(),
+          memberIdentity.realAccount.address.toLowerCase()
+        )
+      })
+
+      it('should return 401', async () => {
+        const response = await makeRequest(
+          memberIdentity,
+          `/v1/communities/${communityId}/posts/${postId}/like`,
+          'DELETE'
+        )
+
+        expect(response.status).toBe(401)
+      })
+
+      it('should not allow the banned user to unlike the post', async () => {
+        const response = await makeRequest(
+          memberIdentity,
+          `/v1/communities/${communityId}/posts/${postId}/like`,
+          'DELETE'
+        )
+
+        expect(response.status).toBe(401)
+        const result = await components.communitiesDb.isMemberBanned(
+          communityId,
+          memberIdentity.realAccount.address.toLowerCase()
+        )
+        expect(result).toBe(true)
+      })
+    })
+
     describe('and the user has liked the post', () => {
       it('should unlike the post successfully', async () => {
         const response = await makeRequest(

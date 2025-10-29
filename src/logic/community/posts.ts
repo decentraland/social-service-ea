@@ -72,6 +72,13 @@ export function createCommunityPostsComponent(
       )
     }
 
+    const isBanned = await communitiesDb.isMemberBanned(communityId, userAddress)
+    if (isBanned) {
+      throw new NotAuthorizedError(
+        `${userAddress} is banned from community ${communityId}. You cannot like/unlike posts in this community.`
+      )
+    }
+
     const post = await communitiesDb.getPost(postId)
     if (!post) {
       throw new CommunityPostNotFoundError(postId)

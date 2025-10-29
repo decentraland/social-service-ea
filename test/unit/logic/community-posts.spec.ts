@@ -555,6 +555,7 @@ describe('Community Posts Component', () => {
           privacy: CommunityPrivacyEnum.Public,
           role: CommunityRole.Member
         })
+        mockCommunitiesDB.isMemberBanned.mockResolvedValue(false)
         mockCommunitiesDB.likePost.mockResolvedValue()
       })
 
@@ -624,6 +625,30 @@ describe('Community Posts Component', () => {
         })
       })
 
+      describe('and the user is banned', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Public,
+            role: CommunityRole.Member
+          })
+          mockCommunitiesDB.isMemberBanned.mockResolvedValue(true)
+        })
+
+        it('should throw NotAuthorizedError for banned users', async () => {
+          await expect(postsComponent.likePost(mockPost.communityId, mockPostId, likerAddress)).rejects.toThrow(
+            new NotAuthorizedError(
+              `${likerAddress} is banned from community ${mockPost.communityId}. You cannot like/unlike posts in this community.`
+            )
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
+          expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
+          expect(mockCommunitiesDB.getPost).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.likePost).not.toHaveBeenCalled()
+        })
+      })
+
       describe('and database operation fails', () => {
         beforeEach(() => {
           mockCommunitiesDB.getCommunity.mockResolvedValue({
@@ -631,6 +656,7 @@ describe('Community Posts Component', () => {
             privacy: CommunityPrivacyEnum.Public,
             role: CommunityRole.Member
           })
+          mockCommunitiesDB.isMemberBanned.mockResolvedValue(false)
           mockCommunitiesDB.likePost.mockRejectedValue(new Error('Database error'))
         })
 
@@ -691,6 +717,7 @@ describe('Community Posts Component', () => {
           privacy: CommunityPrivacyEnum.Public,
           role: CommunityRole.Member
         })
+        mockCommunitiesDB.isMemberBanned.mockResolvedValue(false)
         mockCommunitiesDB.unlikePost.mockResolvedValue()
       })
 
@@ -771,6 +798,30 @@ describe('Community Posts Component', () => {
         })
       })
 
+      describe('and the user is banned', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Public,
+            role: CommunityRole.Member
+          })
+          mockCommunitiesDB.isMemberBanned.mockResolvedValue(true)
+        })
+
+        it('should throw NotAuthorizedError for banned users', async () => {
+          await expect(postsComponent.unlikePost(mockPost.communityId, mockPostId, unlikerAddress)).rejects.toThrow(
+            new NotAuthorizedError(
+              `${unlikerAddress} is banned from community ${mockPost.communityId}. You cannot like/unlike posts in this community.`
+            )
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, unlikerAddress)
+          expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(mockPost.communityId, unlikerAddress)
+          expect(mockCommunitiesDB.getPost).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.unlikePost).not.toHaveBeenCalled()
+        })
+      })
+
       describe('and database operation fails', () => {
         beforeEach(() => {
           mockCommunitiesDB.getCommunity.mockResolvedValue({
@@ -778,6 +829,7 @@ describe('Community Posts Component', () => {
             privacy: CommunityPrivacyEnum.Public,
             role: CommunityRole.Member
           })
+          mockCommunitiesDB.isMemberBanned.mockResolvedValue(false)
           mockCommunitiesDB.unlikePost.mockRejectedValue(new Error('Database error'))
         })
 

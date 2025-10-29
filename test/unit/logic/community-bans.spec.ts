@@ -98,6 +98,7 @@ describe('Community Bans Component', () => {
           beforeEach(() => {
             mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(true)
             mockCommunitiesDB.kickMemberFromCommunity.mockResolvedValue()
+            mockCommunitiesDB.unlikePostsFromCommunity.mockResolvedValue()
             mockCommunitiesDB.banMemberFromCommunity.mockResolvedValue()
           })
 
@@ -112,6 +113,7 @@ describe('Community Bans Component', () => {
             )
             expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(
               communityId,
               bannerAddress,
@@ -122,6 +124,7 @@ describe('Community Bans Component', () => {
           it('should publish member status update to pubsub', async () => {
             await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
 
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
               communityId,
               memberAddress: targetAddress,
@@ -132,6 +135,7 @@ describe('Community Bans Component', () => {
           it('should publish SNS event for member ban', async () => {
             await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
 
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             // Wait for setImmediate callback to execute
             await new Promise((resolve) => setImmediate(resolve))
             expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
@@ -165,6 +169,7 @@ describe('Community Bans Component', () => {
             )
             expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(
               communityId,
               bannerAddress,
@@ -175,6 +180,7 @@ describe('Community Bans Component', () => {
           it('should publish member status update to pubsub', async () => {
             await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
 
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
             expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
               communityId,
               memberAddress: targetAddress,
@@ -185,6 +191,7 @@ describe('Community Bans Component', () => {
           it('should publish SNS event for member ban', async () => {
             await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
 
+            expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
             // Wait for setImmediate callback to execute
             await new Promise((resolve) => setImmediate(resolve))
             expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
@@ -225,6 +232,7 @@ describe('Community Bans Component', () => {
           )
           expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.banMemberFromCommunity).not.toHaveBeenCalled()
           expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
           expect(mockSns.publishMessage).not.toHaveBeenCalled()
@@ -246,6 +254,7 @@ describe('Community Bans Component', () => {
         expect(mockCommunityRoles.validatePermissionToBanMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.banMemberFromCommunity).not.toHaveBeenCalled()
         expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
         expect(mockSns.publishMessage).not.toHaveBeenCalled()
