@@ -11,7 +11,7 @@ import { CommunityNotFoundError, CommunityPostNotFoundError } from './errors'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
 import { normalizeAddress } from '../../utils/address'
 import { getProfileName, getProfileUserId, getProfileHasClaimedName, getProfilePictureUrl } from '../profiles'
-import { isErrorWithMessage } from '../../utils/errors'
+import { CommunityRole } from '../../types/entities'
 
 const MAX_POST_CONTENT_LENGTH = 1000
 const MIN_POST_CONTENT_LENGTH = 1
@@ -73,6 +73,29 @@ export function createCommunityPostsComponent(
     })
   }
 
+  async function validatePermissionsToLikeAndUnlikePost(
+    postId: string,
+    userAddress: EthAddress
+  ): Promise<CommunityPost> {
+    const post = await communitiesDb.getPost(postId)
+    if (!post) {
+      throw new CommunityPostNotFoundError(postId)
+    }
+
+    const community = await communitiesDb.getCommunity(post.communityId, userAddress)
+    if (!community) {
+      throw new CommunityNotFoundError(post.communityId)
+    }
+
+    if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
+      throw new NotAuthorizedError(
+        `${userAddress} is not a member of private community ${post.communityId}. You need to be a member to like/unlike posts in this community.`
+      )
+    }
+
+    return post
+  }
+
   return {
     async createPost(communityId: string, authorAddress: EthAddress, content: string): Promise<CommunityPost> {
       const communityExists = await communitiesDb.communityExists(communityId)
@@ -103,21 +126,15 @@ export function createCommunityPostsComponent(
       communityId: string,
       options: GetCommunityPostsOptions
     ): Promise<{ posts: CommunityPostWithProfile[]; total: number }> {
-      const community = await communitiesDb.getCommunity(communityId)
+      const community = await communitiesDb.getCommunity(communityId, options.userAddress)
       if (!community) {
         throw new CommunityNotFoundError(communityId)
       }
 
-      if (community.privacy === CommunityPrivacyEnum.Private) {
-        if (!options.userAddress) {
-          throw new NotAuthorizedError('Membership required for private communities')
-        }
-        const isMember = await communitiesDb.isMemberOfCommunity(communityId, options.userAddress)
-        if (!isMember) {
-          throw new NotAuthorizedError(
-            `User ${options.userAddress} is not a member of private community ${communityId}`
-          )
-        }
+      if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
+        throw new NotAuthorizedError(
+          `${options.userAddress} is not a member of private community ${communityId}. You need to be a member to get posts in this community.`
+        )
       }
 
       const [posts, total] = await Promise.all([
@@ -152,22 +169,7 @@ export function createCommunityPostsComponent(
     },
 
     async likePost(postId: string, userAddress: EthAddress): Promise<void> {
-      const post = await communitiesDb.getPost(postId)
-      if (!post) {
-        throw new CommunityPostNotFoundError(postId)
-      }
-
-      const community = await communitiesDb.getCommunity(post.communityId)
-      if (!community) {
-        throw new CommunityNotFoundError(post.communityId)
-      }
-
-      if (community.privacy === CommunityPrivacyEnum.Private) {
-        const isMember = await communitiesDb.isMemberOfCommunity(post.communityId, userAddress)
-        if (!isMember) {
-          throw new NotAuthorizedError(`User ${userAddress} is not a member of private community ${post.communityId}`)
-        }
-      }
+      const post = await validatePermissionsToLikeAndUnlikePost(postId, userAddress)
 
       await communitiesDb.likePost(postId, userAddress)
 
@@ -179,10 +181,7 @@ export function createCommunityPostsComponent(
     },
 
     async unlikePost(postId: string, userAddress: EthAddress): Promise<void> {
-      const post = await communitiesDb.getPost(postId)
-      if (!post) {
-        throw new CommunityPostNotFoundError(postId)
-      }
+      const post = await validatePermissionsToLikeAndUnlikePost(postId, userAddress)
 
       await communitiesDb.unlikePost(postId, userAddress)
 

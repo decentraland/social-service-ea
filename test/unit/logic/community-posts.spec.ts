@@ -217,9 +217,15 @@ describe('Community Posts Component', () => {
           pagination: { limit: 10, offset: 0 },
           userAddress: mockUserAddress
         }
-        mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          ...mockCommunity,
+          privacy: CommunityPrivacyEnum.Public,
+          role: CommunityRole.Member
+        })
         mockCommunitiesDB.getPosts.mockResolvedValue([mockPost])
         mockCommunitiesDB.getPostsCount.mockResolvedValue(1)
+        mockCommunitiesDB.getPostLikesCount.mockResolvedValue(0)
+        mockCommunitiesDB.isPostLikedByUser.mockResolvedValue(false)
         mockCatalystClient.getProfiles.mockResolvedValue([createMockProfile(mockUserAddress)])
       })
 
@@ -241,11 +247,12 @@ describe('Community Posts Component', () => {
             ...mockPost,
             authorName: expect.any(String),
             authorProfilePictureUrl: expect.any(String),
-            authorHasClaimedName: expect.any(Boolean)
+            authorHasClaimedName: expect.any(Boolean),
+            likesCount: expect.any(Number),
+            isLikedByUser: expect.any(Boolean)
           })
 
-          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId)
-          expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, options.userAddress)
           expect(mockCommunitiesDB.getPosts).toHaveBeenCalledWith(mockCommunityId, options.pagination)
           expect(mockCommunitiesDB.getPostsCount).toHaveBeenCalledWith(mockCommunityId)
           expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([mockUserAddress])
@@ -254,11 +261,17 @@ describe('Community Posts Component', () => {
         it('should work without userAddress for public communities', async () => {
           const optionsWithoutUser = { pagination: { limit: 10, offset: 0 } }
 
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Public,
+            role: CommunityRole.Member
+          })
+
           const result = await postsComponent.getPosts(mockCommunityId, optionsWithoutUser)
 
           expect(result.posts).toHaveLength(1)
           expect(result.total).toBe(1)
-          expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, undefined)
         })
       })
 
@@ -273,7 +286,11 @@ describe('Community Posts Component', () => {
 
         describe('and user is a member', () => {
           beforeEach(() => {
-            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(true)
+            mockCommunitiesDB.getCommunity.mockResolvedValue({
+              ...mockCommunity,
+              privacy: CommunityPrivacyEnum.Private,
+              role: CommunityRole.Member
+            })
           })
 
           it('should return posts with profiles for members', async () => {
@@ -285,11 +302,12 @@ describe('Community Posts Component', () => {
               ...mockPost,
               authorName: expect.any(String),
               authorProfilePictureUrl: expect.any(String),
-              authorHasClaimedName: expect.any(Boolean)
+              authorHasClaimedName: expect.any(Boolean),
+              likesCount: expect.any(Number),
+              isLikedByUser: expect.any(Boolean)
             })
 
-            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId)
-            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(mockCommunityId, mockUserAddress)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, options.userAddress)
             expect(mockCommunitiesDB.getPosts).toHaveBeenCalledWith(mockCommunityId, options.pagination)
             expect(mockCommunitiesDB.getPostsCount).toHaveBeenCalledWith(mockCommunityId)
             expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([mockUserAddress])
@@ -298,16 +316,17 @@ describe('Community Posts Component', () => {
 
         describe('and user is not a member', () => {
           beforeEach(() => {
-            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(false)
+            mockCommunitiesDB.getCommunity.mockResolvedValue({
+              ...mockCommunity,
+              privacy: CommunityPrivacyEnum.Private,
+              role: CommunityRole.None
+            })
           })
 
           it('should throw NotAuthorizedError for non-members', async () => {
-            await expect(postsComponent.getPosts(mockCommunityId, options)).rejects.toThrow(
-              new NotAuthorizedError(`User ${mockUserAddress} is not a member of private community ${mockCommunityId}`)
-            )
+            await expect(postsComponent.getPosts(mockCommunityId, options)).rejects.toThrow(NotAuthorizedError)
 
-            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId)
-            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(mockCommunityId, mockUserAddress)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, options.userAddress)
             expect(mockCommunitiesDB.getPosts).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.getPostsCount).not.toHaveBeenCalled()
           })
@@ -316,13 +335,20 @@ describe('Community Posts Component', () => {
         describe('and no userAddress is provided', () => {
           const optionsWithoutUser = { pagination: { limit: 10, offset: 0 } }
 
+          beforeEach(() => {
+            mockCommunitiesDB.getCommunity.mockResolvedValue({
+              ...mockCommunity,
+              privacy: CommunityPrivacyEnum.Private,
+              role: CommunityRole.None
+            })
+          })
+
           it('should throw NotAuthorizedError', async () => {
             await expect(postsComponent.getPosts(mockCommunityId, optionsWithoutUser)).rejects.toThrow(
-              new NotAuthorizedError('Membership required for private communities')
+              NotAuthorizedError
             )
 
-            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId)
-            expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, undefined)
             expect(mockCommunitiesDB.getPosts).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.getPostsCount).not.toHaveBeenCalled()
           })
@@ -359,6 +385,7 @@ describe('Community Posts Component', () => {
         beforeEach(() => {
           mockCommunitiesDB.getPosts.mockResolvedValue(mockPosts)
           mockCommunitiesDB.getPostsCount.mockResolvedValue(2)
+          mockCommunitiesDB.getPostLikesCount.mockResolvedValue(0)
           mockCatalystClient.getProfiles.mockResolvedValue([
             createMockProfile(mockUserAddress),
             createMockProfile(secondAuthor)
@@ -408,8 +435,7 @@ describe('Community Posts Component', () => {
           new CommunityNotFoundError(mockCommunityId)
         )
 
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId)
-        expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, options.userAddress)
         expect(mockCommunitiesDB.getPosts).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.getPostsCount).not.toHaveBeenCalled()
       })
@@ -510,7 +536,11 @@ describe('Community Posts Component', () => {
     describe('and the post exists', () => {
       beforeEach(() => {
         mockCommunitiesDB.getPost.mockResolvedValue(mockPost)
-        mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          ...mockCommunity,
+          privacy: CommunityPrivacyEnum.Public,
+          role: CommunityRole.Member
+        })
         mockCommunitiesDB.likePost.mockResolvedValue()
       })
 
@@ -518,7 +548,8 @@ describe('Community Posts Component', () => {
         beforeEach(() => {
           mockCommunitiesDB.getCommunity.mockResolvedValue({
             ...mockCommunity,
-            privacy: CommunityPrivacyEnum.Public
+            privacy: CommunityPrivacyEnum.Public,
+            role: CommunityRole.Member
           })
         })
 
@@ -526,8 +557,7 @@ describe('Community Posts Component', () => {
           await postsComponent.likePost(mockPostId, likerAddress)
 
           expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
-          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId)
-          expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
           expect(mockCommunitiesDB.likePost).toHaveBeenCalledWith(mockPostId, likerAddress)
         })
       })
@@ -536,40 +566,43 @@ describe('Community Posts Component', () => {
         beforeEach(() => {
           mockCommunitiesDB.getCommunity.mockResolvedValue({
             ...mockCommunity,
-            privacy: CommunityPrivacyEnum.Private
+            privacy: CommunityPrivacyEnum.Private,
+            role: CommunityRole.Member
           })
         })
 
         describe('and user is a member', () => {
           beforeEach(() => {
-            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(true)
+            mockCommunitiesDB.getCommunity.mockResolvedValue({
+              ...mockCommunity,
+              privacy: CommunityPrivacyEnum.Private,
+              role: CommunityRole.Member
+            })
           })
 
           it('should like post successfully for members', async () => {
             await postsComponent.likePost(mockPostId, likerAddress)
 
             expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
-            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId)
-            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
             expect(mockCommunitiesDB.likePost).toHaveBeenCalledWith(mockPostId, likerAddress)
           })
         })
 
         describe('and user is not a member', () => {
           beforeEach(() => {
-            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(false)
+            mockCommunitiesDB.getCommunity.mockResolvedValue({
+              ...mockCommunity,
+              privacy: CommunityPrivacyEnum.Private,
+              role: CommunityRole.None
+            })
           })
 
           it('should throw NotAuthorizedError for non-members', async () => {
-            await expect(postsComponent.likePost(mockPostId, likerAddress)).rejects.toThrow(
-              new NotAuthorizedError(
-                `User ${likerAddress} is not a member of private community ${mockPost.communityId}`
-              )
-            )
+            await expect(postsComponent.likePost(mockPostId, likerAddress)).rejects.toThrow(NotAuthorizedError)
 
             expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
-            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId)
-            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
             expect(mockCommunitiesDB.likePost).not.toHaveBeenCalled()
           })
         })
@@ -579,7 +612,8 @@ describe('Community Posts Component', () => {
         beforeEach(() => {
           mockCommunitiesDB.getCommunity.mockResolvedValue({
             ...mockCommunity,
-            privacy: CommunityPrivacyEnum.Public
+            privacy: CommunityPrivacyEnum.Public,
+            role: CommunityRole.Member
           })
           mockCommunitiesDB.likePost.mockRejectedValue(new Error('Database error'))
         })
@@ -618,7 +652,7 @@ describe('Community Posts Component', () => {
         )
 
         expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
         expect(mockCommunitiesDB.likePost).not.toHaveBeenCalled()
       })
     })
@@ -630,29 +664,96 @@ describe('Community Posts Component', () => {
     describe('and the post exists', () => {
       beforeEach(() => {
         mockCommunitiesDB.getPost.mockResolvedValue(mockPost)
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          ...mockCommunity,
+          privacy: CommunityPrivacyEnum.Public,
+          role: CommunityRole.Member
+        })
         mockCommunitiesDB.unlikePost.mockResolvedValue()
       })
 
-      it('should unlike post successfully', async () => {
-        await postsComponent.unlikePost(mockPostId, unlikerAddress)
+      describe('and the community is public', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Public,
+            role: CommunityRole.Member
+          })
+        })
 
-        expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
-        expect(mockCommunitiesDB.unlikePost).toHaveBeenCalledWith(mockPostId, unlikerAddress)
+        it('should unlike post successfully', async () => {
+          await postsComponent.unlikePost(mockPostId, unlikerAddress)
+
+          expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, unlikerAddress)
+          expect(mockCommunitiesDB.unlikePost).toHaveBeenCalledWith(mockPostId, unlikerAddress)
+        })
+
+        it('should log successful post unlike', async () => {
+          await postsComponent.unlikePost(mockPostId, unlikerAddress)
+
+          const logger = mockLogs.getLogger('community-posts-component')
+          expect(logger.info).toHaveBeenCalledWith('Post unliked successfully', {
+            postId: mockPostId,
+            userAddress: unlikerAddress.toLowerCase(),
+            communityId: mockPost.communityId
+          })
+        })
       })
 
-      it('should log successful post unlike', async () => {
-        await postsComponent.unlikePost(mockPostId, unlikerAddress)
+      describe('and the community is private', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Private,
+            role: CommunityRole.Member
+          })
+        })
 
-        const logger = mockLogs.getLogger('community-posts-component')
-        expect(logger.info).toHaveBeenCalledWith('Post unliked successfully', {
-          postId: mockPostId,
-          userAddress: unlikerAddress.toLowerCase(),
-          communityId: mockPost.communityId
+        describe('and user is a member', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.getCommunity.mockResolvedValue({
+              ...mockCommunity,
+              privacy: CommunityPrivacyEnum.Private,
+              role: CommunityRole.Member
+            })
+          })
+
+          it('should unlike post successfully for members', async () => {
+            await postsComponent.unlikePost(mockPostId, unlikerAddress)
+
+            expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, unlikerAddress)
+            expect(mockCommunitiesDB.unlikePost).toHaveBeenCalledWith(mockPostId, unlikerAddress)
+          })
+        })
+
+        describe('and user is not a member', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.getCommunity.mockResolvedValue({
+              ...mockCommunity,
+              privacy: CommunityPrivacyEnum.Private,
+              role: CommunityRole.None
+            })
+          })
+
+          it('should throw NotAuthorizedError for non-members', async () => {
+            await expect(postsComponent.unlikePost(mockPostId, unlikerAddress)).rejects.toThrow(NotAuthorizedError)
+
+            expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, unlikerAddress)
+            expect(mockCommunitiesDB.unlikePost).not.toHaveBeenCalled()
+          })
         })
       })
 
       describe('and database operation fails', () => {
         beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Public,
+            role: CommunityRole.Member
+          })
           mockCommunitiesDB.unlikePost.mockRejectedValue(new Error('Database error'))
         })
 
@@ -673,6 +774,24 @@ describe('Community Posts Component', () => {
         )
 
         expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+        expect(mockCommunitiesDB.getCommunity).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.unlikePost).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the community does not exist', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getPost.mockResolvedValue(mockPost)
+        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
+      })
+
+      it('should throw CommunityNotFoundError', async () => {
+        await expect(postsComponent.unlikePost(mockPostId, unlikerAddress)).rejects.toThrow(
+          new CommunityNotFoundError(mockPost.communityId)
+        )
+
+        expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, unlikerAddress)
         expect(mockCommunitiesDB.unlikePost).not.toHaveBeenCalled()
       })
     })
