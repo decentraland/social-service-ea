@@ -5,8 +5,7 @@ import {
   CommunityMemberProfile,
   GetCommunityMembersOptions,
   ICommunityMembersComponent,
-  CommunityPrivacyEnum,
-  CommunityRequestStatus
+  CommunityPrivacyEnum
 } from './types'
 import { mapMembersWithProfiles } from './utils'
 import { EthAddress, Events } from '@dcl/schemas'
