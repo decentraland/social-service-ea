@@ -183,17 +183,10 @@ describe('Community Posts Component', () => {
           mockCommunitiesDB.createPost.mockRejectedValue(new Error('Database error'))
         })
 
-        it('should log error and rethrow', async () => {
+        it('should throw database error', async () => {
           await expect(postsComponent.createPost(mockCommunityId, authorAddress, content)).rejects.toThrow(
             'Database error'
           )
-
-          const logger = mockLogs.getLogger('community-posts-component')
-          expect(logger.error).toHaveBeenCalledWith('Failed to create post', {
-            error: 'Database error',
-            communityId: mockCommunityId,
-            authorAddress: authorAddress.toLowerCase()
-          })
         })
       })
     })
@@ -399,14 +392,8 @@ describe('Community Posts Component', () => {
           mockCatalystClient.getProfiles.mockRejectedValue(new Error('Profile service error'))
         })
 
-        it('should log error and rethrow', async () => {
+        it('should throw profile service error', async () => {
           await expect(postsComponent.getPosts(mockCommunityId, options)).rejects.toThrow('Profile service error')
-
-          const logger = mockLogs.getLogger('community-posts-component')
-          expect(logger.error).toHaveBeenCalledWith('Failed to get posts', {
-            error: 'Profile service error',
-            communityId: mockCommunityId
-          })
         })
       })
     })
@@ -494,15 +481,8 @@ describe('Community Posts Component', () => {
           mockCommunitiesDB.deletePost.mockRejectedValue(new Error('Database error'))
         })
 
-        it('should log error and rethrow', async () => {
+        it('should throw database error', async () => {
           await expect(postsComponent.deletePost(mockPostId, deleterAddress)).rejects.toThrow('Database error')
-
-          const logger = mockLogs.getLogger('community-posts-component')
-          expect(logger.error).toHaveBeenCalledWith('Failed to delete post', {
-            error: 'Database error',
-            postId: mockPostId,
-            deleterAddress: deleterAddress.toLowerCase()
-          })
         })
       })
     })
@@ -604,15 +584,8 @@ describe('Community Posts Component', () => {
           mockCommunitiesDB.likePost.mockRejectedValue(new Error('Database error'))
         })
 
-        it('should log error and rethrow', async () => {
+        it('should throw database error', async () => {
           await expect(postsComponent.likePost(mockPostId, likerAddress)).rejects.toThrow('Database error')
-
-          const logger = mockLogs.getLogger('community-posts-component')
-          expect(logger.error).toHaveBeenCalledWith('Failed to like post', {
-            error: 'Database error',
-            postId: mockPostId,
-            userAddress: likerAddress.toLowerCase()
-          })
         })
       })
     })
@@ -683,15 +656,8 @@ describe('Community Posts Component', () => {
           mockCommunitiesDB.unlikePost.mockRejectedValue(new Error('Database error'))
         })
 
-        it('should log error and rethrow', async () => {
+        it('should throw database error', async () => {
           await expect(postsComponent.unlikePost(mockPostId, unlikerAddress)).rejects.toThrow('Database error')
-
-          const logger = mockLogs.getLogger('community-posts-component')
-          expect(logger.error).toHaveBeenCalledWith('Failed to unlike post', {
-            error: 'Database error',
-            postId: mockPostId,
-            userAddress: unlikerAddress.toLowerCase()
-          })
         })
       })
     })

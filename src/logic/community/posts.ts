@@ -84,28 +84,19 @@ export function createCommunityPostsComponent(
 
       validatePostContent(content)
 
-      try {
-        const post = await communitiesDb.createPost({
-          communityId,
-          authorAddress,
-          content: content.trim()
-        })
+      const post = await communitiesDb.createPost({
+        communityId,
+        authorAddress,
+        content: content.trim()
+      })
 
-        logger.info('Post created successfully', {
-          postId: post.id,
-          communityId,
-          authorAddress: authorAddress.toLowerCase()
-        })
+      logger.info('Post created successfully', {
+        postId: post.id,
+        communityId,
+        authorAddress: authorAddress.toLowerCase()
+      })
 
-        return post
-      } catch (error) {
-        logger.error('Failed to create post', {
-          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
-          communityId,
-          authorAddress: authorAddress.toLowerCase()
-        })
-        throw error
-      }
+      return post
     },
 
     async getPosts(
@@ -129,111 +120,77 @@ export function createCommunityPostsComponent(
         }
       }
 
-      try {
-        const [posts, total] = await Promise.all([
-          communitiesDb.getPosts(communityId, options.pagination),
-          communitiesDb.getPostsCount(communityId)
-        ])
+      const [posts, total] = await Promise.all([
+        communitiesDb.getPosts(communityId, options.pagination),
+        communitiesDb.getPostsCount(communityId)
+      ])
 
-        const postsWithProfiles = await aggregatePostsWithProfiles(posts, options.userAddress)
+      const postsWithProfiles = await aggregatePostsWithProfiles(posts, options.userAddress)
 
-        return {
-          posts: postsWithProfiles,
-          total
-        }
-      } catch (error) {
-        logger.error('Failed to get posts', {
-          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
-          communityId
-        })
-        throw error
+      return {
+        posts: postsWithProfiles,
+        total
       }
     },
 
     async deletePost(postId: string, deleterAddress: EthAddress): Promise<void> {
       const post = await communitiesDb.getPost(postId)
+
       if (!post) {
         throw new CommunityPostNotFoundError(postId)
       }
 
       await communityRoles.validatePermissionToDeletePost(post.communityId, deleterAddress)
 
-      try {
-        await communitiesDb.deletePost(postId)
+      await communitiesDb.deletePost(postId)
 
-        logger.info('Post deleted successfully', {
-          postId,
-          communityId: post.communityId,
-          deleterAddress: deleterAddress.toLowerCase()
-        })
-      } catch (error) {
-        logger.error('Failed to delete post', {
-          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
-          postId,
-          deleterAddress: deleterAddress.toLowerCase()
-        })
-        throw error
-      }
+      logger.info('Post deleted successfully', {
+        postId,
+        communityId: post.communityId,
+        deleterAddress: deleterAddress.toLowerCase()
+      })
     },
 
     async likePost(postId: string, userAddress: EthAddress): Promise<void> {
-      try {
-        const post = await communitiesDb.getPost(postId)
-        if (!post) {
-          throw new CommunityPostNotFoundError(postId)
-        }
-
-        const community = await communitiesDb.getCommunity(post.communityId)
-        if (!community) {
-          throw new CommunityNotFoundError(post.communityId)
-        }
-
-        if (community.privacy === CommunityPrivacyEnum.Private) {
-          const isMember = await communitiesDb.isMemberOfCommunity(post.communityId, userAddress)
-          if (!isMember) {
-            throw new NotAuthorizedError(`User ${userAddress} is not a member of private community ${post.communityId}`)
-          }
-        }
-
-        await communitiesDb.likePost(postId, userAddress)
-
-        logger.info('Post liked successfully', {
-          postId,
-          userAddress: userAddress.toLowerCase(),
-          communityId: post.communityId
-        })
-      } catch (error) {
-        logger.error('Failed to like post', {
-          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
-          postId,
-          userAddress: userAddress.toLowerCase()
-        })
-        throw error
+      const post = await communitiesDb.getPost(postId)
+      if (!post) {
+        throw new CommunityPostNotFoundError(postId)
       }
+
+      const community = await communitiesDb.getCommunity(post.communityId)
+      if (!community) {
+        throw new CommunityNotFoundError(post.communityId)
+      }
+
+      if (community.privacy === CommunityPrivacyEnum.Private) {
+        const isMember = await communitiesDb.isMemberOfCommunity(post.communityId, userAddress)
+        if (!isMember) {
+          throw new NotAuthorizedError(`User ${userAddress} is not a member of private community ${post.communityId}`)
+        }
+      }
+
+      await communitiesDb.likePost(postId, userAddress)
+
+      logger.info('Post liked successfully', {
+        postId,
+        userAddress: userAddress.toLowerCase(),
+        communityId: post.communityId
+      })
     },
 
     async unlikePost(postId: string, userAddress: EthAddress): Promise<void> {
-      try {
-        const post = await communitiesDb.getPost(postId)
-        if (!post) {
-          throw new CommunityPostNotFoundError(postId)
-        }
-
-        await communitiesDb.unlikePost(postId, userAddress)
-
-        logger.info('Post unliked successfully', {
-          postId,
-          userAddress: userAddress.toLowerCase(),
-          communityId: post.communityId
-        })
-      } catch (error) {
-        logger.error('Failed to unlike post', {
-          error: isErrorWithMessage(error) ? error.message : 'Unknown error',
-          postId,
-          userAddress: userAddress.toLowerCase()
-        })
-        throw error
+      const post = await communitiesDb.getPost(postId)
+      if (!post) {
+        throw new CommunityPostNotFoundError(postId)
       }
+
+      await communitiesDb.unlikePost(postId, userAddress)
+
+      logger.info('Post unliked successfully', {
+        postId,
+        userAddress: userAddress.toLowerCase(),
+        communityId: post.communityId
+      })
     }
   }
 }
