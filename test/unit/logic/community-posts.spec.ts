@@ -8,6 +8,7 @@ import {
   ICommunityPostsComponent,
   ICommunityRolesComponent,
   CommunityPost,
+  CommunityPostWithLikes,
   CommunityPostWithProfile,
   GetCommunityPostsOptions,
   CommunityPrivacyEnum
@@ -41,6 +42,12 @@ describe('Community Posts Component', () => {
     authorAddress: '0x1234567890123456789012345678901234567890',
     content: 'Test post content',
     createdAt: '2023-01-01T00:00:00Z'
+  }
+
+  const mockPostWithLikes: CommunityPostWithLikes = {
+    ...mockPost,
+    likesCount: 0,
+    isLikedByUser: false
   }
 
   beforeEach(() => {
@@ -222,10 +229,8 @@ describe('Community Posts Component', () => {
           privacy: CommunityPrivacyEnum.Public,
           role: CommunityRole.Member
         })
-        mockCommunitiesDB.getPosts.mockResolvedValue([mockPost])
+        mockCommunitiesDB.getPosts.mockResolvedValue([mockPostWithLikes])
         mockCommunitiesDB.getPostsCount.mockResolvedValue(1)
-        mockCommunitiesDB.getPostLikesCount.mockResolvedValue(0)
-        mockCommunitiesDB.isPostLikedByUser.mockResolvedValue(false)
         mockCatalystClient.getProfiles.mockResolvedValue([createMockProfile(mockUserAddress)])
       })
 
@@ -253,7 +258,7 @@ describe('Community Posts Component', () => {
           })
 
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, options.userAddress)
-          expect(mockCommunitiesDB.getPosts).toHaveBeenCalledWith(mockCommunityId, options.pagination)
+          expect(mockCommunitiesDB.getPosts).toHaveBeenCalledWith(mockCommunityId, options)
           expect(mockCommunitiesDB.getPostsCount).toHaveBeenCalledWith(mockCommunityId)
           expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([mockUserAddress])
         })
@@ -266,12 +271,20 @@ describe('Community Posts Component', () => {
             privacy: CommunityPrivacyEnum.Public,
             role: CommunityRole.Member
           })
+          mockCommunitiesDB.getPosts.mockResolvedValue([
+            {
+              ...mockPostWithLikes,
+              isLikedByUser: undefined
+            }
+          ])
+          mockCommunitiesDB.getPostsCount.mockResolvedValue(1)
 
           const result = await postsComponent.getPosts(mockCommunityId, optionsWithoutUser)
 
           expect(result.posts).toHaveLength(1)
           expect(result.total).toBe(1)
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, undefined)
+          expect(mockCommunitiesDB.getPosts).toHaveBeenCalledWith(mockCommunityId, optionsWithoutUser)
         })
       })
 
@@ -308,7 +321,7 @@ describe('Community Posts Component', () => {
             })
 
             expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, options.userAddress)
-            expect(mockCommunitiesDB.getPosts).toHaveBeenCalledWith(mockCommunityId, options.pagination)
+            expect(mockCommunitiesDB.getPosts).toHaveBeenCalledWith(mockCommunityId, options)
             expect(mockCommunitiesDB.getPostsCount).toHaveBeenCalledWith(mockCommunityId)
             expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([mockUserAddress])
           })
@@ -372,20 +385,21 @@ describe('Community Posts Component', () => {
 
       describe('and there are multiple posts from different authors', () => {
         const secondAuthor = '0x9876543210987654321098765432109876543210'
-        const mockPosts: CommunityPost[] = [
-          mockPost,
+        const mockPosts: CommunityPostWithLikes[] = [
+          mockPostWithLikes,
           {
-            ...mockPost,
+            ...mockPostWithLikes,
             id: 'test-post-2',
             authorAddress: secondAuthor,
-            content: 'Second post content'
+            content: 'Second post content',
+            likesCount: 0,
+            isLikedByUser: false
           }
         ]
 
         beforeEach(() => {
           mockCommunitiesDB.getPosts.mockResolvedValue(mockPosts)
           mockCommunitiesDB.getPostsCount.mockResolvedValue(2)
-          mockCommunitiesDB.getPostLikesCount.mockResolvedValue(0)
           mockCatalystClient.getProfiles.mockResolvedValue([
             createMockProfile(mockUserAddress),
             createMockProfile(secondAuthor)

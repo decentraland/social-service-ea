@@ -50,7 +50,5 @@ export const mockCommunitiesDB: jest.Mocked<ICommunitiesDatabaseComponent> = {
   getPostsCount: jest.fn(),
   deletePost: jest.fn(),
   likePost: jest.fn(),
-  unlikePost: jest.fn(),
-  getPostLikesCount: jest.fn(),
-  isPostLikedByUser: jest.fn()
+  unlikePost: jest.fn()
 }

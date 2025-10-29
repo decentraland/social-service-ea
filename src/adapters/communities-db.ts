@@ -16,7 +16,9 @@ import {
   CommunityRequestStatus,
   GetCommunityRequestsOptions,
   CommunityForModeration,
-  CommunityPost
+  CommunityPost,
+  CommunityPostWithLikes,
+  GetCommunityPostsOptions
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -927,15 +929,49 @@ export function createCommunitiesDBComponent(
       return result.rows[0] || null
     },
 
-    async getPosts(communityId: string, pagination: Pagination): Promise<CommunityPost[]> {
-      const result = await pg.query<CommunityPost>(SQL`
-        SELECT id, community_id AS "communityId", author_address AS "authorAddress", content, created_at AS "createdAt"
-        FROM community_posts
-        WHERE community_id = ${communityId}
-        ORDER BY created_at DESC
+    async getPosts(communityId: string, options: GetCommunityPostsOptions): Promise<CommunityPostWithLikes[]> {
+      const { pagination, userAddress } = options
+      const normalizedUserAddress = userAddress ? normalizeAddress(userAddress) : null
+
+      const query = SQL`
+        SELECT 
+          cp.id,
+          cp.community_id AS "communityId",
+          cp.author_address AS "authorAddress",
+          cp.content,
+          cp.created_at AS "createdAt",
+          COALESCE(like_counts.count, 0)::int AS "likesCount"
+      `
+        .append(
+          normalizedUserAddress
+            ? SQL`,
+          CASE WHEN user_like.post_id IS NOT NULL THEN true ELSE false END AS "isLikedByUser"
+      `
+            : SQL``
+        )
+        .append(
+          SQL`
+        FROM community_posts cp
+        LEFT JOIN (
+          SELECT post_id, COUNT(*) as count
+          FROM community_post_likes
+          GROUP BY post_id
+        ) like_counts ON cp.id = like_counts.post_id
+      `
+        )
+        .append(
+          normalizedUserAddress
+            ? SQL`
+        LEFT JOIN community_post_likes user_like ON cp.id = user_like.post_id AND user_like.user_address = ${normalizedUserAddress}
+      `
+            : SQL``
+        ).append(SQL`
+        WHERE cp.community_id = ${communityId}
+        ORDER BY cp.created_at DESC
         LIMIT ${pagination.limit} OFFSET ${pagination.offset}
       `)
 
+      const result = await pg.query<CommunityPostWithLikes>(query)
       return result.rows
     },
 
@@ -971,26 +1007,6 @@ export function createCommunitiesDBComponent(
         DELETE FROM community_post_likes
         WHERE post_id = ${postId} AND user_address = ${normalizedAddress}
       `)
-    },
-
-    async getPostLikesCount(postId: string): Promise<number> {
-      const query = SQL`
-        SELECT COUNT(*) as count
-        FROM community_post_likes
-        WHERE post_id = ${postId}
-      `
-      return pg.getCount(query)
-    },
-
-    async isPostLikedByUser(postId: string, userAddress: EthAddress): Promise<boolean> {
-      const normalizedAddress = normalizeAddress(userAddress)
-      const query = SQL`
-        SELECT EXISTS (
-          SELECT 1 FROM community_post_likes
-          WHERE post_id = ${postId} AND user_address = ${normalizedAddress}
-        ) AS "exists"
-      `
-      return pg.exists(query, 'exists')
     }
   }
 }

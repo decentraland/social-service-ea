@@ -483,6 +483,11 @@ export type CommunityPost = {
   createdAt: string
 }
 
+export type CommunityPostWithLikes = CommunityPost & {
+  likesCount: number
+  isLikedByUser?: boolean
+}
+
 export type CommunityPostWithProfile = CommunityPost & {
   authorName: string
   authorProfilePictureUrl: string

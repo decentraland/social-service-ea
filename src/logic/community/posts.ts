@@ -3,6 +3,7 @@ import { AppComponents } from '../../types/system'
 import {
   ICommunityPostsComponent,
   CommunityPost,
+  CommunityPostWithLikes,
   CommunityPostWithProfile,
   GetCommunityPostsOptions,
   CommunityPrivacyEnum
@@ -34,41 +35,23 @@ export function createCommunityPostsComponent(
     }
   }
 
-  async function aggregatePostsWithProfiles(
-    posts: CommunityPost[],
-    userAddress?: EthAddress
-  ): Promise<CommunityPostWithProfile[]> {
+  async function aggregatePostsWithProfiles(posts: CommunityPostWithLikes[]): Promise<CommunityPostWithProfile[]> {
     if (posts.length === 0) {
       return []
     }
 
-    const authorAddresses = [...new Set(posts.map((post) => post.authorAddress))]
-
-    const list = await catalystClient.getProfiles(authorAddresses)
-
-    const byAddr = new Map(list.map((p) => [getProfileUserId(p), p]))
-
-    const postIds = posts.map((post) => post.id)
-    const [likesCounts, userLikes] = await Promise.all([
-      Promise.all(postIds.map((postId) => communitiesDb.getPostLikesCount(postId))),
-      userAddress
-        ? Promise.all(postIds.map((postId) => communitiesDb.isPostLikedByUser(postId, userAddress)))
-        : Promise.resolve([])
-    ])
-
-    const likesCountMap = new Map(postIds.map((postId, index) => [postId, likesCounts[index]]))
-    const userLikesMap = userAddress ? new Map(postIds.map((postId, index) => [postId, userLikes[index]])) : new Map()
+    const authorAddresses = Array.from(new Set(posts.map((post) => post.authorAddress)))
+    const authorProfiles = await catalystClient.getProfiles(authorAddresses)
+    const authorProfilesByAddress = new Map(authorProfiles.map((p) => [getProfileUserId(p), p]))
 
     return posts.map((post) => {
-      const profile = byAddr.get(normalizeAddress(post.authorAddress))
+      const profile = authorProfilesByAddress.get(normalizeAddress(post.authorAddress))
 
       return {
         ...post,
         authorName: profile ? getProfileName(profile) : post.authorAddress,
         authorProfilePictureUrl: profile ? getProfilePictureUrl(profile) : '',
-        authorHasClaimedName: profile ? getProfileHasClaimedName(profile) : false,
-        likesCount: likesCountMap.get(post.id) || 0,
-        isLikedByUser: userAddress ? userLikesMap.get(post.id) : undefined
+        authorHasClaimedName: profile ? getProfileHasClaimedName(profile) : false
       }
     })
   }
@@ -137,11 +120,11 @@ export function createCommunityPostsComponent(
       }
 
       const [posts, total] = await Promise.all([
-        communitiesDb.getPosts(communityId, options.pagination),
+        communitiesDb.getPosts(communityId, options),
         communitiesDb.getPostsCount(communityId)
       ])
 
-      const postsWithProfiles = await aggregatePostsWithProfiles(posts, options.userAddress)
+      const postsWithProfiles = await aggregatePostsWithProfiles(posts)
 
       return {
         posts: postsWithProfiles,
