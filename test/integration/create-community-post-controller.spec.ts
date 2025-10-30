@@ -160,7 +160,7 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         expect(response.status).toBe(400)
         expect(await response.json()).toMatchObject({
           error: 'Bad request',
-          message: 'Post content is too short'
+          message: 'Content is required'
         })
       })
     })

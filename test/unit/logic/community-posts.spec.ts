@@ -1,5 +1,5 @@
 import { EthAddress } from '@dcl/schemas'
-import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError, CommunityPostNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockCatalystClient, createLogsMockedComponent } from '../../mocks/components'
@@ -103,64 +103,6 @@ describe('Community Posts Component', () => {
           communityId: mockCommunityId,
           authorAddress,
           content: 'This is a test post content'
-        })
-      })
-
-      describe('and the content is empty', () => {
-        beforeEach(() => {
-          mockCommunitiesDB.communityExists.mockResolvedValue(true)
-          mockCommunityRoles.validatePermissionToCreatePost.mockResolvedValue()
-        })
-
-        it('should throw PostContentEmptyError for empty string', async () => {
-          await expect(postsComponent.createPost(mockCommunityId, authorAddress, '')).rejects.toThrow(
-            new InvalidRequestError('Post content is too short')
-          )
-
-          expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(mockCommunityId)
-          expect(mockCommunityRoles.validatePermissionToCreatePost).toHaveBeenCalledWith(mockCommunityId, authorAddress)
-          expect(mockCommunitiesDB.createPost).not.toHaveBeenCalled()
-        })
-
-        it('should throw InvalidRequestError for whitespace only', async () => {
-          await expect(postsComponent.createPost(mockCommunityId, authorAddress, '   ')).rejects.toThrow(
-            new InvalidRequestError('Post content is too short')
-          )
-
-          expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(mockCommunityId)
-          expect(mockCommunityRoles.validatePermissionToCreatePost).toHaveBeenCalledWith(mockCommunityId, authorAddress)
-          expect(mockCommunitiesDB.createPost).not.toHaveBeenCalled()
-        })
-      })
-
-      describe('and the content is too long', () => {
-        beforeEach(() => {
-          mockCommunitiesDB.communityExists.mockResolvedValue(true)
-          mockCommunityRoles.validatePermissionToCreatePost.mockResolvedValue()
-        })
-
-        it('should throw InvalidRequestError for content exceeding 1000 characters', async () => {
-          const longContent = 'a'.repeat(1001)
-
-          await expect(postsComponent.createPost(mockCommunityId, authorAddress, longContent)).rejects.toThrow(
-            new InvalidRequestError('Post content is too long')
-          )
-
-          expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(mockCommunityId)
-          expect(mockCommunityRoles.validatePermissionToCreatePost).toHaveBeenCalledWith(mockCommunityId, authorAddress)
-          expect(mockCommunitiesDB.createPost).not.toHaveBeenCalled()
-        })
-
-        it('should allow content with exactly 1000 characters', async () => {
-          const maxContent = 'a'.repeat(1000)
-
-          await postsComponent.createPost(mockCommunityId, authorAddress, maxContent)
-
-          expect(mockCommunitiesDB.createPost).toHaveBeenCalledWith({
-            communityId: mockCommunityId,
-            authorAddress,
-            content: maxContent
-          })
         })
       })
 

@@ -9,31 +9,16 @@ import {
   CommunityPrivacyEnum
 } from './types'
 import { CommunityNotFoundError, CommunityPostNotFoundError } from './errors'
-import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { normalizeAddress } from '../../utils/address'
 import { getProfileName, getProfileUserId, getProfileHasClaimedName, getProfilePictureUrl } from '../profiles'
 import { CommunityRole } from '../../types/entities'
-
-const MAX_POST_CONTENT_LENGTH = 1000
-const MIN_POST_CONTENT_LENGTH = 1
 
 export function createCommunityPostsComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'communityRoles' | 'catalystClient' | 'logs'>
 ): ICommunityPostsComponent {
   const { communitiesDb, communityRoles, catalystClient, logs } = components
   const logger = logs.getLogger('community-posts-component')
-
-  function validatePostContent(content: string): void {
-    const trimmedContent = content.trim()
-
-    if (trimmedContent.length < MIN_POST_CONTENT_LENGTH) {
-      throw new InvalidRequestError('Post content is too short')
-    }
-
-    if (trimmedContent.length > MAX_POST_CONTENT_LENGTH) {
-      throw new InvalidRequestError('Post content is too long')
-    }
-  }
 
   async function aggregatePostsWithProfiles(posts: CommunityPostWithLikes[]): Promise<CommunityPostWithProfile[]> {
     if (posts.length === 0) {
@@ -93,8 +78,6 @@ export function createCommunityPostsComponent(
       }
 
       await communityRoles.validatePermissionToCreatePost(communityId, authorAddress)
-
-      validatePostContent(content)
 
       const post = await communitiesDb.createPost({
         communityId,
