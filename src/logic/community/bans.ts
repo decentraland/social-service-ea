@@ -49,6 +49,9 @@ export async function createCommunityBansComponent(
 
       if (doesTargetUserBelongsToCommunity) {
         await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
+
+        await communitiesDb.unlikePostsFromCommunity(communityId, targetAddress)
+
         analytics.fireEvent(AnalyticsEvent.BAN_MEMBER_FROM_COMMUNITY, {
           community_id: communityId,
           banner_user_id: bannerAddress.toLowerCase(),

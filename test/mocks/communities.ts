@@ -193,11 +193,15 @@ export function createMockCommunityComplianceValidatorComponent({
 export function createMockCommunityPostsComponent({
   createPost = jest.fn(),
   getPosts = jest.fn(),
-  deletePost = jest.fn()
+  deletePost = jest.fn(),
+  likePost = jest.fn(),
+  unlikePost = jest.fn()
 }: Partial<jest.Mocked<ICommunityPostsComponent>>): jest.Mocked<ICommunityPostsComponent> {
   return {
     createPost,
     getPosts,
-    deletePost
+    deletePost,
+    likePost,
+    unlikePost
   }
 }

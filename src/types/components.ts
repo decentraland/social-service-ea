@@ -39,7 +39,9 @@ import {
   MemberRequest,
   GetCommunityRequestsOptions,
   CommunityForModeration,
-  CommunityPost
+  CommunityPost,
+  CommunityPostWithLikes,
+  GetCommunityPostsOptions
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -209,9 +211,12 @@ export interface ICommunitiesDatabaseComponent {
   acceptAllRequestsToJoin(communityId: string): Promise<string[]>
   createPost(post: { communityId: string; authorAddress: string; content: string }): Promise<CommunityPost>
   getPost(postId: string): Promise<CommunityPost | null>
-  getPosts(communityId: string, pagination: Pagination): Promise<CommunityPost[]>
+  getPosts(communityId: string, options: GetCommunityPostsOptions): Promise<CommunityPostWithLikes[]>
   getPostsCount(communityId: string): Promise<number>
   deletePost(postId: string): Promise<void>
+  likePost(postId: string, userAddress: EthAddress): Promise<void>
+  unlikePost(postId: string, userAddress: EthAddress): Promise<void>
+  unlikePostsFromCommunity(communityId: string, userAddress: EthAddress): Promise<void>
 }
 
 export interface IVoiceDatabaseComponent {

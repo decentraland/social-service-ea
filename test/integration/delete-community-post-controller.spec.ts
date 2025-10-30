@@ -4,7 +4,7 @@ import { test } from '../components'
 import { createMockProfile } from '../mocks/profile'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 
-test('Delete Community Post Controller', async function ({ components, stubComponents }) {
+test('Delete Community Post Controller', async function ({ components, stubComponents, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when deleting a community post', () => {
@@ -164,6 +164,21 @@ test('Delete Community Post Controller', async function ({ components, stubCompo
           error: 'Not Found',
           message: `Community post not found: ${postId}`
         })
+      })
+    })
+
+    describe('and an unhandled error is propagated', () => {
+      beforeEach(() => {
+        spyComponents.communitiesDb.deletePost.mockRejectedValueOnce(new Error('Unhandled error'))
+      })
+
+      it('should respond with a 500 status code', async () => {
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts/${postId}`, 'DELETE')
+        const body = await response.json()
+
+        expect(response.status).toBe(500)
+        expect(body).toHaveProperty('message')
+        expect(body.message).toBe('Unhandled error')
       })
     })
   })

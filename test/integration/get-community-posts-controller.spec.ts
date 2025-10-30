@@ -1,10 +1,11 @@
 import { CommunityPrivacyEnum } from '../../src/logic/community'
 import { CommunityRole } from '../../src/types/entities'
 import { test } from '../components'
-import { createMockProfileWithDetails } from '../mocks/profile'
+import { createMockProfileWithDetails, createMockProfile } from '../mocks/profile'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
+import { mockCommunity } from '../mocks/communities'
 
-test('Get Community Posts Controller', async function ({ components, stubComponents }) {
+test('Get Community Posts Controller', async function ({ components, stubComponents, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
   describe('when getting community posts', () => {
@@ -199,6 +200,155 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
         expect(response.status).toBe(200)
         expect(body.data.posts).toHaveLength(0)
         expect(body.data.total).toBe(0)
+      })
+    })
+
+    describe('and an unhandled error is propagated', () => {
+      beforeEach(() => {
+        spyComponents.communitiesDb.getPosts.mockRejectedValueOnce(new Error('Unhandled error'))
+      })
+
+      it('should respond with a 500 status code', async () => {
+        const response = await components.localHttpFetch.fetch(`/v1/communities/${publicCommunityId}/posts`)
+        const body = await response.json()
+
+        expect(response.status).toBe(500)
+        expect(body).toHaveProperty('message')
+        expect(body.message).toBe('Unhandled error')
+      })
+    })
+
+    describe('and listing posts with likes', () => {
+      let likesCommunityId: string
+      let likesPostId: string
+
+      beforeEach(async () => {
+        // Stub catalyst client responses
+        stubComponents.catalystClient.getOwnedNames.resolves([])
+        stubComponents.catalystClient.getProfile.resolves(
+          createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
+        )
+        stubComponents.catalystClient.getProfiles.resolves([
+          createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
+        ])
+
+        // Create community for likes testing
+        const community = await components.communitiesDb.createCommunity(
+          mockCommunity({
+            name: 'Likes Test Community',
+            description: 'A test community for likes',
+            owner_address: ownerIdentity.realAccount.address.toLowerCase(),
+            private: false
+          })
+        )
+        likesCommunityId = community.id
+
+        // Add members to community
+        await components.communitiesDb.addCommunityMember({
+          communityId: likesCommunityId,
+          memberAddress: ownerIdentity.realAccount.address.toLowerCase(),
+          role: CommunityRole.Owner
+        })
+
+        await components.communitiesDb.addCommunityMember({
+          communityId: likesCommunityId,
+          memberAddress: memberIdentity.realAccount.address.toLowerCase(),
+          role: CommunityRole.Member
+        })
+
+        // Create test post
+        const post = await components.communitiesDb.createPost({
+          communityId: likesCommunityId,
+          authorAddress: ownerIdentity.realAccount.address.toLowerCase(),
+          content: 'This is a test post'
+        })
+        likesPostId = post.id
+
+        // Like the post
+        await components.communitiesDb.likePost(likesPostId, memberIdentity.realAccount.address.toLowerCase())
+      })
+
+      afterEach(async () => {
+        if (likesCommunityId) {
+          // Clean up likes
+          await components.pg.query('DELETE FROM community_post_likes')
+          // Clean up posts
+          await components.pg.query('DELETE FROM community_posts')
+          // Clean up community members
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(likesCommunityId, [
+            ownerIdentity.realAccount.address.toLowerCase(),
+            memberIdentity.realAccount.address.toLowerCase()
+          ])
+          // Clean up community
+          await components.communitiesDbHelper.forceCommunityRemoval(likesCommunityId)
+        }
+      })
+
+      describe('and the user is authenticated', () => {
+        it('should include likes count and isLikedByUser', async () => {
+          const response = await makeRequest(memberIdentity, `/v1/communities/${likesCommunityId}/posts`, 'GET')
+
+          expect(response.status).toBe(200)
+          const body = await response.json()
+          expect(body.data.posts).toHaveLength(1)
+          expect(body.data.posts[0]).toMatchObject({
+            id: likesPostId,
+            likesCount: 1,
+            isLikedByUser: true
+          })
+        })
+      })
+
+      describe('and the user is not authenticated', () => {
+        it('should include likes count but not isLikedByUser', async () => {
+          const response = await components.localHttpFetch.fetch(`/v1/communities/${likesCommunityId}/posts`)
+
+          expect(response.status).toBe(200)
+          const body = await response.json()
+          expect(body.data.posts).toHaveLength(1)
+          expect(body.data.posts[0]).toMatchObject({
+            id: likesPostId,
+            likesCount: 1
+          })
+          expect(body.data.posts[0].isLikedByUser).toBeUndefined()
+        })
+      })
+
+      describe('and multiple users like the same post', () => {
+        it('should increment the like count correctly', async () => {
+          // Add another member
+          const anotherMemberIdentity = await createTestIdentity()
+          await components.communitiesDb.addCommunityMember({
+            communityId: likesCommunityId,
+            memberAddress: anotherMemberIdentity.realAccount.address.toLowerCase(),
+            role: CommunityRole.Member
+          })
+
+          // Like the post with another member
+          await components.communitiesDb.likePost(likesPostId, anotherMemberIdentity.realAccount.address.toLowerCase())
+
+          const response = await makeRequest(memberIdentity, `/v1/communities/${likesCommunityId}/posts`, 'GET')
+
+          expect(response.status).toBe(200)
+          const body = await response.json()
+          expect(body.data.posts[0].likesCount).toBe(2)
+        })
+      })
+
+      describe('and the post has zero likes', () => {
+        beforeEach(async () => {
+          // Unlike the post
+          await components.communitiesDb.unlikePost(likesPostId, memberIdentity.realAccount.address.toLowerCase())
+        })
+
+        it('should show likesCount: 0 and isLikedByUser: false', async () => {
+          const response = await makeRequest(memberIdentity, `/v1/communities/${likesCommunityId}/posts`, 'GET')
+
+          expect(response.status).toBe(200)
+          const body = await response.json()
+          expect(body.data.posts[0].likesCount).toBe(0)
+          expect(body.data.posts[0].isLikedByUser).toBe(false)
+        })
       })
     })
   })

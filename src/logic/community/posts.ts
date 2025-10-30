@@ -3,17 +3,16 @@ import { AppComponents } from '../../types/system'
 import {
   ICommunityPostsComponent,
   CommunityPost,
+  CommunityPostWithLikes,
   CommunityPostWithProfile,
   GetCommunityPostsOptions,
   CommunityPrivacyEnum
 } from './types'
 import { CommunityNotFoundError, CommunityPostNotFoundError } from './errors'
-import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { normalizeAddress } from '../../utils/address'
 import { getProfileName, getProfileUserId, getProfileHasClaimedName, getProfilePictureUrl } from '../profiles'
-
-const MAX_POST_CONTENT_LENGTH = 1000
-const MIN_POST_CONTENT_LENGTH = 1
+import { CommunityRole } from '../../types/entities'
 
 export function createCommunityPostsComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'communityRoles' | 'catalystClient' | 'logs'>
@@ -21,31 +20,17 @@ export function createCommunityPostsComponent(
   const { communitiesDb, communityRoles, catalystClient, logs } = components
   const logger = logs.getLogger('community-posts-component')
 
-  function validatePostContent(content: string): void {
-    const trimmedContent = content.trim()
-
-    if (trimmedContent.length < MIN_POST_CONTENT_LENGTH) {
-      throw new InvalidRequestError('Post content is too short')
-    }
-
-    if (trimmedContent.length > MAX_POST_CONTENT_LENGTH) {
-      throw new InvalidRequestError('Post content is too long')
-    }
-  }
-
-  async function aggregatePostsWithProfiles(posts: CommunityPost[]): Promise<CommunityPostWithProfile[]> {
+  async function aggregatePostsWithProfiles(posts: CommunityPostWithLikes[]): Promise<CommunityPostWithProfile[]> {
     if (posts.length === 0) {
       return []
     }
 
-    const authorAddresses = [...new Set(posts.map((post) => post.authorAddress))]
-
-    const list = await catalystClient.getProfiles(authorAddresses)
-
-    const byAddr = new Map(list.map((p) => [getProfileUserId(p), p]))
+    const authorAddresses = Array.from(new Set(posts.map((post) => post.authorAddress)))
+    const authorProfiles = await catalystClient.getProfiles(authorAddresses)
+    const authorProfilesByAddress = new Map(authorProfiles.map((p) => [getProfileUserId(p), p]))
 
     return posts.map((post) => {
-      const profile = byAddr.get(normalizeAddress(post.authorAddress))
+      const profile = authorProfilesByAddress.get(normalizeAddress(post.authorAddress))
 
       return {
         ...post,
@@ -54,6 +39,35 @@ export function createCommunityPostsComponent(
         authorHasClaimedName: profile ? getProfileHasClaimedName(profile) : false
       }
     })
+  }
+
+  async function validatePermissionsToLikeAndUnlikePost(
+    communityId: string,
+    postId: string,
+    userAddress: EthAddress
+  ): Promise<void> {
+    const community = await communitiesDb.getCommunity(communityId, userAddress)
+    if (!community) {
+      throw new CommunityNotFoundError(communityId)
+    }
+
+    if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
+      throw new NotAuthorizedError(
+        `${userAddress} is not a member of private community ${communityId}. You need to be a member to like/unlike posts in this community.`
+      )
+    }
+
+    const isBanned = await communitiesDb.isMemberBanned(communityId, userAddress)
+    if (isBanned) {
+      throw new NotAuthorizedError(
+        `${userAddress} is banned from community ${communityId}. You cannot like/unlike posts in this community.`
+      )
+    }
+
+    const post = await communitiesDb.getPost(postId)
+    if (!post) {
+      throw new CommunityPostNotFoundError(postId)
+    }
   }
 
   return {
@@ -65,98 +79,91 @@ export function createCommunityPostsComponent(
 
       await communityRoles.validatePermissionToCreatePost(communityId, authorAddress)
 
-      validatePostContent(content)
+      const post = await communitiesDb.createPost({
+        communityId,
+        authorAddress,
+        content: content.trim()
+      })
 
-      try {
-        const post = await communitiesDb.createPost({
-          communityId,
-          authorAddress,
-          content: content.trim()
-        })
+      logger.info('Post created successfully', {
+        postId: post.id,
+        communityId,
+        authorAddress: authorAddress.toLowerCase()
+      })
 
-        logger.info('Post created successfully', {
-          postId: post.id,
-          communityId,
-          authorAddress: authorAddress.toLowerCase()
-        })
-
-        return post
-      } catch (error) {
-        logger.error('Failed to create post', {
-          error: error instanceof Error ? error.message : String(error),
-          communityId,
-          authorAddress: authorAddress.toLowerCase()
-        })
-        throw error
-      }
+      return post
     },
 
     async getPosts(
       communityId: string,
       options: GetCommunityPostsOptions
     ): Promise<{ posts: CommunityPostWithProfile[]; total: number }> {
-      const community = await communitiesDb.getCommunity(communityId)
+      const community = await communitiesDb.getCommunity(communityId, options.userAddress)
       if (!community) {
         throw new CommunityNotFoundError(communityId)
       }
 
-      if (community.privacy === CommunityPrivacyEnum.Private) {
-        if (!options.userAddress) {
-          throw new NotAuthorizedError('Membership required for private communities')
-        }
-        const isMember = await communitiesDb.isMemberOfCommunity(communityId, options.userAddress)
-        if (!isMember) {
-          throw new NotAuthorizedError(
-            `User ${options.userAddress} is not a member of private community ${communityId}`
-          )
-        }
+      if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
+        throw new NotAuthorizedError(
+          `${options.userAddress} is not a member of private community ${communityId}. You need to be a member to get posts in this community.`
+        )
       }
 
-      try {
-        const [posts, total] = await Promise.all([
-          communitiesDb.getPosts(communityId, options.pagination),
-          communitiesDb.getPostsCount(communityId)
-        ])
+      const [posts, total] = await Promise.all([
+        communitiesDb.getPosts(communityId, options),
+        communitiesDb.getPostsCount(communityId)
+      ])
 
-        const postsWithProfiles = await aggregatePostsWithProfiles(posts)
+      const postsWithProfiles = await aggregatePostsWithProfiles(posts)
 
-        return {
-          posts: postsWithProfiles,
-          total
-        }
-      } catch (error) {
-        logger.error('Failed to get posts', {
-          error: error instanceof Error ? error.message : String(error),
-          communityId
-        })
-        throw error
+      return {
+        posts: postsWithProfiles,
+        total
       }
     },
 
     async deletePost(postId: string, deleterAddress: EthAddress): Promise<void> {
       const post = await communitiesDb.getPost(postId)
+
       if (!post) {
         throw new CommunityPostNotFoundError(postId)
       }
 
       await communityRoles.validatePermissionToDeletePost(post.communityId, deleterAddress)
 
-      try {
-        await communitiesDb.deletePost(postId)
+      await communitiesDb.deletePost(postId)
 
-        logger.info('Post deleted successfully', {
-          postId,
-          communityId: post.communityId,
-          deleterAddress: deleterAddress.toLowerCase()
-        })
-      } catch (error) {
-        logger.error('Failed to delete post', {
-          error: error instanceof Error ? error.message : String(error),
-          postId,
-          deleterAddress: deleterAddress.toLowerCase()
-        })
-        throw error
-      }
+      logger.info('Post deleted successfully', {
+        postId,
+        communityId: post.communityId,
+        deleterAddress: deleterAddress.toLowerCase()
+      })
+    },
+
+    async likePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void> {
+      const normalizedUserAddress = normalizeAddress(userAddress)
+      await validatePermissionsToLikeAndUnlikePost(communityId, postId, normalizedUserAddress)
+
+      await communitiesDb.likePost(postId, normalizedUserAddress)
+
+      logger.info('Post liked successfully', {
+        postId,
+        userAddress: normalizedUserAddress,
+        communityId
+      })
+    },
+
+    async unlikePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void> {
+      const normalizedUserAddress = normalizeAddress(userAddress)
+      await validatePermissionsToLikeAndUnlikePost(communityId, postId, normalizedUserAddress)
+
+      await communitiesDb.unlikePost(postId, normalizedUserAddress)
+
+      logger.info('Post unliked successfully', {
+        postId,
+        userAddress: normalizedUserAddress,
+        communityId
+      })
     }
   }
 }

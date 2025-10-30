@@ -171,6 +171,8 @@ export async function createCommunityMembersComponent(
 
       await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
 
+      await communitiesDb.unlikePostsFromCommunity(communityId, targetAddress)
+
       analytics.fireEvent(AnalyticsEvent.KICK_MEMBER_FROM_COMMUNITY, {
         community_id: communityId,
         kicker_user_id: kickerAddress,
@@ -270,6 +272,8 @@ export async function createCommunityMembersComponent(
       await communityRoles.validatePermissionToLeaveCommunity(communityId, memberAddress)
 
       await communitiesDb.kickMemberFromCommunity(communityId, memberAddress)
+
+      await communitiesDb.unlikePostsFromCommunity(communityId, memberAddress)
 
       analytics.fireEvent(AnalyticsEvent.LEAVE_COMMUNITY, {
         community_id: communityId,
