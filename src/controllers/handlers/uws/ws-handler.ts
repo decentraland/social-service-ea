@@ -102,7 +102,7 @@ export async function registerWsHandler(
       }
 
       transport.on('close', () => {
-        logger.debug('[DEBUGGING CONNECTION] Transport close event received', {
+        logger.debug('Transport close event received', {
           wsConnectionId: data.wsConnectionId,
           address
         })
@@ -111,7 +111,7 @@ export async function registerWsHandler(
 
       transport.on('error', (error: unknown) => {
         metrics.increment('ws_transport_errors')
-        logger.error('[DEBUGGING CONNECTION] Transport error event received', {
+        logger.error('Transport error event received', {
           address,
           error: isErrorWithMessage(error) ? error.message : 'Unknown error'
         })
@@ -135,11 +135,6 @@ export async function registerWsHandler(
 
   function forwardMessage(ws: WebSocket<WsUserData>, data: WsAuthenticatedUserData, message: ArrayBuffer) {
     try {
-      logger.info('Received message', {
-        wsConnectionId: data.wsConnectionId,
-        address: getAddress(data)
-      })
-
       if (!data.isConnected) {
         logger.warn('Received message but connection is marked as disconnected', {
           address: getAddress(data),
@@ -249,15 +244,6 @@ export async function registerWsHandler(
     message: async (ws, message) => {
       const data = ws.getUserData()
 
-      logger.debug('[DEBUGGING CONNECTION] Message received', {
-        wsConnectionId: data.wsConnectionId,
-        isConnected: String(data.isConnected),
-        auth: String(data.auth),
-        messageSize: message.byteLength,
-        address: getAddress(data),
-        authenticating: String(data.authenticating)
-      })
-
       if (data.authenticating) {
         logger.warn('Authentication already in progress', {
           wsConnectionId: data.wsConnectionId
@@ -276,16 +262,8 @@ export async function registerWsHandler(
     },
     close: (ws, code, message) => {
       const data = ws.getUserData()
-      const { wsConnectionId, isConnected, auth } = data
+      const { wsConnectionId } = data
       const messageText = textDecoder.decode(message)
-
-      logger.debug('[DEBUGGING CONNECTION] Connection closing', {
-        wsConnectionId: wsConnectionId,
-        code,
-        message: messageText,
-        isConnected: String(isConnected),
-        auth: String(auth)
-      })
 
       cleanupConnection(data, code)
 
