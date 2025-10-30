@@ -13,6 +13,7 @@ import {
 } from '../../../logic/community-voice'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { CommunityRole } from '../../../types/entities'
+import { CommunityPrivacyEnum } from '../../../logic/community'
 
 export function demoteSpeakerInCommunityVoiceChatService({
   components: { logs, commsGatekeeper, communitiesDb }
@@ -53,7 +54,7 @@ export function demoteSpeakerInCommunityVoiceChatService({
 
       // For private communities, acting user must be a member
       // For public communities, we allow voice chat participants to manage themselves and moderators to manage others
-      if (community.privacy === 'private' && actingUserRole === CommunityRole.None) {
+      if (community.privacy === CommunityPrivacyEnum.Private && actingUserRole === CommunityRole.None) {
         throw new UserNotCommunityMemberError(context.address, request.communityId)
       }
 

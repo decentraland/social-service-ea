@@ -9,7 +9,8 @@ import {
   ICommunityPlacesComponent,
   ICommunityRolesComponent,
   ICommunityThumbnailComponent,
-  ICommunityComplianceValidatorComponent
+  ICommunityComplianceValidatorComponent,
+  ICommunityPostsComponent
 } from '../../src/logic/community'
 
 export const mockCommunity = (community: Partial<CommunityDB> = {}): CommunityDB => ({
@@ -61,7 +62,9 @@ export function createMockCommunityRolesComponent({
   validatePermissionToAcceptAndRejectRequests = jest.fn(),
   validatePermissionToViewRequests = jest.fn(),
   validatePermissionToInviteUsers = jest.fn(),
-  validatePermissionToEditCommunityName = jest.fn()
+  validatePermissionToEditCommunityName = jest.fn(),
+  validatePermissionToCreatePost = jest.fn(),
+  validatePermissionToDeletePost = jest.fn()
 }: Partial<jest.Mocked<ICommunityRolesComponent>>): jest.Mocked<ICommunityRolesComponent> {
   return {
     validatePermissionToKickMemberFromCommunity,
@@ -79,7 +82,9 @@ export function createMockCommunityRolesComponent({
     validatePermissionToAcceptAndRejectRequests,
     validatePermissionToViewRequests,
     validatePermissionToInviteUsers,
-    validatePermissionToEditCommunityName
+    validatePermissionToEditCommunityName,
+    validatePermissionToCreatePost,
+    validatePermissionToDeletePost
   }
 }
 
@@ -182,5 +187,17 @@ export function createMockCommunityComplianceValidatorComponent({
 }: Partial<jest.Mocked<ICommunityComplianceValidatorComponent>>): jest.Mocked<ICommunityComplianceValidatorComponent> {
   return {
     validateCommunityContent
+  }
+}
+
+export function createMockCommunityPostsComponent({
+  createPost = jest.fn(),
+  getPosts = jest.fn(),
+  deletePost = jest.fn()
+}: Partial<jest.Mocked<ICommunityPostsComponent>>): jest.Mocked<ICommunityPostsComponent> {
+  return {
+    createPost,
+    getPosts,
+    deletePost
   }
 }

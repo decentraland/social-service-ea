@@ -111,6 +111,8 @@ export interface ICommunityRolesComponent {
   validatePermissionToViewRequests: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToInviteUsers: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToEditCommunityName: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToCreatePost: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToDeletePost: (communityId: string, memberAddress: string) => Promise<void>
 }
 
 export interface ICommunityEventsComponent {
@@ -470,4 +472,33 @@ export interface ICommunityFieldsValidatorComponent {
     thumbnailBuffer?: Buffer,
     options?: CommunityFieldsValidationOptions
   ): Promise<CommunityFieldsValidationFields>
+}
+
+// Community Posts Types
+export type CommunityPost = {
+  id: string
+  communityId: string
+  authorAddress: string
+  content: string
+  createdAt: string
+}
+
+export type CommunityPostWithProfile = CommunityPost & {
+  authorName: string
+  authorProfilePictureUrl: string
+  authorHasClaimedName: boolean
+}
+
+export type GetCommunityPostsOptions = {
+  pagination: Required<PaginatedParameters>
+  userAddress?: EthAddress
+}
+
+export interface ICommunityPostsComponent {
+  createPost(communityId: string, authorAddress: EthAddress, content: string): Promise<CommunityPost>
+  getPosts(
+    communityId: string,
+    options: GetCommunityPostsOptions
+  ): Promise<{ posts: CommunityPostWithProfile[]; total: number }>
+  deletePost(postId: string, deleterAddress: EthAddress): Promise<void>
 }

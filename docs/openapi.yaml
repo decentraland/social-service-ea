@@ -1350,3 +1350,158 @@ paths:
                 $ref: './schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Community Voice Chats
+
+  /v1/communities/{id}/posts:
+    get:
+      summary: List community posts
+      description: |
+        Lists all posts from a specific community with pagination support.
+        This endpoint has optional Signed Fetch authentication.
+        When not signed, it only returns posts from public communities.
+        When signed, it returns all posts if the user has access to the community.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of posts per page (max 100).
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of posts to skip.
+      responses:
+        '200':
+          description: Posts found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetCommunityPosts200OkResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+    post:
+      summary: Create a community post
+      description: |
+        Creates a new post in a community.
+        This endpoint requires Signed Fetch authentication and only community owners or moderators can create posts.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas.yaml#/components/schemas/CreatePostRequest'
+      responses:
+        '201':
+          description: Post created successfully
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/CreatePost201OkResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required or insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
+  /v1/communities/{id}/posts/{postId}:
+    delete:
+      summary: Delete a community post
+      description: |
+        Deletes a post from a community.
+        This endpoint requires Signed Fetch authentication and only community owners or moderators can delete posts.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the post.
+      responses:
+        '204':
+          description: Post deleted successfully
+        '401':
+          description: Unauthorized - Signed Fetch required or insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community or post not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities

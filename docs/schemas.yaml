@@ -99,12 +99,8 @@ components:
     CreateCommunity201OkResponse:
       type: object
       required:
-        - message
         - data
       properties:
-        message:
-          type: string
-          description: 'A message describing the result'
         data:
           type: object
           required:
@@ -644,3 +640,82 @@ components:
                 type: string
                 description: 'Name of the community'
           description: 'List of communities where the inviter is a member but the invitee is not'
+
+    CommunityPost:
+      type: object
+      required:
+        - id
+        - communityId
+        - authorAddress
+        - authorName
+        - authorProfilePictureUrl
+        - authorHasClaimedName
+        - content
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 'Unique post identifier'
+        communityId:
+          type: string
+          format: uuid
+          description: 'ID of the community this post belongs to'
+        authorAddress:
+          type: string
+          description: 'Ethereum address of the post author'
+        authorName:
+          type: string
+          description: 'Display name of the post author'
+        authorProfilePictureUrl:
+          type: string
+          format: uri
+          description: 'URL of the author profile picture'
+        authorHasClaimedName:
+          type: boolean
+          description: 'Whether the author has a claimed name'
+        content:
+          type: string
+          description: 'Post content (1-1000 characters)'
+        createdAt:
+          type: string
+          format: date-time
+          description: 'When the post was created'
+
+    CreatePostRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: 'Post content (1-1000 characters)'
+
+    GetCommunityPosts200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - posts
+            - total
+          properties:
+            posts:
+              type: array
+              items:
+                $ref: '#/components/schemas/CommunityPost'
+            total:
+              type: integer
+              description: 'Total number of posts in the community'
+
+    CreatePost201OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/CommunityPost'

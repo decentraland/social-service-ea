@@ -233,7 +233,7 @@ export async function createCommunityVoiceComponent({
     const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
 
     // For private communities, check if user is a member
-    if (community.privacy === 'private') {
+    if (community.privacy === CommunityPrivacyEnum.Private) {
       if (userRole === CommunityRole.None) {
         throw new UserNotCommunityMemberError(userAddress, communityId)
       }

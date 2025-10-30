@@ -16,7 +16,9 @@ export const OWNER_PERMISSIONS: CommunityPermission[] = [
   'edit_settings',
   'delete_community',
   'assign_roles',
-  'invite_users'
+  'invite_users',
+  'create_posts',
+  'delete_posts'
 ]
 
 export const MODERATOR_PERMISSIONS: CommunityPermission[] = [
@@ -28,7 +30,9 @@ export const MODERATOR_PERMISSIONS: CommunityPermission[] = [
   'view_requests',
   'ban_players',
   'send_invitations',
-  'invite_users'
+  'invite_users',
+  'create_posts',
+  'delete_posts'
 ]
 
 export const COMMUNITY_ROLES: Record<CommunityRole, CommunityPermission[]> = {
@@ -189,6 +193,8 @@ export function createCommunityRolesComponent(
     ),
     validatePermissionToViewRequests: validatePermission('view_requests', 'view requests'),
     validatePermissionToInviteUsers: validatePermission('invite_users', 'invite users'),
-    validatePermissionToEditCommunityName: validatePermission('edit_name', 'edit the community name')
+    validatePermissionToEditCommunityName: validatePermission('edit_name', 'edit the community name'),
+    validatePermissionToCreatePost: validatePermission('create_posts', 'create posts in the community'),
+    validatePermissionToDeletePost: validatePermission('delete_posts', 'delete posts from the community')
   }
 }
