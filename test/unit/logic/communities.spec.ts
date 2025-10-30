@@ -1708,8 +1708,10 @@ describe('Community Component', () => {
             it('should not update the community privacy', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithoutPrivacy)
               expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
-                ...updatesWithoutPrivacy,
-                private: undefined
+                name: updatesWithoutPrivacy.name,
+                description: updatesWithoutPrivacy.description,
+                private: undefined,
+                unlisted: undefined
               })
             })
           })
@@ -1731,16 +1733,20 @@ describe('Community Component', () => {
             it('should update the community privacy successfully', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPublic)
               expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
-                ...updatesWithPrivacyPublic,
-                private: false
+                name: updatesWithPrivacyPublic.name,
+                description: updatesWithPrivacyPublic.description,
+                private: false,
+                unlisted: undefined
               })
             })
 
             it('should update the community privacy successfully', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPublic)
               expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
-                ...updatesWithPrivacyPublic,
-                private: false
+                name: updatesWithPrivacyPublic.name,
+                description: updatesWithPrivacyPublic.description,
+                private: false,
+                unlisted: undefined
               })
             })
 
@@ -1769,8 +1775,10 @@ describe('Community Component', () => {
             it('should update the community privacy successfully', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPrivate)
               expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, {
-                ...updatesWithPrivacyPrivate,
-                private: true
+                name: updatesWithPrivacyPrivate.name,
+                description: updatesWithPrivacyPrivate.description,
+                private: true,
+                unlisted: undefined
               })
             })
 
