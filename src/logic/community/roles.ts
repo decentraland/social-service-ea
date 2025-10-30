@@ -86,17 +86,17 @@ export function createCommunityRolesComponent(
   return {
     async validatePermissionToTransferOwnership(
       communityId: string,
-      updaterAddress: string,
+      ownerAddress: string,
       targetAddress: string
     ): Promise<void> {
-      const roles = await communitiesDb.getCommunityMemberRoles(communityId, [updaterAddress, targetAddress])
-      const updaterRole = roles[updaterAddress]
+      const roles = await communitiesDb.getCommunityMemberRoles(communityId, [ownerAddress, targetAddress])
+      const updaterRole = roles[ownerAddress]
       const targetRole = roles[targetAddress]
 
       // Only current owners can transfer; target must be an existing member (not None)
       if (updaterRole !== CommunityRole.Owner) {
         throw new NotAuthorizedError(
-          `The user ${updaterAddress} doesn't have permission to transfer ownership in community ${communityId}`
+          `The user ${ownerAddress} doesn't have permission to transfer ownership in community ${communityId}`
         )
       }
 
