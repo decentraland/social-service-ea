@@ -361,7 +361,8 @@ export async function createCommunityVoiceComponent({
         pagination: { offset: 0, limit: activeCommunityIds.length },
         onlyMemberOf: false,
         onlyWithActiveVoiceChat: false,
-        communityIds: activeCommunityIds // Filter by the active community IDs only
+        communityIds: activeCommunityIds, // Filter by the active community IDs only
+        includeUnlisted: true
       })
 
       // Create membership map for quick lookup
