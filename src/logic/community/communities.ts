@@ -26,6 +26,7 @@ import {
 import { isErrorWithMessage } from '../../utils/errors'
 import { EthAddress, Events } from '@dcl/schemas'
 import { COMMUNITY_DELETED_UPDATES_CHANNEL } from '../../adapters/pubsub'
+import { AnalyticsEvent } from '../../types/analytics'
 
 export function createCommunityComponent(
   components: Pick<
@@ -45,6 +46,7 @@ export function createCommunityComponent(
     | 'pubsub'
     | 'featureFlags'
     | 'logs'
+    | 'analytics'
   >
 ): ICommunitiesComponent {
   const {
@@ -61,7 +63,8 @@ export function createCommunityComponent(
     communityComplianceValidator,
     pubsub,
     featureFlags,
-    logs
+    logs,
+    analytics
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -481,8 +484,16 @@ export function createCommunityComponent(
         })
       }
 
-      if (isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public) {
-        await communitiesDb.acceptAllRequestsToJoin(communityId)
+      const isUpdatingPrivacyToPublic = isUpdatingPrivacy && updates.privacy === CommunityPrivacyEnum.Public
+
+      if (isUpdatingPrivacyToPublic) {
+        const requestsAccepted = await communitiesDb.acceptAllRequestsToJoin(communityId)
+
+        requestsAccepted?.length > 0 &&
+          analytics.fireEvent(AnalyticsEvent.ACCEPT_ALL_REQUESTS_TO_JOIN, {
+            community_id: communityId,
+            requests_ids: requestsAccepted ?? []
+          })
       }
 
       logger.info('Community updated successfully', {

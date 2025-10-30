@@ -711,7 +711,9 @@ export function createCommunitiesDBComponent(
 
       query = query.append(SQL` ORDER BY created_at DESC`)
 
-      query = query.append(SQL` LIMIT ${filters.pagination.limit} OFFSET ${filters.pagination.offset}`)
+      if (filters.pagination) {
+        query = query.append(SQL` LIMIT ${filters.pagination.limit} OFFSET ${filters.pagination.offset}`)
+      }
 
       const result = await pg.query<MemberRequest>(query)
       return result.rows
@@ -760,7 +762,9 @@ export function createCommunitiesDBComponent(
       query = query.append(SQL` ORDER BY created_at DESC`)
 
       // Apply pagination
-      query = query.append(SQL` LIMIT ${filters.pagination.limit} OFFSET ${filters.pagination.offset}`)
+      if (filters.pagination) {
+        query = query.append(SQL` LIMIT ${filters.pagination.limit} OFFSET ${filters.pagination.offset}`)
+      }
 
       const result = await pg.query<MemberRequest>(query)
       return result.rows
@@ -805,8 +809,8 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
-    async acceptAllRequestsToJoin(communityId: string): Promise<void> {
-      await pg.withTransaction(async (client) => {
+    async acceptAllRequestsToJoin(communityId: string): Promise<string[]> {
+      return pg.withTransaction(async (client) => {
         const addMembersQuery = SQL`
           INSERT INTO community_members (community_id, member_address, role)
           SELECT community_id, member_address, ${CommunityRole.Member}
@@ -817,14 +821,21 @@ export function createCommunitiesDBComponent(
 
         const removeRequestsToJoinQuery = SQL`
           DELETE FROM community_requests WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
+          RETURNING id
         `
-        await client.query(removeRequestsToJoinQuery.text, removeRequestsToJoinQuery.values)
+
+        const result = await client.query<{ id: string }>(
+          removeRequestsToJoinQuery.text,
+          removeRequestsToJoinQuery.values
+        )
+
+        return result.rows.map((row) => row.id)
       })
     },
 
-    async joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<void> {
+    async joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<string | undefined> {
       const normalizedMemberAddress = normalizeAddress(member.memberAddress)
-      await pg.withTransaction(async (client) => {
+      return pg.withTransaction(async (client) => {
         // Add member to community
         const addMemberQuery = SQL`
           INSERT INTO community_members (community_id, member_address, role)
@@ -833,11 +844,14 @@ export function createCommunitiesDBComponent(
         `
         await client.query(addMemberQuery)
 
-        // Remove the request
         const removeRequestQuery = SQL`
-          DELETE FROM community_requests WHERE community_id = ${member.communityId} AND member_address = ${normalizedMemberAddress}
+          DELETE FROM community_requests 
+          WHERE community_id = ${member.communityId} AND member_address = ${normalizedMemberAddress}
+          RETURNING id
         `
-        await client.query(removeRequestQuery)
+        const result = await client.query<{ id: string }>(removeRequestQuery.text, removeRequestQuery.values)
+
+        return result.rows.length > 0 ? result.rows[0].id : undefined
       })
     },
 

@@ -204,9 +204,9 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<number>
   getCommunityRequest(requestId: string): Promise<MemberRequest | undefined>
   removeCommunityRequest(requestId: string): Promise<void>
-  joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
+  joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<string | undefined>
   getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
-  acceptAllRequestsToJoin(communityId: string): Promise<void>
+  acceptAllRequestsToJoin(communityId: string): Promise<string[]>
   createPost(post: { communityId: string; authorAddress: string; content: string }): Promise<CommunityPost>
   getPost(postId: string): Promise<CommunityPost | null>
   getPosts(communityId: string, pagination: Pagination): Promise<CommunityPost[]>
