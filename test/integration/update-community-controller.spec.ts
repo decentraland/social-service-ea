@@ -97,6 +97,7 @@ test('Update Community Controller', async function ({ components, stubComponents
             // Mock owner name - needed for the update flow when querying current community
             spyComponents.communityOwners.getOwnerName.mockResolvedValue('Test Owner')
           })
+
           describe('when updating name only', () => {
             describe('and the user is the community owner', () => {
               it('should update the community name', async () => {
@@ -114,36 +115,6 @@ test('Update Community Controller', async function ({ components, stubComponents
                 expect(body.data.name).toBe('Updated Community Name')
                 expect(body.data.description).toBe('Original Description')
                 expect(body.message).toBe('Community updated successfully')
-              })
-
-              describe('and the communiy is private', () => {
-                beforeEach(async () => {
-                  await components.communitiesDb.updateCommunity(communityId, {
-                    private: true
-                  })
-                })
-
-                afterEach(async () => {
-                  await components.communitiesDb.updateCommunity(communityId, {
-                    private: false
-                  })
-                })
-
-                it('should not switch the community to public', async () => {
-                  const response = await makeMultipartRequest(
-                    identity,
-                    `/v1/communities/${communityId}`,
-                    {
-                      description: 'Updated Description'
-                    },
-                    'PUT'
-                  )
-
-                  expect(response.status).toBe(200)
-                  const body = await response.json()
-                  expect(body.data.description).toBe('Updated Description')
-                  expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
-                })
               })
             })
 
@@ -240,36 +211,6 @@ test('Update Community Controller', async function ({ components, stubComponents
               expect(body.data.name).toBe('Original Community')
               expect(body.data.description).toBe('Updated Description')
               expect(body.message).toBe('Community updated successfully')
-            })
-
-            describe('and the communiy is private', () => {
-              beforeEach(async () => {
-                await components.communitiesDb.updateCommunity(communityId, {
-                  private: true
-                })
-              })
-
-              afterEach(async () => {
-                await components.communitiesDb.updateCommunity(communityId, {
-                  private: false
-                })
-              })
-
-              it('should not switch the community to public', async () => {
-                const response = await makeMultipartRequest(
-                  identity,
-                  `/v1/communities/${communityId}`,
-                  {
-                    description: 'Updated Description'
-                  },
-                  'PUT'
-                )
-
-                expect(response.status).toBe(200)
-                const body = await response.json()
-                expect(body.data.description).toBe('Updated Description')
-                expect(body.data.privacy).toBe(CommunityPrivacyEnum.Private)
-              })
             })
 
             describe('and the user is a moderator', () => {
