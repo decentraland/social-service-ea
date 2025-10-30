@@ -203,7 +203,8 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     peersStats,
     pubsub,
-    commsGatekeeper
+    commsGatekeeper,
+    analytics
   })
   const communityBans = await createCommunityBansComponent({
     communitiesDb,
@@ -213,7 +214,8 @@ export async function initComponents(): Promise<AppComponents> {
     logs,
     catalystClient,
     pubsub,
-    commsGatekeeper
+    commsGatekeeper,
+    analytics
   })
   const communityOwners = createCommunityOwnersComponent({ catalystClient })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
@@ -236,7 +238,8 @@ export async function initComponents(): Promise<AppComponents> {
     communityComplianceValidator,
     featureFlags,
     pubsub,
-    logs
+    logs,
+    analytics
   })
   const communityFieldsValidator = await createCommunityFieldsValidatorComponent({ config })
   const communityRequests = createCommunityRequestsComponent({
@@ -247,7 +250,8 @@ export async function initComponents(): Promise<AppComponents> {
     communityThumbnail,
     catalystClient,
     pubsub,
-    logs
+    logs,
+    analytics
   })
 
   const communityPosts = createCommunityPostsComponent({
