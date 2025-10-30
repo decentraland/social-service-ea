@@ -294,6 +294,8 @@ describe('Community Component', () => {
         ...options,
         communityIds: undefined
       })
+      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, { ...options, communityIds: undefined })
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, { ...options, communityIds: undefined })
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
@@ -317,6 +319,8 @@ describe('Community Component', () => {
         ...options,
         communityIds: undefined
       })
+      expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, { ...options, communityIds: undefined })
+      expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(userAddress, { ...options, communityIds: undefined })
       expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([])
     })
@@ -343,6 +347,7 @@ describe('Community Component', () => {
       // Verify getAllActiveCommunityVoiceChats is NOT called when not filtering
       expect(mockCommsGatekeeper.getAllActiveCommunityVoiceChats).not.toHaveBeenCalled()
     })
+
 
     describe('when filtering by active voice chat', () => {
       const optionsWithVoiceChat = { ...options, onlyWithActiveVoiceChat: true }
@@ -394,6 +399,9 @@ describe('Community Component', () => {
             communityIds: ['community-with-voice-chat']
           })
         )
+        expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(userAddress, expect.objectContaining({
+          communityIds: ['community-with-voice-chat']
+        }))
         // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
         expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
       })
@@ -409,6 +417,18 @@ describe('Community Component', () => {
           expect(result.communities).toHaveLength(0)
           expect(result.total).toBe(0)
 
+
+      describe('when there are no communities with active voice chat', () => {
+        beforeEach(() => {
+          mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValueOnce([])
+        })
+
+        it('should return empty results without calling the database', async () => {
+          const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+          expect(result.communities).toHaveLength(0)
+          expect(result.total).toBe(0)
+          
           // Verify DB is NOT called because of early return
           expect(mockCommunitiesDB.getCommunities).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.getCommunitiesCount).not.toHaveBeenCalled()
@@ -434,6 +454,7 @@ describe('Community Component', () => {
 
           // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
 
+          
           // Verify DB is NOT called because of early return
           expect(mockCommunitiesDB.getCommunities).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.getCommunitiesCount).not.toHaveBeenCalled()
@@ -455,6 +476,7 @@ describe('Community Component', () => {
           expect(result.communities).toHaveLength(0)
           expect(result.total).toBe(0)
 
+          
           // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
           expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
         })
@@ -521,6 +543,8 @@ describe('Community Component', () => {
         search: 'test',
         communityIds: undefined
       })
+      expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith({ ...options, communityIds: undefined })
+      expect(mockCommunitiesDB.getPublicCommunitiesCount).toHaveBeenCalledWith({ search: 'test', communityIds: undefined })
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
 
@@ -583,6 +607,9 @@ describe('Community Component', () => {
             communityIds: ['public-community-with-voice-chat']
           })
         )
+        expect(mockCommunitiesDB.getCommunitiesPublicInformation).toHaveBeenCalledWith(expect.objectContaining({
+          communityIds: ['public-community-with-voice-chat']
+        }))
         // Verify getCommunitiesVoiceChatStatus is NOT called when filtering
         expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
       })
@@ -1459,6 +1486,11 @@ describe('Community Component', () => {
               })
 
               mockCommunitiesDB.acceptAllRequestsToJoin.mockResolvedValueOnce(['request-1'])
+            })
+
+            it('should update the community privacy successfully', async () => {
+              await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPublic)
+              expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, { ...updatesWithPrivacyPublic, private: false })
             })
 
             it('should update the community privacy successfully', async () => {

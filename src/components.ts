@@ -261,6 +261,13 @@ export async function initComponents(): Promise<AppComponents> {
     logs
   })
 
+  const communityPosts = createCommunityPostsComponent({
+    communitiesDb,
+    communityRoles,
+    catalystClient,
+    logs
+  })
+
   const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
   const updateHandler = createUpdateHandlerComponent({
     logs,
