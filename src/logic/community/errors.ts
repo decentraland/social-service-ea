@@ -92,3 +92,10 @@ export class CommunityRequestNotFoundError extends Error {
     this.name = 'CommunityRequestNotFoundError'
   }
 }
+
+export class CommunityPostNotFoundError extends Error {
+  constructor(public readonly postId: string) {
+    super(`Community post not found: ${postId}`)
+    this.name = 'CommunityPostNotFoundError'
+  }
+}

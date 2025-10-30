@@ -224,7 +224,7 @@ describe('CommunityFieldsValidator', () => {
       it('should set privacy to Private when value is "private"', async () => {
         const formData = {
           fields: {
-            privacy: { value: 'private' }
+            privacy: { value: CommunityPrivacyEnum.Private }
           }
         }
 
@@ -236,7 +236,7 @@ describe('CommunityFieldsValidator', () => {
       it('should set privacy to Public when value is not "private"', async () => {
         const formData = {
           fields: {
-            privacy: { value: 'public' }
+            privacy: { value: CommunityPrivacyEnum.Public }
           }
         }
 
@@ -355,7 +355,7 @@ describe('CommunityFieldsValidator', () => {
             name: { value: 'Test Community' },
             description: { value: 'Test Description' },
             placeIds: { value: '["place1", "place2"]' },
-            privacy: { value: 'private' }
+            privacy: { value: CommunityPrivacyEnum.Private }
           }
         }
 

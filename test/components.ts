@@ -53,7 +53,8 @@ import {
   createCommunityThumbnailComponent,
   createCommunityComplianceValidatorComponent,
   createCommunityFieldsValidatorComponent,
-  createCommunityRequestsComponent
+  createCommunityRequestsComponent,
+  createCommunityPostsComponent
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
@@ -178,6 +179,7 @@ async function initComponents(): Promise<TestComponents> {
   const communityBroadcaster = createMockCommunityBroadcasterComponent({})
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
   const communityFieldsValidator = await createCommunityFieldsValidatorComponent({ config })
+  const communityPosts = createCommunityPostsComponent({ communitiesDb, communityRoles, catalystClient, logs })
 
   // Community voice chat cache and polling components
   const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })
@@ -333,6 +335,7 @@ async function initComponents(): Promise<TestComponents> {
     communityMembers,
     communityOwners,
     communityPlaces,
+    communityPosts,
     communityRequests,
     communityRoles,
     communityThumbnail,
@@ -341,8 +344,8 @@ async function initComponents(): Promise<TestComponents> {
     communityVoiceChatPolling,
     config,
     email,
-    features,
     featureFlags,
+    features,
     fetcher,
     friends,
     friendsDb,

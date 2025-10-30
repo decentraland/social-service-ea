@@ -1,7 +1,7 @@
 import { CommunityRole } from '../../types/entities'
 import { UserNotCommunityMemberError } from './errors'
 import { ICommunitiesDatabaseComponent } from '../../types/components'
-import { Community } from '../community/types'
+import { Community, CommunityPrivacyEnum } from '../community/types'
 
 /**
  * Helper function to validate target user permissions for voice chat operations (promote/demote) based on community privacy
@@ -18,7 +18,7 @@ export async function validateCommunityVoiceChatTargetUser(
   targetUserAddress: string
 ): Promise<void> {
   // Validation logic based on community type
-  if (community.privacy === 'private') {
+  if (community.privacy === CommunityPrivacyEnum.Private) {
     // For private communities: user must be member AND NOT banned
     const targetUserRole = await communitiesDb.getCommunityMemberRole(communityId, targetUserAddress)
 

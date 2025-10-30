@@ -15,7 +15,8 @@ import {
   MemberRequest,
   CommunityRequestStatus,
   GetCommunityRequestsOptions,
-  CommunityForModeration
+  CommunityForModeration,
+  CommunityPost
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -901,6 +902,58 @@ export function createCommunitiesDBComponent(
       }
 
       return pg.getCount(query)
+    },
+
+    async createPost(post: { communityId: string; authorAddress: string; content: string }): Promise<CommunityPost> {
+      const postId = randomUUID()
+      const normalizedAuthorAddress = normalizeAddress(post.authorAddress)
+
+      const result = await pg.query<CommunityPost>(SQL`
+        INSERT INTO community_posts (id, community_id, author_address, content)
+        VALUES (${postId}, ${post.communityId}, ${normalizedAuthorAddress}, ${post.content})
+        RETURNING id, community_id AS "communityId", author_address AS "authorAddress", content, created_at AS "createdAt"
+      `)
+
+      return result.rows[0]
+    },
+
+    async getPost(postId: string): Promise<CommunityPost | null> {
+      const result = await pg.query<CommunityPost>(SQL`
+        SELECT id, community_id AS "communityId", author_address AS "authorAddress", content, created_at AS "createdAt"
+        FROM community_posts
+        WHERE id = ${postId}
+      `)
+
+      return result.rows[0] || null
+    },
+
+    async getPosts(communityId: string, pagination: Pagination): Promise<CommunityPost[]> {
+      const result = await pg.query<CommunityPost>(SQL`
+        SELECT id, community_id AS "communityId", author_address AS "authorAddress", content, created_at AS "createdAt"
+        FROM community_posts
+        WHERE community_id = ${communityId}
+        ORDER BY created_at DESC
+        LIMIT ${pagination.limit} OFFSET ${pagination.offset}
+      `)
+
+      return result.rows
+    },
+
+    async getPostsCount(communityId: string): Promise<number> {
+      const query = SQL`
+        SELECT COUNT(1) as count
+        FROM community_posts
+        WHERE community_id = ${communityId}
+      `
+
+      return pg.getCount(query)
+    },
+
+    async deletePost(postId: string): Promise<void> {
+      await pg.query(SQL`
+        DELETE FROM community_posts
+        WHERE id = ${postId}
+      `)
     }
   }
 }

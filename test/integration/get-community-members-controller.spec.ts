@@ -191,7 +191,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                   hasClaimedName: true,
                   joinedAt: expect.any(String),
                   name: `Profile name ${firstMemberAddress}`,
-                  role: 'member',
+                  role: CommunityRole.Member,
                   profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
                   friendshipStatus: FriendshipStatus.NONE
                 }),
@@ -201,7 +201,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                   hasClaimedName: true,
                   joinedAt: expect.any(String),
                   name: `Profile name ${secondMemberAddress}`,
-                  role: 'member',
+                  role: CommunityRole.Member,
                   profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
                   friendshipStatus: FriendshipStatus.NONE
                 }),
@@ -211,7 +211,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                   hasClaimedName: true,
                   joinedAt: expect.any(String),
                   name: `Profile name ${ownerAddress}`,
-                  role: 'owner',
+                  role: CommunityRole.Owner,
                   profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
                   friendshipStatus: FriendshipStatus.NONE
                 })
@@ -242,7 +242,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                   hasClaimedName: true,
                   joinedAt: expect.any(String),
                   name: `Profile name ${firstMemberAddress}`,
-                  role: 'member',
+                  role: CommunityRole.Member,
                   profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
                   friendshipStatus: FriendshipStatus.NONE
                 })
@@ -358,7 +358,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                   hasClaimedName: true,
                   joinedAt: expect.any(String),
                   name: `Profile name ${firstMemberAddress}`,
-                  role: 'member',
+                  role: CommunityRole.Member,
                   profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
                   friendshipStatus: FriendshipStatus.REQUEST_SENT
                 }),
@@ -368,7 +368,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                   hasClaimedName: true,
                   joinedAt: expect.any(String),
                   name: `Profile name ${secondMemberAddress}`,
-                  role: 'member',
+                  role: CommunityRole.Member,
                   profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
                   friendshipStatus: FriendshipStatus.ACCEPTED
                 }),
@@ -378,7 +378,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                   hasClaimedName: true,
                   joinedAt: expect.any(String),
                   name: `Profile name ${ownerAddress}`,
-                  role: 'owner',
+                  role: CommunityRole.Owner,
                   profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
                   friendshipStatus: FriendshipStatus.NONE
                 })
@@ -414,7 +414,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
                   hasClaimedName: true,
                   joinedAt: expect.any(String),
                   name: `Profile name ${firstMemberAddress}`,
-                  role: 'member',
+                  role: CommunityRole.Member,
                   profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
                   friendshipStatus: FriendshipStatus.REQUEST_SENT
                 })
