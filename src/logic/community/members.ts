@@ -11,6 +11,7 @@ import { mapMembersWithProfiles } from './utils'
 import { EthAddress, Events } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { AnalyticsEvent } from '../../types/analytics'
 
 export async function createCommunityMembersComponent(
   components: Pick<
@@ -24,6 +25,7 @@ export async function createCommunityMembersComponent(
     | 'peersStats'
     | 'pubsub'
     | 'commsGatekeeper'
+    | 'analytics'
   >
 ): Promise<ICommunityMembersComponent> {
   const {
@@ -35,7 +37,8 @@ export async function createCommunityMembersComponent(
     logs,
     peersStats,
     pubsub,
-    commsGatekeeper
+    commsGatekeeper,
+    analytics
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -168,6 +171,12 @@ export async function createCommunityMembersComponent(
 
       await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
 
+      analytics.fireEvent(AnalyticsEvent.KICK_MEMBER_FROM_COMMUNITY, {
+        community_id: communityId,
+        kicker_user_id: kickerAddress,
+        target_user_id: targetAddress.toLowerCase()
+      })
+
       // For private communities, also kick user from voice chat if they are in one
       if (community.privacy === CommunityPrivacyEnum.Private) {
         // Only for private communities
@@ -225,10 +234,16 @@ export async function createCommunityMembersComponent(
         throw new NotAuthorizedError(`The user ${memberAddress} is banned from community ${communityId}`)
       }
 
-      await communitiesDb.joinMemberAndRemoveRequests({
+      const requestId = await communitiesDb.joinMemberAndRemoveRequests({
         communityId,
         memberAddress,
         role: CommunityRole.Member
+      })
+
+      analytics.fireEvent(AnalyticsEvent.JOIN_COMMUNITY, {
+        community_id: communityId,
+        user_id: memberAddress,
+        request_id: requestId
       })
 
       await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
@@ -255,6 +270,11 @@ export async function createCommunityMembersComponent(
       await communityRoles.validatePermissionToLeaveCommunity(communityId, memberAddress)
 
       await communitiesDb.kickMemberFromCommunity(communityId, memberAddress)
+
+      analytics.fireEvent(AnalyticsEvent.LEAVE_COMMUNITY, {
+        community_id: communityId,
+        user_id: memberAddress
+      })
 
       await pubsub.publishInChannel(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
         communityId,

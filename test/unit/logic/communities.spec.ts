@@ -22,7 +22,9 @@ import {
   CommunityPrivacyEnum,
   CommunityPublicInformation,
   CommunityUpdates,
-  CommunityMember
+  CommunityMember,
+  CommunityRequestType,
+  CommunityRequestStatus
 } from '../../../src/logic/community/types'
 import {
   createMockCommunityRolesComponent,
@@ -40,10 +42,15 @@ import { Events } from '@dcl/schemas'
 import { ICommunityComplianceValidatorComponent } from '../../../src/logic/community/compliance-validator'
 import { createFeatureFlagsMockComponent } from '../../mocks/components/feature-flags'
 import { FeatureFlag } from '../../../src/adapters/feature-flags'
-import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, COMMUNITY_DELETED_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
+import {
+  COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL,
+  COMMUNITY_DELETED_UPDATES_CHANNEL
+} from '../../../src/adapters/pubsub'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { IPubSubComponent } from '../../../src/types'
 import { ILoggerComponent } from '@well-known-components/interfaces'
+import { createMockedAnalyticsComponent } from '../../mocks/components/analytics'
+import { AnalyticsEvent } from '../../../src/types/analytics'
 
 describe('Community Component', () => {
   let communityComponent: ICommunitiesComponent
@@ -60,6 +67,7 @@ describe('Community Component', () => {
   let mockPubSub: jest.Mocked<IPubSubComponent>
   let mockLogs: jest.Mocked<ILoggerComponent>
   let mockUserAddress: string
+  let mockAnalytics: ReturnType<typeof createMockedAnalyticsComponent>
 
   const communityId = 'test-community'
   const cdnUrl = 'https://cdn.decentraland.org'
@@ -86,6 +94,7 @@ describe('Community Component', () => {
     mockCommunityComplianceValidator = createMockCommunityComplianceValidatorComponent({})
     mockFeatureFlags = createFeatureFlagsMockComponent({})
     mockPubSub = createMockedPubSubComponent({})
+    mockAnalytics = createMockedAnalyticsComponent({})
     mockConfig.requireString.mockResolvedValue(cdnUrl)
     mockCommunityThumbnail.buildThumbnailUrl.mockImplementation(
       (communityId: string) => `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
@@ -108,7 +117,8 @@ describe('Community Component', () => {
       communityThumbnail: mockCommunityThumbnail,
       communityComplianceValidator: mockCommunityComplianceValidator,
       featureFlags: mockFeatureFlags,
-      pubsub: mockPubSub
+      pubsub: mockPubSub,
+      analytics: mockAnalytics
     })
   })
 
@@ -157,7 +167,6 @@ describe('Community Component', () => {
         expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
         expect(mockCommunityEvents.isCurrentlyHostingEvents).toHaveBeenCalledWith(communityId)
       })
-
 
       describe('when the community has no active voice chat', () => {
         beforeEach(() => {
@@ -306,7 +315,6 @@ describe('Community Component', () => {
       expect(result.communities).toHaveLength(1)
       expect(result.total).toBe(1)
     })
-
 
     describe('when filtering by active voice chat', () => {
       const optionsWithVoiceChat = { ...options, onlyWithActiveVoiceChat: true }
@@ -458,7 +466,6 @@ describe('Community Component', () => {
       expect(result.communities).toHaveLength(1)
       expect(result.total).toBe(1)
     })
-
 
     describe('when filtering by active voice chat', () => {
       const optionsWithVoiceChat = { ...options, onlyWithActiveVoiceChat: true }
@@ -919,7 +926,6 @@ describe('Community Component', () => {
             communityId
           })
         })
-
       })
 
       describe('and the user is not the owner and not a global moderator', () => {
@@ -1343,12 +1349,18 @@ describe('Community Component', () => {
                 privacy: CommunityPrivacyEnum.Private,
                 role: CommunityRole.Owner
               })
+
+              mockCommunitiesDB.acceptAllRequestsToJoin.mockResolvedValueOnce(['request-1'])
             })
 
             it('should migrate all requests to join to members', async () => {
               await communityComponent.updateCommunity(communityId, userAddress, updatesWithPrivacyPublic)
 
               expect(mockCommunitiesDB.acceptAllRequestsToJoin).toHaveBeenCalledWith(communityId)
+              expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.ACCEPT_ALL_REQUESTS_TO_JOIN, {
+                community_id: communityId,
+                requests_ids: ['request-1']
+              })
             })
           })
 
@@ -1593,7 +1605,7 @@ describe('Community Component', () => {
             description: 'Test Description',
             ownerAddress: '0x1111111111111111111111111111111111111111',
             privacy: CommunityPrivacyEnum.Public,
-            active: true,
+            active: true
           },
           {
             id: 'community-2',
@@ -1667,7 +1679,6 @@ describe('Community Component', () => {
         expect(mockCommunitiesDB.getAllCommunitiesForModerationCount).toHaveBeenCalledWith({ search: 'test' })
       })
     })
-
 
     describe('when handling empty communities array', () => {
       beforeEach(() => {

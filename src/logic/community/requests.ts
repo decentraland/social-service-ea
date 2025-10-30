@@ -15,6 +15,7 @@ import {
 import { getProfileName } from '../profiles'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { AnalyticsEvent } from '../../types/analytics'
 
 export function createCommunityRequestsComponent(
   components: Pick<
@@ -27,6 +28,7 @@ export function createCommunityRequestsComponent(
     | 'catalystClient'
     | 'pubsub'
     | 'logs'
+    | 'analytics'
   >
 ): ICommunityRequestsComponent {
   const {
@@ -37,7 +39,8 @@ export function createCommunityRequestsComponent(
     communityBroadcaster,
     catalystClient,
     pubsub,
-    logs
+    logs,
+    analytics
   } = components
 
   const logger = logs.getLogger('community-requests-component')
@@ -145,6 +148,12 @@ export function createCommunityRequestsComponent(
         communityId,
         memberAddress,
         role: CommunityRole.Member
+      })
+
+      analytics.fireEvent(AnalyticsEvent.JOIN_COMMUNITY, {
+        community_id: communityId,
+        user_id: memberAddress,
+        request_id: oppositeTypeRequest?.id
       })
 
       createdRequest = {
@@ -291,6 +300,19 @@ export function createCommunityRequestsComponent(
       })
 
       await communitiesDb.removeCommunityRequest(requestId)
+
+      const analyticsEventType =
+        status === CommunityRequestStatus.Rejected
+          ? AnalyticsEvent.REJECT_COMMUNITY_REQUEST
+          : AnalyticsEvent.CANCEL_COMMUNITY_REQUEST
+
+      analytics.fireEvent(analyticsEventType, {
+        request_id: requestId,
+        community_id: request.communityId,
+        type: request.type,
+        member_address: request.memberAddress,
+        caller_address: options.callerAddress
+      })
     }
 
     setImmediate(async () => {
