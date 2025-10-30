@@ -1,4 +1,4 @@
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError, InvalidRequestError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import {
@@ -99,6 +99,26 @@ export async function createCommunityMembersComponent(
     const membersWithProfile = await aggregateWithProfiles(userAddress, communityMembers)
 
     return { members: membersWithProfile, totalMembers }
+  }
+
+  const transferOwnership = async (
+    communityId: string,
+    updaterAddress: EthAddress,
+    targetAddress: EthAddress
+  ): Promise<void> => {
+    // Authorization moved to roles component
+    await communityRoles.validatePermissionToTransferOwnership(communityId, updaterAddress, targetAddress)
+
+    // Target must have a NAME in wallet
+    const ownedNames = await catalystClient.getOwnedNames(targetAddress, {
+      pageSize: '1'
+    })
+
+    if (ownedNames.length === 0) {
+      throw new InvalidRequestError(`The user ${targetAddress} doesn't have any names`)
+    }
+
+    await communitiesDb.transferCommunityOwnership(communityId, targetAddress)
   }
 
   return {
@@ -299,6 +319,13 @@ export async function createCommunityMembersComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
+      // Ownership transfer special-case: setting role to Owner triggers a full ownership swap
+      if (newRole === CommunityRole.Owner) {
+        await transferOwnership(communityId, updaterAddress, targetAddress)
+        return
+      }
+
+      // Default role update path
       await communityRoles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
 
       await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)

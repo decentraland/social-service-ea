@@ -580,6 +580,58 @@ describe('Community Roles Component', () => {
     })
   })
 
+  describe('when validating permission to transfer ownership', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xOwner'
+    const memberAddress = '0xMember'
+    const nonMemberAddress = '0xNonMember'
+
+    describe('and the updater is owner and target is member', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [memberAddress]: CommunityRole.Member
+        })
+      })
+
+      it('should allow the transfer', async () => {
+        await expect(
+          roles.validatePermissionToTransferOwnership(communityId, ownerAddress, memberAddress)
+        ).resolves.not.toThrow()
+      })
+    })
+
+    describe('and the updater is not owner', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [memberAddress]: CommunityRole.Moderator,
+          [ownerAddress]: CommunityRole.Member
+        })
+      })
+
+      it('should throw NotAuthorizedError', async () => {
+        await expect(
+          roles.validatePermissionToTransferOwnership(communityId, memberAddress, ownerAddress)
+        ).rejects.toThrow(NotAuthorizedError)
+      })
+    })
+
+    describe('and the target is not a member', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [nonMemberAddress]: CommunityRole.None
+        })
+      })
+
+      it('should throw NotAuthorizedError', async () => {
+        await expect(
+          roles.validatePermissionToTransferOwnership(communityId, ownerAddress, nonMemberAddress)
+        ).rejects.toThrow(NotAuthorizedError)
+      })
+    })
+  })
+
   describe('when validating permission to add places to a community', () => {
     describe('and the user is an owner', () => {
       beforeEach(() => {

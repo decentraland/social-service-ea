@@ -641,6 +641,40 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
+    async transferCommunityOwnership(communityId: string, newOwnerAddress: EthAddress): Promise<void> {
+      const normalizedNewOwner = normalizeAddress(newOwnerAddress)
+
+      await pg.withTransaction(async (client) => {
+        // Lock community row and fetch current owner
+        const lockResult = await client.query<{ owner_address: string }>(SQL`
+          SELECT owner_address
+          FROM communities
+          WHERE id = ${communityId}
+          FOR UPDATE
+        `)
+
+        const oldOwner = lockResult.rows[0].owner_address
+
+        await client.query(SQL`
+          UPDATE communities 
+          SET owner_address = ${normalizedNewOwner}, updated_at = now() 
+          WHERE id = ${communityId}
+        `)
+
+        await client.query(SQL`
+          UPDATE community_members 
+          SET role = ${CommunityRole.Moderator}
+          WHERE community_id = ${communityId} AND member_address = ${oldOwner}
+        `)
+
+        await client.query(SQL`
+          UPDATE community_members 
+          SET role = ${CommunityRole.Owner}
+          WHERE community_id = ${communityId} AND member_address = ${normalizedNewOwner}
+        `)
+      })
+    },
+
     async updateCommunity(
       communityId: string,
       updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private' | 'unlisted'>>

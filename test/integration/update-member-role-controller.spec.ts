@@ -247,6 +247,10 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
               memberAddress: updaterAddress,
               role: CommunityRole.Owner
             })
+            // Ensure target has NAME by mocking catalyst owned names
+            spyComponents.catalystClient.getOwnedNames.mockResolvedValue([
+              { id: '1', name: 'test-name', contractAddress: '0x123', tokenId: '1' }
+            ])
           })
 
           it('should respond with a 204 status code when promoting a member to moderator', async () => {
@@ -271,6 +275,21 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
               }
             )
             expect(response.status).toBe(204)
+          })
+
+          it('should transfer ownership when role is Owner and target has NAME', async () => {
+            const response = await makeRequest(
+              identity,
+              `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+              'PATCH',
+              {
+                role: CommunityRole.Owner
+              }
+            )
+            expect(response.status).toBe(204)
+
+            const updated = await components.communitiesDb.getCommunity(communityId)
+            expect(updated?.ownerAddress.toLowerCase()).toBe(targetMemberAddress.toLowerCase())
           })
 
           it('should respond with a 401 status code when trying to update another owner', async () => {
@@ -307,6 +326,44 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
             )
             expect(response.status).toBe(500)
           })
+        })
+      })
+
+      describe('and ownership transfer validations fail', () => {
+        beforeEach(async () => {
+          await components.communitiesDb.addCommunityMember({
+            communityId,
+            memberAddress: updaterAddress,
+            role: CommunityRole.Owner
+          })
+        })
+
+        it('should respond with a 400 when target has no NAME', async () => {
+          spyComponents.catalystClient.getOwnedNames.mockResolvedValue([])
+          const response = await makeRequest(
+            identity,
+            `/v1/communities/${communityId}/members/${targetMemberAddress}`,
+            'PATCH',
+            {
+              role: CommunityRole.Owner
+            }
+          )
+          expect(response.status).toBe(400)
+        })
+
+        it('should respond with a 401 when target is not a member', async () => {
+          spyComponents.catalystClient.getOwnedNames.mockResolvedValue([
+            { id: '1', name: 'test-name', contractAddress: '0x123', tokenId: '1' }
+          ])
+          const response = await makeRequest(
+            identity,
+            `/v1/communities/${communityId}/members/${nonMemberAddress}`,
+            'PATCH',
+            {
+              role: CommunityRole.Owner
+            }
+          )
+          expect(response.status).toBe(401)
         })
       })
     })
