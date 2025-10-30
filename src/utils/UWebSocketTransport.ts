@@ -189,14 +189,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         )
       }
 
-      logger.debug('Processing queued message', {
-        transportId,
-        result,
-        queueLength: messageQueue.length,
-        messageAttempts: item.attempts,
-        messageSize: item.message.byteLength
-      })
-
       switch (result) {
         case UWebSocketSendResult.SUCCESS:
           item.future.resolve()
@@ -245,15 +237,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   async function send(msg: Uint8Array) {
-    logger.debug('Queueing message', {
-      transportId,
-      messageSize: msg.byteLength,
-      queueLength: messageQueue.length,
-      isTransportActive: String(isTransportActive),
-      isInitialized: String(isInitialized),
-      isConnected: String(socket.getUserData().isConnected)
-    })
-
     if (!isInitialized) {
       const error = new Error('Transport is not ready')
       logger.error('Transport is not ready', {
@@ -301,13 +284,6 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   }
 
   function handleMessage(message: RecognizedString) {
-    logger.debug('Handling incoming message', {
-      transportId,
-      messageType: message.constructor.name,
-      isTransportActive: String(isTransportActive),
-      isInitialized: String(isInitialized)
-    })
-
     if (!isTransportActive || !isInitialized) return
 
     if (message instanceof ArrayBuffer) {
