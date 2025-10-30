@@ -374,7 +374,10 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           // Verify getAllActiveCommunityVoiceChats is NOT called when not filtering
           expect(spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats).not.toHaveBeenCalled()
           // Verify getCommunitiesVoiceChatStatus IS called when not filtering
-          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([communityId1, communityId2])
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
+            communityId1,
+            communityId2
+          ])
         })
 
         it('should return all communities when onlyWithActiveVoiceChat is not provided', async () => {
@@ -388,7 +391,10 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           // Verify getAllActiveCommunityVoiceChats is NOT called when not filtering
           expect(spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats).not.toHaveBeenCalled()
           // Verify getCommunitiesVoiceChatStatus IS called when not filtering
-          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([communityId1, communityId2])
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
+            communityId1,
+            communityId2
+          ])
         })
 
         it('should include voiceChatStatus in all community responses', async () => {
@@ -635,6 +641,114 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         })
       })
 
+      describe('when filtering by unlisted communities', () => {
+        let unlistedCommunityId: string
+        let listedCommunityId: string
+
+        beforeEach(async () => {
+          // Create an unlisted community
+          const unlistedResult = await components.communitiesDb.createCommunity(
+            mockCommunity({
+              name: 'Unlisted Community',
+              description: 'Unlisted Description',
+              owner_address: address,
+              unlisted: true
+            })
+          )
+          unlistedCommunityId = unlistedResult.id
+
+          // Create a listed community
+          const listedResult = await components.communitiesDb.createCommunity(
+            mockCommunity({
+              name: 'Listed Community',
+              description: 'Listed Description',
+              owner_address: address,
+              unlisted: false
+            })
+          )
+          listedCommunityId = listedResult.id
+
+          // Mock voice chat status for all communities
+          spyComponents.commsGatekeeper.getCommunityVoiceChatStatus.mockImplementation(async () => {
+            return { isActive: false, participantCount: 0, moderatorCount: 0 }
+          })
+
+          spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mockImplementation(
+            async (communityIds: string[]) => {
+              const result: Record<string, any> = {}
+              communityIds.forEach((id) => {
+                result[id] = { isActive: false, participantCount: 0, moderatorCount: 0 }
+              })
+              return result
+            }
+          )
+        })
+
+        afterEach(async () => {
+          await components.communitiesDbHelper.forceCommunityRemoval(unlistedCommunityId)
+          await components.communitiesDbHelper.forceCommunityRemoval(listedCommunityId)
+        })
+
+        it('should exclude unlisted communities from public listings', async () => {
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          const unlistedCommunity = body.data.results.find((c: any) => c.id === unlistedCommunityId)
+          const listedCommunity = body.data.results.find((c: any) => c.id === listedCommunityId)
+
+          expect(unlistedCommunity).toBeUndefined()
+          expect(listedCommunity).toBeDefined()
+        })
+
+        it('should allow direct access to unlisted communities via GET /v1/communities/{id}', async () => {
+          // Mock owner name for the unlisted community
+          spyComponents.communityOwners.getOwnerName.mockResolvedValueOnce('Unlisted Owner')
+
+          // Mock events
+          spyComponents.communityEvents.isCurrentlyHostingEvents.mockResolvedValueOnce(false)
+
+          const response = await makeRequest(identity, `/v1/communities/${unlistedCommunityId}`)
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.id).toBe(unlistedCommunityId)
+          expect(body.data.name).toBe('Unlisted Community')
+        })
+
+        it('should include unlisted communities in results when user is a member', async () => {
+          // Add user as member to unlisted community
+          await components.communitiesDb.addCommunityMember({
+            communityId: unlistedCommunityId,
+            memberAddress: address,
+            role: CommunityRole.Member
+          })
+
+          // When filtering by membership, unlisted communities should be included
+          const response = await makeRequest(identity, '/v1/communities?limit=10&offset=0&onlyMemberOf=true')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          const unlistedCommunity = body.data.results.find((c: any) => c.id === unlistedCommunityId)
+          expect(unlistedCommunity).toBeDefined()
+
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(unlistedCommunityId, [address])
+        })
+
+        it('should exclude unlisted communities from public information endpoint', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch('/v1/communities?limit=10&offset=0')
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          const unlistedCommunity = body.data.results.find((c: any) => c.id === unlistedCommunityId)
+          const listedCommunity = body.data.results.find((c: any) => c.id === listedCommunityId)
+
+          expect(unlistedCommunity).toBeUndefined()
+          expect(listedCommunity).toBeDefined()
+        })
+      })
+
       describe('when filtering by roles', () => {
         let communityId4: string
 
@@ -877,7 +991,6 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(response.status).toBe(500)
         })
       })
-
 
       describe('and owner profile retrieval fails', () => {
         beforeEach(() => {

@@ -37,6 +37,7 @@ paths:
         Lists all communities.
         This endpoint has optional Signed Fetch authentication.
         When signed, it includes properties related to the authenticated user in its response.
+        This endpoint excludes unlisted communities from results. Use direct community access (GET `/v1/communities/{id}`) to retrieve unlisted communities.
       security:
         - SignedFetch: []
       parameters:
@@ -103,6 +104,14 @@ paths:
                 placeIds:
                   type: string
                   description: 'JSON array of place IDs to add to the community'
+                privacy:
+                  type: string
+                  enum: [public, private]
+                  description: 'Community privacy setting'
+                visibility:
+                  type: string
+                  enum: [all, unlisted]
+                  description: 'Community visibility setting'
                 thumbnail:
                   type: string
                   format: binary
@@ -173,7 +182,7 @@ paths:
     put:
       summary: Update a community
       description: |
-        Updates a community's details including name, description, privacy settings, and thumbnail.
+        Updates a community's details including name, description, privacy settings, unlisted status, and thumbnail.
         This endpoint requires Signed Fetch authentication and only community owners can update.
       security:
         - SignedFetch: []
@@ -200,6 +209,14 @@ paths:
                 placeIds:
                   type: string
                   description: 'JSON array of place IDs to replace all current community places'
+                privacy:
+                  type: string
+                  enum: [public, private]
+                  description: 'Community privacy setting'
+                visibility:
+                  type: string
+                  enum: [all, unlisted]
+                  description: 'Community visibility setting'
                 thumbnail:
                   type: string
                   format: binary

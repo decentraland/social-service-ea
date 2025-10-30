@@ -18,7 +18,8 @@ import {
   CommunityForModeration,
   CommunityPost,
   CommunityPostWithLikes,
-  GetCommunityPostsOptions
+  GetCommunityPostsOptions,
+  CommunityVisibilityEnum
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -76,6 +77,7 @@ export function createCommunitiesDBComponent(
           c.description,
           c.owner_address as "ownerAddress",
           CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
+          CASE WHEN c.unlisted THEN 'unlisted' ELSE 'all' END as visibility,
           c.active,
       `
         .append(
@@ -306,11 +308,20 @@ export function createCommunitiesDBComponent(
         FROM communities c
         `
         )
-        .append(membersJoin).append(SQL`
+        .append(membersJoin)
+        .append(
+          SQL`
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
         LEFT JOIN community_friends cf ON c.id = cf.community_id
         LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
-        WHERE c.active = true AND cb.banned_address IS NULL`)
+        WHERE c.active = true`
+        )
+        .append(
+          // When filtering by membership, include unlisted communities so members can see communities they belong to
+          // Otherwise, exclude unlisted communities from public listings
+          onlyMemberOf ? SQL`` : SQL` AND c.unlisted = false`
+        )
+        .append(SQL` AND cb.banned_address IS NULL`)
 
       // Filter by specific community IDs if provided
       if (communityIds && communityIds.length > 0) {
@@ -335,10 +346,19 @@ export function createCommunitiesDBComponent(
 
       const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
 
-      const query = SQL`SELECT COUNT(1) as count FROM communities c`.append(membersJoin).append(SQL`
+      const query = SQL`SELECT COUNT(1) as count FROM communities c`
+        .append(membersJoin)
+        .append(
+          SQL`
         LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
-        WHERE c.active = true AND cb.banned_address IS NULL
-      `)
+        WHERE c.active = true`
+        )
+        .append(
+          // When filtering by membership, include unlisted communities so members can see communities they belong to
+          // Otherwise, exclude unlisted communities from public listings
+          onlyMemberOf ? SQL`` : SQL` AND c.unlisted = false`
+        )
+        .append(SQL` AND cb.banned_address IS NULL`)
 
       if (search) {
         query.append(searchCommunitiesQuery(search))
@@ -367,7 +387,7 @@ export function createCommunitiesDBComponent(
           cwmc."membersCount"
         FROM communities c
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
-        WHERE c.active = true AND c.private = false`
+        WHERE c.active = true AND c.private = false AND c.unlisted = false`
       )
 
       if (communityIds && communityIds.length > 0) {
@@ -386,7 +406,7 @@ export function createCommunitiesDBComponent(
       const query = SQL`
         SELECT COUNT(1) as count
           FROM communities c
-        WHERE c.active = true AND c.private = false
+        WHERE c.active = true AND c.private = false AND c.unlisted = false
       `
 
       if (search) {
@@ -490,9 +510,9 @@ export function createCommunitiesDBComponent(
     async createCommunity(community: CommunityDB): Promise<Community> {
       const id = randomUUID()
       const query = SQL`
-        INSERT INTO communities (id, name, description, owner_address, private, active)
-        VALUES (${id}, ${community.name}, ${community.description}, ${normalizeAddress(community.owner_address)}, ${community.private || false}, ${community.active || true})
-        RETURNING id, name, description, owner_address, private, active, created_at, updated_at
+        INSERT INTO communities (id, name, description, owner_address, private, unlisted, active)
+        VALUES (${id}, ${community.name}, ${community.description}, ${normalizeAddress(community.owner_address)}, ${community.private || false}, ${community.unlisted || false}, ${community.active || true})
+        RETURNING id, name, description, owner_address, private, unlisted, active, created_at, updated_at
         `
       const result = await pg.query(query)
       const row = result.rows[0]
@@ -502,6 +522,7 @@ export function createCommunitiesDBComponent(
         description: row.description,
         ownerAddress: row.owner_address,
         privacy: row.private ? CommunityPrivacyEnum.Private : CommunityPrivacyEnum.Public,
+        visibility: row.unlisted ? CommunityVisibilityEnum.Unlisted : CommunityVisibilityEnum.All,
         active: row.active
       }
     },
@@ -622,7 +643,7 @@ export function createCommunitiesDBComponent(
 
     async updateCommunity(
       communityId: string,
-      updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private'>>
+      updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private' | 'unlisted'>>
     ): Promise<Community> {
       let query = SQL`UPDATE communities SET `
       const setClauses: ReturnType<typeof SQL>[] = []
@@ -639,6 +660,10 @@ export function createCommunitiesDBComponent(
         setClauses.push(SQL`private = ${updates.private}`)
       }
 
+      if (updates.unlisted !== undefined) {
+        setClauses.push(SQL`unlisted = ${updates.unlisted}`)
+      }
+
       setClauses.push(SQL`updated_at = now()`)
 
       // Join the SET clauses
@@ -651,7 +676,7 @@ export function createCommunitiesDBComponent(
 
       query = query
         .append(SQL` WHERE id = ${communityId} AND active = true`)
-        .append(SQL` RETURNING id, name, description, owner_address, private, active, created_at, updated_at`)
+        .append(SQL` RETURNING id, name, description, owner_address, private, unlisted, active, created_at, updated_at`)
 
       const result = await pg.query<CommunityDB>(query)
       const row = result.rows[0]
@@ -666,6 +691,7 @@ export function createCommunitiesDBComponent(
         description: row.description,
         ownerAddress: row.owner_address,
         privacy: row.private ? CommunityPrivacyEnum.Private : CommunityPrivacyEnum.Public,
+        visibility: row.unlisted ? CommunityVisibilityEnum.Unlisted : CommunityVisibilityEnum.All,
         active: row.active
       }
     },

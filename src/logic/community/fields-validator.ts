@@ -1,6 +1,6 @@
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 import fileType from 'file-type'
-import { CommunityPrivacyEnum } from '.'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '.'
 import { AppComponents } from '../../types/system'
 import {
   ICommunityFieldsValidatorComponent,
@@ -30,6 +30,7 @@ export async function createCommunityFieldsValidatorComponent(
       const description: string | undefined = formData.fields.description?.value
       const placeIdsField: string | undefined = formData.fields.placeIds?.value
       const privacy: string | undefined = formData.fields.privacy?.value
+      const visibility: string | undefined = formData.fields.visibility?.value
 
       let placeIds: string[] | undefined = undefined
       if (placeIdsField) {
@@ -67,7 +68,8 @@ export async function createCommunityFieldsValidatorComponent(
         description === undefined &&
         !thumbnailBuffer &&
         placeIds === undefined &&
-        privacy === undefined
+        privacy === undefined &&
+        visibility === undefined
       ) {
         throw new InvalidRequestError('At least one field must be provided for update')
       }
@@ -90,6 +92,7 @@ export async function createCommunityFieldsValidatorComponent(
         description,
         placeIds,
         privacy: (privacy?.trim() as CommunityPrivacyEnum) ?? undefined,
+        visibility: (visibility?.trim() as CommunityVisibilityEnum) ?? undefined,
         thumbnailBuffer
       }
     }

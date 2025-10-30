@@ -6,7 +6,8 @@ import {
   CommunityOwnerNotFoundError,
   CommunityNotCompliantError,
   AIComplianceError,
-  CommunityPrivacyEnum
+  CommunityPrivacyEnum,
+  CommunityVisibilityEnum
 } from '../../../logic/community'
 
 export async function createCommunityHandler(
@@ -26,7 +27,7 @@ export async function createCommunityHandler(
     const thumbnailFile = formData?.files?.['thumbnail']
     const thumbnailBuffer = thumbnailFile?.value
 
-    const { name, description, placeIds, privacy } = await communityFieldsValidator.validate(
+    const { name, description, placeIds, privacy, visibility } = await communityFieldsValidator.validate(
       formData,
       thumbnailBuffer,
       {
@@ -46,7 +47,8 @@ export async function createCommunityHandler(
         name: name!,
         description: description!,
         ownerAddress: address,
-        privacy: privacy ?? CommunityPrivacyEnum.Public
+        privacy: privacy ?? CommunityPrivacyEnum.Public,
+        visibility: visibility ?? CommunityVisibilityEnum.All
       },
       thumbnailBuffer,
       placeIds ?? []

@@ -15,7 +15,8 @@ import {
   MemberRequest,
   ICommunityBroadcasterComponent,
   ICommunityThumbnailComponent,
-  CommunityDB
+  CommunityDB,
+  CommunityVisibilityEnum
 } from '../../../src/logic/community'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { createCommunityRequestsComponent } from '../../../src/logic/community/requests'
@@ -122,7 +123,8 @@ describe('Community Requests Component', () => {
           ownerAddress: userAddress,
           privacy: CommunityPrivacyEnum.Public,
           active: true,
-          role: CommunityRole.None
+          role: CommunityRole.None,
+          visibility: CommunityVisibilityEnum.All
         }
         mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
       })
@@ -326,6 +328,7 @@ describe('Community Requests Component', () => {
           description: 'Mock Description',
           ownerAddress: userAddress,
           privacy: CommunityPrivacyEnum.Private,
+          visibility: CommunityVisibilityEnum.All,
           active: true,
           role: CommunityRole.None
         }
@@ -948,6 +951,7 @@ describe('Community Requests Component', () => {
           name: 'Mock Community',
           ownerAddress: '0x123',
           privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
           id: randomUUID(),
           role: CommunityRole.None
         }

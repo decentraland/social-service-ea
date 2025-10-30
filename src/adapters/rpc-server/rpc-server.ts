@@ -39,7 +39,6 @@ export async function createRpcServerComponent({
   })
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
-  console.log('rpcServerPort', rpcServerPort)
 
   const subscriptionsMap = {
     [FRIENDSHIP_UPDATES_CHANNEL]: [

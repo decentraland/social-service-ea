@@ -11,7 +11,8 @@ import {
   CommunityPostWithLikes,
   CommunityPostWithProfile,
   GetCommunityPostsOptions,
-  CommunityPrivacyEnum
+  CommunityPrivacyEnum,
+  CommunityVisibilityEnum
 } from '../../../src/logic/community/types'
 import { CommunityRole } from '../../../src/types/entities'
 import { createMockCommunityRolesComponent } from '../../mocks/communities'
@@ -32,6 +33,7 @@ describe('Community Posts Component', () => {
     description: 'Test Description',
     ownerAddress: '0x1234567890123456789012345678901234567890',
     privacy: CommunityPrivacyEnum.Public,
+    visibility: CommunityVisibilityEnum.All,
     active: true,
     role: CommunityRole.Member
   }

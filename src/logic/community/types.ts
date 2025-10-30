@@ -104,7 +104,7 @@ export interface ICommunityRolesComponent {
   validatePermissionToRemovePlacesFromCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToUpdatePlaces: (communityId: string, editorAddress: string) => Promise<void>
   validatePermissionToEditCommunity: (communityId: string, editorAddress: string) => Promise<void>
-  validatePermissionToUpdateCommunityPrivacy: (communityId: string, updaterAddress: string) => Promise<void>
+  validatePermissionToEditCommunitySettings: (communityId: string, updaterAddress: string) => Promise<void>
   validatePermissionToDeleteCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToLeaveCommunity: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToAcceptAndRejectRequests: (communityId: string, memberAddress: string) => Promise<void>
@@ -253,6 +253,7 @@ export type CommunityDB = {
   description: string
   owner_address: string
   private: boolean
+  unlisted: boolean
   active: boolean
   created_at?: string
   updated_at?: string
@@ -264,11 +265,17 @@ export type CommunityUpdates = {
   placeIds?: string[]
   thumbnailBuffer?: Buffer
   privacy?: CommunityPrivacyEnum
+  visibility?: CommunityVisibilityEnum
 }
 
 export enum CommunityPrivacyEnum {
   Public = 'public',
   Private = 'private'
+}
+
+export enum CommunityVisibilityEnum {
+  All = 'all',
+  Unlisted = 'unlisted'
 }
 
 export type Community = {
@@ -278,6 +285,7 @@ export type Community = {
   description: string
   ownerAddress: string
   privacy: CommunityPrivacyEnum
+  visibility: CommunityVisibilityEnum
   active: boolean
 }
 
@@ -459,6 +467,7 @@ export type CommunityFieldsValidationFields = {
   placeIds?: string[]
   thumbnailBuffer?: Buffer
   privacy?: CommunityPrivacyEnum
+  visibility?: CommunityVisibilityEnum
 }
 
 export type CommunityFieldsValidationOptions = {

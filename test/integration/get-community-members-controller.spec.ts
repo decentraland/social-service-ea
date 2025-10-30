@@ -35,6 +35,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
           description: 'Test Description',
           private: false,
           active: true,
+          unlisted: false,
           owner_address: '0x0000000000000000000000000000000000000000'
         })
       ).id
@@ -108,6 +109,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
               name: 'Test Community',
               description: 'Test Description',
               private: true,
+              unlisted: false,
               active: true,
               owner_address: '0x0000000000000000000000000000000000000000'
             })
@@ -277,6 +279,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
               description: 'Private Description',
               private: true,
               active: true,
+              unlisted: false,
               owner_address: ownerAddress
             })
           ).id

@@ -8,6 +8,7 @@ import { ICommunityBansComponent } from '../../../src/logic/community'
 import {
   BannedMember,
   CommunityPrivacyEnum,
+  CommunityVisibilityEnum,
   ICommunityBroadcasterComponent,
   ICommunityRolesComponent,
   ICommunityThumbnailComponent
@@ -89,6 +90,7 @@ describe('Community Bans Component', () => {
           active: true,
           ownerAddress: bannerAddress,
           privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
           role: CommunityRole.Owner
         })
       })
@@ -386,6 +388,7 @@ describe('Community Bans Component', () => {
           active: true,
           ownerAddress: userAddress,
           privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
           role: CommunityRole.Owner
         })
       })

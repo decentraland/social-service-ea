@@ -3,7 +3,8 @@ import {
   toCommunityWithUserInformationAndVoiceChat,
   CommunityPrivacyEnum,
   AggregatedCommunityWithMemberAndFriendsData,
-  CommunityVoiceChatStatus
+  CommunityVoiceChatStatus,
+  CommunityVisibilityEnum
 } from '../../../../src/logic/community'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createMockProfile } from '../../../mocks/profile'
@@ -15,6 +16,7 @@ describe('Community Utils', () => {
       name: 'Test Community',
       description: 'Test Description',
       ownerAddress: '0xowner',
+      visibility: CommunityVisibilityEnum.All,
       privacy: CommunityPrivacyEnum.Public,
       active: true,
       ownerName: 'Test Owner',

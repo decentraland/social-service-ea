@@ -38,7 +38,8 @@ test('Delete Community Post Controller', async function ({ components, stubCompo
         description: 'A test community',
         owner_address: ownerIdentity.realAccount.address.toLowerCase(),
         private: false,
-        active: true
+        active: true,
+        unlisted: false
       })
       communityId = community.id
 

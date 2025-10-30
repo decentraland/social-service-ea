@@ -41,6 +41,7 @@ test('Delete Community Controller', function ({ components, spyComponents }) {
             description: 'Test Description',
             owner_address: address,
             private: false,
+            unlisted: false,
             active: true
           })
           communityId = id
@@ -57,6 +58,7 @@ test('Delete Community Controller', function ({ components, spyComponents }) {
               description: 'Another Description',
               owner_address: anotherAddress,
               private: false,
+              unlisted: false,
               active: true
             })
             anotherCommunityId = id
@@ -130,6 +132,7 @@ test('Delete Community Controller', function ({ components, spyComponents }) {
             description: 'Failing Description',
             owner_address: address,
             private: false,
+            unlisted: false,
             active: true
           })
           failingCommunityId = id

@@ -39,6 +39,7 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
         description: 'A public community',
         owner_address: ownerIdentity.realAccount.address.toLowerCase(),
         private: false,
+        unlisted: false,
         active: true
       })
       publicCommunityId = publicCommunity.id
@@ -49,6 +50,7 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
         description: 'A private community',
         owner_address: ownerIdentity.realAccount.address.toLowerCase(),
         private: true,
+        unlisted: false,
         active: true
       })
       privateCommunityId = privateCommunity.id
@@ -178,6 +180,7 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
           description: 'A community with no posts',
           owner_address: ownerIdentity.realAccount.address.toLowerCase(),
           private: false,
+          unlisted: false,
           active: true
         })
         emptyCommunityId = emptyCommunity.id

@@ -14,6 +14,7 @@ import {
   CommunityUpdates,
   AggregatedCommunity,
   CommunityPrivacyEnum,
+  CommunityVisibilityEnum,
   CommunityForModeration,
   CommunityVoiceChatStatus
 } from './types'
@@ -278,6 +279,7 @@ export function createCommunityComponent(
         ...community,
         owner_address: community.ownerAddress,
         private: community.privacy === CommunityPrivacyEnum.Private,
+        unlisted: community.visibility === CommunityVisibilityEnum.Unlisted,
         active: true
       })
 
@@ -390,12 +392,16 @@ export function createCommunityComponent(
           description: existingCommunity.description,
           ownerAddress: existingCommunity.ownerAddress,
           privacy: existingCommunity.privacy,
+          visibility: existingCommunity.visibility,
           active: existingCommunity.active
         }
       }
 
       const { placeIds, thumbnailBuffer, ...restUpdates } = updates
-      const isUpdatingPrivacy = updates.privacy && updates.privacy !== existingCommunity.privacy
+
+      const isUpdatingPrivacy = updates.privacy !== undefined && updates.privacy !== existingCommunity.privacy
+      const isUpdatingVisibility =
+        updates.visibility !== undefined && updates.visibility !== existingCommunity.visibility
 
       if (placeIds && placeIds.length > 0) {
         const uniquePlaceIds = Array.from(new Set(placeIds))
@@ -404,8 +410,8 @@ export function createCommunityComponent(
         await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
       }
 
-      if (isUpdatingPrivacy) {
-        await communityRoles.validatePermissionToUpdateCommunityPrivacy(communityId, userAddress)
+      if (isUpdatingPrivacy || isUpdatingVisibility) {
+        await communityRoles.validatePermissionToEditCommunitySettings(communityId, userAddress)
       }
 
       const nameChanged =
@@ -427,13 +433,19 @@ export function createCommunityComponent(
         userAddress,
         updates: JSON.stringify(restUpdates),
         hasThumbnail: thumbnailBuffer ? 'true' : 'false',
-        placeIds: placeIds ? placeIds.length : 0
+        placeIds: placeIds ? placeIds.length : 0,
+        isUpdatingPrivacy: isUpdatingPrivacy ? 'true' : 'false',
+        isUpdatingVisibility: isUpdatingVisibility ? 'true' : 'false'
       })
 
-      const updatedCommunity = await communitiesDb.updateCommunity(communityId, {
-        ...updates,
-        private: isUpdatingPrivacy ? updates.privacy === CommunityPrivacyEnum.Private : undefined
-      })
+      const dbUpdates = {
+        name: updates.name,
+        description: updates.description,
+        private: isUpdatingPrivacy ? updates.privacy === CommunityPrivacyEnum.Private : undefined,
+        unlisted: isUpdatingVisibility ? updates.visibility === CommunityVisibilityEnum.Unlisted : undefined
+      }
+
+      const updatedCommunity = await communitiesDb.updateCommunity(communityId, dbUpdates)
 
       if (!!updates.name && updates.name.trim() !== existingCommunity.name.trim()) {
         setImmediate(async () => {
@@ -516,6 +528,7 @@ export function createCommunityComponent(
         description: community.description,
         ownerAddress: community.ownerAddress,
         privacy: community.privacy,
+        visibility: community.visibility,
         active: community.active
       }))
     },

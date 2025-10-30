@@ -184,7 +184,7 @@ export interface ICommunitiesDatabaseComponent {
   getBannedMembersCount(communityId: string): Promise<number>
   updateCommunity(
     communityId: string,
-    updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private'>>
+    updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private' | 'unlisted'>>
   ): Promise<Community>
   createCommunityRequest(
     communityId: string,
