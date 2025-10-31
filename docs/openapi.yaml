@@ -2,7 +2,76 @@ openapi: 3.0.0
 info:
   title: Social Service API
   version: 1.0.0
-  description: API documentation for the Social Service.
+  description: |
+    ## Decentraland Social Service API
+
+    The Social Service API powers social interactions and community features within the Decentraland metaverse platform. This API enables users to create and manage communities, connect with friends, participate in voice chats, and engage in social activities.
+
+    ### Key Features
+
+    ### 🏘️ Communities
+    - **Create and manage communities** with customizable privacy settings (public/private) and visibility (listed/unlisted)
+    - **Member management** with role-based permissions (owner, moderator, member)
+    - **Community posts** for sharing updates and announcements
+    - **Place associations** to link communities with specific Decentraland locations
+    - **Ban management** for community moderation
+    - **Invitations and join requests** workflow for private communities
+
+    ### 🎙️ Community Voice Chats
+    - Real-time voice chat sessions within communities
+    - Role-based participation (speakers and listeners)
+    - Active voice chat discovery across communities
+    - Location tracking for voice chat participants
+
+    ### 🎁 Referral System
+    - Track user referrals and invitations
+    - Monitor referral progress and rewards
+    - Email association for referral campaigns
+
+    ### 👥 Social Features
+    - **Friendship management** (via RPC/gRPC - not covered in this REST API)
+    - **Blocking and privacy controls** (via RPC/gRPC)
+    - **User profiles** with claimed names and avatars
+    - **Online status tracking** for community members
+
+    ## Authentication
+
+    This API uses two authentication methods:
+
+    ### Signed Fetch (Primary)
+    Most endpoints use **Signed Fetch authentication** (ADR-44), which cryptographically signs requests using the user's Ethereum wallet. This ensures that requests are genuinely from the wallet owner without requiring traditional API keys.
+
+    - **Header**: `Authorization: <signed-fetch-token>`
+    - **Required for**: All user-facing endpoints
+    - **Optional on**: Public read endpoints (returns additional data when authenticated)
+    - **Security**: Prevents scene-based requests for additional security
+
+    ### Bearer Token (Admin)
+    Administrative endpoints use **Bearer token authentication** for system-level operations.
+
+    - **Header**: `Authorization: Bearer <API_ADMIN_TOKEN>`
+    - **Required for**: Admin and moderation endpoints
+    - **Used by**: Backend services and authorized administrators   
+
+    ### Key Concepts
+
+    ### Community Privacy
+    - **Public**: Anyone can view and join
+    - **Private**: Requires invitation or approval to join
+
+    ### Community Visibility
+    - **All** (listed): Appears in public community listings
+    - **Unlisted**: Only accessible via direct link, not shown in listings
+
+    ### Community Roles
+    - **owner**: Full control over the community
+    - **moderator**: Can manage members, posts, and settings
+    - **member**: Regular community member
+    - **none**: Not a member of the community
+
+    ### Request Types
+    - **invite**: An invitation sent to a user to join a community
+    - **request_to_join**: A request from a user to join a private community   
 
 servers:
   - url: https://social-api.decentraland.org
@@ -65,6 +134,21 @@ paths:
           schema:
             type: boolean
           description: Filter communities where the authenticated user is a member.
+        - name: onlyWithActiveVoiceChat
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter to show only communities with active voice chats.
+        - name: roles
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [owner, moderator, member, none]
+          description: Filter communities by the authenticated user's role (can specify multiple roles).
       responses:
         '200':
           description: Communities found
@@ -141,8 +225,10 @@ paths:
     get:
       summary: Get a community by ID
       description: |
-        Retrieves a specific community by its unique ID.
-        This endpoint requires Signed Fetch authentication.
+        Retrieves detailed information about a specific community by its unique ID.
+        This endpoint requires Signed Fetch authentication and returns the authenticated user's role in the community.
+        Returns both public and private communities if the user has access.
+        Includes voice chat status, member count, and community metadata.
       security:
         - SignedFetch: []
       parameters:
@@ -296,10 +382,11 @@ paths:
     get:
       summary: List community members
       description: |
-        Lists all members of a specific community.
+        Lists all members of a specific community with their profiles and roles.
         This endpoint has optional Signed Fetch authentication.
         When not signed, it only returns members of public communities.
-        When signed, it returns all members if the user has access to the community.
+        When signed, it returns all members if the user has access to the community, including friendship status with each member.
+        Can be filtered to show only online members.
       security:
         - SignedFetch: []
       parameters:
@@ -466,7 +553,7 @@ paths:
               properties:
                 role:
                   type: string
-                  enum: [Owner, Moderator, Member]
+                  enum: [owner, moderator, member]
                   description: 'New role for the member'
       responses:
         '204':
@@ -686,10 +773,11 @@ paths:
     get:
       summary: Get community places
       description: |
-        Lists all places in a specific community.
+        Lists all places (Decentraland world locations) associated with a specific community.
         This endpoint has optional Signed Fetch authentication.
         When not signed, it only returns places of public communities.
         When signed, it returns all places if the user has access to the community or the community is public.
+        Places are identified by their unique place IDs (UUIDs).
       security:
         - SignedFetch: []
       parameters:
@@ -900,6 +988,8 @@ paths:
       description: |
         Creates a referral relationship between a referrer and an invited user.
         This endpoint requires Signed Fetch authentication.
+        The authenticated user becomes the "invited" user, and the referrer address is provided in the request body.
+        This should be called when a user follows a referral link.
       security:
         - SignedFetch: []
       requestBody:
@@ -1059,6 +1149,8 @@ paths:
       description: |
         Lists all pending requests (invites and join requests) for a specific community.
         This endpoint requires Signed Fetch authentication and only community owners or moderators can access it.
+        Returns detailed information about each request including the member's profile, friendship status with the authenticated user.
+        Can be filtered by request type (invite or request_to_join).
       security:
         - SignedFetch: []
       parameters:
@@ -1244,6 +1336,8 @@ paths:
       description: |
         Lists all pending requests (invites received and join requests sent) for a specific member.
         This endpoint requires Signed Fetch authentication and users can only access their own requests.
+        Returns detailed community information for each request including voice chat status, member count, and friends in the community.
+        Can be filtered by request type (invite or request_to_join).
       security:
         - SignedFetch: []
       parameters:
@@ -1432,8 +1526,10 @@ paths:
     get:
       summary: Get active community voice chats
       description: |
-        Lists all active community voice chats for the authenticated user.
+        Lists all active community voice chats visible to the authenticated user.
         This endpoint requires Signed Fetch authentication.
+        Returns voice chats from communities the user is a member of, including participant counts,
+        moderator counts, community information, and location data (positions and worlds).
       security:
         - SignedFetch: []
       responses:
@@ -1458,6 +1554,62 @@ paths:
       tags:
         - Community Voice Chats
 
+  /v1/moderation/communities:
+    get:
+      summary: Get all communities for moderation
+      description: |
+        Lists all communities for moderation purposes with detailed information.
+        This endpoint requires Signed Fetch authentication and the user must be a global moderator.
+        Global moderators are configured via feature flags.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities per page.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of communities to skip.
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search term to filter communities by name or description.
+      responses:
+        '200':
+          description: Communities found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetCommunitiesForModeration200OkResponse'
+        '403':
+          description: Forbidden - Global moderator privileges required
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
   /v1/communities/{id}/posts:
     get:
       summary: List community posts
@@ -1465,7 +1617,8 @@ paths:
         Lists all posts from a specific community with pagination support.
         This endpoint has optional Signed Fetch authentication.
         When not signed, it only returns posts from public communities.
-        When signed, it returns all posts if the user has access to the community.
+        When signed, it returns all posts if the user has access to the community, including the user's like status for each post.
+        Posts are returned in reverse chronological order (newest first).
       security:
         - SignedFetch: []
       parameters:
@@ -1519,6 +1672,8 @@ paths:
       description: |
         Creates a new post in a community.
         This endpoint requires Signed Fetch authentication and only community owners or moderators can create posts.
+        Post content must be between 1 and 1000 characters.
+        Returns the created post with author profile information.
       security:
         - SignedFetch: []
       parameters:
