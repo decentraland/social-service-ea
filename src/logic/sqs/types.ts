@@ -10,7 +10,7 @@ export interface IMessageConsumerComponent extends IBaseComponent {
 
 export type EventHandler = {
   type: Events.Type
-  subTypes: (typeof Events.SubType)[keyof typeof Events.SubType][]
+  subTypes: Event['subType'][]
   handler: (message: Event) => Promise<void>
 }
 

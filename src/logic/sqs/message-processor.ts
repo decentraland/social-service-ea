@@ -9,14 +9,11 @@ export async function createMessageProcessorComponent({
 }: Pick<AppComponents, 'logs' | 'referral'>): Promise<IMessageProcessorComponent> {
   const logger = logs.getLogger('message-processor')
 
-  // Register event handlers
+  // TODO: decouple the handlers from the message processor
   const eventHandlers: EventHandler[] = [
     {
       type: Events.Type.CLIENT,
-      subTypes: [
-        Events.SubType.Client.LOGGED_IN,
-        Events.SubType.Client.LOGGED_IN_CACHED
-      ] as (typeof Events.SubType.Client)[keyof typeof Events.SubType.Client][],
+      subTypes: [Events.SubType.Client.LOGGED_IN, Events.SubType.Client.LOGGED_IN_CACHED],
       handler: async (message: Event) => {
         const { metadata } = message as LoggedInEvent | LoggedInCachedEvent
         const userAddress = metadata.userAddress
