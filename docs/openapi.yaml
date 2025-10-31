@@ -3,7 +3,7 @@ info:
   title: Social Service API
   version: 1.0.0
   description: |
-    ## Decentraland Social Service API
+    ## Overview
 
     The Social Service API powers social interactions and community features within the Decentraland metaverse platform. This API enables users to create and manage communities, connect with friends, participate in voice chats, and engage in social activities.
 
