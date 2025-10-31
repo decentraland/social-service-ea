@@ -218,6 +218,10 @@ export interface ICommunitiesDatabaseComponent {
   likePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePostsFromCommunity(communityId: string, userAddress: EthAddress): Promise<void>
+  updateCommunityRankingScore(communityId: string, score: number): Promise<void>
+  setEditorChoice(communityId: string, isEditorChoice: boolean): Promise<void>
+  getNewMembersCount(communityId: string, days: number): Promise<number>
+  getPlacesCount(communityId: string): Promise<number>
 }
 
 export interface IVoiceDatabaseComponent {
