@@ -40,6 +40,7 @@ export interface ICommunitiesComponent {
     placeIds?: string[]
   ): Promise<AggregatedCommunity>
   updateCommunity(communityId: string, userAddress: EthAddress, updates: CommunityUpdates): Promise<Community>
+  updateEditorChoice(communityId: string, userAddress: EthAddress, editorsChoice: boolean): Promise<void>
   deleteCommunity(id: string, userAddress: string): Promise<void>
   getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
 }
