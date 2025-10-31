@@ -1122,6 +1122,106 @@ export function createCommunitiesDBComponent(
 
     async getPlacesCount(communityId: string): Promise<number> {
       return this.getCommunityPlacesCount(communityId)
+    },
+
+    async getAllCommunitiesWithRankingMetrics(): Promise<
+      Array<{
+        id: string
+        eventCount: number
+        photosCount: number
+        hasDescription: number
+        placesCount: number
+        newMembersCount: number
+        announcementsCount: number
+        streamsCount: number
+        eventsTotalAttendees: number
+        streamingTotalParticipants: number
+      }>
+    > {
+      const query = SQL`
+        SELECT 
+          c.id,
+          COALESCE(crm.events_count, 0)::int AS "eventCount",
+          COALESCE(crm.photos_count, 0)::int AS "photosCount",
+          CASE WHEN c.description IS NOT NULL AND TRIM(c.description) != '' THEN 1 ELSE 0 END AS "hasDescription",
+          COALESCE(places_count.count, 0)::int AS "placesCount",
+          COALESCE(new_members_7d.count, 0)::int AS "newMembersCount",
+          COALESCE(posts_count.count, 0)::int AS "announcementsCount",
+          COALESCE(crm.streaming_count, 0)::int AS "streamsCount",
+          COALESCE(crm.events_total_attendees, 0)::int AS "eventsTotalAttendees",
+          COALESCE(crm.streaming_total_participants, 0)::int AS "streamingTotalParticipants"
+        FROM communities c
+        LEFT JOIN community_ranking_metrics crm ON c.id = crm.community_id
+        LEFT JOIN (
+          SELECT community_id, COUNT(*) as count
+          FROM community_members
+          WHERE joined_at >= NOW() - INTERVAL '7 days'
+          GROUP BY community_id
+        ) new_members_7d ON c.id = new_members_7d.community_id
+        LEFT JOIN (
+          SELECT community_id, COUNT(*) as count
+          FROM community_places
+          GROUP BY community_id
+        ) places_count ON c.id = places_count.community_id
+        LEFT JOIN (
+          SELECT community_id, COUNT(*) as count
+          FROM community_posts
+          GROUP BY community_id
+        ) posts_count ON c.id = posts_count.community_id
+        WHERE c.active = true
+        ORDER BY c.id
+      `
+      const result = await pg.query<{
+        id: string
+        eventCount: number
+        photosCount: number
+        hasDescription: number
+        placesCount: number
+        newMembersCount: number
+        announcementsCount: number
+        streamsCount: number
+        eventsTotalAttendees: number
+        streamingTotalParticipants: number
+      }>(query)
+      return result.rows
+    },
+
+    async incrementCommunityEventsCount(communityId: string, totalAttendees: number = 0): Promise<void> {
+      const query = SQL`
+        INSERT INTO community_ranking_metrics (community_id, events_count, events_total_attendees, updated_at)
+        VALUES (${communityId}, 1, ${totalAttendees}, now())
+        ON CONFLICT (community_id)
+        DO UPDATE SET
+          events_count = community_ranking_metrics.events_count + 1,
+          events_total_attendees = community_ranking_metrics.events_total_attendees + ${totalAttendees},
+          updated_at = now()
+      `
+      await pg.query(query)
+    },
+
+    async incrementCommunityPhotosCount(communityId: string): Promise<void> {
+      const query = SQL`
+        INSERT INTO community_ranking_metrics (community_id, photos_count, updated_at)
+        VALUES (${communityId}, 1, now())
+        ON CONFLICT (community_id)
+        DO UPDATE SET
+          photos_count = community_ranking_metrics.photos_count + 1,
+          updated_at = now()
+      `
+      await pg.query(query)
+    },
+
+    async incrementCommunityStreamingCount(communityId: string, totalParticipants: number = 0): Promise<void> {
+      const query = SQL`
+        INSERT INTO community_ranking_metrics (community_id, streaming_count, streaming_total_participants, updated_at)
+        VALUES (${communityId}, 1, ${totalParticipants}, now())
+        ON CONFLICT (community_id)
+        DO UPDATE SET
+          streaming_count = community_ranking_metrics.streaming_count + 1,
+          streaming_total_participants = community_ranking_metrics.streaming_total_participants + ${totalParticipants},
+          updated_at = now()
+      `
+      await pg.query(query)
     }
   }
 }

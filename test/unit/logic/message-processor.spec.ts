@@ -1,5 +1,5 @@
 import { Event, Events, LoggedInEvent } from '@dcl/schemas'
-import { IMessageProcessorComponent, createMessageProcessorComponent } from '../../../src/logic/sqs'
+import { IMessageProcessorComponent, createMessageProcessorComponent, EventHandler } from '../../../src/logic/sqs'
 
 describe('message-processor', () => {
   let mockLogger: any
@@ -25,6 +25,50 @@ describe('message-processor', () => {
 
   afterEach(() => {
     jest.resetAllMocks()
+  })
+
+  describe('when registering a new handler', () => {
+    let customHandler: jest.Mock
+    let handler: EventHandler
+
+    beforeEach(() => {
+      customHandler = jest.fn().mockResolvedValue(undefined)
+      handler = {
+        type: Events.Type.CLIENT,
+        subTypes: [Events.SubType.Client.LOGGED_IN],
+        handler: customHandler
+      }
+    })
+
+    it('should add the handler to the handlers list', () => {
+      messageProcessor.registerHandler(handler)
+
+      expect(messageProcessor.registerHandler).toBeDefined()
+    })
+
+    describe('and processing a matching message', () => {
+      let message: Event
+
+      beforeEach(() => {
+        message = {
+          type: Events.Type.CLIENT,
+          subType: Events.SubType.Client.LOGGED_IN,
+          metadata: {
+            userAddress: '0x123'
+          },
+          key: 'test-key',
+          timestamp: Date.now()
+        } as unknown as LoggedInEvent
+        messageProcessor.registerHandler(handler)
+      })
+
+      it('should call both the default handler and the custom handler', async () => {
+        await messageProcessor.processMessage(message)
+
+        expect(mockReferral.finalizeReferral).toHaveBeenCalledWith('0x123')
+        expect(customHandler).toHaveBeenCalledWith(message)
+      })
+    })
   })
 
   describe('when processing a message', () => {
