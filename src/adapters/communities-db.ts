@@ -1092,6 +1092,36 @@ export function createCommunitiesDBComponent(
         DELETE FROM community_post_likes
         WHERE post_id IN (SELECT id FROM community_posts WHERE community_id = ${communityId}) AND user_address = ${normalizedAddress}
       `)
+    },
+
+    async updateCommunityRankingScore(communityId: string, score: number): Promise<void> {
+      await pg.query(SQL`
+        UPDATE communities
+        SET ranking_score = ${score}, last_score_calculated_at = now()
+        WHERE id = ${communityId}
+      `)
+    },
+
+    async setEditorChoice(communityId: string, isEditorChoice: boolean): Promise<void> {
+      await pg.query(SQL`
+        UPDATE communities
+        SET editors_choice = ${isEditorChoice}
+        WHERE id = ${communityId}
+      `)
+    },
+
+    async getNewMembersCount(communityId: string, days: number): Promise<number> {
+      const query = SQL`
+        SELECT COUNT(1) as count
+        FROM community_members
+        WHERE community_id = ${communityId}
+          AND joined_at >= NOW() - make_interval(days => ${days})
+      `
+      return pg.getCount(query)
+    },
+
+    async getPlacesCount(communityId: string): Promise<number> {
+      return this.getCommunityPlacesCount(communityId)
     }
   }
 }
