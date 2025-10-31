@@ -1,5 +1,5 @@
 import { CommunityRole } from '../../../src/types'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError, InvalidRequestError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockCatalystClient, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
@@ -1057,6 +1057,71 @@ describe('Community Members Component', () => {
 
         expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
         expect(mockCommunityRoles.validatePermissionToUpdateMemberRole).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.updateMemberRole).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when transferring ownership via updateMemberRole', () => {
+    const updaterAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    const targetAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+
+    beforeEach(() => {
+      mockCommunitiesDB.communityExists.mockResolvedValue(true)
+      mockCommunityRoles.validatePermissionToTransferOwnership.mockResolvedValue()
+      ;(mockCatalystClient.getOwnedNames as jest.Mock).mockResolvedValue([{ name: 'test-name' }])
+      // @ts-ignore add runtime mock if not present
+      mockCommunitiesDB.transferCommunityOwnership = jest.fn().mockResolvedValue(undefined)
+    })
+
+    describe('and the target is not a member', () => {
+      beforeEach(() => {
+        mockCommunityRoles.validatePermissionToTransferOwnership.mockImplementation(() => {
+          throw new NotAuthorizedError(
+            `The user ${updaterAddress} doesn't have permission to assign roles in community test-community`
+          )
+        })
+      })
+
+      it('should throw NotAuthorizedError', async () => {
+        await expect(
+          communityMembersComponent.updateMemberRole(
+            'test-community',
+            updaterAddress,
+            targetAddress,
+            CommunityRole.Owner
+          )
+        ).rejects.toThrow("doesn't have permission")
+      })
+    })
+
+    describe('and the target has no NAME', () => {
+      beforeEach(() => {
+        ;(mockCatalystClient.getOwnedNames as jest.Mock).mockResolvedValue([])
+      })
+
+      it('should throw InvalidRequestError', async () => {
+        await expect(
+          communityMembersComponent.updateMemberRole(
+            'test-community',
+            updaterAddress,
+            targetAddress,
+            CommunityRole.Owner
+          )
+        ).rejects.toThrow(InvalidRequestError)
+      })
+    })
+
+    describe('and validations pass', () => {
+      it('should call transferCommunityOwnership', async () => {
+        await communityMembersComponent.updateMemberRole(
+          'test-community',
+          updaterAddress,
+          targetAddress,
+          CommunityRole.Owner
+        )
+
+        expect(mockCommunitiesDB.transferCommunityOwnership).toHaveBeenCalledWith('test-community', targetAddress)
         expect(mockCommunitiesDB.updateMemberRole).not.toHaveBeenCalled()
       })
     })

@@ -100,6 +100,11 @@ export interface ICommunityRolesComponent {
     targetAddress: string,
     newRole: CommunityRole
   ) => Promise<void>
+  validatePermissionToTransferOwnership: (
+    communityId: string,
+    ownerAddress: string,
+    targetAddress: string
+  ) => Promise<void>
   validatePermissionToAddPlacesToCommunity: (communityId: string, adderAddress: string) => Promise<void>
   validatePermissionToRemovePlacesFromCommunity: (communityId: string, removerAddress: string) => Promise<void>
   validatePermissionToUpdatePlaces: (communityId: string, editorAddress: string) => Promise<void>
