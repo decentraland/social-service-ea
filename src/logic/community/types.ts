@@ -364,6 +364,7 @@ export type GetCommunitiesOptions = {
   onlyWithActiveVoiceChat?: boolean
   roles?: CommunityRole[]
   communityIds?: string[]
+  includeUnlisted?: boolean
 }
 
 export type GetCommunityMembersOptions = {

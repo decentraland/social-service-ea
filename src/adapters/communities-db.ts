@@ -262,7 +262,7 @@ export function createCommunitiesDBComponent(
       memberAddress: EthAddress,
       options: GetCommunitiesOptions
     ): Promise<AggregatedCommunityWithMemberAndFriendsData[]> {
-      const { onlyMemberOf, roles, communityIds } = options
+      const { onlyMemberOf, roles, communityIds, includeUnlisted } = options
 
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
@@ -314,14 +314,15 @@ export function createCommunitiesDBComponent(
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
         LEFT JOIN community_friends cf ON c.id = cf.community_id
         LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
-        WHERE c.active = true`
+        WHERE c.active = true AND cb.banned_address IS NULL`
         )
         .append(
-          // When filtering by membership, include unlisted communities so members can see communities they belong to
+          // Include unlisted communities when:
+          // 1. onlyMemberOf is true (members can see communities they belong to)
+          // 2. includeUnlisted is explicitly true
           // Otherwise, exclude unlisted communities from public listings
-          onlyMemberOf ? SQL`` : SQL` AND c.unlisted = false`
+          onlyMemberOf || includeUnlisted ? SQL`` : SQL` AND c.unlisted = false`
         )
-        .append(SQL` AND cb.banned_address IS NULL`)
 
       // Filter by specific community IDs if provided
       if (communityIds && communityIds.length > 0) {
@@ -339,9 +340,9 @@ export function createCommunitiesDBComponent(
 
     async getCommunitiesCount(
       memberAddress: EthAddress,
-      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds'>
+      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'includeUnlisted'>
     ): Promise<number> {
-      const { search, onlyMemberOf, roles, communityIds } = options ?? {}
+      const { search, onlyMemberOf, roles, communityIds, includeUnlisted } = options ?? {}
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
@@ -354,9 +355,11 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true`
         )
         .append(
-          // When filtering by membership, include unlisted communities so members can see communities they belong to
+          // Include unlisted communities when:
+          // 1. onlyMemberOf is true (members can see communities they belong to)
+          // 2. includeUnlisted is explicitly true
           // Otherwise, exclude unlisted communities from public listings
-          onlyMemberOf ? SQL`` : SQL` AND c.unlisted = false`
+          onlyMemberOf || includeUnlisted ? SQL`` : SQL` AND c.unlisted = false`
         )
         .append(SQL` AND cb.banned_address IS NULL`)
 

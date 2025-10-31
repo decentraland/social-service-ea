@@ -381,7 +381,8 @@ export function createCommunityRequestsComponent(
     const communityIds = requests.map((request) => request.communityId)
     const { communities: communityData } = await communities.getCommunities(memberAddress, {
       communityIds,
-      pagination: { limit: communityIds.length, offset: 0 }
+      pagination: { limit: communityIds.length, offset: 0 },
+      includeUnlisted: true
     })
 
     return requests
