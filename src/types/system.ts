@@ -53,7 +53,8 @@ import {
   ICommunityThumbnailComponent,
   ICommunityRequestsComponent,
   ICommunityComplianceValidatorComponent,
-  ICommunityFieldsValidatorComponent
+  ICommunityFieldsValidatorComponent,
+  IRankingComponent
 } from '../logic/community'
 import { ISettingsComponent } from '../logic/settings'
 import { IVoiceComponent } from '../logic/voice'
@@ -95,6 +96,7 @@ export type BaseComponents = {
   communityPlaces: ICommunityPlacesComponent
   communityPosts: ICommunityPostsComponent
   communityRoles: ICommunityRolesComponent
+  rankingComponent: IRankingComponent
   communityVoice: ICommunityVoiceComponent
   communityEvents: ICommunityEventsComponent
   communityBroadcaster: ICommunityBroadcasterComponent
@@ -143,6 +145,7 @@ export type BaseComponents = {
   communityVoiceChatCache: ICommunityVoiceChatCacheComponent
   communityVoiceChatPolling: ICommunityVoiceChatPollingComponent
   communityVoiceChatPollingJob?: IJobComponent
+  dailyCommunityRankingCalculationJob?: IJobComponent
   slack: ISlackComponent
 }
 

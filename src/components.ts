@@ -45,6 +45,7 @@ import {
   createCommunityRequestsComponent,
   createCommunityPostsComponent
 } from './logic/community'
+import { createRankingComponent } from './logic/community/ranking'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
@@ -180,7 +181,13 @@ export async function initComponents(): Promise<AppComponents> {
 
   const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
+
+  const communityPlaces = await createCommunityPlacesComponent({
+    communitiesDb,
+    communityRoles,
+    logs,
+    placesApi
+  })
 
   const communityVoice = await createCommunityVoiceComponent({
     logs,
@@ -261,6 +268,15 @@ export async function initComponents(): Promise<AppComponents> {
     logs
   })
 
+  const rankingComponent = createRankingComponent({ logs, communitiesDb, communityThumbnail })
+
+  const dailyCommunityRankingCalculationJob = createJobComponent(
+    { logs },
+    rankingComponent.calculateRankingScoreForAllCommunities,
+    24 * 60 * 60 * 1000, // 24 hours in milliseconds
+    { repeat: true, startupDelay: 60 * 60 * 1000 } // Start after 1 hour delay
+  )
+
   const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -340,6 +356,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityVoiceChatCache,
     communityVoiceChatPolling,
     communityVoiceChatPollingJob,
+    dailyCommunityRankingCalculationJob,
     config,
     email,
     expirePrivateVoiceChatJob,
@@ -362,6 +379,7 @@ export async function initComponents(): Promise<AppComponents> {
     placesApi,
     pubsub,
     queue,
+    rankingComponent,
     redis,
     referral,
     referralDb,

@@ -527,3 +527,20 @@ export interface ICommunityPostsComponent {
   likePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void>
   unlikePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void>
 }
+
+export interface IRankingComponent {
+  calculateRankingScoreForAllCommunities(): Promise<void>
+}
+
+export type RankingMetrics = {
+  eventCount: number
+  hasThumbnail: number
+  photosCount: number
+  hasDescription: number
+  placesCount: number
+  newMembersCount: number
+  announcementsCount: number
+  streamsCount: number
+  eventsTotalAttendees: number
+  streamingTotalParticipants: number
+}

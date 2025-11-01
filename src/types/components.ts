@@ -222,6 +222,23 @@ export interface ICommunitiesDatabaseComponent {
   setEditorChoice(communityId: string, isEditorChoice: boolean): Promise<void>
   getNewMembersCount(communityId: string, days: number): Promise<number>
   getPlacesCount(communityId: string): Promise<number>
+  getAllCommunitiesWithRankingMetrics(): Promise<
+    Array<{
+      id: string
+      eventCount: number
+      photosCount: number
+      hasDescription: number
+      placesCount: number
+      newMembersCount: number
+      announcementsCount: number
+      streamsCount: number
+      eventsTotalAttendees: number
+      streamingTotalParticipants: number
+    }>
+  >
+  incrementCommunityEventsCount(communityId: string, totalAttendees?: number): Promise<void>
+  incrementCommunityPhotosCount(communityId: string): Promise<void>
+  incrementCommunityStreamingCount(communityId: string, totalParticipants?: number): Promise<void>
 }
 
 export interface IVoiceDatabaseComponent {
