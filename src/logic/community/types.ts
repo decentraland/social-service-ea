@@ -360,7 +360,7 @@ export type GetCommunitiesOptions = {
   pagination: PaginatedParameters
   search?: string | null
   onlyPublic?: boolean
-  sortBy?: 'membersCount' | 'role'
+  sortBy?: 'membersCount' | 'role' | 'ranking'
   onlyMemberOf?: boolean
   onlyWithActiveVoiceChat?: boolean
   roles?: CommunityRole[]
