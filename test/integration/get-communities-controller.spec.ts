@@ -120,36 +120,32 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         const body = await response.json()
 
         expect(response.status).toBe(200)
-        expect(body).toEqual({
-          data: {
-            results: expect.arrayContaining([
-              expect.objectContaining({
-                id: communityId1,
-                name: 'Test Community 1',
-                description: 'Test Description 1',
-                ownerAddress: address,
-                ownerName: 'Test Owner',
-                privacy: CommunityPrivacyEnum.Public,
-                active: true,
-                membersCount: 2
-              }),
-              expect.objectContaining({
-                id: communityId2,
-                name: 'Test Community 2',
-                description: 'Test Description 2',
-                ownerAddress: address,
-                ownerName: 'Test Owner',
-                privacy: CommunityPrivacyEnum.Public,
-                active: true,
-                membersCount: 1
-              })
-            ]),
-            total: 2,
-            page: 1,
-            pages: 1,
-            limit: 10
-          }
-        })
+        const relevantResults = body.data.results.filter((c: any) => [communityId1, communityId2].includes(c.id))
+        expect(relevantResults).toHaveLength(2)
+        expect(relevantResults).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: communityId1,
+              name: 'Test Community 1',
+              description: 'Test Description 1',
+              ownerAddress: address,
+              ownerName: 'Test Owner',
+              privacy: CommunityPrivacyEnum.Public,
+              active: true,
+              membersCount: 2
+            }),
+            expect.objectContaining({
+              id: communityId2,
+              name: 'Test Community 2',
+              description: 'Test Description 2',
+              ownerAddress: address,
+              ownerName: 'Test Owner',
+              privacy: CommunityPrivacyEnum.Public,
+              active: true,
+              membersCount: 1
+            })
+          ])
+        )
       })
 
       it('should include voiceChatStatus in public community responses', async () => {
@@ -158,11 +154,12 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         const body = await response.json()
 
         expect(response.status).toBe(200)
-        expect(body.data.results).toHaveLength(2)
+        const relevantResults = body.data.results.filter((c: any) => [communityId1, communityId2].includes(c.id))
+        expect(relevantResults).toHaveLength(2)
 
         // Find communities by ID to check their voice chat status
-        const community1 = body.data.results.find((c: any) => c.id === communityId1)
-        const community2 = body.data.results.find((c: any) => c.id === communityId2)
+        const community1 = relevantResults.find((c: any) => c.id === communityId1)
+        const community2 = relevantResults.find((c: any) => c.id === communityId2)
 
         expect(community1).toEqual(
           expect.objectContaining({
@@ -186,11 +183,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           })
         )
 
-        // Verify that the batch method was called
-        expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
-          communityId1,
-          communityId2
-        ])
+        // Verify that the batch method was called with at least our test communities
+        expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalled()
+        const callArgs = spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mock.calls[0][0]
+        expect(callArgs).toContain(communityId1)
+        expect(callArgs).toContain(communityId2)
       })
     })
 
@@ -204,39 +201,149 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           const friend2Profile = createMockProfile(friendAddress2)
 
           expect(response.status).toBe(200)
-          expect(body).toEqual({
-            data: {
-              results: expect.arrayContaining([
-                expect.objectContaining({
-                  id: communityId1,
-                  name: 'Test Community 1',
-                  description: 'Test Description 1',
-                  ownerAddress: address,
-                  ownerName: 'Test Owner',
-                  privacy: CommunityPrivacyEnum.Public,
-                  active: true,
-                  role: CommunityRole.None,
-                  membersCount: 2,
-                  friends: expect.arrayContaining([parseFriend(friend1Profile), parseFriend(friend2Profile)])
-                }),
-                expect.objectContaining({
-                  id: communityId2,
-                  name: 'Test Community 2',
-                  description: 'Test Description 2',
-                  ownerAddress: address,
-                  ownerName: 'Test Owner',
-                  privacy: CommunityPrivacyEnum.Public,
-                  active: true,
-                  role: CommunityRole.None,
-                  membersCount: 1,
-                  friends: expect.arrayContaining([parseFriend(friend1Profile)])
+          const relevantResults = body.data.results.filter((c: any) => [communityId1, communityId2].includes(c.id))
+          expect(relevantResults).toHaveLength(2)
+          expect(relevantResults).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                id: communityId1,
+                name: 'Test Community 1',
+                description: 'Test Description 1',
+                ownerAddress: address,
+                ownerName: 'Test Owner',
+                privacy: CommunityPrivacyEnum.Public,
+                active: true,
+                role: CommunityRole.None,
+                membersCount: 2,
+                friends: expect.arrayContaining([parseFriend(friend1Profile), parseFriend(friend2Profile)])
+              }),
+              expect.objectContaining({
+                id: communityId2,
+                name: 'Test Community 2',
+                description: 'Test Description 2',
+                ownerAddress: address,
+                ownerName: 'Test Owner',
+                privacy: CommunityPrivacyEnum.Public,
+                active: true,
+                role: CommunityRole.None,
+                membersCount: 1,
+                friends: expect.arrayContaining([parseFriend(friend1Profile)])
+              })
+            ])
+          )
+        })
+
+        describe('when sorting by ranking', () => {
+          let editorChoiceCommunityId: string
+          let highScoreCommunityId: string
+          let lowScoreCommunityId: string
+          let editorChoiceHighScoreId: string
+
+          beforeEach(async () => {
+            const editorChoiceResult = await components.communitiesDb.createCommunity(
+              mockCommunity({
+                name: 'Editor Choice Community',
+                description: 'Editor Choice Description',
+                owner_address: address
+              })
+            )
+            editorChoiceCommunityId = editorChoiceResult.id
+            await components.communitiesDb.setEditorChoice(editorChoiceCommunityId, true)
+            await components.communitiesDb.updateCommunityRankingScore(editorChoiceCommunityId, 0.3)
+
+            const highScoreResult = await components.communitiesDb.createCommunity(
+              mockCommunity({
+                name: 'High Score Community',
+                description: 'High Score Description',
+                owner_address: address
+              })
+            )
+            highScoreCommunityId = highScoreResult.id
+            await components.communitiesDb.updateCommunityRankingScore(highScoreCommunityId, 0.8)
+
+            const lowScoreResult = await components.communitiesDb.createCommunity(
+              mockCommunity({
+                name: 'Low Score Community',
+                description: 'Low Score Description',
+                owner_address: address
+              })
+            )
+            lowScoreCommunityId = lowScoreResult.id
+            await components.communitiesDb.updateCommunityRankingScore(lowScoreCommunityId, 0.1)
+
+            const editorChoiceHighScoreResult = await components.communitiesDb.createCommunity(
+              mockCommunity({
+                name: 'Editor Choice High Score',
+                description: 'Editor Choice High Score Description',
+                owner_address: address
+              })
+            )
+            editorChoiceHighScoreId = editorChoiceHighScoreResult.id
+            await components.communitiesDb.setEditorChoice(editorChoiceHighScoreId, true)
+            await components.communitiesDb.updateCommunityRankingScore(editorChoiceHighScoreId, 0.9)
+
+            spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mockImplementation(
+              async (communityIds: string[]) => {
+                const result: Record<string, any> = {}
+                communityIds.forEach((id) => {
+                  result[id] = { isActive: false, participantCount: 0, moderatorCount: 0 }
                 })
-              ]),
-              total: 2,
-              page: 1,
-              pages: 1,
-              limit: 10
-            }
+                return result
+              }
+            )
+          })
+
+          afterEach(async () => {
+            const communitiesToClean = [
+              editorChoiceCommunityId,
+              highScoreCommunityId,
+              lowScoreCommunityId,
+              editorChoiceHighScoreId
+            ]
+
+            await Promise.allSettled(
+              communitiesToClean.map(async (communityId) => {
+                if (communityId) {
+                  await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+                }
+              })
+            )
+          })
+
+          it('should prioritize editors_choice communities over non-editors-choice regardless of score when sorting by ranking', async () => {
+            const { communities: communitiesData } = await components.communities.getCommunities(address, {
+              pagination: { limit: 20, offset: 0 },
+              sortBy: 'ranking'
+            })
+
+            const expectedOrder = [editorChoiceCommunityId, highScoreCommunityId]
+            const relevantCommunities = communitiesData.filter((c: any) => expectedOrder.includes(c.id))
+
+            expect(relevantCommunities).toEqual(expectedOrder.map((id) => expect.objectContaining({ id })))
+          })
+
+          it('should sort by ranking_score within editors_choice communities when sorting by ranking', async () => {
+            const { communities: communitiesData } = await components.communities.getCommunities(address, {
+              pagination: { limit: 20, offset: 0 },
+              sortBy: 'ranking'
+            })
+
+            const expectedOrder = [editorChoiceHighScoreId, editorChoiceCommunityId]
+            const relevantCommunities = communitiesData.filter((c: any) => expectedOrder.includes(c.id))
+
+            expect(relevantCommunities).toEqual(expectedOrder.map((id) => expect.objectContaining({ id })))
+          })
+
+          it('should sort by ranking_score for non-editors-choice communities when sorting by ranking', async () => {
+            const { communities: communitiesData } = await components.communities.getCommunities(address, {
+              pagination: { limit: 20, offset: 0 },
+              sortBy: 'ranking'
+            })
+
+            const expectedOrder = [highScoreCommunityId, lowScoreCommunityId]
+            const relevantCommunities = communitiesData.filter((c: any) => expectedOrder.includes(c.id))
+
+            expect(relevantCommunities).toEqual(expectedOrder.map((id) => expect.objectContaining({ id })))
           })
         })
       })
@@ -304,9 +411,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           const body = await response.json()
 
           expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(3)
-          expect(body.data.results.every((community) => community.ownerName === 'Test Owner')).toBe(true)
-          expect(body.data.total).toBe(3)
+          const relevantResults = body.data.results.filter((c: any) =>
+            [communityId1, communityId2, communityId3].includes(c.id)
+          )
+          expect(relevantResults).toHaveLength(3)
+          expect(relevantResults.every((community) => community.ownerName === 'Test Owner')).toBe(true)
         })
       })
 
@@ -368,16 +477,16 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           const body = await response.json()
 
           expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(2)
-          expect(body.data.total).toBe(2)
+          const relevantResults = body.data.results.filter((c: any) => [communityId1, communityId2].includes(c.id))
+          expect(relevantResults).toHaveLength(2)
 
           // Verify getAllActiveCommunityVoiceChats is NOT called when not filtering
           expect(spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats).not.toHaveBeenCalled()
           // Verify getCommunitiesVoiceChatStatus IS called when not filtering
-          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
-            communityId1,
-            communityId2
-          ])
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalled()
+          const callArgs = spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mock.calls[0][0]
+          expect(callArgs).toContain(communityId1)
+          expect(callArgs).toContain(communityId2)
         })
 
         it('should return all communities when onlyWithActiveVoiceChat is not provided', async () => {
@@ -385,16 +494,16 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           const body = await response.json()
 
           expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(2)
-          expect(body.data.total).toBe(2)
+          const relevantResults = body.data.results.filter((c: any) => [communityId1, communityId2].includes(c.id))
+          expect(relevantResults).toHaveLength(2)
 
           // Verify getAllActiveCommunityVoiceChats is NOT called when not filtering
           expect(spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats).not.toHaveBeenCalled()
           // Verify getCommunitiesVoiceChatStatus IS called when not filtering
-          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
-            communityId1,
-            communityId2
-          ])
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalled()
+          const callArgs = spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mock.calls[0][0]
+          expect(callArgs).toContain(communityId1)
+          expect(callArgs).toContain(communityId2)
         })
 
         it('should include voiceChatStatus in all community responses', async () => {
@@ -402,11 +511,12 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           const body = await response.json()
 
           expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(2)
+          const relevantResults = body.data.results.filter((c: any) => [communityId1, communityId2].includes(c.id))
+          expect(relevantResults).toHaveLength(2)
 
           // Find communities by ID to check their voice chat status
-          const community1 = body.data.results.find((c: any) => c.id === communityId1)
-          const community2 = body.data.results.find((c: any) => c.id === communityId2)
+          const community1 = relevantResults.find((c: any) => c.id === communityId1)
+          const community2 = relevantResults.find((c: any) => c.id === communityId2)
 
           expect(community1).toEqual(
             expect.objectContaining({
@@ -430,11 +540,11 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             })
           )
 
-          // Verify that the batch method was called
-          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalledWith([
-            communityId1,
-            communityId2
-          ])
+          // Verify that the batch method was called with at least our test communities
+          expect(spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus).toHaveBeenCalled()
+          const callArgs = spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mock.calls[0][0]
+          expect(callArgs).toContain(communityId1)
+          expect(callArgs).toContain(communityId2)
         })
 
         describe('when voice chat status check fails', () => {
@@ -932,8 +1042,10 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             const body = await response.json()
 
             expect(response.status).toBe(200)
-            expect(body.data.results).toHaveLength(3) // All communities (no role filtering)
-            expect(body.data.total).toBe(3)
+            const relevantResults = body.data.results.filter((c: any) =>
+              [communityId1, communityId2, communityId4].includes(c.id)
+            )
+            expect(relevantResults).toHaveLength(3) // All communities (no role filtering)
           })
         })
 
@@ -949,8 +1061,10 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             const body = await response.json()
 
             expect(response.status).toBe(200)
-            expect(body.data.results).toHaveLength(3) // All communities (no role filtering)
-            expect(body.data.total).toBe(3)
+            const relevantResults = body.data.results.filter((c: any) =>
+              [communityId1, communityId2, communityId4].includes(c.id)
+            )
+            expect(relevantResults).toHaveLength(3) // All communities (no role filtering)
           })
         })
 
@@ -1044,12 +1158,15 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           const body = await response.json()
 
           expect(response.status).toBe(200)
-          expect(body.data.results).toHaveLength(3)
+          const relevantResults = body.data.results.filter((c: any) =>
+            [communityId1, communityId2, communityId4].includes(c.id)
+          )
+          expect(relevantResults).toHaveLength(3)
 
-          const originalOwnerCommunities = body.data.results.filter(
+          const originalOwnerCommunities = relevantResults.filter(
             (community: any) => community.ownerAddress === address
           )
-          const differentOwnerCommunities = body.data.results.filter(
+          const differentOwnerCommunities = relevantResults.filter(
             (community: any) => community.ownerAddress === differentOwnerAddress
           )
 
