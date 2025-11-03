@@ -159,10 +159,7 @@ export function createCommunitiesDBComponent(
       )
     },
 
-    async getCommunityMembersCount(
-      communityId: string,
-      options?: { filterByMembers?: string[]; joinedWithinDays?: number }
-    ): Promise<number> {
+    async getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number> {
       const query = SQL`
         SELECT COUNT(cm.member_address) 
           FROM community_members cm
@@ -177,10 +174,6 @@ export function createCommunitiesDBComponent(
 
       if (options && options.filterByMembers) {
         query.append(SQL` AND cm.member_address = ANY(${options.filterByMembers.map(normalizeAddress)})`)
-      }
-
-      if (options && options.joinedWithinDays) {
-        query.append(SQL` AND cm.joined_at >= NOW() - make_interval(days => ${options.joinedWithinDays})`)
       }
 
       return pg.getCount(query)
