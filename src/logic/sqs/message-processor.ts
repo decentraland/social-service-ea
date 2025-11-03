@@ -14,7 +14,7 @@ export async function createMessageProcessorComponent({
     {
       type: Events.Type.CLIENT,
       subTypes: [Events.SubType.Client.LOGGED_IN, Events.SubType.Client.LOGGED_IN_CACHED],
-      handler: async (message: Event) => {
+      handle: async (message: Event) => {
         const { metadata } = message as LoggedInEvent | LoggedInCachedEvent
         const userAddress = metadata.userAddress
 
@@ -29,19 +29,23 @@ export async function createMessageProcessorComponent({
   ]
 
   async function processMessage(message: Event) {
-    // Find and execute matching handlers
-    for (const handler of eventHandlers) {
-      if (message.type === handler.type && handler.subTypes.includes(message.subType)) {
-        try {
-          await handler.handler(message)
-        } catch (error) {
-          logger.error('Error processing message in handler', {
-            type: message.type,
-            subType: message.subType,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          })
-        }
-      }
+    const handler = eventHandlers.find(
+      (handler) => message.type === handler.type && handler.subTypes.includes(message.subType)
+    )
+
+    if (!handler) {
+      logger.warn('No handler found for message', { message: JSON.stringify(message) })
+      return
+    }
+
+    try {
+      await handler.handle(message)
+    } catch (error) {
+      logger.error('Error processing message in handler', {
+        type: message.type,
+        subType: message.subType,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 

@@ -36,7 +36,7 @@ describe('message-processor', () => {
       handler = {
         type: Events.Type.CLIENT,
         subTypes: [Events.SubType.Client.LOGGED_IN],
-        handler: customHandler
+        handle: customHandler
       }
     })
 
