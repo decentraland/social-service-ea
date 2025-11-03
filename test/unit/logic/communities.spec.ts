@@ -2156,7 +2156,7 @@ describe('Community Component', () => {
           ...mockCommunity,
           role: CommunityRole.None
         })
-        mockCommunitiesDB.setEditorChoice.mockResolvedValue()
+        mockCommunitiesDB.updateCommunity.mockResolvedValue(mockCommunity)
       })
 
       describe('and the user is a global moderator', () => {
@@ -2167,17 +2167,17 @@ describe('Community Component', () => {
         it("should update Editor's Choice to true", async () => {
           await communityComponent.updateEditorChoice(communityId, userAddress, true)
 
-          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
           expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
-          expect(mockCommunitiesDB.setEditorChoice).toHaveBeenCalledWith(communityId, true)
+          expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, { editors_choice: true })
         })
 
         it("should update Editor's Choice to false", async () => {
           await communityComponent.updateEditorChoice(communityId, userAddress, false)
 
-          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
           expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
-          expect(mockCommunitiesDB.setEditorChoice).toHaveBeenCalledWith(communityId, false)
+          expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith(communityId, { editors_choice: false })
         })
 
         it('should log the update', async () => {
@@ -2197,9 +2197,9 @@ describe('Community Component', () => {
             new NotAuthorizedError("Only global moderators can update Editor's Choice flag")
           )
 
-          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
           expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
-          expect(mockCommunitiesDB.setEditorChoice).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
         })
       })
 
@@ -2213,7 +2213,7 @@ describe('Community Component', () => {
             new NotAuthorizedError("Only global moderators can update Editor's Choice flag")
           )
 
-          expect(mockCommunitiesDB.setEditorChoice).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
         })
       })
 
@@ -2227,7 +2227,7 @@ describe('Community Component', () => {
             new NotAuthorizedError("Only global moderators can update Editor's Choice flag")
           )
 
-          expect(mockCommunitiesDB.setEditorChoice).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
         })
       })
     })
@@ -2242,9 +2242,9 @@ describe('Community Component', () => {
           new CommunityNotFoundError(communityId)
         )
 
-        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
         expect(mockFeatureFlags.getVariants).not.toHaveBeenCalled()
-        expect(mockCommunitiesDB.setEditorChoice).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.updateCommunity).not.toHaveBeenCalled()
       })
     })
   })

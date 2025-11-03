@@ -261,6 +261,9 @@ export type CommunityDB = {
   private: boolean
   unlisted: boolean
   active: boolean
+  editors_choice: boolean
+  ranking_score: number
+  last_score_calculated_at?: string
   created_at?: string
   updated_at?: string
 }

@@ -45,6 +45,12 @@ components:
         offset:
           type: integer
           description: 'Number of items skipped'
+        page:
+          type: integer
+          description: 'Current page number (1-indexed)'
+        pages:
+          type: integer
+          description: 'Total number of pages'
     GetCommunities200OkResponse:
       type: object
       required:
@@ -65,6 +71,7 @@ components:
                       - description
                       - ownerAddress
                       - privacy
+                      - visibility
                       - active
                       - membersCount
                     properties:
@@ -76,26 +83,50 @@ components:
                         type: string
                       ownerAddress:
                         type: string
+                      ownerName:
+                        type: string
+                        description: 'Display name of the community owner'
                       privacy:
                         type: string
                         enum: [public, private]
+                      visibility:
+                        type: string
+                        enum: [all, unlisted]
+                        description: 'Community visibility setting (all = listed, unlisted = hidden from general listings)'
                       active:
                         type: boolean
                       membersCount:
                         type: integer
+                      thumbnails:
+                        type: object
+                        additionalProperties:
+                          type: string
+                        description: 'Map of thumbnail URLs by size/type'
                       friends:
                         type: array
                         items:
-                          type: string
-                          description: |
-                            ETH Address of a friend of the community.
-                            This is only present when the user is signed in.
+                          type: object
+                          description: 'Friend profile information including address and name'
+                        description: |
+                          Array of friends who are members of this community.
+                          This is only present when the user is signed in.
                       role:
                         type: string
-                        enum: [Owner, Moderator, Member, None]
+                        enum: [owner, moderator, member, none]
                         description: |
                           The role of the user in the community.
                           This is only present when the user is signed in.
+                      voiceChatStatus:
+                        type: object
+                        nullable: true
+                        properties:
+                          isActive:
+                            type: boolean
+                          participantCount:
+                            type: integer
+                          moderatorCount:
+                            type: integer
+                        description: 'Voice chat status for the community (null if no active voice chat)'
     CreateCommunity201OkResponse:
       type: object
       required:
@@ -109,6 +140,7 @@ components:
             - description
             - ownerAddress
             - privacy
+            - visibility
             - active
           properties:
             id:
@@ -122,6 +154,9 @@ components:
             privacy:
               type: string
               enum: [public, private]
+            visibility:
+              type: string
+              enum: [all, unlisted]
             active:
               type: boolean
             thumbnails:
@@ -146,6 +181,7 @@ components:
             - description
             - ownerAddress
             - privacy
+            - visibility
             - active
           properties:
             id:
@@ -159,6 +195,9 @@ components:
             privacy:
               type: string
               enum: [public, private]
+            visibility:
+              type: string
+              enum: [all, unlisted]
             active:
               type: boolean
             thumbnails:
@@ -178,9 +217,12 @@ components:
             - name
             - description
             - ownerAddress
+            - ownerName
             - privacy
+            - visibility
             - active
             - membersCount
+            - role
           properties:
             id:
               type: string
@@ -191,15 +233,41 @@ components:
             ownerAddress:
               type: string
               description: 'ETH Address of the community owner'
+            ownerName:
+              type: string
+              description: 'Display name of the community owner'
             privacy:
               type: string
               enum: [public, private]
+            visibility:
+              type: string
+              enum: [all, unlisted]
             active:
               type: boolean
               description: 'Whether the community is active or it was logically deleted'
             membersCount:
               type: integer
               description: 'Number of members in the community'
+            role:
+              type: string
+              enum: [owner, moderator, member, none]
+              description: 'Role of the authenticated user in this community'
+            thumbnails:
+              type: object
+              additionalProperties:
+                type: string
+              description: 'Map of thumbnail URLs by size/type'
+            voiceChatStatus:
+              type: object
+              nullable: true
+              properties:
+                isActive:
+                  type: boolean
+                participantCount:
+                  type: integer
+                moderatorCount:
+                  type: integer
+              description: 'Voice chat status for the community (null if no active voice chat)'
     GetCommunityMembers200OkResponse:
       type: object
       required:
@@ -218,18 +286,34 @@ components:
                       - address
                       - role
                       - joinedAt
+                      - name
+                      - hasClaimedName
+                      - profilePictureUrl
+                      - friendshipStatus
                     properties:
                       address:
                         type: string
                         description: 'ETH Address of the member'
                       role:
                         type: string
-                        enum: [Owner, Moderator, Member]
+                        enum: [owner, moderator, member]
                         description: 'Role of the member in the community'
                       joinedAt:
                         type: string
                         format: date-time
                         description: 'When the member joined the community'
+                      name:
+                        type: string
+                        description: 'Display name of the member'
+                      hasClaimedName:
+                        type: boolean
+                        description: 'Whether the member has claimed their name'
+                      profilePictureUrl:
+                        type: string
+                        description: 'URL of the member profile picture'
+                      friendshipStatus:
+                        type: integer
+                        description: 'Friendship status code between the authenticated user and the member'
     GetMemberCommunities200OkResponse:
       type: object
       required:
@@ -247,9 +331,7 @@ components:
                     required:
                       - id
                       - name
-                      - description
                       - ownerAddress
-                      - privacy
                       - active
                       - role
                     properties:
@@ -257,18 +339,18 @@ components:
                         type: string
                       name:
                         type: string
-                      description:
-                        type: string
                       ownerAddress:
                         type: string
-                      privacy:
-                        type: string
-                        enum: [public, private]
                       active:
                         type: boolean
                       role:
                         type: string
-                        enum: [Owner, Moderator, Member]
+                        enum: [owner, moderator, member]
+                      thumbnails:
+                        type: object
+                        additionalProperties:
+                          type: string
+                        description: 'Map of thumbnail URLs by size/type'
     GetBannedMembers200OkResponse:
       type: object
       required:
@@ -349,7 +431,55 @@ components:
                         type: boolean
                       role:
                         type: string
-                        enum: [Owner, Moderator]
+                        enum: [owner, moderator]
+
+    GetCommunitiesForModeration200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - description
+                      - ownerAddress
+                      - privacy
+                      - visibility
+                      - active
+                      - membersCount
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      description:
+                        type: string
+                      ownerAddress:
+                        type: string
+                      privacy:
+                        type: string
+                        enum: [public, private]
+                      visibility:
+                        type: string
+                        enum: [all, unlisted]
+                      active:
+                        type: boolean
+                      membersCount:
+                        type: integer
+                      thumbnails:
+                        type: object
+                        additionalProperties:
+                          type: string
+                        description: 'Map of thumbnail URLs by size/type'
 
     GetReferralStats200OkResponse:
       type: object
@@ -652,6 +782,7 @@ components:
         - authorHasClaimedName
         - content
         - createdAt
+        - likesCount
       properties:
         id:
           type: string
@@ -681,6 +812,12 @@ components:
           type: string
           format: date-time
           description: 'When the post was created'
+        likesCount:
+          type: integer
+          description: 'Number of likes on this post'
+        isLikedByUser:
+          type: boolean
+          description: 'Whether the authenticated user has liked this post (only present when user is authenticated)'
 
     CreatePostRequest:
       type: object

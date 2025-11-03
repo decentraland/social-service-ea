@@ -520,7 +520,7 @@ export function createCommunityComponent(
     },
 
     updateEditorChoice: async (communityId: string, userAddress: EthAddress, editorsChoice: boolean): Promise<void> => {
-      const community = await communitiesDb.getCommunity(communityId, userAddress)
+      const community = await communitiesDb.getCommunity(communityId)
       if (!community) {
         throw new CommunityNotFoundError(communityId)
       }
@@ -538,7 +538,7 @@ export function createCommunityComponent(
         editorsChoice: editorsChoice ? 'true' : 'false'
       })
 
-      await communitiesDb.setEditorChoice(communityId, editorsChoice)
+      await communitiesDb.updateCommunity(communityId, { editors_choice: editorsChoice })
     },
 
     getCommunityInvites: async (inviter: EthAddress, invitee: EthAddress): Promise<Community[]> => {

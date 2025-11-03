@@ -158,7 +158,10 @@ export function createCommunitiesDBComponent(
       )
     },
 
-    async getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number> {
+    async getCommunityMembersCount(
+      communityId: string,
+      options?: { filterByMembers?: string[]; joinedWithinDays?: number }
+    ): Promise<number> {
       const query = SQL`
         SELECT COUNT(cm.member_address) 
           FROM community_members cm
@@ -173,6 +176,10 @@ export function createCommunitiesDBComponent(
 
       if (options && options.filterByMembers) {
         query.append(SQL` AND cm.member_address = ANY(${options.filterByMembers.map(normalizeAddress)})`)
+      }
+
+      if (options && options.joinedWithinDays) {
+        query.append(SQL` AND cm.joined_at >= NOW() - make_interval(days => ${options.joinedWithinDays})`)
       }
 
       return pg.getCount(query)
@@ -680,7 +687,9 @@ export function createCommunitiesDBComponent(
 
     async updateCommunity(
       communityId: string,
-      updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private' | 'unlisted'>>
+      updates: Partial<
+        Pick<CommunityDB, 'name' | 'description' | 'private' | 'unlisted' | 'ranking_score' | 'editors_choice'>
+      >
     ): Promise<Community> {
       let query = SQL`UPDATE communities SET `
       const setClauses: ReturnType<typeof SQL>[] = []
@@ -699,6 +708,15 @@ export function createCommunitiesDBComponent(
 
       if (updates.unlisted !== undefined) {
         setClauses.push(SQL`unlisted = ${updates.unlisted}`)
+      }
+
+      if (updates.ranking_score !== undefined) {
+        setClauses.push(SQL`ranking_score = ${updates.ranking_score}`)
+        setClauses.push(SQL`last_score_calculated_at = now()`)
+      }
+
+      if (updates.editors_choice !== undefined) {
+        setClauses.push(SQL`editors_choice = ${updates.editors_choice}`)
       }
 
       setClauses.push(SQL`updated_at = now()`)
