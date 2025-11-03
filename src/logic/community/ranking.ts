@@ -49,7 +49,7 @@ export function createRankingComponent({
           const score = await calculateRankingScore(metrics)
 
           // Update ranking score
-          await communitiesDb.updateCommunityRankingScore(communityMetrics.id, score)
+          await communitiesDb.updateCommunity(communityMetrics.id, { ranking_score: score })
         } catch (error) {
           logger.error('Failed to calculate ranking score for community', {
             communityId: communityMetrics.id,

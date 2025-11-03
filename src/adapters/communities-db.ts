@@ -1112,36 +1112,6 @@ export function createCommunitiesDBComponent(
       `)
     },
 
-    async updateCommunityRankingScore(communityId: string, score: number): Promise<void> {
-      await pg.query(SQL`
-        UPDATE communities
-        SET ranking_score = ${score}, last_score_calculated_at = now()
-        WHERE id = ${communityId}
-      `)
-    },
-
-    async setEditorChoice(communityId: string, isEditorChoice: boolean): Promise<void> {
-      await pg.query(SQL`
-        UPDATE communities
-        SET editors_choice = ${isEditorChoice}
-        WHERE id = ${communityId}
-      `)
-    },
-
-    async getNewMembersCount(communityId: string, days: number): Promise<number> {
-      const query = SQL`
-        SELECT COUNT(1) as count
-        FROM community_members
-        WHERE community_id = ${communityId}
-          AND joined_at >= NOW() - make_interval(days => ${days})
-      `
-      return pg.getCount(query)
-    },
-
-    async getPlacesCount(communityId: string): Promise<number> {
-      return this.getCommunityPlacesCount(communityId)
-    },
-
     async getAllCommunitiesWithRankingMetrics(): Promise<
       Array<{
         id: string
@@ -1204,41 +1174,82 @@ export function createCommunitiesDBComponent(
       return result.rows
     },
 
-    async incrementCommunityEventsCount(communityId: string, totalAttendees: number = 0): Promise<void> {
-      const query = SQL`
-        INSERT INTO community_ranking_metrics (community_id, events_count, events_total_attendees, updated_at)
-        VALUES (${communityId}, 1, ${totalAttendees}, now())
-        ON CONFLICT (community_id)
-        DO UPDATE SET
-          events_count = community_ranking_metrics.events_count + 1,
-          events_total_attendees = community_ranking_metrics.events_total_attendees + ${totalAttendees},
-          updated_at = now()
-      `
-      await pg.query(query)
-    },
+    async updateCommunityMetrics(
+      communityId: string,
+      metrics: {
+        eventsCount?: number
+        eventsTotalAttendees?: number
+        photosCount?: number
+        streamingCount?: number
+        streamingTotalParticipants?: number
+      }
+    ): Promise<void> {
+      const { eventsCount, eventsTotalAttendees, photosCount, streamingCount, streamingTotalParticipants } = metrics
 
-    async incrementCommunityPhotosCount(communityId: string): Promise<void> {
-      const query = SQL`
-        INSERT INTO community_ranking_metrics (community_id, photos_count, updated_at)
-        VALUES (${communityId}, 1, now())
-        ON CONFLICT (community_id)
-        DO UPDATE SET
-          photos_count = community_ranking_metrics.photos_count + 1,
-          updated_at = now()
-      `
-      await pg.query(query)
-    },
+      if (Object.values(metrics).every((value) => value === undefined)) {
+        return
+      }
 
-    async incrementCommunityStreamingCount(communityId: string, totalParticipants: number = 0): Promise<void> {
-      const query = SQL`
-        INSERT INTO community_ranking_metrics (community_id, streaming_count, streaming_total_participants, updated_at)
-        VALUES (${communityId}, 1, ${totalParticipants}, now())
-        ON CONFLICT (community_id)
-        DO UPDATE SET
-          streaming_count = community_ranking_metrics.streaming_count + 1,
-          streaming_total_participants = community_ranking_metrics.streaming_total_participants + ${totalParticipants},
-          updated_at = now()
-      `
+      // Build the INSERT clause with only provided fields
+      let insertFields = SQL`community_id`
+      let insertValues = SQL`${communityId}`
+
+      // Build the UPDATE SET clauses
+      const updateClauses: ReturnType<typeof SQL>[] = []
+
+      if (eventsCount !== undefined) {
+        insertFields = insertFields.append(SQL`, events_count`)
+        insertValues = insertValues.append(SQL`, ${eventsCount}`)
+        updateClauses.push(SQL`events_count = community_ranking_metrics.events_count + ${eventsCount}`)
+      }
+
+      if (eventsTotalAttendees !== undefined) {
+        insertFields = insertFields.append(SQL`, events_total_attendees`)
+        insertValues = insertValues.append(SQL`, ${eventsTotalAttendees}`)
+        updateClauses.push(
+          SQL`events_total_attendees = community_ranking_metrics.events_total_attendees + ${eventsTotalAttendees}`
+        )
+      }
+
+      if (photosCount !== undefined) {
+        insertFields = insertFields.append(SQL`, photos_count`)
+        insertValues = insertValues.append(SQL`, ${photosCount}`)
+        updateClauses.push(SQL`photos_count = community_ranking_metrics.photos_count + ${photosCount}`)
+      }
+
+      if (streamingCount !== undefined) {
+        insertFields = insertFields.append(SQL`, streaming_count`)
+        insertValues = insertValues.append(SQL`, ${streamingCount}`)
+        updateClauses.push(SQL`streaming_count = community_ranking_metrics.streaming_count + ${streamingCount}`)
+      }
+
+      if (streamingTotalParticipants !== undefined) {
+        insertFields = insertFields.append(SQL`, streaming_total_participants`)
+        insertValues = insertValues.append(SQL`, ${streamingTotalParticipants}`)
+        updateClauses.push(
+          SQL`streaming_total_participants = community_ranking_metrics.streaming_total_participants + ${streamingTotalParticipants}`
+        )
+      }
+
+      insertFields = insertFields.append(SQL`, updated_at`)
+      insertValues = insertValues.append(SQL`, now()`)
+      updateClauses.push(SQL`updated_at = now()`)
+
+      // Build the final query
+      let query = SQL`INSERT INTO community_ranking_metrics (`
+        .append(insertFields)
+        .append(SQL`) VALUES (`)
+        .append(insertValues)
+        .append(SQL`) ON CONFLICT (community_id) DO UPDATE SET `)
+
+      // Join the UPDATE clauses
+      for (let i = 0; i < updateClauses.length; i++) {
+        query = query.append(updateClauses[i])
+        if (i < updateClauses.length - 1) {
+          query = query.append(SQL`, `)
+        }
+      }
+
       await pg.query(query)
     }
   }

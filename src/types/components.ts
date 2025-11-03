@@ -220,10 +220,6 @@ export interface ICommunitiesDatabaseComponent {
   likePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePostsFromCommunity(communityId: string, userAddress: EthAddress): Promise<void>
-  updateCommunityRankingScore(communityId: string, score: number): Promise<void>
-  setEditorChoice(communityId: string, isEditorChoice: boolean): Promise<void>
-  getNewMembersCount(communityId: string, days: number): Promise<number>
-  getPlacesCount(communityId: string): Promise<number>
   getAllCommunitiesWithRankingMetrics(): Promise<
     Array<{
       id: string
@@ -238,9 +234,16 @@ export interface ICommunitiesDatabaseComponent {
       streamingTotalParticipants: number
     }>
   >
-  incrementCommunityEventsCount(communityId: string, totalAttendees?: number): Promise<void>
-  incrementCommunityPhotosCount(communityId: string): Promise<void>
-  incrementCommunityStreamingCount(communityId: string, totalParticipants?: number): Promise<void>
+  updateCommunityMetrics(
+    communityId: string,
+    metrics: {
+      eventsCount?: number
+      eventsTotalAttendees?: number
+      photosCount?: number
+      streamingCount?: number
+      streamingTotalParticipants?: number
+    }
+  ): Promise<void>
 }
 
 export interface IVoiceDatabaseComponent {
