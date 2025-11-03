@@ -538,7 +538,7 @@ export function createCommunityComponent(
         editorsChoice: editorsChoice ? 'true' : 'false'
       })
 
-      await communitiesDb.setEditorChoice(communityId, editorsChoice)
+      await communitiesDb.updateCommunity(communityId, { editors_choice: editorsChoice })
     },
 
     getCommunityInvites: async (inviter: EthAddress, invitee: EthAddress): Promise<Community[]> => {

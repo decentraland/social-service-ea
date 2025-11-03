@@ -137,7 +137,7 @@ export interface ICommunitiesDatabaseComponent {
   addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void>
   removeCommunityPlace(communityId: string, placeId: string): Promise<void>
   removeCommunityPlacesWithExceptions(communityId: string, exceptPlaceIds: string[]): Promise<void>
-  createCommunity(community: CommunityDB): Promise<Community>
+  createCommunity(community: Omit<CommunityDB, 'ranking_score' | 'editors_choice'>): Promise<Community>
   deleteCommunity(id: string): Promise<void>
   getCommunities(
     memberAddress: EthAddress,
@@ -185,7 +185,9 @@ export interface ICommunitiesDatabaseComponent {
   getBannedMembersCount(communityId: string): Promise<number>
   updateCommunity(
     communityId: string,
-    updates: Partial<Pick<CommunityDB, 'name' | 'description' | 'private' | 'unlisted'>>
+    updates: Partial<
+      Pick<CommunityDB, 'name' | 'description' | 'private' | 'unlisted' | 'ranking_score' | 'editors_choice'>
+    >
   ): Promise<Community>
   createCommunityRequest(
     communityId: string,
@@ -218,10 +220,6 @@ export interface ICommunitiesDatabaseComponent {
   likePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePostsFromCommunity(communityId: string, userAddress: EthAddress): Promise<void>
-  updateCommunityRankingScore(communityId: string, score: number): Promise<void>
-  setEditorChoice(communityId: string, isEditorChoice: boolean): Promise<void>
-  getNewMembersCount(communityId: string, days: number): Promise<number>
-  getPlacesCount(communityId: string): Promise<number>
 }
 
 export interface IVoiceDatabaseComponent {

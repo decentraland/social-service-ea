@@ -248,8 +248,10 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               })
             )
             editorChoiceCommunityId = editorChoiceResult.id
-            await components.communitiesDb.setEditorChoice(editorChoiceCommunityId, true)
-            await components.communitiesDb.updateCommunityRankingScore(editorChoiceCommunityId, 0.3)
+            await components.communitiesDb.updateCommunity(editorChoiceCommunityId, {
+              editors_choice: true,
+              ranking_score: 0.3
+            })
 
             const highScoreResult = await components.communitiesDb.createCommunity(
               mockCommunity({
@@ -259,7 +261,9 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               })
             )
             highScoreCommunityId = highScoreResult.id
-            await components.communitiesDb.updateCommunityRankingScore(highScoreCommunityId, 0.8)
+            await components.communitiesDb.updateCommunity(highScoreCommunityId, {
+              ranking_score: 0.8
+            })
 
             const lowScoreResult = await components.communitiesDb.createCommunity(
               mockCommunity({
@@ -269,7 +273,9 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               })
             )
             lowScoreCommunityId = lowScoreResult.id
-            await components.communitiesDb.updateCommunityRankingScore(lowScoreCommunityId, 0.1)
+            await components.communitiesDb.updateCommunity(lowScoreCommunityId, {
+              ranking_score: 0.1
+            })
 
             const editorChoiceHighScoreResult = await components.communitiesDb.createCommunity(
               mockCommunity({
@@ -279,8 +285,10 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               })
             )
             editorChoiceHighScoreId = editorChoiceHighScoreResult.id
-            await components.communitiesDb.setEditorChoice(editorChoiceHighScoreId, true)
-            await components.communitiesDb.updateCommunityRankingScore(editorChoiceHighScoreId, 0.9)
+            await components.communitiesDb.updateCommunity(editorChoiceHighScoreId, {
+              editors_choice: true,
+              ranking_score: 0.9
+            })
 
             spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mockImplementation(
               async (communityIds: string[]) => {
