@@ -40,10 +40,20 @@ import {
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
+import {
+  UpdateMemberRoleSchema,
+  UpdateCommunityPartiallySchema,
+  AddCommunityPlacesSchema,
+  CreateCommunityPostSchema,
+  CreateReferralSchema,
+  AddReferralEmailSchema,
+  CreateCommunityRequestSchema,
+  UpdateCommunityRequestStatusSchema
+} from '../handlers/http/schemas'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
-    components: { fetcher, config }
+    components: { fetcher, config, schemaValidator }
   } = context
 
   const API_ADMIN_TOKEN = await config.getString('API_ADMIN_TOKEN')
@@ -73,7 +83,12 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.post('/v1/communities/:id/members', signedFetchMiddleware(), addMemberToCommunityHandler)
   router.delete('/v1/communities/:id/members/:memberAddress', signedFetchMiddleware(), removeMemberFromCommunityHandler)
-  router.patch('/v1/communities/:id/members/:address', signedFetchMiddleware(), updateMemberRoleHandler)
+  router.patch(
+    '/v1/communities/:id/members/:address',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(UpdateMemberRoleSchema),
+    updateMemberRoleHandler
+  )
 
   router.get('/v1/communities/:id/bans', signedFetchMiddleware(), getBannedMembersHandler)
   router.post('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), banMemberHandler)
@@ -87,28 +102,62 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
   router.put('/v1/communities/:id', signedFetchMiddleware(), multipartParserWrapper(updateCommunityHandler))
-  router.patch('/v1/communities/:id', signedFetchMiddleware(), updateCommunityPartiallyHandler)
+  router.patch(
+    '/v1/communities/:id',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(UpdateCommunityPartiallySchema),
+    updateCommunityPartiallyHandler
+  )
   router.delete('/v1/communities/:id', signedFetchMiddleware(), deleteCommunityHandler)
 
   router.get('/v1/communities/:id/places', signedFetchMiddleware({ optional: true }), getCommunityPlacesHandler)
-  router.post('/v1/communities/:id/places', signedFetchMiddleware(), addCommunityPlacesHandler)
+  router.post(
+    '/v1/communities/:id/places',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(AddCommunityPlacesSchema),
+    addCommunityPlacesHandler
+  )
   router.delete('/v1/communities/:id/places/:placeId', signedFetchMiddleware(), removeCommunityPlaceHandler)
 
   // Community Posts
   router.get('/v1/communities/:id/posts', signedFetchMiddleware({ optional: true }), getCommunityPostsHandler)
-  // TODO: use schema validator component
-  router.post('/v1/communities/:id/posts', signedFetchMiddleware(), createCommunityPostHandler)
+  router.post(
+    '/v1/communities/:id/posts',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(CreateCommunityPostSchema),
+    createCommunityPostHandler
+  )
   router.delete('/v1/communities/:id/posts/:postId', signedFetchMiddleware(), deleteCommunityPostHandler)
   router.post('/v1/communities/:id/posts/:postId/like', signedFetchMiddleware(), likeCommunityPostHandler)
   router.delete('/v1/communities/:id/posts/:postId/like', signedFetchMiddleware(), unlikeCommunityPostHandler)
 
-  router.post('/v1/referral-progress', signedFetchMiddleware(), createReferralHandler)
+  router.post(
+    '/v1/referral-progress',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(CreateReferralSchema),
+    createReferralHandler
+  )
   router.patch('/v1/referral-progress', signedFetchMiddleware(), updateReferralSignedUpHandler)
   router.get('/v1/referral-progress', signedFetchMiddleware(), getInvitedUsersAcceptedHandler)
-  router.post('/v1/referral-email', signedFetchMiddleware(), addReferralEmailHandler)
+  router.post(
+    '/v1/referral-email',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(AddReferralEmailSchema),
+    addReferralEmailHandler
+  )
 
-  router.post('/v1/communities/:id/requests', signedFetchMiddleware(), createCommunityRequestHandler)
-  router.patch('/v1/communities/:id/requests/:requestId', signedFetchMiddleware(), updateCommunityRequestStatusHandler)
+  router.post(
+    '/v1/communities/:id/requests',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(CreateCommunityRequestSchema),
+    createCommunityRequestHandler
+  )
+  router.patch(
+    '/v1/communities/:id/requests/:requestId',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(UpdateCommunityRequestStatusSchema),
+    updateCommunityRequestStatusHandler
+  )
 
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)

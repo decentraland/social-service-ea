@@ -71,6 +71,7 @@ import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
 import { IFeatureFlagsAdapter } from '../adapters/feature-flags'
 import { IPublisherComponent } from '@dcl/sns-component'
+import { ISchemaValidatorComponent } from '@dcl/schema-validator-component'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -144,6 +145,7 @@ export type BaseComponents = {
   communityVoiceChatPolling: ICommunityVoiceChatPollingComponent
   communityVoiceChatPollingJob?: IJobComponent
   slack: ISlackComponent
+  schemaValidator: ISchemaValidatorComponent<GlobalContext>
 }
 
 // components used in runtime

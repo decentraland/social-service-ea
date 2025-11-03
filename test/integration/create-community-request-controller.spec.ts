@@ -20,7 +20,7 @@ test('Create Community Request Controller', function ({ components, spyComponent
       it('should return 400 status code', async () => {
         const { localHttpFetch } = components
         const targetAddress = '0x0000000000000000000000000000000000000002'
-        
+
         const response = await localHttpFetch.fetch(`/v1/communities/${communityId}/requests`, {
           method: 'POST',
           headers: {
@@ -87,8 +87,6 @@ test('Create Community Request Controller', function ({ components, spyComponent
             type: CommunityRequestType.Invite
           })
           expect(response.status).toBe(400)
-          const body = await response.json()
-          expect(body.message).toBe('Invalid targeted address')
         })
       })
 
@@ -105,8 +103,6 @@ test('Create Community Request Controller', function ({ components, spyComponent
             type: CommunityRequestType.Invite
           })
           expect(response.status).toBe(400)
-          const body = await response.json()
-          expect(body.message).toBe('Missing targetedAddress or type field')
         })
       })
 
@@ -208,7 +204,9 @@ test('Create Community Request Controller', function ({ components, spyComponent
               })
 
               afterEach(async () => {
-                await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [identity.realAccount.address])
+                await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
+                  identity.realAccount.address
+                ])
               })
 
               describe('and community is private', () => {
@@ -229,18 +227,20 @@ test('Create Community Request Controller', function ({ components, spyComponent
                       )
 
                       const body = await response.json()
-                      
+
                       // Wait for any setImmediate callbacks to complete
-                      await new Promise(resolve => setImmediate(resolve))
-                      
+                      await new Promise((resolve) => setImmediate(resolve))
+
                       expect(response.status).toBe(200)
-                      expect(body.data).toEqual(expect.objectContaining({
-                        id: expect.any(String),
-                        communityId,
-                        memberAddress: targetAddress,
-                        type: CommunityRequestType.Invite,
-                        status: CommunityRequestStatus.Pending
-                      }))
+                      expect(body.data).toEqual(
+                        expect.objectContaining({
+                          id: expect.any(String),
+                          communityId,
+                          memberAddress: targetAddress,
+                          type: CommunityRequestType.Invite,
+                          status: CommunityRequestStatus.Pending
+                        })
+                      )
                     })
                   })
 
@@ -327,13 +327,15 @@ test('Create Community Request Controller', function ({ components, spyComponent
                       )
                       expect(response.status).toBe(200)
                       const body = await response.json()
-                      expect(body.data).toEqual(expect.objectContaining({
-                        id: expect.any(String),
-                        communityId,
-                        memberAddress: targetAddress,
-                        type: CommunityRequestType.Invite,
-                        status: CommunityRequestStatus.Pending
-                      }))
+                      expect(body.data).toEqual(
+                        expect.objectContaining({
+                          id: expect.any(String),
+                          communityId,
+                          memberAddress: targetAddress,
+                          type: CommunityRequestType.Invite,
+                          status: CommunityRequestStatus.Pending
+                        })
+                      )
                     })
                   })
 
@@ -502,12 +504,14 @@ test('Create Community Request Controller', function ({ components, spyComponent
                     )
                     expect(response.status).toBe(200)
                     const body = await response.json()
-                    expect(body.data).toEqual(expect.objectContaining({
-                      id: expect.any(String),
-                      communityId,
-                      type: CommunityRequestType.RequestToJoin,
-                      status: CommunityRequestStatus.Pending
-                    }))
+                    expect(body.data).toEqual(
+                      expect.objectContaining({
+                        id: expect.any(String),
+                        communityId,
+                        type: CommunityRequestType.RequestToJoin,
+                        status: CommunityRequestStatus.Pending
+                      })
+                    )
                     expect(body.data.memberAddress.toLowerCase()).toBe(identity.realAccount.address.toLowerCase())
                   })
                 })
@@ -529,12 +533,10 @@ test('Create Community Request Controller', function ({ components, spyComponent
                   })
 
                   it('should return 200 status code with the existing request', async () => {
-                    const response = await makeRequest(
-                      identity,
-                      `/v1/communities/${communityId}/requests`,
-                      'POST',
-                      { ...requestBody, targetedAddress: identity.realAccount.address }
-                    )
+                    const response = await makeRequest(identity, `/v1/communities/${communityId}/requests`, 'POST', {
+                      ...requestBody,
+                      targetedAddress: identity.realAccount.address
+                    })
                     expect(response.status).toBe(200)
                     const body = await response.json()
                     expect(body.data).toEqual(
@@ -583,24 +585,24 @@ test('Create Community Request Controller', function ({ components, spyComponent
                       requestBody
                     )
                     const body = await response.json()
-                    expect(body.data).toEqual(expect.objectContaining({
-                      id: expect.any(String),
-                      communityId,
-                      type: CommunityRequestType.RequestToJoin,
-                      status: CommunityRequestStatus.Accepted
-                    }))
+                    expect(body.data).toEqual(
+                      expect.objectContaining({
+                        id: expect.any(String),
+                        communityId,
+                        type: CommunityRequestType.RequestToJoin,
+                        status: CommunityRequestStatus.Accepted
+                      })
+                    )
                     expect(body.data.memberAddress.toLowerCase()).toBe(identity.realAccount.address.toLowerCase())
                   })
 
                   it('should automatically join the user to the community', async () => {
-                    await makeRequest(
-                      identity,
-                      `/v1/communities/${communityId}/requests`,
-                      'POST',
-                      requestBody
+                    await makeRequest(identity, `/v1/communities/${communityId}/requests`, 'POST', requestBody)
+
+                    const memberRole = await components.communitiesDb.getCommunityMemberRole(
+                      communityId,
+                      identity.realAccount.address
                     )
-                    
-                    const memberRole = await components.communitiesDb.getCommunityMemberRole(communityId, identity.realAccount.address)
                     expect(memberRole).toBe(CommunityRole.Member)
                   })
                 })
@@ -616,7 +618,9 @@ test('Create Community Request Controller', function ({ components, spyComponent
                 })
 
                 afterEach(async () => {
-                  await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [identity.realAccount.address])
+                  await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
+                    identity.realAccount.address
+                  ])
                 })
 
                 it('should return 400 status code with correct message', async () => {
