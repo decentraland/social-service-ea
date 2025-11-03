@@ -186,18 +186,19 @@ test('Update Community Partially Controller', async function ({ components, stub
         })
       })
 
-      describe('and invalid data is provided', () => {
-        it('should respond with a 400 status code when editorsChoice is not a boolean', async () => {
+      describe('and editors choice is not a boolean', () => {
+        it('should respond with a 400 status code', async () => {
           const response = await makeRequest(identity, `/v1/communities/${communityId}`, 'PATCH', {
             editorsChoice: 'not-a-boolean'
           })
 
           expect(response.status).toBe(400)
         })
+      })
 
-        it('should respond with a 400 status code when no fields are provided', async () => {
+      describe('and editors choice is not provided', () => {
+        it('should respond with a 400 status code', async () => {
           const response = await makeRequest(identity, `/v1/communities/${communityId}`, 'PATCH', {})
-
           expect(response.status).toBe(400)
         })
       })

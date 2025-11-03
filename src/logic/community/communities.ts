@@ -520,7 +520,7 @@ export function createCommunityComponent(
     },
 
     updateEditorChoice: async (communityId: string, userAddress: EthAddress, editorsChoice: boolean): Promise<void> => {
-      const community = await communitiesDb.getCommunity(communityId, userAddress)
+      const community = await communitiesDb.getCommunity(communityId)
       if (!community) {
         throw new CommunityNotFoundError(communityId)
       }

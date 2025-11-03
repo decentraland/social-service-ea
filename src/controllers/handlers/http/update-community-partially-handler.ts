@@ -26,13 +26,8 @@ export async function updateCommunityPartiallyHandler(
   try {
     const body: UpdateCommunityPartiallyBody = await request.json()
 
-    const hasAnyUpdate = Object.keys(body).length > 0
-    if (!hasAnyUpdate) {
-      throw new InvalidRequestError('At least one field must be provided for update')
-    }
-
-    if (typeof body.editorsChoice !== 'boolean') {
-      throw new InvalidRequestError('editorsChoice must be a boolean')
+    if (body.editorsChoice === undefined || typeof body.editorsChoice !== 'boolean') {
+      throw new InvalidRequestError('editorsChoice is required and must be a boolean')
     }
 
     await communities.updateEditorChoice(communityId, userAddress, body.editorsChoice)
