@@ -43,9 +43,9 @@ import {
   createCommunityComplianceValidatorComponent,
   createCommunityFieldsValidatorComponent,
   createCommunityRequestsComponent,
-  createCommunityPostsComponent
+  createCommunityPostsComponent,
+  createCommunityRankingComponent
 } from './logic/community'
-import { createCommunityRankingComponent } from './logic/community/types'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
