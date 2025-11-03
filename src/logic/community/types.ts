@@ -40,6 +40,7 @@ export interface ICommunitiesComponent {
     placeIds?: string[]
   ): Promise<AggregatedCommunity>
   updateCommunity(communityId: string, userAddress: EthAddress, updates: CommunityUpdates): Promise<Community>
+  updateEditorChoice(communityId: string, userAddress: EthAddress, editorsChoice: boolean): Promise<void>
   deleteCommunity(id: string, userAddress: string): Promise<void>
   getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
 }
@@ -260,6 +261,9 @@ export type CommunityDB = {
   private: boolean
   unlisted: boolean
   active: boolean
+  editors_choice: boolean
+  ranking_score: number
+  last_score_calculated_at?: string
   created_at?: string
   updated_at?: string
 }
@@ -359,7 +363,7 @@ export type GetCommunitiesOptions = {
   pagination: PaginatedParameters
   search?: string | null
   onlyPublic?: boolean
-  sortBy?: 'membersCount' | 'role'
+  sortBy?: 'membersCount' | 'role' | 'ranking'
   onlyMemberOf?: boolean
   onlyWithActiveVoiceChat?: boolean
   roles?: CommunityRole[]

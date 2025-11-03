@@ -20,7 +20,9 @@ export const mockCommunity = (community: Partial<CommunityDB> = {}): CommunityDB
   owner_address: community.owner_address || '0x123',
   private: community.private || false,
   active: community.active || true,
-  unlisted: community.unlisted || false
+  unlisted: community.unlisted || false,
+  editors_choice: community.editors_choice || false,
+  ranking_score: community.ranking_score || 0
 })
 
 export function createMockCommunitiesComponent({
@@ -32,7 +34,8 @@ export function createMockCommunitiesComponent({
   updateCommunity = jest.fn(),
   deleteCommunity = jest.fn(),
   getCommunityInvites = jest.fn(),
-  getAllCommunitiesForModeration = jest.fn()
+  getAllCommunitiesForModeration = jest.fn(),
+  updateEditorChoice = jest.fn()
 }: Partial<jest.Mocked<ICommunitiesComponent>>): jest.Mocked<ICommunitiesComponent> {
   return {
     getCommunity,
@@ -43,7 +46,8 @@ export function createMockCommunitiesComponent({
     updateCommunity,
     deleteCommunity,
     getCommunityInvites,
-    getAllCommunitiesForModeration
+    getAllCommunitiesForModeration,
+    updateEditorChoice
   }
 }
 
