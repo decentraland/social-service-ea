@@ -29,23 +29,25 @@ export async function createMessageProcessorComponent({
   ]
 
   async function processMessage(message: Event) {
-    const handler = eventHandlers.find(
+    const matchingHandlers = eventHandlers.filter(
       (handler) => message.type === handler.type && handler.subTypes.includes(message.subType)
     )
 
-    if (!handler) {
+    if (matchingHandlers.length === 0) {
       logger.warn('No handler found for message', { message: JSON.stringify(message) })
       return
     }
 
-    try {
-      await handler.handle(message)
-    } catch (error) {
-      logger.error('Error processing message in handler', {
-        type: message.type,
-        subType: message.subType,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
+    for (const handler of matchingHandlers) {
+      try {
+        await handler.handle(message)
+      } catch (error) {
+        logger.error('Error processing message in handler', {
+          type: message.type,
+          subType: message.subType,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        })
+      }
     }
   }
 

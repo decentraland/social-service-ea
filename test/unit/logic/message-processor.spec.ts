@@ -1,24 +1,21 @@
 import { Event, Events, LoggedInEvent } from '@dcl/schemas'
 import { IMessageProcessorComponent, createMessageProcessorComponent, EventHandler } from '../../../src/logic/sqs'
+import { createLogsMockedComponent } from '../../mocks/components'
 
 describe('message-processor', () => {
-  let mockLogger: any
   let mockReferral: any
+  let mockLogs: ReturnType<typeof createLogsMockedComponent>
   let messageProcessor: IMessageProcessorComponent
 
   beforeEach(async () => {
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn()
-    }
+    mockLogs = createLogsMockedComponent()
 
     mockReferral = {
       finalizeReferral: jest.fn()
     }
 
     messageProcessor = await createMessageProcessorComponent({
-      logs: { getLogger: () => mockLogger },
+      logs: mockLogs,
       referral: mockReferral
     })
   })
@@ -106,7 +103,10 @@ describe('message-processor', () => {
         const result = await messageProcessor.processMessage(message)
 
         expect(result).toBeUndefined()
-        expect(mockLogger.error).toHaveBeenCalledWith('User address not found in message', expect.any(Object))
+        expect(mockLogs.getLogger('message-processor').error).toHaveBeenCalledWith(
+          'User address not found in message',
+          expect.any(Object)
+        )
         expect(mockReferral.finalizeReferral).not.toHaveBeenCalled()
       })
     })
