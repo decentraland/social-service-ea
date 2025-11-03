@@ -41,46 +41,46 @@ describe('Ranking Component', () => {
 
   describe('when calculating ranking scores for all communities', () => {
     let communitiesWithMetrics: Array<{
-      id: string
-      eventCount: number
+      communityId: string
+      eventsCount: number
       hasThumbnail: number
       photosCount: number
       hasDescription: number
       placesCount: number
       newMembersCount: number
-      announcementsCount: number
+      postsCount: number
       streamsCount: number
       eventsTotalAttendees: number
-      streamingTotalParticipants: number
+      streamsTotalParticipants: number
     }>
 
     beforeEach(() => {
       communitiesWithMetrics = [
         {
-          id: 'community-1',
-          eventCount: 2,
+          communityId: 'community-1',
+          eventsCount: 2,
           hasThumbnail: 1,
           photosCount: 3,
           hasDescription: 1,
           placesCount: 3,
           newMembersCount: 5,
-          announcementsCount: 8,
+          postsCount: 8,
           streamsCount: 1,
           eventsTotalAttendees: 50,
-          streamingTotalParticipants: 25
+          streamsTotalParticipants: 25
         },
         {
-          id: 'community-2',
-          eventCount: 1,
+          communityId: 'community-2',
+          eventsCount: 1,
           hasThumbnail: 0,
           photosCount: 0,
           hasDescription: 0,
           placesCount: 1,
           newMembersCount: 2,
-          announcementsCount: 3,
+          postsCount: 3,
           streamsCount: 0,
           eventsTotalAttendees: 10,
-          streamingTotalParticipants: 0
+          streamsTotalParticipants: 0
         }
       ]
       mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
@@ -135,17 +135,17 @@ describe('Ranking Component', () => {
       beforeEach(() => {
         communitiesWithMetrics = [
           {
-            id: 'community-3',
-            eventCount: 0,
+            communityId: 'community-3',
+            eventsCount: 0,
             hasThumbnail: 0,
             photosCount: 0,
             hasDescription: 0,
             placesCount: 0,
             newMembersCount: 0,
-            announcementsCount: 0,
+            postsCount: 0,
             streamsCount: 0,
             eventsTotalAttendees: 0,
-            streamingTotalParticipants: 0
+            streamsTotalParticipants: 0
           }
         ]
         mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)

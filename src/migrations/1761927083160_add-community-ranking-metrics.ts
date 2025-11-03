@@ -22,7 +22,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       notNull: true,
       default: 0
     },
-    streaming_count: {
+    streams_count: {
       type: PgType.INTEGER,
       notNull: true,
       default: 0
@@ -32,7 +32,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       notNull: true,
       default: 0
     },
-    streaming_total_participants: {
+    streams_total_participants: {
       type: PgType.INTEGER,
       notNull: true,
       default: 0

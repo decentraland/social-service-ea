@@ -19,7 +19,8 @@ import {
   CommunityPost,
   CommunityPostWithLikes,
   GetCommunityPostsOptions,
-  CommunityVisibilityEnum
+  CommunityVisibilityEnum,
+  CommunityRankingMetrics
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -1112,32 +1113,19 @@ export function createCommunitiesDBComponent(
       `)
     },
 
-    async getAllCommunitiesWithRankingMetrics(): Promise<
-      Array<{
-        id: string
-        eventCount: number
-        photosCount: number
-        hasDescription: number
-        placesCount: number
-        newMembersCount: number
-        announcementsCount: number
-        streamsCount: number
-        eventsTotalAttendees: number
-        streamingTotalParticipants: number
-      }>
-    > {
+    async getAllCommunitiesWithRankingMetrics(): Promise<Array<CommunityRankingMetrics>> {
       const query = SQL`
         SELECT 
-          c.id,
-          COALESCE(crm.events_count, 0)::int AS "eventCount",
+          c.id AS "communityId",
+          COALESCE(crm.events_count, 0)::int AS "eventsCount",
           COALESCE(crm.photos_count, 0)::int AS "photosCount",
           CASE WHEN c.description IS NOT NULL AND TRIM(c.description) != '' THEN 1 ELSE 0 END AS "hasDescription",
           COALESCE(places_count.count, 0)::int AS "placesCount",
           COALESCE(new_members_7d.count, 0)::int AS "newMembersCount",
-          COALESCE(posts_count.count, 0)::int AS "announcementsCount",
-          COALESCE(crm.streaming_count, 0)::int AS "streamsCount",
+          COALESCE(posts_count.count, 0)::int AS "postsCount",
+          COALESCE(crm.streams_count, 0)::int AS "streamsCount",
           COALESCE(crm.events_total_attendees, 0)::int AS "eventsTotalAttendees",
-          COALESCE(crm.streaming_total_participants, 0)::int AS "streamingTotalParticipants"
+          COALESCE(crm.streams_total_participants, 0)::int AS "streamsTotalParticipants"
         FROM communities c
         LEFT JOIN community_ranking_metrics crm ON c.id = crm.community_id
         LEFT JOIN (
@@ -1159,32 +1147,20 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true
         ORDER BY c.id
       `
-      const result = await pg.query<{
-        id: string
-        eventCount: number
-        photosCount: number
-        hasDescription: number
-        placesCount: number
-        newMembersCount: number
-        announcementsCount: number
-        streamsCount: number
-        eventsTotalAttendees: number
-        streamingTotalParticipants: number
-      }>(query)
+      const result = await pg.query<CommunityRankingMetrics>(query)
       return result.rows
     },
 
     async updateCommunityMetrics(
       communityId: string,
-      metrics: {
-        eventsCount?: number
-        eventsTotalAttendees?: number
-        photosCount?: number
-        streamingCount?: number
-        streamingTotalParticipants?: number
-      }
+      metrics: Partial<
+        Pick<
+          CommunityRankingMetrics,
+          'eventsCount' | 'eventsTotalAttendees' | 'photosCount' | 'streamsCount' | 'streamsTotalParticipants'
+        >
+      >
     ): Promise<void> {
-      const { eventsCount, eventsTotalAttendees, photosCount, streamingCount, streamingTotalParticipants } = metrics
+      const { eventsCount, eventsTotalAttendees, photosCount, streamsCount, streamsTotalParticipants } = metrics
 
       if (Object.values(metrics).every((value) => value === undefined)) {
         return
@@ -1217,17 +1193,17 @@ export function createCommunitiesDBComponent(
         updateClauses.push(SQL`photos_count = community_ranking_metrics.photos_count + ${photosCount}`)
       }
 
-      if (streamingCount !== undefined) {
-        insertFields = insertFields.append(SQL`, streaming_count`)
-        insertValues = insertValues.append(SQL`, ${streamingCount}`)
-        updateClauses.push(SQL`streaming_count = community_ranking_metrics.streaming_count + ${streamingCount}`)
+      if (streamsCount !== undefined) {
+        insertFields = insertFields.append(SQL`, streams_count`)
+        insertValues = insertValues.append(SQL`, ${streamsCount}`)
+        updateClauses.push(SQL`streams_count = community_ranking_metrics.streams_count + ${streamsCount}`)
       }
 
-      if (streamingTotalParticipants !== undefined) {
-        insertFields = insertFields.append(SQL`, streaming_total_participants`)
-        insertValues = insertValues.append(SQL`, ${streamingTotalParticipants}`)
+      if (streamsTotalParticipants !== undefined) {
+        insertFields = insertFields.append(SQL`, streams_total_participants`)
+        insertValues = insertValues.append(SQL`, ${streamsTotalParticipants}`)
         updateClauses.push(
-          SQL`streaming_total_participants = community_ranking_metrics.streaming_total_participants + ${streamingTotalParticipants}`
+          SQL`streams_total_participants = community_ranking_metrics.streams_total_participants + ${streamsTotalParticipants}`
         )
       }
 
