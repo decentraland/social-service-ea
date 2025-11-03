@@ -1,11 +1,11 @@
-import { IRankingComponent, RankingMetrics } from './types'
+import { ICommunityRankingComponent, RankingMetrics } from './types'
 import { AppComponents } from '../../types/system'
 
-export function createRankingComponent({
+export function createCommunityRankingComponent({
   logs,
   communitiesDb,
   communityThumbnail
-}: Pick<AppComponents, 'logs' | 'communitiesDb' | 'communityThumbnail'>): IRankingComponent {
+}: Pick<AppComponents, 'logs' | 'communitiesDb' | 'communityThumbnail'>): ICommunityRankingComponent {
   const logger = logs.getLogger('ranking-component')
 
   async function calculateRankingScore(metrics: RankingMetrics): Promise<number> {
@@ -48,6 +48,11 @@ export function createRankingComponent({
           }
           const score = await calculateRankingScore(metrics)
 
+          logger.info('Calculated ranking score for community', {
+            communityId: communityMetrics.id,
+            score
+          })
+
           // Update ranking score
           await communitiesDb.updateCommunity(communityMetrics.id, { ranking_score: score })
         } catch (error) {
@@ -58,13 +63,9 @@ export function createRankingComponent({
         }
       }
 
-      logger.info('Finished ranking score calculation for all communities', {
-        total: communitiesMetrics.length
-      })
+      logger.info(`Finished ranking score calculation for ${communitiesMetrics.length} communities`)
     } catch (error) {
-      logger.error('Failed to calculate ranking scores for all communities', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
+      logger.error(`Failed to calculate ranking scores for all communities: ${error}`)
       throw error
     }
   }

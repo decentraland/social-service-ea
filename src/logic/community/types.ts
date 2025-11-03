@@ -531,7 +531,7 @@ export interface ICommunityPostsComponent {
   unlikePost(communityId: string, postId: string, userAddress: EthAddress): Promise<void>
 }
 
-export interface IRankingComponent {
+export interface ICommunityRankingComponent {
   calculateRankingScoreForAllCommunities(): Promise<void>
 }
 

@@ -45,7 +45,7 @@ import {
   createCommunityRequestsComponent,
   createCommunityPostsComponent
 } from './logic/community'
-import { createRankingComponent } from './logic/community/ranking'
+import { createCommunityRankingComponent } from './logic/community/ranking'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
@@ -268,11 +268,11 @@ export async function initComponents(): Promise<AppComponents> {
     logs
   })
 
-  const rankingComponent = createRankingComponent({ logs, communitiesDb, communityThumbnail })
+  const communityRanking = createCommunityRankingComponent({ logs, communitiesDb, communityThumbnail })
 
-  const dailyCommunityRankingCalculationJob = createJobComponent(
+  const communityRankingCalculationJob = createJobComponent(
     { logs },
-    rankingComponent.calculateRankingScoreForAllCommunities,
+    communityRanking.calculateRankingScoreForAllCommunities,
     24 * 60 * 60 * 1000, // 24 hours in milliseconds
     { repeat: true, startupDelay: 60 * 60 * 1000 } // Start after 1 hour delay
   )
@@ -356,7 +356,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityVoiceChatCache,
     communityVoiceChatPolling,
     communityVoiceChatPollingJob,
-    dailyCommunityRankingCalculationJob,
+    communityRankingCalculationJob,
     config,
     email,
     expirePrivateVoiceChatJob,
@@ -379,7 +379,7 @@ export async function initComponents(): Promise<AppComponents> {
     placesApi,
     pubsub,
     queue,
-    rankingComponent,
+    communityRanking,
     redis,
     referral,
     referralDb,
