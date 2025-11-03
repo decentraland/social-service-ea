@@ -519,6 +519,28 @@ export function createCommunityComponent(
       return updatedCommunity
     },
 
+    updateEditorChoice: async (communityId: string, userAddress: EthAddress, editorsChoice: boolean): Promise<void> => {
+      const community = await communitiesDb.getCommunity(communityId)
+      if (!community) {
+        throw new CommunityNotFoundError(communityId)
+      }
+
+      const globalModerators =
+        (await featureFlags.getVariants<string[]>(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)) || []
+
+      if (!globalModerators.includes(userAddress.toLowerCase())) {
+        throw new NotAuthorizedError("Only global moderators can update Editor's Choice flag")
+      }
+
+      logger.info("Updating Editor's Choice flag", {
+        communityId,
+        userAddress,
+        editorsChoice: editorsChoice ? 'true' : 'false'
+      })
+
+      await communitiesDb.setEditorChoice(communityId, editorsChoice)
+    },
+
     getCommunityInvites: async (inviter: EthAddress, invitee: EthAddress): Promise<Community[]> => {
       const communities = await communitiesDb.getCommunityInvites(inviter, invitee)
 

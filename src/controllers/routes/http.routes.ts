@@ -21,6 +21,7 @@ import {
   addCommunityPlacesHandler,
   removeCommunityPlaceHandler,
   updateCommunityHandler,
+  updateCommunityPartiallyHandler,
   addReferralEmailHandler,
   getActiveCommunityVoiceChatsHandler,
   getMemberRequestsHandler,
@@ -86,6 +87,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
   router.put('/v1/communities/:id', signedFetchMiddleware(), multipartParserWrapper(updateCommunityHandler))
+  router.patch('/v1/communities/:id', signedFetchMiddleware(), updateCommunityPartiallyHandler)
   router.delete('/v1/communities/:id', signedFetchMiddleware(), deleteCommunityHandler)
 
   router.get('/v1/communities/:id/places', signedFetchMiddleware({ optional: true }), getCommunityPlacesHandler)

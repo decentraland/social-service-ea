@@ -331,7 +331,7 @@ export function createCommunitiesDBComponent(
 
       const query = withSearchAndPagination(baseQuery, {
         ...options,
-        sortBy: options.onlyMemberOf ? 'role' : 'membersCount'
+        sortBy: options.onlyMemberOf ? 'role' : options.sortBy
       })
 
       const result = await pg.query<AggregatedCommunityWithMemberAndFriendsData>(query)

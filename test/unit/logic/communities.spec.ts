@@ -2146,4 +2146,106 @@ describe('Community Component', () => {
       })
     })
   })
+
+  describe("when updating Editor's Choice", () => {
+    const userAddress = '0x1234567890123456789012345678901234567890'
+
+    describe('and the community exists', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          ...mockCommunity,
+          role: CommunityRole.None
+        })
+        mockCommunitiesDB.setEditorChoice.mockResolvedValue()
+      })
+
+      describe('and the user is a global moderator', () => {
+        beforeEach(() => {
+          mockFeatureFlags.getVariants.mockResolvedValue([userAddress.toLowerCase(), '0xanother-moderator'])
+        })
+
+        it("should update Editor's Choice to true", async () => {
+          await communityComponent.updateEditorChoice(communityId, userAddress, true)
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+          expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
+          expect(mockCommunitiesDB.setEditorChoice).toHaveBeenCalledWith(communityId, true)
+        })
+
+        it("should update Editor's Choice to false", async () => {
+          await communityComponent.updateEditorChoice(communityId, userAddress, false)
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+          expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
+          expect(mockCommunitiesDB.setEditorChoice).toHaveBeenCalledWith(communityId, false)
+        })
+
+        it('should log the update', async () => {
+          await communityComponent.updateEditorChoice(communityId, userAddress, true)
+
+          expect(mockLogs.getLogger).toHaveBeenCalledWith('community-component')
+        })
+      })
+
+      describe('and the user is not a global moderator', () => {
+        beforeEach(() => {
+          mockFeatureFlags.getVariants.mockResolvedValue(['0xanother-moderator', '0xthird-moderator'])
+        })
+
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityComponent.updateEditorChoice(communityId, userAddress, true)).rejects.toThrow(
+            new NotAuthorizedError("Only global moderators can update Editor's Choice flag")
+          )
+
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+          expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
+          expect(mockCommunitiesDB.setEditorChoice).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and global moderators feature flag returns empty array', () => {
+        beforeEach(() => {
+          mockFeatureFlags.getVariants.mockResolvedValue([])
+        })
+
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityComponent.updateEditorChoice(communityId, userAddress, true)).rejects.toThrow(
+            new NotAuthorizedError("Only global moderators can update Editor's Choice flag")
+          )
+
+          expect(mockCommunitiesDB.setEditorChoice).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and global moderators feature flag returns malformed data', () => {
+        beforeEach(() => {
+          mockFeatureFlags.getVariants.mockResolvedValue(['  ', '  ', 'invalid-address', '  '])
+        })
+
+        it('should throw NotAuthorizedError', async () => {
+          await expect(communityComponent.updateEditorChoice(communityId, userAddress, true)).rejects.toThrow(
+            new NotAuthorizedError("Only global moderators can update Editor's Choice flag")
+          )
+
+          expect(mockCommunitiesDB.setEditorChoice).not.toHaveBeenCalled()
+        })
+      })
+    })
+
+    describe('and the community does not exist', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
+      })
+
+      it('should throw CommunityNotFoundError', async () => {
+        await expect(communityComponent.updateEditorChoice(communityId, userAddress, true)).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+        expect(mockFeatureFlags.getVariants).not.toHaveBeenCalled()
+        expect(mockCommunitiesDB.setEditorChoice).not.toHaveBeenCalled()
+      })
+    })
+  })
 })
