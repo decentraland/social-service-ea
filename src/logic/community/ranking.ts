@@ -9,6 +9,7 @@ export function createCommunityRankingComponent({
   const logger = logs.getLogger('ranking-component')
 
   async function calculateRankingScore(metrics: RankingMetrics): Promise<number> {
+    // TODO: consider normalizing the score to a scale of 0 to 1
     const score =
       metrics.eventCount * 0.5 +
       metrics.hasThumbnail * 1 +
