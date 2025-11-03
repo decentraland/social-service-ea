@@ -1,6 +1,26 @@
 import { ICommunityRankingComponent, CommunityRankingMetrics } from './types'
 import { AppComponents } from '../../types/system'
 
+type MetricWeight = {
+  metric: Exclude<keyof CommunityRankingMetrics, 'communityId'>
+  weight: number
+}
+
+type MetricWeights = Array<MetricWeight>
+
+const DEFAULT_METRIC_WEIGHTS: MetricWeights = [
+  { metric: 'eventsCount', weight: 0.5 },
+  { metric: 'hasThumbnail', weight: 1 },
+  { metric: 'photosCount', weight: 0.2 },
+  { metric: 'hasDescription', weight: 1 },
+  { metric: 'placesCount', weight: 0.2 },
+  { metric: 'newMembersCount', weight: 0.4 },
+  { metric: 'postsCount', weight: 0.2 },
+  { metric: 'streamsCount', weight: 0.2 },
+  { metric: 'eventsTotalAttendees', weight: 0.01 },
+  { metric: 'streamsTotalParticipants', weight: 0.01 }
+]
+
 export function createCommunityRankingComponent({
   logs,
   communitiesDb,
@@ -9,19 +29,10 @@ export function createCommunityRankingComponent({
   const logger = logs.getLogger('ranking-component')
 
   async function calculateRankingScore(metrics: CommunityRankingMetrics): Promise<number> {
-    // TODO: consider normalizing the score to a scale of 0 to 1
-    const score =
-      metrics.eventsCount * 0.5 +
-      metrics.hasThumbnail * 1 +
-      metrics.photosCount * 0.2 +
-      metrics.hasDescription * 1 +
-      metrics.placesCount * 0.2 +
-      metrics.newMembersCount * 0.4 +
-      metrics.postsCount * 0.2 +
-      metrics.streamsCount * 0.2 +
-      metrics.eventsTotalAttendees * 0.01 +
-      metrics.streamsTotalParticipants * 0.01
+    const weights: MetricWeights = DEFAULT_METRIC_WEIGHTS
+    const score = weights.reduce((sum, { metric, weight }) => sum + metrics[metric] * weight, 0)
 
+    // TODO: consider normalizing the score to a scale of 0 to 1
     return Math.max(0, score)
   }
 
