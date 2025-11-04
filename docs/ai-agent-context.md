@@ -44,3 +44,9 @@
 - Real-time friend connectivity updates
 - Block/mute user functionality
 - Community member tracking (for world/community features)
+
+**Database Schema:**
+
+- **Tables**: `friendships` (relationships), `friendship_actions` (history), `blocks` (blocking), `social_settings` (privacy), `communities` (groups), `community_members` (membership), `community_bans` (bans), `community_places` (places), `community_posts` (posts), `community_post_likes` (likes), `community_requests` (requests), `private_voice_chats` (voice chats), `referral_progress` (referrals), `referral_progress_viewed` (referral views)
+- **Key Columns**: `friendships.address_requester`, `friendships.address_requested`, `friendships.is_active`, `communities.id` (PK), `community_members.community_id` (FK), `blocks.blocker_address`
+- **Full Documentation**: See [docs/database-schema.md](docs/database-schema.md) for detailed schema, column definitions, and relationships
