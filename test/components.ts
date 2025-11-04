@@ -128,7 +128,7 @@ async function initComponents(): Promise<TestComponents> {
   )
   const fetcher = createFetchComponent()
   const memoryCache = createInMemoryCacheComponent()
-  const schemaValidator = createSchemaValidatorComponent()
+  const schemaValidator = createSchemaValidatorComponent({ ensureJsonContentType: false })
 
   const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 

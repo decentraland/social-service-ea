@@ -44,7 +44,7 @@ export const UpdateMemberRoleSchema: Schema = {
   properties: {
     role: {
       type: 'string',
-      enum: ['owner', 'moderator', 'member', 'none']
+      enum: Object.values(CommunityRole)
     }
   }
 }
@@ -83,7 +83,8 @@ export const CreateCommunityPostSchema: Schema = {
     content: {
       type: 'string',
       minLength: 1,
-      maxLength: 1000
+      maxLength: 1000,
+      pattern: '^\\S'
     }
   }
 }
@@ -124,7 +125,7 @@ export const CreateCommunityRequestSchema: Schema = {
     },
     type: {
       type: 'string',
-      enum: ['invite', 'request_to_join']
+      enum: Object.values(CommunityRequestType)
     }
   }
 }
@@ -136,7 +137,7 @@ export const UpdateCommunityRequestStatusSchema: Schema = {
   properties: {
     intention: {
       type: 'string',
-      enum: ['accepted', 'rejected', 'cancelled']
+      enum: [CommunityRequestStatus.Accepted, CommunityRequestStatus.Rejected, CommunityRequestStatus.Cancelled]
     }
   }
 }

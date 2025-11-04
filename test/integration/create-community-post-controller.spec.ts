@@ -153,9 +153,17 @@ test('Create Community Post Controller', async function ({ components, stubCompo
           content: '   \n\t   '
         })
 
-        // Schema validator allows whitespace, but handler trims it and may create empty content
-        // The exact behavior depends on whether the handler validates after trimming
-        expect([400, 201]).toContain(response.status)
+        expect(response.status).toBe(400)
+      })
+    })
+
+    describe('and the content starts with whitespace', () => {
+      it('should respond with a 400 status code', async () => {
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: '   hello world'
+        })
+
+        expect(response.status).toBe(400)
       })
     })
 

@@ -103,7 +103,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const fetcher = createFetchComponent()
   const memoryCache = createInMemoryCacheComponent()
-  const schemaValidator = createSchemaValidatorComponent()
+  const schemaValidator = createSchemaValidatorComponent({ ensureJsonContentType: false })
 
   await instrumentHttpServerWithPromClientRegistry({ server: httpServer, metrics, config, registry: metrics.registry! })
 

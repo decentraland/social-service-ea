@@ -28,11 +28,6 @@ export async function createCommunityRequestHandler(
   try {
     const callerAddress = verification!.auth.toLowerCase()
 
-    // Validate EthAddress format (schema validates pattern, but EthAddress.validate provides additional checks)
-    if (!EthAddress.validate(body.targetedAddress)) {
-      throw new InvalidCommunityRequestError('Invalid targeted address')
-    }
-
     const communityRequest = await communityRequests.createCommunityRequest(
       communityId,
       body.targetedAddress as EthAddress,
