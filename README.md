@@ -61,7 +61,7 @@ For detailed setup instructions, see [Getting Started](https://github.com/decent
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-## 🤖 AI Agent Context
+## AI Agent Context
 
 **Service Purpose:** Handles social interactions and relationships for Decentraland users. Manages friendships, friend requests, blocking, muting, and social connectivity status. Publishes social events to enable real-time social features in clients.
 
