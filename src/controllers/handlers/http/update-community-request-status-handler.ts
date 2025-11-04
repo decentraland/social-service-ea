@@ -1,7 +1,8 @@
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { CommunityNotFoundError, CommunityRequestNotFoundError, CommunityRequestStatus } from '../../../logic/community'
+import { CommunityNotFoundError, CommunityRequestNotFoundError } from '../../../logic/community'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
+import { UpdateCommunityRequestStatusRequestBody } from './schemas'
 
 export async function updateCommunityRequestStatusHandler(
   context: Pick<
@@ -17,20 +18,9 @@ export async function updateCommunityRequestStatusHandler(
   } = context
 
   const logger = logs.getLogger('update-community-request-status-handler')
-  const body: { intention: CommunityRequestStatus } = await request.json()
+  const body: UpdateCommunityRequestStatusRequestBody = await request.json()
 
   try {
-    if (
-      !Object.values(CommunityRequestStatus).includes(body.intention) ||
-      body.intention === CommunityRequestStatus.Pending
-    ) {
-      throw new InvalidRequestError(
-        `Invalid intention provided. Must be one of: ${Object.values(CommunityRequestStatus)
-          .filter((status) => status !== CommunityRequestStatus.Pending)
-          .join(', ')}`
-      )
-    }
-
     await communityRequests.updateRequestStatus(requestId, body.intention, {
       callerAddress: verification!.auth.toLowerCase()
     })

@@ -4,12 +4,7 @@ import { HandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { CommunityPost } from '../../../logic/community/types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityNotFoundError } from '../../../logic/community/errors'
-
-export type CreatePostRequestBody = {
-  content: string
-}
-
-const MAX_POST_CONTENT_LENGTH = 1000
+import { CreateCommunityPostRequestBody } from './schemas'
 
 export async function createCommunityPostHandler(
   context: HandlerContextWithPath<'communityPosts' | 'logs', '/v1/communities/:id/posts'> &
@@ -22,18 +17,8 @@ export async function createCommunityPostHandler(
   const userAddress = verification!.auth.toLowerCase()
 
   try {
-    const body = (await request.json()) as CreatePostRequestBody
-    const { content } = body
-
-    const trimmedContent = content.trim()
-
-    if (!trimmedContent) {
-      throw new InvalidRequestError('Content is required')
-    }
-
-    if (trimmedContent.length > MAX_POST_CONTENT_LENGTH) {
-      throw new InvalidRequestError('Post content is too long')
-    }
+    const body: CreateCommunityPostRequestBody = await request.json()
+    const trimmedContent = body.content.trim()
 
     const post = await communityPosts.createPost(params.id, userAddress, trimmedContent)
 

@@ -136,11 +136,6 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
               placeIds: 'not-an-array'
             })
             expect(response.status).toBe(400)
-            const body = await response.json()
-            expect(body).toEqual({
-              error: 'Bad request',
-              message: 'placeIds must be an array'
-            })
           })
 
           it('should respond with a 401 status code when user does not own the places', async () => {
@@ -245,7 +240,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
             memberAddress: userAddress,
             role: CommunityRole.Owner
           })
-          stubComponents.placesApi.getPlaces.resolves(null)
+          stubComponents.placesApi.getPlaces.resolves(undefined)
         })
 
         it('should respond with a 401 status code when places API returns null', async () => {

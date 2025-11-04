@@ -69,6 +69,7 @@ import { createFeatureFlagsAdapter } from './adapters/feature-flags'
 import { createInMemoryCacheComponent } from './adapters/memory-cache'
 import { createSqsComponent } from '@dcl/sqs-component'
 import { createSnsComponent } from '@dcl/sns-component'
+import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -102,6 +103,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const fetcher = createFetchComponent()
   const memoryCache = createInMemoryCacheComponent()
+  const schemaValidator = createSchemaValidatorComponent({ ensureJsonContentType: false })
 
   await instrumentHttpServerWithPromClientRegistry({ server: httpServer, metrics, config, registry: metrics.registry! })
 
@@ -379,6 +381,7 @@ export async function initComponents(): Promise<AppComponents> {
     voice,
     voiceDb,
     worldsStats,
-    wsPool
+    wsPool,
+    schemaValidator
   }
 }

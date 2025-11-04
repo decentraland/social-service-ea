@@ -1,10 +1,11 @@
 import { EthAddress } from '@dcl/schemas'
-import { MemberRequest, CommunityRequestType } from '../../../logic/community/types'
+import { MemberRequest } from '../../../logic/community/types'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { CommunityNotFoundError, InvalidCommunityRequestError } from '../../../logic/community'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { CreateCommunityRequestRequestBody } from './schemas'
 
 export async function createCommunityRequestHandler(
   context: Pick<
@@ -22,32 +23,10 @@ export async function createCommunityRequestHandler(
 
   const logger = logs.getLogger('create-community-request-handler')
 
-  let body: { targetedAddress: string; type: CommunityRequestType }
-
-  try {
-    body = await request.json()
-  } catch (error) {
-    return {
-      status: 400,
-      body: {
-        message: 'Invalid JSON in request body'
-      }
-    }
-  }
+  const body: CreateCommunityRequestRequestBody = await request.json()
 
   try {
     const callerAddress = verification!.auth.toLowerCase()
-    if (!body.targetedAddress || !body.type) {
-      throw new InvalidCommunityRequestError('Missing targetedAddress or type field')
-    }
-
-    if (!EthAddress.validate(body.targetedAddress)) {
-      throw new InvalidCommunityRequestError('Invalid targeted address')
-    }
-
-    if (!Object.values(CommunityRequestType).includes(body.type)) {
-      throw new InvalidCommunityRequestError('Invalid type value')
-    }
 
     const communityRequest = await communityRequests.createCommunityRequest(
       communityId,

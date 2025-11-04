@@ -2,10 +2,7 @@ import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-co
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityNotFoundError } from '../../../logic/community/errors'
-
-type UpdateCommunityPartiallyBody = {
-  editorsChoice?: boolean
-}
+import { UpdateCommunityPartiallyRequestBody } from './schemas'
 
 export async function updateCommunityPartiallyHandler(
   context: Pick<
@@ -24,11 +21,7 @@ export async function updateCommunityPartiallyHandler(
   const userAddress = verification!.auth.toLowerCase()
 
   try {
-    const body: UpdateCommunityPartiallyBody = await request.json()
-
-    if (body.editorsChoice === undefined || typeof body.editorsChoice !== 'boolean') {
-      throw new InvalidRequestError('editorsChoice is required and must be a boolean')
-    }
+    const body: UpdateCommunityPartiallyRequestBody = await request.json()
 
     await communities.updateEditorChoice(communityId, userAddress, body.editorsChoice)
 

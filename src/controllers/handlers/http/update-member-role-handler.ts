@@ -1,9 +1,9 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
-import { CommunityMember, CommunityNotFoundError } from '../../../logic/community'
+import { CommunityNotFoundError } from '../../../logic/community'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { EthAddress } from '@dcl/schemas'
-import { CommunityRole } from '../../../types/entities'
+import { UpdateMemberRoleRequestBody } from './schemas'
 
 export async function updateMemberRoleHandler(
   context: Pick<
@@ -28,16 +28,11 @@ export async function updateMemberRoleHandler(
       throw new InvalidRequestError(`Invalid address provided`)
     }
 
-    const body: Partial<CommunityMember> = await request.json()
-    const newRole = body.role
+    const body: UpdateMemberRoleRequestBody = await request.json()
 
-    if (!newRole || !Object.values(CommunityRole).includes(newRole as CommunityRole)) {
-      throw new InvalidRequestError(`Invalid role provided. Must be one of: ${Object.values(CommunityRole).join(', ')}`)
-    }
+    logger.info(`Updating member role in community ${communityId} for member ${targetAddress} to ${body.role}`)
 
-    logger.info(`Updating member role in community ${communityId} for member ${targetAddress} to ${newRole}`)
-
-    await communityMembers.updateMemberRole(communityId, updaterAddress, targetAddressLower, newRole as CommunityRole)
+    await communityMembers.updateMemberRole(communityId, updaterAddress, targetAddressLower, body.role)
     return {
       status: 204
     }

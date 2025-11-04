@@ -79,6 +79,7 @@ import { createFeaturesComponent } from '@well-known-components/features-compone
 import { createFeatureFlagsAdapter } from '../src/adapters/feature-flags'
 import { createInMemoryCacheComponent } from '../src/adapters/memory-cache'
 import { createMockCommunityBroadcasterComponent } from './mocks/communities'
+import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -127,6 +128,7 @@ async function initComponents(): Promise<TestComponents> {
   )
   const fetcher = createFetchComponent()
   const memoryCache = createInMemoryCacheComponent()
+  const schemaValidator = createSchemaValidatorComponent({ ensureJsonContentType: false })
 
   const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 
@@ -388,6 +390,7 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     voiceDb,
     worldsStats,
-    wsPool
+    wsPool,
+    schemaValidator
   }
 }

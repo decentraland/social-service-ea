@@ -3,10 +3,7 @@ import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-co
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityNotFoundError } from '../../../logic/community'
-
-interface AddPlacesRequest {
-  placeIds: string[]
-}
+import { AddCommunityPlacesRequestBody } from './schemas'
 
 export async function addCommunityPlacesHandler(
   context: HandlerContextWithPath<'communityPlaces' | 'logs', '/v1/communities/:id/places'> &
@@ -24,14 +21,9 @@ export async function addCommunityPlacesHandler(
   const userAddress = verification!.auth.toLowerCase()
 
   try {
-    const body: AddPlacesRequest = await request.json()
-    const { placeIds } = body
+    const body: AddCommunityPlacesRequestBody = await request.json()
 
-    if (!Array.isArray(placeIds)) {
-      throw new InvalidRequestError('placeIds must be an array')
-    }
-
-    await communityPlaces.validateAndAddPlaces(communityId, userAddress, placeIds)
+    await communityPlaces.validateAndAddPlaces(communityId, userAddress, body.placeIds)
     return {
       status: 204
     }

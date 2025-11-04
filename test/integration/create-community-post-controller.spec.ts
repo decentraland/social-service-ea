@@ -144,10 +144,6 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         })
 
         expect(response.status).toBe(400)
-        expect(await response.json()).toMatchObject({
-          error: 'Bad request',
-          message: 'Content is required'
-        })
       })
     })
 
@@ -158,10 +154,16 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         })
 
         expect(response.status).toBe(400)
-        expect(await response.json()).toMatchObject({
-          error: 'Bad request',
-          message: 'Content is required'
+      })
+    })
+
+    describe('and the content starts with whitespace', () => {
+      it('should respond with a 400 status code', async () => {
+        const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
+          content: '   hello world'
         })
+
+        expect(response.status).toBe(400)
       })
     })
 
@@ -173,10 +175,6 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         })
 
         expect(response.status).toBe(400)
-        expect(await response.json()).toMatchObject({
-          error: 'Bad request',
-          message: 'Post content is too long'
-        })
       })
     })
 

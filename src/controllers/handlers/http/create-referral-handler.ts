@@ -7,7 +7,8 @@ import {
   SelfReferralError
 } from '../../../logic/referral/errors'
 import type { HandlerContextWithPath } from '../../../types/http'
-import type { CreateReferralPayload, CreateReferralWithInvitedUser } from '../../../types/create-referral-handler.type'
+import type { CreateReferralWithInvitedUser } from '../../../types/create-referral-handler.type'
+import type { CreateReferralRequestBody } from './schemas'
 
 export async function createReferralHandler(
   ctx: Pick<HandlerContextWithPath<'logs' | 'referral'>, 'components' | 'request' | 'verification'>
@@ -23,17 +24,7 @@ export async function createReferralHandler(
     throw new InvalidRequestError('Authentication required')
   }
 
-  let rawBody: CreateReferralPayload
-  try {
-    rawBody = await request.json()
-  } catch (error) {
-    logger.debug('Invalid JSON body')
-    throw new InvalidRequestError('Invalid JSON body')
-  }
-
-  if (!rawBody.referrer) {
-    throw new InvalidRequestError('Missing required field: referrer')
-  }
+  const rawBody: CreateReferralRequestBody = await request.json()
 
   const cfConnectingIp = request.headers.get('cf-connecting-ip')
   const forwardedFor = request.headers.get('x-forwarded-for')
