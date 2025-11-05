@@ -3,6 +3,7 @@ import { Event, Events, LoggedInEvent, LoggedInCachedEvent } from '@dcl/schemas'
 import { AppComponents } from '../../types/system'
 import { IMessageProcessorComponent, EventHandler } from './types'
 
+// TODO: move to core-components
 export async function createMessageProcessorComponent({
   logs,
   referral
