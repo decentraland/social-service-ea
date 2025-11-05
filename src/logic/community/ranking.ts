@@ -28,7 +28,7 @@ export function createCommunityRankingComponent({
 }: Pick<AppComponents, 'logs' | 'communitiesDb' | 'communityThumbnail'>): ICommunityRankingComponent {
   const logger = logs.getLogger('ranking-component')
 
-  async function calculateRankingScore(metrics: CommunityRankingMetrics): Promise<number> {
+  function calculateRankingScore(metrics: CommunityRankingMetrics): number {
     const weights: MetricWeights = DEFAULT_METRIC_WEIGHTS
     const score = weights.reduce((sum, { metric, weight }) => sum + metrics[metric] * weight, 0)
 
