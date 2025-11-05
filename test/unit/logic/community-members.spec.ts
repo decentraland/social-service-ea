@@ -25,12 +25,15 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { Events } from '@dcl/schemas'
 import { createMockedAnalyticsComponent } from '../../mocks/components/analytics'
+import { createSNSMockedComponent } from '../../mocks/components/sns'
+import { IPublisherComponent } from '@dcl/sns-component'
 
 describe('Community Members Component', () => {
   let communityMembersComponent: ICommunityMembersComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
   let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
   let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
+  let mockSns: jest.Mocked<IPublisherComponent>
   let mockUserAddress: string
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   let mockCommsGatekeeper: ReturnType<typeof createCommsGatekeeperMockedComponent>
@@ -61,9 +64,15 @@ describe('Community Members Component', () => {
     mockCommunityRoles = createMockCommunityRolesComponent({})
     mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
+    mockSns = createSNSMockedComponent({})
     mockPeersStats = createMockPeersStatsComponent()
     mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
     mockAnalytics = createMockedAnalyticsComponent({})
+
+    mockCommunityThumbnail.buildThumbnailUrl.mockImplementation(
+      (communityId: string) => `https://cdn.example.com/communities/${communityId}/thumbnail.png`
+    )
+
     communityMembersComponent = await createCommunityMembersComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
@@ -74,7 +83,8 @@ describe('Community Members Component', () => {
       peersStats: mockPeersStats,
       pubsub: mockPubSub,
       commsGatekeeper: mockCommsGatekeeper,
-      analytics: mockAnalytics
+      analytics: mockAnalytics,
+      sns: mockSns
     })
   })
 
@@ -1113,6 +1123,19 @@ describe('Community Members Component', () => {
     })
 
     describe('and validations pass', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: 'test-community',
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: targetAddress,
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Owner
+        })
+      })
+
       it('should call transferCommunityOwnership', async () => {
         await communityMembersComponent.updateMemberRole(
           'test-community',
@@ -1123,6 +1146,32 @@ describe('Community Members Component', () => {
 
         expect(mockCommunitiesDB.transferCommunityOwnership).toHaveBeenCalledWith('test-community', targetAddress)
         expect(mockCommunitiesDB.updateMemberRole).not.toHaveBeenCalled()
+      })
+
+      it('should publish OWNERSHIP_TRANSFERRED event', async () => {
+        await communityMembersComponent.updateMemberRole(
+          'test-community',
+          updaterAddress,
+          targetAddress,
+          CommunityRole.Owner
+        )
+
+        // Wait for setImmediate callback to execute
+        await new Promise((resolve) => setImmediate(resolve))
+
+        expect(mockSns.publishMessage).toHaveBeenCalledWith({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
+          key: 'test-community',
+          timestamp: expect.any(Number),
+          metadata: {
+            communityId: 'test-community',
+            communityName: 'Test Community',
+            oldOwnerAddress: updaterAddress,
+            newOwnerAddress: targetAddress,
+            thumbnailUrl: expect.stringContaining('test-community')
+          }
+        })
       })
     })
   })

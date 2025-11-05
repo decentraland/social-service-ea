@@ -95,7 +95,7 @@ test('Create Community Post Controller', async function ({ components, stubCompo
     })
 
     describe('and the user is the owner', () => {
-      it('should create post successfully', async () => {
+      it('should create post successfully with author profile', async () => {
         const response = await makeRequest(ownerIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
           content: 'Test post content from owner'
         })
@@ -105,7 +105,10 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         expect(body.data).toMatchObject({
           communityId,
           authorAddress: ownerIdentity.realAccount.address.toLowerCase(),
-          content: 'Test post content from owner'
+          content: 'Test post content from owner',
+          authorName: expect.any(String),
+          authorProfilePictureUrl: expect.any(String),
+          authorHasClaimedName: expect.any(Boolean)
         })
         expect(body.data.id).toBeDefined()
         expect(body.data.createdAt).toBeDefined()
@@ -122,7 +125,7 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         })
       })
 
-      it('should create post successfully', async () => {
+      it('should create post successfully with author profile', async () => {
         const response = await makeRequest(moderatorIdentity, `/v1/communities/${communityId}/posts`, 'POST', {
           content: 'Test post content from moderator'
         })
@@ -132,7 +135,10 @@ test('Create Community Post Controller', async function ({ components, stubCompo
         expect(body.data).toMatchObject({
           communityId,
           authorAddress: moderatorIdentity.realAccount.address.toLowerCase(),
-          content: 'Test post content from moderator'
+          content: 'Test post content from moderator',
+          authorName: expect.any(String),
+          authorProfilePictureUrl: expect.any(String),
+          authorHasClaimedName: expect.any(Boolean)
         })
       })
     })
