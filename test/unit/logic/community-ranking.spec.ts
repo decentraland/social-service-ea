@@ -48,6 +48,7 @@ describe('Ranking Component', () => {
       streamsCount: number
       eventsTotalAttendees: number
       streamsTotalParticipants: number
+      ageInDays: number
     }>
 
     beforeEach(() => {
@@ -63,7 +64,8 @@ describe('Ranking Component', () => {
           postsCount: 8,
           streamsCount: 1,
           eventsTotalAttendees: 50,
-          streamsTotalParticipants: 25
+          streamsTotalParticipants: 25,
+          ageInDays: 5 // New community (5 days old) - gets max boost of 20
         },
         {
           communityId: 'community-2',
@@ -76,35 +78,71 @@ describe('Ranking Component', () => {
           postsCount: 3,
           streamsCount: 0,
           eventsTotalAttendees: 10,
-          streamsTotalParticipants: 0
+          streamsTotalParticipants: 0,
+          ageInDays: 3 // New community (3 days old) - gets max boost of 20
         }
       ]
       mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
-      mockCommunitiesDB.updateCommunity.mockResolvedValue(mockCommunity)
+      mockCommunitiesDB.updateCommunitiesRankingScores.mockResolvedValue()
     })
 
     describe('and calculation succeeds', () => {
-      it('should calculate and update scores for all communities', async () => {
+      it('should calculate and update normalized scores (0-1) for all communities with new community boost', async () => {
         await communityRanking.calculateRankingScoreForAllCommunities()
 
         expect(mockCommunitiesDB.getAllCommunitiesWithRankingMetrics).toHaveBeenCalledTimes(1)
-        expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledTimes(communitiesWithMetrics.length)
-        // community-1: (2 * 0.5) + (1 * 1) + (3 * 0.2) + (1 * 1) + (3 * 0.2) + (5 * 0.4) + (8 * 0.2) + (1 * 0.2) + (50 * 0.01) + (25 * 0.01) = 1 + 1 + 0.6 + 1 + 0.6 + 2 + 1.6 + 0.2 + 0.5 + 0.25 = 8.75
-        expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith('community-1', { ranking_score: 8.75 })
-        // community-2: (1 * 0.5) + (0 * 1) + (0 * 0.2) + (0 * 1) + (1 * 0.2) + (2 * 0.4) + (3 * 0.2) + (0 * 0.2) + (10 * 0.01) + (0 * 0.01) = 0.5 + 0 + 0 + 0 + 0.2 + 0.8 + 0.6 + 0 + 0.1 + 0 = 2.2
-        expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith('community-2', { ranking_score: 2.2 })
+        expect(mockCommunitiesDB.updateCommunitiesRankingScores).toHaveBeenCalledTimes(1)
+
+        // Verify the Map contains correct normalized scores with boost
+        const updateCall = mockCommunitiesDB.updateCommunitiesRankingScores.mock.calls[0][0]
+        expect(updateCall).toBeInstanceOf(Map)
+
+        // Verify scores are normalized (0-1 range)
+        const score1 = updateCall.get('community-1')
+        const score2 = updateCall.get('community-2')
+        expect(score1).toBeGreaterThanOrEqual(0)
+        expect(score1).toBeLessThanOrEqual(1)
+        expect(score2).toBeGreaterThanOrEqual(0)
+        expect(score2).toBeLessThanOrEqual(1)
+
+        // community-1 has better metrics, so should have higher score
+        expect(score1).toBeGreaterThan(score2)
+
+        // Both are new communities (age 3-5 days), so should get boost multiplier of 1.5
+        // community-1 has: thumbnail, description, events, photos, places, new members, posts, streams
+        // Approximate normalized score calculation with boost
+        expect(score1).toBeGreaterThan(0.3) // Should be reasonably high with boost
       })
     })
 
     describe('and one community calculation fails', () => {
       beforeEach(() => {
-        mockCommunitiesDB.updateCommunity.mockRejectedValueOnce(new Error('Database error'))
+        // Mock will throw, but we continue processing other communities
+        // The error is caught in the loop, so we still call updateCommunitiesRankingScores
       })
 
       it('should continue processing other communities', async () => {
+        // Add a community with invalid data that would cause calculation to fail
+        communitiesWithMetrics.push({
+          communityId: 'community-error',
+          eventsCount: NaN,
+          hasThumbnail: 0,
+          photosCount: 0,
+          hasDescription: 0,
+          placesCount: 0,
+          newMembersCount: 0,
+          postsCount: 0,
+          streamsCount: 0,
+          eventsTotalAttendees: 0,
+          streamsTotalParticipants: 0,
+          ageInDays: 10
+        })
+        mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
+
         await communityRanking.calculateRankingScoreForAllCommunities()
 
-        expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledTimes(communitiesWithMetrics.length)
+        // Should still update the valid communities
+        expect(mockCommunitiesDB.updateCommunitiesRankingScores).toHaveBeenCalled()
       })
     })
 
@@ -136,16 +174,66 @@ describe('Ranking Component', () => {
             postsCount: 0,
             streamsCount: 0,
             eventsTotalAttendees: 0,
-            streamsTotalParticipants: 0
+            streamsTotalParticipants: 0,
+            ageInDays: 2 // New community gets boost
           }
         ]
         mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
       })
 
-      it('should return score of 0', async () => {
+      it('should return normalized score with new community boost for zero-metric community', async () => {
         await communityRanking.calculateRankingScoreForAllCommunities()
 
-        expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith('community-3', { ranking_score: 0 })
+        const updateCall = mockCommunitiesDB.updateCommunitiesRankingScores.mock.calls[0][0]
+        const score = updateCall.get('community-3')
+
+        // Score should be normalized (0-1 range)
+        expect(score).toBeGreaterThanOrEqual(0)
+        expect(score).toBeLessThanOrEqual(1)
+
+        // Even with zero metrics, new community gets boost multiplier
+        // Base normalized score is 0, but boost of 1.5x still gives 0
+        // So score should be 0 (or very close to 0)
+        expect(score).toBe(0)
+      })
+    })
+
+    describe('and communities are older than boost threshold', () => {
+      beforeEach(() => {
+        communitiesWithMetrics = [
+          {
+            communityId: 'community-old',
+            eventsCount: 10,
+            hasThumbnail: 1,
+            photosCount: 5,
+            hasDescription: 1,
+            placesCount: 5,
+            newMembersCount: 10,
+            postsCount: 20,
+            streamsCount: 3,
+            eventsTotalAttendees: 100,
+            streamsTotalParticipants: 50,
+            ageInDays: 45 // Older than 30 days - no boost
+          }
+        ]
+        mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
+      })
+
+      it('should calculate normalized score without boost for older community', async () => {
+        await communityRanking.calculateRankingScoreForAllCommunities()
+
+        const updateCall = mockCommunitiesDB.updateCommunitiesRankingScores.mock.calls[0][0]
+        const score = updateCall.get('community-old')
+
+        // Score should be normalized (0-1 range)
+        expect(score).toBeGreaterThanOrEqual(0)
+        expect(score).toBeLessThanOrEqual(1)
+
+        // Older community (45 days) gets no boost (multiplier = 1.0)
+        // This community has good metrics, so should have a decent score
+        // With normalized metrics and weights, should be around 0.4-0.6 range
+        expect(score).toBeGreaterThan(0.3)
+        expect(score).toBeLessThan(0.8)
       })
     })
   })

@@ -557,4 +557,5 @@ export type CommunityRankingMetrics = {
   placesCount: number
   newMembersCount: number
   postsCount: number
+  ageInDays: number
 }

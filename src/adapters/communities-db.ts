@@ -1107,7 +1107,7 @@ export function createCommunitiesDBComponent(
       `)
     },
 
-    async getAllCommunitiesWithRankingMetrics(): Promise<Array<CommunityRankingMetrics>> {
+    async getAllCommunitiesWithRankingMetrics(pagination?: Pagination): Promise<Array<CommunityRankingMetrics>> {
       const query = SQL`
         SELECT 
           c.id AS "communityId",
@@ -1120,7 +1120,8 @@ export function createCommunitiesDBComponent(
           COALESCE(crm.streams_count, 0)::int AS "streamsCount",
           COALESCE(crm.events_total_attendees, 0)::int AS "eventsTotalAttendees",
           COALESCE(crm.streams_total_participants, 0)::int AS "streamsTotalParticipants",
-          COALESCE(crm.has_thumbnail, false)::int AS "hasThumbnail"
+          COALESCE(crm.has_thumbnail, false)::int AS "hasThumbnail",
+          (NOW()::date - c.created_at::date) AS "ageInDays"
         FROM communities c
         LEFT JOIN community_ranking_metrics crm ON c.id = crm.community_id
         LEFT JOIN (
@@ -1139,9 +1140,15 @@ export function createCommunitiesDBComponent(
           FROM community_posts
           GROUP BY community_id
         ) posts_count ON c.id = posts_count.community_id
-        WHERE c.active = true
-        ORDER BY c.id
+        WHERE c.active = true 
+          AND (c.last_score_calculated_at IS NULL OR c.last_score_calculated_at < NOW() - INTERVAL '24 hours')
+        ORDER BY c.last_score_calculated_at ASC NULLS FIRST, c.id
       `
+
+      if (pagination) {
+        query.append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
+      }
+
       const result = await pg.query<CommunityRankingMetrics>(query)
       return result.rows
     },
@@ -1189,6 +1196,40 @@ export function createCommunitiesDBComponent(
         .append(values)
         .append(SQL`) ON CONFLICT (community_id) DO UPDATE SET `)
         .append(update)
+
+      await pg.query(query)
+    },
+
+    async updateCommunitiesRankingScores(updates: Map<string, number>): Promise<void> {
+      if (updates.size === 0) {
+        return
+      }
+
+      const communityIds = Array.from(updates.keys())
+
+      // Build VALUES clause for batch update
+      const valuesQuery = SQL`VALUES `
+      communityIds.forEach((communityId, index) => {
+        const rankingScore = updates.get(communityId)!
+        valuesQuery.append(SQL`(${communityId}::uuid, ${rankingScore}::float4)`)
+        if (index < communityIds.length - 1) {
+          valuesQuery.append(SQL`, `)
+        }
+      })
+
+      // Build the UPDATE query using VALUES and JOIN
+      const query = SQL`
+        UPDATE communities c
+        SET 
+          ranking_score = v.ranking_score,
+          last_score_calculated_at = now(),
+          updated_at = now()
+        FROM (
+      `.append(valuesQuery).append(SQL`
+        ) AS v(id, ranking_score)
+        WHERE c.id = v.id
+          AND c.active = true
+      `)
 
       await pg.query(query)
     }

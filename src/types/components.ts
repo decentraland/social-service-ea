@@ -222,7 +222,8 @@ export interface ICommunitiesDatabaseComponent {
   likePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePostsFromCommunity(communityId: string, userAddress: EthAddress): Promise<void>
-  getAllCommunitiesWithRankingMetrics(): Promise<Array<CommunityRankingMetrics>>
+  getAllCommunitiesWithRankingMetrics(pagination?: Pagination): Promise<Array<CommunityRankingMetrics>>
+  updateCommunitiesRankingScores(updates: Map<string, number>): Promise<void>
   updateCommunityRankingMetrics(
     communityId: string,
     metrics: Partial<
