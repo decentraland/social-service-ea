@@ -37,6 +37,11 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       notNull: true,
       default: 0
     },
+    has_thumbnail: {
+      type: PgType.BOOLEAN,
+      notNull: true,
+      default: false
+    },
     updated_at: {
       type: PgType.TIMESTAMP,
       notNull: true,
