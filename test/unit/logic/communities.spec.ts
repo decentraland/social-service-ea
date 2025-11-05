@@ -722,6 +722,7 @@ describe('Community Component', () => {
         `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
       )
       mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+      mockCommunitiesDB.updateCommunityRankingMetrics.mockResolvedValue()
     })
 
     describe('and the user has owned names', () => {
@@ -776,6 +777,7 @@ describe('Community Component', () => {
           })
           expect(mockCommunityPlaces.addPlaces).not.toHaveBeenCalled()
           expect(mockCommunityThumbnail.uploadThumbnail).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.updateCommunityRankingMetrics).not.toHaveBeenCalled()
         })
 
         it('should create community successfully with thumbnail', async () => {
@@ -803,6 +805,9 @@ describe('Community Component', () => {
             thumbnailBuffer: thumbnail
           })
           expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(newCommunityId, thumbnail)
+          expect(mockCommunitiesDB.updateCommunityRankingMetrics).toHaveBeenCalledWith(newCommunityId, {
+            has_thumbnail: true
+          })
         })
 
         it('should create community with visibility all by default', async () => {
@@ -920,6 +925,9 @@ describe('Community Component', () => {
           })
           expect(mockCommunityPlaces.addPlaces).toHaveBeenCalledWith(newCommunityId, ownerAddress, placeIds)
           expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(newCommunityId, thumbnail)
+          expect(mockCommunitiesDB.updateCommunityRankingMetrics).toHaveBeenCalledWith(newCommunityId, {
+            has_thumbnail: true
+          })
         })
 
         describe('and the user does not own all places', () => {
@@ -1293,6 +1301,9 @@ describe('Community Component', () => {
               unlisted: undefined
             })
             expect(mockCommunityThumbnail.uploadThumbnail).toHaveBeenCalledWith(communityId, updates.thumbnailBuffer)
+            expect(mockCommunitiesDB.updateCommunityRankingMetrics).toHaveBeenCalledWith(communityId, {
+              has_thumbnail: true
+            })
             expect(mockCdnCacheInvalidator.invalidateThumbnail).toHaveBeenCalledWith(communityId)
             expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(communityId, userAddress, updates.placeIds)
           })
@@ -1605,6 +1616,9 @@ describe('Community Component', () => {
               communityId,
               completeUpdate.thumbnailBuffer
             )
+            expect(mockCommunitiesDB.updateCommunityRankingMetrics).toHaveBeenCalledWith(communityId, {
+              has_thumbnail: true
+            })
             expect(mockCommunityPlaces.updatePlaces).toHaveBeenCalledWith(
               communityId,
               userAddress,

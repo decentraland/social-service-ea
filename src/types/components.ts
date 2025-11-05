@@ -41,7 +41,9 @@ import {
   CommunityForModeration,
   CommunityPost,
   CommunityPostWithLikes,
-  GetCommunityPostsOptions
+  GetCommunityPostsOptions,
+  CommunityRankingMetrics,
+  CommunityRankingMetricsDB
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -220,6 +222,22 @@ export interface ICommunitiesDatabaseComponent {
   likePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePost(postId: string, userAddress: EthAddress): Promise<void>
   unlikePostsFromCommunity(communityId: string, userAddress: EthAddress): Promise<void>
+  getAllCommunitiesWithRankingMetrics(pagination?: Pagination): Promise<Array<CommunityRankingMetrics>>
+  updateCommunitiesRankingScores(updates: Map<string, number>): Promise<void>
+  updateCommunityRankingMetrics(
+    communityId: string,
+    metrics: Partial<
+      Pick<
+        CommunityRankingMetricsDB,
+        | 'events_count'
+        | 'events_total_attendees'
+        | 'photos_count'
+        | 'streams_count'
+        | 'streams_total_participants'
+        | 'has_thumbnail'
+      >
+    >
+  ): Promise<void>
 }
 
 export interface IVoiceDatabaseComponent {

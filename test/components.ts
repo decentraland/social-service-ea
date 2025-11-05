@@ -54,7 +54,8 @@ import {
   createCommunityComplianceValidatorComponent,
   createCommunityFieldsValidatorComponent,
   createCommunityRequestsComponent,
-  createCommunityPostsComponent
+  createCommunityPostsComponent,
+  createCommunityRankingComponent
 } from '../src/logic/community'
 import { createDbHelper } from './helpers/community-db-helper'
 import { createVoiceComponent } from '../src/logic/voice'
@@ -270,6 +271,10 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     analytics
   })
+  const communityRanking = createCommunityRankingComponent({
+    logs,
+    communitiesDb
+  })
   const rpcServer = await createRpcServerComponent({
     logs,
     pubsub,
@@ -342,6 +347,7 @@ async function initComponents(): Promise<TestComponents> {
     communityOwners,
     communityPlaces,
     communityPosts,
+    communityRanking,
     communityRequests,
     communityRoles,
     communityThumbnail,

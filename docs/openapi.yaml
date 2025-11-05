@@ -2,6 +2,9 @@ openapi: 3.0.0
 info:
   title: Social Service API
   version: 1.0.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
   description: |
     ## Overview
 
@@ -71,7 +74,7 @@ info:
 
     ### Request Types
     - **invite**: An invitation sent to a user to join a community
-    - **request_to_join**: A request from a user to join a private community   
+    - **request_to_join**: A request from a user to join a private community
 
 servers:
   - url: https://social-api.decentraland.org
@@ -101,6 +104,7 @@ security:
 paths:
   /v1/communities:
     get:
+      operationId: listCommunities
       summary: List communities
       description: |
         Lists all communities.
@@ -156,6 +160,12 @@ paths:
             application/json:
               schema:
                 $ref: './schemas.yaml#/components/schemas/GetCommunities200OkResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
@@ -165,6 +175,7 @@ paths:
       tags:
         - Communities
     post:
+      operationId: createCommunity
       summary: Create a new community
       description: |
         Creates a new community with the provided details.
@@ -223,6 +234,7 @@ paths:
         - Communities
   /v1/communities/{id}:
     get:
+      operationId: getCommunityById
       summary: Get a community by ID
       description: |
         Retrieves detailed information about a specific community by its unique ID.
@@ -266,6 +278,7 @@ paths:
       tags:
         - Communities
     put:
+      operationId: updateCommunity
       summary: Update a community
       description: |
         Updates a community's details including name, description, privacy settings, unlisted status, and thumbnail.
@@ -341,6 +354,7 @@ paths:
       tags:
         - Communities
     patch:
+      operationId: patchCommunity
       summary: Update a community partially
       description: |
         Partially updates a community's properties. Currently supports updating the Editor's Choice flag.
@@ -365,7 +379,7 @@ paths:
               properties:
                 editorsChoice:
                   type: boolean
-                  description: 'Whether the community should be marked as Editor\'s Choice. Only global moderators can update this field.'
+                  description: "Whether the community should be marked as Editor's Choice. Only global moderators can update this field."
       responses:
         '204':
           description: Community updated successfully
@@ -396,6 +410,7 @@ paths:
       tags:
         - Communities
     delete:
+      operationId: deleteCommunity
       summary: Delete a community
       description: |
         Deletes a community.
@@ -435,6 +450,7 @@ paths:
 
   /v1/communities/{id}/members:
     get:
+      operationId: listCommunityMembers
       summary: List community members
       description: |
         Lists all members of a specific community with their profiles and roles.
@@ -497,6 +513,7 @@ paths:
       tags:
         - Communities
     post:
+      operationId: addCommunityMember
       summary: Add a member to a community
       description: |
         Adds a member to a community.
@@ -535,6 +552,7 @@ paths:
         - Communities
   /v1/communities/{id}/members/{memberAddress}:
     delete:
+      operationId: removeCommunityMember
       summary: Remove a member from a community
       description: |
         Removes a member from a community.
@@ -578,6 +596,7 @@ paths:
       tags:
         - Communities
     patch:
+      operationId: updateMemberRole
       summary: Update member role
       description: |
         Updates the role of a member in a community.
@@ -635,6 +654,7 @@ paths:
         - Communities
   /v1/members/{address}/communities:
     get:
+      operationId: getMemberCommunities
       summary: List communities for a member
       description: |
         Lists all communities a member belongs to.
@@ -684,6 +704,7 @@ paths:
 
   /v1/communities/{id}/bans:
     get:
+      operationId: listBannedMembers
       summary: List banned members of a community
       description: |
         Lists all banned members of a specific community.
@@ -738,6 +759,7 @@ paths:
         - Communities
   /v1/communities/{id}/members/{memberAddress}/bans:
     post:
+      operationId: banCommunityMember
       summary: Ban a member from a community
       description: |
         Bans a member from a community.
@@ -781,6 +803,7 @@ paths:
       tags:
         - Communities
     delete:
+      operationId: unbanCommunityMember
       summary: Unban a member from a community
       description: |
         Unbans a member from a community.
@@ -826,6 +849,7 @@ paths:
 
   /v1/communities/{id}/places:
     get:
+      operationId: getCommunityPlaces
       summary: Get community places
       description: |
         Lists all places (Decentraland world locations) associated with a specific community.
@@ -883,6 +907,7 @@ paths:
         - Communities
 
     post:
+      operationId: addCommunityPlaces
       summary: Add places to community
       description: |
         Adds one or more places to a community.
@@ -944,6 +969,7 @@ paths:
 
   /v1/communities/{id}/places/{placeId}:
     delete:
+      operationId: removeCommunityPlace
       summary: Remove place from community
       description: |
         Removes a place from a community.
@@ -990,6 +1016,7 @@ paths:
 
   /v1/communities/{address}/managed:
     get:
+      operationId: getManagedCommunities
       summary: Get managed communities for an address
       description: |
         Lists all communities where the specified address is an owner or moderator.
@@ -1039,6 +1066,7 @@ paths:
 
   /v1/referral-progress:
     post:
+      operationId: createReferralProgress
       summary: Create referral progress
       description: |
         Creates a referral relationship between a referrer and an invited user.
@@ -1083,6 +1111,7 @@ paths:
       tags:
         - Referrals
     patch:
+      operationId: updateReferralStatus
       summary: Update referral signed up status
       description: |
         Updates the referral progress status to signed up for the authenticated user.
@@ -1119,6 +1148,7 @@ paths:
       tags:
         - Referrals
     get:
+      operationId: getReferralStats
       summary: Get invited users accepted stats
       description: |
         Retrieves the current users invited by a referral and the ones from the last time they were fetched, along with reward images containing the tier and URL information. This allows comparing the previously seen data with the current one.
@@ -1155,6 +1185,7 @@ paths:
 
   /v1/referral-email:
     post:
+      operationId: addReferralEmail
       summary: Add referral email
       description: |
         Associates an email address with a referral for the authenticated user.
@@ -1200,6 +1231,7 @@ paths:
 
   /v1/communities/{id}/requests:
     get:
+      operationId: getCommunityRequests
       summary: Get community requests
       description: |
         Lists all pending requests (invites and join requests) for a specific community.
@@ -1262,6 +1294,7 @@ paths:
       tags:
         - Communities
     post:
+      operationId: createCommunityRequest
       summary: Create community request
       description: |
         Creates a community request (invite or join request) for a specific member.
@@ -1328,6 +1361,7 @@ paths:
 
   /v1/communities/{id}/requests/{requestId}:
     patch:
+      operationId: updateCommunityRequestStatus
       summary: Update community request status
       description: |
         Updates the status of a community request (accept, reject, or cancel).
@@ -1387,6 +1421,7 @@ paths:
 
   /v1/members/{address}/requests:
     get:
+      operationId: getMemberRequests
       summary: Get member requests
       description: |
         Lists all pending requests (invites received and join requests sent) for a specific member.
@@ -1445,6 +1480,7 @@ paths:
 
   /v1/members/{address}/invites:
     get:
+      operationId: getCommunityInvites
       summary: Get community invites for a user
       description: |
         Lists all communities where the authenticated user (inviter) is a member but the specified address (invitee) is not a member.
@@ -1489,6 +1525,7 @@ paths:
 
   /v1/communities/{id}/posts/{postId}/like:
     post:
+      operationId: likeCommunityPost
       summary: Like a community post
       description: |
         Likes a post in a community.
@@ -1533,6 +1570,7 @@ paths:
       tags:
         - Communities
     delete:
+      operationId: unlikeCommunityPost
       summary: Unlike a community post
       description: |
         Unlikes a post in a community.
@@ -1579,6 +1617,7 @@ paths:
 
   /v1/community-voice-chats/active:
     get:
+      operationId: getActiveCommunityVoiceChats
       summary: Get active community voice chats
       description: |
         Lists all active community voice chats visible to the authenticated user.
@@ -1611,6 +1650,7 @@ paths:
 
   /v1/moderation/communities:
     get:
+      operationId: getCommunitiesForModeration
       summary: Get all communities for moderation
       description: |
         Lists all communities for moderation purposes with detailed information.
@@ -1667,6 +1707,7 @@ paths:
 
   /v1/communities/{id}/posts:
     get:
+      operationId: listCommunityPosts
       summary: List community posts
       description: |
         Lists all posts from a specific community with pagination support.
@@ -1723,6 +1764,7 @@ paths:
       tags:
         - Communities
     post:
+      operationId: createCommunityPost
       summary: Create a community post
       description: |
         Creates a new post in a community.
@@ -1780,6 +1822,7 @@ paths:
 
   /v1/communities/{id}/posts/{postId}:
     delete:
+      operationId: deleteCommunityPost
       summary: Delete a community post
       description: |
         Deletes a post from a community.

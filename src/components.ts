@@ -43,7 +43,8 @@ import {
   createCommunityComplianceValidatorComponent,
   createCommunityFieldsValidatorComponent,
   createCommunityRequestsComponent,
-  createCommunityPostsComponent
+  createCommunityPostsComponent,
+  createCommunityRankingComponent
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
@@ -182,7 +183,13 @@ export async function initComponents(): Promise<AppComponents> {
 
   const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
-  const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
+
+  const communityPlaces = await createCommunityPlacesComponent({
+    communitiesDb,
+    communityRoles,
+    logs,
+    placesApi
+  })
 
   const communityVoice = await createCommunityVoiceComponent({
     logs,
@@ -263,6 +270,15 @@ export async function initComponents(): Promise<AppComponents> {
     logs
   })
 
+  const communityRanking = createCommunityRankingComponent({ logs, communitiesDb })
+
+  const communityRankingCalculationJob = createJobComponent(
+    { logs },
+    communityRanking.calculateRankingScoreForAllCommunities,
+    24 * 60 * 60 * 1000, // 24 hours in milliseconds
+    { repeat: true /*startupDelay: 60 * 60 * 1000 */ } // Start after 1 hour delay
+  )
+
   const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -342,6 +358,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityVoiceChatCache,
     communityVoiceChatPolling,
     communityVoiceChatPollingJob,
+    communityRankingCalculationJob,
     config,
     email,
     expirePrivateVoiceChatJob,
@@ -364,6 +381,7 @@ export async function initComponents(): Promise<AppComponents> {
     placesApi,
     pubsub,
     queue,
+    communityRanking,
     redis,
     referral,
     referralDb,

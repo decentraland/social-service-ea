@@ -1,30 +1,71 @@
 import { Event, Events, LoggedInEvent } from '@dcl/schemas'
-import { IMessageProcessorComponent, createMessageProcessorComponent } from '../../../src/logic/sqs'
+import { IMessageProcessorComponent, createMessageProcessorComponent, EventHandler } from '../../../src/logic/sqs'
+import { createLogsMockedComponent } from '../../mocks/components'
 
 describe('message-processor', () => {
-  let mockLogger: any
   let mockReferral: any
+  let mockLogs: ReturnType<typeof createLogsMockedComponent>
   let messageProcessor: IMessageProcessorComponent
 
   beforeEach(async () => {
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn()
-    }
+    mockLogs = createLogsMockedComponent()
 
     mockReferral = {
       finalizeReferral: jest.fn()
     }
 
     messageProcessor = await createMessageProcessorComponent({
-      logs: { getLogger: () => mockLogger },
+      logs: mockLogs,
       referral: mockReferral
     })
   })
 
   afterEach(() => {
     jest.resetAllMocks()
+  })
+
+  describe('when registering a new handler', () => {
+    let customHandler: jest.Mock
+    let handler: EventHandler
+
+    beforeEach(() => {
+      customHandler = jest.fn().mockResolvedValue(undefined)
+      handler = {
+        type: Events.Type.CLIENT,
+        subTypes: [Events.SubType.Client.LOGGED_IN],
+        handle: customHandler
+      }
+    })
+
+    it('should add the handler to the handlers list', () => {
+      messageProcessor.registerHandler(handler)
+
+      expect(messageProcessor.registerHandler).toBeDefined()
+    })
+
+    describe('and processing a matching message', () => {
+      let message: Event
+
+      beforeEach(() => {
+        message = {
+          type: Events.Type.CLIENT,
+          subType: Events.SubType.Client.LOGGED_IN,
+          metadata: {
+            userAddress: '0x123'
+          },
+          key: 'test-key',
+          timestamp: Date.now()
+        } as unknown as LoggedInEvent
+        messageProcessor.registerHandler(handler)
+      })
+
+      it('should call both the default handler and the custom handler', async () => {
+        await messageProcessor.processMessage(message)
+
+        expect(mockReferral.finalizeReferral).toHaveBeenCalledWith('0x123')
+        expect(customHandler).toHaveBeenCalledWith(message)
+      })
+    })
   })
 
   describe('when processing a message', () => {
@@ -62,7 +103,10 @@ describe('message-processor', () => {
         const result = await messageProcessor.processMessage(message)
 
         expect(result).toBeUndefined()
-        expect(mockLogger.error).toHaveBeenCalledWith('User address not found in message', expect.any(Object))
+        expect(mockLogs.getLogger('message-processor').error).toHaveBeenCalledWith(
+          'User address not found in message',
+          expect.any(Object)
+        )
         expect(mockReferral.finalizeReferral).not.toHaveBeenCalled()
       })
     })

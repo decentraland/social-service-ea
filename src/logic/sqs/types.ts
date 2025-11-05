@@ -1,5 +1,5 @@
 import { IBaseComponent } from '@well-known-components/interfaces'
-import { Event } from '@dcl/schemas'
+import { Event, Events } from '@dcl/schemas'
 
 export interface IMessageConsumerComponent extends IBaseComponent {
   getStatus(): {
@@ -8,6 +8,13 @@ export interface IMessageConsumerComponent extends IBaseComponent {
   }
 }
 
+export type EventHandler = {
+  type: Events.Type
+  subTypes: Event['subType'][]
+  handle: (message: Event) => Promise<void>
+}
+
 export interface IMessageProcessorComponent extends IBaseComponent {
   processMessage: (message: Event) => Promise<void>
+  registerHandler: (handler: EventHandler) => void
 }

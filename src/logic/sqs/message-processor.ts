@@ -1,37 +1,61 @@
 import { Event, Events, LoggedInEvent, LoggedInCachedEvent } from '@dcl/schemas'
 
 import { AppComponents } from '../../types/system'
-import { IMessageProcessorComponent } from './types'
+import { IMessageProcessorComponent, EventHandler } from './types'
 
+// TODO: move to core-components
 export async function createMessageProcessorComponent({
   logs,
   referral
 }: Pick<AppComponents, 'logs' | 'referral'>): Promise<IMessageProcessorComponent> {
   const logger = logs.getLogger('message-processor')
 
+  // TODO: decouple the handlers from the message processor
+  const eventHandlers: EventHandler[] = [
+    {
+      type: Events.Type.CLIENT,
+      subTypes: [Events.SubType.Client.LOGGED_IN, Events.SubType.Client.LOGGED_IN_CACHED],
+      handle: async (message: Event) => {
+        const { metadata } = message as LoggedInEvent | LoggedInCachedEvent
+        const userAddress = metadata.userAddress
+
+        if (!userAddress) {
+          logger.error('User address not found in message', { message: JSON.stringify(message) })
+          return
+        }
+
+        await referral.finalizeReferral(userAddress)
+      }
+    }
+  ]
+
   async function processMessage(message: Event) {
-    if (
-      message.type !== Events.Type.CLIENT ||
-      (message.subType !== Events.SubType.Client.LOGGED_IN_CACHED &&
-        message.subType !== Events.SubType.Client.LOGGED_IN)
-    ) {
+    const matchingHandlers = eventHandlers.filter(
+      (handler) => message.type === handler.type && handler.subTypes.includes(message.subType)
+    )
+
+    if (matchingHandlers.length === 0) {
+      logger.warn('No handler found for message', { message: JSON.stringify(message) })
       return
     }
 
-    const { metadata } = message as LoggedInEvent | LoggedInCachedEvent
-    const userAddress = metadata.userAddress
-
-    if (!userAddress) {
-      logger.error('User address not found in message', { message: JSON.stringify(message) })
-      return
+    for (const handler of matchingHandlers) {
+      try {
+        await handler.handle(message)
+      } catch (error) {
+        logger.error('Error processing message in handler', {
+          type: message.type,
+          subType: message.subType,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        })
+      }
     }
-
-    await referral.finalizeReferral(userAddress)
-
-    return
   }
 
   return {
-    processMessage
+    processMessage,
+    registerHandler: (handler: EventHandler) => {
+      eventHandlers.push(handler)
+    }
   }
 }

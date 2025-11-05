@@ -19,7 +19,9 @@ import {
   CommunityPost,
   CommunityPostWithLikes,
   GetCommunityPostsOptions,
-  CommunityVisibilityEnum
+  CommunityVisibilityEnum,
+  CommunityRankingMetrics,
+  CommunityRankingMetricsDB
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -158,10 +160,7 @@ export function createCommunitiesDBComponent(
       )
     },
 
-    async getCommunityMembersCount(
-      communityId: string,
-      options?: { filterByMembers?: string[]; joinedWithinDays?: number }
-    ): Promise<number> {
+    async getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number> {
       const query = SQL`
         SELECT COUNT(cm.member_address) 
           FROM community_members cm
@@ -176,10 +175,6 @@ export function createCommunitiesDBComponent(
 
       if (options && options.filterByMembers) {
         query.append(SQL` AND cm.member_address = ANY(${options.filterByMembers.map(normalizeAddress)})`)
-      }
-
-      if (options && options.joinedWithinDays) {
-        query.append(SQL` AND cm.joined_at >= NOW() - make_interval(days => ${options.joinedWithinDays})`)
       }
 
       return pg.getCount(query)
@@ -1110,6 +1105,140 @@ export function createCommunitiesDBComponent(
         DELETE FROM community_post_likes
         WHERE post_id IN (SELECT id FROM community_posts WHERE community_id = ${communityId}) AND user_address = ${normalizedAddress}
       `)
+    },
+
+    async getAllCommunitiesWithRankingMetrics(pagination?: Pagination): Promise<Array<CommunityRankingMetrics>> {
+      const query = SQL`
+        SELECT 
+          c.id AS "communityId",
+          COALESCE(crm.events_count, 0)::int AS "eventsCount",
+          COALESCE(crm.photos_count, 0)::int AS "photosCount",
+          CASE WHEN c.description IS NOT NULL AND TRIM(c.description) != '' THEN 1 ELSE 0 END AS "hasDescription",
+          COALESCE(places_count.count, 0)::int AS "placesCount",
+          COALESCE(new_members_7d.count, 0)::int AS "newMembersCount",
+          COALESCE(posts_count.count, 0)::int AS "postsCount",
+          COALESCE(crm.streams_count, 0)::int AS "streamsCount",
+          COALESCE(crm.events_total_attendees, 0)::int AS "eventsTotalAttendees",
+          COALESCE(crm.streams_total_participants, 0)::int AS "streamsTotalParticipants",
+          COALESCE(crm.has_thumbnail, false)::int AS "hasThumbnail",
+          (NOW()::date - c.created_at::date) AS "ageInDays"
+        FROM communities c
+        LEFT JOIN community_ranking_metrics crm ON c.id = crm.community_id
+        LEFT JOIN (
+          SELECT community_id, COUNT(*) as count
+          FROM community_members
+          WHERE joined_at >= NOW() - INTERVAL '7 days'
+          GROUP BY community_id
+        ) new_members_7d ON c.id = new_members_7d.community_id
+        LEFT JOIN (
+          SELECT community_id, COUNT(*) as count
+          FROM community_places
+          GROUP BY community_id
+        ) places_count ON c.id = places_count.community_id
+        LEFT JOIN (
+          SELECT community_id, COUNT(*) as count
+          FROM community_posts
+          GROUP BY community_id
+        ) posts_count ON c.id = posts_count.community_id
+        WHERE c.active = true 
+        ORDER BY c.id
+      `
+
+      if (pagination) {
+        query.append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
+      }
+
+      const result = await pg.query<CommunityRankingMetrics>(query)
+      return result.rows
+    },
+
+    async updateCommunityRankingMetrics(
+      communityId: string,
+      metrics: Partial<
+        Pick<
+          CommunityRankingMetricsDB,
+          | 'events_count'
+          | 'events_total_attendees'
+          | 'photos_count'
+          | 'streams_count'
+          | 'streams_total_participants'
+          | 'has_thumbnail'
+        >
+      >
+    ): Promise<void> {
+      const definedMetrics = Object.fromEntries(Object.entries(metrics).filter(([_, value]) => value !== undefined))
+
+      if (Object.keys(definedMetrics).length === 0) {
+        return
+      }
+
+      const insertKeys = ['community_id', ...Object.keys(definedMetrics)]
+      const values = [communityId, ...Object.values(definedMetrics)].reduce(
+        (acc, value, index, array) => {
+          return acc.append(SQL`${value}`).append(index === array.length - 1 ? '' : SQL`, `)
+        },
+        SQL``
+      )
+
+      const update = Object.entries(definedMetrics).reduce(
+        (acc, [key, value], index, array) => {
+          const isBoolean = typeof value === 'boolean'
+          if (isBoolean) {
+            return acc
+              .append(`${key} = `)
+              .append(SQL`${value}`)
+              .append(index === array.length - 1 ? '' : ', ')
+          } else {
+            return acc
+              .append(`${key} = community_ranking_metrics.${key} + `)
+              .append(SQL`${value}`)
+              .append(index === array.length - 1 ? '' : ', ')
+          }
+        },
+        SQL``
+      )
+
+      const query = SQL`INSERT INTO community_ranking_metrics (`
+        .append(`${insertKeys.join(', ')}) VALUES (`)
+        .append(values)
+        .append(SQL`) ON CONFLICT (community_id) DO UPDATE SET `)
+        .append(update)
+
+      await pg.query(query)
+    },
+
+    async updateCommunitiesRankingScores(updates: Map<string, number>): Promise<void> {
+      if (updates.size === 0) {
+        return
+      }
+
+      const communityIds = Array.from(updates.keys())
+
+      // Build VALUES clause for batch update
+      const valuesQuery = SQL`VALUES `
+      communityIds.forEach((communityId, index) => {
+        const rankingScore = updates.get(communityId)!
+        valuesQuery.append(SQL`(${communityId}::uuid, ${rankingScore}::float4)`)
+        if (index < communityIds.length - 1) {
+          valuesQuery.append(SQL`, `)
+        }
+      })
+
+      // Build the UPDATE query using VALUES and JOIN
+      const query = SQL`
+        UPDATE communities c
+        SET 
+          ranking_score = v.ranking_score,
+          last_score_calculated_at = now(),
+          updated_at = now()
+        FROM (
+      `.append(valuesQuery).append(SQL`
+        ) AS v(id, ranking_score)
+        WHERE c.id = v.id
+          AND c.active = true
+      `)
+
+      await pg.query(query)
     }
   }
 }
