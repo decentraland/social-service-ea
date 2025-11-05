@@ -1153,71 +1153,52 @@ export function createCommunitiesDBComponent(
         >
       >
     ): Promise<void> {
-      const { eventsCount, eventsTotalAttendees, photosCount, streamsCount, streamsTotalParticipants } = metrics
+      // Filter out undefined values
+      const definedMetrics = Object.fromEntries(Object.entries(metrics).filter(([_, value]) => value !== undefined))
 
-      if (Object.values(metrics).every((value) => value === undefined)) {
+      if (Object.keys(definedMetrics).length === 0) {
         return
       }
 
-      // Build the INSERT clause with only provided fields
-      let insertFields = SQL`community_id`
-      let insertValues = SQL`${communityId}`
-
-      // Build the UPDATE SET clauses
-      const updateClauses: ReturnType<typeof SQL>[] = []
-
-      if (eventsCount !== undefined) {
-        insertFields = insertFields.append(SQL`, events_count`)
-        insertValues = insertValues.append(SQL`, ${eventsCount}`)
-        updateClauses.push(SQL`events_count = community_ranking_metrics.events_count + ${eventsCount}`)
+      // Field name mapping: camelCase -> snake_case
+      const fieldMapping: Record<string, string> = {
+        eventsCount: 'events_count',
+        eventsTotalAttendees: 'events_total_attendees',
+        photosCount: 'photos_count',
+        streamsCount: 'streams_count',
+        streamsTotalParticipants: 'streams_total_participants'
       }
 
-      if (eventsTotalAttendees !== undefined) {
-        insertFields = insertFields.append(SQL`, events_total_attendees`)
-        insertValues = insertValues.append(SQL`, ${eventsTotalAttendees}`)
-        updateClauses.push(
-          SQL`events_total_attendees = community_ranking_metrics.events_total_attendees + ${eventsTotalAttendees}`
-        )
-      }
+      // Build INSERT fields (community_id + metric columns)
+      const keys = Object.keys(definedMetrics).map((key) => fieldMapping[key])
+      const insertKeys = ['community_id', ...keys]
 
-      if (photosCount !== undefined) {
-        insertFields = insertFields.append(SQL`, photos_count`)
-        insertValues = insertValues.append(SQL`, ${photosCount}`)
-        updateClauses.push(SQL`photos_count = community_ranking_metrics.photos_count + ${photosCount}`)
-      }
+      // Build INSERT values (community_id + metric values)
+      const values = [communityId, ...Object.values(definedMetrics)].reduce(
+        (acc, value, index, array) => {
+          return acc.append(SQL`${value}`).append(index === array.length - 1 ? '' : SQL`, `)
+        },
+        SQL``
+      )
 
-      if (streamsCount !== undefined) {
-        insertFields = insertFields.append(SQL`, streams_count`)
-        insertValues = insertValues.append(SQL`, ${streamsCount}`)
-        updateClauses.push(SQL`streams_count = community_ranking_metrics.streams_count + ${streamsCount}`)
-      }
-
-      if (streamsTotalParticipants !== undefined) {
-        insertFields = insertFields.append(SQL`, streams_total_participants`)
-        insertValues = insertValues.append(SQL`, ${streamsTotalParticipants}`)
-        updateClauses.push(
-          SQL`streams_total_participants = community_ranking_metrics.streams_total_participants + ${streamsTotalParticipants}`
-        )
-      }
-
-      insertFields = insertFields.append(SQL`, updated_at`)
-      insertValues = insertValues.append(SQL`, now()`)
-      updateClauses.push(SQL`updated_at = now()`)
+      // Build UPDATE clauses with incremental logic (column = column + value)
+      const update = Object.entries(definedMetrics).reduce(
+        (acc, [key, value], index, array) => {
+          const columnName = fieldMapping[key]
+          return acc
+            .append(`${columnName} = community_ranking_metrics.${columnName} + `)
+            .append(SQL`${value}`)
+            .append(index === array.length - 1 ? '' : ', ')
+        },
+        SQL``
+      )
 
       // Build the final query
-      let query = SQL`INSERT INTO community_ranking_metrics (`
-        .append(insertFields)
-        .append(SQL`) VALUES (`)
-        .append(insertValues)
+      const query = SQL`INSERT INTO community_ranking_metrics (`
+        .append(`${insertKeys.join(', ')}) VALUES (`)
+        .append(values)
         .append(SQL`) ON CONFLICT (community_id) DO UPDATE SET `)
-
-      // Join the UPDATE clauses
-      for (let i = 0; i < updateClauses.length; i++) {
-        query = query.append(updateClauses[i])
-        if (i < updateClauses.length - 1) {
-          query = query.append(SQL`, `)
-        }
-      }
+        .append(update)
 
       await pg.query(query)
     }
