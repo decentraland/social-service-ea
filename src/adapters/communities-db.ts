@@ -1141,8 +1141,7 @@ export function createCommunitiesDBComponent(
           GROUP BY community_id
         ) posts_count ON c.id = posts_count.community_id
         WHERE c.active = true 
-          AND (c.last_score_calculated_at IS NULL OR c.last_score_calculated_at < NOW() - INTERVAL '24 hours')
-        ORDER BY c.last_score_calculated_at ASC NULLS FIRST, c.id
+        ORDER BY c.id
       `
 
       if (pagination) {

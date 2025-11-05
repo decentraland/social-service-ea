@@ -65,7 +65,7 @@ describe('Ranking Component', () => {
           streamsCount: 1,
           eventsTotalAttendees: 50,
           streamsTotalParticipants: 25,
-          ageInDays: 5 // New community (5 days old) - gets max boost of 20
+          ageInDays: 5 // New community (5 days old) - gets age-based boost of 1.15x (reduced by score)
         },
         {
           communityId: 'community-2',
@@ -79,10 +79,15 @@ describe('Ranking Component', () => {
           streamsCount: 0,
           eventsTotalAttendees: 10,
           streamsTotalParticipants: 0,
-          ageInDays: 3 // New community (3 days old) - gets max boost of 20
+          ageInDays: 3 // New community (3 days old) - gets age-based boost of 1.15x (reduced by score)
         }
       ]
-      mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
+      mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockImplementation((pagination) => {
+        if (pagination?.offset === 0) {
+          return Promise.resolve(communitiesWithMetrics)
+        }
+        return Promise.resolve([])
+      })
       mockCommunitiesDB.updateCommunitiesRankingScores.mockResolvedValue()
     })
 
@@ -90,7 +95,7 @@ describe('Ranking Component', () => {
       it('should calculate and update normalized scores (0-1) for all communities with new community boost', async () => {
         await communityRanking.calculateRankingScoreForAllCommunities()
 
-        expect(mockCommunitiesDB.getAllCommunitiesWithRankingMetrics).toHaveBeenCalledTimes(1)
+        expect(mockCommunitiesDB.getAllCommunitiesWithRankingMetrics).toHaveBeenCalledTimes(2)
         expect(mockCommunitiesDB.updateCommunitiesRankingScores).toHaveBeenCalledTimes(1)
 
         // Verify the Map contains correct normalized scores with boost
@@ -108,9 +113,10 @@ describe('Ranking Component', () => {
         // community-1 has better metrics, so should have higher score
         expect(score1).toBeGreaterThan(score2)
 
-        // Both are new communities (age 3-5 days), so should get boost multiplier of 1.5
+        // Both are new communities (age 3-5 days), so should get age-based boost of 1.15x
+        // Boost is reduced by (normalizedScore * 0.3), so communities with higher scores get less boost
         // community-1 has: thumbnail, description, events, photos, places, new members, posts, streams
-        // Approximate normalized score calculation with boost
+        // Approximate normalized score calculation with score-adjusted boost
         expect(score1).toBeGreaterThan(0.3) // Should be reasonably high with boost
       })
     })
@@ -137,7 +143,12 @@ describe('Ranking Component', () => {
           streamsTotalParticipants: 0,
           ageInDays: 10
         })
-        mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
+        mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockImplementation((pagination) => {
+          if (pagination?.offset === 0) {
+            return Promise.resolve(communitiesWithMetrics)
+          }
+          return Promise.resolve([])
+        })
 
         await communityRanking.calculateRankingScoreForAllCommunities()
 
@@ -178,7 +189,12 @@ describe('Ranking Component', () => {
             ageInDays: 2 // New community gets boost
           }
         ]
-        mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
+        mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockImplementation((pagination) => {
+          if (pagination?.offset === 0) {
+            return Promise.resolve(communitiesWithMetrics)
+          }
+          return Promise.resolve([])
+        })
       })
 
       it('should return normalized score with new community boost for zero-metric community', async () => {
@@ -192,8 +208,8 @@ describe('Ranking Component', () => {
         expect(score).toBeLessThanOrEqual(1)
 
         // Even with zero metrics, new community gets boost multiplier
-        // Base normalized score is 0, but boost of 1.5x still gives 0
-        // So score should be 0 (or very close to 0)
+        // Base normalized score is 0, so boost is 1.15x - (0 * 0.3) = 1.15x
+        // But 0 * 1.15x = 0, so score should be 0
         expect(score).toBe(0)
       })
     })
@@ -216,7 +232,12 @@ describe('Ranking Component', () => {
             ageInDays: 45 // Older than 30 days - no boost
           }
         ]
-        mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
+        mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockImplementation((pagination) => {
+          if (pagination?.offset === 0) {
+            return Promise.resolve(communitiesWithMetrics)
+          }
+          return Promise.resolve([])
+        })
       })
 
       it('should calculate normalized score without boost for older community', async () => {
