@@ -302,6 +302,7 @@ export function createCommunityComponent(
 
       if (thumbnail) {
         const thumbnailUrl = await communityThumbnail.uploadThumbnail(newCommunity.id, thumbnail)
+        // await communitiesDb.updateCommunityMetrics(newCommunity.id, {
 
         logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id, size: thumbnail.length })
         newCommunity.thumbnails = {

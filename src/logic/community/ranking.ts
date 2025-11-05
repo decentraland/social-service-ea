@@ -23,12 +23,11 @@ const DEFAULT_METRIC_WEIGHTS: MetricWeights = [
 
 export function createCommunityRankingComponent({
   logs,
-  communitiesDb,
-  communityThumbnail
-}: Pick<AppComponents, 'logs' | 'communitiesDb' | 'communityThumbnail'>): ICommunityRankingComponent {
+  communitiesDb
+}: Pick<AppComponents, 'logs' | 'communitiesDb'>): ICommunityRankingComponent {
   const logger = logs.getLogger('ranking-component')
 
-  function calculateRankingScore(metrics: CommunityRankingMetrics): number {
+  function calculateRankingScore(metrics: Omit<CommunityRankingMetrics, 'communityId'>): number {
     const weights: MetricWeights = DEFAULT_METRIC_WEIGHTS
     const score = weights.reduce((sum, { metric, weight }) => sum + metrics[metric] * weight, 0)
 
@@ -48,28 +47,22 @@ export function createCommunityRankingComponent({
         return
       }
 
-      // Check thumbnails for all communities in a single batch
-      const communityIds = communitiesMetrics.map(({ communityId }) => communityId)
-      const thumbnails = await communityThumbnail.getThumbnails(communityIds)
-
       for (const communityMetrics of communitiesMetrics) {
+        const { communityId, ...metrics } = communityMetrics
+
         try {
-          const metrics: CommunityRankingMetrics = {
-            ...communityMetrics,
-            hasThumbnail: thumbnails[communityMetrics.communityId] ? 1 : 0
-          }
-          const score = await calculateRankingScore(metrics)
+          const score = calculateRankingScore(metrics)
 
           logger.info('Calculated ranking score for community', {
-            communityId: communityMetrics.communityId,
+            communityId,
             score
           })
 
           // Update ranking score
-          await communitiesDb.updateCommunity(communityMetrics.communityId, { ranking_score: score })
+          await communitiesDb.updateCommunity(communityId, { ranking_score: score })
         } catch (error) {
           logger.error('Failed to calculate ranking score for community', {
-            communityId: communityMetrics.communityId,
+            communityId,
             error: error instanceof Error ? error.message : 'Unknown error'
           })
         }

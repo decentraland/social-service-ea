@@ -227,7 +227,12 @@ export interface ICommunitiesDatabaseComponent {
     metrics: Partial<
       Pick<
         CommunityRankingMetrics,
-        'eventsCount' | 'eventsTotalAttendees' | 'photosCount' | 'streamsCount' | 'streamsTotalParticipants'
+        | 'eventsCount'
+        | 'eventsTotalAttendees'
+        | 'photosCount'
+        | 'streamsCount'
+        | 'streamsTotalParticipants'
+        | 'hasThumbnail'
       >
     >
   ): Promise<void>

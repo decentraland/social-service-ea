@@ -4,24 +4,21 @@ import {
   CommunityDB,
   CommunityPrivacyEnum,
   CommunityVisibilityEnum,
-  ICommunityThumbnailComponent,
   ICommunityRankingComponent
 } from '../../../src/logic/community/types'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { createLogsMockedComponent } from '../../mocks/components'
 import { ILoggerComponent } from '@well-known-components/interfaces/dist/components/logger'
-import { createMockCommunityThumbnailComponent, mockCommunity as createMockCommunity } from '../../mocks/communities'
+import { mockCommunity as createMockCommunity } from '../../mocks/communities'
 
 describe('Ranking Component', () => {
   let communityRanking: ICommunityRankingComponent
   let mockLogs: jest.Mocked<ILoggerComponent>
-  let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
   let mockCommunityDB: CommunityDB
   let mockCommunity: Community
 
   beforeEach(() => {
     mockLogs = createLogsMockedComponent({})
-    mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     mockCommunityDB = createMockCommunity()
     mockCommunity = {
       id: mockCommunityDB.id,
@@ -34,8 +31,7 @@ describe('Ranking Component', () => {
     }
     communityRanking = createCommunityRankingComponent({
       logs: mockLogs,
-      communitiesDb: mockCommunitiesDB,
-      communityThumbnail: mockCommunityThumbnail
+      communitiesDb: mockCommunitiesDB
     })
   })
 
@@ -85,10 +81,6 @@ describe('Ranking Component', () => {
       ]
       mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
       mockCommunitiesDB.updateCommunity.mockResolvedValue(mockCommunity)
-      mockCommunityThumbnail.getThumbnails.mockResolvedValue({
-        'community-1': 'thumbnail-url-1',
-        'community-2': undefined
-      })
     })
 
     describe('and calculation succeeds', () => {
@@ -96,7 +88,6 @@ describe('Ranking Component', () => {
         await communityRanking.calculateRankingScoreForAllCommunities()
 
         expect(mockCommunitiesDB.getAllCommunitiesWithRankingMetrics).toHaveBeenCalledTimes(1)
-        expect(mockCommunityThumbnail.getThumbnails).toHaveBeenCalledWith(['community-1', 'community-2'])
         expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledTimes(communitiesWithMetrics.length)
         // community-1: (2 * 0.5) + (1 * 1) + (3 * 0.2) + (1 * 1) + (3 * 0.2) + (5 * 0.4) + (8 * 0.2) + (1 * 0.2) + (50 * 0.01) + (25 * 0.01) = 1 + 1 + 0.6 + 1 + 0.6 + 2 + 1.6 + 0.2 + 0.5 + 0.25 = 8.75
         expect(mockCommunitiesDB.updateCommunity).toHaveBeenCalledWith('community-1', { ranking_score: 8.75 })
@@ -149,9 +140,6 @@ describe('Ranking Component', () => {
           }
         ]
         mockCommunitiesDB.getAllCommunitiesWithRankingMetrics.mockResolvedValue(communitiesWithMetrics)
-        mockCommunityThumbnail.getThumbnails.mockResolvedValue({
-          'community-3': undefined
-        })
       })
 
       it('should return score of 0', async () => {

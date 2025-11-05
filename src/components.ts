@@ -268,7 +268,7 @@ export async function initComponents(): Promise<AppComponents> {
     logs
   })
 
-  const communityRanking = createCommunityRankingComponent({ logs, communitiesDb, communityThumbnail })
+  const communityRanking = createCommunityRankingComponent({ logs, communitiesDb })
 
   const communityRankingCalculationJob = createJobComponent(
     { logs },

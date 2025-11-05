@@ -1118,7 +1118,8 @@ export function createCommunitiesDBComponent(
           COALESCE(posts_count.count, 0)::int AS "postsCount",
           COALESCE(crm.streams_count, 0)::int AS "streamsCount",
           COALESCE(crm.events_total_attendees, 0)::int AS "eventsTotalAttendees",
-          COALESCE(crm.streams_total_participants, 0)::int AS "streamsTotalParticipants"
+          COALESCE(crm.streams_total_participants, 0)::int AS "streamsTotalParticipants",
+          COALESCE(crm.has_thumbnail, false)::int AS "hasThumbnail"
         FROM communities c
         LEFT JOIN community_ranking_metrics crm ON c.id = crm.community_id
         LEFT JOIN (
@@ -1149,7 +1150,12 @@ export function createCommunitiesDBComponent(
       metrics: Partial<
         Pick<
           CommunityRankingMetrics,
-          'eventsCount' | 'eventsTotalAttendees' | 'photosCount' | 'streamsCount' | 'streamsTotalParticipants'
+          | 'eventsCount'
+          | 'eventsTotalAttendees'
+          | 'photosCount'
+          | 'streamsCount'
+          | 'streamsTotalParticipants'
+          | 'hasThumbnail'
         >
       >
     ): Promise<void> {
@@ -1161,12 +1167,13 @@ export function createCommunitiesDBComponent(
       }
 
       // Field name mapping: camelCase -> snake_case
-      const fieldMapping: Record<string, string> = {
+      const fieldMapping: Record<keyof typeof definedMetrics, string> = {
         eventsCount: 'events_count',
         eventsTotalAttendees: 'events_total_attendees',
         photosCount: 'photos_count',
         streamsCount: 'streams_count',
-        streamsTotalParticipants: 'streams_total_participants'
+        streamsTotalParticipants: 'streams_total_participants',
+        hasThumbnail: 'has_thumbnail'
       }
 
       // Build INSERT fields (community_id + metric columns)
