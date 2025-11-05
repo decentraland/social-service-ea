@@ -1182,10 +1182,18 @@ export function createCommunitiesDBComponent(
 
       const update = Object.entries(definedMetrics).reduce(
         (acc, [key, value], index, array) => {
-          return acc
-            .append(`${key} = community_ranking_metrics.${key} + `)
-            .append(SQL`${value}`)
-            .append(index === array.length - 1 ? '' : ', ')
+          const isBoolean = typeof value === 'boolean'
+          if (isBoolean) {
+            return acc
+              .append(`${key} = `)
+              .append(SQL`${value}`)
+              .append(index === array.length - 1 ? '' : ', ')
+          } else {
+            return acc
+              .append(`${key} = community_ranking_metrics.${key} + `)
+              .append(SQL`${value}`)
+              .append(index === array.length - 1 ? '' : ', ')
+          }
         },
         SQL``
       )
