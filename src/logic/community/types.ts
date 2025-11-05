@@ -10,7 +10,8 @@ import {
   CommunityRequestToJoinAcceptedEvent,
   CommunityDeletedContentViolationEvent,
   EthAddress,
-  PaginatedParameters
+  PaginatedParameters,
+  CommunityPostAddedEvent
 } from '@dcl/schemas'
 import {
   CommunityDeletedEventReducedMetadata,
@@ -194,6 +195,7 @@ export interface ICommunityBroadcasterComponent {
       | CommunityRequestToJoinReceivedEventReducedMetadata
       | CommunityInviteReceivedEvent
       | CommunityDeletedContentViolationEvent
+      | CommunityPostAddedEvent
   ): Promise<void>
 }
 
@@ -511,8 +513,6 @@ export type CommunityPostWithProfile = CommunityPost & {
   authorName: string
   authorProfilePictureUrl: string
   authorHasClaimedName: boolean
-  likesCount: number
-  isLikedByUser?: boolean
 }
 
 export type GetCommunityPostsOptions = {

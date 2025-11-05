@@ -251,7 +251,6 @@ export function createUpdateHandlerComponent(
           isMember
         }
 
-        logger.info('Personalized update', { personalizedUpdate: JSON.stringify(personalizedUpdate) }) //TODO: remove this after testing it out
         const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
         if (updateEmitter) {
           updateEmitter.emit('communityVoiceChatUpdate', personalizedUpdate)

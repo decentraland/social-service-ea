@@ -3,6 +3,7 @@ import {
   CommunityRenamedEvent,
   CommunityRequestToJoinReceivedEvent,
   CommunityDeletedContentViolationEvent,
+  CommunityPostAddedEvent,
   Events
 } from '@dcl/schemas'
 import { CommunityRole } from '../../../src/types'
@@ -324,6 +325,80 @@ describe('Community Broadcaster Component', () => {
           offset: 0
         },
         roles: [CommunityRole.Moderator, CommunityRole.Member]
+      })
+    })
+  })
+
+  describe('when broadcasting a post added event', () => {
+    let postAddedEvent: CommunityPostAddedEvent
+
+    beforeEach(() => {
+      postAddedEvent = {
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.POST_ADDED,
+        key: 'post-123',
+        timestamp: Date.now(),
+        metadata: {
+          postId: 'post-123',
+          communityId: 'community-123',
+          communityName: 'Test Community',
+          thumbnailUrl: 'https://example.com/thumbnail.jpg',
+          authorAddress: '0x0000000000000000000000000000000000000000',
+          addressesToNotify: []
+        }
+      }
+
+      // Mock community members - create 5 members including the author at index 0
+      const mockMembers = [
+        {
+          communityId: 'community-123',
+          memberAddress: '0x0000000000000000000000000000000000000000', // Author
+          role: CommunityRole.Member,
+          joinedAt: '2023-01-01T00:00:00Z'
+        },
+        ...Array.from({ length: 4 }, (_, i) => ({
+          communityId: 'community-123',
+          memberAddress: `0x${String(i + 1).padStart(40, '0')}`,
+          role: CommunityRole.Member,
+          joinedAt: '2023-01-01T00:00:00Z'
+        }))
+      ]
+
+      mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockMembers)
+    })
+
+    it('should publish to all members except the author', async () => {
+      await broadcasterComponent.broadcast(postAddedEvent)
+
+      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith('community-123', {
+        pagination: {
+          limit: 100,
+          offset: 0
+        }
+      })
+
+      expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
+      const batchCall = mockSns.publishMessages.mock.calls[0][0]
+      expect(batchCall).toHaveLength(1)
+
+      // Check that the author is not included
+      const allNotifiedAddresses = batchCall.flatMap((batch) => (batch.metadata as any).addressesToNotify)
+      expect(allNotifiedAddresses).not.toContain('0x0000000000000000000000000000000000000000')
+      expect(allNotifiedAddresses).toHaveLength(4) // 5 members minus 1 author
+
+      // Check the batch structure
+      expect(batchCall[0]).toMatchObject({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.POST_ADDED,
+        key: 'post-123-batch-1',
+        metadata: {
+          postId: 'post-123',
+          communityId: 'community-123',
+          communityName: 'Test Community',
+          thumbnailUrl: 'https://example.com/thumbnail.jpg',
+          authorAddress: '0x0000000000000000000000000000000000000000',
+          addressesToNotify: expect.arrayContaining([expect.any(String)])
+        }
       })
     })
   })
