@@ -698,7 +698,8 @@ describe('Community Members Component', () => {
               metadata: {
                 id: communityId,
                 name: expect.any(String),
-                memberAddress: targetAddress
+                memberAddress: targetAddress,
+                thumbnailUrl: expect.stringContaining(communityId)
               }
             })
           })
