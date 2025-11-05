@@ -42,7 +42,8 @@ import {
   CommunityPost,
   CommunityPostWithLikes,
   GetCommunityPostsOptions,
-  CommunityRankingMetrics
+  CommunityRankingMetrics,
+  CommunityRankingMetricsDB
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -226,13 +227,13 @@ export interface ICommunitiesDatabaseComponent {
     communityId: string,
     metrics: Partial<
       Pick<
-        CommunityRankingMetrics,
-        | 'eventsCount'
-        | 'eventsTotalAttendees'
-        | 'photosCount'
-        | 'streamsCount'
-        | 'streamsTotalParticipants'
-        | 'hasThumbnail'
+        CommunityRankingMetricsDB,
+        | 'events_count'
+        | 'events_total_attendees'
+        | 'photos_count'
+        | 'streams_count'
+        | 'streams_total_participants'
+        | 'has_thumbnail'
       >
     >
   ): Promise<void>

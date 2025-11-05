@@ -20,7 +20,8 @@ import {
   CommunityPostWithLikes,
   GetCommunityPostsOptions,
   CommunityVisibilityEnum,
-  CommunityRankingMetrics
+  CommunityRankingMetrics,
+  CommunityRankingMetricsDB
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -1149,38 +1150,23 @@ export function createCommunitiesDBComponent(
       communityId: string,
       metrics: Partial<
         Pick<
-          CommunityRankingMetrics,
-          | 'eventsCount'
-          | 'eventsTotalAttendees'
-          | 'photosCount'
-          | 'streamsCount'
-          | 'streamsTotalParticipants'
-          | 'hasThumbnail'
+          CommunityRankingMetricsDB,
+          | 'events_count'
+          | 'events_total_attendees'
+          | 'photos_count'
+          | 'streams_count'
+          | 'streams_total_participants'
+          | 'has_thumbnail'
         >
       >
     ): Promise<void> {
-      // Filter out undefined values
       const definedMetrics = Object.fromEntries(Object.entries(metrics).filter(([_, value]) => value !== undefined))
 
       if (Object.keys(definedMetrics).length === 0) {
         return
       }
 
-      // Field name mapping: camelCase -> snake_case
-      const fieldMapping: Record<keyof typeof definedMetrics, string> = {
-        eventsCount: 'events_count',
-        eventsTotalAttendees: 'events_total_attendees',
-        photosCount: 'photos_count',
-        streamsCount: 'streams_count',
-        streamsTotalParticipants: 'streams_total_participants',
-        hasThumbnail: 'has_thumbnail'
-      }
-
-      // Build INSERT fields (community_id + metric columns)
-      const keys = Object.keys(definedMetrics).map((key) => fieldMapping[key])
-      const insertKeys = ['community_id', ...keys]
-
-      // Build INSERT values (community_id + metric values)
+      const insertKeys = ['community_id', ...Object.keys(definedMetrics)]
       const values = [communityId, ...Object.values(definedMetrics)].reduce(
         (acc, value, index, array) => {
           return acc.append(SQL`${value}`).append(index === array.length - 1 ? '' : SQL`, `)
@@ -1188,19 +1174,16 @@ export function createCommunitiesDBComponent(
         SQL``
       )
 
-      // Build UPDATE clauses with incremental logic (column = column + value)
       const update = Object.entries(definedMetrics).reduce(
         (acc, [key, value], index, array) => {
-          const columnName = fieldMapping[key]
           return acc
-            .append(`${columnName} = community_ranking_metrics.${columnName} + `)
+            .append(`${key} = community_ranking_metrics.${key} + `)
             .append(SQL`${value}`)
             .append(index === array.length - 1 ? '' : ', ')
         },
         SQL``
       )
 
-      // Build the final query
       const query = SQL`INSERT INTO community_ranking_metrics (`
         .append(`${insertKeys.join(', ')}) VALUES (`)
         .append(values)

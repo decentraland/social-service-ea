@@ -535,6 +535,16 @@ export interface ICommunityRankingComponent {
   calculateRankingScoreForAllCommunities(): Promise<void>
 }
 
+export type CommunityRankingMetricsDB = {
+  community_id: string
+  events_count: number
+  photos_count: number
+  streams_count: number
+  events_total_attendees: number
+  streams_total_participants: number
+  has_thumbnail: boolean
+}
+
 export type CommunityRankingMetrics = {
   communityId: string
   eventsCount: number
