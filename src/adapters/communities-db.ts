@@ -1146,7 +1146,7 @@ export function createCommunitiesDBComponent(
       return result.rows
     },
 
-    async updateCommunityMetrics(
+    async updateCommunityRankingMetrics(
       communityId: string,
       metrics: Partial<
         Pick<

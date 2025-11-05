@@ -302,7 +302,7 @@ export function createCommunityComponent(
 
       if (thumbnail) {
         const thumbnailUrl = await communityThumbnail.uploadThumbnail(newCommunity.id, thumbnail)
-        await communitiesDb.updateCommunityMetrics(newCommunity.id, { has_thumbnail: true })
+        await communitiesDb.updateCommunityRankingMetrics(newCommunity.id, { has_thumbnail: true })
 
         logger.info('Thumbnail stored', { thumbnailUrl, communityId: newCommunity.id, size: thumbnail.length })
         newCommunity.thumbnails = {
@@ -474,7 +474,7 @@ export function createCommunityComponent(
         const thumbnailUrl = await communityThumbnail.uploadThumbnail(communityId, thumbnailBuffer)
         await Promise.all([
           cdnCacheInvalidator.invalidateThumbnail(communityId),
-          communitiesDb.updateCommunityMetrics(communityId, { has_thumbnail: true })
+          communitiesDb.updateCommunityRankingMetrics(communityId, { has_thumbnail: true })
         ])
 
         logger.info('Thumbnail updated', {
