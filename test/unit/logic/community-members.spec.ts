@@ -697,7 +697,7 @@ describe('Community Members Component', () => {
               timestamp: expect.any(Number),
               metadata: {
                 id: communityId,
-                name: expect.any(String),
+                name: 'Test Community',
                 memberAddress: targetAddress,
                 thumbnailUrl: expect.stringContaining(communityId)
               }
