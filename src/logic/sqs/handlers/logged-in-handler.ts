@@ -3,10 +3,7 @@ import { Event, Events, LoggedInEvent, LoggedInCachedEvent } from '@dcl/schemas'
 import { AppComponents } from '../../../types/system'
 import { EventHandler } from '../types'
 
-export function createLoggedInHandler({
-  logs,
-  referral
-}: Pick<AppComponents, 'logs' | 'referral'>): EventHandler {
+export function createLoggedInHandler({ logs, referral }: Pick<AppComponents, 'logs' | 'referral'>): EventHandler {
   const logger = logs.getLogger('logged-in-handler')
 
   return {
@@ -33,4 +30,3 @@ export function createLoggedInHandler({
     }
   }
 }
-
