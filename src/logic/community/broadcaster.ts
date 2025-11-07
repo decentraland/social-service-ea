@@ -126,31 +126,6 @@ export function createCommunityBroadcasterComponent(
   }
 
   /**
-   * Extracts the excluded address from event metadata
-   * Checks multiple possible field names for backward compatibility
-   * @param {any} metadata - Event metadata object
-   * @returns {string | null} The excluded address in lowercase, or null if not found
-   */
-  function getExcludedAddress(metadata: any): string | null {
-    const possibleFields = ['excludedAddress', 'authorAddress', 'senderAddress', 'creatorAddress', 'actorAddress']
-    for (const field of possibleFields) {
-      if (metadata[field] && typeof metadata[field] === 'string') {
-        return metadata[field].toLowerCase()
-      }
-    }
-    return null
-  }
-
-  /**
-   * Gets the community ID from event metadata
-   * @param {any} metadata - Event metadata object
-   * @returns {string | null} The community ID, or null if not found
-   */
-  function getCommunityId(metadata: any): string | null {
-    return metadata.communityId || metadata.id || null
-  }
-
-  /**
    * Broadcasts to all community members in batches
    * @param {BroadcastableEvent} event - The event to broadcast
    */
@@ -226,16 +201,11 @@ export function createCommunityBroadcasterComponent(
    * @throws {Error} If excluded address or community ID is not found in metadata
    */
   async function broadcastToAllMembersButExcluded(event: BroadcastableEvent): Promise<void> {
-    const excludedAddress = getExcludedAddress(event.metadata)
-    const communityId = getCommunityId(event.metadata)
+    const {
+      metadata: { authorAddress, communityId }
+    } = event as CommunityPostAddedEvent
 
-    if (!excludedAddress) {
-      throw new Error('Event metadata must contain an excluded address field (excludedAddress, authorAddress, etc.)')
-    }
-
-    if (!communityId) {
-      throw new Error('Event metadata must contain a communityId or id field')
-    }
+    const excludedAddress = authorAddress.toLowerCase()
 
     const allMemberAddresses = await getAllCommunityMembersAddresses(communityId)
     const addressesToNotify = allMemberAddresses.filter((address) => address.toLowerCase() !== excludedAddress)
