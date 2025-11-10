@@ -23,6 +23,13 @@ export function createCommunityStreamingEndedHandler({
 
       const participants = metadata.totalParticipants || 0
 
+      if (participants <= 1) {
+        logger.warn(
+          `CommunityStreamingEndedEvent for community with id ${metadata.communityId} has no participants other than the streamer, skipping`
+        )
+        return
+      }
+
       try {
         await communitiesDb.updateCommunityRankingMetrics(metadata.communityId, {
           streams_count: 1,
