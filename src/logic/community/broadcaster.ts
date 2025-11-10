@@ -196,7 +196,6 @@ export function createCommunityBroadcasterComponent(
 
   /**
    * Broadcasts to all members except a specific excluded address
-   * Looks for excludedAddress in metadata, or falls back to common field names like authorAddress, senderAddress, etc.
    * @param {BroadcastableEvent} event - The event to broadcast
    * @throws {Error} If excluded address or community ID is not found in metadata
    */
