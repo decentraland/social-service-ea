@@ -11,7 +11,8 @@ import {
   CommunityDeletedContentViolationEvent,
   EthAddress,
   PaginatedParameters,
-  CommunityPostAddedEvent
+  CommunityPostAddedEvent,
+  CommunityOwnershipTransferredEvent
 } from '@dcl/schemas'
 import {
   CommunityDeletedEventReducedMetadata,
@@ -196,6 +197,7 @@ export interface ICommunityBroadcasterComponent {
       | CommunityInviteReceivedEvent
       | CommunityDeletedContentViolationEvent
       | CommunityPostAddedEvent
+      | CommunityOwnershipTransferredEvent
   ): Promise<void>
 }
 

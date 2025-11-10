@@ -213,8 +213,7 @@ export async function initComponents(): Promise<AppComponents> {
     peersStats,
     pubsub,
     commsGatekeeper,
-    analytics,
-    sns
+    analytics
   })
   const communityBans = await createCommunityBansComponent({
     communitiesDb,

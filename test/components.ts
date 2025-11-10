@@ -209,8 +209,7 @@ async function initComponents(): Promise<TestComponents> {
     peersStats,
     pubsub,
     commsGatekeeper,
-    analytics,
-    sns
+    analytics
   })
   const communityBans = await createCommunityBansComponent({
     communitiesDb,

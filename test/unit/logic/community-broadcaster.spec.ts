@@ -4,6 +4,7 @@ import {
   CommunityRequestToJoinReceivedEvent,
   CommunityDeletedContentViolationEvent,
   CommunityPostAddedEvent,
+  CommunityOwnershipTransferredEvent,
   Events
 } from '@dcl/schemas'
 import { CommunityRole } from '../../../src/types'
@@ -64,7 +65,8 @@ describe('Community Broadcaster Component', () => {
         pagination: {
           limit: 100,
           offset: 0
-        }
+        },
+        roles: [CommunityRole.Moderator, CommunityRole.Member]
       })
 
       // Should create 1 batch (5 members / 100 batch size = 1 batch)
@@ -120,13 +122,15 @@ describe('Community Broadcaster Component', () => {
         pagination: {
           limit: 100,
           offset: 0
-        }
+        },
+        roles: [CommunityRole.Moderator, CommunityRole.Member]
       })
       expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenNthCalledWith(2, 'community-123', {
         pagination: {
           limit: 100,
           offset: 100
-        }
+        },
+        roles: [CommunityRole.Moderator, CommunityRole.Member]
       })
     })
   })
@@ -283,49 +287,23 @@ describe('Community Broadcaster Component', () => {
       })
     })
 
-    it('should send two different notifications: one to owner and one to other members', async () => {
+    it('should send direct notification without fetching members', async () => {
       await broadcasterComponent.broadcast(deletedContentViolationEvent)
 
-      // Should notify the owner with the original content violation event
+      // Should notify directly with the original content violation event
       expect(mockSns.publishMessage).toHaveBeenCalledTimes(1)
       expect(mockSns.publishMessage).toHaveBeenCalledWith(deletedContentViolationEvent)
 
-      // Should notify other members with a community deleted event
-      expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
-      const batchCall = mockSns.publishMessages.mock.calls[0][0]
-      expect(batchCall).toHaveLength(1) // 4 members (excluding owner) in 1 batch
-
-      // Check that the event sent to members is a DELETED event, not DELETED_CONTENT_VIOLATION
-      batchCall.forEach((batch, index) => {
-        expect(batch).toMatchObject({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.DELETED,
-          key: `content-violation-123-batch-${index + 1}`,
-          metadata: {
-            id: 'community-123',
-            name: 'Test Community',
-            thumbnailUrl: 'https://example.com/thumbnail.jpg',
-            memberAddresses: expect.arrayContaining([expect.any(String)])
-          }
-        })
-      })
-
-      // Verify that members don't include the owner
-      const allMemberAddresses = batchCall.flatMap((batch) => (batch.metadata as any).memberAddresses)
-      expect(allMemberAddresses).not.toContain('0x0') // Owner address
-      expect(allMemberAddresses).toHaveLength(4) // Total members minus owner
+      // Should not fetch members or batch messages
+      expect(mockCommunitiesDB.getCommunityMembers).not.toHaveBeenCalled()
+      expect(mockSns.publishMessages).not.toHaveBeenCalled()
     })
 
-    it('should fetch only moderators and members (excluding owner) for the community deleted notification', async () => {
+    it('should not fetch members for content violation event', async () => {
       await broadcasterComponent.broadcast(deletedContentViolationEvent)
 
-      expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith('community-123', {
-        pagination: {
-          limit: 100,
-          offset: 0
-        },
-        roles: [CommunityRole.Moderator, CommunityRole.Member]
-      })
+      // DELETED_CONTENT_VIOLATION uses direct broadcast, so no member fetching
+      expect(mockCommunitiesDB.getCommunityMembers).not.toHaveBeenCalled()
     })
   })
 
@@ -364,7 +342,19 @@ describe('Community Broadcaster Component', () => {
         }))
       ]
 
-      mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockMembers)
+      // Mock to filter out excluded addresses
+      mockCommunitiesDB.getCommunityMembers.mockImplementation((communityId, options) => {
+        const { excludedAddresses } = options || {}
+        if (excludedAddresses && excludedAddresses.length > 0) {
+          const excludedLower = excludedAddresses.map((addr: string) => addr.toLowerCase())
+          return Promise.resolve(
+            mockMembers.filter(
+              (member) => !excludedLower.includes(member.memberAddress.toLowerCase())
+            )
+          )
+        }
+        return Promise.resolve(mockMembers)
+      })
     })
 
     it('should publish to all members except the author', async () => {
@@ -374,7 +364,8 @@ describe('Community Broadcaster Component', () => {
         pagination: {
           limit: 100,
           offset: 0
-        }
+        },
+        excludedAddresses: ['0x0000000000000000000000000000000000000000']
       })
 
       expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
@@ -426,6 +417,38 @@ describe('Community Broadcaster Component', () => {
       expect(mockSns.publishMessage).toHaveBeenCalledWith(memberRemovedEvent)
       expect(mockSns.publishMessages).not.toHaveBeenCalled()
       expect(mockCommunitiesDB.getCommunityMembers).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when broadcasting an ownership transferred event', () => {
+    let ownershipTransferredEvent: CommunityOwnershipTransferredEvent
+
+    beforeEach(() => {
+      ownershipTransferredEvent = {
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
+        key: 'ownership-transferred-123',
+        timestamp: Date.now(),
+        metadata: {
+          communityId: 'community-123',
+          communityName: 'Test Community',
+          oldOwnerAddress: '0x1111111111111111111111111111111111111111',
+          newOwnerAddress: '0x2222222222222222222222222222222222222222',
+          thumbnailUrl: 'https://example.com/thumbnail.jpg'
+        }
+      }
+    })
+
+    it('should publish directly without fetching members', async () => {
+      await broadcasterComponent.broadcast(ownershipTransferredEvent)
+
+      // Should notify directly with the ownership transferred event
+      expect(mockSns.publishMessage).toHaveBeenCalledTimes(1)
+      expect(mockSns.publishMessage).toHaveBeenCalledWith(ownershipTransferredEvent)
+
+      // Should not fetch members or batch messages
+      expect(mockCommunitiesDB.getCommunityMembers).not.toHaveBeenCalled()
+      expect(mockSns.publishMessages).not.toHaveBeenCalled()
     })
   })
 

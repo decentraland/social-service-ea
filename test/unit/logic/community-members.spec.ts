@@ -25,15 +25,12 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { Events } from '@dcl/schemas'
 import { createMockedAnalyticsComponent } from '../../mocks/components/analytics'
-import { createSNSMockedComponent } from '../../mocks/components/sns'
-import { IPublisherComponent } from '@dcl/sns-component'
 
 describe('Community Members Component', () => {
   let communityMembersComponent: ICommunityMembersComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
   let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
   let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
-  let mockSns: jest.Mocked<IPublisherComponent>
   let mockUserAddress: string
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   let mockCommsGatekeeper: ReturnType<typeof createCommsGatekeeperMockedComponent>
@@ -64,7 +61,6 @@ describe('Community Members Component', () => {
     mockCommunityRoles = createMockCommunityRolesComponent({})
     mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
-    mockSns = createSNSMockedComponent({})
     mockPeersStats = createMockPeersStatsComponent()
     mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
     mockAnalytics = createMockedAnalyticsComponent({})
@@ -83,8 +79,7 @@ describe('Community Members Component', () => {
       peersStats: mockPeersStats,
       pubsub: mockPubSub,
       commsGatekeeper: mockCommsGatekeeper,
-      analytics: mockAnalytics,
-      sns: mockSns
+      analytics: mockAnalytics
     })
   })
 
@@ -1149,7 +1144,7 @@ describe('Community Members Component', () => {
         expect(mockCommunitiesDB.updateMemberRole).not.toHaveBeenCalled()
       })
 
-      it('should publish OWNERSHIP_TRANSFERRED event', async () => {
+      it('should publish OWNERSHIP_TRANSFERRED event using broadcaster', async () => {
         await communityMembersComponent.updateMemberRole(
           'test-community',
           updaterAddress,
@@ -1160,10 +1155,10 @@ describe('Community Members Component', () => {
         // Wait for setImmediate callback to execute
         await new Promise((resolve) => setImmediate(resolve))
 
-        expect(mockSns.publishMessage).toHaveBeenCalledWith({
+        expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
           type: Events.Type.COMMUNITY,
           subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
-          key: 'test-community',
+          key: expect.stringContaining(`test-community-${updaterAddress}-${targetAddress}-`),
           timestamp: expect.any(Number),
           metadata: {
             communityId: 'test-community',

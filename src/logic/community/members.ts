@@ -8,7 +8,7 @@ import {
   CommunityPrivacyEnum
 } from './types'
 import { mapMembersWithProfiles } from './utils'
-import { CommunityOwnershipTransferredEvent, EthAddress, Events } from '@dcl/schemas'
+import { EthAddress, Events } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { AnalyticsEvent } from '../../types/analytics'
@@ -26,7 +26,6 @@ export async function createCommunityMembersComponent(
     | 'pubsub'
     | 'commsGatekeeper'
     | 'analytics'
-    | 'sns'
   >
 ): Promise<ICommunityMembersComponent> {
   const {
@@ -39,8 +38,7 @@ export async function createCommunityMembersComponent(
     peersStats,
     pubsub,
     commsGatekeeper,
-    analytics,
-    sns
+    analytics
   } = components
 
   const logger = logs.getLogger('community-component')
@@ -126,11 +124,12 @@ export async function createCommunityMembersComponent(
 
       if (!community) return
 
-      const event: CommunityOwnershipTransferredEvent = {
+      const timestamp = Date.now()
+      await communityBroadcaster.broadcast({
         type: Events.Type.COMMUNITY,
         subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
-        key: communityId,
-        timestamp: Date.now(),
+        key: `${communityId}-${updaterAddress}-${targetAddress}-${timestamp}`,
+        timestamp,
         metadata: {
           communityId,
           communityName: community.name,
@@ -138,9 +137,7 @@ export async function createCommunityMembersComponent(
           newOwnerAddress: targetAddress,
           thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
         }
-      }
-
-      void sns.publishMessage(event)
+      })
     })
   }
 

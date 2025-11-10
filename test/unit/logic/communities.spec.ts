@@ -1076,12 +1076,12 @@ describe('Community Component', () => {
           expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
         })
 
-        it('should not publish a community deleted event when deleted by global moderator', async () => {
+        it('should publish a community deleted event when deleted by global moderator', async () => {
           await communityComponent.deleteCommunity(communityId, userAddress)
 
           // Wait for setImmediate callback to execute
           await new Promise((resolve) => setImmediate(resolve))
-          expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalledWith({
+          expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
             type: Events.Type.COMMUNITY,
             subType: Events.SubType.Community.DELETED,
             key: communityId,
@@ -1094,11 +1094,13 @@ describe('Community Component', () => {
           })
         })
 
-        it('should publish a community deleted content violation event ', async () => {
+        it('should publish a community deleted content violation event first, then deleted event', async () => {
           await communityComponent.deleteCommunity(communityId, userAddress)
 
           await new Promise((resolve) => setImmediate(resolve))
-          expect(mockCommunityBroadcaster.broadcast).toHaveBeenLastCalledWith({
+
+          // Should be called with DELETED_CONTENT_VIOLATION first
+          expect(mockCommunityBroadcaster.broadcast).toHaveBeenNthCalledWith(1, {
             type: Events.Type.COMMUNITY,
             subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
             key: communityId,
@@ -1110,13 +1112,42 @@ describe('Community Component', () => {
               thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
             }
           })
+
+          // Then DELETED event should be the last call
+          expect(mockCommunityBroadcaster.broadcast).toHaveBeenLastCalledWith({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED,
+            key: communityId,
+            timestamp: expect.any(Number),
+            metadata: {
+              id: communityId,
+              name: community.name,
+              thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+            }
+          })
         })
 
-        it('should not publish a community deleted event without content violation when deleted by global moderator', async () => {
+        it('should publish both content violation and deleted events when deleted by global moderator', async () => {
           await communityComponent.deleteCommunity(communityId, userAddress)
 
           await new Promise((resolve) => setImmediate(resolve))
-          expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalledWith({
+
+          // Should publish DELETED_CONTENT_VIOLATION
+          expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
+            key: communityId,
+            timestamp: expect.any(Number),
+            metadata: {
+              id: communityId,
+              name: community.name,
+              ownerAddress: community.ownerAddress,
+              thumbnailUrl: `${cdnUrl}/social/communities/${communityId}/raw-thumbnail.png`
+            }
+          })
+
+          // Should also publish DELETED event
+          expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
             type: Events.Type.COMMUNITY,
             subType: Events.SubType.Community.DELETED,
             key: communityId,

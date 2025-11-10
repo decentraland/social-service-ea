@@ -338,19 +338,7 @@ export function createCommunityComponent(
       const thumbnailUrl = (await communityThumbnail.getThumbnail(id)) || 'N/A'
 
       setImmediate(async () => {
-        if (ownerDeletingOwnedCommunity) {
-          await communityBroadcaster.broadcast({
-            type: Events.Type.COMMUNITY,
-            subType: Events.SubType.Community.DELETED,
-            key: id,
-            timestamp: Date.now(),
-            metadata: {
-              id,
-              name: community.name,
-              thumbnailUrl
-            }
-          })
-        } else {
+        if (!ownerDeletingOwnedCommunity) {
           await communityBroadcaster.broadcast({
             type: Events.Type.COMMUNITY,
             subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
@@ -364,6 +352,18 @@ export function createCommunityComponent(
             }
           })
         }
+
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.DELETED,
+          key: id,
+          timestamp: Date.now(),
+          metadata: {
+            id,
+            name: community.name,
+            thumbnailUrl
+          }
+        })
 
         await pubsub.publishInChannel(COMMUNITY_DELETED_UPDATES_CHANNEL, {
           communityId: id

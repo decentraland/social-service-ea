@@ -8,7 +8,8 @@ import {
   CommunityRequestToJoinReceivedEvent,
   CommunityDeletedContentViolationEvent,
   Events,
-  CommunityPostAddedEvent
+  CommunityPostAddedEvent,
+  CommunityOwnershipTransferredEvent
 } from '@dcl/schemas'
 import { AppComponents, CommunityRole } from '../../types'
 import { ICommunityBroadcasterComponent, CommunityMember } from './types'
@@ -59,7 +60,7 @@ export type BroadcastableEvent =
   | CommunityInviteReceivedEvent
   | CommunityDeletedContentViolationEvent
   | CommunityPostAddedEvent
-
+  | CommunityOwnershipTransferredEvent
 /**
  * Type for event handlers that only need the event
  */
@@ -84,7 +85,7 @@ export function createCommunityBroadcasterComponent(
    */
   async function getAllCommunityMembersAddresses(
     communityId: string,
-    filters: { roles?: CommunityRole[] } = {}
+    filters: { roles?: CommunityRole[]; excludedAddresses?: string[] } = {}
   ): Promise<string[]> {
     const allMemberAddresses: string[] = []
     let offset = 0
@@ -199,15 +200,14 @@ export function createCommunityBroadcasterComponent(
    * @param {BroadcastableEvent} event - The event to broadcast
    * @throws {Error} If excluded address or community ID is not found in metadata
    */
-  async function broadcastToAllMembersButExcluded(event: BroadcastableEvent): Promise<void> {
+  async function broadcastToAllMembersButPostAuthor(event: BroadcastableEvent): Promise<void> {
     const {
       metadata: { authorAddress, communityId }
     } = event as CommunityPostAddedEvent
 
-    const excludedAddress = authorAddress.toLowerCase()
-
-    const allMemberAddresses = await getAllCommunityMembersAddresses(communityId)
-    const addressesToNotify = allMemberAddresses.filter((address) => address.toLowerCase() !== excludedAddress)
+    const addressesToNotify = await getAllCommunityMembersAddresses(communityId, {
+      excludedAddresses: [authorAddress.toLowerCase()]
+    })
     const memberBatches = createMemberBatches(addressesToNotify)
 
     await sns.publishMessages(
@@ -220,31 +220,6 @@ export function createCommunityBroadcasterComponent(
         }
       }))
     )
-  }
-
-  /**
-   * Broadcasts deleted content violation - notify owner with original event,
-   * then notify other members with a DELETED event
-   * @param {BroadcastableEvent} event - The content violation event to broadcast
-   */
-  async function broadcastDeletedContentViolation(event: BroadcastableEvent): Promise<void> {
-    const violationEvent = event as CommunityDeletedContentViolationEvent
-
-    // Notify the owner with the original content violation event
-    await sns.publishMessage(violationEvent)
-
-    // Send a different notification to the rest of the community members
-    const communityDeletedEvent: CommunityDeletedEventReducedMetadata = {
-      ...violationEvent,
-      subType: Events.SubType.Community.DELETED,
-      metadata: {
-        id: violationEvent.metadata.id,
-        name: violationEvent.metadata.name,
-        thumbnailUrl: violationEvent.metadata.thumbnailUrl
-      }
-    }
-
-    await broadcastToAllMembersButOwner(communityDeletedEvent)
   }
 
   /**
@@ -262,18 +237,12 @@ export function createCommunityBroadcasterComponent(
   function createBroadcastingRegistry(): BroadcastingRegistry {
     const registry = new Map<Events.SubType.Community, BroadcastingEventHandler>()
 
-    // Events that should be broadcasted to all members
-    registry.set(Events.SubType.Community.DELETED, broadcastToAllMembers)
+    registry.set(Events.SubType.Community.DELETED, broadcastToAllMembersButOwner)
     registry.set(Events.SubType.Community.RENAMED, broadcastToAllMembers)
-
-    // Events that should be broadcasted to owners and moderators only
     registry.set(Events.SubType.Community.REQUEST_TO_JOIN_RECEIVED, broadcastToOwnersAndModerators)
-
-    // Events that should be broadcasted to all members except a specific excluded address
-    registry.set(Events.SubType.Community.POST_ADDED, broadcastToAllMembersButExcluded)
-
-    // Events that need special handling
-    registry.set(Events.SubType.Community.DELETED_CONTENT_VIOLATION, broadcastDeletedContentViolation)
+    registry.set(Events.SubType.Community.POST_ADDED, broadcastToAllMembersButPostAuthor)
+    registry.set(Events.SubType.Community.DELETED_CONTENT_VIOLATION, directBroadcast)
+    registry.set(Events.SubType.Community.OWNERSHIP_TRANSFERRED, directBroadcast)
 
     return registry
   }
