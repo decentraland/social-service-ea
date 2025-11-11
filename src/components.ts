@@ -327,7 +327,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
-  const messageProcessor = await createMessageProcessorComponent({ logs, referral })
+  const messageProcessor = await createMessageProcessorComponent({ logs, referral, communitiesDb })
 
   const messageConsumer = createMessagesConsumerComponent({
     logs,

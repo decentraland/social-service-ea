@@ -1,32 +1,24 @@
-import { Event, Events, LoggedInEvent, LoggedInCachedEvent } from '@dcl/schemas'
+import { Event } from '@dcl/schemas'
 
 import { AppComponents } from '../../types/system'
 import { IMessageProcessorComponent, EventHandler } from './types'
+import { createLoggedInHandler } from './handlers/logged-in-handler'
+import { createEventEndedHandler } from './handlers/event-ended-handler'
+import { createCommunityStreamingEndedHandler } from './handlers/community-streaming-ended-handler'
+import { createPhotoTakenHandler } from './handlers/photo-taken-handler'
 
-// TODO: move to core-components
 export async function createMessageProcessorComponent({
   logs,
-  referral
-}: Pick<AppComponents, 'logs' | 'referral'>): Promise<IMessageProcessorComponent> {
+  referral,
+  communitiesDb
+}: Pick<AppComponents, 'logs' | 'referral' | 'communitiesDb'>): Promise<IMessageProcessorComponent> {
   const logger = logs.getLogger('message-processor')
 
-  // TODO: decouple the handlers from the message processor
   const eventHandlers: EventHandler[] = [
-    {
-      type: Events.Type.CLIENT,
-      subTypes: [Events.SubType.Client.LOGGED_IN, Events.SubType.Client.LOGGED_IN_CACHED],
-      handle: async (message: Event) => {
-        const { metadata } = message as LoggedInEvent | LoggedInCachedEvent
-        const userAddress = metadata.userAddress
-
-        if (!userAddress) {
-          logger.error('User address not found in message', { message: JSON.stringify(message) })
-          return
-        }
-
-        await referral.finalizeReferral(userAddress)
-      }
-    }
+    createLoggedInHandler({ logs, referral }),
+    createEventEndedHandler({ logs, communitiesDb }),
+    createCommunityStreamingEndedHandler({ logs, communitiesDb }),
+    createPhotoTakenHandler({ logs, communitiesDb })
   ]
 
   async function processMessage(message: Event) {

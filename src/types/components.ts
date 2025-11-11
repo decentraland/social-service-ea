@@ -135,6 +135,7 @@ export interface ICommunitiesDatabaseComponent {
   getCommunityPlaces(communityId: string, pagination?: PaginatedParameters): Promise<Pick<CommunityPlace, 'id'>[]>
   getCommunityPlacesCount(communityId: string): Promise<number>
   communityPlaceExists(communityId: string, placeId: string): Promise<boolean>
+  getCommunitiesByPlaceId(placeId: string): Promise<string[]>
   addCommunityPlace(place: CommunityPlace): Promise<void>
   addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void>
   removeCommunityPlace(communityId: string, placeId: string): Promise<void>

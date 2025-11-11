@@ -1,6 +1,6 @@
 import { Event, Events, LoggedInEvent } from '@dcl/schemas'
 import { IMessageProcessorComponent, createMessageProcessorComponent, EventHandler } from '../../../src/logic/sqs'
-import { createLogsMockedComponent } from '../../mocks/components'
+import { createLogsMockedComponent, mockCommunitiesDB } from '../../mocks/components'
 
 describe('message-processor', () => {
   let mockReferral: any
@@ -16,7 +16,8 @@ describe('message-processor', () => {
 
     messageProcessor = await createMessageProcessorComponent({
       logs: mockLogs,
-      referral: mockReferral
+      referral: mockReferral,
+      communitiesDb: mockCommunitiesDB
     })
   })
 

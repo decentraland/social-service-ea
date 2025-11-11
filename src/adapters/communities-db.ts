@@ -232,6 +232,17 @@ export function createCommunitiesDBComponent(
       return pg.exists(query, 'exists')
     },
 
+    async getCommunitiesByPlaceId(placeId: string): Promise<string[]> {
+      const query = SQL`
+        SELECT DISTINCT community_id
+        FROM community_places
+        WHERE id = ${placeId}
+      `
+
+      const result = await pg.query<{ community_id: string }>(query)
+      return result.rows.map((row) => row.community_id)
+    },
+
     async addCommunityPlaces(places: Omit<CommunityPlace, 'addedAt'>[]): Promise<void> {
       if (places.length === 0) return
 

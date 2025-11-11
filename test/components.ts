@@ -320,7 +320,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const messageProcessor = await createMessageProcessorComponent({
     logs,
-    referral
+    referral,
+    communitiesDb
   })
 
   const messageConsumer = createMessagesConsumerComponent({
