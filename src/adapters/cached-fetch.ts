@@ -116,6 +116,10 @@ export async function createCachedFetchComponent(
   // Key: cache key, Value: Promise resolving to the data
   const inflightRequests = new Map<string, Promise<unknown>>()
 
+  // Track batch operations to coordinate concurrent batch fetches
+  // Key: sorted array of keys (as string), Value: Promise resolving to Map<key, value>
+  const batchOperations = new Map<string, Promise<Map<string, unknown>>>()
+
   /**
    * Check if cached entry is stale (older than TTL)
    */
@@ -143,36 +147,60 @@ export async function createCachedFetchComponent(
   }
 
   /**
+   * Get or create an in-flight promise atomically
+   * This prevents race conditions where multiple concurrent requests create duplicate fetches
+   */
+  function getOrCreateInflight<T>(key: string, createPromise: () => Promise<T>): Promise<T> {
+    const existing = inflightRequests.get(key)
+    if (existing) {
+      return existing as Promise<T>
+    }
+
+    const promise = createPromise()
+    inflightRequests.set(key, promise)
+
+    promise
+      .catch(() => {
+        // Error handling is done by the caller
+        // We just need to clean up on error
+      })
+      .finally(() => {
+        // Only delete if this is still the current promise (not replaced)
+        if (inflightRequests.get(key) === promise) {
+          inflightRequests.delete(key)
+        }
+      })
+
+    return promise as Promise<T>
+  }
+
+  /**
    * Refresh data in background without blocking
    * Only refreshes if not already in flight
    */
   function refreshInBackground<T>(key: string, fetchFn: () => Promise<T>): void {
-    // Don't refresh if already in flight
-    if (inflightRequests.has(key)) {
-      return
-    }
-
-    logger.debug('Background refresh started', { key })
-    const promise = fetchAndCache(key, fetchFn)
-    inflightRequests.set(key, promise)
-
-    promise
-      .then(() => {
-        logger.debug('Background refresh completed', { key })
-      })
-      .catch((error) => {
-        // Log but don't throw - we already returned stale data
-        logger.warn('Background refresh failed', {
-          key,
-          error: error instanceof Error ? error.message : String(error)
-        })
-        if (onBackgroundRefreshError) {
-          onBackgroundRefreshError(error instanceof Error ? error : new Error(String(error)), key)
+    getOrCreateInflight(key, () => {
+      logger.debug('Background refresh started', { key })
+      return fetchAndCache(key, fetchFn).then(
+        () => {
+          logger.debug('Background refresh completed', { key })
+          return undefined as T // Background refresh doesn't need to return value
+        },
+        (error) => {
+          // Log but don't throw - we already returned stale data
+          logger.warn('Background refresh failed', {
+            key,
+            error: error instanceof Error ? error.message : String(error)
+          })
+          if (onBackgroundRefreshError) {
+            onBackgroundRefreshError(error instanceof Error ? error : new Error(String(error)), key)
+          }
+          throw error // Re-throw to trigger cleanup
         }
-      })
-      .finally(() => {
-        inflightRequests.delete(key)
-      })
+      )
+    }).catch(() => {
+      // Silently handle - error already logged
+    })
   }
 
   /**
@@ -188,23 +216,16 @@ export async function createCachedFetchComponent(
         onCacheMiss(key)
       }
 
-      // Check if already fetching to avoid duplicate requests
-      if (inflightRequests.has(key)) {
-        logger.debug('Waiting for in-flight request', { key })
-        return inflightRequests.get(key)! as Promise<T>
-      }
+      // Use atomic get-or-create to prevent duplicate fetches
+      const promise = getOrCreateInflight(key, () => {
+        logger.debug('Fetching for cache miss', { key })
+        return fetchAndCache(key, fetchFn)
+      })
 
-      // Fetch synchronously on cache miss
-      const promise = fetchAndCache(key, fetchFn)
-      inflightRequests.set(key, promise)
-
-      try {
-        const result = await promise
-        logger.debug('Cache miss resolved', { key })
-        return result
-      } finally {
-        inflightRequests.delete(key)
-      }
+      logger.debug('Waiting for in-flight request', { key })
+      const result = await promise
+      logger.debug('Cache miss resolved', { key })
+      return result
     }
 
     // Case 2: Fresh data (age <= ttl)
@@ -305,71 +326,86 @@ export async function createCachedFetchComponent(
         missedKeys.forEach((key) => onCacheMiss(key))
       }
 
-      // Deduplicate inflight requests
-      const keysToFetch: string[] = []
-      const fetchPromises: Promise<T[]>[] = []
+      // Use a batch coordinator to ensure only one batch fetch happens for overlapping keys
+      // Each key gets its own promise, but they all resolve from the same batch fetch
+      const keyPromises = new Map<string, Promise<T>>()
 
+      // First pass: collect keys that need fetching and check for existing promises
+      const keysToFetch: string[] = []
       for (const key of missedKeys) {
-        if (inflightRequests.has(key)) {
-          // Already fetching - wait for existing promise
-          fetchPromises.push((inflightRequests.get(key)! as Promise<T>).then((data) => [data]))
+        const existing = inflightRequests.get(key)
+        if (existing) {
+          // Already fetching - reuse existing promise
+          keyPromises.set(key, existing as Promise<T>)
         } else {
           keysToFetch.push(key)
         }
       }
 
-      // Batch fetch new keys
+      // Second pass: batch fetch new keys atomically
       if (keysToFetch.length > 0) {
-        const batchPromise = (async () => {
-          try {
+        // Sort keys to create a stable batch identifier
+        // This allows concurrent requests with overlapping keys to share the same batch
+        const sortedKeys = [...keysToFetch].sort()
+        const batchKey = sortedKeys.join('|')
+
+        // Get or create batch fetch promise atomically
+        const batchFetchPromise = (() => {
+          const existing = batchOperations.get(batchKey)
+          if (existing) {
+            return existing as Promise<Map<string, T>>
+          }
+
+          const promise = (async () => {
             const fetched = await fetchFn(keysToFetch)
-            // Cache all fetched items
+            // Cache all fetched items immediately
+            const fetchedMap = new Map<string, T>()
             fetched.forEach((item) => {
               const itemKey = keyExtractor(item)
+              fetchedMap.set(itemKey, item)
               cache.set(itemKey, {
                 data: item,
                 timestamp: Date.now()
               })
             })
-            return fetched
-          } catch (error) {
-            // Remove from inflight on error
-            keysToFetch.forEach((key) => inflightRequests.delete(key))
-            throw error
-          } finally {
-            keysToFetch.forEach((key) => inflightRequests.delete(key))
-          }
+            return fetchedMap
+          })()
+
+          // Set up cleanup
+          void promise.finally(() => {
+            // Clean up batch operation tracking
+            if (batchOperations.get(batchKey) === promise) {
+              batchOperations.delete(batchKey)
+            }
+          })
+
+          batchOperations.set(batchKey, promise)
+          return promise
         })()
 
-        // Track all keys as inflight
-        keysToFetch.forEach((key) => {
-          inflightRequests.set(
-            key,
-            batchPromise.then((items) => {
-              const item = items.find((i) => keyExtractor(i) === key)
-              if (!item) {
-                throw new Error(`Fetched items missing key: ${key}`)
-              }
-              return item
-            })
-          )
-        })
-
-        fetchPromises.push(batchPromise)
-      }
-
-      // Wait for all fetches (both new and existing)
-      const allFetched = await Promise.all(fetchPromises)
-      const fetchedMap = new Map<string, T>()
-
-      // Combine all fetched items
-      // Each promise returns an array, so we flatten them
-      for (const fetchedArray of allFetched) {
-        for (const item of fetchedArray) {
-          const itemKey = keyExtractor(item)
-          fetchedMap.set(itemKey, item)
+        // For each key, create a promise that extracts its item from the batch
+        // Use getOrCreateInflight to ensure atomicity per key
+        for (const key of keysToFetch) {
+          const itemPromise = getOrCreateInflight(key, async () => {
+            const fetchedMap = await batchFetchPromise
+            const item = fetchedMap.get(key)
+            if (!item) {
+              throw new Error(`Fetched items missing key: ${key}`)
+            }
+            return item
+          })
+          keyPromises.set(key, itemPromise)
         }
       }
+
+      // Wait for all promises to resolve
+      const fetchedMap = new Map<string, T>()
+      await Promise.all(
+        Array.from(keyPromises.entries()).map(async ([key, promise]) => {
+          const result = await promise
+          fetchedMap.set(key, result)
+        })
+      )
 
       // Add fetched items to cached entries
       fetchedMap.forEach((value, key) => {
