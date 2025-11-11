@@ -71,6 +71,7 @@ import { createInMemoryCacheComponent } from './adapters/memory-cache'
 import { createSqsComponent } from '@dcl/sqs-component'
 import { createSnsComponent } from '@dcl/sns-component'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
+import { createCachedFetchFromConfig } from './adapters/cached-fetch'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -152,8 +153,22 @@ export async function initComponents(): Promise<AppComponents> {
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
-  const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
-  const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
+
+  // Create cache instances for external API calls
+  const profileCache = await createCachedFetchFromConfig(
+    { config, logs },
+    'PROFILE_CACHE_',
+    { ttl: 10 * 60 * 1000 } // 10 minutes default
+  )
+
+  const voiceChatCache = await createCachedFetchFromConfig(
+    { config, logs },
+    'VOICE_CHAT_CACHE_',
+    { ttl: 2 * 60 * 1000 } // 2 minutes default
+  )
+
+  const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher, voiceChatCache })
+  const catalystClient = await createCatalystClient({ config, fetcher, logs, profileCache })
   const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
@@ -342,6 +357,8 @@ export async function initComponents(): Promise<AppComponents> {
     catalystClient,
     cdnCacheInvalidator,
     commsGatekeeper,
+    profileCache,
+    voiceChatCache,
     communities,
     communitiesDb,
     communityBans,

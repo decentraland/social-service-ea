@@ -26,6 +26,7 @@ import { createCatalystClient } from '../src/adapters/catalyst-client'
 import { createS3Adapter } from '../src/adapters/s3'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
 import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
+import { createCachedFetchFromConfig } from '../src/adapters/cached-fetch'
 import { createPeerTrackingComponent } from '../src/adapters/peer-tracking'
 import { createArchipelagoStatsComponent } from '../src/adapters/archipelago-stats'
 import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
@@ -155,13 +156,26 @@ async function initComponents(): Promise<TestComponents> {
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
-  const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
+  // Create cache instances for external API calls (same as production)
+  const profileCache = await createCachedFetchFromConfig(
+    { config, logs },
+    'PROFILE_CACHE_',
+    { ttl: 10 * 60 * 1000 } // 10 minutes default
+  )
+
+  const voiceChatCache = await createCachedFetchFromConfig(
+    { config, logs },
+    'VOICE_CHAT_CACHE_',
+    { ttl: 2 * 60 * 1000 } // 2 minutes default
+  )
+
+  const catalystClient = await createCatalystClient({ config, fetcher, logs, profileCache })
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
-  const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
+  const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher, voiceChatCache })
   const settings = await createSettingsComponent({ friendsDb })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const voice = await createVoiceComponent({
@@ -343,6 +357,8 @@ async function initComponents(): Promise<TestComponents> {
     catalystClient,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     commsGatekeeper,
+    profileCache,
+    voiceChatCache,
     communities,
     communitiesDb,
     communitiesDbHelper,

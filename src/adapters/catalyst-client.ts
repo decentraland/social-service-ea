@@ -10,14 +10,12 @@ import { extractMinimalProfile, getProfileUserId } from '../logic/profiles'
 const L1_MAINNET = 'mainnet'
 const L1_TESTNET = 'sepolia'
 
-export const PROFILE_CACHE_PREFIX = 'catalyst:minimal:profile:'
-
 export async function createCatalystClient({
   fetcher,
   config,
-  redis,
-  logs
-}: Pick<AppComponents, 'fetcher' | 'config' | 'redis' | 'logs'>): Promise<ICatalystClientComponent> {
+  logs,
+  profileCache
+}: Pick<AppComponents, 'fetcher' | 'config' | 'logs' | 'profileCache'>): Promise<ICatalystClientComponent> {
   const loadBalancer = await config.requireString('CATALYST_LAMBDAS_URL_LOADBALANCER')
   const logger = logs.getLogger('catalyst-client')
   const env = await config.getString('ENV')
@@ -64,105 +62,51 @@ export async function createCatalystClient({
     }
   }
 
-  function getProfileCacheKey(id: string): string {
-    return `${PROFILE_CACHE_PREFIX}${id}`
-  }
-
-  async function cacheProfile(profileId: string, profile: Profile): Promise<void> {
-    try {
-      const cacheKey = getProfileCacheKey(profileId)
-      await redis.put(cacheKey, profile, {
-        EX: 60 * 10 // 10 minutes
-      })
-    } catch (error: any) {
-      logger.warn('Failed to store profile in cache', {
-        error: error.message,
-        profileId
-      })
-    }
-  }
-
   async function getProfiles(ids: string[], options: ICatalystClientRequestOptions = {}): Promise<Profile[]> {
     if (ids.length === 0) return []
 
-    // Deduplicate IDs to avoid fetching the same profile multiple times
-    const uniqueIds = Array.from(new Set(ids))
-    const cacheKeys = uniqueIds.map((id) => getProfileCacheKey(id))
+    // Use cached-fetch component with SWR pattern
+    return await profileCache.getMany(
+      ids.map((id) => id.toLowerCase()),
+      async (missedIds: string[]) => {
+        const { retries = 3, waitTime = 300, lambdasServerUrl } = options
+        const executeClientRequest = rotateContentServerClient(
+          (contentClientToUse) => contentClientToUse.fetchEntitiesByIds(missedIds),
+          lambdasServerUrl
+        )
+        const fetchedProfiles = await retry(executeClientRequest, retries, waitTime)
 
-    const cachedProfiles = (await redis.mGet<Profile>(cacheKeys)).filter(Boolean) as Profile[]
+        // Extract minimal profiles
+        const minimalProfiles = fetchedProfiles
+          .map((entity) => extractMinimalProfile(entity?.metadata as Profile))
+          .filter(Boolean) as Profile[]
 
-    const idsToFetch = uniqueIds.filter(
-      (id) =>
-        !cachedProfiles.some((profile) => {
-          try {
-            return getProfileUserId(profile) === id.toLowerCase()
-          } catch (err: any) {
-            // Skip profiles that can't be processed (missing avatars, names, etc.)
-            // This ensures the function doesn't fail completely when some profiles are invalid
-            return false
-          }
-        })
+        return minimalProfiles
+      },
+      (profile: Profile) => getProfileUserId(profile).toLowerCase()
     )
-
-    let validProfiles: Profile[] = []
-
-    if (idsToFetch.length > 0) {
-      const { retries = 3, waitTime = 300, contentServerUrl } = options
-      const executeClientRequest = rotateContentServerClient(
-        (contentClientToUse) => contentClientToUse.fetchEntitiesByIds(idsToFetch),
-        contentServerUrl
-      )
-
-      const response = await retry(executeClientRequest, retries, waitTime)
-      validProfiles = response.map((entity) => extractMinimalProfile(entity?.metadata)).filter(Boolean) as Profile[]
-      const minimalProfiles = validProfiles.map(extractMinimalProfile).filter(Boolean) as Profile[]
-
-      validProfiles = minimalProfiles
-
-      // Cache profiles asynchronously without blocking the response
-      setImmediate(() => {
-        Promise.all(
-          minimalProfiles.map(async (minimalProfile) => {
-            await cacheProfile(getProfileUserId(minimalProfile), minimalProfile)
-          })
-        ).catch((error) => {
-          // Catch any unhandled promise rejections
-          logger.error('Profile cache storing in batch failed', { error: error.message })
-        })
-      })
-    }
-
-    return [...cachedProfiles, ...validProfiles]
   }
 
   async function getProfile(id: string, options: ICatalystClientRequestOptions = {}): Promise<Profile> {
-    const { retries = 3, waitTime = 300, contentServerUrl } = options
+    const normalizedId = id.toLowerCase()
 
-    // Try to get cached minimal profile
-    const cachedProfile = await redis.get<Profile>(getProfileCacheKey(id))
-    if (cachedProfile) {
-      return cachedProfile
-    }
+    return await profileCache.get(normalizedId, async () => {
+      const { retries = 3, waitTime = 300, lambdasServerUrl } = options
+      const executeClientRequest = rotateContentServerClient(
+        (contentClientToUse) => contentClientToUse.fetchEntityById(normalizedId),
+        lambdasServerUrl
+      )
 
-    const executeClientRequest = rotateContentServerClient(
-      (contentClientToUse) => contentClientToUse.fetchEntityById(id),
-      contentServerUrl
-    )
+      const response = await retry(executeClientRequest, retries, waitTime)
+      const minimalProfile = extractMinimalProfile(response?.metadata as Profile)
 
-    const response = await retry(executeClientRequest, retries, waitTime)
-    const minimalProfile = extractMinimalProfile(response?.metadata)
+      if (!minimalProfile) {
+        logger.warn(`Invalid profile received from Catalyst, not caching: ${JSON.stringify(response)}`)
+        return response?.metadata as Profile
+      }
 
-    if (!minimalProfile) {
-      logger.warn(`Invalid profile received from Catalyst, not caching: ${JSON.stringify(response)}`)
-      return response?.metadata as Profile
-    }
-
-    // Cache profile asynchronously without blocking the response
-    setImmediate(async () => {
-      await cacheProfile(id, minimalProfile)
+      return minimalProfile
     })
-
-    return minimalProfile
   }
 
   async function getOwnedNames(

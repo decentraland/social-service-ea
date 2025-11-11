@@ -431,3 +431,63 @@ export type IRewardComponent = IBaseComponent & {
 export type IEmailComponent = IBaseComponent & {
   sendEmail(email: string, subject: string, content: string): Promise<void>
 }
+
+export interface ICachedFetchComponent {
+  /**
+   * Get a single value from cache or fetch it
+   * Implements SWR: returns stale data immediately and refreshes in background
+   * 
+   * @param key - Cache key
+   * @param fetchFn - Function to fetch data if cache miss
+   * @returns Cached or freshly fetched data
+   */
+  get<T>(key: string, fetchFn: () => Promise<T>): Promise<T>
+
+  /**
+   * Get multiple values from cache, fetching only misses
+   * Deduplicates requests and batches fetches efficiently
+   * 
+   * @param keys - Array of cache keys
+   * @param fetchFn - Function to batch fetch missing keys
+   * @param keyExtractor - Function to extract key from fetched item
+   * @returns Array of values in same order as keys
+   */
+  getMany<T>(
+    keys: string[],
+    fetchFn: (missedKeys: string[]) => Promise<T[]>,
+    keyExtractor: (item: T) => string
+  ): Promise<T[]>
+
+  /**
+   * Manually set a value in cache
+   * Useful for pre-warming cache or updating after mutations
+   * 
+   * @param key - Cache key
+   * @param value - Value to cache
+   */
+  set<T>(key: string, value: T): void
+
+  /**
+   * Delete a key from cache
+   * Useful for cache invalidation after mutations
+   * 
+   * @param key - Cache key
+   */
+  del(key: string): void
+
+  /**
+   * Clear entire cache
+   * Useful for testing or emergency cache reset
+   */
+  clear(): void
+
+  /**
+   * Get cache statistics
+   * Useful for monitoring and debugging
+   */
+  stats(): {
+    size: number
+    maxSize: number
+    inflightRequests: number
+  }
+}
