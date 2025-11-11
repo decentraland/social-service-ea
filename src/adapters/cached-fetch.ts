@@ -1,16 +1,16 @@
 /**
  * Cached Fetch Component
- * 
+ *
  * Implements SWR (Stale-While-Revalidate) caching pattern with LRU cache for external API calls.
  * Features:
  * - In-memory LRU cache for fast access
  * - Request deduplication to prevent concurrent fetches
  * - Stale-while-revalidate pattern (serves stale data while refreshing)
  * - Batch fetching support (works with GET, POST, or any HTTP method)
- * 
+ *
  * @example Single fetch (GET or POST)
  * const profile = await cache.get('user:0x123', () => fetchProfile('0x123'))
- * 
+ *
  * @example Batch fetch with POST (e.g., Catalyst profiles)
  * const profiles = await cache.getMany(
  *   ['0x123', '0x456'],
@@ -68,7 +68,7 @@ interface CacheEntry<T> {
 
 /**
  * Creates a cached fetch component with SWR pattern
- * 
+ *
  * @param components - App components (config, logs)
  * @param options - Cache configuration options
  * @returns Cached fetch component instance
@@ -152,10 +152,14 @@ export async function createCachedFetchComponent(
       return
     }
 
+    logger.debug('Background refresh started', { key })
     const promise = fetchAndCache(key, fetchFn)
     inflightRequests.set(key, promise)
 
     promise
+      .then(() => {
+        logger.debug('Background refresh completed', { key })
+      })
       .catch((error) => {
         // Log but don't throw - we already returned stale data
         logger.warn('Background refresh failed', {
@@ -179,12 +183,14 @@ export async function createCachedFetchComponent(
 
     // Case 1: Cache miss (never cached or LRU deleted after staleTime)
     if (!cached) {
+      logger.info('Cache miss', { key })
       if (onCacheMiss) {
         onCacheMiss(key)
       }
 
       // Check if already fetching to avoid duplicate requests
       if (inflightRequests.has(key)) {
+        logger.debug('Waiting for in-flight request', { key })
         return inflightRequests.get(key)! as Promise<T>
       }
 
@@ -193,7 +199,9 @@ export async function createCachedFetchComponent(
       inflightRequests.set(key, promise)
 
       try {
-        return await promise
+        const result = await promise
+        logger.debug('Cache miss resolved', { key })
+        return result
       } finally {
         inflightRequests.delete(key)
       }
@@ -201,6 +209,7 @@ export async function createCachedFetchComponent(
 
     // Case 2: Fresh data (age <= ttl)
     if (!isStale(cached, ttl)) {
+      logger.debug('Cache hit (fresh)', { key })
       if (onCacheHit) {
         onCacheHit(key, false)
       }
@@ -210,6 +219,7 @@ export async function createCachedFetchComponent(
     // Case 3: Stale data (ttl < age <= staleTime)
     // We know it's not too stale because LRU hasn't deleted it yet
     // (LRU deletes entries after staleTime)
+    logger.debug('Cache hit (stale)', { key })
     if (onCacheHit) {
       onCacheHit(key, true)
     }
@@ -245,6 +255,8 @@ export async function createCachedFetchComponent(
     // Check cache for all unique keys
     const missedKeys: string[] = []
     const cachedEntries = new Map<string, T>()
+    let freshHits = 0
+    let staleHits = 0
 
     for (const key of uniqueKeys) {
       const cached = cache.get(key)
@@ -252,15 +264,20 @@ export async function createCachedFetchComponent(
       if (!cached) {
         // Cache miss
         missedKeys.push(key)
+        logger.debug('Cache miss in batch', { key })
       } else if (!isStale(cached, ttl)) {
         // Fresh data
+        freshHits++
         cachedEntries.set(key, cached.data as T)
+        logger.debug('Cache hit (fresh) in batch', { key })
         if (onCacheHit) {
           onCacheHit(key, false)
         }
       } else {
         // Stale data - use it but refresh in background
+        staleHits++
         cachedEntries.set(key, cached.data as T)
+        logger.debug('Cache hit (stale) in batch', { key })
         if (onCacheHit) {
           onCacheHit(key, true)
         }
@@ -279,6 +296,11 @@ export async function createCachedFetchComponent(
 
     // Fetch missing keys in batch
     if (missedKeys.length > 0) {
+      logger.info('Batch cache miss', {
+        missedCount: missedKeys.length,
+        totalKeys: uniqueKeys.length,
+        sampleMissedKeys: missedKeys.slice(0, 10).join(', ') // Log first 10 to avoid log spam
+      })
       if (onCacheMiss) {
         missedKeys.forEach((key) => onCacheMiss(key))
       }
@@ -290,9 +312,7 @@ export async function createCachedFetchComponent(
       for (const key of missedKeys) {
         if (inflightRequests.has(key)) {
           // Already fetching - wait for existing promise
-          fetchPromises.push(
-            (inflightRequests.get(key)! as Promise<T>).then((data) => [data])
-          )
+          fetchPromises.push((inflightRequests.get(key)! as Promise<T>).then((data) => [data]))
         } else {
           keysToFetch.push(key)
         }
@@ -323,13 +343,16 @@ export async function createCachedFetchComponent(
 
         // Track all keys as inflight
         keysToFetch.forEach((key) => {
-          inflightRequests.set(key, batchPromise.then((items) => {
-            const item = items.find((i) => keyExtractor(i) === key)
-            if (!item) {
-              throw new Error(`Fetched items missing key: ${key}`)
-            }
-            return item
-          }))
+          inflightRequests.set(
+            key,
+            batchPromise.then((items) => {
+              const item = items.find((i) => keyExtractor(i) === key)
+              if (!item) {
+                throw new Error(`Fetched items missing key: ${key}`)
+              }
+              return item
+            })
+          )
         })
 
         fetchPromises.push(batchPromise)
@@ -354,6 +377,15 @@ export async function createCachedFetchComponent(
       })
     }
 
+    // Log batch operation summary
+    logger.info('Batch cache operation completed', {
+      totalKeys: uniqueKeys.length,
+      freshHits,
+      staleHits,
+      misses: missedKeys.length,
+      hitRate: (((freshHits + staleHits) / uniqueKeys.length) * 100).toFixed(1) + '%'
+    })
+
     // Build results array in original key order
     // Note: If a key is missing from cachedEntries, results[index] remains null
     keys.forEach((key, index) => {
@@ -369,7 +401,7 @@ export async function createCachedFetchComponent(
 
     // Filter out nulls (shouldn't happen but safety check)
     const filtered = results.filter((r) => r !== null) as T[]
-    
+
     // Warn if we lost some results
     if (filtered.length !== keys.length) {
       logger.warn('Batch fetch returned incomplete results', {
@@ -378,7 +410,7 @@ export async function createCachedFetchComponent(
         missing: keys.length - filtered.length
       })
     }
-    
+
     return filtered
   }
 
@@ -438,7 +470,7 @@ export async function createCachedFetchComponent(
 
 /**
  * Helper function to create cached fetch with config from environment variables
- * 
+ *
  * @param components - App components
  * @param configPrefix - Prefix for config keys (e.g., 'PROFILE_CACHE_' for PROFILE_CACHE_TTL)
  * @param defaults - Default values if config not found
@@ -465,4 +497,3 @@ export async function createCachedFetchFromConfig(
     maxSize
   })
 }
-
