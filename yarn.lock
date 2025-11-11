@@ -1718,10 +1718,10 @@
     ajv-keywords "^5.1.0"
     mitt "^3.0.1"
 
-"@dcl/schemas@^18.3.0":
-  version "18.3.0"
-  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-18.3.0.tgz#9016edcaa3eb64d71e1ecca6792cf9a98bb4013d"
-  integrity sha512-6vpQv5nhKjJtcSEsuygyeW/CSe33wVHd5Uij6TFYdSV6Mpjdu2oe/qAkAMkNx1reiK5lXAY8K7Zy3/AB6wBmyQ==
+"@dcl/schemas@^19.8.0":
+  version "19.8.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-19.8.0.tgz#0a1edb79b89e359c4c5efa7a8858ab0504a2ece4"
+  integrity sha512-Jx0osV3akupfuzza2p+Ohqzewz9zaE8MCaOSH2+wfvph1WuvBkyQP5WrCEzs8iIZx7Dh2uCr6Q4+o3tgfC+vnQ==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"

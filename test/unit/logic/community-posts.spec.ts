@@ -1,4 +1,4 @@
-import { EthAddress } from '@dcl/schemas'
+import { EthAddress, Events } from '@dcl/schemas'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError, CommunityPostNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
@@ -7,6 +7,8 @@ import { createCommunityPostsComponent } from '../../../src/logic/community/post
 import {
   ICommunityPostsComponent,
   ICommunityRolesComponent,
+  ICommunityBroadcasterComponent,
+  ICommunityThumbnailComponent,
   CommunityPost,
   CommunityPostWithLikes,
   CommunityPostWithProfile,
@@ -15,13 +17,19 @@ import {
   CommunityVisibilityEnum
 } from '../../../src/logic/community/types'
 import { CommunityRole } from '../../../src/types/entities'
-import { createMockCommunityRolesComponent } from '../../mocks/communities'
+import {
+  createMockCommunityRolesComponent,
+  createMockCommunityBroadcasterComponent,
+  createMockCommunityThumbnailComponent
+} from '../../mocks/communities'
 import { createMockProfile } from '../../mocks/profile'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('Community Posts Component', () => {
   let postsComponent: ICommunityPostsComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
+  let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
+  let mockCommunityThumbnail: jest.Mocked<ICommunityThumbnailComponent>
   let mockLogs: jest.Mocked<ILoggerComponent>
   let mockUserAddress: string
   let mockCommunityId: string
@@ -58,11 +66,17 @@ describe('Community Posts Component', () => {
     mockPostId = 'test-post'
 
     mockCommunityRoles = createMockCommunityRolesComponent({})
+    mockCommunityBroadcaster = createMockCommunityBroadcasterComponent({})
+    mockCommunityThumbnail = createMockCommunityThumbnailComponent({})
     mockLogs = createLogsMockedComponent({})
+
+    mockCommunityThumbnail.buildThumbnailUrl.mockReturnValue(`https://cdn.example.com/communities/${mockCommunityId}/thumbnail.png`)
 
     postsComponent = createCommunityPostsComponent({
       communitiesDb: mockCommunitiesDB,
       communityRoles: mockCommunityRoles,
+      communityBroadcaster: mockCommunityBroadcaster,
+      communityThumbnail: mockCommunityThumbnail,
       catalystClient: mockCatalystClient,
       logs: mockLogs
     })
@@ -75,24 +89,58 @@ describe('Community Posts Component', () => {
   describe('when creating a post', () => {
     const content = 'This is a test post content'
     const authorAddress = '0x1234567890123456789012345678901234567890'
+    let mockAuthorProfile: ReturnType<typeof createMockProfile>
+
+    beforeEach(() => {
+      mockAuthorProfile = createMockProfile(authorAddress)
+    })
 
     describe('and the community exists', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(true)
+        mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
         mockCommunityRoles.validatePermissionToCreatePost.mockResolvedValue()
         mockCommunitiesDB.createPost.mockResolvedValue(mockPost)
+        mockCatalystClient.getProfile.mockResolvedValue(mockAuthorProfile)
       })
 
-      it('should create post successfully', async () => {
+      it('should create post successfully with author profile', async () => {
         const result = await postsComponent.createPost(mockCommunityId, authorAddress, content)
 
-        expect(result).toEqual(mockPost)
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(mockCommunityId)
+        expect(result).toMatchObject({
+          ...mockPost,
+          authorName: expect.any(String),
+          authorProfilePictureUrl: expect.any(String),
+          authorHasClaimedName: expect.any(Boolean)
+        })
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, authorAddress)
         expect(mockCommunityRoles.validatePermissionToCreatePost).toHaveBeenCalledWith(mockCommunityId, authorAddress)
         expect(mockCommunitiesDB.createPost).toHaveBeenCalledWith({
           communityId: mockCommunityId,
           authorAddress,
           content: content.trim()
+        })
+        expect(mockCatalystClient.getProfile).toHaveBeenCalledWith(authorAddress)
+      })
+
+      it('should broadcast POST_ADDED event', async () => {
+        await postsComponent.createPost(mockCommunityId, authorAddress, content)
+
+        // Wait for setImmediate callback to execute
+        await new Promise((resolve) => setImmediate(resolve))
+
+        expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.POST_ADDED,
+          key: mockPost.id,
+          timestamp: expect.any(Number),
+          metadata: {
+            postId: mockPost.id,
+            communityId: mockCommunityId,
+            communityName: mockCommunity.name,
+            thumbnailUrl: expect.stringContaining(mockCommunityId),
+            authorAddress: authorAddress.toLowerCase(),
+            addressesToNotify: []
+          }
         })
       })
 
@@ -106,11 +154,12 @@ describe('Community Posts Component', () => {
           authorAddress,
           content: 'This is a test post content'
         })
+        expect(mockCatalystClient.getProfile).toHaveBeenCalledWith(authorAddress)
       })
 
       describe('and the user does not have permission to create posts', () => {
         beforeEach(() => {
-          mockCommunitiesDB.communityExists.mockResolvedValue(true)
+          mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
           mockCommunityRoles.validatePermissionToCreatePost.mockRejectedValue(
             new NotAuthorizedError(`The user ${authorAddress} doesn't have permission to create posts in the community`)
           )
@@ -121,15 +170,16 @@ describe('Community Posts Component', () => {
             new NotAuthorizedError(`The user ${authorAddress} doesn't have permission to create posts in the community`)
           )
 
-          expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(mockCommunityId)
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, authorAddress)
           expect(mockCommunityRoles.validatePermissionToCreatePost).toHaveBeenCalledWith(mockCommunityId, authorAddress)
           expect(mockCommunitiesDB.createPost).not.toHaveBeenCalled()
+          expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
         })
       })
 
       describe('and database operation fails', () => {
         beforeEach(() => {
-          mockCommunitiesDB.communityExists.mockResolvedValue(true)
+          mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
           mockCommunityRoles.validatePermissionToCreatePost.mockResolvedValue()
           mockCommunitiesDB.createPost.mockRejectedValue(new Error('Database error'))
         })
@@ -144,7 +194,7 @@ describe('Community Posts Component', () => {
 
     describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+        mockCommunitiesDB.getCommunity.mockResolvedValue(null)
       })
 
       it('should throw CommunityNotFoundError', async () => {
@@ -152,9 +202,10 @@ describe('Community Posts Component', () => {
           new CommunityNotFoundError(mockCommunityId)
         )
 
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(mockCommunityId)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, authorAddress)
         expect(mockCommunityRoles.validatePermissionToCreatePost).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.createPost).not.toHaveBeenCalled()
+        expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
       })
     })
   })

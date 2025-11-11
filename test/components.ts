@@ -182,7 +182,14 @@ async function initComponents(): Promise<TestComponents> {
   const communityBroadcaster = createMockCommunityBroadcasterComponent({})
   const communityPlaces = await createCommunityPlacesComponent({ communitiesDb, communityRoles, logs, placesApi })
   const communityFieldsValidator = await createCommunityFieldsValidatorComponent({ config })
-  const communityPosts = createCommunityPostsComponent({ communitiesDb, communityRoles, catalystClient, logs })
+  const communityPosts = createCommunityPostsComponent({
+    communitiesDb,
+    communityRoles,
+    catalystClient,
+    logs,
+    communityBroadcaster,
+    communityThumbnail
+  })
 
   // Community voice chat cache and polling components
   const communityVoiceChatCache = createCommunityVoiceChatCacheComponent({ logs, redis })

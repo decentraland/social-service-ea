@@ -64,6 +64,11 @@ describe('Community Members Component', () => {
     mockPeersStats = createMockPeersStatsComponent()
     mockCommsGatekeeper = createCommsGatekeeperMockedComponent({})
     mockAnalytics = createMockedAnalyticsComponent({})
+
+    mockCommunityThumbnail.buildThumbnailUrl.mockImplementation(
+      (communityId: string) => `https://cdn.example.com/communities/${communityId}/thumbnail.png`
+    )
+
     communityMembersComponent = await createCommunityMembersComponent({
       communitiesDb: mockCommunitiesDB,
       catalystClient: mockCatalystClient,
@@ -687,8 +692,9 @@ describe('Community Members Component', () => {
               timestamp: expect.any(Number),
               metadata: {
                 id: communityId,
-                name: expect.any(String),
-                memberAddress: targetAddress
+                name: 'Test Community',
+                memberAddress: targetAddress,
+                thumbnailUrl: expect.stringContaining(communityId)
               }
             })
           })
@@ -1113,6 +1119,19 @@ describe('Community Members Component', () => {
     })
 
     describe('and validations pass', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          id: 'test-community',
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: targetAddress,
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Owner
+        })
+      })
+
       it('should call transferCommunityOwnership', async () => {
         await communityMembersComponent.updateMemberRole(
           'test-community',
@@ -1123,6 +1142,32 @@ describe('Community Members Component', () => {
 
         expect(mockCommunitiesDB.transferCommunityOwnership).toHaveBeenCalledWith('test-community', targetAddress)
         expect(mockCommunitiesDB.updateMemberRole).not.toHaveBeenCalled()
+      })
+
+      it('should publish OWNERSHIP_TRANSFERRED event using broadcaster', async () => {
+        await communityMembersComponent.updateMemberRole(
+          'test-community',
+          updaterAddress,
+          targetAddress,
+          CommunityRole.Owner
+        )
+
+        // Wait for setImmediate callback to execute
+        await new Promise((resolve) => setImmediate(resolve))
+
+        expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
+          key: expect.stringContaining(`test-community-${updaterAddress}-${targetAddress}-`),
+          timestamp: expect.any(Number),
+          metadata: {
+            communityId: 'test-community',
+            communityName: 'Test Community',
+            oldOwnerAddress: updaterAddress,
+            newOwnerAddress: targetAddress,
+            thumbnailUrl: expect.stringContaining('test-community')
+          }
+        })
       })
     })
   })

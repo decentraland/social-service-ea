@@ -164,7 +164,13 @@ export interface ICommunitiesDatabaseComponent {
   kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
   getCommunityMembers(
     id: string,
-    options: { userAddress?: EthAddress; pagination: Pagination; filterByMembers?: string[]; roles?: CommunityRole[] }
+    options: {
+      userAddress?: EthAddress
+      pagination: Pagination
+      filterByMembers?: string[]
+      roles?: CommunityRole[]
+      excludedAddresses?: string[]
+    }
   ): Promise<CommunityMember[]>
   getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number>
   getMemberCommunities(

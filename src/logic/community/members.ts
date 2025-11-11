@@ -119,6 +119,26 @@ export async function createCommunityMembersComponent(
     }
 
     await communitiesDb.transferCommunityOwnership(communityId, targetAddress)
+    setImmediate(async () => {
+      const community = await communitiesDb.getCommunity(communityId)
+
+      if (!community) return
+
+      const timestamp = Date.now()
+      await communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
+        key: `${communityId}-${updaterAddress}-${targetAddress}-${timestamp}`,
+        timestamp,
+        metadata: {
+          communityId,
+          communityName: community.name,
+          oldOwnerAddress: updaterAddress,
+          newOwnerAddress: targetAddress,
+          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+        }
+      })
+    })
   }
 
   return {

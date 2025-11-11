@@ -1,4 +1,4 @@
-import { EthAddress } from '@dcl/schemas'
+import { EthAddress, Events } from '@dcl/schemas'
 import { AppComponents } from '../../types/system'
 import {
   ICommunityPostsComponent,
@@ -13,12 +13,28 @@ import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { normalizeAddress } from '../../utils/address'
 import { getProfileName, getProfileUserId, getProfileHasClaimedName, getProfilePictureUrl } from '../profiles'
 import { CommunityRole } from '../../types/entities'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 export function createCommunityPostsComponent(
-  components: Pick<AppComponents, 'communitiesDb' | 'communityRoles' | 'catalystClient' | 'logs'>
+  components: Pick<
+    AppComponents,
+    'communityBroadcaster' | 'communitiesDb' | 'communityRoles' | 'catalystClient' | 'communityThumbnail' | 'logs'
+  >
 ): ICommunityPostsComponent {
-  const { communitiesDb, communityRoles, catalystClient, logs } = components
+  const { communityBroadcaster, communitiesDb, communityRoles, catalystClient, communityThumbnail, logs } = components
   const logger = logs.getLogger('community-posts-component')
+
+  function aggregatePostWithProfile<T extends CommunityPostWithLikes | CommunityPost>(
+    post: T,
+    authorProfile: Profile | undefined
+  ): T & CommunityPostWithProfile {
+    return {
+      ...post,
+      authorName: authorProfile ? getProfileName(authorProfile) : post.authorAddress,
+      authorProfilePictureUrl: authorProfile ? getProfilePictureUrl(authorProfile) : '',
+      authorHasClaimedName: authorProfile ? getProfileHasClaimedName(authorProfile) : false
+    }
+  }
 
   async function aggregatePostsWithProfiles(posts: CommunityPostWithLikes[]): Promise<CommunityPostWithProfile[]> {
     if (posts.length === 0) {
@@ -30,14 +46,8 @@ export function createCommunityPostsComponent(
     const authorProfilesByAddress = new Map(authorProfiles.map((p) => [getProfileUserId(p), p]))
 
     return posts.map((post) => {
-      const profile = authorProfilesByAddress.get(normalizeAddress(post.authorAddress))
-
-      return {
-        ...post,
-        authorName: profile ? getProfileName(profile) : post.authorAddress,
-        authorProfilePictureUrl: profile ? getProfilePictureUrl(profile) : '',
-        authorHasClaimedName: profile ? getProfileHasClaimedName(profile) : false
-      }
+      const authorProfile = authorProfilesByAddress.get(normalizeAddress(post.authorAddress))
+      return aggregatePostWithProfile(post, authorProfile)
     })
   }
 
@@ -72,8 +82,8 @@ export function createCommunityPostsComponent(
 
   return {
     async createPost(communityId: string, authorAddress: EthAddress, content: string): Promise<CommunityPost> {
-      const communityExists = await communitiesDb.communityExists(communityId)
-      if (!communityExists) {
+      const community = await communitiesDb.getCommunity(communityId, authorAddress)
+      if (!community) {
         throw new CommunityNotFoundError(communityId)
       }
 
@@ -91,7 +101,27 @@ export function createCommunityPostsComponent(
         authorAddress: authorAddress.toLowerCase()
       })
 
-      return post
+      const authorProfile = await catalystClient.getProfile(authorAddress)
+      const postWithAuthorProfile = aggregatePostWithProfile(post, authorProfile)
+
+      setImmediate(() => {
+        void communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.POST_ADDED,
+          key: post.id,
+          timestamp: Date.now(),
+          metadata: {
+            postId: post.id,
+            communityId,
+            communityName: community.name,
+            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId),
+            authorAddress: authorAddress.toLowerCase(),
+            addressesToNotify: [] // This is populated by the broadcaster
+          }
+        })
+      })
+
+      return postWithAuthorProfile
     },
 
     async getPosts(
