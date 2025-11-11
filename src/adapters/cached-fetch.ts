@@ -204,7 +204,7 @@ export async function createCachedFetchComponent(
       if (onCacheHit) {
         onCacheHit(key, false)
       }
-      return cached.data
+      return cached.data as T
     }
 
     // Case 3: Stale data (ttl < age <= staleTime)
@@ -214,7 +214,7 @@ export async function createCachedFetchComponent(
       onCacheHit(key, true)
     }
     refreshInBackground(key, fetchFn)
-    return cached.data
+    return cached.data as T
   }
 
   /**
@@ -254,13 +254,13 @@ export async function createCachedFetchComponent(
         missedKeys.push(key)
       } else if (!isStale(cached, ttl)) {
         // Fresh data
-        cachedEntries.set(key, cached.data)
+        cachedEntries.set(key, cached.data as T)
         if (onCacheHit) {
           onCacheHit(key, false)
         }
       } else {
         // Stale data - use it but refresh in background
-        cachedEntries.set(key, cached.data)
+        cachedEntries.set(key, cached.data as T)
         if (onCacheHit) {
           onCacheHit(key, true)
         }
