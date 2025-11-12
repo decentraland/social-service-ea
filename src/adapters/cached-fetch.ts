@@ -398,14 +398,16 @@ export async function createCachedFetchComponent(
         }
       }
 
-      // Wait for all promises to resolve
+      // Wait for all promises to resolve efficiently (single await, no double resolution)
+      const keys = Array.from(keyPromises.keys())
+      const promises = Array.from(keyPromises.values())
+      const results = await Promise.all(promises)
+
+      // Map results back to keys
       const fetchedMap = new Map<string, T>()
-      await Promise.all(
-        Array.from(keyPromises.entries()).map(async ([key, promise]) => {
-          const result = await promise
-          fetchedMap.set(key, result)
-        })
-      )
+      keys.forEach((key, index) => {
+        fetchedMap.set(key, results[index])
+      })
 
       // Add fetched items to cached entries
       fetchedMap.forEach((value, key) => {
