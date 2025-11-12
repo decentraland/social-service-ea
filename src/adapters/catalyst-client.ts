@@ -26,7 +26,7 @@ export async function createCatalystClient({
   }
 
   function getContentClientOrDefault(contentServerUrl?: string): ContentClient {
-    return createContentClient({ fetcher, url: contentServerUrl ?? loadBalancer })
+    return createContentClient({ fetcher, url: `${contentServerUrl ?? loadBalancer}/content` })
   }
 
   function rotateContentServerClient<T>(
@@ -69,10 +69,10 @@ export async function createCatalystClient({
     return await profileCache.getMany(
       ids.map((id) => id.toLowerCase()),
       async (missedIds: string[]) => {
-        const { retries = 3, waitTime = 300, lambdasServerUrl } = options
+        const { retries = 3, waitTime = 300, contentServerUrl } = options
         const executeClientRequest = rotateContentServerClient(
           (contentClientToUse) => contentClientToUse.fetchEntitiesByIds(missedIds),
-          lambdasServerUrl
+          contentServerUrl
         )
         const fetchedProfiles = await retry(executeClientRequest, retries, waitTime)
 
@@ -91,10 +91,10 @@ export async function createCatalystClient({
     const normalizedId = id.toLowerCase()
 
     return await profileCache.get(normalizedId, async () => {
-      const { retries = 3, waitTime = 300, lambdasServerUrl } = options
+      const { retries = 3, waitTime = 300, contentServerUrl } = options
       const executeClientRequest = rotateContentServerClient(
         (contentClientToUse) => contentClientToUse.fetchEntityById(normalizedId),
-        lambdasServerUrl
+        contentServerUrl
       )
 
       const response = await retry(executeClientRequest, retries, waitTime)
