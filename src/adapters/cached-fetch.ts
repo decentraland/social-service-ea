@@ -359,14 +359,31 @@ export async function createCachedFetchComponent(
           const promise = (async () => {
             const fetched = await fetchFn(keysToFetch)
             // Cache all fetched items immediately
+            // Wrap key extraction in try-catch to handle invalid items gracefully
             const fetchedMap = new Map<string, T>()
             fetched.forEach((item) => {
-              const itemKey = keyExtractor(item)
-              fetchedMap.set(itemKey, item)
-              cache.set(itemKey, {
-                data: item,
-                timestamp: Date.now()
-              })
+              try {
+                const itemKey = keyExtractor(item)
+                if (itemKey) {
+                  fetchedMap.set(itemKey, item)
+                  cache.set(itemKey, {
+                    data: item,
+                    timestamp: Date.now()
+                  })
+                } else {
+                  logger.warn('Key extractor returned empty key for item', {
+                    itemType: typeof item,
+                    itemKeysSample: item && typeof item === 'object' ? Object.keys(item).slice(0, 5).join(', ') : 'N/A'
+                  })
+                }
+              } catch (error) {
+                // If key extraction fails, log and skip this item
+                // This can happen if the item structure is invalid or missing required fields
+                logger.warn('Failed to extract key from fetched item', {
+                  error: error instanceof Error ? error.message : String(error),
+                  itemType: typeof item
+                })
+              }
             })
             return fetchedMap
           })()
@@ -390,23 +407,44 @@ export async function createCachedFetchComponent(
             const fetchedMap = await batchFetchPromise
             const item = fetchedMap.get(key)
             if (!item) {
-              throw new Error(`Fetched items missing key: ${key}`)
+              // Log warning but don't throw - some keys might not have corresponding data
+              // (e.g., addresses without profiles, deleted entities, etc.)
+              logger.warn('Fetched items missing key in batch result', {
+                key,
+                availableKeysCount: fetchedMap.size,
+                requestedKeysCount: keysToFetch.length,
+                sampleAvailableKeys: Array.from(fetchedMap.keys()).slice(0, 5).join(', ')
+              })
+              // Return null to indicate missing data - will be filtered out later
+              return null as unknown as T
             }
             return item
+          }).catch((error) => {
+            // If promise fails, log and return null instead of propagating error
+            logger.warn('Error extracting item from batch for key', {
+              key,
+              error: error instanceof Error ? error.message : String(error)
+            })
+            return null as unknown as T
           })
           keyPromises.set(key, itemPromise)
         }
       }
 
       // Wait for all promises to resolve efficiently (single await, no double resolution)
+      // Note: Promises are wrapped to handle missing keys gracefully (return null instead of throwing)
       const keys = Array.from(keyPromises.keys())
       const promises = Array.from(keyPromises.values())
       const results = await Promise.all(promises)
 
-      // Map results back to keys
+      // Map results back to keys, filtering out null values (missing keys)
       const fetchedMap = new Map<string, T>()
       keys.forEach((key, index) => {
-        fetchedMap.set(key, results[index])
+        const result = results[index]
+        // Only add non-null results (null indicates missing data from API)
+        if (result !== null && result !== undefined) {
+          fetchedMap.set(key, result)
+        }
       })
 
       // Add fetched items to cached entries
