@@ -115,6 +115,21 @@ export async function createCatalystClient({
 
       const response = await retry(executeClientRequest, retries, waitTime)
       validProfiles = response.map((entity) => extractMinimalProfile(entity?.metadata)).filter(Boolean) as Profile[]
+      const minimalProfiles = validProfiles.map(extractMinimalProfile).filter(Boolean) as Profile[]
+
+      validProfiles = minimalProfiles
+
+      // Cache profiles asynchronously without blocking the response
+      setImmediate(() => {
+        Promise.all(
+          minimalProfiles.map(async (minimalProfile) => {
+            await cacheProfile(getProfileUserId(minimalProfile), minimalProfile)
+          })
+        ).catch((error) => {
+          // Catch any unhandled promise rejections
+          logger.error('Profile cache storing in batch failed', { error: error.message })
+        })
+      })
     }
 
     return [...cachedProfiles, ...validProfiles]

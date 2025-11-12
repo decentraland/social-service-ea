@@ -159,6 +159,53 @@ describe('catalyst-client', () => {
         ])
       })
 
+      it('should cache fetched profiles as minimal profiles with correct expiration', async () => {
+        await catalystClient.getProfiles(profileIds)
+
+        jest.runOnlyPendingTimers()
+
+        expect(mockRedis.put).toHaveBeenCalledTimes(2)
+
+        // Check that minimal profiles are cached (only essential properties)
+        const firstCall = mockRedis.put.mock.calls[0]
+        expect(firstCall[0]).toBe(getProfileCacheKey('0x1234567890123456789012345678901234567890'))
+        expect(firstCall[2]).toEqual({ EX: 60 * 10 })
+        expect(firstCall[1]).toEqual({
+          avatars: [
+            {
+              userId: '0x1234567890123456789012345678901234567890',
+              name: 'TestUser1',
+              unclaimedName: undefined,
+              hasClaimedName: true,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar1.jpg'
+                }
+              }
+            }
+          ]
+        })
+
+        const secondCall = mockRedis.put.mock.calls[1]
+        expect(secondCall[0]).toBe(getProfileCacheKey('0x0987654321098765432109876543210987654321'))
+        expect(secondCall[2]).toEqual({ EX: 60 * 10 })
+        expect(secondCall[1]).toEqual({
+          avatars: [
+            {
+              userId: '0x0987654321098765432109876543210987654321',
+              name: 'TestUser2',
+              unclaimedName: undefined,
+              hasClaimedName: false,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar2.jpg'
+                }
+              }
+            }
+          ]
+        })
+      })
+
       describe('and the catalyst server fails', () => {
         beforeEach(() => {
           contentClientMock.fetchEntitiesByIds = jest
@@ -280,6 +327,66 @@ describe('catalyst-client', () => {
         expect(result).toEqual(expect.arrayContaining([cachedProfile, expectedFetchedProfile]))
       })
 
+      it('should cache only the newly fetched profiles as minimal profiles', async () => {
+        await catalystClient.getProfiles(profileIds)
+
+        jest.runOnlyPendingTimers()
+
+        expect(mockRedis.put).toHaveBeenCalledTimes(1)
+        expect(mockRedis.put).toHaveBeenCalledWith(
+          getProfileCacheKey('0x0987654321098765432109876543210987654321'),
+          {
+            avatars: [
+              {
+                userId: '0x0987654321098765432109876543210987654321',
+                name: 'FetchedUser',
+                unclaimedName: undefined,
+                hasClaimedName: false,
+                avatar: {
+                  snapshots: {
+                    face256: 'https://example.com/fetched.jpg'
+                  }
+                }
+              }
+            ]
+          },
+          { EX: 60 * 10 }
+        )
+      })
+
+    })
+
+    describe('and batch caching Promise.all fails', () => {
+      beforeEach(() => {
+        jest.useRealTimers()
+        mockRedis.mGet.mockResolvedValue([null])
+        jest.spyOn(require('../../../src/logic/profiles'), 'getProfileUserId').mockImplementation(() => {
+          throw new Error('Batch cache failed')
+        })
+        contentClientMock.fetchEntitiesByIds = jest.fn().mockResolvedValue([{ metadata: mockProfile }])
+      })
+
+      afterEach(() => {
+        jest.useFakeTimers()
+        jest.restoreAllMocks()
+      })
+
+      it('should log error for batch failure', async () => {
+        const logger = mockLogs.getLogger('catalyst-client')
+        const result = await catalystClient.getProfiles([profileIds[0]])
+
+        // Wait for setImmediate to complete
+        await new Promise((resolve) => setImmediate(resolve))
+
+        expect(logger.error).toHaveBeenCalledWith(
+          'Profile cache storing in batch failed',
+          expect.objectContaining({
+            error: 'Batch cache failed'
+          })
+        )
+        expect(result).toHaveLength(1)
+        expect(result[0]).toEqual(mockProfile)
+      })
     })
 
     describe('and all profiles are cached', () => {
