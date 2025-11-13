@@ -1,8 +1,15 @@
 import { IFetchComponent, Request, RequestOptions, Response } from '@well-known-components/interfaces'
 
-// TODO: make this component production-ready handling errors and timeouts
+// Maximum age for inflight requests before considering them hung (20 seconds)
+const MAX_REQUEST_AGE_MS = 20000
+
+interface InflightRequest {
+  promise: Promise<Response>
+  startTime: number
+}
+
 export function withDeduplication(fetcher: IFetchComponent): IFetchComponent {
-  const inflightRequests = new Map<string, Promise<Response>>()
+  const inflightRequests = new Map<string, InflightRequest>()
 
   async function fetch(url: Request, options?: RequestOptions): Promise<Response> {
     const method = (options?.method?.toUpperCase() || 'GET') as string
@@ -31,28 +38,29 @@ export function withDeduplication(fetcher: IFetchComponent): IFetchComponent {
       key = `${method}:${url.toString()}:${bodyKey}`
     }
 
-    // Atomic check-and-set to prevent race conditions
-    let existingPromise = inflightRequests.get(key)
-    if (existingPromise) {
-      return existingPromise
+    const existingRequest = inflightRequests.get(key)
+    if (existingRequest) {
+      // Check if request is too old (hung/timed out)
+      const age = Date.now() - existingRequest.startTime
+      if (age > MAX_REQUEST_AGE_MS) {
+        inflightRequests.delete(key)
+      } else {
+        return existingRequest.promise
+      }
     }
 
-    // Create promise and set atomically
-    const newPromise = fetcher.fetch(url, options).finally(() => {
-      // Only delete if this is still the current promise (handles race condition)
-      if (inflightRequests.get(key) === newPromise) {
+    const startTime = Date.now()
+    const promise = fetcher.fetch(url, options).finally(() => {
+      const current = inflightRequests.get(key)
+      if (current && current.promise === promise) {
         inflightRequests.delete(key)
       }
     })
 
-    // Check again after creating promise (double-check pattern)
-    existingPromise = inflightRequests.get(key)
-    if (existingPromise) {
-      return existingPromise
-    }
+    const newRequest: InflightRequest = { promise, startTime }
 
-    inflightRequests.set(key, newPromise)
-    return newPromise
+    inflightRequests.set(key, newRequest)
+    return promise
   }
 
   return {
