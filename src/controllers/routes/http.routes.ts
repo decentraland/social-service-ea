@@ -50,6 +50,7 @@ import {
   CreateCommunityRequestSchema,
   UpdateCommunityRequestStatusSchema
 } from '../handlers/http/schemas'
+import { getDedupeMetrics, resetDedupeMetrics } from '../../utils/fetch-deduper'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
@@ -164,6 +165,25 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   // Moderation endpoints
   router.get('/v1/moderation/communities', signedFetchMiddleware(), getAllCommunitiesForModerationHandler)
+
+  // Metrics endpoints for performance investigation
+  router.get('/v1/metrics/dedupe', async () => {
+    return {
+      status: 200,
+      body: getDedupeMetrics()
+    }
+  })
+
+  router.post('/v1/metrics/dedupe/reset', async () => {
+    resetDedupeMetrics()
+    return {
+      status: 200,
+      body: {
+        success: true,
+        message: 'Deduplication metrics have been reset'
+      }
+    }
+  })
 
   return router
 }
