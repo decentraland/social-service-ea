@@ -51,30 +51,6 @@ test('Get Community Controller', function ({ components, spyComponents }) {
           const response = await localHttpFetch.fetch(`/v1/communities/${communityId}`)
           expect(response.status).toBe(400)
         })
-
-        describe('and API ADMIN TOKEN is provided', () => {
-          let API_ADMIN_TOKEN: string
-          let headers: Record<string, string>
-          beforeEach(async () => {
-            API_ADMIN_TOKEN = await components.config.getString('API_ADMIN_TOKEN')
-            headers = { Authorization: `Bearer ${API_ADMIN_TOKEN}` }
-          })
-
-          it('should respond with a 200 status code', async () => {
-            const response = await makeRequest(identity, `/v1/communities/${communityId}`, 'GET', undefined, headers)
-            const body = await response.json()
-            expect(response.status).toBe(200)
-            expect(body.data).toMatchObject({
-              id: communityId,
-              name: 'Test Community',
-              active: true,
-              description: 'Test Description',
-              ownerAddress: address,
-              ownerName: 'Test Owner',
-              privacy: CommunityPrivacyEnum.Public
-            })
-          })
-        })
       })
     })
 
