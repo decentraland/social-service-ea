@@ -14,24 +14,16 @@ export async function getCommunityHandler(
   >
 ): Promise<HTTPResponse<AggregatedCommunityWithMemberData>> {
   const {
-    components: { communities, logs, config },
+    components: { communities, logs },
     params: { id },
-    verification,
-    request
+    verification
   } = context
   const logger = logs.getLogger('get-community-handler')
-  const API_ADMIN_TOKEN = await config.getString('API_ADMIN_TOKEN')
 
   logger.info(`Getting community: ${id}`)
 
   try {
     const userAddress: string | undefined = verification?.auth?.toLowerCase()
-    const optionalAuthHeader = request.headers.get('Authorization')
-    const isAdmin = !!(API_ADMIN_TOKEN && optionalAuthHeader === `Bearer ${API_ADMIN_TOKEN}`)
-
-    if (!isAdmin && !userAddress) {
-      throw new InvalidRequestError('This endpoint requires a signed fetch request. See ADR-44.')
-    }
 
     return {
       status: 200,
