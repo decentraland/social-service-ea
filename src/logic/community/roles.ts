@@ -1,7 +1,7 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityRole, CommunityPermission } from '../../types/entities'
 import { AppComponents } from '../../types/system'
-import { ICommunityRolesComponent } from './types'
+import { ICommunityRolesComponent, CommunityPost } from './types'
 
 export const OWNER_PERMISSIONS: CommunityPermission[] = [
   'edit_info',
@@ -215,6 +215,26 @@ export function createCommunityRolesComponent(
     validatePermissionToInviteUsers: validatePermission('invite_users', 'invite users'),
     validatePermissionToEditCommunityName: validatePermission('edit_name', 'edit the community name'),
     validatePermissionToCreatePost: validatePermission('create_posts', 'create posts in the community'),
-    validatePermissionToDeletePost: validatePermission('delete_posts', 'delete posts from the community')
+    async validatePermissionToDeletePost(post: CommunityPost, deleterAddress: string): Promise<void> {
+      const role = await communitiesDb.getCommunityMemberRole(post.communityId, deleterAddress)
+
+      if (!role || !hasPermission(role, 'delete_posts')) {
+        throw new NotAuthorizedError(
+          `The user ${deleterAddress} doesn't have permission to delete posts from the community`
+        )
+      }
+
+      // If the user is a moderator (not owner), they can only delete their own posts
+      if (role === CommunityRole.Moderator) {
+        const normalizedDeleterAddress = deleterAddress.toLowerCase()
+        const normalizedAuthorAddress = post.authorAddress.toLowerCase()
+
+        if (normalizedDeleterAddress !== normalizedAuthorAddress) {
+          throw new NotAuthorizedError(
+            `The user ${deleterAddress} doesn't have permission to delete posts from the community`
+          )
+        }
+      }
+    }
   }
 }

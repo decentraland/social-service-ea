@@ -159,7 +159,7 @@ export function createCommunityPostsComponent(
         throw new CommunityPostNotFoundError(postId)
       }
 
-      await communityRoles.validatePermissionToDeletePost(post.communityId, deleterAddress)
+      await communityRoles.validatePermissionToDeletePost(post, deleterAddress)
 
       await communitiesDb.deletePost(postId)
 

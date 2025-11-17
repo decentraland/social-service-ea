@@ -120,7 +120,7 @@ export interface ICommunityRolesComponent {
   validatePermissionToInviteUsers: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToEditCommunityName: (communityId: string, memberAddress: string) => Promise<void>
   validatePermissionToCreatePost: (communityId: string, memberAddress: string) => Promise<void>
-  validatePermissionToDeletePost: (communityId: string, memberAddress: string) => Promise<void>
+  validatePermissionToDeletePost: (post: CommunityPost, deleterAddress: string) => Promise<void>
 }
 
 export interface ICommunityEventsComponent {

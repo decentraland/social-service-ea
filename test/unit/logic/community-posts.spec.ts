@@ -465,10 +465,7 @@ describe('Community Posts Component', () => {
         await postsComponent.deletePost(mockPostId, deleterAddress)
 
         expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
-        expect(mockCommunityRoles.validatePermissionToDeletePost).toHaveBeenCalledWith(
-          mockPost.communityId,
-          deleterAddress
-        )
+        expect(mockCommunityRoles.validatePermissionToDeletePost).toHaveBeenCalledWith(mockPost, deleterAddress)
         expect(mockCommunitiesDB.deletePost).toHaveBeenCalledWith(mockPostId)
       })
 
@@ -501,10 +498,7 @@ describe('Community Posts Component', () => {
           )
 
           expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
-          expect(mockCommunityRoles.validatePermissionToDeletePost).toHaveBeenCalledWith(
-            mockPost.communityId,
-            deleterAddress
-          )
+          expect(mockCommunityRoles.validatePermissionToDeletePost).toHaveBeenCalledWith(mockPost, deleterAddress)
           expect(mockCommunitiesDB.deletePost).not.toHaveBeenCalled()
         })
       })

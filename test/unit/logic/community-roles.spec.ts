@@ -971,4 +971,90 @@ describe('Community Roles Component', () => {
       })
     })
   })
+
+  describe('when validating permission to delete a post', () => {
+    const communityId = 'test-community'
+    const ownerAddress = '0xOwner'
+    const moderatorAddress = '0xModerator'
+    const memberAddress = '0xMember'
+    const postAuthorAddress = '0xPostAuthor'
+
+    const mockPost = {
+      id: 'test-post',
+      communityId,
+      authorAddress: postAuthorAddress,
+      content: 'Test post content',
+      createdAt: '2023-01-01T00:00:00Z'
+    }
+
+    describe('and the user is an owner', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+      })
+
+      it('should allow to delete any post', async () => {
+        await expect(roles.validatePermissionToDeletePost(mockPost, ownerAddress)).resolves.not.toThrow()
+      })
+
+      it('should allow to delete post even if owner is not the author', async () => {
+        await expect(roles.validatePermissionToDeletePost(mockPost, ownerAddress)).resolves.not.toThrow()
+      })
+    })
+
+    describe('and the user is a moderator', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+      })
+
+      describe('and the moderator is the author of the post', () => {
+        const postByModerator = {
+          ...mockPost,
+          authorAddress: moderatorAddress
+        }
+
+        it('should allow to delete their own post', async () => {
+          await expect(roles.validatePermissionToDeletePost(postByModerator, moderatorAddress)).resolves.not.toThrow()
+        })
+      })
+
+      describe('and the moderator is not the author of the post', () => {
+        it('should throw NotAuthorizedError when trying to delete another user post', async () => {
+          await expect(roles.validatePermissionToDeletePost(mockPost, moderatorAddress)).rejects.toThrow(
+            new NotAuthorizedError(
+              `The user ${moderatorAddress} doesn't have permission to delete posts from the community`
+            )
+          )
+        })
+      })
+    })
+
+    describe('and the user is a member', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+      })
+
+      it('should throw NotAuthorizedError as members cannot delete posts', async () => {
+        await expect(roles.validatePermissionToDeletePost(mockPost, memberAddress)).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${memberAddress} doesn't have permission to delete posts from the community`
+          )
+        )
+      })
+    })
+
+    describe('and the user is not a member', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+      })
+
+      it('should throw NotAuthorizedError as non-members cannot delete posts', async () => {
+        const nonMemberAddress = '0xNonMember'
+        await expect(roles.validatePermissionToDeletePost(mockPost, nonMemberAddress)).rejects.toThrow(
+          new NotAuthorizedError(
+            `The user ${nonMemberAddress} doesn't have permission to delete posts from the community`
+          )
+        )
+      })
+    })
+  })
 })
