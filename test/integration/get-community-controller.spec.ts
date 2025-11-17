@@ -46,10 +46,31 @@ test('Get Community Controller', function ({ components, spyComponents }) {
           communityId = id
         })
 
-        it('should respond with a 400 status code', async () => {
+        it('should respond with a 200 status code', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/communities/${communityId}`)
-          expect(response.status).toBe(400)
+          expect(response.status).toBe(200)
+          const body = await response.json()
+          expect(body).toEqual({
+            data: {
+              id: communityId,
+              name: 'Test Community',
+              description: 'Test Description',
+              ownerAddress: address,
+              ownerName: 'Test Owner',
+              privacy: CommunityPrivacyEnum.Public,
+              active: true,
+              isHostingLiveEvent: false,
+              role: CommunityRole.None,
+              visibility: CommunityVisibilityEnum.All,
+              membersCount: 0,
+              voiceChatStatus: {
+                isActive: true,
+                participantCount: 2,
+                moderatorCount: 1
+              }
+            }
+          })
         })
       })
     })
