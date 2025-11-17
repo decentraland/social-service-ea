@@ -30,8 +30,7 @@ export async function getCommunityHandler(
     const isAdmin = !!(API_ADMIN_TOKEN && optionalAuthHeader === `Bearer ${API_ADMIN_TOKEN}`)
 
     if (!isAdmin && !userAddress) {
-      logger.warn('This endpoint requires a signed fetch request. See ADR-44.')
-      // throw new InvalidRequestError('This endpoint requires a signed fetch request. See ADR-44.')
+      throw new InvalidRequestError('This endpoint requires a signed fetch request. See ADR-44.')
     }
 
     return {
