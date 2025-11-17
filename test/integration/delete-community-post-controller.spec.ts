@@ -117,21 +117,47 @@ test('Delete Community Post Controller', async function ({ components, stubCompo
     })
 
     describe('and the user is a moderator', () => {
-      it('should delete post successfully', async () => {
-        const response = await makeRequest(
-          moderatorIdentity,
-          `/v1/communities/${communityId}/posts/${postId}`,
-          'DELETE'
-        )
+      describe('and the moderator is the author of the post', () => {
+        let moderatorPostId: string
 
-        expect(response.status).toBe(204)
+        beforeEach(async () => {
+          // Create a post by the moderator
+          const moderatorPost = await components.communitiesDb.createPost({
+            communityId,
+            authorAddress: moderatorIdentity.realAccount.address.toLowerCase(),
+            content: 'Moderator post to delete'
+          })
+          moderatorPostId = moderatorPost.id
+        })
 
-        // Verify post is deleted by trying to list posts
-        const { localHttpFetch } = components
-        const listResponse = await localHttpFetch.fetch(`/v1/communities/${communityId}/posts`)
-        const listBody = await listResponse.json()
-        expect(listBody.data.posts).toHaveLength(0)
-        expect(listBody.data.total).toBe(0)
+        it('should delete post successfully', async () => {
+          const response = await makeRequest(
+            moderatorIdentity,
+            `/v1/communities/${communityId}/posts/${moderatorPostId}`,
+            'DELETE'
+          )
+
+          expect(response.status).toBe(204)
+
+          // Verify post is deleted by trying to list posts
+          const { localHttpFetch } = components
+          const listResponse = await localHttpFetch.fetch(`/v1/communities/${communityId}/posts`)
+          const listBody = await listResponse.json()
+          expect(listBody.data.posts).toHaveLength(1)
+          expect(listBody.data.total).toBe(1)
+        })
+      })
+
+      describe('and the moderator is not the author of the post', () => {
+        it('should respond with a 401 status code', async () => {
+          const response = await makeRequest(
+            moderatorIdentity,
+            `/v1/communities/${communityId}/posts/${postId}`,
+            'DELETE'
+          )
+
+          expect(response.status).toBe(401)
+        })
       })
     })
 
