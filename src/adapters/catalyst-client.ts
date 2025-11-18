@@ -1,4 +1,4 @@
-import { createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
+import { ContentClient, createContentClient, createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { AppComponents, ICatalystClientComponent, ICatalystClientRequestOptions, OwnedName } from '../types'
 import { retry } from '../utils/retrier'
@@ -25,6 +25,26 @@ export async function createCatalystClient({
 
   function getLambdasClientOrDefault(lambdasServerUrl?: string): LambdasClient {
     return createLambdasClient({ fetcher, url: lambdasServerUrl ?? loadBalancer })
+  }
+
+  function getContentClientOrDefault(contentServerUrl?: string): ContentClient {
+    return createContentClient({ fetcher, url: contentServerUrl ?? loadBalancer })
+  }
+
+  function rotateContentServerClient<T>(
+    executeClientRequest: (client: ContentClient) => Promise<T>,
+    contentServerUrl?: string
+  ) {
+    const contentServers = shuffleArray(getCatalystServersFromCache(contractNetwork)).map((server) => server.address)
+    let contentClientToUse: ContentClient = getContentClientOrDefault(contentServerUrl)
+
+    return (attempt: number): Promise<T> => {
+      if (attempt > 1 && contentServers.length > 0) {
+        const [contentServerUrl] = contentServers.splice(attempt % contentServers.length, 1)
+        contentClientToUse = getContentClientOrDefault(contentServerUrl)
+      }
+      return executeClientRequest(contentClientToUse)
+    }
   }
 
   function rotateLambdasServerClient<T>(
@@ -87,15 +107,15 @@ export async function createCatalystClient({
     let validProfiles: Profile[] = []
 
     if (idsToFetch.length > 0) {
-      const { retries = 3, waitTime = 300, lambdasServerUrl } = options
-      const executeClientRequest = rotateLambdasServerClient(
-        (lambdasClientToUse) => lambdasClientToUse.getAvatarsDetailsByPost({ ids: idsToFetch }),
-        lambdasServerUrl
+      const { retries = 3, waitTime = 300, contentServerUrl } = options
+      const executeClientRequest = rotateContentServerClient(
+        (contentClientToUse) => contentClientToUse.fetchEntitiesByIds(idsToFetch),
+        contentServerUrl
       )
-      const fetchedProfiles = await retry(executeClientRequest, retries, waitTime)
 
-      // Extract minimal profiles and cache them asynchronously (fire-and-forget)
-      const minimalProfiles = fetchedProfiles.map(extractMinimalProfile).filter(Boolean) as Profile[]
+      const response = await retry(executeClientRequest, retries, waitTime)
+      validProfiles = response.map((entity) => extractMinimalProfile(entity?.metadata)).filter(Boolean) as Profile[]
+      const minimalProfiles = validProfiles.map(extractMinimalProfile).filter(Boolean) as Profile[]
 
       validProfiles = minimalProfiles
 
@@ -116,7 +136,7 @@ export async function createCatalystClient({
   }
 
   async function getProfile(id: string, options: ICatalystClientRequestOptions = {}): Promise<Profile> {
-    const { retries = 3, waitTime = 300, lambdasServerUrl } = options
+    const { retries = 3, waitTime = 300, contentServerUrl } = options
 
     // Try to get cached minimal profile
     const cachedProfile = await redis.get<Profile>(getProfileCacheKey(id))
@@ -124,17 +144,17 @@ export async function createCatalystClient({
       return cachedProfile
     }
 
-    const executeClientRequest = rotateLambdasServerClient(
-      (lambdasClientToUse) => lambdasClientToUse.getAvatarDetails(id),
-      lambdasServerUrl
+    const executeClientRequest = rotateContentServerClient(
+      (contentClientToUse) => contentClientToUse.fetchEntityById(id),
+      contentServerUrl
     )
 
     const response = await retry(executeClientRequest, retries, waitTime)
-    const minimalProfile = extractMinimalProfile(response)
+    const minimalProfile = extractMinimalProfile(response?.metadata)
 
     if (!minimalProfile) {
       logger.warn(`Invalid profile received from Catalyst, not caching: ${JSON.stringify(response)}`)
-      return response
+      return response?.metadata as Profile
     }
 
     // Cache profile asynchronously without blocking the response
