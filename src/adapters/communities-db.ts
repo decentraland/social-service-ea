@@ -99,6 +99,26 @@ export function createCommunitiesDBComponent(
       return result.rows[0]
     },
 
+    async getCommunityPublicInformation(id: string): Promise<Omit<CommunityPublicInformation, 'ownerName'> | null> {
+      const baseQuery = useCTEs([getCommunitiesWithMembersCountCTE({ onlyPublic: true })]).append(
+        SQL`
+        SELECT 
+          c.id,
+          c.name,
+          c.description,
+          c.owner_address as "ownerAddress",
+          CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
+          c.active,
+          cwmc."membersCount"
+        FROM communities c
+        LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
+        WHERE c.id = ${id} AND c.active = true AND c.private = false AND c.unlisted = false`
+      )
+
+      const result = await pg.query<Omit<CommunityPublicInformation, 'ownerName'>>(baseQuery)
+      return result.rows[0] || null
+    },
+
     async getCommunityMembers(
       id: string,
       options: {

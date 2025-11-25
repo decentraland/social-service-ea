@@ -3,7 +3,8 @@ import { errorMessageOrDefault } from '../../../utils/errors'
 import {
   CommunityNotFoundError,
   CommunityOwnerNotFoundError,
-  AggregatedCommunityWithMemberData
+  AggregatedCommunityWithMemberAndVoiceChatData,
+  CommunityPublicInformationWithVoiceChat
 } from '../../../logic/community'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 
@@ -12,7 +13,11 @@ export async function getCommunityHandler(
     HandlerContextWithPath<'logs' | 'config' | 'communities', '/v1/communities/:id'>,
     'components' | 'params' | 'verification' | 'request'
   >
-): Promise<HTTPResponse<AggregatedCommunityWithMemberData>> {
+): Promise<
+  HTTPResponse<
+    AggregatedCommunityWithMemberAndVoiceChatData | Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>
+  >
+> {
   const {
     components: { communities, logs },
     params: { id },
@@ -25,12 +30,16 @@ export async function getCommunityHandler(
   try {
     const userAddress: string | undefined = verification?.auth?.toLowerCase()
 
+    const data = userAddress
+      ? await communities.getCommunity(id, {
+          as: userAddress
+        })
+      : await communities.getCommunityPublicInformation(id)
+
     return {
       status: 200,
       body: {
-        data: await communities.getCommunity(id, {
-          as: userAddress
-        })
+        data
       }
     }
   } catch (error: any) {

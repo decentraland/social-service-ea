@@ -22,6 +22,9 @@ import {
 
 export interface ICommunitiesComponent {
   getCommunity(id: string, options: { as?: EthAddress }): Promise<AggregatedCommunityWithMemberAndVoiceChatData>
+  getCommunityPublicInformation(
+    id: string
+  ): Promise<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>
   getCommunities(
     userAddress: string,
     options: GetCommunitiesOptions

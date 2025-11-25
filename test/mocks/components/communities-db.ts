@@ -2,6 +2,7 @@ import { ICommunitiesDatabaseComponent } from '../../../src/types'
 
 export const mockCommunitiesDB: jest.Mocked<ICommunitiesDatabaseComponent> = {
   getCommunity: jest.fn(),
+  getCommunityPublicInformation: jest.fn(),
   getCommunityPlaces: jest.fn(),
   getCommunityPlacesCount: jest.fn(),
   addCommunityPlace: jest.fn(),

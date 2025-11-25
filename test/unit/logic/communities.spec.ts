@@ -22,6 +22,7 @@ import {
   CommunityPrivacyEnum,
   CommunityVisibilityEnum,
   CommunityPublicInformation,
+  CommunityPublicInformationWithVoiceChat,
   CommunityUpdates,
   CommunityMember,
   CommunityRequestType,
@@ -219,6 +220,68 @@ describe('Community Component', () => {
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
         expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+      })
+    })
+  })
+
+  describe('when getting a public community', () => {
+    describe('and the community exists', () => {
+      const mockVoiceChatStatus = {
+        isActive: true,
+        participantCount: 5,
+        moderatorCount: 2
+      }
+      let publicCommunityResult: Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>
+
+      beforeEach(async () => {
+        mockCommunitiesDB.getCommunityPublicInformation.mockResolvedValue({
+          ...mockCommunity,
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          membersCount: 10,
+          isHostingLiveEvent: false
+        })
+        mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(mockVoiceChatStatus)
+        mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+        publicCommunityResult = await communityComponent.getCommunityPublicInformation(communityId)
+      })
+
+      it('should return public community information with owner name and voice chat status', () => {
+        expect(publicCommunityResult).toEqual({
+          id: mockCommunity.id,
+          name: mockCommunity.name,
+          description: mockCommunity.description,
+          ownerAddress: mockCommunity.ownerAddress,
+          ownerName: 'Test Owner Name',
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: mockCommunity.active,
+          thumbnails: undefined,
+          membersCount: 10,
+          voiceChatStatus: mockVoiceChatStatus,
+          isHostingLiveEvent: false
+        })
+
+        expect(mockCommunitiesDB.getCommunityPublicInformation).toHaveBeenCalledWith(communityId)
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+        expect(mockCommunityOwners.getOwnerName).toHaveBeenCalledWith(mockCommunity.ownerAddress, communityId)
+      })
+    })
+
+    describe('and the community does not exist', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityPublicInformation.mockResolvedValue(null)
+        mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue(null)
+      })
+
+      it('should throw CommunityNotFoundError', async () => {
+        await expect(communityComponent.getCommunityPublicInformation(communityId)).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommunitiesDB.getCommunityPublicInformation).toHaveBeenCalledWith(communityId)
         expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
       })
     })

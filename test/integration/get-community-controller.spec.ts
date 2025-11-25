@@ -52,7 +52,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
           expect(response.status).toBe(200)
           const body = await response.json()
           expect(body).toEqual({
-            data: {
+            data: expect.objectContaining({
               id: communityId,
               name: 'Test Community',
               description: 'Test Description',
@@ -60,17 +60,15 @@ test('Get Community Controller', function ({ components, spyComponents }) {
               ownerName: 'Test Owner',
               privacy: CommunityPrivacyEnum.Public,
               active: true,
-              isHostingLiveEvent: false,
-              role: CommunityRole.None,
-              visibility: CommunityVisibilityEnum.All,
               membersCount: 0,
               voiceChatStatus: {
                 isActive: true,
                 participantCount: 2,
                 moderatorCount: 1
               }
-            }
+            })
           })
+          expect(body.data).not.toHaveProperty('role')
         })
       })
     })

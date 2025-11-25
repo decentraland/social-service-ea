@@ -27,6 +27,7 @@ export const mockCommunity = (community: Partial<CommunityDB> = {}): CommunityDB
 
 export function createMockCommunitiesComponent({
   getCommunity = jest.fn(),
+  getCommunityPublicInformation = jest.fn(),
   getCommunities = jest.fn(),
   getCommunitiesPublicInformation = jest.fn(),
   getMemberCommunities = jest.fn(),
@@ -39,6 +40,7 @@ export function createMockCommunitiesComponent({
 }: Partial<jest.Mocked<ICommunitiesComponent>>): jest.Mocked<ICommunitiesComponent> {
   return {
     getCommunity,
+    getCommunityPublicInformation,
     getCommunities,
     getCommunitiesPublicInformation,
     getMemberCommunities,
