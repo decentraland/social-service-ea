@@ -3,7 +3,8 @@ import { errorMessageOrDefault } from '../../../utils/errors'
 import {
   CommunityNotFoundError,
   CommunityOwnerNotFoundError,
-  AggregatedCommunityWithMemberData
+  AggregatedCommunityWithMemberAndVoiceChatData,
+  CommunityPublicInformationWithVoiceChat
 } from '../../../logic/community'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 
@@ -12,33 +13,33 @@ export async function getCommunityHandler(
     HandlerContextWithPath<'logs' | 'config' | 'communities', '/v1/communities/:id'>,
     'components' | 'params' | 'verification' | 'request'
   >
-): Promise<HTTPResponse<AggregatedCommunityWithMemberData>> {
+): Promise<
+  HTTPResponse<
+    AggregatedCommunityWithMemberAndVoiceChatData | Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>
+  >
+> {
   const {
-    components: { communities, logs, config },
+    components: { communities, logs },
     params: { id },
-    verification,
-    request
+    verification
   } = context
   const logger = logs.getLogger('get-community-handler')
-  const API_ADMIN_TOKEN = await config.getString('API_ADMIN_TOKEN')
 
   logger.info(`Getting community: ${id}`)
 
   try {
     const userAddress: string | undefined = verification?.auth?.toLowerCase()
-    const optionalAuthHeader = request.headers.get('Authorization')
-    const isAdmin = !!(API_ADMIN_TOKEN && optionalAuthHeader === `Bearer ${API_ADMIN_TOKEN}`)
 
-    if (!isAdmin && !userAddress) {
-      throw new InvalidRequestError('This endpoint requires a signed fetch request. See ADR-44.')
-    }
+    const data = userAddress
+      ? await communities.getCommunity(id, {
+          as: userAddress
+        })
+      : await communities.getCommunityPublicInformation(id)
 
     return {
       status: 200,
       body: {
-        data: await communities.getCommunity(id, {
-          as: userAddress
-        })
+        data
       }
     }
   } catch (error: any) {

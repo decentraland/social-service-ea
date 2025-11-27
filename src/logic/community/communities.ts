@@ -140,6 +140,23 @@ export function createCommunityComponent(
       return toCommunityWithMembersCount({ ...community, ownerName, isHostingLiveEvent }, membersCount, voiceChatStatus)
     },
 
+    getCommunityPublicInformation: async (
+      id: string
+    ): Promise<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>> => {
+      const [community, voiceChatStatus] = await Promise.all([
+        communitiesDb.getCommunityPublicInformation(id),
+        commsGatekeeper.getCommunityVoiceChatStatus(id)
+      ])
+
+      if (!community) {
+        throw new CommunityNotFoundError(id)
+      }
+
+      const ownerName = await communityOwners.getOwnerName(community.ownerAddress, community.id)
+
+      return toPublicCommunityWithVoiceChat({ ...community, ownerName }, voiceChatStatus)
+    },
+
     getCommunities: async (
       userAddress: string,
       options: GetCommunitiesOptions
