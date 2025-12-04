@@ -289,7 +289,7 @@ export function getCommunitiesWithMembersCountCTE(options?: { onlyPublic?: boole
 }
 
 export function withSearchAndPagination(query: SQLStatement, options?: GetCommunitiesOptions): SQLStatement {
-  const { search, pagination, sortBy = 'membersCount' } = options ?? {}
+  const { search, pagination, sortBy = 'ranking' } = options ?? {}
   const { limit, offset } = pagination ?? {}
 
   if (search) {
