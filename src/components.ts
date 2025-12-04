@@ -278,7 +278,7 @@ export async function initComponents(): Promise<AppComponents> {
     { logs },
     communityRanking.calculateRankingScoreForAllCommunities,
     24 * 60 * 60 * 1000, // 24 hours in milliseconds
-    { repeat: true /*startupDelay: 60 * 60 * 1000 */ } // Start after 1 hour delay
+    { repeat: true, startupDelay: 30 * 60 * 1000 } // Start after 30 minutes delay
   )
 
   const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
