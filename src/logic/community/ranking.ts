@@ -136,7 +136,8 @@ export function createCommunityRankingComponent({
     logger.info('Starting ranking score calculation for all communities')
 
     try {
-      const batchSize = 2
+      const batchSize = 100
+
       let offset = 0
       let totalProcessed = 0
 
