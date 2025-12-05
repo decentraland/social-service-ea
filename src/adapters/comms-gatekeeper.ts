@@ -12,8 +12,9 @@ export class PrivateVoiceChatNotFoundError extends Error {
 export const createCommsGatekeeperComponent = async ({
   logs,
   config,
-  fetcher
-}: Pick<AppComponents, 'logs' | 'config' | 'fetcher'>): Promise<ICommsGatekeeperComponent> => {
+  fetcher,
+  voiceChatCache
+}: Pick<AppComponents, 'logs' | 'config' | 'fetcher' | 'voiceChatCache'>): Promise<ICommsGatekeeperComponent> => {
   const { fetch } = fetcher
   const logger = logs.getLogger('comms-gatekeeper-component')
   const commsUrl = await config.requireString('COMMS_GATEKEEPER_URL')
@@ -440,35 +441,39 @@ export const createCommsGatekeeperComponent = async ({
    * @returns The community voice chat status or null if not active
    */
   async function getCommunityVoiceChatStatus(communityId: string): Promise<CommunityVoiceChatStatus | null> {
-    try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/status`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
+    const cacheKey = `voice-chat:${communityId}`
+
+    return await voiceChatCache.get(cacheKey, async () => {
+      try {
+        const response = await fetch(`${commsUrl}/community-voice-chat/${communityId}/status`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${commsGateKeeperToken}`
+          }
+        })
+
+        if (response.status === 404) {
+          return null
         }
-      })
 
-      if (response.status === 404) {
-        return null
-      }
+        if (!response.ok) {
+          throw new Error(`Server responded with status ${response.status}`)
+        }
 
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
+        const data = await response.json()
+        return {
+          isActive: data.active,
+          participantCount: data.participant_count,
+          moderatorCount: data.moderator_count
+        }
+      } catch (error) {
+        logger.error(
+          `Failed to get community voice chat status for community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
+        )
+        throw error
       }
-
-      const data = await response.json()
-      return {
-        isActive: data.active,
-        participantCount: data.participant_count,
-        moderatorCount: data.moderator_count
-      }
-    } catch (error) {
-      logger.error(
-        `Failed to get community voice chat status for community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
-      )
-      throw error
-    }
+    })
   }
 
   /**
@@ -483,40 +488,21 @@ export const createCommsGatekeeperComponent = async ({
       return {}
     }
 
-    try {
-      const response = await fetch(`${commsUrl}/community-voice-chat/status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${commsGateKeeperToken}`
-        },
-        body: JSON.stringify({
-          community_ids: communityIds
-        })
-      })
+    // Fetch all statuses in parallel using cache
+    const statusPromises = communityIds.map(async (communityId) => {
+      const status = await getCommunityVoiceChatStatus(communityId)
+      return { communityId, status }
+    })
 
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`)
+    const results = await Promise.all(statusPromises)
+
+    // Convert to record format, filtering out nulls
+    return results.reduce((acc, { communityId, status }) => {
+      if (status !== null) {
+        acc[communityId] = status
       }
-
-      const responseData = await response.json()
-      const statuses = responseData.data || []
-
-      // Map the response data to the expected format
-      return statuses.reduce((acc: Record<string, CommunityVoiceChatStatus>, status: any) => {
-        acc[status.community_id] = {
-          isActive: status.active,
-          participantCount: status.participant_count,
-          moderatorCount: status.moderator_count
-        }
-        return acc
-      }, {})
-    } catch (error) {
-      logger.error(
-        `Failed to get multiple community voice chat statuses: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
-      )
-      throw error
-    }
+      return acc
+    }, {} as Record<string, CommunityVoiceChatStatus>)
   }
 
   /**

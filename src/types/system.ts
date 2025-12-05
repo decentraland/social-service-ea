@@ -28,6 +28,7 @@ import {
   IStatusCheckComponent,
   ICommunitiesDatabaseComponent,
   IPgComponent,
+  ICachedFetchComponent,
   ICommunitiesDbHelperComponent,
   IVoiceDatabaseComponent,
   IStorageComponent,
@@ -87,6 +88,8 @@ export type BaseComponents = {
   archipelagoStats: IArchipelagoStatsComponent
   catalystClient: ICatalystClientComponent
   commsGatekeeper: ICommsGatekeeperComponent
+  profileCache: ICachedFetchComponent
+  voiceChatCache: ICachedFetchComponent
   communities: ICommunitiesComponent
   communitiesDb: ICommunitiesDatabaseComponent
   communityBans: ICommunityBansComponent
