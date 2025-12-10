@@ -90,6 +90,23 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   let isTransportActive = true
   let isInitialized = false
 
+  /**
+   * Safely checks if the socket is still connected.
+   * Returns false if the socket is closed or if accessing it throws an error.
+   * This is necessary because uWebSockets.js throws when accessing a closed socket.
+   */
+  function isSocketConnected(): boolean {
+    if (!isTransportActive || !isInitialized) {
+      return false
+    }
+    try {
+      return socket.getUserData().isConnected
+    } catch {
+      // Socket is closed or invalid, accessing it throws
+      return false
+    }
+  }
+
   // Simple queue for messages that couldn't be sent immediately
   const messageQueue: Array<{
     message: Uint8Array
@@ -131,7 +148,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
 
     try {
-      while (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
+      while (messageQueue.length > 0 && isSocketConnected()) {
         const currentMessage = messageQueue[0]
 
         // Check max retries
@@ -141,7 +158,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
             attempts: currentMessage.attempts,
             messageSize: currentMessage.message.byteLength
           })
-          currentMessage.future.reject(new Error('Message dropped after max retries'))
+          // Resolve to prevent unhandled rejection crashes
+          currentMessage.future.resolve()
           messageQueue.shift()
           continue
         }
@@ -229,7 +247,9 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         transportId,
         error: errorMessage
       })
-      item.future.reject(new Error(errorMessage))
+      // Resolve instead of reject to prevent unhandled rejection crashes
+      // The message is lost anyway when socket is closed
+      item.future.resolve()
       events.emit('error', new Error(errorMessage))
       messageQueue.shift()
       return UWebSocketSendResult.ERROR
@@ -243,17 +263,17 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         transportId,
         isTransportActive: String(isTransportActive),
         isInitialized: String(isInitialized),
-        isConnected: String(socket.getUserData().isConnected)
+        isConnected: String(isSocketConnected())
       })
       return events.emit('error', error)
     }
 
-    if (!isTransportActive || !socket.getUserData().isConnected) {
+    if (!isSocketConnected()) {
       // The transport is not active or the socket is not connected, skip message
       logger.debug('Skipping message because transport is not active or socket is not connected', {
         transportId,
         isTransportActive: String(isTransportActive),
-        isConnected: String(socket.getUserData().isConnected)
+        isConnected: String(isSocketConnected())
       })
       return
     }
@@ -312,11 +332,11 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       processingTimeout = null
     }
 
-    // Reject all queued messages and clear the queue
+    // Resolve all queued messages to prevent unhandled rejection crashes
     while (messageQueue.length > 0) {
       const item = messageQueue.shift()
       if (item) {
-        item.future.reject(new Error('Connection closed'))
+        item.future.resolve()
       }
     }
 
@@ -333,7 +353,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   const api: Transport = {
     ...events,
     get isConnected() {
-      return isTransportActive && isInitialized && socket.getUserData().isConnected
+      return isSocketConnected()
     },
     sendMessage(message: any) {
       if (!(message instanceof Uint8Array)) {

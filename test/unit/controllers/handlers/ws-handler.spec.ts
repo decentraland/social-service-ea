@@ -243,6 +243,35 @@ describe('ws-handler', () => {
 
         clearTimeout(mockTimeout)
       })
+
+      describe('and the connection closes during authentication (race condition)', () => {
+        let userData: WsNotAuthenticatedUserData
+
+        beforeEach(() => {
+          userData = mockWs.getUserData()
+
+          // Simulate the race condition: verify takes time and connection closes before it completes
+          ;(verify as jest.Mock).mockImplementation(async () => {
+            // Simulate connection being closed while verify is in progress
+            userData.isConnected = false
+            return { auth: '0x123' }
+          })
+        })
+
+        it('should abort user attachment when connection closes during verify', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockRpcServer.attachUser).not.toHaveBeenCalled()
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_race_condition_aborted')
+          expect(userData.auth).toBe(false)
+        })
+
+        it('should not overwrite isConnected when connection is already closed', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(userData.isConnected).toBe(false)
+        })
+      })
     })
   })
 
