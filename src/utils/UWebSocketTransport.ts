@@ -158,8 +158,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
             attempts: currentMessage.attempts,
             messageSize: currentMessage.message.byteLength
           })
-          // Resolve to prevent unhandled rejection crashes
-          currentMessage.future.resolve()
+          currentMessage.future.reject(new Error('Message dropped after max retries'))
           messageQueue.shift()
           continue
         }
@@ -247,9 +246,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         transportId,
         error: errorMessage
       })
-      // Resolve instead of reject to prevent unhandled rejection crashes
-      // The message is lost anyway when socket is closed
-      item.future.resolve()
+      item.future.reject(new Error(errorMessage))
       events.emit('error', new Error(errorMessage))
       messageQueue.shift()
       return UWebSocketSendResult.ERROR
@@ -332,11 +329,11 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
       processingTimeout = null
     }
 
-    // Resolve all queued messages to prevent unhandled rejection crashes
+    // Reject all queued messages and clear the queue
     while (messageQueue.length > 0) {
       const item = messageQueue.shift()
       if (item) {
-        item.future.resolve()
+        item.future.reject(new Error('Connection closed'))
       }
     }
 

@@ -164,8 +164,9 @@ describe('UWebSocketTransport', () => {
         expect(mockMetrics.increment).toHaveBeenCalledWith('ws_backpressure_events', { result: 'dropped' })
       })
 
-      it('should drop message after max retries and resolve to prevent crashes', async () => {
+      it('should drop message after max retries', async () => {
         const sendPromise = transport.sendMessage(mockMessage)
+        ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
         await jest.advanceTimersByTimeAsync(0)
 
@@ -183,8 +184,7 @@ describe('UWebSocketTransport', () => {
         )
         await jest.advanceTimersByTimeAsync(finalDelay)
 
-        // Should resolve (not reject) to prevent unhandled rejection crashes
-        await expect(sendPromise).resolves.toBeUndefined()
+        await expect(sendPromise).rejects.toThrow('Message dropped after max retries')
       })
     })
 
@@ -227,13 +227,13 @@ describe('UWebSocketTransport', () => {
         })
       })
 
-      it('should handle socket send errors gracefully without crashing', async () => {
+      it('should handle socket send errors', async () => {
         const sendPromise = transport.sendMessage(mockMessage)
+        ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
         await jest.advanceTimersByTimeAsync(0)
 
-        // Should resolve (not reject) to prevent unhandled rejection crashes
-        await expect(sendPromise).resolves.toBeUndefined()
+        await expect(sendPromise).rejects.toThrow('Failed to send message: Socket error')
         expect(errorListener).toHaveBeenCalledWith(new Error('Failed to send message: Socket error'))
       })
     })
@@ -247,11 +247,14 @@ describe('UWebSocketTransport', () => {
           })
         })
 
-        it('should resolve and emit error', async () => {
+        it('should reject and emit error', async () => {
           const sendPromise = transport.sendMessage(mockMessage)
+          ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
           await jest.advanceTimersByTimeAsync(0)
 
-          await expect(sendPromise).resolves.toBeUndefined()
+          await expect(sendPromise).rejects.toThrow(
+            'Failed to send message: Invalid access of closed uWS.WebSocket/SSLWebSocket.'
+          )
           expect(errorListener).toHaveBeenCalledWith(
             new Error('Failed to send message: Invalid access of closed uWS.WebSocket/SSLWebSocket.')
           )
@@ -458,17 +461,17 @@ describe('UWebSocketTransport', () => {
       expect(transport.isConnected).toBe(false)
     })
 
-    it('should clean up with pending timeouts and resolve pending messages', async () => {
+    it('should clean up with pending timeouts', async () => {
       mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
 
       const sendPromise = transport.sendMessage(mockMessage)
+      ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
       await jest.advanceTimersByTimeAsync(0)
 
       transport.close()
 
-      // Should resolve (not reject) to prevent unhandled rejection crashes
-      await expect(sendPromise).resolves.toBeUndefined()
+      await expect(sendPromise).rejects.toThrow('Connection closed')
     })
 
     it('should handle cleanup with null timeouts', () => {
