@@ -112,7 +112,7 @@ export function createCommunitiesDBComponent(
           cwmc."membersCount"
         FROM communities c
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
-        WHERE c.id = ${id} AND c.active = true AND c.unlisted = false`
+        WHERE c.id = ${id} AND c.active = true`
       )
 
       const result = await pg.query<Omit<CommunityPublicInformation, 'ownerName'>>(baseQuery)
