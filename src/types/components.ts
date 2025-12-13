@@ -299,6 +299,7 @@ export type ICatalystClientRequestOptions = {
   retries?: number
   waitTime?: number
   lambdasServerUrl?: string
+  contentServerUrl?: string
 }
 
 export type ICatalystClientComponent = {
