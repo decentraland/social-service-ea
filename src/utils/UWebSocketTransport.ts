@@ -90,6 +90,23 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   let isTransportActive = true
   let isInitialized = false
 
+  /**
+   * Safely checks if the socket is still connected.
+   * Returns false if the socket is closed or if accessing it throws an error.
+   * This is necessary because uWebSockets.js throws when accessing a closed socket.
+   */
+  function isSocketConnected(): boolean {
+    if (!isTransportActive || !isInitialized) {
+      return false
+    }
+    try {
+      return socket.getUserData().isConnected
+    } catch {
+      // Socket is closed or invalid, accessing it throws
+      return false
+    }
+  }
+
   // Simple queue for messages that couldn't be sent immediately
   const messageQueue: Array<{
     message: Uint8Array
@@ -131,7 +148,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
 
     try {
-      while (messageQueue.length > 0 && isTransportActive && socket.getUserData().isConnected) {
+      while (messageQueue.length > 0 && isSocketConnected()) {
         const currentMessage = messageQueue[0]
 
         // Check max retries
@@ -243,17 +260,17 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         transportId,
         isTransportActive: String(isTransportActive),
         isInitialized: String(isInitialized),
-        isConnected: String(socket.getUserData().isConnected)
+        isConnected: String(isSocketConnected())
       })
       return events.emit('error', error)
     }
 
-    if (!isTransportActive || !socket.getUserData().isConnected) {
+    if (!isSocketConnected()) {
       // The transport is not active or the socket is not connected, skip message
       logger.debug('Skipping message because transport is not active or socket is not connected', {
         transportId,
         isTransportActive: String(isTransportActive),
-        isConnected: String(socket.getUserData().isConnected)
+        isConnected: String(isSocketConnected())
       })
       return
     }
@@ -333,7 +350,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
   const api: Transport = {
     ...events,
     get isConnected() {
-      return isTransportActive && isInitialized && socket.getUserData().isConnected
+      return isSocketConnected()
     },
     sendMessage(message: any) {
       if (!(message instanceof Uint8Array)) {

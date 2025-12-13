@@ -35,6 +35,10 @@ export const metricDeclarations = {
     type: IMetricsComponent.CounterType,
     help: 'Number of WebSocket authentication errors'
   },
+  ws_auth_race_condition_aborted: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of authentication attempts aborted due to connection closed during auth'
+  },
   ws_idle_timeouts: {
     type: IMetricsComponent.CounterType,
     help: 'Number of WebSocket idle timeouts'

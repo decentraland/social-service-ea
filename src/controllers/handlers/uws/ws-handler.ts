@@ -83,6 +83,17 @@ export async function registerWsHandler(
       })
       const address = normalizeAddress(verifyResult.auth)
 
+      // Check if connection was closed during authentication (race condition protection)
+      // The close handler sets isConnected to false, so if it's false here, the socket is already closed
+      if (!data.isConnected) {
+        logger.warn('WebSocket closed during authentication, aborting user attachment', {
+          address,
+          wsConnectionId: data.wsConnectionId
+        })
+        metrics.increment('ws_auth_race_condition_aborted')
+        return
+      }
+
       logger.debug('Authenticated User', { address, wsConnectionId: data.wsConnectionId })
 
       const eventEmitter = mitt<IUWebSocketEventMap>()
