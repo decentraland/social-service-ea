@@ -1664,13 +1664,13 @@
     "@well-known-components/fetch-component" "^2.0.2"
     "@well-known-components/interfaces" "^1.4.2"
 
-"@dcl/platform-server-commons@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.npmjs.org/@dcl/platform-server-commons/-/platform-server-commons-0.1.0.tgz"
-  integrity sha512-lFdk9nw5mC37oWPu8p5cRwmN9hiLPCZvKZB74lIYTu/TL7XPmJIe0afans3ftptx1CP96dqor8LBTzaUx+HpoQ==
+"@dcl/platform-server-commons@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@dcl/platform-server-commons/-/platform-server-commons-1.0.0.tgz#2f4d7e202d00c18b831dd58458bb310f702ada4d"
+  integrity sha512-VWrkUkcShdgzzrmQqQRDIl+onT+xOUVTcmnzlW8yX2kchrr1WloEk0MeUODDIMTApOcoWZsMyyVF22CsqbZWPg==
   dependencies:
-    "@dcl/schemas" "^16.9.0"
-    "@well-known-components/http-server" "^2.1.0"
+    "@dcl/schemas" "^18.0.0"
+    "@dcl/wkc-http-server" "^1.0.3"
     "@well-known-components/interfaces" "^1.4.3"
     node-fetch "^2.7.0"
 
@@ -1708,10 +1708,10 @@
     ajv-keywords "^5.1.0"
     mitt "^3.0.1"
 
-"@dcl/schemas@^16.9.0":
-  version "16.11.0"
-  resolved "https://registry.npmjs.org/@dcl/schemas/-/schemas-16.11.0.tgz"
-  integrity sha512-jUay4P1DCDEQIDY8QTbV1jjpJ9wPNDmo8zpJGeUG3A9SDjGnni76/dgwZg0EAZ0/bkIMrQzN1sdmcnluTQgqYw==
+"@dcl/schemas@^18.0.0":
+  version "18.8.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-18.8.0.tgz#fe8e3fb47d01b848481f54887008118aafee0f51"
+  integrity sha512-1HxbL0azB7N+kMwYyU4/Uqltc+7F8Lv8UcS3dxDNVTPn71gldIDImj58OM9Y3gIyQG5Tauacrlk5cDkXhjMkOA==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
@@ -1776,6 +1776,21 @@
     protobufjs "^7.2.4"
     ts-poet "^6.4.1"
     ts-proto-descriptors "^1.15.0"
+
+"@dcl/wkc-http-server@^1.0.3":
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/@dcl/wkc-http-server/-/wkc-http-server-1.0.3.tgz#fd43a4bf1a1e26461ee59447d9e22f6bd636b72e"
+  integrity sha512-3Pi4VlalpoRymoVCEkqNVHQtLTkK4hVSmyS7gQdpKRktJnWwl9JoUeARDpbffsRwD3/485mDAQvIA3HE7v7uqA==
+  dependencies:
+    "@types/http-errors" "^2.0.4"
+    destroy "^1.2.0"
+    fp-future "^1.0.1"
+    http-errors "^2.0.0"
+    mitt "^3.0.0"
+    node-fetch "^2.6.9"
+    on-finished "^2.4.1"
+    path-to-regexp "^6.3.0"
+    reflect-metadata "^0.2.2"
 
 "@emnapi/core@^1.4.3":
   version "1.4.5"
@@ -3941,7 +3956,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/http-errors@^2.0.1":
+"@types/http-errors@^2.0.4":
   version "2.0.5"
   resolved "https://registry.npmjs.org/@types/http-errors/-/http-errors-2.0.5.tgz"
   integrity sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==
@@ -4323,20 +4338,6 @@
   dependencies:
     "@well-known-components/interfaces" "^1.4.1"
     cross-fetch "^3.1.5"
-
-"@well-known-components/http-server@^2.1.0":
-  version "2.1.0"
-  resolved "https://registry.npmjs.org/@well-known-components/http-server/-/http-server-2.1.0.tgz"
-  integrity sha512-IHD7aLTA+9DYEchQubHDBwc4FmVEmQC+2TWbi8Tz+QlkiQdtndcuba8XHH+EwqlB5sna/EAJGZGXPxS7okcHKA==
-  dependencies:
-    "@types/http-errors" "^2.0.1"
-    destroy "^1.2.0"
-    fp-future "^1.0.1"
-    http-errors "^2.0.0"
-    mitt "^3.0.0"
-    node-fetch "^2.6.9"
-    on-finished "^2.4.1"
-    path-to-regexp "^6.2.1"
 
 "@well-known-components/interfaces@^1.1.1", "@well-known-components/interfaces@^1.3.0", "@well-known-components/interfaces@^1.4.1", "@well-known-components/interfaces@^1.4.2", "@well-known-components/interfaces@^1.4.3", "@well-known-components/interfaces@^1.5.1", "@well-known-components/interfaces@^1.5.2":
   version "1.5.2"
@@ -6904,7 +6905,7 @@ path-parse@^1.0.7:
   resolved "https://registry.npmjs.org/path-parse/-/path-parse-1.0.7.tgz"
   integrity sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw==
 
-path-to-regexp@^6.2.1:
+path-to-regexp@^6.3.0:
   version "6.3.0"
   resolved "https://registry.npmjs.org/path-to-regexp/-/path-to-regexp-6.3.0.tgz"
   integrity sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ==
@@ -7210,6 +7211,11 @@ redis@*, redis@^4.7.0:
     "@redis/json" "1.0.7"
     "@redis/search" "1.2.0"
     "@redis/time-series" "1.1.0"
+
+reflect-metadata@^0.2.2:
+  version "0.2.2"
+  resolved "https://registry.yarnpkg.com/reflect-metadata/-/reflect-metadata-0.2.2.tgz#400c845b6cba87a21f2c65c4aeb158f4fa4d9c5b"
+  integrity sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==
 
 require-directory@^2.1.1:
   version "2.1.1"

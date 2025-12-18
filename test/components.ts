@@ -40,8 +40,7 @@ import {
   createAIComplianceMock
 } from './mocks/components'
 import { mockTracing } from './mocks/components/tracing'
-import { createServerComponent } from '@well-known-components/http-server'
-import { createStatusCheckComponent } from '@well-known-components/http-server'
+import { createStatusCheckComponent, createServerComponent } from '@dcl/wkc-http-server'
 import {
   createCommunityBansComponent,
   createCommunityComponent,

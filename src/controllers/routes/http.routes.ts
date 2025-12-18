@@ -1,4 +1,4 @@
-import { Router } from '@well-known-components/http-server'
+import { Router } from '@dcl/wkc-http-server'
 import { GlobalContext } from '../../types'
 import { bearerTokenMiddleware, errorHandler } from '@dcl/platform-server-commons'
 import {
