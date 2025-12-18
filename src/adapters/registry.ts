@@ -55,7 +55,7 @@ export async function createRegistryComponent({
     let validProfiles: Profile[] = []
 
     if (idsToFetch.length > 0) {
-      const response = await fetcher.fetch(registryUrl, {
+      const response = await fetcher.fetch(`${registryUrl}/profiles`, {
         method: 'POST',
         body: JSON.stringify({ ids: idsToFetch })
       })
@@ -102,7 +102,7 @@ export async function createRegistryComponent({
       return cachedProfile
     }
 
-    const response = await fetcher.fetch(registryUrl, {
+    const response = await fetcher.fetch(`${registryUrl}/profiles`, {
       method: 'POST',
       body: JSON.stringify({ ids: [id] })
     })
