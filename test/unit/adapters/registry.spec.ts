@@ -96,7 +96,7 @@ describe('registry', () => {
           getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(mockFetcher.fetch).toHaveBeenCalledWith(
-          expect.any(URL),
+          `${REGISTRY_URL}/profiles`,
           expect.objectContaining({
             method: 'POST',
             body: JSON.stringify({ ids: profileIds })
@@ -220,7 +220,7 @@ describe('registry', () => {
           getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(mockFetcher.fetch).toHaveBeenCalledWith(
-          expect.any(URL),
+          `${REGISTRY_URL}/profiles`,
           expect.objectContaining({
             body: JSON.stringify({ ids: ['0x0987654321098765432109876543210987654321'] })
           })
@@ -357,7 +357,7 @@ describe('registry', () => {
           getProfileCacheKey('0x0987654321098765432109876543210987654321')
         ])
         expect(mockFetcher.fetch).toHaveBeenCalledWith(
-          expect.any(URL),
+          `${REGISTRY_URL}/profiles`,
           expect.objectContaining({
             body: JSON.stringify({
               ids: ['0x1234567890123456789012345678901234567890', '0x0987654321098765432109876543210987654321']
@@ -441,7 +441,7 @@ describe('registry', () => {
 
         expect(mockRedis.get).toHaveBeenCalledWith(getProfileCacheKey(profileId))
         expect(mockFetcher.fetch).toHaveBeenCalledWith(
-          expect.any(URL),
+          `${REGISTRY_URL}/profiles`,
           expect.objectContaining({
             method: 'POST',
             body: JSON.stringify({ ids: [profileId] })

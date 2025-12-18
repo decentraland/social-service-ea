@@ -9,7 +9,7 @@ export async function createRegistryComponent({
   redis,
   logs
 }: Pick<AppComponents, 'fetcher' | 'config' | 'redis' | 'logs'>): Promise<IRegistryComponent> {
-  const registryUrl = new URL(await config.requireString('REGISTRY_URL'))
+  const registryUrl = (await config.requireString('REGISTRY_URL')).replace(/\/+$/, '')
   const logger = logs.getLogger('registry')
 
   function getProfileCacheKey(id: string): string {
