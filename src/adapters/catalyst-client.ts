@@ -13,11 +13,12 @@ const L1_TESTNET = 'sepolia'
 export const PROFILE_CACHE_PREFIX = 'catalyst:minimal:profile:'
 
 export async function createCatalystClient({
+  registry,
   fetcher,
   config,
   redis,
   logs
-}: Pick<AppComponents, 'fetcher' | 'config' | 'redis' | 'logs'>): Promise<ICatalystClientComponent> {
+}: Pick<AppComponents, 'registry' | 'fetcher' | 'config' | 'redis' | 'logs'>): Promise<ICatalystClientComponent> {
   const loadBalancer = await config.requireString('CATALYST_LAMBDAS_URL_LOADBALANCER')
   const logger = logs.getLogger('catalyst-client')
   const env = await config.getString('ENV')
@@ -25,6 +26,10 @@ export async function createCatalystClient({
 
   function getLambdasClientOrDefault(lambdasServerUrl?: string): LambdasClient {
     return createLambdasClient({ fetcher, url: lambdasServerUrl ?? loadBalancer })
+  }
+
+  async function getProfilesFromRegistry(ids: string[]): Promise<Profile[]> {
+    return registry.getProfiles(ids)
   }
 
   function rotateLambdasServerClient<T>(
@@ -87,29 +92,88 @@ export async function createCatalystClient({
     let validProfiles: Profile[] = []
 
     if (idsToFetch.length > 0) {
-      const { retries = 3, waitTime = 300, lambdasServerUrl } = options
-      const executeClientRequest = rotateLambdasServerClient(
-        (lambdasClientToUse) => lambdasClientToUse.getAvatarsDetailsByPost({ ids: idsToFetch }),
-        lambdasServerUrl
-      )
-      const fetchedProfiles = await retry(executeClientRequest, retries, waitTime)
+      // Try registry first
+      let registryProfiles: Profile[] = []
 
-      // Extract minimal profiles and cache them asynchronously (fire-and-forget)
-      const minimalProfiles = fetchedProfiles.map(extractMinimalProfile).filter(Boolean) as Profile[]
+      try {
+        const registryResults = await getProfilesFromRegistry(idsToFetch)
 
-      validProfiles = minimalProfiles
+        if (registryResults.length > 0) {
+          // Extract minimal profiles and filter invalid ones
+          const minimalRegistryProfiles = registryResults.map(extractMinimalProfile).filter(Boolean) as Profile[]
 
-      // Cache profiles asynchronously without blocking the response
-      setImmediate(() => {
-        Promise.all(
-          minimalProfiles.map(async (minimalProfile) => {
-            await cacheProfile(getProfileUserId(minimalProfile), minimalProfile)
+          // Cache registry profiles asynchronously without blocking the response
+          setImmediate(() => {
+            Promise.all(
+              minimalRegistryProfiles.map(async (minimalProfile) => {
+                try {
+                  const userId = getProfileUserId(minimalProfile)
+                  await cacheProfile(userId, minimalProfile)
+                } catch (error: any) {
+                  logger.warn('Failed to cache registry profile', {
+                    error: error.message
+                  })
+                }
+              })
+            ).catch((error) => {
+              logger.error('Registry profile cache storing in batch failed', {
+                error: error.message
+              })
+            })
           })
-        ).catch((error) => {
-          // Catch any unhandled promise rejections
-          logger.error('Profile cache storing in batch failed', { error: error.message })
+
+          registryProfiles = minimalRegistryProfiles
+        }
+      } catch (error: any) {
+        logger.warn('Failed to fetch profiles from registry, falling back to Catalyst', {
+          error: error.message,
+          idsCount: idsToFetch.length
         })
-      })
+      }
+
+      const idsFromRegistry = new Set(
+        registryProfiles
+          .map((profile) => {
+            try {
+              return getProfileUserId(profile).toLowerCase()
+            } catch {
+              return ''
+            }
+          })
+          .filter(Boolean)
+      )
+
+      const idsToFetchFromCatalyst = idsToFetch.filter((id) => !idsFromRegistry.has(id.toLowerCase()))
+
+      // Fetch missing profiles from Catalyst if needed
+      if (idsToFetchFromCatalyst.length > 0) {
+        const { retries = 3, waitTime = 300, lambdasServerUrl } = options
+        const executeClientRequest = rotateLambdasServerClient(
+          (lambdasClientToUse) => lambdasClientToUse.getAvatarsDetailsByPost({ ids: idsToFetchFromCatalyst }),
+          lambdasServerUrl
+        )
+        const fetchedProfiles = await retry(executeClientRequest, retries, waitTime)
+
+        // Extract minimal profiles and cache them asynchronously (fire-and-forget)
+        const minimalProfiles = fetchedProfiles.map(extractMinimalProfile).filter(Boolean) as Profile[]
+
+        validProfiles = [...registryProfiles, ...minimalProfiles]
+
+        // Cache Catalyst profiles asynchronously without blocking the response
+        setImmediate(() => {
+          Promise.all(
+            minimalProfiles.map(async (minimalProfile) => {
+              await cacheProfile(getProfileUserId(minimalProfile), minimalProfile)
+            })
+          ).catch((error) => {
+            // Catch any unhandled promise rejections
+            logger.error('Profile cache storing in batch failed', { error: error.message })
+          })
+        })
+      } else {
+        // All profiles were fetched from registry
+        validProfiles = registryProfiles
+      }
     }
 
     return [...cachedProfiles, ...validProfiles]
@@ -124,6 +188,29 @@ export async function createCatalystClient({
       return cachedProfile
     }
 
+    try {
+      const registryProfiles = await getProfilesFromRegistry([id])
+
+      if (registryProfiles.length > 0) {
+        const minimalProfile = extractMinimalProfile(registryProfiles[0])
+
+        if (minimalProfile) {
+          // Cache registry profile asynchronously without blocking the response
+          setImmediate(async () => {
+            await cacheProfile(id, minimalProfile)
+          })
+
+          return minimalProfile
+        }
+      }
+    } catch (error: any) {
+      logger.warn('Failed to fetch profile from registry, falling back to Catalyst', {
+        error: error.message,
+        profileId: id
+      })
+    }
+
+    // Fallback to Catalyst
     const executeClientRequest = rotateLambdasServerClient(
       (lambdasClientToUse) => lambdasClientToUse.getAvatarDetails(id),
       lambdasServerUrl

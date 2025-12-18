@@ -311,6 +311,10 @@ export type ICatalystClientComponent = {
   ): Promise<OwnedName[]>
 }
 
+export interface IRegistryComponent {
+  getProfiles(ids: string[]): Promise<Profile[]>
+}
+
 export interface ICdnCacheInvalidatorComponent {
   invalidateThumbnail(communityId: string): Promise<void>
 }
