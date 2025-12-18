@@ -33,6 +33,7 @@ export function createCommunityComponent(
   components: Pick<
     AppComponents,
     | 'communitiesDb'
+    | 'registry'
     | 'catalystClient'
     | 'communityRoles'
     | 'communityPlaces'
@@ -52,6 +53,7 @@ export function createCommunityComponent(
 ): ICommunitiesComponent {
   const {
     communitiesDb,
+    registry,
     catalystClient,
     communityRoles,
     communityPlaces,
@@ -198,7 +200,7 @@ export function createCommunityComponent(
       const friendsAddresses = Array.from(new Set(communitiesWithOwnerNames.flatMap((community) => community.friends)))
 
       const [friendsProfiles, voiceChatStatuses] = await Promise.all([
-        catalystClient.getProfiles(friendsAddresses),
+        registry.getProfiles(friendsAddresses),
         options.onlyWithActiveVoiceChat
           ? Promise.resolve(voiceChatStatusesFromFilter)
           : getVoiceChatStatuses(communitiesWithOwnerNames.map((c) => c.id))

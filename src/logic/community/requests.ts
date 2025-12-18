@@ -25,7 +25,7 @@ export function createCommunityRequestsComponent(
     | 'communityRoles'
     | 'communityThumbnail'
     | 'communityBroadcaster'
-    | 'catalystClient'
+    | 'registry'
     | 'pubsub'
     | 'logs'
     | 'analytics'
@@ -37,7 +37,7 @@ export function createCommunityRequestsComponent(
     communityRoles,
     communityThumbnail,
     communityBroadcaster,
-    catalystClient,
+    registry,
     pubsub,
     logs,
     analytics
@@ -186,7 +186,7 @@ export function createCommunityRequestsComponent(
           createdRequest.type === CommunityRequestType.RequestToJoin &&
           createdRequest.status === CommunityRequestStatus.Pending
         ) {
-          const memberProfile = await catalystClient.getProfile(createdRequest.memberAddress)
+          const memberProfile = await registry.getProfile(createdRequest.memberAddress)
           memberName = getProfileName(memberProfile)
         }
       } catch (error) {

@@ -154,8 +154,8 @@ export async function initComponents(): Promise<AppComponents> {
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
-  const registry = await createRegistryComponent({ fetcher, config })
-  const catalystClient = await createCatalystClient({ config, fetcher, redis, logs, registry })
+  const registry = await createRegistryComponent({ fetcher, config, redis, logs })
+  const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
   const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
@@ -199,7 +199,7 @@ export async function initComponents(): Promise<AppComponents> {
     communitiesDb,
     pubsub,
     analytics,
-    catalystClient,
+    registry,
     communityVoiceChatCache,
     placesApi,
     communityThumbnail,
@@ -212,6 +212,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityThumbnail,
     communityBroadcaster,
     logs,
+    registry,
     catalystClient,
     peersStats,
     pubsub,
@@ -224,12 +225,12 @@ export async function initComponents(): Promise<AppComponents> {
     communityThumbnail,
     communityBroadcaster,
     logs,
-    catalystClient,
+    registry,
     pubsub,
     commsGatekeeper,
     analytics
   })
-  const communityOwners = createCommunityOwnersComponent({ catalystClient })
+  const communityOwners = createCommunityOwnersComponent({ registry })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
 
   // AI Compliance components
@@ -238,6 +239,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const communities = createCommunityComponent({
     communitiesDb,
+    registry,
     catalystClient,
     communityRoles,
     communityPlaces,
@@ -260,7 +262,7 @@ export async function initComponents(): Promise<AppComponents> {
     communityRoles,
     communityBroadcaster,
     communityThumbnail,
-    catalystClient,
+    registry,
     pubsub,
     logs,
     analytics
@@ -269,7 +271,7 @@ export async function initComponents(): Promise<AppComponents> {
   const communityPosts = createCommunityPostsComponent({
     communitiesDb,
     communityRoles,
-    catalystClient,
+    registry,
     logs,
     communityBroadcaster,
     communityThumbnail
@@ -284,13 +286,13 @@ export async function initComponents(): Promise<AppComponents> {
     { repeat: true, startupDelay: 30 * 60 * 1000 } // Start after 30 minutes delay
   )
 
-  const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
+  const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
   const updateHandler = createUpdateHandlerComponent({
     logs,
     subscribersContext,
     friendsDb,
     communityMembers,
-    catalystClient
+    registry
   })
 
   const rpcServer = await createRpcServerComponent({

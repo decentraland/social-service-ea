@@ -17,6 +17,7 @@ export async function createCommunityMembersComponent(
   components: Pick<
     AppComponents,
     | 'communitiesDb'
+    | 'registry'
     | 'catalystClient'
     | 'communityRoles'
     | 'communityThumbnail'
@@ -30,6 +31,7 @@ export async function createCommunityMembersComponent(
 ): Promise<ICommunityMembersComponent> {
   const {
     communitiesDb,
+    registry,
     catalystClient,
     communityRoles,
     communityThumbnail,
@@ -51,7 +53,7 @@ export async function createCommunityMembersComponent(
       return []
     }
 
-    const profiles = await catalystClient.getProfiles(members.map((member) => member.memberAddress))
+    const profiles = await registry.getProfiles(members.map((member) => member.memberAddress))
 
     const membersWithProfile = mapMembersWithProfiles<T, T & CommunityMemberProfile>(userAddress, members, profiles)
 

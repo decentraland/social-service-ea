@@ -313,6 +313,7 @@ export type ICatalystClientComponent = {
 
 export interface IRegistryComponent {
   getProfiles(ids: string[]): Promise<Profile[]>
+  getProfile(id: string): Promise<Profile>
 }
 
 export interface ICdnCacheInvalidatorComponent {

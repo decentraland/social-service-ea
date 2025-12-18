@@ -17,9 +17,9 @@ import { getNewFriendshipStatus } from './friendships'
 import { BlockedUser, IFriendsComponent } from './types'
 
 export async function createFriendsComponent(
-  components: Pick<AppComponents, 'friendsDb' | 'catalystClient' | 'pubsub' | 'sns' | 'logs'>
+  components: Pick<AppComponents, 'friendsDb' | 'registry' | 'pubsub' | 'sns' | 'logs'>
 ): Promise<IFriendsComponent> {
-  const { friendsDb, catalystClient, pubsub, sns, logs } = components
+  const { friendsDb, registry, pubsub, sns, logs } = components
   const logger = logs.getLogger('friends-component')
 
   return {
@@ -32,7 +32,7 @@ export async function createFriendsComponent(
         friendsDb.getFriendsCount(userAddress, { onlyActive: true })
       ])
 
-      const friendsProfiles = await catalystClient.getProfiles(friends.map((friend) => friend.address))
+      const friendsProfiles = await registry.getProfiles(friends.map((friend) => friend.address))
 
       return {
         friendsProfiles,
@@ -40,7 +40,7 @@ export async function createFriendsComponent(
       }
     },
     blockUser: async (blockerAddress: string, blockedAddress: string): Promise<BlockedUser> => {
-      const profile = await catalystClient.getProfile(blockedAddress)
+      const profile = await registry.getProfile(blockedAddress)
 
       if (!profile) {
         throw new ProfileNotFoundError(blockedAddress)
@@ -84,7 +84,7 @@ export async function createFriendsComponent(
     ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }> => {
       const blockedUsers = await friendsDb.getBlockedUsers(userAddress)
       const blockedAddresses = blockedUsers.map((user) => user.address)
-      const profiles = await catalystClient.getProfiles(blockedAddresses)
+      const profiles = await registry.getProfiles(blockedAddresses)
 
       return {
         blockedUsers,
@@ -123,7 +123,7 @@ export async function createFriendsComponent(
         friendsDb.getMutualFriendsCount(requesterAddress, requestedAddress)
       ])
 
-      const profiles = await catalystClient.getProfiles(mutualFriends.map((friend) => friend.address))
+      const profiles = await registry.getProfiles(mutualFriends.map((friend) => friend.address))
 
       return {
         friendsProfiles: profiles,
@@ -140,7 +140,7 @@ export async function createFriendsComponent(
       ])
 
       const pendingRequestsAddresses = pendingRequests.map(({ address }) => address)
-      const pendingRequesterProfiles = await catalystClient.getProfiles(pendingRequestsAddresses)
+      const pendingRequesterProfiles = await registry.getProfiles(pendingRequestsAddresses)
 
       return {
         requests: pendingRequests,
@@ -158,7 +158,7 @@ export async function createFriendsComponent(
       ])
 
       const sentRequestsAddresses = sentRequests.map(({ address }) => address)
-      const sentRequestedProfiles = await catalystClient.getProfiles(sentRequestsAddresses)
+      const sentRequestedProfiles = await registry.getProfiles(sentRequestsAddresses)
 
       return {
         requests: sentRequests,
@@ -167,7 +167,7 @@ export async function createFriendsComponent(
       }
     },
     unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile> => {
-      const profile = await catalystClient.getProfile(blockedAddress)
+      const profile = await registry.getProfile(blockedAddress)
 
       if (!profile) {
         throw new ProfileNotFoundError(blockedAddress)
@@ -250,7 +250,7 @@ export async function createFriendsComponent(
           timestamp: Date.now(),
           metadata
         }),
-        catalystClient.getProfiles([userAddress, friendAddress])
+        registry.getProfiles([userAddress, friendAddress])
       ])
 
       const profilesMap = new Map(profiles.map((profile) => [getProfileUserId(profile), profile]))
