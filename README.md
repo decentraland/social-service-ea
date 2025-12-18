@@ -9,17 +9,17 @@ This server interacts with PostgreSQL for data persistence, Redis for caching, N
 ## Table of Contents
 
 - [Features](#features)
-- [Dependencies & Related Services](#dependencies--related-services)
+- [Dependencies](#dependencies)
 - [API Documentation](#api-documentation)
-- [Database Schema](#database-schema)
+- [Database](#database)
+  - [Schema](#schema)
+  - [Migrations](#migrations)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
   - [Configuration](#configuration)
   - [Running the Service](#running-the-service)
 - [Testing](#testing)
-- [How to Contribute](#how-to-contribute)
-- [License](#license)
 
 ## Features
 
@@ -34,17 +34,12 @@ This server interacts with PostgreSQL for data persistence, Redis for caching, N
 - **User Profiles**: Integration with user profiles including claimed names and avatars
 - **Online Status**: Track online status for community members
 
-## Dependencies & Related Services
-
-This service interacts with the following services:
+## Dependencies
 
 - **[Catalyst](https://github.com/decentraland/catalyst)**: Content server for user profiles and avatar data
 - **[Places API](https://github.com/decentraland/places-api)**: Scene and place information
 - **[Comms Gatekeeper](https://github.com/decentraland/comms-gatekeeper)**: Voice chat token generation
 - **[Archipelago Stats](https://github.com/decentraland/archipelago-workers)**: User presence and online status
-
-External dependencies:
-
 - **PostgreSQL**: Database for communities, members, posts, friendships, and social settings
 - **Redis**: Caching layer for performance optimization
 - **NATS**: Message broker for real-time updates and event distribution
@@ -72,9 +67,41 @@ This API uses two authentication methods:
 - [🧪 Testing](https://github.com/decentraland/social-service-ea/wiki/Testing)
 - [🔄 CI/CD](https://github.com/decentraland/social-service-ea/wiki/CI-CD)
 
-## Database Schema
+## Database
+
+### Schema
 
 See [docs/database-schemas.md](docs/database-schemas.md) for detailed schema, column definitions, and relationships.
+
+### Migrations
+
+The service uses `node-pg-migrate` for database migrations. These migrations are located in `src/migrations/`. The service automatically runs the migrations when starting up.
+
+#### Create a new migration
+
+Migrations are created by running the create command:
+
+```bash
+yarn migrate create name-of-the-migration
+```
+
+This will result in the creation of a migration file inside of the `src/migrations/` directory. This migration file MUST contain the migration set up and rollback procedures.
+
+#### Manually applying migrations
+
+If required, these migrations can be run manually.
+
+To run them manually:
+
+```bash
+yarn migrate up
+```
+
+To rollback them manually:
+
+```bash
+yarn migrate down
+```
 
 ## Getting Started
 
@@ -117,23 +144,13 @@ yarn build
 
 ### Configuration
 
-The service uses environment variables for configuration. Create a `.env` file in the root directory:
+The service uses environment variables for configuration. Copy the example file and adjust as needed:
 
 ```bash
 cp .env.default .env
 ```
 
-Edit the `.env` file with your configuration. Key configuration variables include:
-
-- `PG_COMPONENT_PSQL_CONNECTION_STRING`: PostgreSQL connection string
-- `REDIS_HOST`: Redis host
-- `NATS_URL`: NATS server URL
-- `AWS_S3_BUCKET`: S3 bucket name for media storage
-- `AWS_SNS_ARN`: SNS topic ARN for event notifications
-- `CATALYST_URL`: Catalyst content server URL
-- `PLACES_API_URL`: Places API endpoint
-- `COMMS_GATEKEEPER_URL`: Comms Gatekeeper endpoint
-- `ARCHIPELAGO_STATS_URL`: Archipelago Stats endpoint
+See `.env.default` for available configuration options.
 
 ### Running the Service
 
@@ -215,22 +232,6 @@ yarn test:integration:watch
 - **Integration Tests** (`test/integration/`): Test the complete request/response cycle
 
 For detailed testing guidelines and standards, refer to our [Testing Standards](https://github.com/decentraland/docs/tree/main/development-standards/testing-standards) documentation.
-
-## Database Migrations
-
-The service uses `node-pg-migrate` for database migrations. Migrations are located in `src/migrations/`.
-
-To run migrations:
-
-```bash
-yarn migrate up
-```
-
-To rollback migrations:
-
-```bash
-yarn migrate down
-```
 
 ## AI Agent Context
 
