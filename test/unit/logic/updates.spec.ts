@@ -1,7 +1,7 @@
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createUpdateHandlerComponent } from '../../../src/logic/updates'
-import { mockCatalystClient, mockFriendsDB, mockLogs } from '../../mocks/components'
+import { mockRegistry, mockFriendsDB, mockLogs } from '../../mocks/components'
 import mitt, { Emitter } from 'mitt'
 import {
   Action,
@@ -31,7 +31,7 @@ describe('Updates Handlers', () => {
     subscribersContext.addSubscriber('0x789', mitt<SubscriptionEventsEmitter>())
 
     mockCommunityMembers = createMockCommunityMembersComponent({})
-    mockCatalystClient.getProfile.mockResolvedValue(createMockProfile('0x456'))
+    mockRegistry.getProfile.mockResolvedValue(createMockProfile('0x456'))
 
     mockCommunitiesDb = {
       getCommunityMemberRole: jest.fn(),
@@ -42,7 +42,7 @@ describe('Updates Handlers', () => {
       logs: mockLogs,
       subscribersContext,
       friendsDb: mockFriendsDB,
-      catalystClient: mockCatalystClient,
+      registry: mockRegistry,
       communityMembers: mockCommunityMembers
     })
   })
@@ -1153,7 +1153,7 @@ describe('Updates Handlers', () => {
       eventEmitter = mitt<SubscriptionEventsEmitter>()
       parser = jest.fn()
 
-      mockCatalystClient.getProfile.mockResolvedValue(mockProfile)
+      mockRegistry.getProfile.mockResolvedValue(mockProfile)
       subscribersContext = createSubscribersContext()
       subscribersContext.addSubscriber('0x123', eventEmitter)
 
@@ -1316,7 +1316,7 @@ describe('Updates Handlers', () => {
         const result = await resultPromise
         expect(result.value).toEqual({ parsed: true })
         expect(parser).toHaveBeenCalledWith(blockUpdate, null)
-        expect(mockCatalystClient.getProfile).not.toHaveBeenCalled()
+        expect(mockRegistry.getProfile).not.toHaveBeenCalled()
       })
     })
 
@@ -1329,7 +1329,7 @@ describe('Updates Handlers', () => {
       beforeEach(() => {
         mockedProfile = createMockProfile('0x789')
         mockedProfileAddress = mockedProfile.avatars[0].userId
-        mockCatalystClient.getProfile
+        mockRegistry.getProfile
           .mockReset()
           .mockRejectedValueOnce(new Error('Profile not found'))
           .mockResolvedValueOnce(mockedProfile)

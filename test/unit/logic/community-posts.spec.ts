@@ -2,7 +2,7 @@ import { EthAddress, Events } from '@dcl/schemas'
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError, CommunityPostNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockCatalystClient, createLogsMockedComponent } from '../../mocks/components'
+import { mockRegistry, createLogsMockedComponent } from '../../mocks/components'
 import { createCommunityPostsComponent } from '../../../src/logic/community/posts'
 import {
   ICommunityPostsComponent,
@@ -77,7 +77,7 @@ describe('Community Posts Component', () => {
       communityRoles: mockCommunityRoles,
       communityBroadcaster: mockCommunityBroadcaster,
       communityThumbnail: mockCommunityThumbnail,
-      catalystClient: mockCatalystClient,
+      registry: mockRegistry,
       logs: mockLogs
     })
   })
@@ -100,7 +100,7 @@ describe('Community Posts Component', () => {
         mockCommunitiesDB.getCommunity.mockResolvedValue(mockCommunity)
         mockCommunityRoles.validatePermissionToCreatePost.mockResolvedValue()
         mockCommunitiesDB.createPost.mockResolvedValue(mockPost)
-        mockCatalystClient.getProfile.mockResolvedValue(mockAuthorProfile)
+        mockRegistry.getProfile.mockResolvedValue(mockAuthorProfile)
       })
 
       it('should create post successfully with author profile', async () => {
@@ -119,7 +119,7 @@ describe('Community Posts Component', () => {
           authorAddress,
           content: content.trim()
         })
-        expect(mockCatalystClient.getProfile).toHaveBeenCalledWith(authorAddress)
+        expect(mockRegistry.getProfile).toHaveBeenCalledWith(authorAddress)
       })
 
       it('should broadcast POST_ADDED event', async () => {
@@ -154,7 +154,7 @@ describe('Community Posts Component', () => {
           authorAddress,
           content: 'This is a test post content'
         })
-        expect(mockCatalystClient.getProfile).toHaveBeenCalledWith(authorAddress)
+        expect(mockRegistry.getProfile).toHaveBeenCalledWith(authorAddress)
       })
 
       describe('and the user does not have permission to create posts', () => {
@@ -226,7 +226,7 @@ describe('Community Posts Component', () => {
         })
         mockCommunitiesDB.getPosts.mockResolvedValue([mockPostWithLikes])
         mockCommunitiesDB.getPostsCount.mockResolvedValue(1)
-        mockCatalystClient.getProfiles.mockResolvedValue([createMockProfile(mockUserAddress)])
+        mockRegistry.getProfiles.mockResolvedValue([createMockProfile(mockUserAddress)])
       })
 
       describe('and the community is public', () => {
@@ -255,7 +255,7 @@ describe('Community Posts Component', () => {
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, options.userAddress)
           expect(mockCommunitiesDB.getPosts).toHaveBeenCalledWith(mockCommunityId, options)
           expect(mockCommunitiesDB.getPostsCount).toHaveBeenCalledWith(mockCommunityId)
-          expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([mockUserAddress])
+          expect(mockRegistry.getProfiles).toHaveBeenCalledWith([mockUserAddress])
         })
 
         it('should work without userAddress for public communities', async () => {
@@ -318,7 +318,7 @@ describe('Community Posts Component', () => {
             expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockCommunityId, options.userAddress)
             expect(mockCommunitiesDB.getPosts).toHaveBeenCalledWith(mockCommunityId, options)
             expect(mockCommunitiesDB.getPostsCount).toHaveBeenCalledWith(mockCommunityId)
-            expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([mockUserAddress])
+            expect(mockRegistry.getProfiles).toHaveBeenCalledWith([mockUserAddress])
           })
         })
 
@@ -374,7 +374,7 @@ describe('Community Posts Component', () => {
 
           expect(result.posts).toEqual([])
           expect(result.total).toBe(0)
-          expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+          expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
         })
       })
 
@@ -395,7 +395,7 @@ describe('Community Posts Component', () => {
         beforeEach(() => {
           mockCommunitiesDB.getPosts.mockResolvedValue(mockPosts)
           mockCommunitiesDB.getPostsCount.mockResolvedValue(2)
-          mockCatalystClient.getProfiles.mockResolvedValue([
+          mockRegistry.getProfiles.mockResolvedValue([
             createMockProfile(mockUserAddress),
             createMockProfile(secondAuthor)
           ])
@@ -419,13 +419,13 @@ describe('Community Posts Component', () => {
             authorHasClaimedName: expect.any(Boolean)
           })
 
-          expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([mockUserAddress, secondAuthor])
+          expect(mockRegistry.getProfiles).toHaveBeenCalledWith([mockUserAddress, secondAuthor])
         })
       })
 
       describe('and profile fetching fails', () => {
         beforeEach(() => {
-          mockCatalystClient.getProfiles.mockRejectedValue(new Error('Profile service error'))
+          mockRegistry.getProfiles.mockRejectedValue(new Error('Profile service error'))
         })
 
         it('should throw profile service error', async () => {

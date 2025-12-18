@@ -4,6 +4,7 @@ import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import {
   mockCatalystClient,
+  mockRegistry,
   mockConfig,
   mockCdnCacheInvalidator,
   createMockedPubSubComponent,
@@ -108,6 +109,7 @@ describe('Community Component', () => {
 
     communityComponent = createCommunityComponent({
       communitiesDb: mockCommunitiesDB,
+      registry: mockRegistry,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
       communityPlaces: mockCommunityPlaces,
@@ -309,7 +311,7 @@ describe('Community Component', () => {
     beforeEach(() => {
       mockCommunitiesDB.getCommunities.mockResolvedValue(mockCommunities)
       mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
-      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+      mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       mockCommunityOwners.getOwnersNames.mockResolvedValue({
         [mockCommunity.ownerAddress]: 'Test Owner Name'
       })
@@ -360,7 +362,7 @@ describe('Community Component', () => {
         ...options,
         communityIds: undefined
       })
-      expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
+      expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xfriend1', '0xfriend2'])
       expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([mockCommunity.ownerAddress])
     })
 
@@ -386,7 +388,7 @@ describe('Community Component', () => {
           ...options,
           communityIds: undefined
         })
-        expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+        expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
         expect(mockCommunityOwners.getOwnersNames).toHaveBeenCalledWith([])
       })
     })
@@ -441,7 +443,7 @@ describe('Community Component', () => {
         ])
         mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
         mockStorage.exists.mockResolvedValue(false)
-        mockCatalystClient.getProfiles.mockResolvedValue([])
+        mockRegistry.getProfiles.mockResolvedValue([])
         mockCommunityOwners.getOwnersNames.mockResolvedValue({
           [mockCommunitiesWithVoiceChat[0].ownerAddress]: 'Test Owner Name'
         })
