@@ -69,7 +69,7 @@ test('Get Community Members Controller', function ({ components, spyComponents }
         addressMakingRequest
       ])
 
-      spyComponents.catalystClient.getProfiles.mockResolvedValue([
+      spyComponents.registry.getProfiles.mockResolvedValue([
         createMockProfile(firstMemberAddress),
         createMockProfile(secondMemberAddress),
         createMockProfile(ownerAddress),

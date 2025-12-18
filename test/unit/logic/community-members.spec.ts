@@ -2,7 +2,7 @@ import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError, InvalidRequestError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, mockCatalystClient, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
+import { mockLogs, mockCatalystClient, mockRegistry, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { createCommunityMembersComponent } from '../../../src/logic/community/members'
 import {
@@ -71,6 +71,7 @@ describe('Community Members Component', () => {
 
     communityMembersComponent = await createCommunityMembersComponent({
       communitiesDb: mockCommunitiesDB,
+      registry: mockRegistry,
       catalystClient: mockCatalystClient,
       communityRoles: mockCommunityRoles,
       communityThumbnail: mockCommunityThumbnail,
@@ -100,7 +101,7 @@ describe('Community Members Component', () => {
       mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockCommunityMembers)
       mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(2)
-      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+      mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
       mockPeersStats.getConnectedPeers.mockResolvedValue(onlinePeers)
     })
 
@@ -162,7 +163,7 @@ describe('Community Members Component', () => {
             expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId, {
               filterByMembers: undefined
             })
-            expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(
+            expect(mockRegistry.getProfiles).toHaveBeenCalledWith(
               mockCommunityMembers.map((member) => member.memberAddress)
             )
           })
@@ -176,7 +177,7 @@ describe('Community Members Component', () => {
             mockPeersStats.getConnectedPeers.mockResolvedValue(onlinePeers)
             mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockCommunityMembers.slice(0, 1))
             mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(1)
-            mockCatalystClient.getProfiles.mockResolvedValue([mockProfiles[0]])
+            mockRegistry.getProfiles.mockResolvedValue([mockProfiles[0]])
           })
 
           it('should filter by online peers', async () => {
@@ -259,7 +260,7 @@ describe('Community Members Component', () => {
             expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
             expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
             expect(mockCommunitiesDB.getCommunityMembers).not.toHaveBeenCalled()
-            expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+            expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
           })
         })
       })
@@ -297,7 +298,7 @@ describe('Community Members Component', () => {
       mockCommunitiesDB.getCommunity.mockResolvedValue(community)
       mockCommunitiesDB.getCommunityMembers.mockResolvedValue(mockCommunityMembers)
       mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(2)
-      mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+      mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
     })
 
     describe('and the community exists', () => {

@@ -28,7 +28,7 @@ test('Create Community Post Controller', async function ({ components, stubCompo
       stubComponents.catalystClient.getOwnedNames.resolves([
         { id: '1', name: 'OwnerName', contractAddress: '0x123', tokenId: '1' }
       ])
-      stubComponents.catalystClient.getProfile.resolves(
+      stubComponents.registry.getProfile.resolves(
         createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
       )
 

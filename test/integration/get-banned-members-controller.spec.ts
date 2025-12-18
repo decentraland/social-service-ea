@@ -128,7 +128,7 @@ test('Get Banned Members Controller', function ({ components, spyComponents }) {
         })
 
         // Setup profiles
-        spyComponents.catalystClient.getProfiles.mockResolvedValue([
+        spyComponents.registry.getProfiles.mockResolvedValue([
           createMockProfile(firstBannedAddress),
           createMockProfile(secondBannedAddress)
         ])

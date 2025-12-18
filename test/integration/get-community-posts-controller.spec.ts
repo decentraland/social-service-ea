@@ -27,7 +27,7 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
         { id: '3', name: 'NonMemberName', contractAddress: '0x123', tokenId: '3' }
       ])
 
-      stubComponents.catalystClient.getProfiles.resolves([
+      stubComponents.registry.getProfiles.resolves([
         createMockProfileWithDetails(ownerIdentity.realAccount.address.toLowerCase(), { name: 'OwnerName' }),
         createMockProfileWithDetails(memberIdentity.realAccount.address.toLowerCase(), { name: 'MemberName' }),
         createMockProfileWithDetails(nonMemberIdentity.realAccount.address.toLowerCase(), { name: 'NonMemberName' })
@@ -228,10 +228,10 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
       beforeEach(async () => {
         // Stub catalyst client responses
         stubComponents.catalystClient.getOwnedNames.resolves([])
-        stubComponents.catalystClient.getProfile.resolves(
+        stubComponents.registry.getProfile.resolves(
           createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
         )
-        stubComponents.catalystClient.getProfiles.resolves([
+        stubComponents.registry.getProfiles.resolves([
           createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
         ])
 
