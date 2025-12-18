@@ -4,9 +4,7 @@ import { ICommunityOwnersComponent } from './types'
 import { CommunityOwnerNotFoundError } from './errors'
 import { getProfileName, getProfileUserId } from '../profiles'
 
-export function createCommunityOwnersComponent(
-  components: Pick<AppComponents, 'registry'>
-): ICommunityOwnersComponent {
+export function createCommunityOwnersComponent(components: Pick<AppComponents, 'registry'>): ICommunityOwnersComponent {
   const { registry } = components
 
   async function getOwnerName(ownerAddress: EthAddress, communityId: string = 'N/A'): Promise<string> {
