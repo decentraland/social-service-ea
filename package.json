@@ -51,7 +51,7 @@
     "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-18139325564.commit-905b963.tgz",
     "@dcl/rpc": "^1.1.2",
     "@dcl/schema-validator-component": "^0.2.0",
-    "@dcl/schemas": "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/community-voice-chat-notification-event/dcl-schemas-20.4.2-20371648877.commit-3201f12.tgz",
+    "@dcl/schemas": "^20.5.0",
     "@dcl/slack-component": "^1.0.1",
     "@dcl/sns-component": "^2.1.0",
     "@dcl/sqs-component": "^2.0.3",
