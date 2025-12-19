@@ -1,3 +1,4 @@
+import { Events } from '@dcl/schemas'
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AppComponents, CommunityVoiceChat, CommunityRole, CommunityVoiceChatStatus } from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
@@ -29,7 +30,8 @@ export async function createCommunityVoiceComponent({
   communityVoiceChatCache,
   placesApi,
   communityThumbnail,
-  communityPlaces
+  communityPlaces,
+  communityBroadcaster
 }: Pick<
   AppComponents,
   | 'logs'
@@ -41,6 +43,7 @@ export async function createCommunityVoiceComponent({
   | 'placesApi'
   | 'communityThumbnail'
   | 'communityPlaces'
+  | 'communityBroadcaster'
 > & {
   communityVoiceChatCache: ICommunityVoiceChatCacheComponent
 }): Promise<ICommunityVoiceComponent> {
@@ -123,7 +126,8 @@ export async function createCommunityVoiceComponent({
       logger.info(`Community voice chat room created for community ${communityId}`)
 
       // Add to cache as active
-      await communityVoiceChatCache.setCommunityVoiceChat(communityId, Date.now())
+      const createdAt = Date.now()
+      await communityVoiceChatCache.setCommunityVoiceChat(communityId, createdAt)
 
       // Get community information for the update
       let communityPositions: string[] = []
@@ -175,21 +179,37 @@ export async function createCommunityVoiceComponent({
         // Continue without community info - non-critical error
       }
 
-      // Publish start event with community information using protocol enum
-      await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
-        communityId,
-        status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
-        positions: communityPositions,
-        worlds: communityWorlds,
-        communityName,
-        communityImage
-      })
-
-      // Analytics event
-      analytics.fireEvent(AnalyticsEvent.START_COMMUNITY_CALL, {
-        call_id: communityId,
-        user_id: creatorAddress
-      })
+      await Promise.all([
+        // Publish start event with community information using protocol enum
+        pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
+          communityId,
+          status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: communityPositions,
+          worlds: communityWorlds,
+          communityName,
+          communityImage,
+          creatorAddress
+        }),
+        // TODO: Remove 'as any' cast once local common-schemas is linked with VOICE_CHAT_STARTED event type
+        communityBroadcaster.broadcast(
+          {
+            type: Events.Type.COMMUNITY,
+            subType: Events.SubType.Community.VOICE_CHAT_STARTED,
+            key: `${communityId}-${createdAt}`,
+            timestamp: Date.now(),
+            metadata: {
+              communityId,
+              communityName,
+              thumbnailUrl: communityImage || ''
+            }
+          } as any,
+          { excludeAddresses: [creatorAddress] }
+        ),
+        analytics.fireEvent(AnalyticsEvent.START_COMMUNITY_CALL, {
+          call_id: communityId,
+          user_id: creatorAddress
+        })
+      ])
 
       return credentials
     } catch (error) {

@@ -25,6 +25,7 @@ import { ICommunityVoiceComponent } from '../../../src/logic/community-voice'
 import { ICommunityVoiceChatCacheComponent } from '../../../src/logic/community-voice/community-voice-cache'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../../src/logic/community'
+import { ICommunityBroadcasterComponent } from '../../../src/logic/community/types'
 
 describe('Community Voice Logic', () => {
   let mockLogs: jest.Mocked<ILoggerComponent>
@@ -38,6 +39,7 @@ describe('Community Voice Logic', () => {
   let mockCommunityVoiceChatCache: jest.Mocked<ICommunityVoiceChatCacheComponent>
   let mockPlacesApi: jest.Mocked<any>
   let mockCommunityThumbnail: jest.Mocked<any>
+  let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
 
   const communityId = 'test-community-id'
 
@@ -100,6 +102,10 @@ describe('Community Voice Logic', () => {
       getThumbnail: jest.fn()
     }
 
+    mockCommunityBroadcaster = {
+      broadcast: jest.fn().mockResolvedValue(undefined)
+    }
+
     const mockCommunityPlaces = {
       getPlaces: jest.fn(),
       validateAndAddPlaces: jest.fn(),
@@ -120,7 +126,8 @@ describe('Community Voice Logic', () => {
       communityVoiceChatCache: mockCommunityVoiceChatCache,
       placesApi: mockPlacesApi,
       communityThumbnail: mockCommunityThumbnail,
-      communityPlaces: mockCommunityPlaces
+      communityPlaces: mockCommunityPlaces,
+      communityBroadcaster: mockCommunityBroadcaster
     })
   })
 
@@ -192,7 +199,8 @@ describe('Community Voice Logic', () => {
               positions: ['1,1', '1,2', '2,1', '2,2'],
               worlds: [],
               communityName: 'Test Community',
-              communityImage: 'test-community.jpg'
+              communityImage: 'test-community.jpg',
+              creatorAddress
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -228,7 +236,8 @@ describe('Community Voice Logic', () => {
               positions: ['1,1', '1,2', '2,1', '2,2'],
               worlds: [],
               communityName: 'Test Community',
-              communityImage: 'test-community.jpg'
+              communityImage: 'test-community.jpg',
+              creatorAddress
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -290,7 +299,8 @@ describe('Community Voice Logic', () => {
               positions: ['1,1', '1,2', '2,1', '2,2'],
               worlds: [],
               communityName: 'Test Community',
-              communityImage: 'test-community.jpg'
+              communityImage: 'test-community.jpg',
+              creatorAddress
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -326,7 +336,8 @@ describe('Community Voice Logic', () => {
               positions: ['1,1', '1,2', '2,1', '2,2'],
               worlds: [],
               communityName: 'Test Community',
-              communityImage: 'test-community.jpg'
+              communityImage: 'test-community.jpg',
+              creatorAddress
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -351,7 +362,8 @@ describe('Community Voice Logic', () => {
               positions: [],
               worlds: [],
               communityName: 'Test Community', // Still gets community info even when places fail
-              communityImage: 'test-community.jpg'
+              communityImage: 'test-community.jpg',
+              creatorAddress
             })
           })
         })
@@ -373,7 +385,8 @@ describe('Community Voice Logic', () => {
               positions: [],
               worlds: [],
               communityName: 'Test Community', // Still gets community info even when placesApi fails
-              communityImage: 'test-community.jpg'
+              communityImage: 'test-community.jpg',
+              creatorAddress
             })
           })
         })

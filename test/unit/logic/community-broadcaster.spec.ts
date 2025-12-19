@@ -7,22 +7,31 @@ import {
   CommunityOwnershipTransferredEvent,
   Events
 } from '@dcl/schemas'
-import { CommunityRole } from '../../../src/types'
-import { createCommunityBroadcasterComponent } from '../../../src/logic/community/broadcaster'
+import { CommunityRole, ISubscribersContext } from '../../../src/types'
+import {
+  createCommunityBroadcasterComponent,
+  CommunityVoiceChatStartedEventReducedMetadata
+} from '../../../src/logic/community/broadcaster'
 import { ICommunityBroadcasterComponent } from '../../../src/logic/community/types'
 import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { IPublisherComponent } from '@dcl/sns-component'
+import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
+import mitt from 'mitt'
+import { SubscriptionEventsEmitter } from '../../../src/types'
 
 describe('Community Broadcaster Component', () => {
   let broadcasterComponent: ICommunityBroadcasterComponent
   let mockSns: jest.Mocked<IPublisherComponent>
+  let subscribersContext: ISubscribersContext
 
   beforeEach(() => {
     mockSns = createSNSMockedComponent({})
+    subscribersContext = createSubscribersContext()
     broadcasterComponent = createCommunityBroadcasterComponent({
       sns: mockSns,
-      communitiesDb: mockCommunitiesDB
+      communitiesDb: mockCommunitiesDB,
+      subscribersContext
     })
   })
 
@@ -348,9 +357,7 @@ describe('Community Broadcaster Component', () => {
         if (excludedAddresses && excludedAddresses.length > 0) {
           const excludedLower = excludedAddresses.map((addr: string) => addr.toLowerCase())
           return Promise.resolve(
-            mockMembers.filter(
-              (member) => !excludedLower.includes(member.memberAddress.toLowerCase())
-            )
+            mockMembers.filter((member) => !excludedLower.includes(member.memberAddress.toLowerCase()))
           )
         }
         return Promise.resolve(mockMembers)
@@ -506,6 +513,131 @@ describe('Community Broadcaster Component', () => {
       const batchCall = mockSns.publishMessages.mock.calls[0][0]
       expect(batchCall).toHaveLength(1)
       expect((batchCall[0].metadata as any).memberAddresses).toHaveLength(3)
+    })
+  })
+
+  describe('when broadcasting a voice chat started event', () => {
+    let voiceChatStartedEvent: CommunityVoiceChatStartedEventReducedMetadata
+
+    beforeEach(() => {
+      voiceChatStartedEvent = {
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.VOICE_CHAT_STARTED,
+        key: 'community-123-1234567890',
+        timestamp: Date.now(),
+        metadata: {
+          communityId: 'community-123',
+          communityName: 'Test Community',
+          thumbnailUrl: 'https://example.com/thumbnail.jpg'
+        }
+      }
+    })
+
+    describe('and there are online community members', () => {
+      beforeEach(() => {
+        // Add online subscribers (including the creator)
+        subscribersContext.addSubscriber('0xcreator', mitt<SubscriptionEventsEmitter>())
+        subscribersContext.addSubscriber('0xmember1', mitt<SubscriptionEventsEmitter>())
+        subscribersContext.addSubscriber('0xmember2', mitt<SubscriptionEventsEmitter>())
+
+        // Mock getCommunityMembers to return members that are online, respecting excludedAddresses
+        mockCommunitiesDB.getCommunityMembers.mockImplementation(async (communityId, options) => {
+          const { filterByMembers, excludedAddresses } = options || {}
+          if (filterByMembers) {
+            const excludedLower = (excludedAddresses || []).map((addr: string) => addr.toLowerCase())
+            return filterByMembers
+              .filter((addr: string) => !excludedLower.includes(addr.toLowerCase()))
+              .map((addr: string) => ({
+                communityId,
+                memberAddress: addr,
+                role: CommunityRole.Member,
+                joinedAt: '2023-01-01T00:00:00Z'
+              }))
+          }
+          return []
+        })
+      })
+
+      it('should publish to online members excluding addresses passed in options', async () => {
+        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
+        await broadcasterComponent.broadcast(voiceChatStartedEvent as any, { excludeAddresses: ['0xcreator'] })
+
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith('community-123', {
+          pagination: { limit: 100, offset: 0 },
+          filterByMembers: ['0xcreator', '0xmember1', '0xmember2'],
+          excludedAddresses: ['0xcreator']
+        })
+
+        expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
+        const batchCall = mockSns.publishMessages.mock.calls[0][0]
+        expect(batchCall).toHaveLength(1)
+
+        const notifiedAddresses = batchCall[0].metadata.addressesToNotify
+        expect(notifiedAddresses).not.toContain('0xcreator')
+        expect(notifiedAddresses).toContain('0xmember1')
+        expect(notifiedAddresses).toContain('0xmember2')
+      })
+
+      it('should publish to all online members when no excludeAddresses option is provided', async () => {
+        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
+        await broadcasterComponent.broadcast(voiceChatStartedEvent as any)
+
+        expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith('community-123', {
+          pagination: { limit: 100, offset: 0 },
+          filterByMembers: ['0xcreator', '0xmember1', '0xmember2'],
+          excludedAddresses: undefined
+        })
+
+        expect(mockSns.publishMessages).toHaveBeenCalledTimes(1)
+        const batchCall = mockSns.publishMessages.mock.calls[0][0]
+        expect(batchCall).toHaveLength(1)
+
+        const notifiedAddresses = batchCall[0].metadata.addressesToNotify
+        expect(notifiedAddresses).toContain('0xcreator')
+        expect(notifiedAddresses).toContain('0xmember1')
+        expect(notifiedAddresses).toContain('0xmember2')
+      })
+    })
+
+    describe('and there are no online subscribers', () => {
+      it('should not publish any messages', async () => {
+        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
+        await broadcasterComponent.broadcast(voiceChatStartedEvent as any, { excludeAddresses: ['0xcreator'] })
+
+        expect(mockSns.publishMessages).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and all online subscribers are excluded', () => {
+      beforeEach(() => {
+        subscribersContext.addSubscriber('0xcreator', mitt<SubscriptionEventsEmitter>())
+
+        // Mock getCommunityMembers to return empty when creator is excluded
+        mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
+      })
+
+      it('should not publish any messages', async () => {
+        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
+        await broadcasterComponent.broadcast(voiceChatStartedEvent as any, { excludeAddresses: ['0xcreator'] })
+
+        expect(mockSns.publishMessages).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and there are no online community members', () => {
+      beforeEach(() => {
+        subscribersContext.addSubscriber('0xmember1', mitt<SubscriptionEventsEmitter>())
+
+        // Mock getCommunityMembers to return empty (user is online but not a member)
+        mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
+      })
+
+      it('should not publish any messages', async () => {
+        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
+        await broadcasterComponent.broadcast(voiceChatStartedEvent as any)
+
+        expect(mockSns.publishMessages).not.toHaveBeenCalled()
+      })
     })
   })
 })

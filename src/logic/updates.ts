@@ -228,7 +228,11 @@ export function createUpdateHandlerComponent(
   const communityVoiceChatUpdateHandler = handleUpdate<'communityVoiceChatUpdate'>(async (update) => {
     logger.info('Community voice chat update', { update: JSON.stringify(update) })
 
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    // Get all online subscribers, excluding the creator if present (creator already knows about their action)
+    const creatorAddress = update.creatorAddress?.toLowerCase()
+    const onlineSubscribers = subscribersContext
+      .getSubscribersAddresses()
+      .filter((address) => !creatorAddress || address !== creatorAddress)
 
     try {
       // Get all online members of this community in a single efficient query
@@ -241,7 +245,7 @@ export function createUpdateHandlerComponent(
         })
       }
 
-      // Notify ALL online users with personalized membership info
+      // Notify ALL online users with personalized membership info (excluding the creator)
       const notifications = onlineSubscribers.map(async (userAddress) => {
         const isMember = communityMemberAddresses.has(userAddress)
 
@@ -264,7 +268,7 @@ export function createUpdateHandlerComponent(
     } catch (error) {
       logger.error(`Failed to process community voice chat update for community ${update.communityId}: ${error}`)
 
-      // Fallback: send update to all users without membership info
+      // Fallback: send update to all users without membership info (still excluding the creator)
       const fallbackNotifications = onlineSubscribers.map(async (userAddress) => {
         const fallbackUpdate = {
           ...update,

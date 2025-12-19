@@ -9,7 +9,8 @@ import {
   CommunityDeletedContentViolationEvent,
   Events,
   CommunityPostAddedEvent,
-  CommunityOwnershipTransferredEvent
+  CommunityOwnershipTransferredEvent,
+  CommunityVoiceChatStartedEvent
 } from '@dcl/schemas'
 import { AppComponents, CommunityRole } from '../../types'
 import { ICommunityBroadcasterComponent, CommunityMember } from './types'
@@ -47,6 +48,24 @@ export type CommunityRequestToJoinReceivedEventReducedMetadata = Omit<
   }
 }
 
+export type CommunityVoiceChatStartedEventReducedMetadata = Omit<CommunityVoiceChatStartedEvent, 'metadata'> & {
+  metadata: {
+    communityId: string
+    communityName: string
+    thumbnailUrl: string
+  }
+}
+
+/**
+ * Options for broadcasting events
+ */
+export type BroadcastOptions = {
+  /**
+   * Addresses to exclude from receiving the notification
+   */
+  excludeAddresses?: string[]
+}
+
 /**
  * Union type of all events that can be broadcasted
  */
@@ -61,10 +80,11 @@ export type BroadcastableEvent =
   | CommunityDeletedContentViolationEvent
   | CommunityPostAddedEvent
   | CommunityOwnershipTransferredEvent
+  | CommunityVoiceChatStartedEventReducedMetadata
 /**
- * Type for event handlers that only need the event
+ * Type for event handlers that accept event and optional options
  */
-type BroadcastingEventHandler = (event: BroadcastableEvent) => Promise<void>
+type BroadcastingEventHandler = (event: BroadcastableEvent, options?: BroadcastOptions) => Promise<void>
 
 /**
  * Registry mapping event subTypes to their broadcasting event handlers
@@ -72,9 +92,9 @@ type BroadcastingEventHandler = (event: BroadcastableEvent) => Promise<void>
 type BroadcastingRegistry = Map<Events.SubType.Community, BroadcastingEventHandler>
 
 export function createCommunityBroadcasterComponent(
-  components: Pick<AppComponents, 'sns' | 'communitiesDb'>
+  components: Pick<AppComponents, 'sns' | 'communitiesDb' | 'subscribersContext'>
 ): ICommunityBroadcasterComponent {
-  const { sns, communitiesDb } = components
+  const { sns, communitiesDb, subscribersContext } = components
 
   /**
    * Gets all community member addresses with pagination support
@@ -223,6 +243,85 @@ export function createCommunityBroadcasterComponent(
   }
 
   /**
+   * Gets online community members with pagination support
+   * @param {string} communityId - The ID of the community
+   * @param {string[]} onlineUsers - Array of online user addresses to filter by
+   * @param {string[]} excludedAddresses - Optional array of addresses to exclude
+   * @returns {Promise<string[]>} Array of online member addresses
+   */
+  async function getOnlineCommunityMembersAddresses(
+    communityId: string,
+    onlineUsers: string[],
+    excludedAddresses?: string[]
+  ): Promise<string[]> {
+    const onlineMemberAddresses: string[] = []
+    let offset = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const batch = await communitiesDb.getCommunityMembers(communityId, {
+        pagination: { limit: MEMBER_FETCH_BATCH_SIZE, offset },
+        filterByMembers: onlineUsers,
+        excludedAddresses
+      })
+
+      if (batch.length === 0) break
+
+      batch.forEach(({ memberAddress }) => {
+        onlineMemberAddresses.push(memberAddress)
+      })
+
+      offset += MEMBER_FETCH_BATCH_SIZE
+      hasMore = batch.length === MEMBER_FETCH_BATCH_SIZE
+    }
+
+    return onlineMemberAddresses
+  }
+
+  /**
+   * Broadcasts voice chat started event to online community members
+   * @param {BroadcastableEvent} event - The event to broadcast
+   * @param {BroadcastOptions} options - Optional broadcast options (e.g., excludeAddresses)
+   */
+  async function broadcastVoiceChatStarted(event: BroadcastableEvent, options?: BroadcastOptions): Promise<void> {
+    const { metadata } = event as CommunityVoiceChatStartedEventReducedMetadata
+    const { communityId } = metadata
+
+    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+
+    if (onlineSubscribers.length === 0) {
+      return
+    }
+
+    // Get online members from the community, excluding specified addresses at database level
+    const excludedAddresses = options?.excludeAddresses?.map((addr) => addr.toLowerCase())
+    const onlineMemberAddresses = await getOnlineCommunityMembersAddresses(
+      communityId,
+      onlineSubscribers,
+      excludedAddresses
+    )
+
+    if (onlineMemberAddresses.length === 0) {
+      return
+    }
+
+    const memberBatches = createMemberBatches(onlineMemberAddresses)
+
+    await sns.publishMessages(
+      memberBatches.map((batch, i) => ({
+        ...event,
+        key: `${event.key}-batch-${i + 1}`,
+        metadata: {
+          communityId: metadata.communityId,
+          communityName: metadata.communityName,
+          thumbnailUrl: metadata.thumbnailUrl,
+          addressesToNotify: batch
+        }
+      }))
+    )
+  }
+
+  /**
    * Direct broadcast - publish event as-is without any modifications
    * @param {BroadcastableEvent} event - The event to broadcast
    */
@@ -243,6 +342,7 @@ export function createCommunityBroadcasterComponent(
     registry.set(Events.SubType.Community.POST_ADDED, broadcastToAllMembersButPostAuthor)
     registry.set(Events.SubType.Community.DELETED_CONTENT_VIOLATION, directBroadcast)
     registry.set(Events.SubType.Community.OWNERSHIP_TRANSFERRED, directBroadcast)
+    registry.set(Events.SubType.Community.VOICE_CHAT_STARTED, broadcastVoiceChatStarted)
 
     return registry
   }
@@ -252,10 +352,11 @@ export function createCommunityBroadcasterComponent(
   /**
    * Broadcasts an event to the appropriate recipients based on the event type
    * @param {BroadcastableEvent} event - The event to broadcast
+   * @param {BroadcastOptions} options - Optional broadcast options
    */
-  async function broadcast(event: BroadcastableEvent): Promise<void> {
+  async function broadcast(event: BroadcastableEvent, options?: BroadcastOptions): Promise<void> {
     const broadcastingEventHandler = broadcastingRegistry.get(event.subType) || directBroadcast
-    await broadcastingEventHandler(event)
+    await broadcastingEventHandler(event, options)
   }
 
   return {

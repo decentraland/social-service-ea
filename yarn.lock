@@ -1737,6 +1737,15 @@
     ajv-errors "^3.0.0"
     ajv-keywords "^5.1.0"
 
+"@dcl/schemas@https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/community-voice-chat-notification-event/dcl-schemas-20.4.2-20371648877.commit-3201f12.tgz":
+  version "20.4.2-20371648877.commit-3201f12"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/community-voice-chat-notification-event/dcl-schemas-20.4.2-20371648877.commit-3201f12.tgz#5443a5fd6c596c20e3f35834eb5bc88900a08d2d"
+  dependencies:
+    ajv "^8.11.0"
+    ajv-errors "^3.0.0"
+    ajv-keywords "^5.1.0"
+    mitt "^3.0.1"
+
 "@dcl/slack-component@^1.0.1":
   version "1.0.1"
   resolved "https://registry.npmjs.org/@dcl/slack-component/-/slack-component-1.0.1.tgz"

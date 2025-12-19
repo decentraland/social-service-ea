@@ -964,12 +964,39 @@ describe('Updates Handlers', () => {
           communityId: string,
           onlineUsers: string[]
         ) {
-          // Only return 0x456 as a member of the community
-          yield [{ communityId, memberAddress: '0x456' }]
+          // Only return 0x456 as a member of the community (if present in onlineUsers)
+          const members = onlineUsers.includes('0x456') ? [{ communityId, memberAddress: '0x456' }] : []
+          yield members
         })
       })
 
-      it('should notify ALL online users about the voice chat update with personalized membership info', async () => {
+      it('should notify online users except the creator with personalized membership info', async () => {
+        const update = {
+          communityId: 'community-1',
+          voiceChatId: 'voice-chat-1',
+          status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          positions: ['1,1', '1,2', '2,1', '2,2'],
+          communityName: 'Test Community',
+          communityImage: 'test-image.jpg',
+          creatorAddress: '0x123'
+        }
+
+        await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
+
+        // Should notify online subscribers except the creator
+        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: true // 456 is a member
+        })
+        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+          ...update,
+          isMember: false // 789 is not a member
+        })
+        // Creator should NOT be notified
+        expect(emitSpy123).not.toHaveBeenCalled()
+      })
+
+      it('should notify ALL online users when no creatorAddress is provided', async () => {
         const update = {
           communityId: 'community-1',
           voiceChatId: 'voice-chat-1',
@@ -984,21 +1011,15 @@ describe('Updates Handlers', () => {
         // Should notify ALL online subscribers with personalized membership info
         expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
-          isMember: true, // 456 is a member
-          communityName: 'Test Community',
-          communityImage: 'test-image.jpg'
+          isMember: true // 456 is a member
         })
         expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
-          isMember: false, // 789 is not a member
-          communityName: 'Test Community',
-          communityImage: 'test-image.jpg'
+          isMember: false // 789 is not a member
         })
         expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
-          isMember: false, // 123 is not a member
-          communityName: 'Test Community',
-          communityImage: 'test-image.jpg'
+          isMember: false // 123 is not a member
         })
       })
 
@@ -1009,7 +1030,8 @@ describe('Updates Handlers', () => {
           status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
           positions: [],
           communityName: 'Test Community',
-          communityImage: undefined
+          communityImage: undefined,
+          creatorAddress: '0x999' // Not an online subscriber
         }
 
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
@@ -1017,32 +1039,27 @@ describe('Updates Handlers', () => {
         // Should notify ALL online subscribers with personalized membership info
         expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
-          isMember: true, // 456 is a member
-          communityName: 'Test Community',
-          communityImage: undefined
+          isMember: true // 456 is a member
         })
         expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
-          isMember: false, // 789 is not a member
-          communityName: 'Test Community',
-          communityImage: undefined
+          isMember: false // 789 is not a member
         })
         expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
-          isMember: false, // 123 is not a member
-          communityName: 'Test Community',
-          communityImage: undefined
+          isMember: false // 123 is not a member
         })
       })
 
-      it('should send fallback updates when community members query fails', async () => {
+      it('should send fallback updates when community members query fails, excluding the creator', async () => {
         const update = {
           communityId: 'community-1',
           voiceChatId: 'voice-chat-1',
           status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
           positions: ['1,1', '1,2'],
           communityName: 'Test Community',
-          communityImage: 'test-image.jpg'
+          communityImage: 'test-image.jpg',
+          creatorAddress: '0x123'
         }
 
         // Mock community members to throw an error
@@ -1052,7 +1069,7 @@ describe('Updates Handlers', () => {
 
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
 
-        // Should send fallback updates to all users with isMember: false
+        // Should send fallback updates to all users with isMember: false, except the creator
         expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
           isMember: false
@@ -1061,10 +1078,8 @@ describe('Updates Handlers', () => {
           ...update,
           isMember: false
         })
-        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false
-        })
+        // Creator should NOT be notified
+        expect(emitSpy123).not.toHaveBeenCalled()
       })
     })
 
@@ -1075,12 +1090,13 @@ describe('Updates Handlers', () => {
           communityId: string,
           onlineUsers: string[]
         ) {
-          // Only return 0x456 as a member of the community
-          yield [{ communityId, memberAddress: '0x456' }]
+          // Only return 0x456 as a member of the community (if present in onlineUsers)
+          const members = onlineUsers.includes('0x456') ? [{ communityId, memberAddress: '0x456' }] : []
+          yield members
         })
       })
 
-      it('should notify ALL online users about the ended voice chat', async () => {
+      it('should notify ALL online users about the ended voice chat (no creator exclusion for ended events)', async () => {
         const update = {
           communityId: 'community-1',
           voiceChatId: 'voice-chat-1',
@@ -1088,6 +1104,7 @@ describe('Updates Handlers', () => {
           ended_at: Date.now(),
           communityName: '',
           communityImage: undefined
+          // Note: ended events typically don't have creatorAddress
         }
 
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
@@ -1095,21 +1112,15 @@ describe('Updates Handlers', () => {
         // Should notify ALL online subscribers with personalized membership info
         expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
-          isMember: true, // 456 is a member
-          communityName: '',
-          communityImage: undefined
+          isMember: true // 456 is a member
         })
         expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
-          isMember: false, // 789 is not a member
-          communityName: '',
-          communityImage: undefined
+          isMember: false // 789 is not a member
         })
         expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
           ...update,
-          isMember: false, // 123 is not a member
-          communityName: '',
-          communityImage: undefined
+          isMember: false // 123 is not a member
         })
       })
     })
@@ -1391,10 +1402,7 @@ describe('Updates Handlers', () => {
 
         await updateHandler.communityDeletedUpdateHandler(JSON.stringify(update))
 
-        expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith(
-          communityId,
-          expect.any(Array)
-        )
+        expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith(communityId, expect.any(Array))
 
         expect(emitSpy1).toHaveBeenCalledWith('communityMemberConnectivityUpdate', {
           communityId,
@@ -1428,10 +1436,7 @@ describe('Updates Handlers', () => {
 
         await updateHandler.communityDeletedUpdateHandler(JSON.stringify(update))
 
-        expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith(
-          communityId,
-          expect.any(Array)
-        )
+        expect(mockCommunityMembers.getOnlineMembersFromCommunity).toHaveBeenCalledWith(communityId, expect.any(Array))
 
         // Verify no emit calls were made
         const allSubscribers = subscribersContext.getSubscribers()

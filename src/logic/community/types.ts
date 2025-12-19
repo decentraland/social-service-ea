@@ -17,7 +17,9 @@ import {
 import {
   CommunityDeletedEventReducedMetadata,
   CommunityRenamedEventReducedMetadata,
-  CommunityRequestToJoinReceivedEventReducedMetadata
+  CommunityRequestToJoinReceivedEventReducedMetadata,
+  CommunityVoiceChatStartedEventReducedMetadata,
+  BroadcastOptions
 } from './broadcaster'
 
 export interface ICommunitiesComponent {
@@ -201,6 +203,8 @@ export interface ICommunityBroadcasterComponent {
       | CommunityDeletedContentViolationEvent
       | CommunityPostAddedEvent
       | CommunityOwnershipTransferredEvent
+      | CommunityVoiceChatStartedEventReducedMetadata,
+    options?: BroadcastOptions
   ): Promise<void>
 }
 
