@@ -57,7 +57,9 @@ export type SubscriptionEventsEmitter = {
     memberAddress: EthAddress
     status: ConnectivityStatus
   }
-  communityVoiceChatUpdate: CommunityVoiceChatUpdate
+  communityVoiceChatUpdate: CommunityVoiceChatUpdate & {
+    creatorAddress?: string // Internal field to exclude creator from notifications
+  }
   communityDeletedUpdate: {
     communityId: string
   }
