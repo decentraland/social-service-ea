@@ -238,6 +238,60 @@ describe('UWebSocketTransport', () => {
       })
     })
 
+    describe('and the socket is closed during sending (race condition)', () => {
+      describe('and the socket throws on send', () => {
+        beforeEach(() => {
+          const closedSocketError = new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+          mockSocket.send.mockImplementation(() => {
+            throw closedSocketError
+          })
+        })
+
+        it('should reject and emit error', async () => {
+          const sendPromise = transport.sendMessage(mockMessage)
+          ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
+          await jest.advanceTimersByTimeAsync(0)
+
+          await expect(sendPromise).rejects.toThrow(
+            'Failed to send message: Invalid access of closed uWS.WebSocket/SSLWebSocket.'
+          )
+          expect(errorListener).toHaveBeenCalledWith(
+            new Error('Failed to send message: Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+          )
+        })
+      })
+
+      describe('and the socket reports disconnected', () => {
+        beforeEach(() => {
+          mockSocket.getUserData.mockReturnValue({ isConnected: false })
+        })
+
+        it('should skip message without attempting to send', async () => {
+          const sendPromise = transport.sendMessage(mockMessage)
+          await jest.advanceTimersByTimeAsync(0)
+
+          expect(mockSocket.send).not.toHaveBeenCalled()
+          await expect(sendPromise).resolves.toBeUndefined()
+        })
+      })
+
+      describe('and getUserData throws', () => {
+        beforeEach(() => {
+          mockSocket.getUserData.mockImplementation(() => {
+            throw new Error('Invalid access of closed uWS.WebSocket')
+          })
+        })
+
+        it('should not attempt to send and should not crash', async () => {
+          const sendPromise = transport.sendMessage(mockMessage)
+          await jest.advanceTimersByTimeAsync(0)
+
+          expect(mockSocket.send).not.toHaveBeenCalled()
+          await expect(sendPromise).resolves.toBeUndefined()
+        })
+      })
+    })
+
     describe('and an invalid message type is provided', () => {
       it('should reject invalid message types', async () => {
         await transport.sendMessage('invalid' as any)
