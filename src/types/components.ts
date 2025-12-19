@@ -302,8 +302,6 @@ export type ICatalystClientRequestOptions = {
 }
 
 export type ICatalystClientComponent = {
-  getProfiles(ids: string[], options?: ICatalystClientRequestOptions): Promise<Profile[]>
-  getProfile(id: string, options?: ICatalystClientRequestOptions): Promise<Profile>
   getOwnedNames(
     address: EthAddress,
     params?: GetNamesParams,

@@ -1,7 +1,8 @@
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { AppComponents, IRegistryComponent } from '../types'
 import { extractMinimalProfile, getProfileUserId } from '../logic/profiles'
-import { PROFILE_CACHE_PREFIX } from './catalyst-client'
+
+export const PROFILE_CACHE_PREFIX = 'catalyst:minimal:profile:'
 
 export async function createRegistryComponent({
   fetcher,
@@ -33,7 +34,6 @@ export async function createRegistryComponent({
   async function getProfiles(ids: string[]): Promise<Profile[]> {
     if (ids.length === 0) return []
 
-    // Deduplicate IDs to avoid fetching the same profile multiple times
     const uniqueIds = Array.from(new Set(ids))
     const cacheKeys = uniqueIds.map((id) => getProfileCacheKey(id))
 
@@ -46,7 +46,6 @@ export async function createRegistryComponent({
             return getProfileUserId(profile) === id.toLowerCase()
           } catch (err: any) {
             // Skip profiles that can't be processed (missing avatars, names, etc.)
-            // This ensures the function doesn't fail completely when some profiles are invalid
             return false
           }
         })
@@ -66,12 +65,9 @@ export async function createRegistryComponent({
 
       const registryResults = (await response.json()) as Profile[]
 
-      // Extract minimal profiles and filter invalid ones
       const minimalProfiles = registryResults.map(extractMinimalProfile).filter(Boolean) as Profile[]
-
       validProfiles = minimalProfiles
 
-      // Cache profiles asynchronously without blocking the response
       setImmediate(() => {
         Promise.all(
           minimalProfiles.map(async (minimalProfile) => {
@@ -96,7 +92,6 @@ export async function createRegistryComponent({
   }
 
   async function getProfile(id: string): Promise<Profile> {
-    // Try to get cached profile
     const cachedProfile = await redis.get<Profile>(getProfileCacheKey(id))
     if (cachedProfile) {
       return cachedProfile
@@ -123,7 +118,6 @@ export async function createRegistryComponent({
       throw new Error(`Invalid profile received from registry: ${id}`)
     }
 
-    // Cache profile asynchronously without blocking the response
     setImmediate(async () => {
       await cacheProfile(id, minimalProfile)
     })
