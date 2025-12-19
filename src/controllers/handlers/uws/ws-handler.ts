@@ -81,6 +81,12 @@ export async function registerWsHandler(
         fetcher,
         expiration: authSignatureExpirationInMs
       })
+
+      if (data.timeout) {
+        clearTimeout(data.timeout)
+        delete data.timeout
+      }
+
       const address = normalizeAddress(verifyResult.auth)
 
       // Check if connection was closed during authentication (race condition protection)
@@ -106,11 +112,6 @@ export async function registerWsHandler(
         isConnected: true,
         transport
       })
-
-      if (data.timeout) {
-        clearTimeout(data.timeout)
-        delete data.timeout
-      }
 
       transport.on('close', () => {
         logger.debug('Transport close event received', {
