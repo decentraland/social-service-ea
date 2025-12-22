@@ -190,7 +190,6 @@ export async function createCommunityVoiceComponent({
           communityImage,
           creatorAddress
         }),
-        // TODO: Remove 'as any' cast once local common-schemas is linked with VOICE_CHAT_STARTED event type
         communityBroadcaster.broadcast(
           {
             type: Events.Type.COMMUNITY,
@@ -202,7 +201,7 @@ export async function createCommunityVoiceComponent({
               communityName,
               thumbnailUrl: communityImage || ''
             }
-          } as any,
+          },
           { excludeAddresses: [creatorAddress] }
         ),
         analytics.fireEvent(AnalyticsEvent.START_COMMUNITY_CALL, {

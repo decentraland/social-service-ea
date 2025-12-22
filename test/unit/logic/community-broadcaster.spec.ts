@@ -559,8 +559,7 @@ describe('Community Broadcaster Component', () => {
       })
 
       it('should publish to online members excluding addresses passed in options', async () => {
-        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
-        await broadcasterComponent.broadcast(voiceChatStartedEvent as any, { excludeAddresses: ['0xcreator'] })
+        await broadcasterComponent.broadcast(voiceChatStartedEvent, { excludeAddresses: ['0xcreator'] })
 
         expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith('community-123', {
           pagination: { limit: 100, offset: 0 },
@@ -579,8 +578,7 @@ describe('Community Broadcaster Component', () => {
       })
 
       it('should publish to all online members when no excludeAddresses option is provided', async () => {
-        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
-        await broadcasterComponent.broadcast(voiceChatStartedEvent as any)
+        await broadcasterComponent.broadcast(voiceChatStartedEvent)
 
         expect(mockCommunitiesDB.getCommunityMembers).toHaveBeenCalledWith('community-123', {
           pagination: { limit: 100, offset: 0 },
@@ -600,9 +598,12 @@ describe('Community Broadcaster Component', () => {
     })
 
     describe('and there are no online subscribers', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
+      })
+
       it('should not publish any messages', async () => {
-        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
-        await broadcasterComponent.broadcast(voiceChatStartedEvent as any, { excludeAddresses: ['0xcreator'] })
+        await broadcasterComponent.broadcast(voiceChatStartedEvent, { excludeAddresses: ['0xcreator'] })
 
         expect(mockSns.publishMessages).not.toHaveBeenCalled()
       })
@@ -617,8 +618,7 @@ describe('Community Broadcaster Component', () => {
       })
 
       it('should not publish any messages', async () => {
-        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
-        await broadcasterComponent.broadcast(voiceChatStartedEvent as any, { excludeAddresses: ['0xcreator'] })
+        await broadcasterComponent.broadcast(voiceChatStartedEvent, { excludeAddresses: ['0xcreator'] })
 
         expect(mockSns.publishMessages).not.toHaveBeenCalled()
       })
@@ -633,8 +633,7 @@ describe('Community Broadcaster Component', () => {
       })
 
       it('should not publish any messages', async () => {
-        // Note: Using type assertion because @dcl/schemas hasn't been updated yet
-        await broadcasterComponent.broadcast(voiceChatStartedEvent as any)
+        await broadcasterComponent.broadcast(voiceChatStartedEvent)
 
         expect(mockSns.publishMessages).not.toHaveBeenCalled()
       })

@@ -97,19 +97,28 @@ export function createCommunityBroadcasterComponent(
   const { sns, communitiesDb, subscribersContext } = components
 
   /**
-   * Gets all community member addresses with pagination support
+   * Gets community member addresses with pagination support
    * @param {string} communityId - The ID of the community
    * @param {Object} filters - Optional filters for member selection
    * @param {CommunityRole[]} [filters.roles] - Optional array of roles to filter by
+   * @param {string[]} [filters.excludedAddresses] - Optional array of addresses to exclude
+   * @param {boolean} [filters.onlyOnline] - Optional flag to only return online members
    * @returns {Promise<string[]>} Array of member addresses
    */
-  async function getAllCommunityMembersAddresses(
+  async function getCommunityMemberAddresses(
     communityId: string,
-    filters: { roles?: CommunityRole[]; excludedAddresses?: string[] } = {}
+    filters: { roles?: CommunityRole[]; excludedAddresses?: string[]; onlyOnline?: boolean } = {}
   ): Promise<string[]> {
     const allMemberAddresses: string[] = []
+    const { onlyOnline, ...options } = filters
+
     let offset = 0
     let hasMore = true
+    let filterByMembers: string[] | undefined
+
+    if (onlyOnline) {
+      filterByMembers = subscribersContext.getSubscribersAddresses()
+    }
 
     while (hasMore) {
       const communityMembers = await communitiesDb.getCommunityMembers(communityId, {
@@ -117,7 +126,8 @@ export function createCommunityBroadcasterComponent(
           limit: MEMBER_FETCH_BATCH_SIZE,
           offset
         },
-        ...filters
+        filterByMembers,
+        ...options
       })
 
       const memberAddresses = communityMembers.map((member: CommunityMember) => member.memberAddress)
@@ -152,7 +162,7 @@ export function createCommunityBroadcasterComponent(
    */
   async function broadcastToAllMembers(event: BroadcastableEvent): Promise<void> {
     const eventWithId = event as CommunityDeletedEventReducedMetadata | CommunityRenamedEventReducedMetadata
-    const allMemberAddresses = await getAllCommunityMembersAddresses(eventWithId.metadata.id)
+    const allMemberAddresses = await getCommunityMemberAddresses(eventWithId.metadata.id)
     const memberBatches = createMemberBatches(allMemberAddresses)
 
     await sns.publishMessages(
@@ -176,7 +186,7 @@ export function createCommunityBroadcasterComponent(
    */
   async function broadcastToOwnersAndModerators(event: BroadcastableEvent): Promise<void> {
     const eventWithCommunityId = event as CommunityRequestToJoinReceivedEventReducedMetadata
-    const moderatorsAndOwners = await getAllCommunityMembersAddresses(eventWithCommunityId.metadata.communityId, {
+    const moderatorsAndOwners = await getCommunityMemberAddresses(eventWithCommunityId.metadata.communityId, {
       roles: [CommunityRole.Moderator, CommunityRole.Owner]
     })
 
@@ -198,7 +208,7 @@ export function createCommunityBroadcasterComponent(
    */
   async function broadcastToAllMembersButOwner(event: BroadcastableEvent): Promise<void> {
     const eventWithId = event as CommunityDeletedEventReducedMetadata
-    const addressesToNotify = await getAllCommunityMembersAddresses(eventWithId.metadata.id, {
+    const addressesToNotify = await getCommunityMemberAddresses(eventWithId.metadata.id, {
       roles: [CommunityRole.Moderator, CommunityRole.Member]
     })
 
@@ -225,7 +235,7 @@ export function createCommunityBroadcasterComponent(
       metadata: { authorAddress, communityId }
     } = event as CommunityPostAddedEvent
 
-    const addressesToNotify = await getAllCommunityMembersAddresses(communityId, {
+    const addressesToNotify = await getCommunityMemberAddresses(communityId, {
       excludedAddresses: [authorAddress.toLowerCase()]
     })
     const memberBatches = createMemberBatches(addressesToNotify)
@@ -243,78 +253,30 @@ export function createCommunityBroadcasterComponent(
   }
 
   /**
-   * Gets online community members with pagination support
-   * @param {string} communityId - The ID of the community
-   * @param {string[]} onlineUsers - Array of online user addresses to filter by
-   * @param {string[]} excludedAddresses - Optional array of addresses to exclude
-   * @returns {Promise<string[]>} Array of online member addresses
-   */
-  async function getOnlineCommunityMembersAddresses(
-    communityId: string,
-    onlineUsers: string[],
-    excludedAddresses?: string[]
-  ): Promise<string[]> {
-    const onlineMemberAddresses: string[] = []
-    let offset = 0
-    let hasMore = true
-
-    while (hasMore) {
-      const batch = await communitiesDb.getCommunityMembers(communityId, {
-        pagination: { limit: MEMBER_FETCH_BATCH_SIZE, offset },
-        filterByMembers: onlineUsers,
-        excludedAddresses
-      })
-
-      if (batch.length === 0) break
-
-      batch.forEach(({ memberAddress }) => {
-        onlineMemberAddresses.push(memberAddress)
-      })
-
-      offset += MEMBER_FETCH_BATCH_SIZE
-      hasMore = batch.length === MEMBER_FETCH_BATCH_SIZE
-    }
-
-    return onlineMemberAddresses
-  }
-
-  /**
    * Broadcasts voice chat started event to online community members
    * @param {BroadcastableEvent} event - The event to broadcast
    * @param {BroadcastOptions} options - Optional broadcast options (e.g., excludeAddresses)
    */
   async function broadcastVoiceChatStarted(event: BroadcastableEvent, options?: BroadcastOptions): Promise<void> {
     const { metadata } = event as CommunityVoiceChatStartedEventReducedMetadata
-    const { communityId } = metadata
 
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    const addressesToNotify = await getCommunityMemberAddresses(metadata.communityId, {
+      onlyOnline: true,
+      excludedAddresses: options?.excludeAddresses
+    })
 
-    if (onlineSubscribers.length === 0) {
+    if (addressesToNotify.length === 0) {
       return
     }
 
-    // Get online members from the community, excluding specified addresses at database level
-    const excludedAddresses = options?.excludeAddresses?.map((addr) => addr.toLowerCase())
-    const onlineMemberAddresses = await getOnlineCommunityMembersAddresses(
-      communityId,
-      onlineSubscribers,
-      excludedAddresses
-    )
-
-    if (onlineMemberAddresses.length === 0) {
-      return
-    }
-
-    const memberBatches = createMemberBatches(onlineMemberAddresses)
+    const memberBatches = createMemberBatches(addressesToNotify)
 
     await sns.publishMessages(
       memberBatches.map((batch, i) => ({
         ...event,
         key: `${event.key}-batch-${i + 1}`,
         metadata: {
-          communityId: metadata.communityId,
-          communityName: metadata.communityName,
-          thumbnailUrl: metadata.thumbnailUrl,
+          ...event.metadata,
           addressesToNotify: batch
         }
       }))
