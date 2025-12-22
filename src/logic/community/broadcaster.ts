@@ -9,7 +9,8 @@ import {
   CommunityDeletedContentViolationEvent,
   Events,
   CommunityPostAddedEvent,
-  CommunityOwnershipTransferredEvent
+  CommunityOwnershipTransferredEvent,
+  CommunityVoiceChatStartedEvent
 } from '@dcl/schemas'
 import { AppComponents, CommunityRole } from '../../types'
 import { ICommunityBroadcasterComponent, CommunityMember } from './types'
@@ -47,6 +48,24 @@ export type CommunityRequestToJoinReceivedEventReducedMetadata = Omit<
   }
 }
 
+export type CommunityVoiceChatStartedEventReducedMetadata = Omit<CommunityVoiceChatStartedEvent, 'metadata'> & {
+  metadata: {
+    communityId: string
+    communityName: string
+    thumbnailUrl: string
+  }
+}
+
+/**
+ * Options for broadcasting events
+ */
+export type BroadcastOptions = {
+  /**
+   * Addresses to exclude from receiving the notification
+   */
+  excludeAddresses?: string[]
+}
+
 /**
  * Union type of all events that can be broadcasted
  */
@@ -61,10 +80,11 @@ export type BroadcastableEvent =
   | CommunityDeletedContentViolationEvent
   | CommunityPostAddedEvent
   | CommunityOwnershipTransferredEvent
+  | CommunityVoiceChatStartedEventReducedMetadata
 /**
- * Type for event handlers that only need the event
+ * Type for event handlers that accept event and optional options
  */
-type BroadcastingEventHandler = (event: BroadcastableEvent) => Promise<void>
+type BroadcastingEventHandler = (event: BroadcastableEvent, options?: BroadcastOptions) => Promise<void>
 
 /**
  * Registry mapping event subTypes to their broadcasting event handlers
@@ -72,24 +92,33 @@ type BroadcastingEventHandler = (event: BroadcastableEvent) => Promise<void>
 type BroadcastingRegistry = Map<Events.SubType.Community, BroadcastingEventHandler>
 
 export function createCommunityBroadcasterComponent(
-  components: Pick<AppComponents, 'sns' | 'communitiesDb'>
+  components: Pick<AppComponents, 'sns' | 'communitiesDb' | 'subscribersContext'>
 ): ICommunityBroadcasterComponent {
-  const { sns, communitiesDb } = components
+  const { sns, communitiesDb, subscribersContext } = components
 
   /**
-   * Gets all community member addresses with pagination support
+   * Gets community member addresses with pagination support
    * @param {string} communityId - The ID of the community
    * @param {Object} filters - Optional filters for member selection
    * @param {CommunityRole[]} [filters.roles] - Optional array of roles to filter by
+   * @param {string[]} [filters.excludedAddresses] - Optional array of addresses to exclude
+   * @param {boolean} [filters.onlyOnline] - Optional flag to only return online members
    * @returns {Promise<string[]>} Array of member addresses
    */
-  async function getAllCommunityMembersAddresses(
+  async function getCommunityMemberAddresses(
     communityId: string,
-    filters: { roles?: CommunityRole[]; excludedAddresses?: string[] } = {}
+    filters: { roles?: CommunityRole[]; excludedAddresses?: string[]; onlyOnline?: boolean } = {}
   ): Promise<string[]> {
     const allMemberAddresses: string[] = []
+    const { onlyOnline, ...options } = filters
+
     let offset = 0
     let hasMore = true
+    let filterByMembers: string[] | undefined
+
+    if (onlyOnline) {
+      filterByMembers = subscribersContext.getSubscribersAddresses()
+    }
 
     while (hasMore) {
       const communityMembers = await communitiesDb.getCommunityMembers(communityId, {
@@ -97,7 +126,8 @@ export function createCommunityBroadcasterComponent(
           limit: MEMBER_FETCH_BATCH_SIZE,
           offset
         },
-        ...filters
+        filterByMembers,
+        ...options
       })
 
       const memberAddresses = communityMembers.map((member: CommunityMember) => member.memberAddress)
@@ -132,7 +162,7 @@ export function createCommunityBroadcasterComponent(
    */
   async function broadcastToAllMembers(event: BroadcastableEvent): Promise<void> {
     const eventWithId = event as CommunityDeletedEventReducedMetadata | CommunityRenamedEventReducedMetadata
-    const allMemberAddresses = await getAllCommunityMembersAddresses(eventWithId.metadata.id)
+    const allMemberAddresses = await getCommunityMemberAddresses(eventWithId.metadata.id)
     const memberBatches = createMemberBatches(allMemberAddresses)
 
     await sns.publishMessages(
@@ -156,7 +186,7 @@ export function createCommunityBroadcasterComponent(
    */
   async function broadcastToOwnersAndModerators(event: BroadcastableEvent): Promise<void> {
     const eventWithCommunityId = event as CommunityRequestToJoinReceivedEventReducedMetadata
-    const moderatorsAndOwners = await getAllCommunityMembersAddresses(eventWithCommunityId.metadata.communityId, {
+    const moderatorsAndOwners = await getCommunityMemberAddresses(eventWithCommunityId.metadata.communityId, {
       roles: [CommunityRole.Moderator, CommunityRole.Owner]
     })
 
@@ -178,7 +208,7 @@ export function createCommunityBroadcasterComponent(
    */
   async function broadcastToAllMembersButOwner(event: BroadcastableEvent): Promise<void> {
     const eventWithId = event as CommunityDeletedEventReducedMetadata
-    const addressesToNotify = await getAllCommunityMembersAddresses(eventWithId.metadata.id, {
+    const addressesToNotify = await getCommunityMemberAddresses(eventWithId.metadata.id, {
       roles: [CommunityRole.Moderator, CommunityRole.Member]
     })
 
@@ -205,9 +235,40 @@ export function createCommunityBroadcasterComponent(
       metadata: { authorAddress, communityId }
     } = event as CommunityPostAddedEvent
 
-    const addressesToNotify = await getAllCommunityMembersAddresses(communityId, {
+    const addressesToNotify = await getCommunityMemberAddresses(communityId, {
       excludedAddresses: [authorAddress.toLowerCase()]
     })
+    const memberBatches = createMemberBatches(addressesToNotify)
+
+    await sns.publishMessages(
+      memberBatches.map((batch, i) => ({
+        ...event,
+        key: `${event.key}-batch-${i + 1}`,
+        metadata: {
+          ...event.metadata,
+          addressesToNotify: batch
+        }
+      }))
+    )
+  }
+
+  /**
+   * Broadcasts voice chat started event to online community members
+   * @param {BroadcastableEvent} event - The event to broadcast
+   * @param {BroadcastOptions} options - Optional broadcast options (e.g., excludeAddresses)
+   */
+  async function broadcastVoiceChatStarted(event: BroadcastableEvent, options?: BroadcastOptions): Promise<void> {
+    const { metadata } = event as CommunityVoiceChatStartedEventReducedMetadata
+
+    const addressesToNotify = await getCommunityMemberAddresses(metadata.communityId, {
+      onlyOnline: true,
+      excludedAddresses: options?.excludeAddresses
+    })
+
+    if (addressesToNotify.length === 0) {
+      return
+    }
+
     const memberBatches = createMemberBatches(addressesToNotify)
 
     await sns.publishMessages(
@@ -243,6 +304,7 @@ export function createCommunityBroadcasterComponent(
     registry.set(Events.SubType.Community.POST_ADDED, broadcastToAllMembersButPostAuthor)
     registry.set(Events.SubType.Community.DELETED_CONTENT_VIOLATION, directBroadcast)
     registry.set(Events.SubType.Community.OWNERSHIP_TRANSFERRED, directBroadcast)
+    registry.set(Events.SubType.Community.VOICE_CHAT_STARTED, broadcastVoiceChatStarted)
 
     return registry
   }
@@ -252,10 +314,11 @@ export function createCommunityBroadcasterComponent(
   /**
    * Broadcasts an event to the appropriate recipients based on the event type
    * @param {BroadcastableEvent} event - The event to broadcast
+   * @param {BroadcastOptions} options - Optional broadcast options
    */
-  async function broadcast(event: BroadcastableEvent): Promise<void> {
+  async function broadcast(event: BroadcastableEvent, options?: BroadcastOptions): Promise<void> {
     const broadcastingEventHandler = broadcastingRegistry.get(event.subType) || directBroadcast
-    await broadcastingEventHandler(event)
+    await broadcastingEventHandler(event, options)
   }
 
   return {

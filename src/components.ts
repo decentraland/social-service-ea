@@ -181,7 +181,7 @@ export async function initComponents(): Promise<AppComponents> {
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
 
-  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
+  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb, subscribersContext })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
 
   const communityPlaces = await createCommunityPlacesComponent({
@@ -201,7 +201,8 @@ export async function initComponents(): Promise<AppComponents> {
     communityVoiceChatCache,
     placesApi,
     communityThumbnail,
-    communityPlaces
+    communityPlaces,
+    communityBroadcaster
   })
   const communityMembers = await createCommunityMembersComponent({
     communitiesDb,

@@ -265,7 +265,8 @@ async function initComponents(): Promise<TestComponents> {
     communityVoiceChatCache,
     placesApi,
     communityThumbnail,
-    communityPlaces
+    communityPlaces,
+    communityBroadcaster
   })
   const communityRequests = createCommunityRequestsComponent({
     communitiesDb,
