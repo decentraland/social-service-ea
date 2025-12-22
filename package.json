@@ -25,13 +25,15 @@
     "@types/file-type": "^10.9.3",
     "@types/node": "^20.12.7",
     "@types/redis": "^4.0.11",
+    "@types/uuid": "^9.0.8",
     "@types/ws": "^8.5.10",
     "@well-known-components/test-helpers": "^1.5.6",
     "form-data": "^4.0.3",
     "jimp": "^1.6.0",
     "nodemon": "^3.1.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "uuid": "^9.0.1"
   },
   "prettier": {
     "printWidth": 120,
