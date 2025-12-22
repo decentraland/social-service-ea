@@ -42,6 +42,7 @@ import {
 import { mockTracing } from './mocks/components/tracing'
 import { createServerComponent } from '@well-known-components/http-server'
 import { createStatusCheckComponent } from '@well-known-components/http-server'
+// check
 import {
   createCommunityBansComponent,
   createCommunityComponent,
