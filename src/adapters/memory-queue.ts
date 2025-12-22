@@ -47,11 +47,11 @@ export function createMemoryQueueAdapter(): IQueueComponent {
     }
   }
 
-  async function changeMessageVisibility(receiptHandle: string, visibilityTimeout: number): Promise<void> {
+  async function changeMessageVisibility(_receiptHandle: string, _visibilityTimeout: number): Promise<void> {
     return
   }
 
-  async function changeMessagesVisibility(receiptHandles: string[], visibilityTimeout: number): Promise<void> {
+  async function changeMessagesVisibility(_receiptHandles: string[], _visibilityTimeout: number): Promise<void> {
     return
   }
 
