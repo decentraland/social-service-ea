@@ -38,43 +38,45 @@ describe('registry', () => {
   })
 
   describe('when getting profiles', () => {
-    const profileIds = ['0x1234567890123456789012345678901234567890', '0x0987654321098765432109876543210987654321']
-    const mockProfiles: Profile[] = [
-      {
-        avatars: [
-          {
-            ethAddress: '0x1234567890123456789012345678901234567890',
-            userId: '0x1234567890123456789012345678901234567890',
-            name: 'TestUser1',
-            unclaimedName: undefined,
-            hasClaimedName: true,
-            avatar: {
-              snapshots: {
-                face256: 'https://example.com/avatar1.jpg'
-              }
-            }
-          }
-        ]
-      },
-      {
-        avatars: [
-          {
-            ethAddress: '0x0987654321098765432109876543210987654321',
-            userId: '0x0987654321098765432109876543210987654321',
-            name: 'TestUser2',
-            unclaimedName: undefined,
-            hasClaimedName: false,
-            avatar: {
-              snapshots: {
-                face256: 'https://example.com/avatar2.jpg'
-              }
-            }
-          }
-        ]
-      }
-    ]
+    let profileIds: string[]
+    let mockProfiles: Profile[]
 
     beforeEach(() => {
+      profileIds = ['0x1234567890123456789012345678901234567890', '0x0987654321098765432109876543210987654321']
+      mockProfiles = [
+        {
+          avatars: [
+            {
+              ethAddress: '0x1234567890123456789012345678901234567890',
+              userId: '0x1234567890123456789012345678901234567890',
+              name: 'TestUser1',
+              unclaimedName: undefined,
+              hasClaimedName: true,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar1.jpg'
+                }
+              }
+            }
+          ]
+        },
+        {
+          avatars: [
+            {
+              ethAddress: '0x0987654321098765432109876543210987654321',
+              userId: '0x0987654321098765432109876543210987654321',
+              name: 'TestUser2',
+              unclaimedName: undefined,
+              hasClaimedName: false,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/avatar2.jpg'
+                }
+              }
+            }
+          ]
+        }
+      ]
       mockRedis.get.mockReset()
       mockRedis.put.mockReset()
     })
@@ -171,23 +173,27 @@ describe('registry', () => {
     })
 
     describe('and some profiles are cached', () => {
-      const cachedProfile = {
-        avatars: [
-          {
-            ethAddress: '0x1234567890123456789012345678901234567890',
-            userId: '0x1234567890123456789012345678901234567890',
-            name: 'CachedUser',
-            unclaimedName: undefined,
-            hasClaimedName: true,
-            avatar: {
-              snapshots: {
-                face256: 'https://example.com/cached.jpg'
+      let cachedProfile: Profile
+      let fetchedProfile: Profile
+
+      beforeEach(() => {
+        cachedProfile = {
+          avatars: [
+            {
+              ethAddress: '0x1234567890123456789012345678901234567890',
+              userId: '0x1234567890123456789012345678901234567890',
+              name: 'CachedUser',
+              unclaimedName: undefined,
+              hasClaimedName: true,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/cached.jpg'
+                }
               }
             }
-          }
-        ]
-      }
-      const fetchedProfile = {
+          ]
+        }
+        fetchedProfile = {
         avatars: [
           {
             ethAddress: '0x0987654321098765432109876543210987654321',
@@ -203,8 +209,6 @@ describe('registry', () => {
           }
         ]
       }
-
-      beforeEach(() => {
         mockRedis.mGet.mockResolvedValue([cachedProfile, null])
         mockFetcher.fetch.mockResolvedValueOnce({
           ok: true,
@@ -275,40 +279,42 @@ describe('registry', () => {
     })
 
     describe('and all profiles are cached', () => {
-      const cachedProfile1 = {
-        avatars: [
-          {
-            ethAddress: '0x1234567890123456789012345678901234567890',
-            userId: '0x1234567890123456789012345678901234567890',
-            name: 'CachedUser1',
-            unclaimedName: undefined,
-            hasClaimedName: true,
-            avatar: {
-              snapshots: {
-                face256: 'https://example.com/cached1.jpg'
-              }
-            }
-          }
-        ]
-      }
-      const cachedProfile2 = {
-        avatars: [
-          {
-            ethAddress: '0x0987654321098765432109876543210987654321',
-            userId: '0x0987654321098765432109876543210987654321',
-            name: 'CachedUser2',
-            unclaimedName: undefined,
-            hasClaimedName: false,
-            avatar: {
-              snapshots: {
-                face256: 'https://example.com/cached2.jpg'
-              }
-            }
-          }
-        ]
-      }
+      let cachedProfile1
+      let cachedProfile2
 
       beforeEach(() => {
+        cachedProfile1 = {
+          avatars: [
+            {
+              ethAddress: '0x1234567890123456789012345678901234567890',
+              userId: '0x1234567890123456789012345678901234567890',
+              name: 'CachedUser1',
+              unclaimedName: undefined,
+              hasClaimedName: true,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/cached1.jpg'
+                }
+              }
+            }
+          ]
+        }
+        cachedProfile2 = {
+          avatars: [
+            {
+              ethAddress: '0x0987654321098765432109876543210987654321',
+              userId: '0x0987654321098765432109876543210987654321',
+              name: 'CachedUser2',
+              unclaimedName: undefined,
+              hasClaimedName: false,
+              avatar: {
+                snapshots: {
+                  face256: 'https://example.com/cached2.jpg'
+                }
+              }
+            }
+          ]
+        }
         mockRedis.mGet.mockResolvedValue([cachedProfile1, cachedProfile2])
       })
 
@@ -335,13 +341,14 @@ describe('registry', () => {
     })
 
     describe('and duplicate profile IDs are provided', () => {
-      const duplicateProfileIds = [
-        '0x1234567890123456789012345678901234567890',
-        '0x1234567890123456789012345678901234567890',
-        '0x0987654321098765432109876543210987654321'
-      ]
+      let duplicateProfileIds: string[]
 
       beforeEach(() => {
+        duplicateProfileIds = [
+          '0x1234567890123456789012345678901234567890',
+          '0x1234567890123456789012345678901234567890',
+          '0x0987654321098765432109876543210987654321'
+        ]
         mockRedis.mGet.mockResolvedValue([null, null])
         mockFetcher.fetch.mockResolvedValueOnce({
           ok: true,
@@ -369,11 +376,12 @@ describe('registry', () => {
     })
 
     describe('and registry API returns invalid profiles', () => {
-      const invalidProfile = {
-        avatars: [] // This will cause extractMinimalProfile to return null
-      }
+      let invalidProfile
 
       beforeEach(() => {
+        invalidProfile = {
+          avatars: [] // This will cause extractMinimalProfile to return null
+        }
         mockRedis.mGet.mockResolvedValue([null])
         mockFetcher.fetch.mockResolvedValueOnce({
           ok: true,
@@ -460,9 +468,10 @@ describe('registry', () => {
     })
 
     describe('and the profile is cached', () => {
-      const cachedProfile = { avatars: [{ ethAddress: profileId, userId: profileId }] }
+      let cachedProfile
 
       beforeEach(() => {
+        cachedProfile = { avatars: [{ ethAddress: profileId, userId: profileId }] }
         mockRedis.get.mockResolvedValue(cachedProfile)
       })
 
@@ -489,11 +498,12 @@ describe('registry', () => {
     })
 
     describe('and registry API returns invalid profile', () => {
-      const invalidProfile = {
-        avatars: [] // This will cause extractMinimalProfile to return null
-      }
+      let invalidProfile
 
       beforeEach(() => {
+        invalidProfile = {
+          avatars: [] // This will cause extractMinimalProfile to return null
+        }
         mockRedis.get.mockResolvedValue(null)
         mockFetcher.fetch.mockResolvedValueOnce({
           ok: true,
