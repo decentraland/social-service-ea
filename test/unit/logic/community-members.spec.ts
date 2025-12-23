@@ -279,7 +279,7 @@ describe('Community Members Component', () => {
         expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId, { onlyPublic: false })
         expect(mockCommunitiesDB.getCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.getCommunityMembers).not.toHaveBeenCalled()
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
   })

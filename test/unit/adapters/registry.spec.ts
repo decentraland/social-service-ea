@@ -1,9 +1,8 @@
-import { createRegistryComponent } from '../../../src/adapters/registry'
+import { createRegistryComponent, PROFILE_CACHE_PREFIX } from '../../../src/adapters/registry'
 import { IRegistryComponent } from '../../../src/types'
 import { mockConfig, mockFetcher, mockRedis, mockLogs } from '../../mocks/components'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { mockProfile } from '../../mocks/profile'
-import { PROFILE_CACHE_PREFIX } from '../../../src/adapters/catalyst-client'
 
 jest.mock('../../../src/utils/timer', () => ({
   sleep: jest.fn()
