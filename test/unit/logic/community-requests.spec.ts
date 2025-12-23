@@ -23,8 +23,8 @@ import { createCommunityRequestsComponent } from '../../../src/logic/community/r
 import { createMockedPubSubComponent, mockLogs } from '../../mocks/components'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { CommunityRole, IPubSubComponent } from '../../../src/types'
-import { ICatalystClientComponent } from '../../../src/types'
-import { createMockCatalystClient } from '../../mocks/components/catalyst-client'
+import { IRegistryComponent } from '../../../src/types'
+import { createMockRegistry } from '../../mocks/components/registry'
 import {
   createMockCommunitiesComponent,
   createMockCommunityBroadcasterComponent,
@@ -48,14 +48,14 @@ describe('Community Requests Component', () => {
   let mockCommunityBroadcaster: ICommunityBroadcasterComponent
   let mockCommunityThumbnail: ICommunityThumbnailComponent
   let mockCommunityRoles: jest.Mocked<ICommunityRolesComponent>
-  let mockCatalystClient: jest.Mocked<ICatalystClientComponent>
+  let mockRegistry: jest.Mocked<IRegistryComponent>
   let mockPubsub: jest.Mocked<IPubSubComponent>
   let mockAnalytics: ReturnType<typeof createMockedAnalyticsComponent>
 
   beforeEach(() => {
     communitiesComponent = createMockCommunitiesComponent({})
     mockCommunityRoles = createMockCommunityRolesComponent({})
-    mockCatalystClient = createMockCatalystClient()
+    mockRegistry = createMockRegistry()
     mockAnalytics = createMockedAnalyticsComponent({})
     // Ensure logs.getLogger returns a valid logger after mock resets
     mockLogs.getLogger.mockReturnValue({
@@ -74,7 +74,7 @@ describe('Community Requests Component', () => {
       communityRoles: mockCommunityRoles,
       communityBroadcaster: mockCommunityBroadcaster,
       communityThumbnail: mockCommunityThumbnail,
-      catalystClient: mockCatalystClient,
+      registry: mockRegistry,
       pubsub: mockPubsub,
       logs: mockLogs,
       analytics: mockAnalytics
@@ -374,7 +374,7 @@ describe('Community Requests Component', () => {
                   }
                 ]
               }
-              mockCatalystClient.getProfile.mockResolvedValueOnce(mockProfile)
+              mockRegistry.getProfile.mockResolvedValueOnce(mockProfile)
             })
 
             it('should create and return the request as pending', async () => {
@@ -422,14 +422,14 @@ describe('Community Requests Component', () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               // Wait for async broadcast
               await new Promise((resolve) => setImmediate(resolve))
-              expect(mockCatalystClient.getProfile).toHaveBeenCalledWith(userAddress)
+              expect(mockRegistry.getProfile).toHaveBeenCalledWith(userAddress)
             })
           })
 
           describe('and profile fetch fails', () => {
             beforeEach(() => {
               mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
-              mockCatalystClient.getProfile.mockRejectedValueOnce(new Error('Profile not found'))
+              mockRegistry.getProfile.mockRejectedValueOnce(new Error('Profile not found'))
             })
 
             it('should still broadcast the request to join received event with Unknown as member name', async () => {
@@ -659,7 +659,7 @@ describe('Community Requests Component', () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
               // Wait for async broadcast
               await new Promise((resolve) => setImmediate(resolve))
-              expect(mockCatalystClient.getProfile).not.toHaveBeenCalled()
+              expect(mockRegistry.getProfile).not.toHaveBeenCalled()
             })
 
             it('should not include member name in invite received event', async () => {

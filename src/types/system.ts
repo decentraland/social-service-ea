@@ -36,7 +36,8 @@ import {
   IUpdateHandlerComponent,
   IRewardComponent,
   IEmailComponent,
-  ICdnCacheInvalidatorComponent
+  ICdnCacheInvalidatorComponent,
+  IRegistryComponent
 } from './components'
 import { ICommunityVoiceChatCacheComponent } from '../logic/community-voice/community-voice-cache'
 import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/community-voice-polling'
@@ -85,6 +86,7 @@ export type BaseComponents = {
   aiCompliance: IAIComplianceComponent
   analytics: IAnalyticsComponent<AnalyticsEventPayload>
   archipelagoStats: IArchipelagoStatsComponent
+  registry: IRegistryComponent
   catalystClient: ICatalystClientComponent
   commsGatekeeper: ICommsGatekeeperComponent
   communities: ICommunitiesComponent

@@ -34,7 +34,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
         const mockFriendProfile = createMockProfile(friendAddress)
         friendshipId = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
-        stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
+        stubComponents.registry.getProfiles.resolves([mockFriendProfile])
       })
 
       afterEach(async () => {
@@ -59,7 +59,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
     describe('and the user has no friends', () => {
       beforeEach(() => {
-        stubComponents.catalystClient.getProfiles.resolves([])
+        stubComponents.registry.getProfiles.resolves([])
       })
 
       it('should return empty list', async () => {
@@ -89,7 +89,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         mutualFriendAddress = '0x77c4c17331436d3b8798596e3d7c0d8e1b786aa4'
         const mockMutualFriendProfile = createMockProfile(mutualFriendAddress)
 
-        stubComponents.catalystClient.getProfiles.resolves([mockMutualFriendProfile])
+        stubComponents.registry.getProfiles.resolves([mockMutualFriendProfile])
 
         const id1 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
         const id2 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, mutualFriendAddress])
@@ -130,7 +130,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         const { friendsDb, rpcClient } = components
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
         friendshipId = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
-        stubComponents.catalystClient.getProfiles.resolves([])
+        stubComponents.registry.getProfiles.resolves([])
       })
 
       afterEach(async () => {
@@ -166,7 +166,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
         const mockFriendProfile = createMockProfile(friendAddress)
         friendshipId = await createPendingFriendshipRequest(friendsDb, [friendAddress, rpcClient.authAddress])
-        stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
+        stubComponents.registry.getProfiles.resolves([mockFriendProfile])
       })
 
       afterEach(async () => {
@@ -193,7 +193,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
     describe('and the user has no pending friendship requests', () => {
       beforeEach(() => {
-        stubComponents.catalystClient.getProfiles.resolves([])
+        stubComponents.registry.getProfiles.resolves([])
       })
 
       it('should return empty list', async () => {
@@ -232,7 +232,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           requestIds.push(id)
         }
 
-        stubComponents.catalystClient.getProfiles.resolves(mockProfiles)
+        stubComponents.registry.getProfiles.resolves(mockProfiles)
       })
 
       afterEach(async () => {
@@ -281,7 +281,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
         const mockFriendProfile = createMockProfile(friendAddress)
         friendshipId = await createPendingFriendshipRequest(friendsDb, [rpcClient.authAddress, friendAddress])
-        stubComponents.catalystClient.getProfiles.resolves([mockFriendProfile])
+        stubComponents.registry.getProfiles.resolves([mockFriendProfile])
       })
 
       afterEach(async () => {
@@ -308,7 +308,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
     describe('and the user has no sent friendship requests', () => {
       beforeEach(() => {
-        stubComponents.catalystClient.getProfiles.resolves([])
+        stubComponents.registry.getProfiles.resolves([])
       })
 
       it('should return empty list', async () => {
@@ -347,7 +347,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           requestIds.push(id)
         }
 
-        stubComponents.catalystClient.getProfiles.resolves(mockProfiles)
+        stubComponents.registry.getProfiles.resolves(mockProfiles)
       })
 
       afterEach(async () => {
@@ -397,7 +397,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     describe('and the user is not blocked', () => {
       beforeEach(() => {
         mockBlockedProfile = createMockProfile(blockedAddress)
-        stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
+        stubComponents.registry.getProfile.resolves(mockBlockedProfile)
       })
 
       afterEach(async () => {
@@ -421,7 +421,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     describe('and the user is already blocked', () => {
       beforeEach(() => {
         mockBlockedProfile = createMockProfile(blockedAddress)
-        stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
+        stubComponents.registry.getProfile.resolves(mockBlockedProfile)
       })
 
       afterEach(async () => {
@@ -453,7 +453,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
       beforeEach(async () => {
         mockBlockedProfile = createMockProfile(blockedAddress)
-        stubComponents.catalystClient.getProfile.resolves(mockBlockedProfile)
+        stubComponents.registry.getProfile.resolves(mockBlockedProfile)
 
         // Setup: block the user first
         await components.friendsDb.blockUser(components.rpcClient.authAddress, blockedAddress)
@@ -629,7 +629,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     let communitiesDbSpy: any = {}
     let commsGatekeeperSpy: any = {}
     let analyticsSpy: any = {}
-    let catalystClientSpy: any = {}
+    let registrySpy: any = {}
 
     beforeEach(async () => {
       const { rpcClient, communitiesDb } = components
@@ -647,7 +647,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         components.commsGatekeeper,
         'getCommunityVoiceChatStatus'
       )
-      catalystClientSpy.getProfile = jest.spyOn(components.catalystClient, 'getProfile')
+      registrySpy.getProfile = jest.spyOn(components.registry, 'getProfile')
       analyticsSpy.fireEvent = jest.spyOn(components.analytics, 'fireEvent')
 
       // Create test community
@@ -686,7 +686,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         participantCount: 0,
         moderatorCount: 0
       })
-      catalystClientSpy.getProfile.mockResolvedValue({
+      registrySpy.getProfile.mockResolvedValue({
         avatars: [
           {
             name: 'testuser',
@@ -710,7 +710,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
       Object.values(communitiesDbSpy).forEach((spy) => (spy as jest.SpyInstance).mockRestore?.())
       Object.values(commsGatekeeperSpy).forEach((spy) => (spy as jest.SpyInstance).mockRestore?.())
       Object.values(analyticsSpy).forEach((spy) => (spy as jest.SpyInstance).mockRestore?.())
-      Object.values(catalystClientSpy).forEach((spy) => (spy as jest.SpyInstance).mockRestore?.())
+      Object.values(registrySpy).forEach((spy) => (spy as jest.SpyInstance).mockRestore?.())
 
       // Clean up community data
       if (communityId) {
@@ -730,7 +730,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           commsGatekeeperSpy.createCommunityVoiceChatRoom.mockResolvedValue({
             connectionUrl: 'livekit:wss://voice.test.decentraland.org?access_token=test-token'
           })
-          catalystClientSpy.getProfile.mockResolvedValue({
+          registrySpy.getProfile.mockResolvedValue({
             avatars: [
               {
                 name: 'testuser',
@@ -825,8 +825,8 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
             participantCount: 0,
             moderatorCount: 0
           })
-          catalystClientSpy.getProfile.mockClear()
-          catalystClientSpy.getProfile.mockResolvedValue({
+          registrySpy.getProfile.mockClear()
+          registrySpy.getProfile.mockResolvedValue({
             avatars: [
               {
                 name: 'testuser',
@@ -1207,7 +1207,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd4'
         const mockUserProfile = createMockProfile(rpcClient.authAddress)
         const mockFriendProfile = createMockProfile(friendAddress)
-        stubComponents.catalystClient.getProfiles.resolves([mockUserProfile, mockFriendProfile])
+        stubComponents.registry.getProfiles.resolves([mockUserProfile, mockFriendProfile])
       })
 
       afterEach(async () => {
@@ -1296,7 +1296,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
         const mockUserProfile = createMockProfile(rpcClient.authAddress)
         const mockFriendProfile = createMockProfile(friendAddress)
-        stubComponents.catalystClient.getProfiles.resolves([mockUserProfile, mockFriendProfile])
+        stubComponents.registry.getProfiles.resolves([mockUserProfile, mockFriendProfile])
       })
 
       afterEach(async () => {

@@ -26,7 +26,7 @@ export async function createCommunityVoiceComponent({
   communitiesDb,
   pubsub,
   analytics,
-  catalystClient,
+  registry,
   communityVoiceChatCache,
   placesApi,
   communityThumbnail,
@@ -39,7 +39,7 @@ export async function createCommunityVoiceComponent({
   | 'communitiesDb'
   | 'pubsub'
   | 'analytics'
-  | 'catalystClient'
+  | 'registry'
   | 'placesApi'
   | 'communityThumbnail'
   | 'communityPlaces'
@@ -56,7 +56,7 @@ export async function createCommunityVoiceComponent({
    */
   async function getUserProfileData(userAddress: string): Promise<CommunityVoiceChatProfileData | null> {
     try {
-      const userProfile = await catalystClient.getProfile(userAddress)
+      const userProfile = await registry.getProfile(userAddress)
       if (!userProfile) {
         logger.warn(`No profile found for user ${userAddress}`)
         return null

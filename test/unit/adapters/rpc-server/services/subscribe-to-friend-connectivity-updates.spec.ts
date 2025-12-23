@@ -3,9 +3,9 @@ import { RpcServerContext } from '../../../../../src/types'
 import {
   mockLogs,
   mockFriendsDB,
-  mockCatalystClient,
   createMockPeersStatsComponent,
-  createMockUpdateHandlerComponent
+  createMockUpdateHandlerComponent,
+  mockRegistry
 } from '../../../../mocks/components'
 import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-friend-connectivity-updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -36,7 +36,7 @@ describe('when subscribing to friend connectivity updates', () => {
       components: {
         logs: mockLogs,
         friendsDb: mockFriendsDB,
-        catalystClient: mockCatalystClient,
+        registry: mockRegistry,
         peersStats: mockPeersStats,
         updateHandler: mockUpdateHandler
       }
@@ -51,7 +51,7 @@ describe('when subscribing to friend connectivity updates', () => {
   describe('when there are online friends', () => {
     beforeEach(() => {
       mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
-      mockCatalystClient.getProfiles.mockResolvedValueOnce([mockFriendProfile])
+      mockRegistry.getProfiles.mockResolvedValueOnce([mockFriendProfile])
       mockPeersStats.getConnectedPeers.mockResolvedValueOnce(['0x456', '0x789', '0x654', '0x987'])
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
         yield {
@@ -79,7 +79,7 @@ describe('when subscribing to friend connectivity updates', () => {
   describe('when there are no online friends', () => {
     beforeEach(() => {
       mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
-      mockCatalystClient.getProfiles.mockResolvedValueOnce([])
+      mockRegistry.getProfiles.mockResolvedValueOnce([])
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
         yield {
           friend: parseProfileToFriend(mockFriendProfile),
@@ -92,7 +92,7 @@ describe('when subscribing to friend connectivity updates', () => {
       const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
 
       const result = await generator.next()
-      expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+      expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
       expect(result.done).toBe(false)
 
       const result2 = await generator.next()
@@ -134,7 +134,7 @@ describe('when subscribing to friend connectivity updates', () => {
   describe('when extracting addresses from updates', () => {
     beforeEach(() => {
       mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
-      mockCatalystClient.getProfiles.mockResolvedValueOnce([])
+      mockRegistry.getProfiles.mockResolvedValueOnce([])
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
         yield {
           friend: parseProfileToFriend(mockFriendProfile),
@@ -159,7 +159,7 @@ describe('when subscribing to friend connectivity updates', () => {
 
     beforeEach(() => {
       mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
-      mockCatalystClient.getProfiles.mockResolvedValueOnce([])
+      mockRegistry.getProfiles.mockResolvedValueOnce([])
       mockUpdateFromOther = {
         address: '0x456', // different from context.address
         status: ConnectivityStatus.ONLINE

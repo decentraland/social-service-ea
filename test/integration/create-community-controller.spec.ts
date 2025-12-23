@@ -196,7 +196,7 @@ test('Create Community Controller', async function ({ components, stubComponents
                 tokenId: '1'
               }
             ])
-            spyComponents.catalystClient.getProfile.mockResolvedValue(
+            spyComponents.registry.getProfile.mockResolvedValue(
               createMockProfile(identity.realAccount.address.toLowerCase())
             )
           })

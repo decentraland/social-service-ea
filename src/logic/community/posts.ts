@@ -18,10 +18,10 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 export function createCommunityPostsComponent(
   components: Pick<
     AppComponents,
-    'communityBroadcaster' | 'communitiesDb' | 'communityRoles' | 'catalystClient' | 'communityThumbnail' | 'logs'
+    'communityBroadcaster' | 'communitiesDb' | 'communityRoles' | 'registry' | 'communityThumbnail' | 'logs'
   >
 ): ICommunityPostsComponent {
-  const { communityBroadcaster, communitiesDb, communityRoles, catalystClient, communityThumbnail, logs } = components
+  const { communityBroadcaster, communitiesDb, communityRoles, registry, communityThumbnail, logs } = components
   const logger = logs.getLogger('community-posts-component')
 
   function aggregatePostWithProfile<T extends CommunityPostWithLikes | CommunityPost>(
@@ -42,7 +42,7 @@ export function createCommunityPostsComponent(
     }
 
     const authorAddresses = Array.from(new Set(posts.map((post) => post.authorAddress)))
-    const authorProfiles = await catalystClient.getProfiles(authorAddresses)
+    const authorProfiles = await registry.getProfiles(authorAddresses)
     const authorProfilesByAddress = new Map(authorProfiles.map((p) => [getProfileUserId(p), p]))
 
     return posts.map((post) => {
@@ -101,7 +101,7 @@ export function createCommunityPostsComponent(
         authorAddress: authorAddress.toLowerCase()
       })
 
-      const authorProfile = await catalystClient.getProfile(authorAddress)
+      const authorProfile = await registry.getProfile(authorAddress)
       const postWithAuthorProfile = aggregatePostWithProfile(post, authorProfile)
 
       setImmediate(() => {

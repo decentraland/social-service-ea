@@ -25,9 +25,9 @@ export type SubscriptionHandlerParams<T, U> = {
 }
 
 export function createUpdateHandlerComponent(
-  components: Pick<AppComponents, 'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'catalystClient'>
+  components: Pick<AppComponents, 'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry'>
 ): IUpdateHandlerComponent {
-  const { logs, subscribersContext, friendsDb, communityMembers, catalystClient } = components
+  const { logs, subscribersContext, friendsDb, communityMembers, registry } = components
   const logger = logs.getLogger('update-handler')
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
@@ -310,7 +310,7 @@ export function createUpdateHandlerComponent(
         let profile: Profile | null = null
 
         try {
-          profile = shouldRetrieveProfile ? await catalystClient.getProfile(getAddressFromUpdate(update as U)) : null
+          profile = shouldRetrieveProfile ? await registry.getProfile(getAddressFromUpdate(update as U)) : null
         } catch (_) {
           // If the profile is not found, skip the update
           logger.warn(`Unable to retrieve profile for ${getAddressFromUpdate(update as U)} in ${eventNameString}`)

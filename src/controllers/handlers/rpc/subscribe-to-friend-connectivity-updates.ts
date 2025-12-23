@@ -7,8 +7,8 @@ import {
 import { parseEmittedUpdateToFriendConnectivityUpdate, parseProfilesToFriends } from '../../../logic/friends'
 
 export function subscribeToFriendConnectivityUpdatesService({
-  components: { logs, friendsDb, catalystClient, peersStats, updateHandler }
-}: RPCServiceContext<'logs' | 'friendsDb' | 'catalystClient' | 'peersStats' | 'updateHandler'>) {
+  components: { logs, friendsDb, registry, peersStats, updateHandler }
+}: RPCServiceContext<'logs' | 'friendsDb' | 'registry' | 'peersStats' | 'updateHandler'>) {
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
@@ -18,7 +18,7 @@ export function subscribeToFriendConnectivityUpdatesService({
       const onlinePeers = await peersStats.getConnectedPeers()
       const onlineFriends = await friendsDb.getOnlineFriends(context.address, onlinePeers)
 
-      const profiles = await catalystClient.getProfiles(onlineFriends.map((friend) => friend.address))
+      const profiles = await registry.getProfiles(onlineFriends.map((friend) => friend.address))
       const parsedProfiles = parseProfilesToFriends(profiles).map((friend) => ({
         friend,
         status: ConnectivityStatus.ONLINE

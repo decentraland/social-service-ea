@@ -11,7 +11,7 @@ export async function createCommunityBansComponent(
   components: Pick<
     AppComponents,
     | 'communitiesDb'
-    | 'catalystClient'
+    | 'registry'
     | 'communityRoles'
     | 'communityThumbnail'
     | 'communityBroadcaster'
@@ -23,7 +23,7 @@ export async function createCommunityBansComponent(
 ): Promise<ICommunityBansComponent> {
   const {
     communitiesDb,
-    catalystClient,
+    registry,
     communityRoles,
     communityThumbnail,
     communityBroadcaster,
@@ -132,7 +132,7 @@ export async function createCommunityBansComponent(
       const bannedMembers = await communitiesDb.getBannedMembers(id, userAddress, pagination)
       const totalBannedMembers = await communitiesDb.getBannedMembersCount(id)
 
-      const profiles = await catalystClient.getProfiles(bannedMembers.map((member) => member.memberAddress))
+      const profiles = await registry.getProfiles(bannedMembers.map((member) => member.memberAddress))
       const membersWithProfile: BannedMemberProfile[] = mapMembersWithProfiles<BannedMember, BannedMemberProfile>(
         userAddress,
         bannedMembers,

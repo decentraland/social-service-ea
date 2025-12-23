@@ -26,7 +26,7 @@ test('Delete Community Post Controller', async function ({ components, stubCompo
         { id: '3', name: 'MemberName', contractAddress: '0x123', tokenId: '3' }
       ])
 
-      stubComponents.catalystClient.getProfiles.resolves([
+      stubComponents.registry.getProfiles.resolves([
         createMockProfile(ownerIdentity.realAccount.address.toLowerCase()),
         createMockProfile(moderatorIdentity.realAccount.address.toLowerCase()),
         createMockProfile(memberIdentity.realAccount.address.toLowerCase())

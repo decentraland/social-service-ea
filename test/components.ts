@@ -23,6 +23,7 @@ import { createRedisComponent } from '../src/adapters/redis'
 import { createPubSubComponent } from '../src/adapters/pubsub'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createCatalystClient } from '../src/adapters/catalyst-client'
+import { createRegistryComponent } from '../src/adapters/registry'
 import { createS3Adapter } from '../src/adapters/s3'
 import { createRpcServerComponent, createSubscribersContext } from '../src/adapters/rpc-server'
 import { createCommsGatekeeperComponent } from '../src/adapters/comms-gatekeeper'
@@ -99,7 +100,8 @@ async function initComponents(): Promise<TestComponents> {
       path: ['.env.default', '.env.test']
     },
     {
-      ARCHIPELAGO_STATS_URL
+      ARCHIPELAGO_STATS_URL,
+      REGISTRY_URL: 'https://registry.test.com'
     }
   )
 
@@ -154,7 +156,8 @@ async function initComponents(): Promise<TestComponents> {
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
-  const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
+  const catalystClient = await createCatalystClient({ config, fetcher })
+  const registry = await createRegistryComponent({ fetcher, config, redis, logs })
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
@@ -184,7 +187,7 @@ async function initComponents(): Promise<TestComponents> {
   const communityPosts = createCommunityPostsComponent({
     communitiesDb,
     communityRoles,
-    catalystClient,
+    registry,
     logs,
     communityBroadcaster,
     communityThumbnail
@@ -204,6 +207,7 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail,
     communityBroadcaster,
     logs,
+    registry,
     catalystClient,
     peersStats,
     pubsub,
@@ -216,12 +220,12 @@ async function initComponents(): Promise<TestComponents> {
     communityThumbnail,
     communityBroadcaster,
     logs,
-    catalystClient,
+    registry,
     pubsub,
     commsGatekeeper,
     analytics
   })
-  const communityOwners = createCommunityOwnersComponent({ catalystClient })
+  const communityOwners = createCommunityOwnersComponent({ registry })
   const communityEvents = await createCommunityEventsComponent({ config, logs, fetcher, redis })
   const aiCompliance = createAIComplianceMock({})
   const features = await createFeaturesComponent(
@@ -232,6 +236,7 @@ async function initComponents(): Promise<TestComponents> {
   const communityComplianceValidator = createCommunityComplianceValidatorComponent({ aiCompliance, featureFlags, logs })
   const communities = createCommunityComponent({
     communitiesDb,
+    registry,
     catalystClient,
     communityRoles,
     communityPlaces,
@@ -252,7 +257,7 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     friendsDb,
     communityMembers,
-    catalystClient
+    registry
   })
   const communityVoice = await createCommunityVoiceComponent({
     logs,
@@ -260,7 +265,7 @@ async function initComponents(): Promise<TestComponents> {
     pubsub,
     analytics,
     communitiesDb,
-    catalystClient,
+    registry,
     communityVoiceChatCache,
     placesApi,
     communityThumbnail,
@@ -273,7 +278,7 @@ async function initComponents(): Promise<TestComponents> {
     communityRoles,
     communityBroadcaster,
     communityThumbnail,
-    catalystClient,
+    registry,
     pubsub,
     logs,
     analytics
@@ -334,12 +339,13 @@ async function initComponents(): Promise<TestComponents> {
 
   const wsPool = createWsPoolComponent({ logs, metrics })
 
-  const friends = await createFriendsComponent({ friendsDb, catalystClient, pubsub, sns, logs })
+  const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
 
   return {
     aiCompliance,
     analytics,
     archipelagoStats,
+    registry,
     catalystClient,
     cdnCacheInvalidator: mockCdnCacheInvalidator,
     commsGatekeeper,

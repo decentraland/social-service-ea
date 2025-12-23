@@ -302,13 +302,16 @@ export type ICatalystClientRequestOptions = {
 }
 
 export type ICatalystClientComponent = {
-  getProfiles(ids: string[], options?: ICatalystClientRequestOptions): Promise<Profile[]>
-  getProfile(id: string, options?: ICatalystClientRequestOptions): Promise<Profile>
   getOwnedNames(
     address: EthAddress,
     params?: GetNamesParams,
     options?: ICatalystClientRequestOptions
   ): Promise<OwnedName[]>
+}
+
+export interface IRegistryComponent {
+  getProfiles(ids: string[]): Promise<Profile[]>
+  getProfile(id: string): Promise<Profile>
 }
 
 export interface ICdnCacheInvalidatorComponent {

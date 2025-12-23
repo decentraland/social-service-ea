@@ -36,7 +36,7 @@ test('Update Community Controller', async function ({ components, stubComponents
         }
       ])
 
-      spyComponents.catalystClient.getProfile.mockResolvedValue({
+      spyComponents.registry.getProfile.mockResolvedValue({
         avatars: [{ name: 'Owner Test Name' }]
       })
 

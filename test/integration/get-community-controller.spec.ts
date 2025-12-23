@@ -21,7 +21,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
         participantCount: 2,
         moderatorCount: 1
       })
-      spyComponents.catalystClient.getProfile.mockResolvedValue({
+      spyComponents.registry.getProfile.mockResolvedValue({
         avatars: [{ name: 'Test Owner' }]
       })
     })
@@ -112,7 +112,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
 
           describe('and the owner has a profile with a name', () => {
             beforeEach(async () => {
-              spyComponents.catalystClient.getProfile.mockResolvedValue({
+              spyComponents.registry.getProfile.mockResolvedValue({
                 avatars: [{ name: 'Test Owner' }]
               })
             })
@@ -189,7 +189,7 @@ test('Get Community Controller', function ({ components, spyComponents }) {
 
           describe('and the owner has a profile with an unclaimed name', () => {
             beforeEach(async () => {
-              spyComponents.catalystClient.getProfile.mockResolvedValue({
+              spyComponents.registry.getProfile.mockResolvedValue({
                 avatars: [{ unclaimedName: 'Test Owner Unclaimed' }]
               })
             })

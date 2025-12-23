@@ -7,7 +7,7 @@ import {
   ICommsGatekeeperComponent,
   IPubSubComponent,
   ICommunitiesDatabaseComponent,
-  ICatalystClientComponent
+  IRegistryComponent
 } from '../../../src/types'
 import { createMockProfile } from '../../mocks/profile'
 import {
@@ -33,7 +33,7 @@ describe('Community Voice Logic', () => {
   let mockCommunitiesDb: Partial<jest.Mocked<ICommunitiesDatabaseComponent>>
   let mockPubsub: jest.Mocked<IPubSubComponent>
   let mockAnalytics: jest.Mocked<IAnalyticsComponent<AnalyticsEventPayload>>
-  let mockCatalystClient: jest.Mocked<ICatalystClientComponent>
+  let mockRegistry: jest.Mocked<IRegistryComponent>
   let communityVoice: ICommunityVoiceComponent
   let logger: jest.Mocked<ReturnType<ILoggerComponent['getLogger']>>
   let mockCommunityVoiceChatCache: jest.Mocked<ICommunityVoiceChatCacheComponent>
@@ -77,11 +77,10 @@ describe('Community Voice Logic', () => {
       sendEvent: jest.fn()
     } as jest.Mocked<IAnalyticsComponent<AnalyticsEventPayload>>
 
-    mockCatalystClient = {
+    mockRegistry = {
       getProfile: jest.fn(),
-      getProfiles: jest.fn(),
-      getOwnedNames: jest.fn()
-    } as jest.Mocked<ICatalystClientComponent>
+      getProfiles: jest.fn()
+    } as jest.Mocked<IRegistryComponent>
 
     mockCommunityVoiceChatCache = {
       getCommunityVoiceChat: jest.fn(),
@@ -122,7 +121,7 @@ describe('Community Voice Logic', () => {
       communitiesDb: mockCommunitiesDb as ICommunitiesDatabaseComponent,
       pubsub: mockPubsub,
       analytics: mockAnalytics,
-      catalystClient: mockCatalystClient,
+      registry: mockRegistry,
       communityVoiceChatCache: mockCommunityVoiceChatCache,
       placesApi: mockPlacesApi,
       communityThumbnail: mockCommunityThumbnail,
@@ -170,7 +169,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
+            mockRegistry.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
           })
 
           it('should successfully start a community voice chat with profile data', async () => {
@@ -211,7 +210,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is not available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
+            mockRegistry.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
           })
 
           it('should successfully start a community voice chat without profile data', async () => {
@@ -270,7 +269,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
+            mockRegistry.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
           })
 
           it('should successfully start a community voice chat with profile data for moderator', async () => {
@@ -311,7 +310,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is not available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
+            mockRegistry.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
           })
 
           it('should successfully start a community voice chat without profile data', async () => {
@@ -348,7 +347,7 @@ describe('Community Voice Logic', () => {
 
         describe('when getCommunityPlaces fails', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
+            mockRegistry.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
             mockCommunitiesDb.getCommunityPlaces!.mockRejectedValue(new Error('Places fetch failed'))
           })
 
@@ -370,7 +369,7 @@ describe('Community Voice Logic', () => {
 
         describe('when placesApi fails', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
+            mockRegistry.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
             mockCommunitiesDb.getCommunityPlaces!.mockResolvedValue([{ id: 'place-1' }])
             mockPlacesApi.getPlaces.mockRejectedValue(new Error('PlacesApi failed'))
           })
@@ -592,7 +591,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockResolvedValue(createMockProfile(userAddress))
+            mockRegistry.getProfile.mockResolvedValue(createMockProfile(userAddress))
           })
 
           it('should successfully join community voice chat with profile data', async () => {
@@ -621,7 +620,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is not available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
+            mockRegistry.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
           })
 
           it('should successfully join community voice chat without profile data', async () => {
@@ -666,7 +665,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockResolvedValue({
+            mockRegistry.getProfile.mockResolvedValue({
               avatars: [
                 {
                   unclaimedName: 'PublicUser#0456',
@@ -709,7 +708,7 @@ describe('Community Voice Logic', () => {
 
         describe('when profile data is not available', () => {
           beforeEach(() => {
-            mockCatalystClient.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
+            mockRegistry.getProfile.mockRejectedValue(new Error('Profile fetch failed'))
             mockCommunitiesDb.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
           })
 

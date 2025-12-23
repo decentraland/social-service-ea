@@ -1,7 +1,7 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, mockCatalystClient, mockPubSub } from '../../mocks/components'
+import { mockLogs, mockRegistry, mockPubSub } from '../../mocks/components'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { createCommunityBansComponent } from '../../../src/logic/community/bans'
 import { ICommunityBansComponent } from '../../../src/logic/community'
@@ -66,7 +66,7 @@ describe('Community Bans Component', () => {
     mockAnalytics = createMockedAnalyticsComponent({})
     communityBansComponent = await createCommunityBansComponent({
       communitiesDb: mockCommunitiesDB,
-      catalystClient: mockCatalystClient,
+      registry: mockRegistry,
       communityRoles: mockCommunityRoles,
       communityThumbnail: mockCommunityThumbnail,
       communityBroadcaster: mockCommunityBroadcaster,
@@ -402,7 +402,7 @@ describe('Community Bans Component', () => {
           beforeEach(() => {
             mockCommunitiesDB.getBannedMembers.mockResolvedValue(mockBannedMembers)
             mockCommunitiesDB.getBannedMembersCount.mockResolvedValue(2)
-            mockCatalystClient.getProfiles.mockResolvedValue(mockProfiles)
+            mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
           })
 
           it('should return banned members with profiles', async () => {
@@ -437,7 +437,7 @@ describe('Community Bans Component', () => {
             )
             expect(mockCommunitiesDB.getBannedMembers).toHaveBeenCalledWith(communityId, userAddress, pagination)
             expect(mockCommunitiesDB.getBannedMembersCount).toHaveBeenCalledWith(communityId)
-            expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith(
+            expect(mockRegistry.getProfiles).toHaveBeenCalledWith(
               mockBannedMembers.map((member) => member.memberAddress)
             )
           })
@@ -446,7 +446,7 @@ describe('Community Bans Component', () => {
             const customPagination = { limit: 5, offset: 10 }
             mockCommunitiesDB.getBannedMembers.mockResolvedValue(mockBannedMembers.slice(0, 1))
             mockCommunitiesDB.getBannedMembersCount.mockResolvedValue(1)
-            mockCatalystClient.getProfiles.mockResolvedValue([mockProfiles[0]])
+            mockRegistry.getProfiles.mockResolvedValue([mockProfiles[0]])
 
             await communityBansComponent.getBannedMembers(communityId, userAddress, customPagination)
 
@@ -458,7 +458,7 @@ describe('Community Bans Component', () => {
           beforeEach(() => {
             mockCommunitiesDB.getBannedMembers.mockResolvedValue([])
             mockCommunitiesDB.getBannedMembersCount.mockResolvedValue(0)
-            mockCatalystClient.getProfiles.mockResolvedValue([])
+            mockRegistry.getProfiles.mockResolvedValue([])
           })
 
           it('should return empty list', async () => {
@@ -469,7 +469,7 @@ describe('Community Bans Component', () => {
               totalMembers: 0
             })
 
-            expect(mockCatalystClient.getProfiles).toHaveBeenCalledWith([])
+            expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
           })
         })
       })
@@ -493,7 +493,7 @@ describe('Community Bans Component', () => {
           expect(mockCommunityRoles.validatePermissionToGetBannedMembers).toHaveBeenCalledWith(communityId, userAddress)
           expect(mockCommunitiesDB.getBannedMembers).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.getBannedMembersCount).not.toHaveBeenCalled()
-          expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+          expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
         })
       })
     })
@@ -512,7 +512,7 @@ describe('Community Bans Component', () => {
         expect(mockCommunityRoles.validatePermissionToGetBannedMembers).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.getBannedMembers).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.getBannedMembersCount).not.toHaveBeenCalled()
-        expect(mockCatalystClient.getProfiles).not.toHaveBeenCalled()
+        expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
   })
