@@ -71,6 +71,7 @@ import { createInMemoryCacheComponent } from './adapters/memory-cache'
 import { createSqsComponent } from '@dcl/sqs-component'
 import { createSnsComponent } from '@dcl/sns-component'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
+import { withDeduplication } from './utils/fetch-deduper'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -153,7 +154,7 @@ export async function initComponents(): Promise<AppComponents> {
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
-  const catalystClient = await createCatalystClient({ config, fetcher, redis, logs })
+  const catalystClient = await createCatalystClient({ config, fetcher: withDeduplication(fetcher), redis, logs })
   const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
