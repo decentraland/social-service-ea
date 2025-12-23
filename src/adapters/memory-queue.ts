@@ -47,5 +47,21 @@ export function createMemoryQueueAdapter(): IQueueComponent {
     }
   }
 
-  return { sendMessage, receiveMessages, deleteMessage, deleteMessages, getStatus }
+  async function changeMessageVisibility(_receiptHandle: string, _visibilityTimeout: number): Promise<void> {
+    return
+  }
+
+  async function changeMessagesVisibility(_receiptHandles: string[], _visibilityTimeout: number): Promise<void> {
+    return
+  }
+
+  return {
+    sendMessage,
+    receiveMessages,
+    deleteMessage,
+    deleteMessages,
+    getStatus,
+    changeMessageVisibility,
+    changeMessagesVisibility
+  }
 }
