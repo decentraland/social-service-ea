@@ -52,7 +52,7 @@ import { createMessageProcessorComponent, createMessagesConsumerComponent } from
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
-import { createJobComponent } from './logic/job'
+import { createJobComponent } from '@dcl/job-component'
 import { createPlacesApiAdapter } from './adapters/places-api'
 import { createUpdateHandlerComponent } from './logic/updates'
 import { AnalyticsEventPayload } from './types/analytics'
