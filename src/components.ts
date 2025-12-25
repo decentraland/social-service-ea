@@ -72,6 +72,7 @@ import { createSqsComponent } from '@dcl/sqs-component'
 import { createSnsComponent } from '@dcl/sns-component'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 import { createRegistryComponent } from './adapters/registry'
+import { createSqsHandlers } from './controllers/handlers/sqs/handler'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -324,14 +325,16 @@ export async function initComponents(): Promise<AppComponents> {
     communityVoiceChatPollingJobInterval,
     { repeat: true }
   )
-  const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
-  const queue = sqsEndpoint ? await createSqsComponent(config) : createMemoryQueueAdapter()
-  const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
 
   const slackToken = await config.requireString('SLACK_BOT_TOKEN')
   const slack = await createSlackComponent({ logs }, { token: slackToken })
 
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
+
+  const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
+  const queue = sqsEndpoint ? await createSqsComponent(config) : createMemoryQueueAdapter()
+  const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
+  createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
 
   return {
     aiCompliance,

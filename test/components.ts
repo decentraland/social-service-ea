@@ -13,6 +13,7 @@ import { createUWsComponent } from '@well-known-components/uws-http-server'
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createAnalyticsComponent } from '@dcl/analytics-component'
 import { createPgComponent } from '../src/adapters/pg'
+import { createSqsHandlers } from '../src/controllers/handlers/sqs/handler'
 
 import { main } from '../src/service'
 import { GlobalContext, TestComponents } from '../src/types'
@@ -63,7 +64,6 @@ import { createCommunityVoiceComponent } from '../src/logic/community-voice'
 import { createCommunityVoiceChatCacheComponent } from '../src/logic/community-voice/community-voice-cache'
 import { createCommunityVoiceChatPollingComponent } from '../src/logic/community-voice/community-voice-polling'
 import { createSettingsComponent } from '../src/logic/settings'
-import { createMessageProcessorComponent, createMessagesConsumerComponent } from '../src/logic/sqs'
 import { createReferralDBComponent } from '../src/adapters/referral-db'
 import { createReferralComponent } from '../src/logic/referral/referral'
 import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
@@ -81,6 +81,7 @@ import { createFeatureFlagsAdapter } from '../src/adapters/feature-flags'
 import { createInMemoryCacheComponent } from '../src/adapters/memory-cache'
 import { createMockCommunityBroadcasterComponent } from './mocks/communities'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
+import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -322,18 +323,8 @@ async function initComponents(): Promise<TestComponents> {
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
   const queue = createMemoryQueueAdapter()
-
-  const messageProcessor = await createMessageProcessorComponent({
-    logs,
-    referral,
-    communitiesDb
-  })
-
-  const messageConsumer = createMessagesConsumerComponent({
-    logs,
-    queue,
-    messageProcessor
-  })
+  const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
+  createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
 
   const storageHelper = await createStorageHelper({ config })
 
@@ -380,9 +371,8 @@ async function initComponents(): Promise<TestComponents> {
     localUwsFetch,
     logs,
     memoryCache,
-    messageConsumer,
-    messageProcessor,
     metrics,
+    queueProcessor,
     nats,
     peerTracking,
     peersStats,
