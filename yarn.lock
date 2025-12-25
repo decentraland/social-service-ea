@@ -1085,6 +1085,15 @@
     "@dcl/ts-proto" "1.154.0"
     protobufjs "7.2.4"
 
+"@dcl/queue-consumer-component@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@dcl/queue-consumer-component/-/queue-consumer-component-1.0.0.tgz#8958e7f9b43bccfab21c04c1450d151498937f50"
+  integrity sha512-rdqirCkdaTSXwbdcKUrcAQupQgKoFnJcJyHGrhNUR4Ctw7a4em/ZtUHW16Ths34NS9RUAjBllAe6kYoaiHME+A==
+  dependencies:
+    "@dcl/core-commons" "0.5.1"
+    "@dcl/sqs-component" "2.0.5"
+    "@well-known-components/interfaces" "^1.5.2"
+
 "@dcl/rpc@^1.1.2":
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/@dcl/rpc/-/rpc-1.1.2.tgz#789f4f24c8d432a48df3e786b77d017883dda11a"
@@ -1161,7 +1170,7 @@
     "@dcl/core-commons" "0.5.0"
     "@well-known-components/interfaces" "^1.5.1"
 
-"@dcl/sqs-component@^2.0.3":
+"@dcl/sqs-component@2.0.5", "@dcl/sqs-component@^2.0.3":
   version "2.0.5"
   resolved "https://registry.yarnpkg.com/@dcl/sqs-component/-/sqs-component-2.0.5.tgz#337017da169f7a205e7bde05f276436d4152ac48"
   integrity sha512-ktqiegWK9OL4wgTHsm83z3lFjeathxJNqAEa6XKQdwIXmXlR4+6JqDF0iM4Pg+AF/Qx8T+DEO3GsEh6pHI8vFA==

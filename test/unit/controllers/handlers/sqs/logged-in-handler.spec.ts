@@ -1,5 +1,5 @@
-import { Event, Events, LoggedInEvent, LoggedInCachedEvent } from '@dcl/schemas'
-import { createLoggedInHandler } from '../../../../../src/logic/sqs/handlers/logged-in-handler'
+import { Events, LoggedInEvent, LoggedInCachedEvent } from '@dcl/schemas'
+import { createLoggedInHandler } from '../../../../../src/controllers/handlers/sqs/logged-in-handler'
 import { createLogsMockedComponent } from '../../../../mocks/components'
 import { ILoggerComponent } from '@well-known-components/interfaces/dist/components/logger'
 import { IReferralComponent } from '../../../../../src/logic/referral/types'

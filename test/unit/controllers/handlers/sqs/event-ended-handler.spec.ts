@@ -1,5 +1,5 @@
 import { Event, Events, EventEndedEvent } from '@dcl/schemas'
-import { createEventEndedHandler } from '../../../../../src/logic/sqs/handlers/event-ended-handler'
+import { createEventEndedHandler } from '../../../../../src/controllers/handlers/sqs/event-ended-handler'
 import { createLogsMockedComponent, mockCommunitiesDB } from '../../../../mocks/components'
 import { ILoggerComponent } from '@well-known-components/interfaces/dist/components/logger'
 import { ICommunitiesDatabaseComponent } from '../../../../../src/types'
