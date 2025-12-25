@@ -1,5 +1,5 @@
-import { Event, Events, PhotoTakenEvent } from '@dcl/schemas'
-import { createPhotoTakenHandler } from '../../../../../src/logic/sqs/handlers/photo-taken-handler'
+import { Events, PhotoTakenEvent } from '@dcl/schemas'
+import { createPhotoTakenHandler } from '../../../../../src/controllers/handlers/sqs/photo-taken-handler'
 import { createLogsMockedComponent, mockCommunitiesDB } from '../../../../mocks/components'
 import { ILoggerComponent } from '@well-known-components/interfaces/dist/components/logger'
 import { ICommunitiesDatabaseComponent } from '../../../../../src/types'

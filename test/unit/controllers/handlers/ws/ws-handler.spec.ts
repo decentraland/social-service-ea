@@ -1,11 +1,11 @@
 import mitt from 'mitt'
 import { verify } from '@dcl/platform-crypto-middleware'
-import { registerWsHandler } from '../../../../src/controllers/handlers/uws/ws-handler'
-import { mockLogs, mockMetrics, mockFetcher, mockUWs, mockConfig, mockRpcServer } from '../../../mocks/components'
-import { WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../../src/types'
-import { mockTracing } from '../../../mocks/components/tracing'
-import { createWsPoolMockedComponent } from '../../../mocks/components/ws-pool'
-import { IWsPoolComponent } from '../../../../src/logic/ws-pool'
+import { registerWsHandler } from '../../../../../src/controllers/handlers/uws/ws-handler'
+import { mockLogs, mockMetrics, mockFetcher, mockUWs, mockConfig, mockRpcServer } from '../../../../mocks/components'
+import { WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../../../src/types'
+import { mockTracing } from '../../../../mocks/components/tracing'
+import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
+import { IWsPoolComponent } from '../../../../../src/logic/ws-pool'
 
 jest.mock('@dcl/platform-crypto-middleware')
 

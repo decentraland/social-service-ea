@@ -1,5 +1,5 @@
 import { Event, Events, CommunityStreamingEndedEvent } from '@dcl/schemas'
-import { createCommunityStreamingEndedHandler } from '../../../../../src/logic/sqs/handlers/community-streaming-ended-handler'
+import { createCommunityStreamingEndedHandler } from '../../../../../src/controllers/handlers/sqs/community-streaming-ended-handler'
 import { createLogsMockedComponent, mockCommunitiesDB } from '../../../../mocks/components'
 import { ILoggerComponent } from '@well-known-components/interfaces/dist/components/logger'
 import { ICommunitiesDatabaseComponent } from '../../../../../src/types'
