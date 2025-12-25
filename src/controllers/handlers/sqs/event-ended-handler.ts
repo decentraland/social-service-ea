@@ -1,7 +1,7 @@
 import { Event, Events, EventEndedEvent } from '@dcl/schemas'
 
 import { AppComponents } from '../../../types/system'
-import { EventHandler } from '../types'
+import { EventHandler } from './types'
 
 export function createEventEndedHandler({
   logs,

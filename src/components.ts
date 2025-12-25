@@ -48,7 +48,6 @@ import {
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
-import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
@@ -68,6 +67,7 @@ import { createAIComplianceComponent } from './adapters/ai-compliance'
 import { createFeaturesComponent } from '@well-known-components/features-component'
 import { createFeatureFlagsAdapter } from './adapters/feature-flags'
 import { createInMemoryCacheComponent } from './adapters/memory-cache'
+import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
 import { createSqsComponent } from '@dcl/sqs-component'
 import { createSnsComponent } from '@dcl/sns-component'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
@@ -326,19 +326,12 @@ export async function initComponents(): Promise<AppComponents> {
   )
   const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
   const queue = sqsEndpoint ? await createSqsComponent(config) : createMemoryQueueAdapter()
+  const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
 
   const slackToken = await config.requireString('SLACK_BOT_TOKEN')
   const slack = await createSlackComponent({ logs }, { token: slackToken })
 
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
-
-  const messageProcessor = await createMessageProcessorComponent({ logs, referral, communitiesDb })
-
-  const messageConsumer = createMessagesConsumerComponent({
-    logs,
-    queue,
-    messageProcessor
-  })
 
   return {
     aiCompliance,
@@ -378,8 +371,7 @@ export async function initComponents(): Promise<AppComponents> {
     httpServer,
     logs,
     memoryCache,
-    messageConsumer,
-    messageProcessor,
+    queueProcessor,
     metrics,
     nats,
     peerTracking,
