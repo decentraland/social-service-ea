@@ -66,7 +66,7 @@ import { createCommunityVoiceChatPollingComponent } from '../src/logic/community
 import { createSettingsComponent } from '../src/logic/settings'
 import { createReferralDBComponent } from '../src/adapters/referral-db'
 import { createReferralComponent } from '../src/logic/referral/referral'
-import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
+import { createMemoryQueueComponent } from '@dcl/memory-queue-component'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
 import { createStorageHelper } from './integration/utils/storage'
 import { createUpdateHandlerComponent } from '../src/logic/updates'
@@ -322,7 +322,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
-  const queue = createMemoryQueueAdapter()
+  const queue = createMemoryQueueComponent()
   const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
   createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
 

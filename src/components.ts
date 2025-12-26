@@ -48,7 +48,7 @@ import {
 } from './logic/community'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
-import { createMemoryQueueAdapter } from './adapters/memory-queue'
+import { createMemoryQueueComponent } from '@dcl/memory-queue-component'
 import { createPeersStatsComponent } from './logic/peers-stats'
 import { createS3Adapter } from './adapters/s3'
 import { createJobComponent } from '@dcl/job-component'
@@ -325,14 +325,14 @@ export async function initComponents(): Promise<AppComponents> {
     communityVoiceChatPollingJobInterval,
     { repeat: true }
   )
+  const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
+  const queue = sqsEndpoint ? await createSqsComponent(config) : createMemoryQueueComponent()
 
   const slackToken = await config.requireString('SLACK_BOT_TOKEN')
   const slack = await createSlackComponent({ logs }, { token: slackToken })
 
   const referral = await createReferralComponent({ referralDb, logs, sns, config, rewards, email, slack, redis })
 
-  const sqsEndpoint = await config.getString('AWS_SQS_ENDPOINT')
-  const queue = sqsEndpoint ? await createSqsComponent(config) : createMemoryQueueAdapter()
   const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
   createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
 

@@ -57,6 +57,7 @@
     "@dcl/rpc": "^1.1.2",
     "@dcl/schema-validator-component": "^0.2.0",
     "@dcl/schemas": "^20.5.0",
+    "@dcl/memory-queue-component": "^2.0.0",
     "@dcl/slack-component": "^1.0.1",
     "@dcl/sns-component": "^2.1.0",
     "@dcl/sqs-component": "^2.0.3",
