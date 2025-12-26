@@ -1005,6 +1005,13 @@
   dependencies:
     "@well-known-components/interfaces" "^1.5.2"
 
+"@dcl/core-commons@0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@dcl/core-commons/-/core-commons-0.6.0.tgz#30e98852e2a12a9f1f4d6eaafa4466973b557b3a"
+  integrity sha512-t7+Q+oZcj8PKjvP0iQXkjnK5+pNCNUpBcEFP+V0Lcurl3DdndI7sOsYPIzkxhdjFgOfcaT9SdgFD/LxmjwA3Tg==
+  dependencies:
+    "@well-known-components/interfaces" "^1.5.2"
+
 "@dcl/crypto@^3.3.1", "@dcl/crypto@^3.4.0", "@dcl/crypto@^3.4.3":
   version "3.4.5"
   resolved "https://registry.yarnpkg.com/@dcl/crypto/-/crypto-3.4.5.tgz#95ca2beab46fa3494b4d38f009bf0d49c87ba235"
@@ -1052,12 +1059,19 @@
     reflect-metadata "^0.2.2"
 
 "@dcl/job-component@^0.2.7":
-  version "0.2.7"
-  resolved "https://registry.yarnpkg.com/@dcl/job-component/-/job-component-0.2.7.tgz#d05d7a246b4734f588c25a488ccd21a5fe74e407"
-  integrity sha512-ONVTlRTZWlOR0Wj0TP8KSXQR3dyBnsSi7Ekzv7QM5p62E6fcumyLI8S6VuhbCZ0sfF3RgraTcMmBbPApUz18zQ==
+  version "0.2.8"
+  resolved "https://registry.yarnpkg.com/@dcl/job-component/-/job-component-0.2.8.tgz#24d6d2341ee7f252ddcc4b1b468f54d4a8b91401"
+  integrity sha512-cg/MlxkqRql8+X2rdscL2ZwPjBq8Ln1bPWLky1ZqziAl4F1bRxLwjXdPDMYlQWm+RL8mF5V+DbvaP0ZHFyzKJw==
   dependencies:
-    "@dcl/core-commons" "0.5.1"
+    "@dcl/core-commons" "0.6.0"
     "@well-known-components/interfaces" "^1.5.2"
+
+"@dcl/memory-queue-component@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@dcl/memory-queue-component/-/memory-queue-component-2.0.0.tgz#a6ab0b4b3356e8e62a4e7e070634ba7770d980a3"
+  integrity sha512-T2dwZbpAKyGT6g9z1cvX8/vkM+Ofhge7jcynO4P0GVCPlWBufjcQJfnLPAxCVE2XDcVHHEi05IEDi7bqxyR8BA==
+  dependencies:
+    "@dcl/core-commons" "0.6.0"
 
 "@dcl/platform-crypto-middleware@^1.1.0":
   version "1.1.0"
