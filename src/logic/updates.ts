@@ -231,9 +231,7 @@ export function createUpdateHandlerComponent(
     // Get all online subscribers, excluding the creator if present (creator already knows about their action)
     const creatorAddress = update.creatorAddress?.toLowerCase()
     const allOnlineSubscribers = await subscribersContext.getSubscribersAddresses()
-    const onlineSubscribers = allOnlineSubscribers.filter(
-      (address) => !creatorAddress || address !== creatorAddress
-    )
+    const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
     try {
       // Get all online members of this community in a single efficient query
