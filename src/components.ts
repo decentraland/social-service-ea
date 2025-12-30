@@ -184,7 +184,7 @@ export async function initComponents(): Promise<AppComponents> {
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
 
-  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb, subscribersContext })
+  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb, peersStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
 
   const communityPlaces = await createCommunityPlacesComponent({
