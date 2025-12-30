@@ -7,7 +7,7 @@ import {
   CommunityOwnershipTransferredEvent,
   Events
 } from '@dcl/schemas'
-import { CommunityRole, ISubscribersContext } from '../../../src/types'
+import { CommunityRole } from '../../../src/types'
 import {
   createCommunityBroadcasterComponent,
   CommunityVoiceChatStartedEventReducedMetadata
@@ -16,22 +16,22 @@ import { ICommunityBroadcasterComponent } from '../../../src/logic/community/typ
 import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { IPublisherComponent } from '@dcl/sns-component'
-import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
-import mitt from 'mitt'
-import { SubscriptionEventsEmitter } from '../../../src/types'
+import { IPeersStatsComponent } from '../../../src/logic/peers-stats/types'
 
 describe('Community Broadcaster Component', () => {
   let broadcasterComponent: ICommunityBroadcasterComponent
   let mockSns: jest.Mocked<IPublisherComponent>
-  let subscribersContext: ISubscribersContext
+  let mockPeersStats: jest.Mocked<IPeersStatsComponent>
 
   beforeEach(() => {
     mockSns = createSNSMockedComponent({})
-    subscribersContext = createSubscribersContext()
+    mockPeersStats = {
+      getConnectedPeers: jest.fn().mockResolvedValue([])
+    }
     broadcasterComponent = createCommunityBroadcasterComponent({
       sns: mockSns,
       communitiesDb: mockCommunitiesDB,
-      subscribersContext
+      peersStats: mockPeersStats
     })
   })
 
@@ -535,10 +535,8 @@ describe('Community Broadcaster Component', () => {
 
     describe('and there are online community members', () => {
       beforeEach(() => {
-        // Add online subscribers (including the creator)
-        subscribersContext.addSubscriber('0xcreator', mitt<SubscriptionEventsEmitter>())
-        subscribersContext.addSubscriber('0xmember1', mitt<SubscriptionEventsEmitter>())
-        subscribersContext.addSubscriber('0xmember2', mitt<SubscriptionEventsEmitter>())
+        // Mock online peers (including the creator)
+        mockPeersStats.getConnectedPeers.mockResolvedValue(['0xcreator', '0xmember1', '0xmember2'])
 
         // Mock getCommunityMembers to return members that are online, respecting excludedAddresses
         mockCommunitiesDB.getCommunityMembers.mockImplementation(async (communityId, options) => {
@@ -599,6 +597,7 @@ describe('Community Broadcaster Component', () => {
 
     describe('and there are no online subscribers', () => {
       beforeEach(() => {
+        mockPeersStats.getConnectedPeers.mockResolvedValue([])
         mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
       })
 
@@ -611,7 +610,7 @@ describe('Community Broadcaster Component', () => {
 
     describe('and all online subscribers are excluded', () => {
       beforeEach(() => {
-        subscribersContext.addSubscriber('0xcreator', mitt<SubscriptionEventsEmitter>())
+        mockPeersStats.getConnectedPeers.mockResolvedValue(['0xcreator'])
 
         // Mock getCommunityMembers to return empty when creator is excluded
         mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
@@ -626,7 +625,7 @@ describe('Community Broadcaster Component', () => {
 
     describe('and there are no online community members', () => {
       beforeEach(() => {
-        subscribersContext.addSubscriber('0xmember1', mitt<SubscriptionEventsEmitter>())
+        mockPeersStats.getConnectedPeers.mockResolvedValue(['0xmember1'])
 
         // Mock getCommunityMembers to return empty (user is online but not a member)
         mockCommunitiesDB.getCommunityMembers.mockResolvedValue([])
