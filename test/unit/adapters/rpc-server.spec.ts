@@ -1,7 +1,16 @@
 import { createRpcServerComponent, createSubscribersContext } from '../../../src/adapters/rpc-server'
-import { IRPCServerComponent, ISubscribersContext, IUpdateHandlerComponent, RpcServerContext } from '../../../src/types'
+import {
+  IRPCServerComponent,
+  ISubscribersContext,
+  IUpdateHandlerComponent,
+  ICacheComponent,
+  IRedisComponent,
+  RpcServerContext
+} from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
-import { mockConfig, mockFriendsDB, mockLogs, mockMetrics, mockPubSub, mockUWs } from '../../mocks/components'
+import { mockConfig, mockFriendsDB, mockMetrics, mockPubSub, mockUWs } from '../../mocks/components'
+import { createRedisMock } from '../../mocks/components/redis'
+import { createLogsMockedComponent } from '../../mocks/components/logs'
 import {
   BLOCK_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
@@ -15,6 +24,7 @@ import {
 import { createVoiceMockedComponent } from '../../mocks/components/voice'
 import { setupRpcRoutes } from '../../../src/controllers/routes/rpc.routes'
 import { createMockUpdateHandlerComponent } from '../../mocks/components/updates'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 jest.mock('@dcl/rpc', () => ({
   createRpcServer: jest.fn().mockReturnValue({
@@ -31,10 +41,28 @@ describe('createRpcServerComponent', () => {
   let subscribersContext: ISubscribersContext
   let endIncomingOrOutgoingPrivateVoiceChatForUserMock: jest.Mock
   let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
+  let mockRedis: jest.Mocked<IRedisComponent & ICacheComponent>
+  let mockLogs: jest.Mocked<ILoggerComponent>
 
   beforeEach(async () => {
     endIncomingOrOutgoingPrivateVoiceChatForUserMock = jest.fn()
-    subscribersContext = createSubscribersContext()
+    mockRedis = createRedisMock({})
+    mockLogs = createLogsMockedComponent()
+
+    // Set up Redis mock with state tracking
+    const addressesSet = new Set<string>()
+    mockRedis.sAdd.mockImplementation(async (_key: string, address: string) => {
+      addressesSet.add(address)
+      return 1
+    })
+    mockRedis.sRem.mockImplementation(async (_key: string, addresses: string | string[]) => {
+      const toRemove = Array.isArray(addresses) ? addresses : [addresses]
+      toRemove.forEach((addr) => addressesSet.delete(addr))
+      return toRemove.length
+    })
+    mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
+
+    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs })
 
     rpcServerMock = createRpcServer({
       logger: mockLogs.getLogger('rpcServer-test')
@@ -176,7 +204,7 @@ describe('createRpcServerComponent', () => {
       const subscriber = subscribersContext.getOrAddSubscriber(address)
       expect(subscriber).toBeDefined()
       expect(subscriber.all).toBeDefined()
-      expect(subscribersContext.getSubscribersAddresses()).toContain(address)
+      expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address)
     })
 
     it('should not override existing subscriber for the same address', () => {
@@ -199,8 +227,8 @@ describe('createRpcServerComponent', () => {
       const subscriber2 = subscribersContext.getOrAddSubscriber(address2)
 
       expect(subscriber1).not.toBe(subscriber2)
-      expect(subscribersContext.getSubscribersAddresses()).toContain(address)
-      expect(subscribersContext.getSubscribersAddresses()).toContain(address2)
+      expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address)
+      expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address2)
     })
   })
 
@@ -212,12 +240,14 @@ describe('createRpcServerComponent', () => {
       endIncomingOrOutgoingPrivateVoiceChatForUserMock.mockResolvedValue(undefined)
     })
 
-    it('should remove subscriber when detaching user', () => {
-      expect(subscribersContext.getSubscribersAddresses()).toContain(address)
+    it('should remove subscriber when detaching user', async () => {
+      expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address)
 
       rpcServer.detachUser(address)
 
-      expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
+      // Wait for async removeSubscriber to complete
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(subscribersContext.getLocalSubscribersAddresses()).not.toContain(address)
     })
 
     it('should clear subscriber events when detaching', () => {
@@ -233,7 +263,7 @@ describe('createRpcServerComponent', () => {
       const nonExistentAddress = '0x456'
 
       expect(() => rpcServer.detachUser(nonExistentAddress)).not.toThrow()
-      expect(subscribersContext.getSubscribersAddresses()).not.toContain(nonExistentAddress)
+      expect(subscribersContext.getLocalSubscribersAddresses()).not.toContain(nonExistentAddress)
     })
 
     it('should end the incoming or outgoing private voice chat for the user when detaching', () => {
@@ -241,11 +271,13 @@ describe('createRpcServerComponent', () => {
       expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).toHaveBeenCalledWith(address)
     })
 
-    it('should handle multiple detach calls for same user', () => {
+    it('should handle multiple detach calls for same user', async () => {
       rpcServer.detachUser(address)
       rpcServer.detachUser(address)
 
-      expect(subscribersContext.getSubscribersAddresses()).not.toContain(address)
+      // Wait for async removeSubscriber to complete
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(subscribersContext.getLocalSubscribersAddresses()).not.toContain(address)
     })
   })
 })

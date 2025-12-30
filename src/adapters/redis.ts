@@ -77,12 +77,42 @@ export async function createRedisComponent(
     }
   }
 
+  async function sAdd(key: string, member: string): Promise<number> {
+    try {
+      return await client.sAdd(key, member)
+    } catch (err: any) {
+      logger.error(`Error adding member to set "${key}"`, err)
+      throw err
+    }
+  }
+
+  async function sRem(key: string, members: string | string[]): Promise<number> {
+    try {
+      return await client.sRem(key, members)
+    } catch (err: any) {
+      logger.error(`Error removing member(s) from set "${key}"`, err)
+      throw err
+    }
+  }
+
+  async function sMembers(key: string): Promise<string[]> {
+    try {
+      return await client.sMembers(key)
+    } catch (err: any) {
+      logger.error(`Error getting members from set "${key}"`, err)
+      throw err
+    }
+  }
+
   return {
     client,
     start,
     stop,
     get,
     mGet,
-    put
+    put,
+    sAdd,
+    sRem,
+    sMembers
   }
 }

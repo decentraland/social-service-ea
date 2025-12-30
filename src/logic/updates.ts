@@ -73,7 +73,7 @@ export function createUpdateHandlerComponent(
   })
 
   const friendConnectivityUpdateHandler = handleUpdate<'friendConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
     const friends = await friendsDb.getOnlineFriends(update.address, onlineSubscribers)
 
     // Notify friends about connectivity change
@@ -86,7 +86,7 @@ export function createUpdateHandlerComponent(
   })
 
   const communityMemberConnectivityUpdateHandler = handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromUserCommunities(update.memberAddress, onlineSubscribers)
 
     for await (const batch of batches) {
@@ -174,7 +174,7 @@ export function createUpdateHandlerComponent(
 
     logger.info('Community member status update', { update: JSON.stringify(update) })
 
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromCommunity(
       communityId,
       onlineSubscribers.filter((address) => address !== normalizedMemberAddress)
@@ -208,7 +208,7 @@ export function createUpdateHandlerComponent(
   const communityDeletedUpdateHandler = handleUpdate<'communityDeletedUpdate'>(async (update) => {
     const { communityId } = update
 
-    const onlineSubscribers = subscribersContext.getSubscribersAddresses()
+    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromCommunity(communityId, onlineSubscribers)
 
     for await (const batch of batches) {
@@ -230,9 +230,10 @@ export function createUpdateHandlerComponent(
 
     // Get all online subscribers, excluding the creator if present (creator already knows about their action)
     const creatorAddress = update.creatorAddress?.toLowerCase()
-    const onlineSubscribers = subscribersContext
-      .getSubscribersAddresses()
-      .filter((address) => !creatorAddress || address !== creatorAddress)
+    const allOnlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    const onlineSubscribers = allOnlineSubscribers.filter(
+      (address) => !creatorAddress || address !== creatorAddress
+    )
 
     try {
       // Get all online members of this community in a single efficient query
