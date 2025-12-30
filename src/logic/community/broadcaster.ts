@@ -92,9 +92,9 @@ type BroadcastingEventHandler = (event: BroadcastableEvent, options?: BroadcastO
 type BroadcastingRegistry = Map<Events.SubType.Community, BroadcastingEventHandler>
 
 export function createCommunityBroadcasterComponent(
-  components: Pick<AppComponents, 'sns' | 'communitiesDb' | 'subscribersContext'>
+  components: Pick<AppComponents, 'sns' | 'communitiesDb' | 'peersStats'>
 ): ICommunityBroadcasterComponent {
-  const { sns, communitiesDb, subscribersContext } = components
+  const { sns, communitiesDb, peersStats } = components
 
   /**
    * Gets community member addresses with pagination support
@@ -117,7 +117,7 @@ export function createCommunityBroadcasterComponent(
     let filterByMembers: string[] | undefined
 
     if (onlyOnline) {
-      filterByMembers = subscribersContext.getSubscribersAddresses()
+      filterByMembers = await peersStats.getConnectedPeers()
     }
 
     while (hasMore) {
