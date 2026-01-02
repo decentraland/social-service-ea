@@ -46,8 +46,7 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
 
       // Clear local emitters
       for (const address of Object.keys(localSubscribers)) {
-        localSubscribers[address].all.clear()
-        delete localSubscribers[address]
+        removeLocalSubscriber(address)
       }
     },
 
