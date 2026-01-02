@@ -260,6 +260,9 @@ export interface IVoiceDatabaseComponent {
 
 export interface IRedisComponent extends IBaseComponent {
   client: ReturnType<typeof createClient>
+  sAdd: (key: string, member: string) => Promise<number>
+  sRem: (key: string, members: string | string[]) => Promise<number>
+  sMembers: (key: string) => Promise<string[]>
 }
 
 export interface ICacheComponent extends IBaseCacheComponent {
@@ -318,12 +321,13 @@ export interface ICdnCacheInvalidatorComponent {
   invalidateThumbnail(communityId: string): Promise<void>
 }
 
-export type ISubscribersContext = {
+export type ISubscribersContext = IBaseComponent & {
   getSubscribers: () => Subscribers
-  getSubscribersAddresses: () => string[]
+  getSubscribersAddresses: () => Promise<string[]>
+  getLocalSubscribersAddresses: () => string[]
   getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
-  addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => void
-  removeSubscriber: (address: string) => void
+  addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => Promise<void>
+  removeSubscriber: (address: string) => Promise<void>
 }
 
 export type ITracingComponent = IBaseComponent & {

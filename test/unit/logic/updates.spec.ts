@@ -1,12 +1,14 @@
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createUpdateHandlerComponent } from '../../../src/logic/updates'
-import { mockRegistry, mockFriendsDB, mockLogs } from '../../mocks/components'
+import { mockRegistry, mockFriendsDB } from '../../mocks/components'
 import mitt, { Emitter } from 'mitt'
 import {
   Action,
   IUpdateHandlerComponent,
   ISubscribersContext,
+  ICacheComponent,
+  IRedisComponent,
   SubscriptionEventsEmitter,
   RpcServerContext
 } from '../../../src/types'
@@ -14,21 +16,43 @@ import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@d
 import { sleep } from '../../../src/utils/timer'
 import { createMockProfile, mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
+import { createRedisMock } from '../../mocks/components/redis'
+import { createLogsMockedComponent } from '../../mocks/components/logs'
 import { VoiceChatStatus } from '../../../src/logic/voice/types'
 import { ICommunityMembersComponent } from '../../../src/logic/community/types'
 import { createMockCommunityMembersComponent } from '../../mocks/communities'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('Updates Handlers', () => {
-  const logger = mockLogs.getLogger('test')
+  let mockLogs: jest.Mocked<ILoggerComponent>
+  let logger: ReturnType<ILoggerComponent['getLogger']>
+  let mockRedis: jest.Mocked<IRedisComponent & ICacheComponent>
   let subscribersContext: ISubscribersContext
   let updateHandler: IUpdateHandlerComponent
   let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
   let mockCommunitiesDb: jest.Mocked<any>
 
-  beforeEach(() => {
-    subscribersContext = createSubscribersContext()
-    subscribersContext.addSubscriber('0x456', mitt<SubscriptionEventsEmitter>())
-    subscribersContext.addSubscriber('0x789', mitt<SubscriptionEventsEmitter>())
+  beforeEach(async () => {
+    mockLogs = createLogsMockedComponent()
+    logger = mockLogs.getLogger('test')
+    mockRedis = createRedisMock({})
+
+    // Set up Redis mock with state tracking
+    const addressesSet = new Set<string>()
+    mockRedis.sAdd.mockImplementation(async (_key: string, address: string) => {
+      addressesSet.add(address)
+      return 1
+    })
+    mockRedis.sRem.mockImplementation(async (_key: string, addresses: string | string[]) => {
+      const toRemove = Array.isArray(addresses) ? addresses : [addresses]
+      toRemove.forEach((addr) => addressesSet.delete(addr))
+      return toRemove.length
+    })
+    mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
+
+    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs })
+    await subscribersContext.addSubscriber('0x456', mitt<SubscriptionEventsEmitter>())
+    await subscribersContext.addSubscriber('0x789', mitt<SubscriptionEventsEmitter>())
 
     mockCommunityMembers = createMockCommunityMembersComponent({})
     mockRegistry.getProfile.mockResolvedValue(createMockProfile('0x456'))
@@ -1147,15 +1171,29 @@ describe('Updates Handlers', () => {
     let blockUpdate: SubscriptionEventsEmitter['blockUpdate']
     let friendshipUpdate: SubscriptionEventsEmitter['friendshipUpdate']
 
-    beforeEach(() => {
+    beforeEach(async () => {
       friendshipUpdate = { id: '1', to: '0x456', from: '0x123', action: Action.REQUEST, timestamp: Date.now() }
       blockUpdate = { blockerAddress: '0x456', blockedAddress: '0x123', isBlocked: true }
       eventEmitter = mitt<SubscriptionEventsEmitter>()
       parser = jest.fn()
 
       mockRegistry.getProfile.mockResolvedValue(mockProfile)
-      subscribersContext = createSubscribersContext()
-      subscribersContext.addSubscriber('0x123', eventEmitter)
+
+      // Set up Redis mock with state tracking (reuse the outer scope mockRedis/mockLogs)
+      const addressesSet = new Set<string>()
+      mockRedis.sAdd.mockImplementation(async (_key: string, address: string) => {
+        addressesSet.add(address)
+        return 1
+      })
+      mockRedis.sRem.mockImplementation(async (_key: string, addresses: string | string[]) => {
+        const toRemove = Array.isArray(addresses) ? addresses : [addresses]
+        toRemove.forEach((addr) => addressesSet.delete(addr))
+        return toRemove.length
+      })
+      mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
+
+      subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs })
+      await subscribersContext.addSubscriber('0x123', eventEmitter)
 
       rpcContext = {
         address: '0x123',

@@ -1,10 +1,13 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
+import { ICacheComponent, IRedisComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { subscribeToCommunityMemberConnectivityUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-member-connectivity-updates'
-import { createMockUpdateHandlerComponent, mockLogs } from '../../../../mocks/components'
+import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
+import { createRedisMock } from '../../../../mocks/components/redis'
+import { createLogsMockedComponent } from '../../../../mocks/components/logs'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { CommunityMemberConnectivityUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('when subscribing to community member connectivity updates', () => {
   let subscribeToCommunityMemberConnectivityUpdates: ReturnType<
@@ -13,6 +16,8 @@ describe('when subscribing to community member connectivity updates', () => {
   let rpcContext: RpcServerContext
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
+  let redis: jest.Mocked<IRedisComponent & ICacheComponent>
+  let logs: jest.Mocked<ILoggerComponent>
 
   const mockUpdate = {
     communityId: 'community-1',
@@ -21,12 +26,14 @@ describe('when subscribing to community member connectivity updates', () => {
   }
 
   beforeEach(() => {
-    subscribersContext = createSubscribersContext()
+    redis = createRedisMock({})
+    logs = createLogsMockedComponent()
+    subscribersContext = createSubscribersContext({ redis, logs })
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     subscribeToCommunityMemberConnectivityUpdates = subscribeToCommunityMemberConnectivityUpdatesService({
       components: {
-        logs: mockLogs,
+        logs,
         updateHandler: mockUpdateHandler
       }
     })

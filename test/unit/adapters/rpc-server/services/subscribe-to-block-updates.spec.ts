@@ -1,14 +1,19 @@
 import { subscribeToBlockUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-block-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { RpcServerContext } from '../../../../../src/types'
-import { mockLogs, createMockUpdateHandlerComponent } from '../../../../mocks/components'
+import { ICacheComponent, IRedisComponent, RpcServerContext } from '../../../../../src/types'
+import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
+import { createRedisMock } from '../../../../mocks/components/redis'
+import { createLogsMockedComponent } from '../../../../mocks/components/logs'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('when subscribing to block updates', () => {
   let subscribeToBlockUpdates: ReturnType<typeof subscribeToBlockUpdatesService>
   let rpcContext: RpcServerContext
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
+  let redis: jest.Mocked<IRedisComponent & ICacheComponent>
+  let logs: jest.Mocked<ILoggerComponent>
 
   const mockUpdate = {
     blockerAddress: '0x123',
@@ -17,12 +22,14 @@ describe('when subscribing to block updates', () => {
   }
 
   beforeEach(() => {
-    subscribersContext = createSubscribersContext()
+    redis = createRedisMock({})
+    logs = createLogsMockedComponent()
+    subscribersContext = createSubscribersContext({ redis, logs })
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     subscribeToBlockUpdates = subscribeToBlockUpdatesService({
       components: {
-        logs: mockLogs,
+        logs,
         updateHandler: mockUpdateHandler
       }
     })

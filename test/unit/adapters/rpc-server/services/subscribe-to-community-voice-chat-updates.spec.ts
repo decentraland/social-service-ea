@@ -5,12 +5,20 @@ import {
   CommunityVoiceChatUpdate
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { subscribeToCommunityVoiceChatUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-voice-chat-updates'
-import { IUpdateHandlerComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
+import {
+  ICacheComponent,
+  IRedisComponent,
+  IUpdateHandlerComponent,
+  RpcServerContext,
+  SubscriptionEventsEmitter
+} from '../../../../../src/types'
 import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
+import { createRedisMock } from '../../../../mocks/components/redis'
 
 describe('when subscribing to community voice chat updates', () => {
   let logs: jest.Mocked<ILoggerComponent>
+  let redis: jest.Mocked<IRedisComponent & ICacheComponent>
   let service: ReturnType<typeof subscribeToCommunityVoiceChatUpdatesService>
   let rpcContext: RpcServerContext
   let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
@@ -23,6 +31,7 @@ describe('when subscribing to community voice chat updates', () => {
     communityId = 'test-community-123'
     voiceChatId = 'test-voice-chat-456'
     logs = createLogsMockedComponent()
+    redis = createRedisMock({})
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     service = subscribeToCommunityVoiceChatUpdatesService({
@@ -31,7 +40,7 @@ describe('when subscribing to community voice chat updates', () => {
 
     rpcContext = {
       address: userAddress,
-      subscribersContext: createSubscribersContext()
+      subscribersContext: createSubscribersContext({ redis, logs })
     }
   })
 

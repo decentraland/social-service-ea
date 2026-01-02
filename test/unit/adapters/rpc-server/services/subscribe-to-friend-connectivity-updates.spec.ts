@@ -1,7 +1,6 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { RpcServerContext } from '../../../../../src/types'
+import { ICacheComponent, IRedisComponent, RpcServerContext } from '../../../../../src/types'
 import {
-  mockLogs,
   mockFriendsDB,
   createMockPeersStatsComponent,
   createMockUpdateHandlerComponent,
@@ -12,7 +11,10 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
+import { createRedisMock } from '../../../../mocks/components/redis'
+import { createLogsMockedComponent } from '../../../../mocks/components/logs'
 import { IPeersStatsComponent } from '../../../../../src/logic/peers-stats'
+import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('when subscribing to friend connectivity updates', () => {
   let subscribeToFriendConnectivityUpdates: ReturnType<typeof subscribeToFriendConnectivityUpdatesService>
@@ -21,20 +23,24 @@ describe('when subscribing to friend connectivity updates', () => {
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   let subscribersContext: any
   let mockFriendProfile: any
+  let redis: jest.Mocked<IRedisComponent & ICacheComponent>
+  let logs: jest.Mocked<ILoggerComponent>
 
   const friend = {
     address: '0x456'
   }
 
   beforeEach(() => {
-    subscribersContext = createSubscribersContext()
+    redis = createRedisMock({})
+    logs = createLogsMockedComponent()
+    subscribersContext = createSubscribersContext({ redis, logs })
     mockUpdateHandler = createMockUpdateHandlerComponent({})
     mockPeersStats = createMockPeersStatsComponent()
     mockFriendProfile = createMockProfile('0x456')
 
     subscribeToFriendConnectivityUpdates = subscribeToFriendConnectivityUpdatesService({
       components: {
-        logs: mockLogs,
+        logs,
         friendsDb: mockFriendsDB,
         registry: mockRegistry,
         peersStats: mockPeersStats,

@@ -100,17 +100,21 @@ export async function createRpcServerComponent({
     },
     attachUser({ transport, address }) {
       const eventEmitter = subscribersContext.getOrAddSubscriber(address)
-      subscribersContext.addSubscriber(address, eventEmitter)
+      subscribersContext.addSubscriber(address, eventEmitter).catch((error) => {
+        logger.error('Failed to add subscriber', { address, error })
+      })
       rpcServer.attachTransport(transport, {
         subscribersContext,
         address
       })
     },
     detachUser(address) {
-      // Check if the user is subscribed before detaching
-      if (subscribersContext.getSubscribersAddresses().find((a) => a === address)) {
+      // Check if the user is subscribed locally before detaching
+      if (subscribersContext.getLocalSubscribersAddresses().find((a) => a === address)) {
         // End all calls that the user is involved in
-        subscribersContext.removeSubscriber(address)
+        subscribersContext.removeSubscriber(address).catch((error) => {
+          logger.error('Failed to remove subscriber', { address, error })
+        })
         voice.endIncomingOrOutgoingPrivateVoiceChatForUser(address).catch((_) => {
           // Do nothing
         })
