@@ -185,40 +185,39 @@ test('Get Community Members Controller', function ({ components, spyComponents }
             expect(response.status).toBe(200)
             const result = await response.json()
 
-            expect(result.data.results).toEqual(
-              expect.arrayContaining([
-                expect.objectContaining({
-                  communityId,
-                  memberAddress: firstMemberAddress,
-                  hasClaimedName: true,
-                  joinedAt: expect.any(String),
-                  name: `Profile name ${firstMemberAddress}`,
-                  role: CommunityRole.Member,
-                  profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-                  friendshipStatus: FriendshipStatus.NONE
-                }),
-                expect.objectContaining({
-                  communityId,
-                  memberAddress: secondMemberAddress,
-                  hasClaimedName: true,
-                  joinedAt: expect.any(String),
-                  name: `Profile name ${secondMemberAddress}`,
-                  role: CommunityRole.Member,
-                  profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-                  friendshipStatus: FriendshipStatus.NONE
-                }),
-                expect.objectContaining({
-                  communityId,
-                  memberAddress: ownerAddress,
-                  hasClaimedName: true,
-                  joinedAt: expect.any(String),
-                  name: `Profile name ${ownerAddress}`,
-                  role: CommunityRole.Owner,
-                  profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-                  friendshipStatus: FriendshipStatus.NONE
-                })
-              ])
-            )
+            // Verify members are sorted by role (owner first), then by joined_at
+            expect(result.data.results).toEqual([
+              expect.objectContaining({
+                communityId,
+                memberAddress: ownerAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${ownerAddress}`,
+                role: CommunityRole.Owner,
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.NONE
+              }),
+              expect.objectContaining({
+                communityId,
+                memberAddress: firstMemberAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${firstMemberAddress}`,
+                role: CommunityRole.Member,
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.NONE
+              }),
+              expect.objectContaining({
+                communityId,
+                memberAddress: secondMemberAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${secondMemberAddress}`,
+                role: CommunityRole.Member,
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.NONE
+              })
+            ])
           })
         })
 
@@ -353,40 +352,39 @@ test('Get Community Members Controller', function ({ components, spyComponents }
 
             expect(result.data.results).toHaveLength(3)
 
-            expect(result.data.results).toEqual(
-              expect.arrayContaining([
-                expect.objectContaining({
-                  communityId,
-                  memberAddress: firstMemberAddress,
-                  hasClaimedName: true,
-                  joinedAt: expect.any(String),
-                  name: `Profile name ${firstMemberAddress}`,
-                  role: CommunityRole.Member,
-                  profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-                  friendshipStatus: FriendshipStatus.REQUEST_SENT
-                }),
-                expect.objectContaining({
-                  communityId,
-                  memberAddress: secondMemberAddress,
-                  hasClaimedName: true,
-                  joinedAt: expect.any(String),
-                  name: `Profile name ${secondMemberAddress}`,
-                  role: CommunityRole.Member,
-                  profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-                  friendshipStatus: FriendshipStatus.ACCEPTED
-                }),
-                expect.objectContaining({
-                  communityId,
-                  memberAddress: ownerAddress,
-                  hasClaimedName: true,
-                  joinedAt: expect.any(String),
-                  name: `Profile name ${ownerAddress}`,
-                  role: CommunityRole.Owner,
-                  profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
-                  friendshipStatus: FriendshipStatus.NONE
-                })
-              ])
-            )
+            // Verify members are sorted by role (owner first), then by joined_at
+            expect(result.data.results).toEqual([
+              expect.objectContaining({
+                communityId,
+                memberAddress: ownerAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${ownerAddress}`,
+                role: CommunityRole.Owner,
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.NONE
+              }),
+              expect.objectContaining({
+                communityId,
+                memberAddress: firstMemberAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${firstMemberAddress}`,
+                role: CommunityRole.Member,
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.REQUEST_SENT
+              }),
+              expect.objectContaining({
+                communityId,
+                memberAddress: secondMemberAddress,
+                hasClaimedName: true,
+                joinedAt: expect.any(String),
+                name: `Profile name ${secondMemberAddress}`,
+                role: CommunityRole.Member,
+                profilePictureUrl: expect.stringContaining('https://profile-images.decentraland.org'),
+                friendshipStatus: FriendshipStatus.ACCEPTED
+              })
+            ])
           })
 
           it('should handle members with no friendship status correctly', async () => {

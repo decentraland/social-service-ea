@@ -156,7 +156,9 @@ export function createCommunitiesDBComponent(
           excludedAddresses ? SQL` AND cm.member_address <> ANY(${excludedAddresses.map(normalizeAddress)})` : SQL``
         )
         .append(roles ? SQL` AND cm.role = ANY(${roles})` : SQL``)
-        .append(SQL` ORDER BY cm.joined_at ASC`)
+        .append(
+          SQL` ORDER BY CASE cm.role WHEN 'owner' THEN 1 WHEN 'moderator' THEN 2 WHEN 'member' THEN 3 ELSE 4 END ASC, cm.joined_at ASC`
+        )
         .append(SQL` LIMIT ${pagination.limit}`)
         .append(SQL` OFFSET ${pagination.offset}`)
 
