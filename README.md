@@ -60,3 +60,7 @@ For detailed setup instructions, see [Getting Started](https://github.com/decent
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## AI Agent Context
+
+For detailed AI Agent context, see [docs/ai-agent-context.md](docs/ai-agent-context.md).
