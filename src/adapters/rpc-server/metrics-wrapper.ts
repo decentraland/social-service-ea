@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import { BaseComponents, RpcServerContext, RPCServiceContext } from '../../types'
 import {
   BlockUserResponse,
@@ -188,21 +189,35 @@ export function createRpcServerMetricsWrapper({
     return async (params: TParams, context: RpcServerContext) => {
       const startTime = Date.now()
 
-      try {
-        recordRequestSize(procedureName, params)
-        const result = await serviceFunction(params, context)
+      // Wrap in Sentry transaction so Redis/DB calls become child spans
+      return Sentry.startSpan(
+        {
+          name: `RPC ${procedureName}`,
+          op: 'rpc.call',
+          attributes: {
+            'rpc.method': procedureName,
+            'rpc.service': 'Social-Service-EA',
+            'user.address': context.address
+          }
+        },
+        async () => {
+          try {
+            recordRequestSize(procedureName, params)
+            const result = await serviceFunction(params, context)
 
-        // Determine the response code from the result structure
-        const responseCode = getResponseCode(result)
+            // Determine the response code from the result structure
+            const responseCode = getResponseCode(result)
 
-        recordResponseSize(procedureName, responseCode, result)
-        recordCallMetrics(procedureName, responseCode, startTime)
+            recordResponseSize(procedureName, responseCode, result)
+            recordCallMetrics(procedureName, responseCode, startTime)
 
-        return result
-      } catch (error) {
-        recordCallMetrics(procedureName, RpcResponseCode.ERROR, startTime)
-        throw error
-      }
+            return result
+          } catch (error) {
+            recordCallMetrics(procedureName, RpcResponseCode.ERROR, startTime)
+            throw error
+          }
+        }
+      )
     }
   }
 
@@ -216,9 +231,22 @@ export function createRpcServerMetricsWrapper({
 
       recordRequestSize(procedureName, params)
 
-      try {
-        const generator = serviceFunction(params, context)
+      // We only trace set-up face since stream are long-lived
+      const generator = await Sentry.startSpan(
+        {
+          name: `RPC Stream ${procedureName}`,
+          op: 'rpc.stream.init',
+          attributes: {
+            'rpc.method': procedureName,
+            'rpc.service': 'Social-Service-EA',
+            'rpc.stream.event': event,
+            'user.address': context.address
+          }
+        },
+        async () => serviceFunction(params, context)
+      )
 
+      try {
         for await (const item of generator) {
           metrics.increment('rpc_updates_sent_on_subscription', { event })
           yield item
