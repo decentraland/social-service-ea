@@ -285,10 +285,7 @@ describe('Friends Component', () => {
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(3)
         // Catalyst returns only 2 profiles instead of 3
-        mockRegistry.getProfiles.mockResolvedValue([
-          createMockProfile('0xfriend1'),
-          createMockProfile('0xfriend2')
-        ])
+        mockRegistry.getProfiles.mockResolvedValue([createMockProfile('0xfriend1'), createMockProfile('0xfriend2')])
       })
 
       it('should return the profiles that were successfully retrieved', async () => {
@@ -312,10 +309,7 @@ describe('Friends Component', () => {
         mockFriendsDB.getFriends.mockResolvedValue(mockFriends)
         mockFriendsDB.getFriendsCount.mockResolvedValue(1)
         // Catalyst returns 2 profiles instead of 1
-        mockRegistry.getProfiles.mockResolvedValue([
-          createMockProfile('0xfriend1'),
-          createMockProfile('0xfriend2')
-        ])
+        mockRegistry.getProfiles.mockResolvedValue([createMockProfile('0xfriend1'), createMockProfile('0xfriend2')])
       })
 
       it('should return all profiles from catalyst', async () => {
@@ -432,10 +426,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
         // Catalyst returns only 2 profiles instead of 3
-        mockRegistry.getProfiles.mockResolvedValue([
-          createMockProfile('0xblocked1'),
-          createMockProfile('0xblocked2')
-        ])
+        mockRegistry.getProfiles.mockResolvedValue([createMockProfile('0xblocked1'), createMockProfile('0xblocked2')])
       })
 
       it('should return the profiles that were successfully retrieved', async () => {
@@ -481,7 +472,7 @@ describe('Friends Component', () => {
         mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(undefined)
       })
 
-      it('should return NONE status', async () => {
+      it('should return undefined', async () => {
         const result = await friendsComponent.getFriendshipStatus('0x123', '0x456')
 
         expect(result).toEqual(undefined)

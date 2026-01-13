@@ -4,6 +4,7 @@ import { PoolClient } from 'pg'
 import {
   AppComponents,
   Friendship,
+  Action,
   FriendshipAction,
   FriendshipRequest,
   IFriendsDatabaseComponent,
@@ -77,11 +78,32 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       const normalizedFriendUser = normalizeAddress(friendUser)
 
       const query = SQL`
-        SELECT fa.*
-        FROM friendships f
-        INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
-        WHERE (f.address_requester, f.address_requested) IN ((${normalizedLoggedUser}, ${normalizedFriendUser}), (${normalizedFriendUser}, ${normalizedLoggedUser}))
-        ORDER BY fa.timestamp DESC LIMIT 1
+        WITH friendship_action AS (
+          SELECT fa.id, fa.friendship_id, fa.action, fa.acting_user, fa.metadata, fa.timestamp
+          FROM friendships f
+          INNER JOIN friendship_actions fa ON f.id = fa.friendship_id
+          WHERE (f.address_requester, f.address_requested) IN ((${normalizedLoggedUser}, ${normalizedFriendUser}), (${normalizedFriendUser}, ${normalizedLoggedUser}))
+          ORDER BY fa.timestamp DESC
+          LIMIT 1
+        ),
+        block_action AS (
+          SELECT
+            b.id,
+            NULL::uuid as friendship_id,
+            ${Action.BLOCK} as action,
+            b.blocker_address as acting_user,
+            NULL::json as metadata,
+            b.blocked_at as timestamp
+          FROM blocks b
+          WHERE (b.blocker_address, b.blocked_address) IN ((${normalizedLoggedUser}, ${normalizedFriendUser}), (${normalizedFriendUser}, ${normalizedLoggedUser}))
+            AND NOT EXISTS (SELECT 1 FROM friendship_action)
+          LIMIT 1
+        )
+        SELECT * FROM friendship_action
+        UNION ALL
+        SELECT * FROM block_action
+        ORDER BY timestamp DESC
+        LIMIT 1
       `
 
       const results = await pg.query<FriendshipAction>(query)

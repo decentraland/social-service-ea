@@ -266,7 +266,7 @@ describe('friendsDb', () => {
   })
 
   describe('getLastFriendshipActionByUsers', () => {
-    it('should return the most recent friendship action between two users', async () => {
+    it('should return the most recent friendship or block action between two users', async () => {
       const mockAction = {
         id: 'action-1',
         friendship_id: 'friendship-1',
@@ -283,6 +283,12 @@ describe('friendsDb', () => {
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('WHERE (f.address_requester, f.address_requested) IN'),
+          values: expect.arrayContaining(['0x123', '0x456', '0x456', '0x123'])
+        })
+      )
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('WHERE (b.blocker_address, b.blocked_address) IN'),
           values: expect.arrayContaining(['0x123', '0x456', '0x456', '0x123'])
         })
       )

@@ -2,6 +2,7 @@ import {
   BlockedUserProfile,
   BlockUserResponse,
   FriendshipRequests,
+  FriendshipStatus,
   PaginatedFriendshipRequestsResponse,
   PrivateMessagePrivacySetting
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -1191,8 +1192,66 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
         expect(result.response?.$case).toBe('accepted')
         if (result.response?.$case === 'accepted') {
-          expect(result.response.accepted.status).toBe(7) // NONE status = 7
+          expect(result.response.accepted.status).toBe(FriendshipStatus.NONE)
         }
+      })
+    })
+
+    describe('and a user is blocked without prior friendship', () => {
+      let blockedAddress: string
+
+      beforeEach(() => {
+        blockedAddress = '0x8888888888888888888888888888888888888888'
+      })
+
+      afterEach(async () => {
+        const { friendsDb, rpcClient } = components
+        await friendsDb.unblockUser(rpcClient.authAddress, blockedAddress)
+      })
+
+      describe('and the logged user blocked the other user', () => {
+        beforeEach(async () => {
+          const { friendsDb, rpcClient } = components
+          await friendsDb.blockUser(rpcClient.authAddress, blockedAddress)
+        })
+
+        it('should return BLOCKED status', async () => {
+          const { rpcClient } = components
+
+          const result = await rpcClient.client.getFriendshipStatus({
+            user: { address: blockedAddress }
+          })
+
+          expect(result.response?.$case).toBe('accepted')
+          if (result.response?.$case === 'accepted') {
+            expect(result.response.accepted.status).toBe(FriendshipStatus.BLOCKED)
+          }
+        })
+      })
+
+      describe('and the logged user was blocked by the other user', () => {
+        beforeEach(async () => {
+          const { friendsDb, rpcClient } = components
+          await friendsDb.blockUser(blockedAddress, rpcClient.authAddress)
+        })
+
+        afterEach(async () => {
+          const { friendsDb, rpcClient } = components
+          await friendsDb.unblockUser(blockedAddress, rpcClient.authAddress)
+        })
+
+        it('should return BLOCKED_BY status', async () => {
+          const { rpcClient } = components
+
+          const result = await rpcClient.client.getFriendshipStatus({
+            user: { address: blockedAddress }
+          })
+
+          expect(result.response?.$case).toBe('accepted')
+          if (result.response?.$case === 'accepted') {
+            expect(result.response.accepted.status).toBe(FriendshipStatus.BLOCKED_BY)
+          }
+        })
       })
     })
   })
