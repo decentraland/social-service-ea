@@ -1,6 +1,7 @@
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { AppComponents, IRegistryComponent } from '../types'
 import { extractMinimalProfile, getProfileUserId } from '../logic/profiles'
+import { withoutTracing } from '../utils/tracing'
 
 export const PROFILE_CACHE_PREFIX = 'catalyst:minimal:profile:'
 
@@ -68,21 +69,24 @@ export async function createRegistryComponent({
       const minimalProfiles = registryResults.map(extractMinimalProfile).filter(Boolean) as Profile[]
       validProfiles = minimalProfiles
 
-      setImmediate(() => {
-        Promise.all(
-          minimalProfiles.map(async (minimalProfile) => {
-            try {
-              const userId = getProfileUserId(minimalProfile)
-              await cacheProfile(userId, minimalProfile)
-            } catch (error: any) {
-              logger.warn('Failed to cache registry profile', {
-                error: error.message
-              })
-            }
-          })
-        ).catch((error) => {
-          logger.error('Registry profile cache storing in batch failed', {
-            error: error.message
+      setImmediate(async () => {
+        // Suppress tracing for fire-and-forget cache operations (breaks trace context)
+        await withoutTracing(async () => {
+          await Promise.all(
+            minimalProfiles.map(async (minimalProfile) => {
+              try {
+                const userId = getProfileUserId(minimalProfile)
+                await cacheProfile(userId, minimalProfile)
+              } catch (error: any) {
+                logger.warn('Failed to cache registry profile', {
+                  error: error.message
+                })
+              }
+            })
+          ).catch((error) => {
+            logger.error('Registry profile cache storing in batch failed', {
+              error: error.message
+            })
           })
         })
       })
@@ -119,7 +123,10 @@ export async function createRegistryComponent({
     }
 
     setImmediate(async () => {
-      await cacheProfile(id, minimalProfile)
+      // Suppress tracing for fire-and-forget cache operations (breaks trace context)
+      await withoutTracing(async () => {
+        return cacheProfile(id, minimalProfile)
+      })
     })
 
     return minimalProfile
