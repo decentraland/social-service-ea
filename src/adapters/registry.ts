@@ -1,6 +1,7 @@
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { AppComponents, IRegistryComponent } from '../types'
 import { extractMinimalProfile, getProfileUserId } from '../logic/profiles'
+import { withoutTracing } from '../utils/tracing'
 
 export const PROFILE_CACHE_PREFIX = 'catalyst:minimal:profile:'
 
@@ -69,18 +70,23 @@ export async function createRegistryComponent({
       validProfiles = minimalProfiles
 
       setImmediate(() => {
-        Promise.all(
-          minimalProfiles.map(async (minimalProfile) => {
-            try {
-              const userId = getProfileUserId(minimalProfile)
-              await cacheProfile(userId, minimalProfile)
-            } catch (error: any) {
-              logger.warn('Failed to cache registry profile', {
-                error: error.message
+        // Suppress tracing for fire-and-forget cache operations (breaks trace context)
+        Promise.resolve(
+          withoutTracing(async () => {
+            await Promise.all(
+              minimalProfiles.map(async (minimalProfile) => {
+                try {
+                  const userId = getProfileUserId(minimalProfile)
+                  await cacheProfile(userId, minimalProfile)
+                } catch (error: any) {
+                  logger.warn('Failed to cache registry profile', {
+                    error: error.message
+                  })
+                }
               })
-            }
+            )
           })
-        ).catch((error) => {
+        ).catch((error: any) => {
           logger.error('Registry profile cache storing in batch failed', {
             error: error.message
           })
@@ -118,8 +124,18 @@ export async function createRegistryComponent({
       throw new Error(`Invalid profile received from registry: ${id}`)
     }
 
-    setImmediate(async () => {
-      await cacheProfile(id, minimalProfile)
+    setImmediate(() => {
+      // Suppress tracing for fire-and-forget cache operations (breaks trace context)
+      Promise.resolve(
+        withoutTracing(async () => {
+          await cacheProfile(id, minimalProfile)
+        })
+      ).catch((error: any) => {
+        logger.error('Failed to cache single profile', {
+          error: error.message,
+          profileId: id
+        })
+      })
     })
 
     return minimalProfile

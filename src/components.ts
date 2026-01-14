@@ -73,6 +73,7 @@ import { createSnsComponent } from '@dcl/sns-component'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 import { createRegistryComponent } from './adapters/registry'
 import { createSqsHandlers } from './controllers/handlers/sqs/handler'
+import { withSuppressedTracing, withoutTracing } from './utils/tracing'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -152,7 +153,7 @@ export async function initComponents(): Promise<AppComponents> {
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
-  const worldsStats = await createWorldsStatsComponent({ logs, redis })
+  const worldsStats = withSuppressedTracing(await createWorldsStatsComponent({ logs, redis }))
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const registry = await createRegistryComponent({ fetcher, config, redis, logs })
@@ -307,13 +308,18 @@ export async function initComponents(): Promise<AppComponents> {
     updateHandler
   })
 
-  const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
-  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+  const peersSynchronizer = withSuppressedTracing(
+    await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
+  )
+  const peerTracking = withSuppressedTracing(
+    await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+  )
   const wsPool = createWsPoolComponent({ logs, metrics })
 
   const expirePrivateVoiceChatJob = createJobComponent(
     { logs },
-    voice.expirePrivateVoiceChat,
+    // wrap function itself since it is executed in different context (setImmediate)
+    () => withoutTracing(() => voice.expirePrivateVoiceChat()),
     privateVoiceChatJobInterval,
     { repeat: true }
   )
@@ -321,7 +327,8 @@ export async function initComponents(): Promise<AppComponents> {
   // Community voice chat polling job (every 45 seconds)
   const communityVoiceChatPollingJob = createJobComponent(
     { logs },
-    communityVoiceChatPolling.checkAllVoiceChats,
+    // wrap function itself since it is executed in different context (setImmediate)
+    () => withoutTracing(() => communityVoiceChatPolling.checkAllVoiceChats()),
     communityVoiceChatPollingJobInterval,
     { repeat: true }
   )
