@@ -4,6 +4,7 @@ import { AppComponents } from '../types'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { NatsMsg } from '@well-known-components/nats-component/dist/types'
 import { COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL, FRIEND_STATUS_UPDATES_CHANNEL } from './pubsub'
+import { withoutTracing } from '../utils/tracing'
 
 export type PeerStatusHandler = {
   event: PeerStatusHandlerEvent
@@ -89,16 +90,20 @@ export async function createPeerTrackingComponent({
 
   function createMessageHandler(handler: PeerStatusHandler) {
     return async (err: Error | null, message: NatsMsg) => {
-      if (err) {
-        logger.error(`Error processing peer ${handler.event} message:`, {
-          error: err.message,
-          pattern: handler.pattern
-        })
-        return
-      }
+      // Suppress tracing for NATS callbacks - they execute in a new async context
+      // and would otherwise create standalone Redis transactions
+      return withoutTracing(async () => {
+        if (err) {
+          logger.error(`Error processing peer ${handler.event} message:`, {
+            error: err.message,
+            pattern: handler.pattern
+          })
+          return
+        }
 
-      const peerId = message.subject.split('.')[1]
-      await handlePeerEvent(peerId, handler)
+        const peerId = message.subject.split('.')[1]
+        await handlePeerEvent(peerId, handler)
+      })
     }
   }
 
