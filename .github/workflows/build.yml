@@ -7,4 +7,4 @@ jobs:
   build:
     uses: decentraland/platform-actions/.github/workflows/apps-with-db-build.yml@main
     with:
-      node-version: 20.x
+      node-version: '24.13'

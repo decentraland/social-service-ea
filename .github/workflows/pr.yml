@@ -8,4 +8,5 @@ jobs:
     uses: decentraland/platform-actions/.github/workflows/apps-pr.yml@main
     with:
       service-name: social-service-ea
+      node-version: '24.13'
     secrets: inherit
