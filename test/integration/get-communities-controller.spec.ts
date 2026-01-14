@@ -865,6 +865,75 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(unlistedCommunity).toBeUndefined()
           expect(listedCommunity).toBeDefined()
         })
+
+        describe('when filtering unlisted communities with active voice chat', () => {
+          let nonMemberIdentity: Identity
+
+          beforeEach(async () => {
+            nonMemberIdentity = await createTestIdentity()
+
+            // Mock both communities to have active voice chat
+            spyComponents.commsGatekeeper.getCommunitiesVoiceChatStatus.mockImplementation(
+              async (communityIds: string[]) => {
+                const result: Record<string, any> = {}
+                communityIds.forEach((communityId) => {
+                  result[communityId] = { isActive: true, participantCount: 3, moderatorCount: 1 }
+                })
+                return result
+              }
+            )
+
+            // Mock getAllActiveCommunityVoiceChats to return both communities
+            spyComponents.commsGatekeeper.getAllActiveCommunityVoiceChats.mockImplementation(async () => {
+              return [
+                { communityId: unlistedCommunityId, participantCount: 3, moderatorCount: 1 },
+                { communityId: listedCommunityId, participantCount: 3, moderatorCount: 1 }
+              ]
+            })
+          })
+
+          describe('and the user is a member of the unlisted community', () => {
+            beforeEach(async () => {
+              await components.communitiesDb.addCommunityMember({
+                communityId: unlistedCommunityId,
+                memberAddress: address,
+                role: CommunityRole.Member
+              })
+            })
+
+            afterEach(async () => {
+              await components.communitiesDbHelper.forceCommunityMemberRemoval(unlistedCommunityId, [address])
+            })
+
+            it('should include unlisted community with active voice chat for members', async () => {
+              const response = await makeRequest(
+                identity,
+                '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=true'
+              )
+              const body = await response.json()
+
+              expect(response.status).toBe(200)
+              const communityIds = body.data.results.map((c: any) => c.id)
+              expect(communityIds).toContain(unlistedCommunityId)
+              expect(communityIds).toContain(listedCommunityId)
+            })
+          })
+
+          describe('and the user is NOT a member of the unlisted community', () => {
+            it('should exclude unlisted community with active voice chat for non-members', async () => {
+              const response = await makeRequest(
+                nonMemberIdentity,
+                '/v1/communities?limit=10&offset=0&onlyWithActiveVoiceChat=true'
+              )
+              const body = await response.json()
+
+              expect(response.status).toBe(200)
+              const communityIds = body.data.results.map((c: any) => c.id)
+              expect(communityIds).not.toContain(unlistedCommunityId)
+              expect(communityIds).toContain(listedCommunityId)
+            })
+          })
+        })
       })
 
       describe('when filtering by roles', () => {

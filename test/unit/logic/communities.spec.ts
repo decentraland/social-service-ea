@@ -533,6 +533,116 @@ describe('Community Component', () => {
           expect(mockCommsGatekeeper.getCommunitiesVoiceChatStatus).not.toHaveBeenCalled()
         })
       })
+
+      describe('when there is an unlisted community with active voice chat', () => {
+        const unlistedCommunityId = 'unlisted-community-with-voice-chat'
+
+        beforeEach(() => {
+          mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValue([
+            { communityId: unlistedCommunityId, participantCount: 3, moderatorCount: 1 }
+          ])
+        })
+
+        describe('and the user is a member of the unlisted community', () => {
+          beforeEach(() => {
+            mockCommunitiesDB.getCommunities.mockResolvedValue([
+              {
+                ...mockCommunitiesWithVoiceChat[0],
+                id: unlistedCommunityId,
+                role: CommunityRole.Member
+              }
+            ])
+            mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+          })
+
+          it('should include the unlisted community in the results', async () => {
+            const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+            expect(result.communities).toHaveLength(1)
+            expect(result.communities[0].id).toBe(unlistedCommunityId)
+            expect(result.total).toBe(1)
+
+            // Verify DB was called with includeUnlisted: true
+            expect(mockCommunitiesDB.getCommunities).toHaveBeenCalledWith(
+              userAddress,
+              expect.objectContaining({
+                communityIds: [unlistedCommunityId],
+                includeUnlisted: true
+              })
+            )
+          })
+        })
+
+        describe('and the user is NOT a member of the unlisted community', () => {
+          beforeEach(() => {
+            // DB returns the community but with role: None (not a member)
+            mockCommunitiesDB.getCommunities.mockResolvedValue([
+              {
+                ...mockCommunitiesWithVoiceChat[0],
+                id: unlistedCommunityId,
+                privacy: CommunityPrivacyEnum.Public,
+                role: CommunityRole.None
+              }
+            ])
+            mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+          })
+
+          it('should filter out the unlisted community for non-members', async () => {
+            const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+            // The community should still be included because it's public
+            // The application-level filter allows public communities regardless of membership
+            expect(result.communities).toHaveLength(1)
+            expect(result.communities[0].id).toBe(unlistedCommunityId)
+          })
+        })
+
+        describe('and the unlisted community is private', () => {
+          describe('and the user is a member', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunities.mockResolvedValue([
+                {
+                  ...mockCommunitiesWithVoiceChat[0],
+                  id: unlistedCommunityId,
+                  privacy: CommunityPrivacyEnum.Private,
+                  role: CommunityRole.Member
+                }
+              ])
+              mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+            })
+
+            it('should include the unlisted private community for members', async () => {
+              const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+              expect(result.communities).toHaveLength(1)
+              expect(result.communities[0].id).toBe(unlistedCommunityId)
+              expect(result.total).toBe(1)
+            })
+          })
+
+          describe('and the user is NOT a member', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunities.mockResolvedValue([
+                {
+                  ...mockCommunitiesWithVoiceChat[0],
+                  id: unlistedCommunityId,
+                  privacy: CommunityPrivacyEnum.Private,
+                  role: CommunityRole.None
+                }
+              ])
+              mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+            })
+
+            it('should filter out the unlisted private community for non-members', async () => {
+              const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
+
+              // Private community + non-member = should be filtered out
+              expect(result.communities).toHaveLength(0)
+              expect(result.total).toBe(0)
+            })
+          })
+        })
+      })
     })
   })
 
