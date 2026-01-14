@@ -56,10 +56,5 @@ export function withSuppressedTracing<T extends object>(component: T): T {
  * }
  */
 export function withoutTracing<T>(fn: () => T | Promise<T>): T | Promise<T> {
-  return Sentry.suppressTracing(() => {
-    if (fn instanceof Promise) {
-      return fn.then((result) => result)
-    }
-    return fn()
-  })
+  return Sentry.suppressTracing(() => fn())
 }

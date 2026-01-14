@@ -69,24 +69,26 @@ export async function createRegistryComponent({
       const minimalProfiles = registryResults.map(extractMinimalProfile).filter(Boolean) as Profile[]
       validProfiles = minimalProfiles
 
-      setImmediate(async () => {
+      setImmediate(() => {
         // Suppress tracing for fire-and-forget cache operations (breaks trace context)
-        await withoutTracing(async () => {
-          await Promise.all(
-            minimalProfiles.map(async (minimalProfile) => {
-              try {
-                const userId = getProfileUserId(minimalProfile)
-                await cacheProfile(userId, minimalProfile)
-              } catch (error: any) {
-                logger.warn('Failed to cache registry profile', {
-                  error: error.message
-                })
-              }
-            })
-          ).catch((error) => {
-            logger.error('Registry profile cache storing in batch failed', {
-              error: error.message
-            })
+        Promise.resolve(
+          withoutTracing(async () => {
+            await Promise.all(
+              minimalProfiles.map(async (minimalProfile) => {
+                try {
+                  const userId = getProfileUserId(minimalProfile)
+                  await cacheProfile(userId, minimalProfile)
+                } catch (error: any) {
+                  logger.warn('Failed to cache registry profile', {
+                    error: error.message
+                  })
+                }
+              })
+            )
+          })
+        ).catch((error: any) => {
+          logger.error('Registry profile cache storing in batch failed', {
+            error: error.message
           })
         })
       })
@@ -122,10 +124,17 @@ export async function createRegistryComponent({
       throw new Error(`Invalid profile received from registry: ${id}`)
     }
 
-    setImmediate(async () => {
+    setImmediate(() => {
       // Suppress tracing for fire-and-forget cache operations (breaks trace context)
-      await withoutTracing(async () => {
-        return cacheProfile(id, minimalProfile)
+      Promise.resolve(
+        withoutTracing(async () => {
+          await cacheProfile(id, minimalProfile)
+        })
+      ).catch((error: any) => {
+        logger.error('Failed to cache single profile', {
+          error: error.message,
+          profileId: id
+        })
       })
     })
 
