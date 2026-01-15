@@ -46,6 +46,7 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
         let ownerAddress: string
         let communityId1: string
         let communityId2: string
+        let unlistedCommunityId: string
         let queryParameters: string
 
         beforeEach(async () => {
@@ -77,6 +78,17 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
           )
           communityId2 = result2.id
 
+          const unlistedResult = await components.communitiesDb.createCommunity(
+            mockCommunity({
+              name: 'Unlisted Community',
+              description: 'Unlisted Description',
+              owner_address: ownerAddress,
+              private: false,
+              unlisted: true
+            })
+          )
+          unlistedCommunityId = unlistedResult.id
+
           // Owners are members too
           await components.communitiesDb.addCommunityMember({
             communityId: communityId1,
@@ -88,6 +100,11 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
             memberAddress: ownerAddress,
             role: CommunityRole.Owner
           })
+          await components.communitiesDb.addCommunityMember({
+            communityId: unlistedCommunityId,
+            memberAddress: ownerAddress,
+            role: CommunityRole.Owner
+          })
 
           // Create pending requests for the target address
           await components.communitiesDb.createCommunityRequest(communityId1, address, CommunityRequestType.Invite)
@@ -96,13 +113,20 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
             address,
             CommunityRequestType.RequestToJoin
           )
+          await components.communitiesDb.createCommunityRequest(
+            unlistedCommunityId,
+            address,
+            CommunityRequestType.Invite
+          )
         })
 
         afterEach(async () => {
           await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId1, [ownerAddress])
           await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId2, [ownerAddress])
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(unlistedCommunityId, [ownerAddress])
           await components.communitiesDbHelper.forceCommunityRemoval(communityId1)
           await components.communitiesDbHelper.forceCommunityRemoval(communityId2)
+          await components.communitiesDbHelper.forceCommunityRemoval(unlistedCommunityId)
         })
 
         it('should return 200 status code and return aggregated requests with community information', async () => {
@@ -110,10 +134,11 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
           const body = await response.json()
 
           expect(response.status).toBe(200)
-          expect(body.data.results.length).toBe(2)
+          expect(body.data.results.length).toBe(3)
 
           const invite = body.data.results.find((r: any) => r.communityId === communityId1)
           const requestToJoin = body.data.results.find((r: any) => r.communityId === communityId2)
+          const unlistedInvite = body.data.results.find((r: any) => r.communityId === unlistedCommunityId)
 
           expect(invite).toEqual(
             expect.objectContaining({
@@ -135,7 +160,17 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
               type: CommunityRequestType.RequestToJoin
             })
           )
-          expect(body.data.total).toBe(2)
+          expect(unlistedInvite).toEqual(
+            expect.objectContaining({
+              communityId: unlistedCommunityId,
+              name: 'Unlisted Community',
+              description: 'Unlisted Description',
+              ownerAddress: ownerAddress,
+              ownerName: 'Test Owner',
+              type: CommunityRequestType.Invite
+            })
+          )
+          expect(body.data.total).toBe(3)
           expect(body.data.page).toBe(1)
           expect(body.data.pages).toBe(1)
           expect(body.data.limit).toBe(10)
@@ -150,9 +185,11 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
             const response = await makeRequest(identity, `/v1/members/${address}/requests${queryParameters}`)
             const body = await response.json()
             expect(response.status).toBe(200)
-            expect(body.data.results.length).toBe(1)
-            expect(body.data.results[0]).toEqual(
-              expect.objectContaining({ communityId: communityId1, type: CommunityRequestType.Invite })
+            expect(body.data.results.length).toBe(2)
+            const inviteCommunityIds = body.data.results.map((result: any) => result.communityId)
+            expect(inviteCommunityIds).toEqual(expect.arrayContaining([communityId1, unlistedCommunityId]))
+            expect(body.data.results).toEqual(
+              expect.arrayContaining([expect.objectContaining({ type: CommunityRequestType.Invite })])
             )
           })
         })
@@ -185,8 +222,8 @@ test('Get Member Requests Controller', function ({ components, spyComponents }) 
             expect(response.status).toBe(200)
             expect(body.data.results.length).toBe(1)
             expect(body.data.page).toBe(1)
-            expect(body.data.pages).toBe(2)
-            expect(body.data.total).toBe(2)
+            expect(body.data.pages).toBe(3)
+            expect(body.data.total).toBe(3)
             expect(body.data.limit).toBe(1)
           })
         })
