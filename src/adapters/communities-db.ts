@@ -363,9 +363,13 @@ export function createCommunitiesDBComponent(
         .append(
           // Include unlisted communities when:
           // 1. onlyMemberOf is true (members can see communities they belong to)
-          // 2. includeUnlisted is explicitly true
+          // 2. includeUnlisted is explicitly true AND user is a member (cm.role IS NOT NULL)
           // Otherwise, exclude unlisted communities from public listings
-          onlyMemberOf || includeUnlisted ? SQL`` : SQL` AND c.unlisted = false`
+          onlyMemberOf
+            ? SQL``
+            : includeUnlisted
+              ? SQL` AND (c.unlisted = false OR cm.role IS NOT NULL)`
+              : SQL` AND c.unlisted = false`
         )
 
       // Filter by specific community IDs if provided
@@ -401,9 +405,13 @@ export function createCommunitiesDBComponent(
         .append(
           // Include unlisted communities when:
           // 1. onlyMemberOf is true (members can see communities they belong to)
-          // 2. includeUnlisted is explicitly true
+          // 2. includeUnlisted is explicitly true AND user is a member (cm.role IS NOT NULL)
           // Otherwise, exclude unlisted communities from public listings
-          onlyMemberOf || includeUnlisted ? SQL`` : SQL` AND c.unlisted = false`
+          onlyMemberOf
+            ? SQL``
+            : includeUnlisted
+              ? SQL` AND (c.unlisted = false OR cm.role IS NOT NULL)`
+              : SQL` AND c.unlisted = false`
         )
         .append(SQL` AND cb.banned_address IS NULL`)
 

@@ -179,7 +179,11 @@ export function createCommunityComponent(
         }
       }
 
-      const dbOptions = { ...options, communityIds }
+      const dbOptions = {
+        ...options,
+        communityIds,
+        includeUnlisted: options.onlyWithActiveVoiceChat || options.includeUnlisted
+      }
 
       const [communities, total] = await Promise.all([
         communitiesDb.getCommunities(userAddress, dbOptions),
