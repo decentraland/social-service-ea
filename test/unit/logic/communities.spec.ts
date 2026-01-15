@@ -549,6 +549,7 @@ describe('Community Component', () => {
               {
                 ...mockCommunitiesWithVoiceChat[0],
                 id: unlistedCommunityId,
+                visibility: CommunityVisibilityEnum.Unlisted,
                 role: CommunityRole.Member
               }
             ])
@@ -575,27 +576,19 @@ describe('Community Component', () => {
 
         describe('and the user is NOT a member of the unlisted community', () => {
           beforeEach(() => {
-            // DB returns the community but with role: None (not a member)
-            mockCommunitiesDB.getCommunities.mockResolvedValue([
-              {
-                ...mockCommunitiesWithVoiceChat[0],
-                id: unlistedCommunityId,
-                privacy: CommunityPrivacyEnum.Public,
-                role: CommunityRole.None
-              }
-            ])
-            mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(1)
+            // DB excludes unlisted communities for non-members
+            mockCommunitiesDB.getCommunities.mockResolvedValue([])
+            mockCommunitiesDB.getCommunitiesCount.mockResolvedValue(0)
           })
 
           it('should filter out the unlisted community for non-members', async () => {
             const result = await communityComponent.getCommunities(userAddress, optionsWithVoiceChat)
 
-            // The community should still be included because it's public
-            // The application-level filter allows public communities regardless of membership
-            expect(result.communities).toHaveLength(1)
-            expect(result.communities[0].id).toBe(unlistedCommunityId)
+            expect(result.communities).toHaveLength(0)
+            expect(result.total).toBe(0)
           })
         })
+
 
         describe('and the unlisted community is private', () => {
           describe('and the user is a member', () => {
@@ -605,6 +598,7 @@ describe('Community Component', () => {
                   ...mockCommunitiesWithVoiceChat[0],
                   id: unlistedCommunityId,
                   privacy: CommunityPrivacyEnum.Private,
+                  visibility: CommunityVisibilityEnum.Unlisted,
                   role: CommunityRole.Member
                 }
               ])
@@ -627,6 +621,7 @@ describe('Community Component', () => {
                   ...mockCommunitiesWithVoiceChat[0],
                   id: unlistedCommunityId,
                   privacy: CommunityPrivacyEnum.Private,
+                  visibility: CommunityVisibilityEnum.Unlisted,
                   role: CommunityRole.None
                 }
               ])

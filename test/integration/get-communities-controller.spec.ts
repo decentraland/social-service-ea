@@ -933,6 +933,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               expect(communityIds).toContain(listedCommunityId)
             })
           })
+
         })
       })
 

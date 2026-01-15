@@ -191,7 +191,12 @@ export function createCommunityComponent(
       ])
 
       const filteredCommunities = options.onlyWithActiveVoiceChat
-        ? communities.filter((c) => c.privacy === CommunityPrivacyEnum.Public || c.role !== CommunityRole.None)
+        ? communities.filter(
+            (community) =>
+              community.role !== CommunityRole.None ||
+              (community.privacy === CommunityPrivacyEnum.Public &&
+                community.visibility === CommunityVisibilityEnum.All)
+          )
         : communities
 
       const communityOwnersNames = await communityOwners.getOwnersNames(filteredCommunities.map((c) => c.ownerAddress))

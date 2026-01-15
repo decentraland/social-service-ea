@@ -346,6 +346,7 @@ export function createCommunitiesDBComponent(
           c.owner_address as "ownerAddress",
           COALESCE(cm.role, ${CommunityRole.None}) as role,
           CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy,
+          CASE WHEN c.unlisted THEN 'unlisted' ELSE 'all' END as visibility,
           c.active,
           cwmc."membersCount",
           COALESCE(cf.friends, ARRAY[]::text[]) as friends
@@ -363,13 +364,9 @@ export function createCommunitiesDBComponent(
         .append(
           // Include unlisted communities when:
           // 1. onlyMemberOf is true (members can see communities they belong to)
-          // 2. includeUnlisted is explicitly true AND user is a member (cm.role IS NOT NULL)
+          // 2. includeUnlisted is explicitly true
           // Otherwise, exclude unlisted communities from public listings
-          onlyMemberOf
-            ? SQL``
-            : includeUnlisted
-              ? SQL` AND (c.unlisted = false OR cm.role IS NOT NULL)`
-              : SQL` AND c.unlisted = false`
+          onlyMemberOf || includeUnlisted ? SQL`` : SQL` AND c.unlisted = false`
         )
 
       // Filter by specific community IDs if provided
@@ -405,13 +402,9 @@ export function createCommunitiesDBComponent(
         .append(
           // Include unlisted communities when:
           // 1. onlyMemberOf is true (members can see communities they belong to)
-          // 2. includeUnlisted is explicitly true AND user is a member (cm.role IS NOT NULL)
+          // 2. includeUnlisted is explicitly true
           // Otherwise, exclude unlisted communities from public listings
-          onlyMemberOf
-            ? SQL``
-            : includeUnlisted
-              ? SQL` AND (c.unlisted = false OR cm.role IS NOT NULL)`
-              : SQL` AND c.unlisted = false`
+          onlyMemberOf || includeUnlisted ? SQL`` : SQL` AND c.unlisted = false`
         )
         .append(SQL` AND cb.banned_address IS NULL`)
 
