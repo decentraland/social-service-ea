@@ -24,6 +24,33 @@ export type SubscriptionHandlerParams<T, U> = {
   parseArgs?: any[]
 }
 
+/**
+ * Processes an array in batches, yielding the event loop between batches.
+ * This prevents long-running synchronous iterations from blocking the event loop.
+ *
+ * @param items - The array of items to process
+ * @param processor - The function to call for each item
+ * @param batchSize - Number of items to process before yielding (default: 10)
+ */
+async function processInBatches<T>(
+  items: T[],
+  processor: (item: T) => void | Promise<void>,
+  batchSize: number = 10
+): Promise<void> {
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize)
+
+    for (const item of batch) {
+      await processor(item)
+    }
+
+    // Yield the event loop if there are more items
+    if (i + batchSize < items.length) {
+      await new Promise((resolve) => setImmediate(resolve))
+    }
+  }
+}
+
 export function createUpdateHandlerComponent(
   components: Pick<AppComponents, 'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry'>
 ): IUpdateHandlerComponent {
@@ -76,13 +103,17 @@ export function createUpdateHandlerComponent(
     const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
     const friends = await friendsDb.getOnlineFriends(update.address, onlineSubscribers)
 
-    // Notify friends about connectivity change
-    friends.forEach(({ address: friendAddress }) => {
-      const updateEmitter = subscribersContext.getOrAddSubscriber(friendAddress)
-      if (updateEmitter) {
-        updateEmitter.emit('friendConnectivityUpdate', update)
-      }
-    })
+    // Notify friends about connectivity change, yielding event loop for large friend lists
+    await processInBatches(
+      friends,
+      ({ address: friendAddress }) => {
+        const updateEmitter = subscribersContext.getOrAddSubscriber(friendAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('friendConnectivityUpdate', update)
+        }
+      },
+      20
+    )
   })
 
   const communityMemberConnectivityUpdateHandler = handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
@@ -90,16 +121,21 @@ export function createUpdateHandlerComponent(
     const batches = communityMembers.getOnlineMembersFromUserCommunities(update.memberAddress, onlineSubscribers)
 
     for await (const batch of batches) {
-      batch.forEach(({ communityId, memberAddress }) => {
-        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityMemberConnectivityUpdate', {
-            communityId,
-            memberAddress: update.memberAddress,
-            status: update.status
-          })
-        }
-      })
+      // Process each batch with event loop yielding
+      await processInBatches(
+        batch,
+        ({ communityId, memberAddress }) => {
+          const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
+          if (updateEmitter) {
+            updateEmitter.emit('communityMemberConnectivityUpdate', {
+              communityId,
+              memberAddress: update.memberAddress,
+              status: update.status
+            })
+          }
+        },
+        20
+      )
     }
   })
 
@@ -180,17 +216,25 @@ export function createUpdateHandlerComponent(
       onlineSubscribers.filter((address) => address !== normalizedMemberAddress)
     )
 
+    // Pre-create the update payload to avoid repeated object creation
+    const memberUpdate = {
+      communityId,
+      memberAddress: update.memberAddress,
+      status
+    }
+
     for await (const batch of batches) {
-      batch.forEach(({ memberAddress }) => {
-        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityMemberConnectivityUpdate', {
-            communityId,
-            memberAddress: update.memberAddress,
-            status
-          })
-        }
-      })
+      // Process each batch with event loop yielding
+      await processInBatches(
+        batch,
+        ({ memberAddress: batchMemberAddress }) => {
+          const updateEmitter = subscribersContext.getOrAddSubscriber(batchMemberAddress)
+          if (updateEmitter) {
+            updateEmitter.emit('communityMemberConnectivityUpdate', memberUpdate)
+          }
+        },
+        20
+      )
     }
 
     // When a member leaves, is kicked, or banned from a community,
@@ -212,16 +256,21 @@ export function createUpdateHandlerComponent(
     const batches = communityMembers.getOnlineMembersFromCommunity(communityId, onlineSubscribers)
 
     for await (const batch of batches) {
-      batch.forEach(({ memberAddress }) => {
-        const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityMemberConnectivityUpdate', {
-            communityId,
-            memberAddress,
-            status: ConnectivityStatus.OFFLINE
-          })
-        }
-      })
+      // Process each batch with event loop yielding
+      await processInBatches(
+        batch,
+        ({ memberAddress }) => {
+          const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
+          if (updateEmitter) {
+            updateEmitter.emit('communityMemberConnectivityUpdate', {
+              communityId,
+              memberAddress,
+              status: ConnectivityStatus.OFFLINE
+            })
+          }
+        },
+        20
+      )
     }
   })
 
@@ -244,43 +293,42 @@ export function createUpdateHandlerComponent(
         })
       }
 
+      // Pre-create the base update object to avoid repeated object spreads
+      const baseUpdate = { ...update }
+
       // Notify ALL online users with personalized membership info (excluding the creator)
-      const notifications = onlineSubscribers.map(async (userAddress) => {
-        const isMember = communityMemberAddresses.has(userAddress)
-
-        // Create personalized update for this user
-        const personalizedUpdate = {
-          ...update,
-          isMember
-        }
-
-        const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityVoiceChatUpdate', personalizedUpdate)
-        }
-      })
-
-      // Wait for all notifications to complete
-      await Promise.all(notifications)
+      // Process in batches to yield the event loop and prevent blocking
+      await processInBatches(
+        onlineSubscribers,
+        (userAddress) => {
+          const isMember = communityMemberAddresses.has(userAddress)
+          const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
+          if (updateEmitter) {
+            // Reuse base update, only set isMember property
+            updateEmitter.emit('communityVoiceChatUpdate', { ...baseUpdate, isMember })
+          }
+        },
+        20 // Process 20 users before yielding the event loop
+      )
 
       logger.info(`Community voice chat update sent to ${onlineSubscribers.length} online users`)
     } catch (error) {
       logger.error(`Failed to process community voice chat update for community ${update.communityId}: ${error}`)
 
       // Fallback: send update to all users without membership info (still excluding the creator)
-      const fallbackNotifications = onlineSubscribers.map(async (userAddress) => {
-        const fallbackUpdate = {
-          ...update,
-          isMember: false
-        }
+      const fallbackUpdate = { ...update, isMember: false }
 
-        const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
-        if (updateEmitter) {
-          updateEmitter.emit('communityVoiceChatUpdate', fallbackUpdate)
-        }
-      })
+      await processInBatches(
+        onlineSubscribers,
+        (userAddress) => {
+          const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
+          if (updateEmitter) {
+            updateEmitter.emit('communityVoiceChatUpdate', fallbackUpdate)
+          }
+        },
+        20
+      )
 
-      await Promise.all(fallbackNotifications)
       logger.warn(`Sent fallback community voice chat update to ${onlineSubscribers.length} online users`)
     }
   })
