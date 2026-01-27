@@ -39,7 +39,7 @@ export function initSentry() {
 
   const profileLifecycleEnv = process.env.SENTRY_PROFILE_LIFECYCLE
   const profileLifecycle: 'manual' | 'trace' =
-    profileLifecycleEnv === 'trace' ? 'trace' : profileLifecycleEnv === 'manual' ? 'manual' : 'manual'
+    profileLifecycleEnv === 'manual' || profileLifecycleEnv === 'trace' ? profileLifecycleEnv : 'manual'
 
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
