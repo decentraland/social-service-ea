@@ -325,6 +325,11 @@ export type ISubscribersContext = IBaseComponent & {
   getSubscribers: () => Subscribers
   getSubscribersAddresses: () => Promise<string[]>
   getLocalSubscribersAddresses: () => string[]
+  /**
+   * Get an existing subscriber without creating one if it doesn't exist.
+   * Use this in update handlers to avoid creating orphaned emitters.
+   */
+  getSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter> | undefined
   getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
   addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => Promise<void>
   removeSubscriber: (address: string) => Promise<void>

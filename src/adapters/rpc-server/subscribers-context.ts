@@ -54,6 +54,15 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
 
     getLocalSubscribersAddresses: () => Object.keys(localSubscribers).map(normalizeAddress),
 
+    /**
+     * Get an existing subscriber without creating one if it doesn't exist.
+     * Use this in update handlers to avoid creating orphaned emitters.
+     */
+    getSubscriber: (address: string): Emitter<SubscriptionEventsEmitter> | undefined => {
+      const normalizedAddress = normalizeAddress(address)
+      return localSubscribers[normalizedAddress]
+    },
+
     async getSubscribersAddresses(): Promise<string[]> {
       try {
         const addresses = await redis.sMembers(SUBSCRIBERS_SET_KEY)
