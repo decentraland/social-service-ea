@@ -7,11 +7,12 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { BlockedUserWithDate, SubscriptionEventsEmitter } from '../../types'
 
 export function parseProfileToBlockedUser(profile: Profile, blockedAt?: Date): BlockedUserProfile {
-  const { name, userId, hasClaimedName, profilePictureUrl } = getProfileInfo(profile)
+  const { name, nameColor, userId, hasClaimedName, profilePictureUrl } = getProfileInfo(profile)
 
   return {
     address: userId,
     name,
+    nameColor,
     hasClaimedName,
     profilePictureUrl,
     blockedAt: blockedAt?.getTime()

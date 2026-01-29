@@ -1092,10 +1092,9 @@
     "@well-known-components/interfaces" "^1.4.3"
     node-fetch "^2.7.0"
 
-"@dcl/protocol@next":
-  version "1.0.0-21441071457.commit-c889dd0"
-  resolved "https://registry.yarnpkg.com/@dcl/protocol/-/protocol-1.0.0-21441071457.commit-c889dd0.tgz#b5488f48f496cf80a1f8bd22073a05dda754e3f0"
-  integrity sha512-5wwI2UrU0CxCGWCIksbt993whHO49R5rgIGojIy+bqhlW+CS02ZPZfdN9dLU5nBHoXUyrI5xVTA4X6DyjObEUA==
+"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-21488425580.commit-efb223c.tgz":
+  version "1.0.0-21488425580.commit-efb223c"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-21488425580.commit-efb223c.tgz#011d9876ec87289fa800f843c139cda588603409"
   dependencies:
     "@dcl/ts-proto" "1.154.0"
     protobufjs "7.2.4"
@@ -4029,10 +4028,9 @@ dataloader@^1.4.0:
   resolved "https://registry.yarnpkg.com/dataloader/-/dataloader-1.4.0.tgz#bca11d867f5d3f1b9ed9f737bd15970c65dff5c8"
   integrity sha512-68s5jYdlvasItOJnCuI2Q9s4q98g0pCyL3HrcKJu8KNugUl8ahgmZYg38ysLTgQjjXX3H8CJLkAvWrclWfcalw==
 
-dcl-catalyst-client@^21.8.1:
-  version "21.10.2"
-  resolved "https://registry.yarnpkg.com/dcl-catalyst-client/-/dcl-catalyst-client-21.10.2.tgz#d1bdc71ed33f3728f897016dc0b2d9adac573d7e"
-  integrity sha512-1WDb/63KAsvGLiyT2F9rimzWfbAXkNTgdIFrnlqqYhCdcNxmI3EeaMdgBbUkuY5sBAZamRajqxk2eFCgysIQnA==
+"dcl-catalyst-client@https://sdk-team-cdn.decentraland.org/@dcl/catalyst-client/branch/chore/bump-catalyst-api-specs/dcl-catalyst-client-21.10.3-21490259746.commit-e36890c.tgz":
+  version "21.10.3-21490259746.commit-e36890c"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/catalyst-client/branch/chore/bump-catalyst-api-specs/dcl-catalyst-client-21.10.3-21490259746.commit-e36890c.tgz#abdf30b93eaf17f4238dcea314d489eaf1480eda"
   dependencies:
     "@dcl/catalyst-contracts" "^4.4.0"
     "@dcl/crypto" "^3.4.0"

@@ -12,7 +12,8 @@ import {
   EthAddress,
   PaginatedParameters,
   CommunityPostAddedEvent,
-  CommunityOwnershipTransferredEvent
+  CommunityOwnershipTransferredEvent,
+  Color3
 } from '@dcl/schemas'
 import {
   CommunityDeletedEventReducedMetadata,
@@ -341,6 +342,7 @@ export type CommunityMemberProfile = CommunityMember & {
   profilePictureUrl: string
   hasClaimedName: boolean
   name: string
+  nameColor: Color3 | undefined
   friendshipStatus: FriendshipStatus
 }
 
@@ -348,6 +350,7 @@ export type BannedMemberProfile = BannedMember & {
   profilePictureUrl: string
   hasClaimedName: boolean
   name: string
+  nameColor: Color3 | undefined
   friendshipStatus: FriendshipStatus
 }
 
