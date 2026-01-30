@@ -58,7 +58,7 @@ export function getProfileInfo(profile: Profile) {
 
   return {
     name,
-    nameColor,
+    ...(nameColor && { nameColor }),
     userId,
     hasClaimedName,
     profilePictureUrl

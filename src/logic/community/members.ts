@@ -55,9 +55,7 @@ export async function createCommunityMembersComponent(
 
     const profiles = await registry.getProfiles(members.map((member) => member.memberAddress))
 
-    const membersWithProfile = mapMembersWithProfiles<T, T & CommunityMemberProfile>(userAddress, members, profiles)
-
-    return membersWithProfile
+    return mapMembersWithProfiles(userAddress, members, profiles) as (T & CommunityMemberProfile)[]
   }
 
   const filterAndCountCommunityMembers = async (id: string, options: GetCommunityMembersOptions) => {
