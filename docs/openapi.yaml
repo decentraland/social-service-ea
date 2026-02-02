@@ -608,6 +608,52 @@ paths:
       tags:
         - Communities
   /v1/communities/{id}/members/{memberAddress}:
+    get:
+      operationId: checkCommunityMember
+      summary: Check if a user is a member of a community
+      description: |
+        Checks if a specific user is a member of a specific community.
+        This endpoint requires Signed Fetch authentication.
+        Returns 204 No Content if the user is a member, 404 Not Found if not.
+        This is used by other services (like worlds-content-server) to verify community membership for access control.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: memberAddress
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the member to check.
+      responses:
+        '204':
+          description: User is a member of the community
+        '404':
+          description: User is not a member of the community or community doesn't exist
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
     delete:
       operationId: removeCommunityMember
       summary: Remove a member from a community
