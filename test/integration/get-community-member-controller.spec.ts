@@ -3,10 +3,10 @@ import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { mockCommunity } from '../mocks/communities'
 
-test('Check Community Member Controller', function ({ components, spyComponents }) {
+test('Get Community Member Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
 
-  describe('when checking if a user is a member of a community', () => {
+  describe('when getting a member of a community', () => {
     let identity: Identity
     let address: string
     let communityId: string

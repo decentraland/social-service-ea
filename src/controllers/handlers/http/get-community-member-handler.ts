@@ -1,7 +1,7 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 
-export async function checkCommunityMemberHandler(
+export async function getCommunityMemberHandler(
   context: Pick<
     HandlerContextWithPath<'communitiesDb' | 'logs', '/v1/communities/:id/members/:memberAddress'>,
     'components' | 'params' | 'verification'
@@ -11,7 +11,7 @@ export async function checkCommunityMemberHandler(
     components: { communitiesDb, logs },
     params
   } = context
-  const logger = logs.getLogger('check-community-member-handler')
+  const logger = logs.getLogger('get-community-member-handler')
 
   const communityId = params.id
   const memberAddress = params.memberAddress
@@ -21,8 +21,7 @@ export async function checkCommunityMemberHandler(
 
     if (isMember) {
       return {
-        status: 204,
-        body: undefined
+        status: 204
       }
     }
 
@@ -34,7 +33,7 @@ export async function checkCommunityMemberHandler(
     }
   } catch (error) {
     const message = errorMessageOrDefault(error)
-    logger.error(`Error checking community membership: ${message}`, { communityId, memberAddress })
+    logger.error(`Error getting community membership: ${message}`, { communityId, memberAddress })
 
     return {
       status: 500,

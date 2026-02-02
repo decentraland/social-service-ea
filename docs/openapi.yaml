@@ -609,10 +609,10 @@ paths:
         - Communities
   /v1/communities/{id}/members/{memberAddress}:
     get:
-      operationId: checkCommunityMember
-      summary: Check if a user is a member of a community
+      operationId: getCommunityMember
+      summary: Get a member of a community
       description: |
-        Checks if a specific user is a member of a specific community.
+        Gets a specific member of a specific community.
         This endpoint requires Signed Fetch authentication.
         Returns 204 No Content if the user is a member, 404 Not Found if not.
         This is used by other services (like worlds-content-server) to verify community membership for access control.
