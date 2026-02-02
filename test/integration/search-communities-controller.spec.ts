@@ -212,7 +212,7 @@ test('Search Communities Controller', function ({ components, spyComponents }) {
 
         expect(response.status).toBe(500)
         const body = await response.json()
-        expect(body.error).toBe('Internal Server Error')
+        expect(body.message).toBe('Database error')
       })
     })
   })
