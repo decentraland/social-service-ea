@@ -856,3 +856,30 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/CommunityPost'
+
+    SearchCommunities200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - communities
+          properties:
+            communities:
+              type: array
+              items:
+                type: object
+                required:
+                  - id
+                  - name
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    description: 'Unique identifier of the community'
+                  name:
+                    type: string
+                    description: 'Name of the community'
+              description: 'List of communities matching the search query'

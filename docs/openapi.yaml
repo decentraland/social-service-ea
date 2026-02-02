@@ -102,6 +102,63 @@ security:
   - SignedFetch: []
 
 paths:
+  /v1/communities/search:
+    get:
+      operationId: searchCommunities
+      summary: Search communities by name
+      description: |
+        Fast community search for finding communities by name prefix.
+        This endpoint has optional Signed Fetch authentication.
+        
+        **Visibility Rules:**
+        - Public and Private communities: searchable by anyone
+        - Unlisted communities: only searchable by their members
+        
+        **Search Behavior:**
+        - Matches community names starting with the search term
+        - Also matches words in the middle of the name (after a space)
+        - Minimum 2 characters required for search
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+          description: Search query (minimum 2 characters). Matches community name prefixes.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Maximum number of results to return (default 10, max 50).
+      responses:
+        '200':
+          description: Communities matching the search query
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/SearchCommunities200OkResponse'
+        '400':
+          description: Invalid request - search query too short
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+
   /v1/communities:
     get:
       operationId: listCommunities

@@ -246,6 +246,10 @@ export interface ICommunitiesDatabaseComponent {
       >
     >
   ): Promise<void>
+  searchCommunities(
+    search: string,
+    options: { userAddress?: EthAddress; limit: number }
+  ): Promise<Array<{ id: string; name: string }>>
 }
 
 export interface IVoiceDatabaseComponent {

@@ -1282,6 +1282,38 @@ export function createCommunitiesDBComponent(
       `)
 
       await pg.query(query)
+    },
+
+    async searchCommunities(
+      search: string,
+      options: { userAddress?: EthAddress; limit: number }
+    ): Promise<Array<{ id: string; name: string }>> {
+      const { userAddress, limit } = options
+      const normalizedUserAddress = userAddress ? normalizeAddress(userAddress) : null
+
+      // Optimized prefix matching query:
+      // - Matches names starting with the search term
+      // - Also matches words in the middle of the name (after a space)
+      // - Public and Private communities are always searchable
+      // - Unlisted communities are only searchable by their members
+      const query = SQL`
+        SELECT c.id, c.name
+        FROM communities c
+        WHERE c.active = true
+          AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})
+          AND (
+            c.unlisted = false
+            OR EXISTS (
+              SELECT 1 FROM community_members cm
+              WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
+            )
+          )
+        ORDER BY c.name ASC
+        LIMIT ${limit}
+      `
+
+      const result = await pg.query<{ id: string; name: string }>(query)
+      return result.rows
     }
   }
 }
