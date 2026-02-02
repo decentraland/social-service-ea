@@ -59,18 +59,18 @@ test('Search Communities Controller', function ({ components, spyComponents }) {
 
         expect(response.status).toBe(400)
         const body = await response.json()
-        expect(body.message).toContain('at least 2 characters')
+        expect(body.message).toContain('at least 3 characters')
       })
     })
 
     describe('and the search query is too short', () => {
       it('should respond with a 400 status code', async () => {
         const { localHttpFetch } = components
-        const response = await localHttpFetch.fetch('/v1/communities/search?q=a')
+        const response = await localHttpFetch.fetch('/v1/communities/search?q=ab')
 
         expect(response.status).toBe(400)
         const body = await response.json()
-        expect(body.message).toContain('at least 2 characters')
+        expect(body.message).toContain('at least 3 characters')
       })
     })
 

@@ -126,8 +126,8 @@ paths:
           required: true
           schema:
             type: string
-            minLength: 2
-          description: Search query (minimum 2 characters). Matches community name prefixes.
+            minLength: 3
+          description: Search query (minimum 3 characters). Matches community name prefixes.
         - name: limit
           in: query
           required: false

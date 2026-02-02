@@ -1,7 +1,7 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 
-const MIN_SEARCH_LENGTH = 2
+const MIN_SEARCH_LENGTH = 3
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 50
 
