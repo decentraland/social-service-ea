@@ -36,7 +36,8 @@ export function createMockCommunitiesComponent({
   deleteCommunity = jest.fn(),
   getCommunityInvites = jest.fn(),
   getAllCommunitiesForModeration = jest.fn(),
-  updateEditorChoice = jest.fn()
+  updateEditorChoice = jest.fn(),
+  searchCommunities = jest.fn(),
 }: Partial<jest.Mocked<ICommunitiesComponent>>): jest.Mocked<ICommunitiesComponent> {
   return {
     getCommunity,
@@ -49,7 +50,8 @@ export function createMockCommunitiesComponent({
     deleteCommunity,
     getCommunityInvites,
     getAllCommunitiesForModeration,
-    updateEditorChoice
+    updateEditorChoice,
+    searchCommunities,
   }
 }
 

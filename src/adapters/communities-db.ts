@@ -1282,6 +1282,102 @@ export function createCommunitiesDBComponent(
       `)
 
       await pg.query(query)
+    },
+
+    async getVisibleCommunitiesByIds(communityIds: string[], userAddress: EthAddress): Promise<Array<{ id: string }>> {
+      if (communityIds.length === 0) {
+        return []
+      }
+
+      const normalizedUserAddress = normalizeAddress(userAddress)
+
+      // Returns communities that exist, are active, and are visible to the user:
+      // - Public communities (private = false)
+      // - Private communities where the user is a member
+      const query = SQL`
+        SELECT DISTINCT c.id
+        FROM communities c
+        LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedUserAddress}
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedUserAddress} AND cb.active = true
+        WHERE c.id = ANY(${communityIds})
+          AND c.active = true
+          AND cb.banned_address IS NULL
+          AND (c.private = false OR cm.member_address IS NOT NULL)
+      `
+
+      const result = await pg.query<{ id: string }>(query)
+      return result.rows
+    },
+
+    async searchCommunities(
+      search: string,
+      options: { userAddress: EthAddress; limit: number; offset: number }
+    ): Promise<{
+      results: Array<{ id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }>
+      total: number
+    }> {
+      const { userAddress, limit, offset } = options
+      const normalizedUserAddress = normalizeAddress(userAddress)
+
+      // Optimized prefix matching query:
+      // - Matches names starting with the search term (when provided)
+      // - Also matches words in the middle of the name (after a space)
+      // - Public and Private communities are always searchable
+      // - Unlisted communities are only searchable by their members
+      const mainQuery = useCTEs([getCommunitiesWithMembersCountCTE()]).append(
+        SQL`SELECT c.id, c.name, COALESCE(cwmc."membersCount", 0)::int as "membersCount", CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy`
+      )
+      const countQuery = SQL`SELECT COUNT(*) as count`
+
+      const baseCondition = SQL`
+        FROM communities c
+        LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
+        WHERE c.active = true
+          AND (
+            c.unlisted = false
+            OR EXISTS (
+              SELECT 1 FROM community_members cm
+              WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
+            )
+          )
+      `
+
+      const countBaseCondition = SQL`
+        FROM communities c
+        WHERE c.active = true
+          AND (
+            c.unlisted = false
+            OR EXISTS (
+              SELECT 1 FROM community_members cm
+              WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
+            )
+          )
+      `
+
+      mainQuery.append(baseCondition)
+      countQuery.append(countBaseCondition)
+
+      if (search) {
+        const searchCondition = SQL` AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})`
+        mainQuery.append(searchCondition)
+        countQuery.append(searchCondition)
+      }
+
+      mainQuery.append(SQL`
+        ORDER BY c.name ASC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `)
+
+      const [results, count] = await Promise.all([
+        pg.query<{ id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }>(mainQuery),
+        pg.query<{ count: string }>(countQuery)
+      ])
+
+      return {
+        results: results.rows,
+        total: parseInt(count.rows[0]?.count ?? '0', 10)
+      }
     }
   }
 }

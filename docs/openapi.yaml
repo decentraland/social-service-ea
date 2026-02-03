@@ -107,10 +107,26 @@ paths:
       operationId: listCommunities
       summary: List communities
       description: |
-        Lists all communities.
+        Lists all communities with full details, or performs a fast community search with minimal data.
         This endpoint has optional Signed Fetch authentication.
         When signed, it includes properties related to the authenticated user in its response.
         This endpoint excludes unlisted communities from results. Use direct community access (GET `/v1/communities/{id}`) to retrieve unlisted communities.
+        
+        **Minimal Mode (minimal=true):**
+        When `minimal=true` is set, authentication is required and only the `search` parameter is used:
+        - Returns community `id`, `name`, `membersCount`, and `privacy` for fast lookups
+        - Requires `search` parameter with minimum 3 characters
+        - Maximum 50 results per request
+        - Supports pagination with `limit` and `offset` parameters
+        - Other filter parameters are ignored
+        
+        **Visibility Rules (Minimal Mode):**
+        - Public and Private communities: searchable by anyone
+        - Unlisted communities: only searchable by their members
+        
+        **Search Behavior (Minimal Mode):**
+        - Matches community names starting with the search term
+        - Also matches words in the middle of the name (after a space)
       security:
         - SignedFetch: []
       parameters:
@@ -119,7 +135,7 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of communities per page.
+          description: Number of communities per page. When `minimal=true`, max is 50.
         - name: offset
           in: query
           required: false
@@ -131,19 +147,30 @@ paths:
           required: false
           schema:
             type: string
-          description: Search term to filter communities by name or description.
+          description: Search term to filter communities by name. Required when `minimal=true` (minimum 3 characters).
+        - name: minimal
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |
+            When `true`, returns community `id`, `name`, `membersCount`, and `privacy` for fast lookups.
+            Requires authentication and `search` parameter with minimum 3 characters.
+            Supports pagination with `limit` (max 50) and `offset` parameters.
+            Other filter parameters (`onlyMemberOf`, `onlyWithActiveVoiceChat`, `roles`) are ignored.
         - name: onlyMemberOf
           in: query
           required: false
           schema:
             type: boolean
-          description: Filter communities where the authenticated user is a member.
+          description: Filter communities where the authenticated user is a member. Ignored when `minimal=true`.
         - name: onlyWithActiveVoiceChat
           in: query
           required: false
           schema:
             type: boolean
-          description: Filter to show only communities with active voice chats.
+          description: Filter to show only communities with active voice chats. Ignored when `minimal=true`.
         - name: roles
           in: query
           required: false
@@ -152,14 +179,16 @@ paths:
             items:
               type: string
               enum: [owner, moderator, member, none]
-          description: Filter communities by the authenticated user's role (can specify multiple roles).
+          description: Filter communities by the authenticated user's role (can specify multiple roles). Ignored when `minimal=true`.
       responses:
         '200':
           description: Communities found
           content:
             application/json:
               schema:
-                $ref: './schemas.yaml#/components/schemas/GetCommunities200OkResponse'
+                oneOf:
+                  - $ref: './schemas.yaml#/components/schemas/GetCommunities200OkResponse'
+                  - $ref: './schemas.yaml#/components/schemas/GetCommunitiesMinimal200OkResponse'
         '400':
           description: Invalid request
           content:
@@ -689,6 +718,71 @@ paths:
                 $ref: './schemas.yaml#/components/schemas/GetMemberCommunities200OkResponse'
         '401':
           description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities
+    post:
+      operationId: getMemberCommunitiesByIds
+      summary: Get member communities by IDs
+      description: |
+        Validates a batch of community IDs and returns only those that exist and are visible to a user.
+        This endpoint is used by other services (like worlds-content-server) to validate community IDs
+        when storing access settings.
+
+        **Authentication:**
+        This endpoint requires Bearer token authentication (admin token).
+
+        **Visibility Rules:**
+        - Public communities are always visible
+        - Private communities are only visible to their members
+        - Banned users cannot see communities they are banned from
+
+        **Usage:**
+        - Caller provides a list of community IDs to validate
+        - Response contains only the valid and visible communities
+        - Caller should check that all requested IDs are present in the response
+
+        **Limits:**
+        - Maximum 50 community IDs per request
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ETH address of the member to check visibility for.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas.yaml#/components/schemas/GetMemberCommunitiesByIdsRequest'
+      responses:
+        '200':
+          description: Valid and visible communities
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetMemberCommunitiesByIds200OkResponse'
+        '400':
+          description: Invalid request - malformed community IDs or exceeds limit
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Bearer token required
           content:
             application/json:
               schema:
