@@ -102,72 +102,30 @@ security:
   - SignedFetch: []
 
 paths:
-  /v1/communities/search:
-    get:
-      operationId: searchCommunities
-      summary: Search communities by name
-      description: |
-        Fast community search for finding communities by name prefix.
-        This endpoint has optional Signed Fetch authentication.
-        
-        **Visibility Rules:**
-        - Public and Private communities: searchable by anyone
-        - Unlisted communities: only searchable by their members
-        
-        **Search Behavior:**
-        - Matches community names starting with the search term
-        - Also matches words in the middle of the name (after a space)
-        - Minimum 2 characters required for search
-      security:
-        - SignedFetch: []
-      parameters:
-        - name: q
-          in: query
-          required: true
-          schema:
-            type: string
-            minLength: 3
-          description: Search query (minimum 3 characters). Matches community name prefixes.
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 50
-            default: 10
-          description: Maximum number of results to return (default 10, max 50).
-      responses:
-        '200':
-          description: Communities matching the search query
-          content:
-            application/json:
-              schema:
-                $ref: './schemas.yaml#/components/schemas/SearchCommunities200OkResponse'
-        '400':
-          description: Invalid request - search query too short
-          content:
-            application/json:
-              schema:
-                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
-      tags:
-        - Communities
-
   /v1/communities:
     get:
       operationId: listCommunities
       summary: List communities
       description: |
-        Lists all communities.
+        Lists all communities with full details, or performs a fast community search with minimal data.
         This endpoint has optional Signed Fetch authentication.
         When signed, it includes properties related to the authenticated user in its response.
         This endpoint excludes unlisted communities from results. Use direct community access (GET `/v1/communities/{id}`) to retrieve unlisted communities.
+        
+        **Minimal Mode (minimal=true):**
+        When `minimal=true` is set, authentication is required and only the `search` parameter is used:
+        - Returns only community `id` and `name` for fast lookups
+        - Requires `search` parameter with minimum 3 characters
+        - Maximum 50 results per request
+        - Other filter parameters are ignored
+        
+        **Visibility Rules (Minimal Mode):**
+        - Public and Private communities: searchable by anyone
+        - Unlisted communities: only searchable by their members
+        
+        **Search Behavior (Minimal Mode):**
+        - Matches community names starting with the search term
+        - Also matches words in the middle of the name (after a space)
       security:
         - SignedFetch: []
       parameters:
@@ -176,7 +134,7 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of communities per page.
+          description: Number of communities per page. When `minimal=true`, max is 50.
         - name: offset
           in: query
           required: false
@@ -188,19 +146,29 @@ paths:
           required: false
           schema:
             type: string
-          description: Search term to filter communities by name or description.
+          description: Search term to filter communities by name. Required when `minimal=true` (minimum 3 characters).
+        - name: minimal
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |
+            When `true`, returns only community `id` and `name` for fast lookups.
+            Requires authentication and `search` parameter with minimum 3 characters.
+            Other filter parameters (`onlyMemberOf`, `onlyWithActiveVoiceChat`, `roles`) are ignored.
         - name: onlyMemberOf
           in: query
           required: false
           schema:
             type: boolean
-          description: Filter communities where the authenticated user is a member.
+          description: Filter communities where the authenticated user is a member. Ignored when `minimal=true`.
         - name: onlyWithActiveVoiceChat
           in: query
           required: false
           schema:
             type: boolean
-          description: Filter to show only communities with active voice chats.
+          description: Filter to show only communities with active voice chats. Ignored when `minimal=true`.
         - name: roles
           in: query
           required: false
@@ -209,14 +177,16 @@ paths:
             items:
               type: string
               enum: [owner, moderator, member, none]
-          description: Filter communities by the authenticated user's role (can specify multiple roles).
+          description: Filter communities by the authenticated user's role (can specify multiple roles). Ignored when `minimal=true`.
       responses:
         '200':
           description: Communities found
           content:
             application/json:
               schema:
-                $ref: './schemas.yaml#/components/schemas/GetCommunities200OkResponse'
+                oneOf:
+                  - $ref: './schemas.yaml#/components/schemas/GetCommunities200OkResponse'
+                  - $ref: './schemas.yaml#/components/schemas/GetCommunitiesMinimal200OkResponse'
         '400':
           description: Invalid request
           content:
