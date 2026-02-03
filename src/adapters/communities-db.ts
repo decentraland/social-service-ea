@@ -1287,7 +1287,10 @@ export function createCommunitiesDBComponent(
     async searchCommunities(
       search: string,
       options: { userAddress: EthAddress; limit: number; offset: number }
-    ): Promise<{ results: Array<{ id: string; name: string; membersCount: number }>; total: number }> {
+    ): Promise<{
+      results: Array<{ id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }>
+      total: number
+    }> {
       const { userAddress, limit, offset } = options
       const normalizedUserAddress = normalizeAddress(userAddress)
 
@@ -1297,7 +1300,7 @@ export function createCommunitiesDBComponent(
       // - Public and Private communities are always searchable
       // - Unlisted communities are only searchable by their members
       const mainQuery = useCTEs([getCommunitiesWithMembersCountCTE()]).append(
-        SQL`SELECT c.id, c.name, COALESCE(cwmc."membersCount", 0)::int as "membersCount"`
+        SQL`SELECT c.id, c.name, COALESCE(cwmc."membersCount", 0)::int as "membersCount", CASE WHEN c.private THEN 'private' ELSE 'public' END as privacy`
       )
       const countQuery = SQL`SELECT COUNT(*) as count`
 
@@ -1342,7 +1345,7 @@ export function createCommunitiesDBComponent(
       `)
 
       const [results, count] = await Promise.all([
-        pg.query<{ id: string; name: string; membersCount: number }>(mainQuery),
+        pg.query<{ id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }>(mainQuery),
         pg.query<{ count: string }>(countQuery)
       ])
 

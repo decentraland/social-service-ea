@@ -2471,12 +2471,12 @@ describe('Community Component', () => {
     const offset = 0
 
     describe('and communities match the search', () => {
-      let searchResults: { id: string; name: string }[]
+      let searchResults: { id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }[]
 
       beforeEach(() => {
         searchResults = [
-          { id: 'community-1', name: 'Test Community 1' },
-          { id: 'community-2', name: 'Test Community 2' }
+          { id: 'community-1', name: 'Test Community 1', membersCount: 10, privacy: CommunityPrivacyEnum.Public },
+          { id: 'community-2', name: 'Test Community 2', membersCount: 5, privacy: CommunityPrivacyEnum.Private }
         ]
         mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: searchResults, total: 2 })
       })
@@ -2508,12 +2508,12 @@ describe('Community Component', () => {
     })
 
     describe('and pagination is applied', () => {
-      let searchResults: { id: string; name: string }[]
+      let searchResults: { id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }[]
 
       beforeEach(() => {
         searchResults = [
-          { id: 'community-11', name: 'Test Community 11' },
-          { id: 'community-12', name: 'Test Community 12' }
+          { id: 'community-11', name: 'Test Community 11', membersCount: 3, privacy: CommunityPrivacyEnum.Public },
+          { id: 'community-12', name: 'Test Community 12', membersCount: 7, privacy: CommunityPrivacyEnum.Private }
         ]
         mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: searchResults, total: 15 })
       })

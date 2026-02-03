@@ -1345,7 +1345,8 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             expect(body.data.results[0]).toEqual({
               id: minimalCommunityId1,
               name: 'Alpha Minimal Community',
-              membersCount: 0
+              membersCount: 0,
+              privacy: 'public'
             })
             expect(body.data.total).toBe(1)
             expect(body.data.page).toBe(1)
