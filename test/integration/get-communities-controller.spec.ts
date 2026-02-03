@@ -1331,7 +1331,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
       describe('and the search query is valid', () => {
         describe('and the user is not a member of the unlisted community', () => {
           it('should respond with matching listed communities and pagination params', async () => {
-            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha%20Minimal')
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha%20Minimal&limit=10')
 
             expect(response.status).toBe(200)
             const body = await response.json()
@@ -1416,7 +1416,7 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             expect(response.status).toBe(200)
             const body = await response.json()
             expect(body.data.results.length).toBeLessThanOrEqual(10)
-            expect(body.data.limit).toBe(10)
+            expect(body.data.limit).toBe(50)
           })
 
           it('should cap limit at maximum value', async () => {
