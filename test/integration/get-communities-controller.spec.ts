@@ -1338,7 +1338,8 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
             expect(body.data.results).toHaveLength(1)
             expect(body.data.results[0]).toEqual({
               id: minimalCommunityId1,
-              name: 'Alpha Minimal Community'
+              name: 'Alpha Minimal Community',
+              membersCount: 0
             })
             expect(body.data.total).toBe(1)
             expect(body.data.page).toBe(1)

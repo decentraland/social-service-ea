@@ -549,12 +549,13 @@ export interface ICommunityRankingComponent {
 }
 
 /**
- * Minimal community search result containing only id and name.
+ * Minimal community search result containing only id, name, and membersCount.
  * Used for lightweight search operations (e.g., autocomplete, quick lookups).
  */
 export type CommunitySearchResult = {
   id: string
   name: string
+  membersCount: number
 }
 
 export type CommunityRankingMetricsDB = {

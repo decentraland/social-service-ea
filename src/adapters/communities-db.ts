@@ -1287,7 +1287,7 @@ export function createCommunitiesDBComponent(
     async searchCommunities(
       search: string,
       options: { userAddress: EthAddress; limit: number; offset: number }
-    ): Promise<{ results: Array<{ id: string; name: string }>; total: number }> {
+    ): Promise<{ results: Array<{ id: string; name: string; membersCount: number }>; total: number }> {
       const { userAddress, limit, offset } = options
       const normalizedUserAddress = normalizeAddress(userAddress)
 
@@ -1296,10 +1296,13 @@ export function createCommunitiesDBComponent(
       // - Also matches words in the middle of the name (after a space)
       // - Public and Private communities are always searchable
       // - Unlisted communities are only searchable by their members
-      const mainQuery = SQL`SELECT c.id, c.name`
+      const mainQuery = useCTEs([getCommunitiesWithMembersCountCTE()]).append(
+        SQL`SELECT c.id, c.name, COALESCE(cwmc."membersCount", 0)::int as "membersCount"`
+      )
       const countQuery = SQL`SELECT COUNT(*) as count`
       const body = SQL`
         FROM communities c
+        LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
         WHERE c.active = true
           AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})
           AND (
@@ -1311,7 +1314,18 @@ export function createCommunitiesDBComponent(
           )
       `
       mainQuery.append(body)
-      countQuery.append(body)
+      countQuery.append(SQL`
+        FROM communities c
+        WHERE c.active = true
+          AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})
+          AND (
+            c.unlisted = false
+            OR EXISTS (
+              SELECT 1 FROM community_members cm
+              WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
+            )
+          )
+      `)
 
       mainQuery.append(SQL`
         ORDER BY c.name ASC
@@ -1320,7 +1334,7 @@ export function createCommunitiesDBComponent(
       `)
 
       const [results, count] = await Promise.all([
-        pg.query<{ id: string; name: string }>(mainQuery),
+        pg.query<{ id: string; name: string; membersCount: number }>(mainQuery),
         pg.query<{ count: string }>(countQuery)
       ])
 

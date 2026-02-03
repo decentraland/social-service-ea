@@ -249,7 +249,7 @@ export interface ICommunitiesDatabaseComponent {
   searchCommunities(
     search: string,
     options: { userAddress: EthAddress; limit: number; offset: number }
-  ): Promise<{ results: Array<{ id: string; name: string }>; total: number }>
+  ): Promise<{ results: Array<{ id: string; name: string; membersCount: number }>; total: number }>
 }
 
 export interface IVoiceDatabaseComponent {
