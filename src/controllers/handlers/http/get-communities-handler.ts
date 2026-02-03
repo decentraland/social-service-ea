@@ -34,7 +34,7 @@ export async function getCommunitiesHandler(
   const userAddress = verification?.auth?.toLowerCase()
   const minimal = url.searchParams.get('minimal')?.toLowerCase() === 'true'
   const pagination = getPaginationParams(url.searchParams)
-  const search = url.searchParams.get('search')
+  const search = url.searchParams.get('search')?.trim()
 
   try {
     if (minimal) {
@@ -42,7 +42,7 @@ export async function getCommunitiesHandler(
         throw new NotAuthorizedError('Authentication required for minimal community search')
       }
 
-      if (!search || search.length < MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE) {
+      if (search && search.length < MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE) {
         throw new InvalidRequestError(
           `Search query must be at least ${MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE} characters when using minimal`
         )
@@ -58,7 +58,7 @@ export async function getCommunitiesHandler(
         limit
       })
 
-      const { communities: communitiesResult, total } = await communities.searchCommunities(search!, {
+      const { communities: communitiesResult, total } = await communities.searchCommunities(search ?? '', {
         userAddress: userAddress!,
         limit,
         offset: pagination.offset

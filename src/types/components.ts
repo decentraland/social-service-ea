@@ -43,7 +43,8 @@ import {
   CommunityPostWithLikes,
   GetCommunityPostsOptions,
   CommunityRankingMetrics,
-  CommunityRankingMetricsDB
+  CommunityRankingMetricsDB,
+  CommunityPrivacyEnum
 } from '../logic/community'
 import { Pagination } from './entities'
 import { Subscribers, SubscriptionEventsEmitter } from './rpc'
@@ -249,9 +250,11 @@ export interface ICommunitiesDatabaseComponent {
   getVisibleCommunitiesByIds(communityIds: string[], userAddress: EthAddress): Promise<Array<{ id: string }>>
   searchCommunities(
     search: string,
-    options: { userAddress?: EthAddress; limit: number }
-  ): Promise<Array<{ id: string; name: string }>>
-  searchCommunitiesCount(search: string, options: { userAddress: EthAddress }): Promise<number>
+    options: { userAddress?: EthAddress; limit: number; offset: number }
+  ): Promise<{
+    results: Array<{ id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }>
+    total: number
+  }>
 }
 
 export interface IVoiceDatabaseComponent {

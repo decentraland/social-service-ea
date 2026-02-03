@@ -2471,15 +2471,14 @@ describe('Community Component', () => {
     const offset = 0
 
     describe('and communities match the search', () => {
-      let searchResults: { id: string; name: string }[]
+      let searchResults: { id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }[]
 
       beforeEach(() => {
         searchResults = [
-          { id: 'community-1', name: 'Test Community 1' },
-          { id: 'community-2', name: 'Test Community 2' }
+          { id: 'community-1', name: 'Test Community 1', membersCount: 10, privacy: CommunityPrivacyEnum.Public },
+          { id: 'community-2', name: 'Test Community 2', membersCount: 5, privacy: CommunityPrivacyEnum.Private }
         ]
-        mockCommunitiesDB.searchCommunities.mockResolvedValue(searchResults)
-        mockCommunitiesDB.searchCommunitiesCount.mockResolvedValue(2)
+        mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: searchResults, total: 2 })
       })
 
       it('should return matching communities with total count', async () => {
@@ -2490,14 +2489,12 @@ describe('Community Component', () => {
           total: 2
         })
         expect(mockCommunitiesDB.searchCommunities).toHaveBeenCalledWith(searchQuery, { userAddress, limit, offset })
-        expect(mockCommunitiesDB.searchCommunitiesCount).toHaveBeenCalledWith(searchQuery, { userAddress })
       })
     })
 
     describe('and no communities match the search', () => {
       beforeEach(() => {
-        mockCommunitiesDB.searchCommunities.mockResolvedValue([])
-        mockCommunitiesDB.searchCommunitiesCount.mockResolvedValue(0)
+        mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: [], total: 0 })
       })
 
       it('should return empty results with zero total', async () => {
@@ -2511,15 +2508,14 @@ describe('Community Component', () => {
     })
 
     describe('and pagination is applied', () => {
-      let searchResults: { id: string; name: string }[]
+      let searchResults: { id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }[]
 
       beforeEach(() => {
         searchResults = [
-          { id: 'community-11', name: 'Test Community 11' },
-          { id: 'community-12', name: 'Test Community 12' }
+          { id: 'community-11', name: 'Test Community 11', membersCount: 3, privacy: CommunityPrivacyEnum.Public },
+          { id: 'community-12', name: 'Test Community 12', membersCount: 7, privacy: CommunityPrivacyEnum.Private }
         ]
-        mockCommunitiesDB.searchCommunities.mockResolvedValue(searchResults)
-        mockCommunitiesDB.searchCommunitiesCount.mockResolvedValue(15)
+        mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: searchResults, total: 15 })
       })
 
       it('should pass offset to the database query', async () => {
