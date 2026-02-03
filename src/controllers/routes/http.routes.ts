@@ -37,7 +37,6 @@ import {
   likeCommunityPostHandler,
   unlikeCommunityPostHandler,
   searchCommunitiesHandler,
-  getCommunityMemberHandler,
   getMemberCommunitiesByIdsHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
@@ -85,7 +84,6 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.get('/v1/communities/:id', signedFetchMiddleware({ optional: true }), getCommunityHandler)
   router.get('/v1/communities', signedFetchMiddleware({ optional: true }), getCommunitiesHandler)
   router.get('/v1/communities/:id/members', signedFetchMiddleware({ optional: true }), getCommunityMembersHandler)
-  router.get('/v1/communities/:id/members/:memberAddress', signedFetchMiddleware(), getCommunityMemberHandler)
 
   router.post('/v1/communities/:id/members', signedFetchMiddleware(), addMemberToCommunityHandler)
   router.delete('/v1/communities/:id/members/:memberAddress', signedFetchMiddleware(), removeMemberFromCommunityHandler)
