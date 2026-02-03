@@ -1286,10 +1286,10 @@ export function createCommunitiesDBComponent(
 
     async searchCommunities(
       search: string,
-      options: { userAddress?: EthAddress; limit: number }
+      options: { userAddress: EthAddress; limit: number; offset: number }
     ): Promise<Array<{ id: string; name: string }>> {
-      const { userAddress, limit } = options
-      const normalizedUserAddress = userAddress ? normalizeAddress(userAddress) : null
+      const { userAddress, limit, offset } = options
+      const normalizedUserAddress = normalizeAddress(userAddress)
 
       // Optimized prefix matching query:
       // - Matches names starting with the search term
@@ -1310,10 +1310,33 @@ export function createCommunitiesDBComponent(
           )
         ORDER BY c.name ASC
         LIMIT ${limit}
+        OFFSET ${offset}
       `
 
       const result = await pg.query<{ id: string; name: string }>(query)
       return result.rows
+    },
+
+    async searchCommunitiesCount(search: string, options: { userAddress: EthAddress }): Promise<number> {
+      const { userAddress } = options
+      const normalizedUserAddress = normalizeAddress(userAddress)
+
+      const query = SQL`
+        SELECT COUNT(*) as count
+        FROM communities c
+        WHERE c.active = true
+          AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})
+          AND (
+            c.unlisted = false
+            OR EXISTS (
+              SELECT 1 FROM community_members cm
+              WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
+            )
+          )
+      `
+
+      const result = await pg.query<{ count: string }>(query)
+      return parseInt(result.rows[0]?.count ?? '0', 10)
     }
   }
 }

@@ -587,6 +587,17 @@ export function createCommunityComponent(
       }))
     },
 
+    searchCommunities: async (
+      search: string,
+      options: { userAddress: EthAddress; limit: number; offset: number }
+    ): Promise<{ communities: { id: string; name: string }[]; total: number }> => {
+      const [communities, total] = await Promise.all([
+        communitiesDb.searchCommunities(search, options),
+        communitiesDb.searchCommunitiesCount(search, options)
+      ])
+      return { communities, total }
+    },
+
     getAllCommunitiesForModeration: async (
       options: GetCommunitiesOptions
     ): Promise<GetCommunitiesWithTotal<CommunityForModeration>> => {

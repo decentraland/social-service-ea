@@ -35,8 +35,7 @@ import {
   getCommunityPostsHandler,
   deleteCommunityPostHandler,
   likeCommunityPostHandler,
-  unlikeCommunityPostHandler,
-  searchCommunitiesHandler
+  unlikeCommunityPostHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
@@ -78,7 +77,6 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
     router.get('/v1/communities/:address/managed', bearerTokenMiddleware(API_ADMIN_TOKEN), getManagedCommunitiesHandler)
   }
 
-  router.get('/v1/communities/search', signedFetchMiddleware({ optional: true }), searchCommunitiesHandler)
   router.get('/v1/communities/:id', signedFetchMiddleware({ optional: true }), getCommunityHandler)
   router.get('/v1/communities', signedFetchMiddleware({ optional: true }), getCommunitiesHandler)
   router.get('/v1/communities/:id/members', signedFetchMiddleware({ optional: true }), getCommunityMembersHandler)

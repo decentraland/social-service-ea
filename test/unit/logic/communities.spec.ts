@@ -2463,4 +2463,78 @@ describe('Community Component', () => {
       })
     })
   })
+
+  describe('when searching communities', () => {
+    const userAddress = '0x1234567890123456789012345678901234567890'
+    const searchQuery = 'test'
+    const limit = 10
+    const offset = 0
+
+    describe('and communities match the search', () => {
+      let searchResults: { id: string; name: string }[]
+
+      beforeEach(() => {
+        searchResults = [
+          { id: 'community-1', name: 'Test Community 1' },
+          { id: 'community-2', name: 'Test Community 2' }
+        ]
+        mockCommunitiesDB.searchCommunities.mockResolvedValue(searchResults)
+        mockCommunitiesDB.searchCommunitiesCount.mockResolvedValue(2)
+      })
+
+      it('should return matching communities with total count', async () => {
+        const result = await communityComponent.searchCommunities(searchQuery, { userAddress, limit, offset })
+
+        expect(result).toEqual({
+          communities: searchResults,
+          total: 2
+        })
+        expect(mockCommunitiesDB.searchCommunities).toHaveBeenCalledWith(searchQuery, { userAddress, limit, offset })
+        expect(mockCommunitiesDB.searchCommunitiesCount).toHaveBeenCalledWith(searchQuery, { userAddress })
+      })
+    })
+
+    describe('and no communities match the search', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.searchCommunities.mockResolvedValue([])
+        mockCommunitiesDB.searchCommunitiesCount.mockResolvedValue(0)
+      })
+
+      it('should return empty results with zero total', async () => {
+        const result = await communityComponent.searchCommunities(searchQuery, { userAddress, limit, offset })
+
+        expect(result).toEqual({
+          communities: [],
+          total: 0
+        })
+      })
+    })
+
+    describe('and pagination is applied', () => {
+      let searchResults: { id: string; name: string }[]
+
+      beforeEach(() => {
+        searchResults = [
+          { id: 'community-11', name: 'Test Community 11' },
+          { id: 'community-12', name: 'Test Community 12' }
+        ]
+        mockCommunitiesDB.searchCommunities.mockResolvedValue(searchResults)
+        mockCommunitiesDB.searchCommunitiesCount.mockResolvedValue(15)
+      })
+
+      it('should pass offset to the database query', async () => {
+        const result = await communityComponent.searchCommunities(searchQuery, { userAddress, limit: 5, offset: 10 })
+
+        expect(result).toEqual({
+          communities: searchResults,
+          total: 15
+        })
+        expect(mockCommunitiesDB.searchCommunities).toHaveBeenCalledWith(searchQuery, {
+          userAddress,
+          limit: 5,
+          offset: 10
+        })
+      })
+    })
+  })
 })

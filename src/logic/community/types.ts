@@ -34,6 +34,10 @@ export interface ICommunitiesComponent {
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
   ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>>
+  searchCommunities(
+    search: string,
+    options: { userAddress: EthAddress; limit: number; offset: number }
+  ): Promise<GetCommunitiesWithTotal<CommunitySearchResult>>
   getMemberCommunities(
     memberAddress: string,
     options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
@@ -542,6 +546,15 @@ export interface ICommunityPostsComponent {
 
 export interface ICommunityRankingComponent {
   calculateRankingScoreForAllCommunities(): Promise<void>
+}
+
+/**
+ * Minimal community search result containing only id and name.
+ * Used for lightweight search operations (e.g., autocomplete, quick lookups).
+ */
+export type CommunitySearchResult = {
+  id: string
+  name: string
 }
 
 export type CommunityRankingMetricsDB = {
