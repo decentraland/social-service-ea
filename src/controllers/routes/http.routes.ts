@@ -35,7 +35,8 @@ import {
   getCommunityPostsHandler,
   deleteCommunityPostHandler,
   likeCommunityPostHandler,
-  unlikeCommunityPostHandler
+  unlikeCommunityPostHandler,
+  getMemberCommunitiesByIdsHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
@@ -48,7 +49,8 @@ import {
   CreateReferralSchema,
   AddReferralEmailSchema,
   CreateCommunityRequestSchema,
-  UpdateCommunityRequestStatusSchema
+  UpdateCommunityRequestStatusSchema,
+  GetMemberCommunitiesByIdsSchema
 } from '../handlers/http/schemas'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
@@ -95,6 +97,15 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.delete('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), unbanMemberHandler)
 
   router.get('/v1/members/:address/communities', signedFetchMiddleware(), getMemberCommunitiesHandler)
+
+  if (API_ADMIN_TOKEN) {
+    router.post(
+      '/v1/members/:address/communities',
+      bearerTokenMiddleware(API_ADMIN_TOKEN),
+      schemaValidator.withSchemaValidatorMiddleware(GetMemberCommunitiesByIdsSchema),
+      getMemberCommunitiesByIdsHandler
+    )
+  }
   router.get('/v1/members/:address/requests', signedFetchMiddleware(), getMemberRequestsHandler)
   router.get('/v1/communities/:id/requests', signedFetchMiddleware(), getCommunityRequestsHandler)
 

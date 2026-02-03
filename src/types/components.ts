@@ -246,9 +246,10 @@ export interface ICommunitiesDatabaseComponent {
       >
     >
   ): Promise<void>
+  getVisibleCommunitiesByIds(communityIds: string[], userAddress: EthAddress): Promise<Array<{ id: string }>>
   searchCommunities(
     search: string,
-    options: { userAddress: EthAddress; limit: number; offset: number }
+    options: { userAddress?: EthAddress; limit: number }
   ): Promise<Array<{ id: string; name: string }>>
   searchCommunitiesCount(search: string, options: { userAddress: EthAddress }): Promise<number>
 }
