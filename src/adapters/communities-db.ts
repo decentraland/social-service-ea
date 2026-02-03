@@ -1292,7 +1292,7 @@ export function createCommunitiesDBComponent(
       const normalizedUserAddress = normalizeAddress(userAddress)
 
       // Optimized prefix matching query:
-      // - Matches names starting with the search term
+      // - Matches names starting with the search term (when provided)
       // - Also matches words in the middle of the name (after a space)
       // - Public and Private communities are always searchable
       // - Unlisted communities are only searchable by their members
@@ -1300,11 +1300,11 @@ export function createCommunitiesDBComponent(
         SQL`SELECT c.id, c.name, COALESCE(cwmc."membersCount", 0)::int as "membersCount"`
       )
       const countQuery = SQL`SELECT COUNT(*) as count`
-      const body = SQL`
+
+      const baseCondition = SQL`
         FROM communities c
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
         WHERE c.active = true
-          AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})
           AND (
             c.unlisted = false
             OR EXISTS (
@@ -1313,11 +1313,10 @@ export function createCommunitiesDBComponent(
             )
           )
       `
-      mainQuery.append(body)
-      countQuery.append(SQL`
+
+      const countBaseCondition = SQL`
         FROM communities c
         WHERE c.active = true
-          AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})
           AND (
             c.unlisted = false
             OR EXISTS (
@@ -1325,7 +1324,16 @@ export function createCommunitiesDBComponent(
               WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
             )
           )
-      `)
+      `
+
+      mainQuery.append(baseCondition)
+      countQuery.append(countBaseCondition)
+
+      if (search) {
+        const searchCondition = SQL` AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})`
+        mainQuery.append(searchCondition)
+        countQuery.append(searchCondition)
+      }
 
       mainQuery.append(SQL`
         ORDER BY c.name ASC
