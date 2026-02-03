@@ -874,6 +874,8 @@ components:
                     required:
                       - id
                       - name
+                      - membersCount
+                      - privacy
                     properties:
                       id:
                         type: string
@@ -882,6 +884,13 @@ components:
                       name:
                         type: string
                         description: 'Name of the community'
+                      membersCount:
+                        type: integer
+                        description: 'Number of members in the community'
+                      privacy:
+                        type: string
+                        enum: [public, private]
+                        description: 'Community privacy setting'
                   description: 'List of communities matching the search query with minimal data'
 
     GetMemberCommunitiesByIdsRequest:

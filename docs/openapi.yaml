@@ -114,9 +114,10 @@ paths:
         
         **Minimal Mode (minimal=true):**
         When `minimal=true` is set, authentication is required and only the `search` parameter is used:
-        - Returns only community `id` and `name` for fast lookups
+        - Returns community `id`, `name`, `membersCount`, and `privacy` for fast lookups
         - Requires `search` parameter with minimum 3 characters
         - Maximum 50 results per request
+        - Supports pagination with `limit` and `offset` parameters
         - Other filter parameters are ignored
         
         **Visibility Rules (Minimal Mode):**
@@ -154,8 +155,9 @@ paths:
             type: boolean
             default: false
           description: |
-            When `true`, returns only community `id` and `name` for fast lookups.
+            When `true`, returns community `id`, `name`, `membersCount`, and `privacy` for fast lookups.
             Requires authentication and `search` parameter with minimum 3 characters.
+            Supports pagination with `limit` (max 50) and `offset` parameters.
             Other filter parameters (`onlyMemberOf`, `onlyWithActiveVoiceChat`, `roles`) are ignored.
         - name: onlyMemberOf
           in: query
