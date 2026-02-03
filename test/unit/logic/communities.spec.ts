@@ -2478,8 +2478,7 @@ describe('Community Component', () => {
           { id: 'community-1', name: 'Test Community 1' },
           { id: 'community-2', name: 'Test Community 2' }
         ]
-        mockCommunitiesDB.searchCommunities.mockResolvedValue(searchResults)
-        mockCommunitiesDB.searchCommunitiesCount.mockResolvedValue(2)
+        mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: searchResults, total: 2 })
       })
 
       it('should return matching communities with total count', async () => {
@@ -2490,14 +2489,12 @@ describe('Community Component', () => {
           total: 2
         })
         expect(mockCommunitiesDB.searchCommunities).toHaveBeenCalledWith(searchQuery, { userAddress, limit, offset })
-        expect(mockCommunitiesDB.searchCommunitiesCount).toHaveBeenCalledWith(searchQuery, { userAddress })
       })
     })
 
     describe('and no communities match the search', () => {
       beforeEach(() => {
-        mockCommunitiesDB.searchCommunities.mockResolvedValue([])
-        mockCommunitiesDB.searchCommunitiesCount.mockResolvedValue(0)
+        mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: [], total: 0 })
       })
 
       it('should return empty results with zero total', async () => {
@@ -2518,8 +2515,7 @@ describe('Community Component', () => {
           { id: 'community-11', name: 'Test Community 11' },
           { id: 'community-12', name: 'Test Community 12' }
         ]
-        mockCommunitiesDB.searchCommunities.mockResolvedValue(searchResults)
-        mockCommunitiesDB.searchCommunitiesCount.mockResolvedValue(15)
+        mockCommunitiesDB.searchCommunities.mockResolvedValue({ results: searchResults, total: 15 })
       })
 
       it('should pass offset to the database query', async () => {

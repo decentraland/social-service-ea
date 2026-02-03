@@ -1287,7 +1287,7 @@ export function createCommunitiesDBComponent(
     async searchCommunities(
       search: string,
       options: { userAddress: EthAddress; limit: number; offset: number }
-    ): Promise<Array<{ id: string; name: string }>> {
+    ): Promise<{ results: Array<{ id: string; name: string }>; total: number }> {
       const { userAddress, limit, offset } = options
       const normalizedUserAddress = normalizeAddress(userAddress)
 
@@ -1296,8 +1296,9 @@ export function createCommunitiesDBComponent(
       // - Also matches words in the middle of the name (after a space)
       // - Public and Private communities are always searchable
       // - Unlisted communities are only searchable by their members
-      const query = SQL`
-        SELECT c.id, c.name
+      const mainQuery = SQL`SELECT c.id, c.name`
+      const countQuery = SQL`SELECT COUNT(*) as count`
+      const body = SQL`
         FROM communities c
         WHERE c.active = true
           AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})
@@ -1308,35 +1309,25 @@ export function createCommunitiesDBComponent(
               WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
             )
           )
+      `
+      mainQuery.append(body)
+      countQuery.append(body)
+
+      mainQuery.append(SQL`
         ORDER BY c.name ASC
         LIMIT ${limit}
         OFFSET ${offset}
-      `
+      `)
 
-      const result = await pg.query<{ id: string; name: string }>(query)
-      return result.rows
-    },
+      const [results, count] = await Promise.all([
+        pg.query<{ id: string; name: string }>(mainQuery),
+        pg.query<{ count: string }>(countQuery)
+      ])
 
-    async searchCommunitiesCount(search: string, options: { userAddress: EthAddress }): Promise<number> {
-      const { userAddress } = options
-      const normalizedUserAddress = normalizeAddress(userAddress)
-
-      const query = SQL`
-        SELECT COUNT(*) as count
-        FROM communities c
-        WHERE c.active = true
-          AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})
-          AND (
-            c.unlisted = false
-            OR EXISTS (
-              SELECT 1 FROM community_members cm
-              WHERE cm.community_id = c.id AND cm.member_address = ${normalizedUserAddress}
-            )
-          )
-      `
-
-      const result = await pg.query<{ count: string }>(query)
-      return parseInt(result.rows[0]?.count ?? '0', 10)
+      return {
+        results: results.rows,
+        total: parseInt(count.rows[0]?.count ?? '0', 10)
+      }
     }
   }
 }

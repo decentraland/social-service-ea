@@ -249,8 +249,7 @@ export interface ICommunitiesDatabaseComponent {
   searchCommunities(
     search: string,
     options: { userAddress: EthAddress; limit: number; offset: number }
-  ): Promise<Array<{ id: string; name: string }>>
-  searchCommunitiesCount(search: string, options: { userAddress: EthAddress }): Promise<number>
+  ): Promise<{ results: Array<{ id: string; name: string }>; total: number }>
 }
 
 export interface IVoiceDatabaseComponent {
