@@ -593,7 +593,7 @@ export function createCommunityComponent(
     ): Promise<{ communities: { id: string; name: string }[]; total: number }> => {
       const [communities, total] = await Promise.all([
         communitiesDb.searchCommunities(search, options),
-        communitiesDb.searchCommunitiesCount(search, options)
+        communitiesDb.searchCommunitiesCount(search, { userAddress: options.userAddress })
       ])
       return { communities, total }
     },
