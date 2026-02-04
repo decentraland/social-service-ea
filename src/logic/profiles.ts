@@ -1,4 +1,8 @@
-import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
+import {
+  Profile,
+  ProfileAvatarsItem,
+  ProfileAvatarsItemNameColor
+} from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { normalizeAddress } from '../utils/address'
 
 export function getProfileAvatarItem(profile: Pick<Profile, 'avatars'>): ProfileAvatarsItem {
@@ -15,6 +19,12 @@ export function getProfileName(profile: Pick<Profile, 'avatars'>): string {
   if (!name && !unclaimedName) throw new Error('Missing profile avatar name')
 
   return name || unclaimedName!
+}
+
+export function getProfileNameColor(profile: Pick<Profile, 'avatars'>): ProfileAvatarsItemNameColor | undefined {
+  const { nameColor } = getProfileAvatarItem(profile)
+
+  return nameColor
 }
 
 export function getProfileUserId(profile: Pick<Profile, 'avatars'>): string {
@@ -41,12 +51,14 @@ export function getProfilePictureUrl(profile: Pick<Profile, 'avatars'>): string 
 
 export function getProfileInfo(profile: Profile) {
   const name = getProfileName(profile)
+  const nameColor = getProfileNameColor(profile)
   const userId = getProfileUserId(profile)
   const hasClaimedName = getProfileHasClaimedName(profile)
   const profilePictureUrl = getProfilePictureUrl(profile)
 
   return {
     name,
+    ...(nameColor && { nameColor }),
     userId,
     hasClaimedName,
     profilePictureUrl
@@ -60,7 +72,14 @@ export function getProfileInfo(profile: Profile) {
 export function extractMinimalProfile(profile: Profile): Profile | null {
   try {
     const avatar = getProfileAvatarItem(profile)
-    const { userId, name, unclaimedName, hasClaimedName = false, avatar: { snapshots: { face256 } = {} } = {} } = avatar
+    const {
+      userId,
+      name,
+      nameColor,
+      unclaimedName,
+      hasClaimedName = false,
+      avatar: { snapshots: { face256 } = {} } = {}
+    } = avatar
 
     if (!userId || (!name && !unclaimedName) || !face256) {
       return null
@@ -71,6 +90,7 @@ export function extractMinimalProfile(profile: Profile): Profile | null {
         {
           userId,
           name,
+          nameColor,
           unclaimedName,
           hasClaimedName,
           avatar: {

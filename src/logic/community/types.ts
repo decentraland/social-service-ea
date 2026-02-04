@@ -2,6 +2,7 @@ import {
   FriendProfile,
   FriendshipStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { ProfileAvatarsItemNameColor } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { CommunityRole, Action } from '../../types/entities'
 import {
   CommunityInviteReceivedEvent,
@@ -341,19 +342,17 @@ export type BannedMember = {
   bannedBy: string
 } & FriendshipAction
 
-export type CommunityMemberProfile = CommunityMember & {
+export type MemberProfileInfo = {
   profilePictureUrl: string
   hasClaimedName: boolean
   name: string
+  nameColor?: ProfileAvatarsItemNameColor
   friendshipStatus: FriendshipStatus
 }
 
-export type BannedMemberProfile = BannedMember & {
-  profilePictureUrl: string
-  hasClaimedName: boolean
-  name: string
-  friendshipStatus: FriendshipStatus
-}
+export type CommunityMemberProfile = CommunityMember & MemberProfileInfo
+
+export type BannedMemberProfile = BannedMember & MemberProfileInfo
 
 export type AggregatedCommunityWithMemberData = AggregatedCommunity & {
   role: CommunityRole
