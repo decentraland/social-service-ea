@@ -57,7 +57,7 @@
     "@dcl/queue-consumer-component": "^1.0.0",
     "@dcl/rpc": "^1.1.2",
     "@dcl/schema-validator-component": "^0.2.0",
-    "@dcl/schemas": "^23.0.0",
+    "@dcl/schemas": "^23.1.0",
     "@dcl/slack-component": "^1.0.1",
     "@dcl/sns-component": "^2.1.0",
     "@dcl/sqs-component": "^2.0.3",

@@ -133,6 +133,24 @@ test('Remove Member from Community Controller', function ({ components, spyCompo
             expect(isMember).toBe(false)
           })
 
+          it('should publish MEMBER_LEFT event when a member leaves', async () => {
+            await makeRequest(identity, `/v1/communities/${communityId}/members/${kickerAddress}`, 'DELETE')
+
+            // Wait for any setImmediate callbacks to complete
+            await new Promise((resolve) => setImmediate(resolve))
+
+            expect(spyComponents.communityBroadcaster.broadcast).toHaveBeenCalledWith({
+              type: Events.Type.COMMUNITY,
+              subType: Events.SubType.Community.MEMBER_LEFT,
+              key: expect.stringContaining(`${communityId}-${kickerAddress}-`),
+              timestamp: expect.any(Number),
+              metadata: {
+                id: communityId,
+                memberAddress: kickerAddress
+              }
+            })
+          })
+
           it('should not allow an owner to leave', async () => {
             const response = await makeRequest(
               ownerIdentity,
