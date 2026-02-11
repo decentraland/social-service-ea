@@ -36,7 +36,10 @@ import {
   deleteCommunityPostHandler,
   likeCommunityPostHandler,
   unlikeCommunityPostHandler,
-  getMemberCommunitiesByIdsHandler
+  getMemberCommunitiesByIdsHandler,
+  getMemoryStatsHandler,
+  takeHeapSnapshotHandler,
+  forceGCHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
@@ -175,6 +178,14 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   // Moderation endpoints
   router.get('/v1/moderation/communities', signedFetchMiddleware(), getAllCommunitiesForModerationHandler)
+
+  // Memory debug endpoints (only enabled when MEMORY_DEBUG=true)
+  const MEMORY_DEBUG = (await config.getString('MEMORY_DEBUG')) === 'true'
+  if (MEMORY_DEBUG) {
+    router.get('/debug/memory', getMemoryStatsHandler)
+    router.post('/debug/heap-snapshot', takeHeapSnapshotHandler)
+    router.post('/debug/gc', forceGCHandler)
+  }
 
   return router
 }

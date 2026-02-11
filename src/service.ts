@@ -1,6 +1,7 @@
 import { Lifecycle } from '@well-known-components/interfaces'
 import { AppComponents, GlobalContext, TestComponents } from './types'
 import { setupHttpRoutes, setupUWSRoutes, setupRpcRoutes } from './controllers/routes'
+import { startMemoryMonitoring } from './utils/memory-debug'
 
 // this function wires the business logic (adapters & controllers) with the components (ports)
 export async function main(program: Lifecycle.EntryPointParameters<AppComponents | TestComponents>) {
@@ -28,8 +29,18 @@ export async function main(program: Lifecycle.EntryPointParameters<AppComponents
 
   await startComponents()
 
-  const { peerTracking, peersSynchronizer } = components
+  const { peerTracking, peersSynchronizer, config, logs } = components
 
   await peerTracking.subscribeToPeerStatusUpdates()
   await peersSynchronizer.syncPeers()
+
+  // Start memory monitoring when MEMORY_DEBUG is enabled
+  const memoryDebug = (await config.getString('MEMORY_DEBUG')) === 'true'
+  if (memoryDebug) {
+    const logger = logs.getLogger('memory-debug')
+    const intervalMs = Number((await config.getString('MEMORY_DEBUG_INTERVAL_MS')) || '30000')
+    logger.info(`Memory debugging enabled. Logging stats every ${intervalMs}ms`)
+    logger.info('Debug endpoints available: GET /debug/memory, POST /debug/heap-snapshot, POST /debug/gc')
+    startMemoryMonitoring(logger, intervalMs)
+  }
 }
