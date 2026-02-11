@@ -325,6 +325,20 @@ export async function createCommunityMembersComponent(
         memberAddress,
         status: ConnectivityStatus.OFFLINE
       })
+
+      setImmediate(async () => {
+        const timestamp = Date.now()
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.MEMBER_LEFT,
+          key: `${communityId}-${memberAddress}-${timestamp}`,
+          timestamp,
+          metadata: {
+            id: communityId,
+            memberAddress
+          }
+        })
+      })
     },
 
     updateMemberRole: async (

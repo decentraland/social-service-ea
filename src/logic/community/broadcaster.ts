@@ -10,7 +10,8 @@ import {
   Events,
   CommunityPostAddedEvent,
   CommunityOwnershipTransferredEvent,
-  CommunityVoiceChatStartedEvent
+  CommunityVoiceChatStartedEvent,
+  CommunityMemberLeftEvent
 } from '@dcl/schemas'
 import { AppComponents, CommunityRole } from '../../types'
 import { ICommunityBroadcasterComponent, CommunityMember } from './types'
@@ -81,6 +82,7 @@ export type BroadcastableEvent =
   | CommunityPostAddedEvent
   | CommunityOwnershipTransferredEvent
   | CommunityVoiceChatStartedEventReducedMetadata
+  | CommunityMemberLeftEvent
 /**
  * Type for event handlers that accept event and optional options
  */
@@ -305,6 +307,7 @@ export function createCommunityBroadcasterComponent(
     registry.set(Events.SubType.Community.DELETED_CONTENT_VIOLATION, directBroadcast)
     registry.set(Events.SubType.Community.OWNERSHIP_TRANSFERRED, directBroadcast)
     registry.set(Events.SubType.Community.VOICE_CHAT_STARTED, broadcastVoiceChatStarted)
+    registry.set(Events.SubType.Community.MEMBER_LEFT, directBroadcast)
 
     return registry
   }

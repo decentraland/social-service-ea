@@ -923,6 +923,24 @@ describe('Community Members Component', () => {
               status: ConnectivityStatus.OFFLINE
             })
           })
+
+          it('should publish MEMBER_LEFT event to notify member left', async () => {
+            await communityMembersComponent.leaveCommunity(communityId, memberAddress)
+
+            // Wait for setImmediate callback to execute
+            await new Promise((resolve) => setImmediate(resolve))
+
+            expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
+              type: Events.Type.COMMUNITY,
+              subType: Events.SubType.Community.MEMBER_LEFT,
+              key: expect.stringContaining(`${communityId}-${memberAddress}-`),
+              timestamp: expect.any(Number),
+              metadata: {
+                id: communityId,
+                memberAddress
+              }
+            })
+          })
         })
 
         describe('and the user does not have permission to leave', () => {
