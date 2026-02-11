@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
     "dev": "nodemon --watch 'src/**' --ext 'ts,json' --ignore 'src/**/*.spec.ts' --ignore 'src/migrations' --exec 'ts-node src/index.ts'",
+    "dev:debug-memory": "MEMORY_DEBUG=true nodemon --watch 'src/**' --ext 'ts,json' --ignore 'src/**/*.spec.ts' --ignore 'src/migrations' --exec 'node --inspect --expose-gc --trace-gc --max-old-space-size=512 --require ts-node/register src/index.ts'",
     "pretest": "yarn test:integration:before",
     "test": "jest --forceExit --detectOpenHandles --coverage --verbose -c jest.config.all.js",
     "test:unit": "jest --forceExit --detectOpenHandles --coverage --verbose -c jest.config.js",
