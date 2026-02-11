@@ -8,6 +8,8 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
     let publicCommunityId: string
     let privateCommunityId: string
     let privateCommunityWithMembershipId: string
+    let unlistedCommunityId: string
+    let unlistedCommunityWithMembershipId: string
     let headers: Record<string, string>
 
     beforeEach(async () => {
@@ -57,13 +59,45 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
         memberAddress: address,
         role: CommunityRole.Member
       })
+
+      // Create an unlisted community (not visible unless member)
+      const unlistedResult = await components.communitiesDb.createCommunity(
+        mockCommunity({
+          name: 'Unlisted Community',
+          description: 'An unlisted community',
+          owner_address: '0x9876543210987654321098765432109876543210',
+          unlisted: true
+        })
+      )
+      unlistedCommunityId = unlistedResult.id
+
+      // Create an unlisted community where user is a member
+      const unlistedMemberResult = await components.communitiesDb.createCommunity(
+        mockCommunity({
+          name: 'Unlisted Community with Membership',
+          description: 'An unlisted community where user is a member',
+          owner_address: '0x9876543210987654321098765432109876543210',
+          unlisted: true
+        })
+      )
+      unlistedCommunityWithMembershipId = unlistedMemberResult.id
+
+      // Add user as member of the unlisted community
+      await components.communitiesDb.addCommunityMember({
+        communityId: unlistedCommunityWithMembershipId,
+        memberAddress: address,
+        role: CommunityRole.Member
+      })
     })
 
     afterEach(async () => {
       await components.communitiesDbHelper.forceCommunityMemberRemoval(privateCommunityWithMembershipId, [address])
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(unlistedCommunityWithMembershipId, [address])
       await components.communitiesDbHelper.forceCommunityRemoval(publicCommunityId)
       await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
       await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityWithMembershipId)
+      await components.communitiesDbHelper.forceCommunityRemoval(unlistedCommunityId)
+      await components.communitiesDbHelper.forceCommunityRemoval(unlistedCommunityWithMembershipId)
     })
 
     describe('and the request is not authenticated', () => {
@@ -169,12 +203,62 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
       })
 
       describe('and requesting private communities without membership', () => {
-        it('should not return the private community', async () => {
+        it('should return the private community', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ communityIds: [privateCommunityId] })
+          })
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body).toEqual({
+            data: {
+              communities: [{ id: privateCommunityId }]
+            }
+          })
+        })
+      })
+
+      describe('and requesting a mix of communities', () => {
+        it('should return only addable communities', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              communityIds: [
+                publicCommunityId,
+                privateCommunityId,
+                privateCommunityWithMembershipId,
+                unlistedCommunityId,
+                unlistedCommunityWithMembershipId
+              ]
+            })
+          })
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.communities).toHaveLength(4)
+          expect(body.data.communities.map((c: { id: string }) => c.id)).toEqual(
+            expect.arrayContaining([
+              publicCommunityId,
+              privateCommunityId,
+              privateCommunityWithMembershipId,
+              unlistedCommunityWithMembershipId
+            ])
+          )
+        })
+      })
+
+      describe('and requesting unlisted communities without membership', () => {
+        it('should not return the unlisted community', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ communityIds: [unlistedCommunityId] })
           })
           const body = await response.json()
 
@@ -187,42 +271,22 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
         })
       })
 
-      describe('and requesting private communities with membership', () => {
-        it('should return the private community', async () => {
+      describe('and requesting unlisted communities with membership', () => {
+        it('should return the unlisted community', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ communityIds: [privateCommunityWithMembershipId] })
+            body: JSON.stringify({ communityIds: [unlistedCommunityWithMembershipId] })
           })
           const body = await response.json()
 
           expect(response.status).toBe(200)
           expect(body).toEqual({
             data: {
-              communities: [{ id: privateCommunityWithMembershipId }]
+              communities: [{ id: unlistedCommunityWithMembershipId }]
             }
           })
-        })
-      })
-
-      describe('and requesting a mix of communities', () => {
-        it('should return only visible communities', async () => {
-          const { localHttpFetch } = components
-          const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              communityIds: [publicCommunityId, privateCommunityId, privateCommunityWithMembershipId]
-            })
-          })
-          const body = await response.json()
-
-          expect(response.status).toBe(200)
-          expect(body.data.communities).toHaveLength(2)
-          expect(body.data.communities.map((c: { id: string }) => c.id)).toEqual(
-            expect.arrayContaining([publicCommunityId, privateCommunityWithMembershipId])
-          )
         })
       })
 

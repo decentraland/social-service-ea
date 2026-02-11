@@ -1291,9 +1291,6 @@ export function createCommunitiesDBComponent(
 
       const normalizedUserAddress = normalizeAddress(userAddress)
 
-      // Returns communities that exist, are active, and are visible to the user:
-      // - Public communities (private = false)
-      // - Private communities where the user is a member
       const query = SQL`
         SELECT DISTINCT c.id
         FROM communities c
@@ -1302,7 +1299,7 @@ export function createCommunitiesDBComponent(
         WHERE c.id = ANY(${communityIds})
           AND c.active = true
           AND cb.banned_address IS NULL
-          AND (c.private = false OR cm.member_address IS NOT NULL)
+          AND (c.unlisted = false OR cm.member_address IS NOT NULL)
       `
 
       const result = await pg.query<{ id: string }>(query)

@@ -36,7 +36,6 @@ export async function getMemberCommunitiesByIdsHandler(
       communityIdsCount: communityIds.length
     })
 
-    // Get communities that exist and are visible to the user (single DB query)
     const visibleCommunities = await communitiesDb.getVisibleCommunitiesByIds(communityIds, normalizedMemberAddress)
 
     return {
