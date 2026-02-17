@@ -533,20 +533,18 @@ export function createCommunitiesDBComponent(
       const normalizedUserAddress = normalizeAddress(userAddress)
 
       const query = SQL`
-        SELECT DISTINCT
+        SELECT
           cm.community_id as "communityId",
           cm.member_address as "memberAddress"
         FROM community_members cm
-        JOIN community_members ucm ON cm.community_id = ucm.community_id
-        WHERE ucm.member_address = ${normalizedUserAddress}
+        WHERE cm.community_id IN (
+          SELECT ucm.community_id
+          FROM community_members ucm
+          JOIN communities c ON c.id = ucm.community_id AND c.active = true
+          WHERE ucm.member_address = ${normalizedUserAddress}
+        )
           AND cm.member_address = ANY(${onlineUsers.map(normalizeAddress)})
           AND cm.member_address != ${normalizedUserAddress}
-          AND EXISTS (
-            SELECT 1 
-            FROM communities c 
-            WHERE c.id = cm.community_id 
-            AND c.active = true
-          )
         ORDER BY cm.community_id, cm.member_address
         LIMIT ${pagination.limit} OFFSET ${pagination.offset}
       `
