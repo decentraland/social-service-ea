@@ -12,8 +12,8 @@ config()
  * @see https://docs.sentry.io/platforms/node/configuration/sampling/#ignoring-standalone-transactions
  */
 const FILTERED_TRANSACTION_PATTERNS = [
-  /^GET\s/,
-  /^SET\s/,
+  /^GET\s(?!\/)/,
+  /^SET\s(?!\/)/,
   /^MGET/,
   /^DEL\s/,
   /^SADD\s/,
