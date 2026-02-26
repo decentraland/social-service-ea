@@ -119,25 +119,26 @@ export async function createCommunityMembersComponent(
     }
 
     await communitiesDb.transferCommunityOwnership(communityId, targetAddress)
-    setImmediate(async () => {
-      const community = await communitiesDb.getCommunity(communityId)
 
-      if (!community) return
+    void broadcastOwnershipTransferred(communityId, updaterAddress, targetAddress)
+  }
 
-      const timestamp = Date.now()
-      await communityBroadcaster.broadcast({
-        type: Events.Type.COMMUNITY,
-        subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
-        key: `${communityId}-${updaterAddress}-${targetAddress}-${timestamp}`,
-        timestamp,
-        metadata: {
-          communityId,
-          communityName: community.name,
-          oldOwnerAddress: updaterAddress,
-          newOwnerAddress: targetAddress,
-          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
-        }
-      })
+  async function broadcastOwnershipTransferred(communityId: string, updaterAddress: string, targetAddress: string) {
+    const community = await communitiesDb.getCommunity(communityId)
+    if (!community) return
+    const timestamp = Date.now()
+    await communityBroadcaster.broadcast({
+      type: Events.Type.COMMUNITY,
+      subType: Events.SubType.Community.OWNERSHIP_TRANSFERRED,
+      key: `${communityId}-${updaterAddress}-${targetAddress}-${timestamp}`,
+      timestamp,
+      metadata: {
+        communityId,
+        communityName: community.name,
+        oldOwnerAddress: updaterAddress,
+        newOwnerAddress: targetAddress,
+        thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+      }
     })
   }
 
@@ -239,20 +240,18 @@ export async function createCommunityMembersComponent(
         status: ConnectivityStatus.OFFLINE
       })
 
-      setImmediate(async () => {
-        const timestamp = Date.now()
-        await communityBroadcaster.broadcast({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.MEMBER_REMOVED,
-          key: `${communityId}-${targetAddress}-${timestamp}`,
-          timestamp,
-          metadata: {
-            id: communityId,
-            name: community.name,
-            memberAddress: targetAddress,
-            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
-          }
-        })
+      const timestamp = Date.now()
+      void communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.MEMBER_REMOVED,
+        key: `${communityId}-${targetAddress}-${timestamp}`,
+        timestamp,
+        metadata: {
+          id: communityId,
+          name: community.name,
+          memberAddress: targetAddress,
+          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+        }
       })
     },
 
@@ -326,18 +325,16 @@ export async function createCommunityMembersComponent(
         status: ConnectivityStatus.OFFLINE
       })
 
-      setImmediate(async () => {
-        const timestamp = Date.now()
-        await communityBroadcaster.broadcast({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.MEMBER_LEFT,
-          key: `${communityId}-${memberAddress}-${timestamp}`,
-          timestamp,
-          metadata: {
-            id: communityId,
-            memberAddress
-          }
-        })
+      const timestamp = Date.now()
+      void communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.MEMBER_LEFT,
+        key: `${communityId}-${memberAddress}-${timestamp}`,
+        timestamp,
+        metadata: {
+          id: communityId,
+          memberAddress
+        }
       })
     },
 

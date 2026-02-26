@@ -104,21 +104,19 @@ export function createCommunityPostsComponent(
       const authorProfile = await registry.getProfile(authorAddress)
       const postWithAuthorProfile = aggregatePostWithProfile(post, authorProfile)
 
-      setImmediate(() => {
-        void communityBroadcaster.broadcast({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.POST_ADDED,
-          key: post.id,
-          timestamp: Date.now(),
-          metadata: {
-            postId: post.id,
-            communityId,
-            communityName: community.name,
-            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId),
-            authorAddress: authorAddress.toLowerCase(),
-            addressesToNotify: [] // This is populated by the broadcaster
-          }
-        })
+      void communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.POST_ADDED,
+        key: post.id,
+        timestamp: Date.now(),
+        metadata: {
+          postId: post.id,
+          communityId,
+          communityName: community.name,
+          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId),
+          authorAddress: authorAddress.toLowerCase(),
+          addressesToNotify: [] // This is populated by the broadcaster
+        }
       })
 
       return postWithAuthorProfile

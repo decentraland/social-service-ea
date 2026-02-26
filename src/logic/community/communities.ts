@@ -118,6 +118,64 @@ export function createCommunityComponent(
     }
   }
 
+  async function broadcastCommunityDeleted(
+    id: string,
+    community: Community,
+    ownerDeletingOwnedCommunity: boolean,
+    thumbnailUrl: string
+  ) {
+    if (!ownerDeletingOwnedCommunity) {
+      await communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
+        key: id,
+        timestamp: Date.now(),
+        metadata: {
+          id,
+          name: community.name,
+          ownerAddress: community.ownerAddress,
+          thumbnailUrl
+        }
+      })
+    }
+
+    await communityBroadcaster.broadcast({
+      type: Events.Type.COMMUNITY,
+      subType: Events.SubType.Community.DELETED,
+      key: id,
+      timestamp: Date.now(),
+      metadata: {
+        id,
+        name: community.name,
+        thumbnailUrl
+      }
+    })
+
+    await pubsub.publishInChannel(COMMUNITY_DELETED_UPDATES_CHANNEL, {
+      communityId: id
+    })
+  }
+
+  async function broadcastCommunityRenamed(
+    communityId: string,
+    eventKeySuffix: string,
+    oldName: string,
+    newName: string
+  ) {
+    await communityBroadcaster.broadcast({
+      type: Events.Type.COMMUNITY,
+      subType: Events.SubType.Community.RENAMED,
+      key: `${communityId}-${eventKeySuffix}`,
+      timestamp: Date.now(),
+      metadata: {
+        id: communityId,
+        oldName,
+        newName,
+        thumbnailUrl: (await communityThumbnail.getThumbnail(communityId)) || 'N/A'
+      }
+    })
+  }
+
   return {
     getCommunity: async (
       id: string,
@@ -366,38 +424,7 @@ export function createCommunityComponent(
 
       const thumbnailUrl = (await communityThumbnail.getThumbnail(id)) || 'N/A'
 
-      setImmediate(async () => {
-        if (!ownerDeletingOwnedCommunity) {
-          await communityBroadcaster.broadcast({
-            type: Events.Type.COMMUNITY,
-            subType: Events.SubType.Community.DELETED_CONTENT_VIOLATION,
-            key: id,
-            timestamp: Date.now(),
-            metadata: {
-              id,
-              name: community.name,
-              ownerAddress: community.ownerAddress,
-              thumbnailUrl
-            }
-          })
-        }
-
-        await communityBroadcaster.broadcast({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.DELETED,
-          key: id,
-          timestamp: Date.now(),
-          metadata: {
-            id,
-            name: community.name,
-            thumbnailUrl
-          }
-        })
-
-        await pubsub.publishInChannel(COMMUNITY_DELETED_UPDATES_CHANNEL, {
-          communityId: id
-        })
-      })
+      void broadcastCommunityDeleted(id, community, ownerDeletingOwnedCommunity, thumbnailUrl)
     },
 
     updateCommunity: async (
@@ -478,25 +505,12 @@ export function createCommunityComponent(
       const updatedCommunity = await communitiesDb.updateCommunity(communityId, dbUpdates)
 
       if (!!updates.name && updates.name.trim() !== existingCommunity.name.trim()) {
-        setImmediate(async () => {
-          const eventKeySuffix =
-            updates.name!.trim().toLowerCase().replace(/ /g, '-') +
-            '-' +
-            existingCommunity.name.trim().toLowerCase().replace(/ /g, '-')
+        const eventKeySuffix =
+          updates.name!.trim().toLowerCase().replace(/ /g, '-') +
+          '-' +
+          existingCommunity.name.trim().toLowerCase().replace(/ /g, '-')
 
-          await communityBroadcaster.broadcast({
-            type: Events.Type.COMMUNITY,
-            subType: Events.SubType.Community.RENAMED,
-            key: `${communityId}-${eventKeySuffix}`,
-            timestamp: Date.now(),
-            metadata: {
-              id: communityId,
-              oldName: existingCommunity.name,
-              newName: updates.name!,
-              thumbnailUrl: (await communityThumbnail.getThumbnail(communityId)) || 'N/A'
-            }
-          })
-        })
+        void broadcastCommunityRenamed(communityId, eventKeySuffix, existingCommunity.name, updates.name!)
       }
 
       if (thumbnailBuffer) {
