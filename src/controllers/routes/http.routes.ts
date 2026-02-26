@@ -179,12 +179,12 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   // Moderation endpoints
   router.get('/v1/moderation/communities', signedFetchMiddleware(), getAllCommunitiesForModerationHandler)
 
-  // Memory debug endpoints (only enabled when MEMORY_DEBUG=true)
+  // Memory debug endpoints (only enabled when MEMORY_DEBUG=true, protected by admin token)
   const MEMORY_DEBUG = (await config.getString('MEMORY_DEBUG')) === 'true'
-  if (MEMORY_DEBUG) {
-    router.get('/debug/memory', getMemoryStatsHandler)
-    router.post('/debug/heap-snapshot', takeHeapSnapshotHandler)
-    router.post('/debug/gc', forceGCHandler)
+  if (MEMORY_DEBUG && API_ADMIN_TOKEN) {
+    router.get('/debug/memory', bearerTokenMiddleware(API_ADMIN_TOKEN), getMemoryStatsHandler)
+    router.post('/debug/heap-snapshot', bearerTokenMiddleware(API_ADMIN_TOKEN), takeHeapSnapshotHandler)
+    router.post('/debug/gc', bearerTokenMiddleware(API_ADMIN_TOKEN), forceGCHandler)
   }
 
   return router
