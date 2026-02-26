@@ -2,17 +2,22 @@ import { HandlerContextWithPath, IHandlerResult } from '../../../types'
 import { getMemoryStats, takeHeapSnapshot } from '../../../utils/memory-debug'
 
 export async function getMemoryStatsHandler(
-  context: Pick<HandlerContextWithPath<'logs', '/debug/memory'>, 'components'>
+  context: Pick<HandlerContextWithPath<'logs' | 'subscribersContext', '/debug/memory'>, 'components'>
 ): Promise<IHandlerResult> {
   const {
-    components: { logs }
+    components: { logs, subscribersContext }
   } = context
   const logger = logs.getLogger('memory-debug-handler')
   logger.info('Memory stats requested')
 
+  const subscriberStats = {
+    local: subscribersContext.getLocalSubscribersAddresses().length,
+    redis: (await subscribersContext.getSubscribersAddresses()).length
+  }
+
   return {
     status: 200,
-    body: getMemoryStats()
+    body: getMemoryStats(subscriberStats)
   }
 }
 

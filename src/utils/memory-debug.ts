@@ -6,7 +6,7 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 const BYTES_TO_MB = 1024 * 1024
 
 interface MemoryStats {
-  [key: string]: string
+  [key: string]: string | number
   rss: string
   heapTotal: string
   heapUsed: string
@@ -17,7 +17,12 @@ interface MemoryStats {
   usedHeapPercentage: string
 }
 
-export function getMemoryStats(): MemoryStats {
+interface SubscriberStats {
+  local: number
+  redis: number
+}
+
+export function getMemoryStats(subscriberStats?: SubscriberStats): MemoryStats {
   const memUsage = process.memoryUsage()
   const heapStats = v8.getHeapStatistics()
 
@@ -29,7 +34,12 @@ export function getMemoryStats(): MemoryStats {
     arrayBuffers: `${(memUsage.arrayBuffers / BYTES_TO_MB).toFixed(2)} MB`,
     heapSizeLimit: `${(heapStats.heap_size_limit / BYTES_TO_MB).toFixed(2)} MB`,
     totalAvailableSize: `${(heapStats.total_available_size / BYTES_TO_MB).toFixed(2)} MB`,
-    usedHeapPercentage: `${((heapStats.used_heap_size / heapStats.heap_size_limit) * 100).toFixed(2)}%`
+    usedHeapPercentage: `${((heapStats.used_heap_size / heapStats.heap_size_limit) * 100).toFixed(2)}%`,
+    ...(subscriberStats && {
+      localSubscribers: subscriberStats.local,
+      redisSubscribers: subscriberStats.redis,
+      subscriberDrift: subscriberStats.redis - subscriberStats.local
+    })
   }
 }
 
@@ -63,13 +73,15 @@ export function takeHeapSnapshot(outputDir = 'heapdumps'): string {
  */
 export function startMemoryMonitoring(
   logger: ILoggerComponent.ILogger,
-  intervalMs = 30_000
+  intervalMs = 30_000,
+  getSubscriberStats?: () => Promise<SubscriberStats>
 ): { stop: () => void } {
   let previous = process.memoryUsage()
 
-  const intervalId = setInterval(() => {
+  const intervalId = setInterval(async () => {
     const current = process.memoryUsage()
-    const stats = getMemoryStats()
+    const subscriberStats = await getSubscriberStats?.()
+    const stats = getMemoryStats(subscriberStats)
     const heapDelta = ((current.heapUsed - previous.heapUsed) / BYTES_TO_MB).toFixed(2)
     const rssDelta = ((current.rss - previous.rss) / BYTES_TO_MB).toFixed(2)
 

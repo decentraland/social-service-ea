@@ -29,7 +29,7 @@ export async function main(program: Lifecycle.EntryPointParameters<AppComponents
 
   await startComponents()
 
-  const { peerTracking, peersSynchronizer, config, logs } = components
+  const { peerTracking, peersSynchronizer, config, logs, subscribersContext } = components
 
   await peerTracking.subscribeToPeerStatusUpdates()
   await peersSynchronizer.syncPeers()
@@ -41,6 +41,9 @@ export async function main(program: Lifecycle.EntryPointParameters<AppComponents
     const intervalMs = Number((await config.getString('MEMORY_DEBUG_INTERVAL_MS')) || '30000')
     logger.info(`Memory debugging enabled. Logging stats every ${intervalMs}ms`)
     logger.info('Debug endpoints available: GET /debug/memory, POST /debug/heap-snapshot, POST /debug/gc')
-    startMemoryMonitoring(logger, intervalMs)
+    startMemoryMonitoring(logger, intervalMs, async () => ({
+      local: subscribersContext.getLocalSubscribersAddresses().length,
+      redis: (await subscribersContext.getSubscribersAddresses()).length
+    }))
   }
 }
