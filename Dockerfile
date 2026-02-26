@@ -42,4 +42,5 @@ RUN echo "" > /app/.env
 #            and: https://www.ctl.io/developers/blog/post/gracefully-stopping-docker-containers/
 ENTRYPOINT ["tini", "--"]
 # Run the program under Tini
-CMD [ "/usr/local/bin/node", "--inspect=0.0.0.0:9229", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
+# --expose-gc: allows DevTools (or global.gc()) to trigger GC before heap snapshots for cleaner leak analysis
+CMD [ "/usr/local/bin/node", "--inspect=0.0.0.0:9229", "--expose-gc", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
