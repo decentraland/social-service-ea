@@ -54,6 +54,11 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
     async return(value) {
       isDone = true
       emitter.off(event, eventHandler)
+      // Drain pending next() calls so the for-await loop can terminate
+      while (nextQueue.length > 0) {
+        const { resolve } = nextQueue.shift()!
+        resolve({ done: true, value: undefined })
+      }
       return {
         done: true,
         value
@@ -62,6 +67,10 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
     async throw(e) {
       isDone = true
       emitter.off(event, eventHandler)
+      while (nextQueue.length > 0) {
+        const { reject } = nextQueue.shift()!
+        reject(e)
+      }
       throw e
     }
   }

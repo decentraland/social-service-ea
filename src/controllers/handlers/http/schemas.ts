@@ -141,3 +141,27 @@ export const UpdateCommunityRequestStatusSchema: Schema = {
     }
   }
 }
+
+const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+const MAX_COMMUNITY_IDS = 50
+
+export type GetMemberCommunitiesByIdsRequestBody = {
+  communityIds: string[]
+}
+
+export const GetMemberCommunitiesByIdsSchema: Schema = {
+  type: 'object',
+  required: ['communityIds'],
+  additionalProperties: false,
+  properties: {
+    communityIds: {
+      type: 'array',
+      items: {
+        type: 'string',
+        pattern: UUID_PATTERN
+      },
+      minItems: 1,
+      maxItems: MAX_COMMUNITY_IDS
+    }
+  }
+}

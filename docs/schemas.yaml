@@ -856,3 +856,76 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/CommunityPost'
+
+    GetCommunitiesMinimal200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - membersCount
+                      - privacy
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        description: 'Unique identifier of the community'
+                      name:
+                        type: string
+                        description: 'Name of the community'
+                      membersCount:
+                        type: integer
+                        description: 'Number of members in the community'
+                      privacy:
+                        type: string
+                        enum: [public, private]
+                        description: 'Community privacy setting'
+                  description: 'List of communities matching the search query with minimal data'
+
+    GetMemberCommunitiesByIdsRequest:
+      type: object
+      required:
+        - communityIds
+      properties:
+        communityIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          maxItems: 50
+          description: 'List of community IDs to validate (max 50)'
+
+    GetMemberCommunitiesByIds200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - communities
+          properties:
+            communities:
+              type: array
+              items:
+                type: object
+                required:
+                  - id
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    description: 'Unique identifier of a valid and visible community'
+              description: 'List of communities that exist and are visible to the user'

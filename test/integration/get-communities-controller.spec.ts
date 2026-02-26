@@ -1255,5 +1255,216 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         })
       })
     })
+
+    describe('when using minimal response format', () => {
+      let minimalCommunityId1: string
+      let minimalCommunityId2: string
+      let unlistedMinimalCommunityId: string
+
+      beforeEach(async () => {
+        const result1 = await components.communitiesDb.createCommunity(
+          mockCommunity({
+            name: 'Alpha Minimal Community',
+            description: 'Test Description 1',
+            owner_address: address
+          })
+        )
+        minimalCommunityId1 = result1.id
+
+        const result2 = await components.communitiesDb.createCommunity(
+          mockCommunity({
+            name: 'Beta Minimal Community',
+            description: 'Test Description 2',
+            owner_address: address
+          })
+        )
+        minimalCommunityId2 = result2.id
+
+        const result3 = await components.communitiesDb.createCommunity(
+          mockCommunity({
+            name: 'Alpha Unlisted Minimal',
+            description: 'Unlisted community',
+            owner_address: address,
+            unlisted: true
+          })
+        )
+        unlistedMinimalCommunityId = result3.id
+      })
+
+      afterEach(async () => {
+        await components.communitiesDbHelper.forceCommunityRemoval(minimalCommunityId1)
+        await components.communitiesDbHelper.forceCommunityRemoval(minimalCommunityId2)
+        await components.communitiesDbHelper.forceCommunityRemoval(unlistedMinimalCommunityId)
+      })
+
+      describe('and the request is not signed', () => {
+        it('should respond with a 401 status code', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch('/v1/communities?minimal=true&search=Alpha')
+
+          expect(response.status).toBe(401)
+          const body = await response.json()
+          expect(body.message).toContain('Authentication required')
+        })
+      })
+
+      describe('and the search query is missing', () => {
+        it('should respond with listed communities and pagination params', async () => {
+          const response = await makeRequest(identity, '/v1/communities?minimal=true&limit=50')
+
+          expect(response.status).toBe(200)
+          const body = await response.json()
+          const names = body.data.results.map((c: { name: string }) => c.name)
+          expect(names).toContain('Alpha Minimal Community')
+          expect(names).toContain('Beta Minimal Community')
+          expect(names).not.toContain('Alpha Unlisted Minimal')
+          expect(body.data.total).toBeGreaterThanOrEqual(2)
+          expect(body.data.page).toBe(1)
+          expect(body.data.limit).toBe(50)
+        })
+      })
+
+      describe('and the search query is too short', () => {
+        it('should respond with a 400 status code', async () => {
+          const response = await makeRequest(identity, '/v1/communities?minimal=true&search=ab')
+
+          expect(response.status).toBe(400)
+          const body = await response.json()
+          expect(body.message).toContain('at least 3 characters')
+        })
+      })
+
+      describe('and the search query is valid', () => {
+        describe('and the user is not a member of the unlisted community', () => {
+          it('should respond with matching listed communities and pagination params', async () => {
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha%20Minimal&limit=10')
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            expect(body.data.results).toHaveLength(1)
+            expect(body.data.results[0]).toEqual({
+              id: minimalCommunityId1,
+              name: 'Alpha Minimal Community',
+              membersCount: 0,
+              privacy: 'public'
+            })
+            expect(body.data.total).toBe(1)
+            expect(body.data.page).toBe(1)
+            expect(body.data.pages).toBe(1)
+            expect(body.data.limit).toBe(10)
+          })
+
+          it('should not include unlisted communities', async () => {
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha')
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            const ids = body.data.results.map((c: { id: string }) => c.id)
+            expect(ids).toContain(minimalCommunityId1)
+            expect(ids).not.toContain(unlistedMinimalCommunityId)
+          })
+        })
+
+        describe('and the user is a member of the unlisted community', () => {
+          beforeEach(async () => {
+            await components.communitiesDb.addCommunityMember({
+              communityId: unlistedMinimalCommunityId,
+              memberAddress: address,
+              role: CommunityRole.Member
+            })
+          })
+
+          afterEach(async () => {
+            await components.communitiesDbHelper.forceCommunityMemberRemoval(unlistedMinimalCommunityId, [address])
+          })
+
+          it('should include unlisted communities the user is a member of', async () => {
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha')
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            const ids = body.data.results.map((c: { id: string }) => c.id)
+            expect(ids).toContain(minimalCommunityId1)
+            expect(ids).toContain(unlistedMinimalCommunityId)
+          })
+        })
+
+        describe('and using prefix matching', () => {
+          it('should match communities starting with the search term', async () => {
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Beta%20Minimal')
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            expect(body.data.results).toHaveLength(1)
+            expect(body.data.results[0].name).toBe('Beta Minimal Community')
+          })
+
+          it('should match words in the middle of the name', async () => {
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Minimal%20Community')
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            expect(body.data.results.length).toBeGreaterThanOrEqual(2)
+          })
+        })
+
+        describe('and using limit parameter', () => {
+          it('should respect the limit parameter', async () => {
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Minimal&limit=1')
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            expect(body.data.results).toHaveLength(1)
+            expect(body.data.limit).toBe(1)
+          })
+
+          it('should use default limit when not provided', async () => {
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Minimal')
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            expect(body.data.results.length).toBeLessThanOrEqual(10)
+            expect(body.data.limit).toBe(50)
+          })
+
+          it('should cap limit at maximum value', async () => {
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Minimal&limit=100')
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            // Results should be limited to MAX_LIMIT (50)
+            expect(body.data.results.length).toBeLessThanOrEqual(50)
+            expect(body.data.limit).toBe(50)
+          })
+        })
+
+        describe('and no communities match', () => {
+          it('should return empty results with pagination', async () => {
+            const response = await makeRequest(identity, '/v1/communities?minimal=true&search=NonExistent')
+
+            expect(response.status).toBe(200)
+            const body = await response.json()
+            expect(body.data.results).toEqual([])
+            expect(body.data.total).toBe(0)
+            expect(body.data.page).toBe(1)
+            expect(body.data.pages).toBe(0)
+          })
+        })
+      })
+
+      describe('and the query fails', () => {
+        beforeEach(() => {
+          spyComponents.communities.searchCommunities.mockRejectedValue(new Error('Database error'))
+        })
+
+        it('should respond with a 500 status code', async () => {
+          const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha')
+
+          expect(response.status).toBe(500)
+          const body = await response.json()
+          expect(body.message).toBe('Database error')
+        })
+      })
+    })
   })
 })

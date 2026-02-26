@@ -1,7 +1,7 @@
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { AppComponents } from '../../types'
 import { CommunityNotFoundError } from './errors'
-import { BannedMemberProfile, BannedMember, ICommunityBansComponent, CommunityPrivacyEnum } from './types'
+import { BannedMemberProfile, ICommunityBansComponent, CommunityPrivacyEnum } from './types'
 import { mapMembersWithProfiles } from './utils'
 import { EthAddress, Events, PaginatedParameters } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
@@ -133,11 +133,7 @@ export async function createCommunityBansComponent(
       const totalBannedMembers = await communitiesDb.getBannedMembersCount(id)
 
       const profiles = await registry.getProfiles(bannedMembers.map((member) => member.memberAddress))
-      const membersWithProfile: BannedMemberProfile[] = mapMembersWithProfiles<BannedMember, BannedMemberProfile>(
-        userAddress,
-        bannedMembers,
-        profiles
-      )
+      const membersWithProfile = mapMembersWithProfiles(userAddress, bannedMembers, profiles)
 
       return { members: membersWithProfile, totalMembers: totalBannedMembers }
     }

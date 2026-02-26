@@ -2,6 +2,7 @@ import {
   FriendProfile,
   FriendshipStatus
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { ProfileAvatarsItemNameColor } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { CommunityRole, Action } from '../../types/entities'
 import {
   CommunityInviteReceivedEvent,
@@ -12,7 +13,8 @@ import {
   EthAddress,
   PaginatedParameters,
   CommunityPostAddedEvent,
-  CommunityOwnershipTransferredEvent
+  CommunityOwnershipTransferredEvent,
+  CommunityMemberLeftEvent
 } from '@dcl/schemas'
 import {
   CommunityDeletedEventReducedMetadata,
@@ -34,6 +36,10 @@ export interface ICommunitiesComponent {
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
   ): Promise<GetCommunitiesWithTotal<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>>>
+  searchCommunities(
+    search: string,
+    options: { userAddress: EthAddress; limit: number; offset: number }
+  ): Promise<GetCommunitiesWithTotal<CommunitySearchResult>>
   getMemberCommunities(
     memberAddress: string,
     options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
@@ -203,7 +209,8 @@ export interface ICommunityBroadcasterComponent {
       | CommunityDeletedContentViolationEvent
       | CommunityPostAddedEvent
       | CommunityOwnershipTransferredEvent
-      | CommunityVoiceChatStartedEventReducedMetadata,
+      | CommunityVoiceChatStartedEventReducedMetadata
+      | CommunityMemberLeftEvent,
     options?: BroadcastOptions
   ): Promise<void>
 }
@@ -337,19 +344,17 @@ export type BannedMember = {
   bannedBy: string
 } & FriendshipAction
 
-export type CommunityMemberProfile = CommunityMember & {
+export type MemberProfileInfo = {
   profilePictureUrl: string
   hasClaimedName: boolean
   name: string
+  nameColor?: ProfileAvatarsItemNameColor
   friendshipStatus: FriendshipStatus
 }
 
-export type BannedMemberProfile = BannedMember & {
-  profilePictureUrl: string
-  hasClaimedName: boolean
-  name: string
-  friendshipStatus: FriendshipStatus
-}
+export type CommunityMemberProfile = CommunityMember & MemberProfileInfo
+
+export type BannedMemberProfile = BannedMember & MemberProfileInfo
 
 export type AggregatedCommunityWithMemberData = AggregatedCommunity & {
   role: CommunityRole
@@ -542,6 +547,17 @@ export interface ICommunityPostsComponent {
 
 export interface ICommunityRankingComponent {
   calculateRankingScoreForAllCommunities(): Promise<void>
+}
+
+/**
+ * Minimal community search result containing only id, name, membersCount, and privacy.
+ * Used for lightweight search operations (e.g., autocomplete, quick lookups).
+ */
+export type CommunitySearchResult = {
+  id: string
+  name: string
+  membersCount: number
+  privacy: CommunityPrivacyEnum
 }
 
 export type CommunityRankingMetricsDB = {

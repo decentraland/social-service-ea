@@ -57,5 +57,7 @@ export const mockCommunitiesDB: jest.Mocked<ICommunitiesDatabaseComponent> = {
   transferCommunityOwnership: jest.fn(),
   getAllCommunitiesWithRankingMetrics: jest.fn(),
   updateCommunityRankingMetrics: jest.fn(),
-  updateCommunitiesRankingScores: jest.fn()
+  updateCommunitiesRankingScores: jest.fn(),
+  searchCommunities: jest.fn(),
+  getVisibleCommunitiesByIds: jest.fn()
 }

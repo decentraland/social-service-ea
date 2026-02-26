@@ -3,11 +3,12 @@ import { getProfileInfo } from '../profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 export function parseProfileToFriend(profile: Profile): FriendProfile {
-  const { name, userId, hasClaimedName, profilePictureUrl } = getProfileInfo(profile)
+  const { name, nameColor, userId, hasClaimedName, profilePictureUrl } = getProfileInfo(profile)
 
   return {
     address: userId,
     name,
+    nameColor,
     hasClaimedName,
     profilePictureUrl
   }

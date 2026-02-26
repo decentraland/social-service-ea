@@ -72,7 +72,7 @@ export function createUpdateHandlerComponent(
   }
 
   const friendshipUpdateHandler = handleUpdate<'friendshipUpdate'>((update) => {
-    const updateEmitter = subscribersContext.getOrAddSubscriber(update.to)
+    const updateEmitter = subscribersContext.getSubscriber(update.to)
     if (updateEmitter) {
       updateEmitter.emit('friendshipUpdate', update)
     }
@@ -89,7 +89,7 @@ export function createUpdateHandlerComponent(
     ]
 
     notifications.forEach(({ subscriber, friend }) => {
-      const emitter = subscribersContext.getOrAddSubscriber(subscriber)
+      const emitter = subscribersContext.getSubscriber(subscriber)
       if (emitter) {
         emitter.emit('friendConnectivityUpdate', {
           address: friend,
@@ -107,7 +107,7 @@ export function createUpdateHandlerComponent(
     await processInBatches(
       friends,
       ({ address: friendAddress }) => {
-        const updateEmitter = subscribersContext.getOrAddSubscriber(friendAddress)
+        const updateEmitter = subscribersContext.getSubscriber(friendAddress)
         if (updateEmitter) {
           updateEmitter.emit('friendConnectivityUpdate', update)
         }
@@ -125,7 +125,7 @@ export function createUpdateHandlerComponent(
       await processInBatches(
         batch,
         ({ communityId, memberAddress }) => {
-          const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
+          const updateEmitter = subscribersContext.getSubscriber(memberAddress)
           if (updateEmitter) {
             updateEmitter.emit('communityMemberConnectivityUpdate', {
               communityId,
@@ -144,7 +144,7 @@ export function createUpdateHandlerComponent(
       update: JSON.stringify(update)
     })
 
-    const updateEmitter = subscribersContext.getOrAddSubscriber(update.blockedAddress)
+    const updateEmitter = subscribersContext.getSubscriber(update.blockedAddress)
     if (updateEmitter) {
       updateEmitter.emit('blockUpdate', update)
     }
@@ -197,7 +197,7 @@ export function createUpdateHandlerComponent(
     }
 
     addressesToNotify.forEach((address) => {
-      const updateEmitter = subscribersContext.getOrAddSubscriber(address)
+      const updateEmitter = subscribersContext.getSubscriber(address)
       if (updateEmitter) {
         updateEmitter.emit('privateVoiceChatUpdate', update)
       }
@@ -228,7 +228,7 @@ export function createUpdateHandlerComponent(
       await processInBatches(
         batch,
         ({ memberAddress: batchMemberAddress }) => {
-          const updateEmitter = subscribersContext.getOrAddSubscriber(batchMemberAddress)
+          const updateEmitter = subscribersContext.getSubscriber(batchMemberAddress)
           if (updateEmitter) {
             updateEmitter.emit('communityMemberConnectivityUpdate', memberUpdate)
           }
@@ -240,7 +240,7 @@ export function createUpdateHandlerComponent(
     // When a member leaves, is kicked, or banned from a community,
     // we need to notify the affected member about their status change.
     const affectedMember = onlineSubscribers.find((address) => address === normalizedMemberAddress)
-    const updateEmitter = affectedMember ? subscribersContext.getOrAddSubscriber(affectedMember) : null
+    const updateEmitter = affectedMember ? subscribersContext.getSubscriber(affectedMember) : undefined
     if (updateEmitter) {
       logger.debug('Notifying affected member about their status change', {
         update: JSON.stringify(update)
@@ -260,7 +260,7 @@ export function createUpdateHandlerComponent(
       await processInBatches(
         batch,
         ({ memberAddress }) => {
-          const updateEmitter = subscribersContext.getOrAddSubscriber(memberAddress)
+          const updateEmitter = subscribersContext.getSubscriber(memberAddress)
           if (updateEmitter) {
             updateEmitter.emit('communityMemberConnectivityUpdate', {
               communityId,
@@ -302,7 +302,7 @@ export function createUpdateHandlerComponent(
         onlineSubscribers,
         (userAddress) => {
           const isMember = communityMemberAddresses.has(userAddress)
-          const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
+          const updateEmitter = subscribersContext.getSubscriber(userAddress)
           if (updateEmitter) {
             // Reuse base update, only set isMember property
             updateEmitter.emit('communityVoiceChatUpdate', { ...baseUpdate, isMember })
@@ -321,7 +321,7 @@ export function createUpdateHandlerComponent(
       await processInBatches(
         onlineSubscribers,
         (userAddress) => {
-          const updateEmitter = subscribersContext.getOrAddSubscriber(userAddress)
+          const updateEmitter = subscribersContext.getSubscriber(userAddress)
           if (updateEmitter) {
             updateEmitter.emit('communityVoiceChatUpdate', fallbackUpdate)
           }

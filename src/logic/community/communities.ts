@@ -16,7 +16,8 @@ import {
   CommunityPrivacyEnum,
   CommunityVisibilityEnum,
   CommunityForModeration,
-  CommunityVoiceChatStatus
+  CommunityVoiceChatStatus,
+  CommunitySearchResult
 } from './types'
 import {
   isOwner,
@@ -585,6 +586,14 @@ export function createCommunityComponent(
         visibility: community.visibility,
         active: community.active
       }))
+    },
+
+    searchCommunities: async (
+      search: string,
+      options: { userAddress: EthAddress; limit: number; offset: number }
+    ): Promise<GetCommunitiesWithTotal<CommunitySearchResult>> => {
+      const { results, total } = await communitiesDb.searchCommunities(search, options)
+      return { communities: results, total }
     },
 
     getAllCommunitiesForModeration: async (

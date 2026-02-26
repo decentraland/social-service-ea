@@ -55,9 +55,7 @@ export async function createCommunityMembersComponent(
 
     const profiles = await registry.getProfiles(members.map((member) => member.memberAddress))
 
-    const membersWithProfile = mapMembersWithProfiles<T, T & CommunityMemberProfile>(userAddress, members, profiles)
-
-    return membersWithProfile
+    return mapMembersWithProfiles(userAddress, members, profiles) as (T & CommunityMemberProfile)[]
   }
 
   const filterAndCountCommunityMembers = async (id: string, options: GetCommunityMembersOptions) => {
@@ -326,6 +324,20 @@ export async function createCommunityMembersComponent(
         communityId,
         memberAddress,
         status: ConnectivityStatus.OFFLINE
+      })
+
+      setImmediate(async () => {
+        const timestamp = Date.now()
+        await communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.MEMBER_LEFT,
+          key: `${communityId}-${memberAddress}-${timestamp}`,
+          timestamp,
+          metadata: {
+            id: communityId,
+            memberAddress
+          }
+        })
       })
     },
 

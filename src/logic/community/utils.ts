@@ -13,7 +13,8 @@ import {
   AggregatedCommunity,
   CommunityVoiceChatStatus,
   CommunityRequestType,
-  CommunityPrivacyEnum
+  CommunityPrivacyEnum,
+  MemberProfileInfo
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friends'
@@ -125,18 +126,12 @@ export const toPublicCommunityWithVoiceChat = (
 }
 
 export const mapMembersWithProfiles = <
-  T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress },
-  R extends {
-    profilePictureUrl: string
-    hasClaimedName: boolean
-    name: string
-    friendshipStatus: FriendshipStatus
-  }
+  T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress }
 >(
   userAddress: EthAddress | undefined,
   members: T[],
   profiles: Profile[]
-): (T & R)[] => {
+): (T & MemberProfileInfo)[] => {
   const profileMap = new Map(profiles.map((profile) => [getProfileUserId(profile), profile]))
   return members
     .map((member) => {
@@ -156,17 +151,18 @@ export const mapMembersWithProfiles = <
         return undefined
       }
 
-      const { profilePictureUrl, hasClaimedName, name } = getProfileInfo(memberProfile)
+      const { profilePictureUrl, hasClaimedName, name, nameColor } = getProfileInfo(memberProfile)
 
       return {
         ...member,
         profilePictureUrl,
         hasClaimedName,
         name,
+        ...(nameColor && { nameColor }),
         friendshipStatus
-      }
+      } as T & MemberProfileInfo
     })
-    .filter((member): member is T & R => member !== undefined)
+    .filter((member): member is T & MemberProfileInfo => member !== undefined)
 }
 
 export const getCommunityThumbnailPath = (communityId: string) => {
