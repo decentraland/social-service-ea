@@ -140,4 +140,40 @@ describe('emitterToAsyncGenerator', () => {
     expect(result2.done).toBe(true)
     expect(result2.value).toBeUndefined()
   })
+
+  it('resolves pending next() when return() is called while waiting', async () => {
+    const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+
+    // Start a next() call without emitting anything — this will block
+    const pendingNext = generator.next()
+
+    // Call return() while next() is still pending
+    await generator.return('done')
+
+    // The pending next() should resolve to done:true without hanging
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Timed out: pending next() was never resolved')), 1000)
+    )
+    const result = await Promise.race([pendingNext, timeout])
+
+    expect(result.done).toBe(true)
+  })
+
+  it('rejects pending next() when throw() is called while waiting', async () => {
+    const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+
+    // Start a next() call without emitting anything — this will block
+    const pendingNext = generator.next()
+
+    const error = new Error('thrown while waiting')
+
+    // Call throw() while next() is still pending — swallow the rethrown error
+    await generator.throw(error).catch(() => {})
+
+    // The pending next() should reject with the error without hanging
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Timed out: pending next() was never rejected')), 1000)
+    )
+    await expect(Promise.race([pendingNext, timeout])).rejects.toThrow('thrown while waiting')
+  })
 })
