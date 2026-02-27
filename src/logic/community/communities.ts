@@ -424,7 +424,9 @@ export function createCommunityComponent(
 
       const thumbnailUrl = (await communityThumbnail.getThumbnail(id)) || 'N/A'
 
-      void broadcastCommunityDeleted(id, community, ownerDeletingOwnedCommunity, thumbnailUrl)
+      void broadcastCommunityDeleted(id, community, ownerDeletingOwnedCommunity, thumbnailUrl).catch((error: any) => {
+        logger.error('Unhandled error in broadcastCommunityDeleted', { error: error.message, communityId: id })
+      })
     },
 
     updateCommunity: async (

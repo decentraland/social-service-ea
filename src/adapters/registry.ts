@@ -117,9 +117,13 @@ export async function createRegistryComponent({
     }
 
     // Suppress tracing for cache writes to avoid Sentry spans
-    await withoutTracing(async () => {
-      await cacheProfile(id, minimalProfile)
-    })
+    try {
+      await withoutTracing(async () => {
+        await cacheProfile(id, minimalProfile)
+      })
+    } catch (error: any) {
+      logger.error('Failed to cache single profile', { error: error.message, profileId: id })
+    }
 
     return minimalProfile
   }

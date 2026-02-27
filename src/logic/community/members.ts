@@ -120,7 +120,9 @@ export async function createCommunityMembersComponent(
 
     await communitiesDb.transferCommunityOwnership(communityId, targetAddress)
 
-    void broadcastOwnershipTransferred(communityId, updaterAddress, targetAddress)
+    void broadcastOwnershipTransferred(communityId, updaterAddress, targetAddress).catch((error: any) => {
+      logger.error('Unhandled error in broadcastOwnershipTransferred', { error: error.message, communityId })
+    })
   }
 
   async function broadcastOwnershipTransferred(communityId: string, updaterAddress: string, targetAddress: string) {
