@@ -240,26 +240,22 @@ describe('emitterToAsyncGenerator', () => {
 
     it('should keep exactly MAX_VALUE_QUEUE_SIZE items when overflowing', async () => {
       const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+      const overflow = 5
 
-      for (let i = 0; i < MAX_VALUE_QUEUE_SIZE + 5; i++) {
+      for (let i = 0; i < MAX_VALUE_QUEUE_SIZE + overflow; i++) {
         emitter.emit('testEvent', `event-${i}`)
       }
 
-      // Consume all items
-      let count = 0
-      while (true) {
-        // Start a race: next item vs. a short timeout to check if queue is empty
-        const result = await Promise.race([
-          generator.next(),
-          new Promise<IteratorResult<string>>((resolve) =>
-            setTimeout(() => resolve({ done: false, value: '__timeout__' }), 50)
-          )
-        ])
-        if (result.value === '__timeout__') break
-        count++
+      // Consume exactly MAX_VALUE_QUEUE_SIZE items (the cap)
+      for (let i = 0; i < MAX_VALUE_QUEUE_SIZE; i++) {
+        const result = await generator.next()
+        expect(result.done).toBe(false)
       }
 
-      expect(count).toBe(MAX_VALUE_QUEUE_SIZE)
+      // Queue should now be empty — destroy and confirm no more items
+      generator.destroy()
+      const result = await generator.next()
+      expect(result.done).toBe(true)
     })
   })
 })

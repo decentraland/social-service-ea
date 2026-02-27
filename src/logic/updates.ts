@@ -383,12 +383,6 @@ export function createUpdateHandlerComponent(
       rpcContext.subscribersContext.unregisterGenerator(normalizedAddress, updatesGenerator)
       await updatesGenerator.return(undefined)
     }
-
-    // Return a cleanup function
-    return () => {
-      logger.debug(`Cleaning up subscription for ${eventNameString}`, { address: rpcContext.address })
-      void updatesGenerator.return(undefined)
-    }
   }
 
   return {
