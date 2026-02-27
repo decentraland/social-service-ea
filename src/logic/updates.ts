@@ -347,6 +347,7 @@ export function createUpdateHandlerComponent(
     const eventNameString = String(eventName)
 
     const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
+    rpcContext.subscribersContext.registerGenerator(normalizedAddress, updatesGenerator)
 
     try {
       for await (const update of updatesGenerator) {
@@ -379,6 +380,7 @@ export function createUpdateHandlerComponent(
       })
       throw error
     } finally {
+      rpcContext.subscribersContext.unregisterGenerator(normalizedAddress, updatesGenerator)
       await updatesGenerator.return(undefined)
     }
 
