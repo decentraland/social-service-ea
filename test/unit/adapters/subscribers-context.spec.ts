@@ -149,6 +149,63 @@ describe('SubscribersContext Component', () => {
     })
   })
 
+  describe('when managing generators', () => {
+    it('should register and unregister generators', async () => {
+      const { context, subscriber, address } = createTestContext()
+      await context.addSubscriber(address, subscriber)
+
+      const mockGenerator = { destroy: jest.fn() }
+      context.registerGenerator(address, mockGenerator)
+      context.unregisterGenerator(address, mockGenerator)
+
+      // After unregister, removing the subscriber should not call destroy
+      await context.removeSubscriber(address)
+      expect(mockGenerator.destroy).not.toHaveBeenCalled()
+    })
+
+    it('should call destroy on all registered generators when removing a subscriber', async () => {
+      const { context, subscriber, address } = createTestContext()
+      await context.addSubscriber(address, subscriber)
+
+      const gen1 = { destroy: jest.fn() }
+      const gen2 = { destroy: jest.fn() }
+      context.registerGenerator(address, gen1)
+      context.registerGenerator(address, gen2)
+
+      await context.removeSubscriber(address)
+
+      expect(gen1.destroy).toHaveBeenCalledTimes(1)
+      expect(gen2.destroy).toHaveBeenCalledTimes(1)
+    })
+
+    it('should call destroy on generators before clearing emitter handlers', async () => {
+      const { context, subscriber, address } = createTestContext()
+      await context.addSubscriber(address, subscriber)
+
+      const callOrder: string[] = []
+      const clearSpy = jest.spyOn(subscriber.all, 'clear').mockImplementation(() => {
+        callOrder.push('clear')
+      })
+      const gen = {
+        destroy: jest.fn().mockImplementation(() => {
+          callOrder.push('destroy')
+        })
+      }
+      context.registerGenerator(address, gen)
+
+      await context.removeSubscriber(address)
+
+      expect(callOrder).toEqual(['destroy', 'clear'])
+      clearSpy.mockRestore()
+    })
+
+    it('should handle unregister for non-existent address gracefully', () => {
+      const { context } = createTestContext()
+      const mockGenerator = { destroy: jest.fn() }
+      expect(() => context.unregisterGenerator('0xnonexistent', mockGenerator)).not.toThrow()
+    })
+  })
+
   describe('when stopping the component', () => {
     it('should remove all local subscribers from Redis', async () => {
       const { context } = createTestContext()
@@ -162,6 +219,25 @@ describe('SubscribersContext Component', () => {
 
       expect(mockRedis.sRem).toHaveBeenCalledWith('online_subscribers', addresses)
       expect(context.getSubscribers()).toEqual({})
+    })
+
+    it('should destroy all generators for all subscribers on stop', async () => {
+      const { context } = createTestContext()
+      const addresses = ['0x123', '0x456']
+      const generators: { destroy: jest.Mock }[] = []
+
+      for (const address of addresses) {
+        await context.addSubscriber(address, mitt())
+        const gen = { destroy: jest.fn() }
+        generators.push(gen)
+        context.registerGenerator(address, gen)
+      }
+
+      await context.stop?.()
+
+      for (const gen of generators) {
+        expect(gen.destroy).toHaveBeenCalledTimes(1)
+      }
     })
   })
 })

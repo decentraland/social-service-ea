@@ -12,6 +12,10 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
   // Local in-memory emitters for WebSocket connections on this instance
   const localSubscribers: Subscribers = {}
 
+  // Track active emitterToAsyncGenerator instances per subscriber so we can
+  // synchronously terminate them when the subscriber disconnects.
+  const subscriberGenerators = new Map<string, Set<{ destroy(): void }>>()
+
   function addLocalSubscriber(address: string, subscriber: Emitter<SubscriptionEventsEmitter>): void {
     const normalizedAddress = normalizeAddress(address)
     if (!localSubscribers[normalizedAddress]) {
@@ -19,9 +23,23 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
     }
   }
 
+  function destroyGeneratorsForAddress(address: string): void {
+    const generators = subscriberGenerators.get(address)
+    if (generators) {
+      for (const gen of generators) {
+        gen.destroy()
+      }
+      generators.clear()
+      subscriberGenerators.delete(address)
+    }
+  }
+
   function removeLocalSubscriber(address: string): void {
     const normalizedAddress = normalizeAddress(address)
     if (localSubscribers[normalizedAddress]) {
+      // Destroy generators first so pending next() calls resolve before
+      // we clear the emitter handlers (prevents the deadlock).
+      destroyGeneratorsForAddress(normalizedAddress)
       localSubscribers[normalizedAddress].all.clear()
       delete localSubscribers[normalizedAddress]
     }
@@ -44,7 +62,7 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
         }
       }
 
-      // Clear local emitters
+      // Destroy all generators and clear local emitters
       for (const address of Object.keys(localSubscribers)) {
         removeLocalSubscriber(address)
       }
@@ -126,6 +144,27 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
           address: normalizedAddress,
           error: error?.message || error
         })
+      }
+    },
+
+    registerGenerator(address: string, generator: { destroy(): void }): void {
+      const normalizedAddress = normalizeAddress(address)
+      let generators = subscriberGenerators.get(normalizedAddress)
+      if (!generators) {
+        generators = new Set()
+        subscriberGenerators.set(normalizedAddress, generators)
+      }
+      generators.add(generator)
+    },
+
+    unregisterGenerator(address: string, generator: { destroy(): void }): void {
+      const normalizedAddress = normalizeAddress(address)
+      const generators = subscriberGenerators.get(normalizedAddress)
+      if (generators) {
+        generators.delete(generator)
+        if (generators.size === 0) {
+          subscriberGenerators.delete(normalizedAddress)
+        }
       }
     }
   }

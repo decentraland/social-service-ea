@@ -342,6 +342,8 @@ export type ISubscribersContext = IBaseComponent & {
   getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
   addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => Promise<void>
   removeSubscriber: (address: string) => Promise<void>
+  registerGenerator: (address: string, generator: { destroy(): void }) => void
+  unregisterGenerator: (address: string, generator: { destroy(): void }) => void
 }
 
 export type ITracingComponent = IBaseComponent & {
