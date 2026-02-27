@@ -1,5 +1,6 @@
 import { EventType, Emitter } from 'mitt'
 
+// TODO: Choose a proper value based on real metrics from peak queue sizes in production.
 export const MAX_VALUE_QUEUE_SIZE = 1000
 
 export type DestroyableAsyncGenerator<T> = AsyncGenerator<T> & { destroy(): void }
@@ -33,6 +34,8 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
     }
 
     if (valueQueue.length >= MAX_VALUE_QUEUE_SIZE) {
+      // Drop oldest event silently to prevent unbounded memory growth.
+      // TODO: Add metrics/logging here once a logger is available in this utility.
       valueQueue.shift()
     }
     valueQueue.push(value)
@@ -80,6 +83,10 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
         value
       }
     },
+    // Note: throw() intentionally does NOT delegate to destroy() because
+    // destroy() resolves pending next() calls, while throw() must reject them.
+    // Callers should ensure unregisterGenerator() is called separately (the
+    // finally block in handleSubscriptionUpdates handles this).
     async throw(e) {
       isDone = true
       emitter.off(event, eventHandler)

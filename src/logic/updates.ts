@@ -380,8 +380,8 @@ export function createUpdateHandlerComponent(
       })
       throw error
     } finally {
-      rpcContext.subscribersContext.unregisterGenerator(normalizedAddress, updatesGenerator)
       await updatesGenerator.return(undefined)
+      rpcContext.subscribersContext.unregisterGenerator(normalizedAddress, updatesGenerator)
     }
   }
 
