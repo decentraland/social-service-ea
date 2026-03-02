@@ -46,6 +46,7 @@ import {
   createCommunityPostsComponent,
   createCommunityRankingComponent
 } from './logic/community'
+import { createUserModerationDBComponent } from './adapters/user-moderation-db'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
 import { createMemoryQueueComponent } from '@dcl/memory-queue-component'
@@ -138,6 +139,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
+  const userModerationDb = createUserModerationDBComponent({ pg, logs })
   const referralDb = await createReferralDBComponent({ pg, logs, config })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
@@ -389,6 +391,7 @@ export async function initComponents(): Promise<AppComponents> {
     peersSynchronizer,
     pg,
     placesApi,
+    userModerationDb,
     pubsub,
     queue,
     communityRanking,

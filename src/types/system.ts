@@ -37,7 +37,8 @@ import {
   IRewardComponent,
   IEmailComponent,
   ICdnCacheInvalidatorComponent,
-  IRegistryComponent
+  IRegistryComponent,
+  IUserModerationDatabaseComponent
 } from './components'
 import { ICommunityVoiceChatCacheComponent } from '../logic/community-voice/community-voice-cache'
 import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/community-voice-polling'
@@ -122,6 +123,7 @@ export type BaseComponents = {
   peersSynchronizer: IPeersSynchronizer
   pg: IPgComponent
   placesApi: IPlacesApiComponent
+  userModerationDb: IUserModerationDatabaseComponent
   pubsub: IPubSubComponent
   queue: IQueueComponent
   redis: IRedisComponent & ICacheComponent
