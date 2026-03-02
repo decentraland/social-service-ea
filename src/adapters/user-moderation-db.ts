@@ -25,20 +25,18 @@ export function createUserModerationDBComponent(
       const bannedAddress = normalizeAddress(input.bannedAddress)
       const bannedBy = normalizeAddress(input.bannedBy)
 
+      const { isBanned } = await this.isPlayerBanned(bannedAddress)
+      if (isBanned) {
+        throw new PlayerAlreadyBannedError(bannedAddress)
+      }
+
       const query = SQL`
         INSERT INTO user_bans (id, banned_address, banned_by, reason, custom_message, expires_at)
         VALUES (${id}, ${bannedAddress}, ${bannedBy}, ${input.reason}, ${input.customMessage ?? null}, ${input.expiresAt ?? null})
         RETURNING `.append(BAN_SELECT_FIELDS)
 
-      try {
-        const result = await pg.query<UserBan>(query)
-        return result.rows[0]
-      } catch (error: any) {
-        if (error.code === '23505') {
-          throw new PlayerAlreadyBannedError(bannedAddress)
-        }
-        throw error
-      }
+      const result = await pg.query<UserBan>(query)
+      return result.rows[0]
     },
 
     async liftBan(address: string, liftedBy: string): Promise<void> {

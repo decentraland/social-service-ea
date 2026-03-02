@@ -82,6 +82,7 @@ import { createInMemoryCacheComponent } from '../src/adapters/memory-cache'
 import { createMockCommunityBroadcasterComponent } from './mocks/communities'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
+import { createUserModerationDBComponent } from '../src/adapters/user-moderation-db'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -332,6 +333,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
 
+  const userModerationDb = createUserModerationDBComponent({ pg, logs })
+
   return {
     aiCompliance,
     analytics,
@@ -401,6 +404,7 @@ async function initComponents(): Promise<TestComponents> {
     voiceDb,
     worldsStats,
     wsPool,
-    schemaValidator
+    schemaValidator,
+    userModerationDb
   }
 }

@@ -51,12 +51,6 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     }
   })
 
-  pgm.sql(`
-    CREATE UNIQUE INDEX user_bans_unique_active_ban
-    ON user_bans (banned_address)
-    WHERE lifted_at IS NULL AND (expires_at IS NULL OR expires_at > now())
-  `)
-
   pgm.createIndex('user_bans', 'banned_address', {
     name: 'idx_user_bans_banned_address'
   })
