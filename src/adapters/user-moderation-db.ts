@@ -35,9 +35,7 @@ export function createUserModerationDBComponent(
         UPDATE user_bans
         SET lifted_at = now(), lifted_by = ${liftedBy}
         WHERE banned_address = ${address}
-          AND lifted_at IS NULL
-          AND (expires_at IS NULL OR expires_at > now())
-      `
+          AND `.append(ACTIVE_BAN_FILTER)
 
       const result = await pg.query(query)
       return result.rowCount > 0
