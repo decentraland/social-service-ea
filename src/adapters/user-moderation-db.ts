@@ -7,7 +7,9 @@ const BAN_SELECT_FIELDS = `id, banned_address as "bannedAddress", banned_by as "
                custom_message as "customMessage", banned_at as "bannedAt", expires_at as "expiresAt",
                lifted_at as "liftedAt", lifted_by as "liftedBy", created_at as "createdAt"`
 
-const ACTIVE_BAN_FILTER = `lifted_at IS NULL AND (expires_at IS NULL OR expires_at > now())`
+function activeBanFilter(now: Date = new Date()) {
+  return SQL`lifted_at IS NULL AND (expires_at IS NULL OR expires_at > ${now})`
+}
 
 const WARNING_SELECT_FIELDS = `id, warned_address as "warnedAddress", warned_by as "warnedBy", reason,
                warned_at as "warnedAt", created_at as "createdAt"`
@@ -35,7 +37,7 @@ export function createUserModerationDBComponent(
         UPDATE user_bans
         SET lifted_at = now(), lifted_by = ${liftedBy}
         WHERE banned_address = ${address}
-          AND `.append(ACTIVE_BAN_FILTER)
+          AND `.append(activeBanFilter())
 
       const result = await pg.query(query)
       return result.rowCount > 0
@@ -45,7 +47,7 @@ export function createUserModerationDBComponent(
       const query = SQL`SELECT `
         .append(BAN_SELECT_FIELDS)
         .append(SQL` FROM user_bans WHERE banned_address = ${address} AND `)
-        .append(ACTIVE_BAN_FILTER)
+        .append(activeBanFilter())
 
       const result = await pg.query<UserBan>(query)
       if (result.rows.length > 0) {
@@ -58,7 +60,7 @@ export function createUserModerationDBComponent(
       const query = SQL`SELECT `
         .append(BAN_SELECT_FIELDS)
         .append(` FROM user_bans WHERE `)
-        .append(ACTIVE_BAN_FILTER)
+        .append(activeBanFilter())
         .append(` ORDER BY banned_at DESC`)
 
       const result = await pg.query<UserBan>(query)

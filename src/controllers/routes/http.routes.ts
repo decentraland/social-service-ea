@@ -64,7 +64,7 @@ import {
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
   const {
-    components: { fetcher, config, schemaValidator }
+    components: { fetcher, config, schemaValidator, moderator }
   } = context
 
   const API_ADMIN_TOKEN = await config.getString('API_ADMIN_TOKEN')
@@ -190,19 +190,31 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.post(
     '/v1/moderation/users/:address/bans',
     signedFetchMiddleware(),
+    moderator.moderatorAuthMiddleware,
     schemaValidator.withSchemaValidatorMiddleware(BanPlayerSchema),
     banPlayerHandler
   )
-  router.delete('/v1/moderation/users/:address/bans', signedFetchMiddleware(), liftBanHandler)
+  router.delete(
+    '/v1/moderation/users/:address/bans',
+    signedFetchMiddleware(),
+    moderator.moderatorAuthMiddleware,
+    liftBanHandler
+  )
   router.get('/v1/moderation/users/:address/bans', signedFetchMiddleware({ optional: true }), banStatusHandler)
   router.post(
     '/v1/moderation/users/:address/warnings',
     signedFetchMiddleware(),
+    moderator.moderatorAuthMiddleware,
     schemaValidator.withSchemaValidatorMiddleware(WarnPlayerSchema),
     warnPlayerHandler
   )
-  router.get('/v1/moderation/users/:address/warnings', signedFetchMiddleware(), getWarningsHandler)
-  router.get('/v1/moderation/bans', signedFetchMiddleware(), listBansHandler)
+  router.get(
+    '/v1/moderation/users/:address/warnings',
+    signedFetchMiddleware(),
+    moderator.moderatorAuthMiddleware,
+    getWarningsHandler
+  )
+  router.get('/v1/moderation/bans', signedFetchMiddleware(), moderator.moderatorAuthMiddleware, listBansHandler)
 
   return router
 }

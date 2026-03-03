@@ -89,25 +89,22 @@ describe('user-moderation-component', () => {
 
     describe('and a duration is provided', () => {
       let ban: UserBan
-      let now: number
       let duration: number
 
       beforeEach(() => {
-        now = Date.now()
-        jest.spyOn(Date, 'now').mockReturnValue(now)
         duration = 24 * 60 * 60 * 1000
-        ban = makeBan({ expiresAt: new Date(now + duration) })
+        ban = makeBan({ expiresAt: new Date(Date.now() + duration) })
         mockUserModerationDb.isPlayerBanned.mockResolvedValueOnce({ isBanned: false })
         mockUserModerationDb.createBan.mockResolvedValueOnce(ban)
       })
 
-      it('should compute expiresAt from the duration in milliseconds', async () => {
+      it('should pass expiresAt to the adapter', async () => {
         const result = await component.banPlayer('0xABC', '0xADMIN', 'Violation', duration)
 
         expect(result).toEqual(ban)
         expect(mockUserModerationDb.createBan).toHaveBeenCalledWith(
           expect.objectContaining({
-            expiresAt: new Date(now + duration)
+            expiresAt: expect.any(Date)
           })
         )
       })

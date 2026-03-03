@@ -69,6 +69,7 @@ import { IJobComponent } from '@dcl/job-component'
 import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
+import { IModeratorComponent } from '../logic/moderator'
 import { IUserModerationComponent } from '../logic/user-moderation'
 import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
@@ -117,6 +118,7 @@ export type BaseComponents = {
   httpServer: IHttpServerComponent<GlobalContext>
   logs: ILoggerComponent
   memoryCache: ICacheComponent
+  moderator: IModeratorComponent
   metrics: IMetricsComponent<MetricsDeclaration>
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
