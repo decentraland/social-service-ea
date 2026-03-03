@@ -456,7 +456,7 @@ export type IEmailComponent = IBaseComponent & {
 
 export interface IUserModerationDatabaseComponent {
   createBan(input: CreateBanInput): Promise<UserBan>
-  liftBan(address: string, liftedBy: string): Promise<void>
+  liftBan(address: string, liftedBy: string): Promise<boolean>
   isPlayerBanned(address: string): Promise<BanStatus>
   getActiveBans(): Promise<UserBan[]>
   createWarning(input: CreateWarningInput): Promise<UserWarning>

@@ -69,6 +69,7 @@ import { IJobComponent } from '@dcl/job-component'
 import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
+import { IUserModerationComponent } from '../logic/user-moderation'
 import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
 import { IFeatureFlagsAdapter } from '../adapters/feature-flags'
@@ -123,6 +124,7 @@ export type BaseComponents = {
   peersSynchronizer: IPeersSynchronizer
   pg: IPgComponent
   placesApi: IPlacesApiComponent
+  userModeration: IUserModerationComponent
   userModerationDb: IUserModerationDatabaseComponent
   pubsub: IPubSubComponent
   queue: IQueueComponent

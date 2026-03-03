@@ -83,6 +83,7 @@ import { createMockCommunityBroadcasterComponent } from './mocks/communities'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
 import { createUserModerationDBComponent } from '../src/adapters/user-moderation-db'
+import { createUserModerationComponent } from '../src/logic/user-moderation/component'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -335,6 +336,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const userModerationDb = createUserModerationDBComponent({ pg, logs })
 
+  const userModeration = createUserModerationComponent({ userModerationDb, logs })
+
   return {
     aiCompliance,
     analytics,
@@ -405,6 +408,7 @@ async function initComponents(): Promise<TestComponents> {
     worldsStats,
     wsPool,
     schemaValidator,
-    userModerationDb
+    userModerationDb,
+    userModeration
   }
 }

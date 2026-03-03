@@ -35,3 +35,18 @@ export type CreateWarningInput = {
   warnedBy: string
   reason: string
 }
+
+export interface IUserModerationComponent {
+  banPlayer(
+    address: string,
+    bannedBy: string,
+    reason: string,
+    duration?: number,
+    customMessage?: string
+  ): Promise<UserBan>
+  liftBan(address: string, liftedBy: string): Promise<void>
+  warnPlayer(address: string, reason: string, warnedBy: string): Promise<UserWarning>
+  isPlayerBanned(address: string): Promise<BanStatus>
+  getActiveBans(): Promise<UserBan[]>
+  getPlayerWarnings(address: string): Promise<UserWarning[]>
+}
