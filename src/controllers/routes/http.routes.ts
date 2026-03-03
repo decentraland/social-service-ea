@@ -36,11 +36,18 @@ import {
   deleteCommunityPostHandler,
   likeCommunityPostHandler,
   unlikeCommunityPostHandler,
-  getMemberCommunitiesByIdsHandler
+  getMemberCommunitiesByIdsHandler,
+  banPlayerHandler,
+  liftBanHandler,
+  banStatusHandler,
+  warnPlayerHandler,
+  getWarningsHandler,
+  listBansHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
+import { userModerationErrorsHandler } from '../middlewares/user-moderation-errors'
 import {
   UpdateMemberRoleSchema,
   UpdateCommunityPartiallySchema,
@@ -50,7 +57,9 @@ import {
   AddReferralEmailSchema,
   CreateCommunityRequestSchema,
   UpdateCommunityRequestStatusSchema,
-  GetMemberCommunitiesByIdsSchema
+  GetMemberCommunitiesByIdsSchema,
+  BanPlayerSchema,
+  WarnPlayerSchema
 } from '../handlers/http/schemas'
 
 export async function setupHttpRoutes(context: GlobalContext): Promise<Router<GlobalContext>> {
@@ -74,6 +83,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.use(errorHandler)
   router.use(communitiesErrorsHandler)
+  router.use(userModerationErrorsHandler)
 
   if (API_ADMIN_TOKEN) {
     router.get('/v1/communities/:address/managed', bearerTokenMiddleware(API_ADMIN_TOKEN), getManagedCommunitiesHandler)
@@ -175,6 +185,24 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   // Moderation endpoints
   router.get('/v1/moderation/communities', signedFetchMiddleware(), getAllCommunitiesForModerationHandler)
+
+  // User moderation endpoints
+  router.post(
+    '/v1/moderation/users/:address/bans',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(BanPlayerSchema),
+    banPlayerHandler
+  )
+  router.delete('/v1/moderation/users/:address/bans', signedFetchMiddleware(), liftBanHandler)
+  router.get('/v1/moderation/users/:address/bans', signedFetchMiddleware({ optional: true }), banStatusHandler)
+  router.post(
+    '/v1/moderation/users/:address/warnings',
+    signedFetchMiddleware(),
+    schemaValidator.withSchemaValidatorMiddleware(WarnPlayerSchema),
+    warnPlayerHandler
+  )
+  router.get('/v1/moderation/users/:address/warnings', signedFetchMiddleware(), getWarningsHandler)
+  router.get('/v1/moderation/bans', signedFetchMiddleware(), listBansHandler)
 
   return router
 }
