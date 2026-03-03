@@ -437,6 +437,14 @@ export function createCommunityComponent(
         const uniquePlaceIds = Array.from(new Set(placeIds))
         const currentPlaces = await communitiesDb.getCommunityPlaces(communityId)
         const placeIdsToValidate = uniquePlaceIds.filter((placeId) => !currentPlaces.some((p) => p.id === placeId))
+
+        logger.info('Place IDs to validate ownership for community update', {
+          communityId,
+          incomingPlaceIds: uniquePlaceIds.join(','),
+          currentPlaceIds: currentPlaces.map((p) => p.id).join(','),
+          placeIdsToValidate: placeIdsToValidate.join(',')
+        })
+
         await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
       }
 

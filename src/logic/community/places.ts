@@ -23,6 +23,13 @@ export async function createCommunityPlacesComponent(
     const uniquePlaceIds = Array.from(new Set(placeIds))
     const places = await placesApi.getPlaces(uniquePlaceIds)
 
+    logger.info('Places API response for ownership validation', {
+      requestedIds: uniquePlaceIds.join(','),
+      requestedCount: uniquePlaceIds.length,
+      returnedCount: places?.length ?? 0,
+      placeOwners: places?.map((p) => `${p.id}:${p.owner ?? 'null'}`).join('|') ?? 'none'
+    })
+
     const splitPlacesByOwnership = places?.reduce(
       (acc, place) => {
         if (place.owner?.toLowerCase() === userAddress.toLowerCase()) {
