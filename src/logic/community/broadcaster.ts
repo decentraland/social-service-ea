@@ -94,9 +94,10 @@ type BroadcastingEventHandler = (event: BroadcastableEvent, options?: BroadcastO
 type BroadcastingRegistry = Map<Events.SubType.Community, BroadcastingEventHandler>
 
 export function createCommunityBroadcasterComponent(
-  components: Pick<AppComponents, 'sns' | 'communitiesDb' | 'peersStats'>
+  components: Pick<AppComponents, 'sns' | 'communitiesDb' | 'peersStats' | 'logs'>
 ): ICommunityBroadcasterComponent {
-  const { sns, communitiesDb, peersStats } = components
+  const { sns, communitiesDb, peersStats, logs } = components
+  const logger = logs.getLogger('community-broadcaster')
 
   /**
    * Gets community member addresses with pagination support
@@ -320,8 +321,16 @@ export function createCommunityBroadcasterComponent(
    * @param {BroadcastOptions} options - Optional broadcast options
    */
   async function broadcast(event: BroadcastableEvent, options?: BroadcastOptions): Promise<void> {
-    const broadcastingEventHandler = broadcastingRegistry.get(event.subType) || directBroadcast
-    await broadcastingEventHandler(event, options)
+    try {
+      const broadcastingEventHandler = broadcastingRegistry.get(event.subType) || directBroadcast
+      await broadcastingEventHandler(event, options)
+    } catch (error: any) {
+      logger.error('Failed to broadcast event', {
+        error: error.message,
+        subType: event.subType,
+        key: event.key
+      })
+    }
   }
 
   return {

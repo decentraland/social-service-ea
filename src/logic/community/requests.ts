@@ -178,28 +178,7 @@ export function createCommunityRequestsComponent(
       )
     }
 
-    setImmediate(async () => {
-      let memberName: string | undefined
-
-      try {
-        if (
-          createdRequest.type === CommunityRequestType.RequestToJoin &&
-          createdRequest.status === CommunityRequestStatus.Pending
-        ) {
-          const memberProfile = await registry.getProfile(createdRequest.memberAddress)
-          memberName = getProfileName(memberProfile)
-        }
-      } catch (error) {
-        logger.warn(`Failed to fetch profile for member ${createdRequest.memberAddress}: ${error}`)
-      }
-
-      await notifyStakeholdersAboutRequest(createdRequest, {
-        communityId,
-        communityName: community.name,
-        memberAddress,
-        memberName
-      })
-    })
+    void notifyAboutNewRequest(createdRequest, communityId, community.name, memberAddress)
 
     return createdRequest
   }
@@ -315,16 +294,14 @@ export function createCommunityRequestsComponent(
       })
     }
 
-    setImmediate(async () => {
-      await notifyStakeholdersAboutRequest(
-        { ...request, status },
-        {
-          communityId: community.id,
-          communityName: community.name,
-          memberAddress: request.memberAddress
-        }
-      )
-    })
+    void notifyStakeholdersAboutRequest(
+      { ...request, status },
+      {
+        communityId: community.id,
+        communityName: community.name,
+        memberAddress: request.memberAddress
+      }
+    )
   }
 
   /**
@@ -400,6 +377,26 @@ export function createCommunityRequestsComponent(
         } as MemberCommunityRequest
       })
       .filter(Boolean) as MemberCommunityRequest[]
+  }
+
+  async function notifyAboutNewRequest(
+    request: MemberRequest,
+    communityId: string,
+    communityName: string,
+    memberAddress: string
+  ) {
+    let memberName: string | undefined
+
+    try {
+      if (request.type === CommunityRequestType.RequestToJoin && request.status === CommunityRequestStatus.Pending) {
+        const memberProfile = await registry.getProfile(request.memberAddress)
+        memberName = getProfileName(memberProfile)
+      }
+    } catch (error) {
+      logger.warn(`Failed to fetch profile for member ${request.memberAddress}: ${error}`)
+    }
+
+    await notifyStakeholdersAboutRequest(request, { communityId, communityName, memberAddress, memberName })
   }
 
   return {

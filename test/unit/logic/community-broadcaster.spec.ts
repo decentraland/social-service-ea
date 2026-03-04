@@ -17,6 +17,7 @@ import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { IPublisherComponent } from '@dcl/sns-component'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats/types'
+import { mockLogs } from '../../mocks/components/logs'
 
 describe('Community Broadcaster Component', () => {
   let broadcasterComponent: ICommunityBroadcasterComponent
@@ -31,7 +32,8 @@ describe('Community Broadcaster Component', () => {
     broadcasterComponent = createCommunityBroadcasterComponent({
       sns: mockSns,
       communitiesDb: mockCommunitiesDB,
-      peersStats: mockPeersStats
+      peersStats: mockPeersStats,
+      logs: mockLogs
     })
   })
 

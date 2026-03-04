@@ -80,20 +80,18 @@ export async function createCommunityBansComponent(
         status: ConnectivityStatus.OFFLINE
       })
 
-      setImmediate(async () => {
-        const timestamp = Date.now()
-        await communityBroadcaster.broadcast({
-          type: Events.Type.COMMUNITY,
-          subType: Events.SubType.Community.MEMBER_BANNED,
-          key: `${communityId}-${targetAddress}-${timestamp}`,
-          timestamp,
-          metadata: {
-            id: communityId,
-            name: community.name,
-            memberAddress: targetAddress,
-            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
-          }
-        })
+      const timestamp = Date.now()
+      void communityBroadcaster.broadcast({
+        type: Events.Type.COMMUNITY,
+        subType: Events.SubType.Community.MEMBER_BANNED,
+        key: `${communityId}-${targetAddress}-${timestamp}`,
+        timestamp,
+        metadata: {
+          id: communityId,
+          name: community.name,
+          memberAddress: targetAddress,
+          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+        }
       })
     },
 

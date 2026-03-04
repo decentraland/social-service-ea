@@ -274,22 +274,20 @@ export async function createFriendsComponent(
         metadata: metadata || null
       }
 
-      setImmediate(async () => {
-        if (shouldNotify(action)) {
-          await sendNotification(
-            action,
-            {
-              requestId: actionId,
-              senderAddress: userAddress,
-              receiverAddress: friendAddress,
-              senderProfile,
-              receiverProfile,
-              message: metadata?.message
-            },
-            { sns, logs }
-          )
-        }
-      })
+      if (shouldNotify(action)) {
+        void sendNotification(
+          action,
+          {
+            requestId: actionId,
+            senderAddress: userAddress,
+            receiverAddress: friendAddress,
+            senderProfile,
+            receiverProfile,
+            message: metadata?.message
+          },
+          { sns, logs }
+        )
+      }
 
       return {
         friendshipRequest,
