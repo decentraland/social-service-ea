@@ -201,10 +201,18 @@ export async function createCommunityPlacesComponent(
         }
 
         const uniquePlaceIds = Array.from(new Set(placeIds))
-        const placesData = await placesApi.getPlaces(uniquePlaceIds)
+        const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
+        const worldNameIds = uniquePlaceIds.filter((id) => !UUID_REGEX.test(id))
 
-        if (placesData) {
-          return separatePositionsAndWorlds(placesData)
+        const [uuidPlacesData, worldPlacesData] = await Promise.all([
+          uuidIds.length > 0 ? placesApi.getPlaces(uuidIds) : Promise.resolve([]),
+          worldNameIds.length > 0 ? placesApi.getWorlds(worldNameIds) : Promise.resolve([])
+        ])
+
+        const allPlacesData = [...(uuidPlacesData ?? []), ...(worldPlacesData ?? [])]
+
+        if (allPlacesData.length > 0) {
+          return separatePositionsAndWorlds(allPlacesData)
         }
 
         return { positions: [], worlds: [] }
