@@ -26,6 +26,19 @@ export async function createTestIdentity(): Promise<Identity> {
   return { authChain, realAccount, ephemeralIdentity }
 }
 
+export async function createTestIdentityFromAccount(realAccount: IdentityType): Promise<Identity> {
+  const ephemeralIdentity = createUnsafeIdentity()
+
+  const authChain = await Authenticator.initializeAuthChain(
+    realAccount.address,
+    ephemeralIdentity,
+    10,
+    async (message) => Authenticator.createSignature(realAccount, message)
+  )
+
+  return { authChain, realAccount, ephemeralIdentity }
+}
+
 export function createAuthHeaders(
   method: string,
   path: string,

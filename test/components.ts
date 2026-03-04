@@ -84,6 +84,10 @@ import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
 import { createUserModerationDBComponent } from '../src/adapters/user-moderation-db'
 import { createUserModerationComponent } from '../src/logic/user-moderation/component'
+import { createModeratorComponent } from '../src/logic/moderator'
+import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
+
+export const TEST_MODERATOR_ACCOUNT = createUnsafeIdentity()
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -338,6 +342,8 @@ async function initComponents(): Promise<TestComponents> {
 
   const userModeration = createUserModerationComponent({ userModerationDb, logs })
 
+  const moderator = await createModeratorComponent([TEST_MODERATOR_ACCOUNT.address], logs)
+
   return {
     aiCompliance,
     analytics,
@@ -378,6 +384,7 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     memoryCache,
     metrics,
+    moderator,
     queueProcessor,
     nats,
     peerTracking,
