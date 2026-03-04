@@ -347,6 +347,7 @@ export function createUpdateHandlerComponent(
     const eventNameString = String(eventName)
 
     const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
+    rpcContext.subscribersContext.registerGenerator(normalizedAddress, updatesGenerator)
 
     try {
       for await (const update of updatesGenerator) {
@@ -380,12 +381,7 @@ export function createUpdateHandlerComponent(
       throw error
     } finally {
       await updatesGenerator.return(undefined)
-    }
-
-    // Return a cleanup function
-    return () => {
-      logger.debug(`Cleaning up subscription for ${eventNameString}`, { address: rpcContext.address })
-      void updatesGenerator.return(undefined)
+      rpcContext.subscribersContext.unregisterGenerator(normalizedAddress, updatesGenerator)
     }
   }
 

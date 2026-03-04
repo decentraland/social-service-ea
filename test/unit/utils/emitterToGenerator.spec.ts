@@ -1,5 +1,5 @@
 import mitt, { Emitter } from 'mitt'
-import emitterToAsyncGenerator from '../../../src/utils/emitterToGenerator'
+import emitterToAsyncGenerator, { MAX_VALUE_QUEUE_SIZE } from '../../../src/utils/emitterToGenerator'
 
 type TestEvents = {
   testEvent: string
@@ -173,6 +173,89 @@ describe('emitterToAsyncGenerator', () => {
         )
         await expect(Promise.race([pendingNext, timeout])).rejects.toThrow('thrown while waiting')
       })
+    })
+  })
+
+  describe('destroy()', () => {
+    it('should resolve pending next() with done: true', async () => {
+      const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+
+      const pendingNext = generator.next()
+      generator.destroy()
+
+      // destroy() is synchronous, so the pending next() resolves immediately
+      const result = await pendingNext
+      expect(result.done).toBe(true)
+    })
+
+    it('should clear valueQueue', async () => {
+      const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+
+      emitter.emit('testEvent', 'queued-event')
+      generator.destroy()
+
+      const result = await generator.next()
+      expect(result.done).toBe(true)
+      expect(result.value).toBeUndefined()
+    })
+
+    it('should make subsequent next() return done: true', async () => {
+      const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+      generator.destroy()
+
+      const result = await generator.next()
+      expect(result.done).toBe(true)
+      expect(result.value).toBeUndefined()
+    })
+
+    it('should be idempotent', () => {
+      const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+      generator.destroy()
+      expect(() => generator.destroy()).not.toThrow()
+    })
+
+    it('should stop receiving events after destroy', async () => {
+      const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+      generator.destroy()
+
+      emitter.emit('testEvent', 'after-destroy')
+      const result = await generator.next()
+      expect(result.done).toBe(true)
+    })
+  })
+
+  describe('valueQueue cap', () => {
+    it('should drop oldest events when exceeding MAX_VALUE_QUEUE_SIZE', async () => {
+      const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+
+      // Fill beyond the cap
+      for (let i = 0; i < MAX_VALUE_QUEUE_SIZE + 10; i++) {
+        emitter.emit('testEvent', `event-${i}`)
+      }
+
+      // The first 10 events should have been dropped
+      const result = await generator.next()
+      expect(result.value).toBe('event-10')
+    })
+
+    it('should keep exactly MAX_VALUE_QUEUE_SIZE items when overflowing', async () => {
+      const generator = emitterToAsyncGenerator(emitter, 'testEvent')
+      const overflow = 5
+
+      for (let i = 0; i < MAX_VALUE_QUEUE_SIZE + overflow; i++) {
+        emitter.emit('testEvent', `event-${i}`)
+      }
+
+      // Consume exactly MAX_VALUE_QUEUE_SIZE items (the cap)
+      for (let i = 0; i < MAX_VALUE_QUEUE_SIZE; i++) {
+        const result = await generator.next()
+        expect(result.done).toBe(false)
+      }
+
+      // Queue should now be empty — destroy and confirm no more items
+      generator.destroy()
+      const result = await generator.next()
+      expect(result.done).toBe(true)
     })
   })
 })

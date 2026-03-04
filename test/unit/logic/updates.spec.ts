@@ -1401,6 +1401,57 @@ describe('Updates Handlers', () => {
         expect(parser).toHaveBeenCalledWith(blockUpdateWithProfile, mockedProfile)
       })
     })
+
+    describe('and generator lifecycle tracking', () => {
+      it('should register generator on creation and unregister in finally block', async () => {
+        const registerSpy = jest.spyOn(subscribersContext, 'registerGenerator')
+        const unregisterSpy = jest.spyOn(subscribersContext, 'unregisterGenerator')
+
+        parser.mockResolvedValueOnce({ parsed: true })
+
+        const generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext,
+          eventName: 'friendshipUpdate',
+          shouldRetrieveProfile: false,
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser
+        })
+
+        // First next() starts the generator and triggers registration
+        const resultPromise = generator.next()
+        expect(registerSpy).toHaveBeenCalledWith('0x123', expect.objectContaining({ destroy: expect.any(Function) }))
+
+        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        await resultPromise
+
+        // Return the generator to trigger finally block
+        await generator.return(undefined)
+
+        expect(unregisterSpy).toHaveBeenCalledWith('0x123', expect.objectContaining({ destroy: expect.any(Function) }))
+      })
+
+      it('should unregister generator even when an error occurs', async () => {
+        const unregisterSpy = jest.spyOn(subscribersContext, 'unregisterGenerator')
+
+        parser.mockRejectedValueOnce(new Error('parser error'))
+
+        const generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext,
+          eventName: 'friendshipUpdate',
+          shouldRetrieveProfile: false,
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser
+        })
+
+        const resultPromise = generator.next()
+        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+
+        await expect(resultPromise).rejects.toThrow('parser error')
+        expect(unregisterSpy).toHaveBeenCalled()
+      })
+    })
   })
 
   describe('when handling community deleted updates', () => {
