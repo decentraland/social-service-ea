@@ -30,6 +30,25 @@ export async function createPlacesApiAdapter(
       const parsedResponse = (await response.json()) as PlacesApiResponse
 
       return parsedResponse.data ?? []
+    },
+
+    getWorlds: async (worldNames: string[]): Promise<PlacesApiResponse['data']> => {
+      if (worldNames.length === 0) return []
+      const params = worldNames.map((n) => `names=${encodeURIComponent(n)}`).join('&')
+      const response = await fetcher.fetch(`${placesApiUrl}/api/worlds?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get worlds')
+      }
+
+      const parsedResponse = (await response.json()) as PlacesApiResponse
+
+      return parsedResponse.data ?? []
     }
   }
 }

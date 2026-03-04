@@ -9,6 +9,9 @@ import { IPlacesApiComponent } from '../../../src/types/components'
 import { createMockCommunityRolesComponent } from '../../mocks/communities'
 import { ILoggerComponent } from '@well-known-components/interfaces/dist/components/logger'
 
+const PLACE_UUID_1 = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+const PLACE_UUID_2 = 'b2c3d4e5-f6a7-8901-bcde-f01234567890'
+
 describe('Community Places Component', () => {
   let defaultWorldData: { world: boolean; world_name: string }
   let communityPlacesComponent: ICommunityPlacesComponent
@@ -19,13 +22,13 @@ describe('Community Places Component', () => {
   const communityId = 'test-community'
   const mockPlaces: CommunityPlace[] = [
     {
-      id: 'place-1',
+      id: PLACE_UUID_1,
       communityId,
       addedBy: '0x1234567890123456789012345678901234567890',
       addedAt: new Date()
     },
     {
-      id: 'place-2',
+      id: PLACE_UUID_2,
       communityId,
       addedBy: '0x1234567890123456789012345678901234567890',
       addedAt: new Date()
@@ -265,7 +268,7 @@ describe('Community Places Component', () => {
     let placeIds: string[]
 
     beforeEach(() => {
-      placeIds = ['place-1', 'place-2']
+      placeIds = [PLACE_UUID_1, PLACE_UUID_2]
       mockCommunitiesDB.communityExists.mockResolvedValue(false)
       mockPlacesApi.getPlaces.mockResolvedValue(
         mockPlaces.map((place) => ({
@@ -330,8 +333,8 @@ describe('Community Places Component', () => {
             let uniquePlaceIds: string[]
 
             beforeEach(() => {
-              duplicatePlaceIds = ['place-1', 'place-1', 'place-2']
-              uniquePlaceIds = ['place-1', 'place-2']
+              duplicatePlaceIds = [PLACE_UUID_1, PLACE_UUID_1, PLACE_UUID_2]
+              uniquePlaceIds = [PLACE_UUID_1, PLACE_UUID_2]
             })
 
             it('should deduplicate the place IDs before processing', async () => {
@@ -352,8 +355,8 @@ describe('Community Places Component', () => {
         describe('and the user does not own all places', () => {
           beforeEach(() => {
             mockPlacesApi.getPlaces.mockResolvedValueOnce([
-              { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
-              { id: 'place-2', title: 'Place 2', positions: [], owner: '0xother-owner', ...defaultWorldData }
+              { id: PLACE_UUID_1, title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
+              { id: PLACE_UUID_2, title: 'Place 2', positions: [], owner: '0xother-owner', ...defaultWorldData }
             ])
           })
 
@@ -369,6 +372,27 @@ describe('Community Places Component', () => {
             )
             expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith(placeIds)
             expect(mockCommunitiesDB.addCommunityPlaces).not.toHaveBeenCalled()
+          })
+        })
+
+        describe('and the input contains a world name', () => {
+          const worldName = 'radioheadtest.dcl.eth'
+          const resolvedWorldUuid = 'c3d4e5f6-a7b8-9012-cdef-012345678901'
+
+          beforeEach(() => {
+            mockPlacesApi.getWorlds.mockResolvedValueOnce([
+              { id: resolvedWorldUuid, title: 'Radiohead Test', positions: [], owner: mockUserAddress, world: true, world_name: worldName }
+            ])
+          })
+
+          it('should store the resolved UUID instead of the world name', async () => {
+            await communityPlacesComponent.validateAndAddPlaces(communityId, mockUserAddress, [worldName])
+
+            expect(mockPlacesApi.getWorlds).toHaveBeenCalledWith([worldName])
+            expect(mockPlacesApi.getPlaces).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.addCommunityPlaces).toHaveBeenCalledWith([
+              { id: resolvedWorldUuid, communityId, addedBy: mockUserAddress }
+            ])
           })
         })
       })
@@ -469,7 +493,7 @@ describe('Community Places Component', () => {
     let placeExists: boolean
 
     beforeEach(() => {
-      placeId = 'place-1'
+      placeId = PLACE_UUID_1
       placeExists = false
       mockCommunitiesDB.communityExists.mockResolvedValue(false)
       mockCommunitiesDB.communityPlaceExists.mockResolvedValue(placeExists)
@@ -634,7 +658,7 @@ describe('Community Places Component', () => {
     let placeIds: string[]
 
     beforeEach(() => {
-      placeIds = ['place-1', 'place-2']
+      placeIds = [PLACE_UUID_1, PLACE_UUID_2]
       mockPlacesApi.getPlaces.mockResolvedValue(
         mockPlaces.map((place) => ({
           id: place.id,
@@ -650,7 +674,7 @@ describe('Community Places Component', () => {
       jest.resetAllMocks()
     })
 
-    describe('and the user owns all places', () => {
+    describe('and the user owns all places (UUID IDs)', () => {
       beforeEach(() => {
         mockPlacesApi.getPlaces.mockResolvedValue(
           mockPlaces.map((place) => ({
@@ -670,6 +694,7 @@ describe('Community Places Component', () => {
         expect(result.ownedPlaces).toEqual(placeIds)
         expect(result.notOwnedPlaces).toEqual([])
         expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith(placeIds)
+        expect(mockPlacesApi.getWorlds).not.toHaveBeenCalled()
       })
 
       describe('and owner addresses have different casing', () => {
@@ -678,8 +703,8 @@ describe('Community Places Component', () => {
         beforeEach(() => {
           upperCaseUserAddress = mockUserAddress.toUpperCase()
           mockPlacesApi.getPlaces.mockResolvedValueOnce([
-            { id: 'place-1', title: 'Place 1', positions: [], owner: upperCaseUserAddress, ...defaultWorldData },
-            { id: 'place-2', title: 'Place 2', positions: [], owner: upperCaseUserAddress, ...defaultWorldData }
+            { id: PLACE_UUID_1, title: 'Place 1', positions: [], owner: upperCaseUserAddress, ...defaultWorldData },
+            { id: PLACE_UUID_2, title: 'Place 2', positions: [], owner: upperCaseUserAddress, ...defaultWorldData }
           ])
         })
 
@@ -697,11 +722,11 @@ describe('Community Places Component', () => {
         let uniquePlaceIds: string[]
 
         beforeEach(() => {
-          duplicatePlaceIds = ['place-1', 'place-1', 'place-2']
-          uniquePlaceIds = ['place-1', 'place-2']
+          duplicatePlaceIds = [PLACE_UUID_1, PLACE_UUID_1, PLACE_UUID_2]
+          uniquePlaceIds = [PLACE_UUID_1, PLACE_UUID_2]
           mockPlacesApi.getPlaces.mockResolvedValueOnce([
-            { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
-            { id: 'place-2', title: 'Place 2', positions: [], owner: mockUserAddress, ...defaultWorldData }
+            { id: PLACE_UUID_1, title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
+            { id: PLACE_UUID_2, title: 'Place 2', positions: [], owner: mockUserAddress, ...defaultWorldData }
           ])
         })
 
@@ -719,8 +744,8 @@ describe('Community Places Component', () => {
     describe('and the user does not own all places', () => {
       beforeEach(() => {
         mockPlacesApi.getPlaces.mockResolvedValueOnce([
-          { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
-          { id: 'place-2', title: 'Place 2', positions: [], owner: '0xother-owner', ...defaultWorldData }
+          { id: PLACE_UUID_1, title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData },
+          { id: PLACE_UUID_2, title: 'Place 2', positions: [], owner: '0xother-owner', ...defaultWorldData }
         ])
       })
 
@@ -751,8 +776,8 @@ describe('Community Places Component', () => {
     describe('and places have no owner', () => {
       beforeEach(() => {
         mockPlacesApi.getPlaces.mockResolvedValueOnce([
-          { id: 'place-1', title: 'Place 1', positions: [], owner: mockUserAddress, world: false, world_name: '' },
-          { id: 'place-2', title: 'Place 2', positions: [], owner: null, world: false, world_name: '' }
+          { id: PLACE_UUID_1, title: 'Place 1', positions: [], owner: mockUserAddress, world: false, world_name: '' },
+          { id: PLACE_UUID_2, title: 'Place 2', positions: [], owner: null, world: false, world_name: '' }
         ])
       })
 
@@ -784,6 +809,82 @@ describe('Community Places Component', () => {
         await expect(communityPlacesComponent.validateOwnership(placeIds, mockUserAddress)).rejects.toThrow(
           new NotAuthorizedError(`The user ${mockUserAddress} doesn't own all the places`)
         )
+      })
+    })
+
+    describe('and the input contains a world name (non-UUID)', () => {
+      const worldName = 'radioheadtest.dcl.eth'
+      const resolvedWorldUuid = 'c3d4e5f6-a7b8-9012-cdef-012345678901'
+
+      beforeEach(() => {
+        mockPlacesApi.getWorlds.mockResolvedValueOnce([
+          { id: resolvedWorldUuid, title: 'Radiohead Test', positions: [], owner: mockUserAddress, world: true, world_name: worldName }
+        ])
+      })
+
+      it('should call getWorlds and resolve the canonical UUID', async () => {
+        const result = await communityPlacesComponent.validateOwnership([worldName], mockUserAddress)
+
+        expect(result.isValid).toBe(true)
+        expect(result.ownedPlaces).toEqual([resolvedWorldUuid])
+        expect(result.notOwnedPlaces).toEqual([])
+        expect(mockPlacesApi.getPlaces).not.toHaveBeenCalled()
+        expect(mockPlacesApi.getWorlds).toHaveBeenCalledWith([worldName])
+      })
+
+      it('should throw NotAuthorizedError when the world is not owned by the user', async () => {
+        mockPlacesApi.getWorlds.mockReset()
+        mockPlacesApi.getWorlds.mockResolvedValueOnce([
+          { id: resolvedWorldUuid, title: 'Radiohead Test', positions: [], owner: '0xother-owner', world: true, world_name: worldName }
+        ])
+
+        await expect(communityPlacesComponent.validateOwnership([worldName], mockUserAddress)).rejects.toThrow(
+          new NotAuthorizedError(`The user ${mockUserAddress} doesn't own all the places`)
+        )
+      })
+    })
+
+    describe('and the input contains a mix of UUIDs and world names', () => {
+      const worldName = 'myworld.dcl.eth'
+      const resolvedWorldUuid = 'd4e5f6a7-b8c9-0123-defa-0123456789ab'
+
+      beforeEach(() => {
+        mockPlacesApi.getPlaces.mockResolvedValueOnce([
+          { id: PLACE_UUID_1, title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData }
+        ])
+        mockPlacesApi.getWorlds.mockResolvedValueOnce([
+          { id: resolvedWorldUuid, title: 'My World', positions: [], owner: mockUserAddress, world: true, world_name: worldName }
+        ])
+      })
+
+      it('should call getPlaces for UUIDs and getWorlds for world names', async () => {
+        const result = await communityPlacesComponent.validateOwnership([PLACE_UUID_1, worldName], mockUserAddress)
+
+        expect(result.isValid).toBe(true)
+        expect(result.ownedPlaces).toEqual([PLACE_UUID_1, resolvedWorldUuid])
+        expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith([PLACE_UUID_1])
+        expect(mockPlacesApi.getWorlds).toHaveBeenCalledWith([worldName])
+      })
+    })
+
+    describe('and getWorlds returns multiple rows for the same world name (multi-scene)', () => {
+      const worldName = 'multiworld.dcl.eth'
+      const bestUuid = 'e5f6a7b8-c9d0-1234-efab-1234567890cd'
+      const otherUuid = 'f6a7b8c9-d0e1-2345-fabc-23456789abcd'
+
+      beforeEach(() => {
+        mockPlacesApi.getWorlds.mockResolvedValueOnce([
+          { id: bestUuid, title: 'Multi World Scene 1', positions: [], owner: mockUserAddress, world: true, world_name: worldName },
+          { id: otherUuid, title: 'Multi World Scene 2', positions: [], owner: mockUserAddress, world: true, world_name: worldName }
+        ])
+      })
+
+      it('should deduplicate by world_name and use only the first (best-ranked) entry', async () => {
+        const result = await communityPlacesComponent.validateOwnership([worldName], mockUserAddress)
+
+        expect(result.isValid).toBe(true)
+        expect(result.ownedPlaces).toEqual([bestUuid])
+        expect(result.ownedPlaces).not.toContain(otherUuid)
       })
     })
   })

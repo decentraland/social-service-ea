@@ -294,8 +294,10 @@ export function createCommunityComponent(
 
       const ownerName: string = await communityOwners.getOwnerName(community.ownerAddress)
 
+      let resolvedPlaceIds = placeIds
       if (placeIds.length > 0) {
-        await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
+        const { ownedPlaces } = await communityPlaces.validateOwnership(placeIds, community.ownerAddress)
+        resolvedPlaceIds = ownedPlaces
       }
 
       await communityComplianceValidator.validateCommunityContent({
@@ -318,8 +320,8 @@ export function createCommunityComponent(
         role: CommunityRole.Owner
       })
 
-      if (placeIds.length > 0) {
-        await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, placeIds)
+      if (resolvedPlaceIds.length > 0) {
+        await communityPlaces.addPlaces(newCommunity.id, community.ownerAddress, resolvedPlaceIds)
       }
 
       logger.info('Community created', {
@@ -433,19 +435,31 @@ export function createCommunityComponent(
       const isUpdatingVisibility =
         updates.visibility !== undefined && updates.visibility !== existingCommunity.visibility
 
-      if (placeIds && placeIds.length > 0) {
-        const uniquePlaceIds = Array.from(new Set(placeIds))
-        const currentPlaces = await communitiesDb.getCommunityPlaces(communityId)
-        const placeIdsToValidate = uniquePlaceIds.filter((placeId) => !currentPlaces.some((p) => p.id === placeId))
+      let resolvedPlaceIds: string[] | undefined = placeIds
+      if (placeIds !== undefined) {
+        if (placeIds.length > 0) {
+          const uniquePlaceIds = Array.from(new Set(placeIds))
+          const currentPlaces = await communitiesDb.getCommunityPlaces(communityId)
+          const currentPlaceIds = currentPlaces.map((p) => p.id)
+          const placeIdsToValidate = uniquePlaceIds.filter((id) => !currentPlaceIds.includes(id))
 
-        logger.info('Place IDs to validate ownership for community update', {
-          communityId,
-          incomingPlaceIds: uniquePlaceIds.join(','),
-          currentPlaceIds: currentPlaces.map((p) => p.id).join(','),
-          placeIdsToValidate: placeIdsToValidate.join(',')
-        })
+          logger.info('Place IDs to validate ownership for community update', {
+            communityId,
+            incomingPlaceIds: uniquePlaceIds.join(','),
+            currentPlaceIds: currentPlaceIds.join(','),
+            placeIdsToValidate: placeIdsToValidate.join(',')
+          })
 
-        await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
+          if (placeIdsToValidate.length > 0) {
+            const { ownedPlaces } = await communityPlaces.validateOwnership(placeIdsToValidate, userAddress)
+            const existingPlaceIds = uniquePlaceIds.filter((id) => currentPlaceIds.includes(id))
+            resolvedPlaceIds = [...existingPlaceIds, ...ownedPlaces]
+          } else {
+            resolvedPlaceIds = uniquePlaceIds
+          }
+        } else {
+          resolvedPlaceIds = []
+        }
       }
 
       if (isUpdatingPrivacy || isUpdatingVisibility) {
@@ -527,13 +541,13 @@ export function createCommunityComponent(
 
       // Update places if placeIds is provided (even if empty array to remove all places)
       // If placeIds is undefined, it means nothing changed related to places
-      if (placeIds !== undefined) {
-        await communityPlaces.updatePlaces(communityId, userAddress, placeIds)
+      if (resolvedPlaceIds !== undefined) {
+        await communityPlaces.updatePlaces(communityId, userAddress, resolvedPlaceIds)
 
         logger.info('Community places updated', {
           communityId,
           userAddress,
-          placeIds: placeIds.length
+          placeIds: resolvedPlaceIds.length
         })
       }
 

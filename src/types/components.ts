@@ -430,6 +430,7 @@ export interface IStorageHelperComponent {
 
 export interface IPlacesApiComponent {
   getPlaces: (placesIds: string[]) => Promise<PlacesApiResponse['data']>
+  getWorlds: (worldNames: string[]) => Promise<PlacesApiResponse['data']>
 }
 
 export interface IUpdateHandlerComponent {
