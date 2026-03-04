@@ -2,7 +2,7 @@ import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-co
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
-import { CommunityNotFoundError, CommunityPlace } from '../../../logic/community'
+import { CommunityNotFoundError, CommunityPlaceWithDetails } from '../../../logic/community'
 import { getPaginationResultProperties } from '../../../utils/pagination'
 
 export async function getCommunityPlacesHandler(
@@ -10,7 +10,7 @@ export async function getCommunityPlacesHandler(
     HandlerContextWithPath<'communityPlaces' | 'logs', '/v1/communities/:id/places'>,
     'components' | 'url' | 'verification' | 'params'
   >
-): Promise<HTTPResponse<PaginatedResponse<Pick<CommunityPlace, 'id'>>>> {
+): Promise<HTTPResponse<PaginatedResponse<CommunityPlaceWithDetails>>> {
   const {
     components: { communityPlaces, logs },
     verification,

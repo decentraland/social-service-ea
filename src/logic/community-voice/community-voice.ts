@@ -20,6 +20,8 @@ import { CommunityVoiceChatProfileData, ICommunityVoiceComponent } from './types
 import { getProfileInfo } from '../profiles'
 import { ICommunityVoiceChatCacheComponent } from './community-voice-cache'
 
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+
 export async function createCommunityVoiceComponent({
   logs,
   commsGatekeeper,
@@ -153,9 +155,16 @@ export async function createCommunityVoiceComponent({
 
         if (placeIds.length > 0) {
           const uniquePlaceIds = Array.from(new Set(placeIds))
-          const placesData = await placesApi.getPlaces(uniquePlaceIds)
+          const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
+          const worldNameIds = uniquePlaceIds.filter((id) => !UUID_REGEX.test(id))
 
-          if (placesData) {
+          const [uuidData, worldData] = await Promise.all([
+            uuidIds.length > 0 ? placesApi.getPlaces(uuidIds) : Promise.resolve([]),
+            worldNameIds.length > 0 ? placesApi.getWorlds(worldNameIds) : Promise.resolve([])
+          ])
+          const placesData = [...(uuidData ?? []), ...(worldData ?? [])]
+
+          if (placesData.length > 0) {
             const { positions, worlds } = separatePositionsAndWorlds(placesData)
             communityPositions = positions
             communityWorlds = worlds

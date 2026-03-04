@@ -1,7 +1,7 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
-import { CommunityPlace, CommunityPrivacyEnum, ICommunityPlacesComponent } from './types'
+import { CommunityPlace, CommunityPlaceWithDetails, CommunityPrivacyEnum, ICommunityPlacesComponent } from './types'
 import { separatePositionsAndWorlds } from '../../utils/places'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
@@ -119,7 +119,7 @@ export async function createCommunityPlacesComponent(
         userAddress?: EthAddress
         pagination: PaginatedParameters
       }
-    ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
+    ): Promise<{ places: CommunityPlaceWithDetails[]; totalPlaces: number }> => {
       const communityExists = await communitiesDb.communityExists(communityId, { onlyPublic: !options.userAddress })
 
       if (!communityExists) {
@@ -149,7 +149,27 @@ export async function createCommunityPlacesComponent(
       const places = await communitiesDb.getCommunityPlaces(communityId, options.pagination)
       const totalPlaces = await communitiesDb.getCommunityPlacesCount(communityId)
 
-      return { places, totalPlaces }
+      if (places.length === 0) return { places, totalPlaces }
+
+      const uuidIds = places.map((p) => p.id).filter((id) => UUID_REGEX.test(id))
+      const worldNameIds = places.map((p) => p.id).filter((id) => !UUID_REGEX.test(id))
+
+      const detailsMap = new Map<string, { title: string; positions: string[]; world: boolean; world_name: string }>()
+      try {
+        const [uuidData, worldData] = await Promise.all([
+          uuidIds.length > 0 ? placesApi.getPlaces(uuidIds) : Promise.resolve([]),
+          worldNameIds.length > 0 ? placesApi.getWorlds(worldNameIds) : Promise.resolve([])
+        ])
+        for (const place of [...(uuidData ?? []), ...(worldData ?? [])]) {
+          detailsMap.set(place.id, place)
+        }
+      } catch (error) {
+        logger.warn(`Failed to enrich places for community ${communityId}: ${error}`)
+        return { places, totalPlaces }
+      }
+
+      const enrichedPlaces = places.map((p) => ({ ...p, ...detailsMap.get(p.id) }))
+      return { places: enrichedPlaces, totalPlaces }
     },
 
     validateAndAddPlaces: async (communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void> => {

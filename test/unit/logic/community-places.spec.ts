@@ -225,6 +225,97 @@ describe('Community Places Component', () => {
           expect(mockCommunitiesDB.getCommunityPlacesCount).toHaveBeenCalledWith(communityId)
         })
       })
+
+      describe('and the community has UUID places', () => {
+        beforeEach(() => {
+          community = {
+            id: communityId,
+            name: 'Test Community',
+            description: 'Test Description',
+            ownerAddress: '0xowner',
+            privacy: CommunityPrivacyEnum.Public,
+            active: true,
+            role: CommunityRole.Member
+          }
+          mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
+          mockCommunitiesDB.getCommunityPlaces.mockResolvedValueOnce([{ id: PLACE_UUID_1 }])
+          mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValueOnce(1)
+          mockPlacesApi.getPlaces.mockResolvedValueOnce([
+            { id: PLACE_UUID_1, title: 'Genesis Plaza', positions: ['0,0'], owner: userAddress, world: false, world_name: '' }
+          ])
+        })
+
+        it('should return enriched place data from the Places API', async () => {
+          const result = await communityPlacesComponent.getPlaces(communityId, options)
+
+          expect(result.places).toEqual([
+            expect.objectContaining({ id: PLACE_UUID_1, title: 'Genesis Plaza', positions: ['0,0'], world: false })
+          ])
+          expect(result.totalPlaces).toBe(1)
+          expect(mockPlacesApi.getPlaces).toHaveBeenCalledWith([PLACE_UUID_1])
+          expect(mockPlacesApi.getWorlds).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the community has world-name places', () => {
+        const worldName = 'radioheadtest.dcl.eth'
+
+        beforeEach(() => {
+          community = {
+            id: communityId,
+            name: 'Test Community',
+            description: 'Test Description',
+            ownerAddress: '0xowner',
+            privacy: CommunityPrivacyEnum.Public,
+            active: true,
+            role: CommunityRole.Member
+          }
+          mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
+          mockCommunitiesDB.getCommunityPlaces.mockResolvedValueOnce([{ id: worldName }])
+          mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValueOnce(1)
+          mockPlacesApi.getWorlds.mockResolvedValueOnce([
+            { id: worldName, title: 'Radiohead World', positions: [], owner: userAddress, world: true, world_name: worldName }
+          ])
+        })
+
+        it('should return enriched world place data from the Places API', async () => {
+          const result = await communityPlacesComponent.getPlaces(communityId, options)
+
+          expect(result.places).toEqual([
+            expect.objectContaining({ id: worldName, title: 'Radiohead World', world: true, world_name: worldName })
+          ])
+          expect(result.totalPlaces).toBe(1)
+          expect(mockPlacesApi.getWorlds).toHaveBeenCalledWith([worldName])
+          expect(mockPlacesApi.getPlaces).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the Places API throws during enrichment', () => {
+        beforeEach(() => {
+          community = {
+            id: communityId,
+            name: 'Test Community',
+            description: 'Test Description',
+            ownerAddress: '0xowner',
+            privacy: CommunityPrivacyEnum.Public,
+            active: true,
+            role: CommunityRole.Member
+          }
+          mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
+          mockCommunitiesDB.getCommunityPlaces.mockResolvedValueOnce([{ id: PLACE_UUID_1 }])
+          mockCommunitiesDB.getCommunityPlacesCount.mockResolvedValueOnce(1)
+          mockPlacesApi.getPlaces.mockRejectedValueOnce(new Error('Places API unreachable'))
+        })
+
+        it('should degrade gracefully and return raw place data without crashing', async () => {
+          const result = await communityPlacesComponent.getPlaces(communityId, options)
+
+          expect(result).toEqual({
+            places: [{ id: PLACE_UUID_1 }],
+            totalPlaces: 1
+          })
+        })
+      })
     })
 
     describe('and the community does not exist', () => {
