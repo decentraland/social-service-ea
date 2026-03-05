@@ -203,7 +203,7 @@ export async function createCommunityPlacesComponent(
         const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
         const worldNameIds = uniquePlaceIds.filter((id) => !UUID_REGEX.test(id))
 
-        const allPlacesData = await placesApi.getDestinations(uuidIds, worldNameIds)
+        const allPlacesData = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
 
         if (allPlacesData.length > 0) {
           return separatePositionsAndWorlds(allPlacesData)
