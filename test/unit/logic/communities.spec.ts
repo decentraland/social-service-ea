@@ -1787,6 +1787,12 @@ describe('Community Component', () => {
               thumbnailBuffer: Buffer.from('complete-thumbnail')
             }
 
+            mockCommunityPlaces.validateOwnership.mockResolvedValueOnce({
+              isValid: true,
+              ownedPlaces: completeUpdate.placeIds,
+              notOwnedPlaces: []
+            })
+
             mockCommunitiesDB.updateCommunity.mockResolvedValueOnce({
               ...mockCommunity,
               ...completeUpdate
