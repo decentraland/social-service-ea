@@ -26,25 +26,7 @@ export async function createCommunityPlacesComponent(
     const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
     const worldNameIds = uniquePlaceIds.filter((id) => !UUID_REGEX.test(id))
 
-    const uuidPlaces = uuidIds.length > 0 ? ((await placesApi.getPlaces(uuidIds)) ?? []) : []
-
-    let worldPlaces: typeof uuidPlaces = []
-    if (worldNameIds.length > 0) {
-      const rawWorldPlaces = (await placesApi.getWorlds(worldNameIds)) ?? []
-      // getWorlds may return multiple rows per world name (multi-scene worlds).
-      // Keep the first entry per world_name — the API returns best-ranked first.
-      const seen = new Set<string>()
-      worldPlaces = rawWorldPlaces.filter((p) => {
-        const key = p.world_name?.toLowerCase()
-        if (key && !seen.has(key)) {
-          seen.add(key)
-          return true
-        }
-        return false
-      })
-    }
-
-    const places = [...uuidPlaces, ...worldPlaces]
+    const places = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
 
     logger.info('Places API response for ownership validation', {
       requestedIds: uniquePlaceIds.join(','),
@@ -156,11 +138,8 @@ export async function createCommunityPlacesComponent(
 
       const detailsMap = new Map<string, { title: string; positions: string[]; world: boolean; world_name: string }>()
       try {
-        const [uuidData, worldData] = await Promise.all([
-          uuidIds.length > 0 ? placesApi.getPlaces(uuidIds) : Promise.resolve([]),
-          worldNameIds.length > 0 ? placesApi.getWorlds(worldNameIds) : Promise.resolve([])
-        ])
-        for (const place of [...(uuidData ?? []), ...(worldData ?? [])]) {
+        const allData = await placesApi.getDestinations(uuidIds, worldNameIds)
+        for (const place of allData ?? []) {
           detailsMap.set(place.id, place)
         }
       } catch (error) {
@@ -224,12 +203,7 @@ export async function createCommunityPlacesComponent(
         const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
         const worldNameIds = uniquePlaceIds.filter((id) => !UUID_REGEX.test(id))
 
-        const [uuidPlacesData, worldPlacesData] = await Promise.all([
-          uuidIds.length > 0 ? placesApi.getPlaces(uuidIds) : Promise.resolve([]),
-          worldNameIds.length > 0 ? placesApi.getWorlds(worldNameIds) : Promise.resolve([])
-        ])
-
-        const allPlacesData = [...(uuidPlacesData ?? []), ...(worldPlacesData ?? [])]
+        const allPlacesData = await placesApi.getDestinations(uuidIds, worldNameIds)
 
         if (allPlacesData.length > 0) {
           return separatePositionsAndWorlds(allPlacesData)

@@ -14,36 +14,22 @@ export async function createPlacesApiAdapter(
   const placesApiUrl = await config.requireString('PLACES_API_URL')
 
   return {
-    getPlaces: async (placesIds: string[]): Promise<PlacesApiResponse['data']> => {
-      const response = await fetcher.fetch(`${placesApiUrl}/api/places`, {
+    getDestinations: async (placeIds: string[], worldNames: string[]): Promise<PlacesApiResponse['data']> => {
+      if (placeIds.length === 0 && worldNames.length === 0) return []
+
+      const params = worldNames.map((n) => `world_names=${encodeURIComponent(n)}`).join('&')
+      const url = `${placesApiUrl}/api/destinations${params ? '?' + params : ''}`
+
+      const response = await fetcher.fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(placesIds)
+        body: JSON.stringify(placeIds)
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get places')
-      }
-
-      const parsedResponse = (await response.json()) as PlacesApiResponse
-
-      return parsedResponse.data ?? []
-    },
-
-    getWorlds: async (worldNames: string[]): Promise<PlacesApiResponse['data']> => {
-      if (worldNames.length === 0) return []
-      const params = worldNames.map((n) => `names=${encodeURIComponent(n)}`).join('&')
-      const response = await fetcher.fetch(`${placesApiUrl}/api/worlds?${params}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to get worlds')
+        throw new Error('Failed to get destinations')
       }
 
       const parsedResponse = (await response.json()) as PlacesApiResponse

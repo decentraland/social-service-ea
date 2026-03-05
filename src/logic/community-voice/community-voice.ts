@@ -158,11 +158,7 @@ export async function createCommunityVoiceComponent({
           const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
           const worldNameIds = uniquePlaceIds.filter((id) => !UUID_REGEX.test(id))
 
-          const [uuidData, worldData] = await Promise.all([
-            uuidIds.length > 0 ? placesApi.getPlaces(uuidIds) : Promise.resolve([]),
-            worldNameIds.length > 0 ? placesApi.getWorlds(worldNameIds) : Promise.resolve([])
-          ])
-          const placesData = [...(uuidData ?? []), ...(worldData ?? [])]
+          const placesData = await placesApi.getDestinations(uuidIds, worldNameIds)
 
           if (placesData.length > 0) {
             const { positions, worlds } = separatePositionsAndWorlds(placesData)
