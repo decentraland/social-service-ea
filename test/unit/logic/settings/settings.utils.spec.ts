@@ -1,7 +1,8 @@
 import {
   PrivateMessagePrivacySetting,
   BlockedUsersMessagesVisibilitySetting,
-  SocialSettings
+  SocialSettings,
+  SituationReactionsVisibility as RPCSituationReactionsVisibility
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   convertDBSettingsToRPCSettings,
@@ -32,7 +33,7 @@ describe('convertDBSettingsToRPCSettings', () => {
     expect(convertDBSettingsToRPCSettings(dbSettings)).toEqual({
       privateMessagesPrivacy: rpcPrivacy,
       blockedUsersMessagesVisibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
-      showSituationReactions: 0
+      showSituationReactions: RPCSituationReactionsVisibility.SHOW
     })
   })
 
@@ -52,14 +53,14 @@ describe('convertDBSettingsToRPCSettings', () => {
       expect(convertDBSettingsToRPCSettings(dbSettings)).toEqual({
         privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL,
         blockedUsersMessagesVisibility: rpcVisibility,
-        showSituationReactions: 0
+        showSituationReactions: RPCSituationReactionsVisibility.SHOW
       })
     }
   )
 
   it.each([
-    [DBSituationReactionsVisibility.SHOW, 0],
-    [DBSituationReactionsVisibility.HIDE, 1]
+    [DBSituationReactionsVisibility.SHOW, RPCSituationReactionsVisibility.SHOW],
+    [DBSituationReactionsVisibility.HIDE, RPCSituationReactionsVisibility.HIDE]
   ])(
     'should convert the DB situation reactions visibility setting "%s" to RPC settings',
     (dbVisibility, rpcVisibility) => {
@@ -142,27 +143,27 @@ describe('convertRPCSettingsIntoDBSettings', () => {
   })
 
   it.each([
-    [0, DBSituationReactionsVisibility.SHOW],
-    [1, DBSituationReactionsVisibility.HIDE]
+    [RPCSituationReactionsVisibility.SHOW, DBSituationReactionsVisibility.SHOW],
+    [RPCSituationReactionsVisibility.HIDE, DBSituationReactionsVisibility.HIDE]
   ])(
     'should convert the RPC situation reactions visibility setting "%s" to DB settings',
     (rpcVisibility, dbVisibility) => {
-      const rpcSettings = {
+      const rpcSettings: Partial<SocialSettings> = {
         showSituationReactions: rpcVisibility
-      } as Record<string, unknown>
+      }
 
-      expect(convertRPCSettingsIntoDBSettings(rpcSettings as any)).toEqual({
+      expect(convertRPCSettingsIntoDBSettings(rpcSettings)).toEqual({
         show_situation_reactions: dbVisibility
       })
     }
   )
 
   it('should throw error for unknown situation reactions visibility setting', () => {
-    const rpcSettings = {
-      showSituationReactions: -1
-    } as Record<string, unknown>
+    const rpcSettings: Partial<SocialSettings> = {
+      showSituationReactions: RPCSituationReactionsVisibility.UNRECOGNIZED
+    }
 
-    expect(() => convertRPCSettingsIntoDBSettings(rpcSettings as any)).toThrow(
+    expect(() => convertRPCSettingsIntoDBSettings(rpcSettings)).toThrow(
       'Unknown situation reactions visibility setting'
     )
   })
