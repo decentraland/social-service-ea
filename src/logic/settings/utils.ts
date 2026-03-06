@@ -126,9 +126,7 @@ function convertRPCBlockedUsersMessagesVisibilityIntoDBSetting(
   return dbVisibility
 }
 
-function convertRPCSituationReactionsVisibilityIntoDBSetting(
-  visibility: number
-): DBSituationReactionsVisibility {
+function convertRPCSituationReactionsVisibilityIntoDBSetting(visibility: number): DBSituationReactionsVisibility {
   const dbVisibility = RPC_SITUATION_REACTIONS_VISIBILITY_TO_DB[visibility]
   if (dbVisibility === undefined) {
     throw new InvalidSocialSettingsError('Unknown situation reactions visibility setting')
