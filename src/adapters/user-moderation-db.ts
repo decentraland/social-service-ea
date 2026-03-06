@@ -23,9 +23,11 @@ export function createUserModerationDBComponent(
     async createBan(input: CreateBanInput): Promise<UserBan> {
       const id = randomUUID()
 
+      const now = new Date()
+
       const query = SQL`
-        INSERT INTO user_bans (id, banned_address, banned_by, reason, custom_message, expires_at)
-        VALUES (${id}, ${input.bannedAddress}, ${input.bannedBy}, ${input.reason}, ${input.customMessage ?? null}, ${input.expiresAt ?? null})
+        INSERT INTO user_bans (id, banned_address, banned_by, reason, custom_message, banned_at, expires_at, created_at)
+        VALUES (${id}, ${input.bannedAddress}, ${input.bannedBy}, ${input.reason}, ${input.customMessage ?? null}, ${now}, ${input.expiresAt ?? null}, ${now})
         RETURNING `.append(BAN_SELECT_FIELDS)
 
       const result = await pg.query<UserBan>(query)
@@ -33,9 +35,11 @@ export function createUserModerationDBComponent(
     },
 
     async liftBan(address: string, liftedBy: string): Promise<boolean> {
+      const now = new Date()
+
       const query = SQL`
         UPDATE user_bans
-        SET lifted_at = now(), lifted_by = ${liftedBy}
+        SET lifted_at = ${now}, lifted_by = ${liftedBy}
         WHERE banned_address = ${address}
           AND `.append(activeBanFilter())
 
@@ -70,9 +74,11 @@ export function createUserModerationDBComponent(
     async createWarning(input: CreateWarningInput): Promise<UserWarning> {
       const id = randomUUID()
 
+      const now = new Date()
+
       const query = SQL`
-        INSERT INTO user_warnings (id, warned_address, warned_by, reason)
-        VALUES (${id}, ${input.warnedAddress}, ${input.warnedBy}, ${input.reason})
+        INSERT INTO user_warnings (id, warned_address, warned_by, reason, warned_at, created_at)
+        VALUES (${id}, ${input.warnedAddress}, ${input.warnedBy}, ${input.reason}, ${now}, ${now})
         RETURNING `.append(WARNING_SELECT_FIELDS)
 
       const result = await pg.query<UserWarning>(query)
