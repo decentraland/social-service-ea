@@ -34,6 +34,15 @@ const RPC_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_DB_BLOCKED_USERS_MESSAGES_VISIBIL
   [RPCBlockedUsersMessagesVisibilitySetting.UNRECOGNIZED]: undefined
 }
 
+const RPC_SITUATION_REACTIONS_VISIBILITY_TO_DB: Record<
+  RPCSituationReactionsVisibility,
+  DBSituationReactionsVisibility | undefined
+> = {
+  [RPCSituationReactionsVisibility.SHOW]: DBSituationReactionsVisibility.SHOW,
+  [RPCSituationReactionsVisibility.HIDE]: DBSituationReactionsVisibility.HIDE,
+  [RPCSituationReactionsVisibility.UNRECOGNIZED]: undefined
+}
+
 const DB_PRIVATE_MESSAGE_PRIVACY_TO_RPC_PRIVATE_MESSAGE_PRIVACY: Record<
   DBPrivateMessagesPrivacy,
   RPCPrivateMessagePrivacySetting
@@ -49,15 +58,6 @@ const DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBIL
   [DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES]: RPCBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
   [DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES]:
     RPCBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
-}
-
-const RPC_SITUATION_REACTIONS_VISIBILITY_TO_DB: Record<
-  RPCSituationReactionsVisibility,
-  DBSituationReactionsVisibility | undefined
-> = {
-  [RPCSituationReactionsVisibility.SHOW]: DBSituationReactionsVisibility.SHOW,
-  [RPCSituationReactionsVisibility.HIDE]: DBSituationReactionsVisibility.HIDE,
-  [RPCSituationReactionsVisibility.UNRECOGNIZED]: undefined
 }
 
 const DB_SITUATION_REACTIONS_VISIBILITY_TO_RPC: Record<

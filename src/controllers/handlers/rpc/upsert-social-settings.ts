@@ -23,7 +23,7 @@ export function upsertSocialSettingsService({
       if (
         request.privateMessagesPrivacy === undefined &&
         request.blockedUsersMessagesVisibility === undefined &&
-        (request as Record<string, unknown>).showSituationReactions === undefined
+        request.showSituationReactions === undefined
       ) {
         return {
           response: {
