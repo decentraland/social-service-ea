@@ -20,7 +20,11 @@ export function upsertSocialSettingsService({
     context: RpcServerContext
   ): Promise<UpsertSocialSettingsResponse> {
     try {
-      if (request.privateMessagesPrivacy === undefined && request.blockedUsersMessagesVisibility === undefined) {
+      if (
+        request.privateMessagesPrivacy === undefined &&
+        request.blockedUsersMessagesVisibility === undefined &&
+        (request as Record<string, unknown>).showSituationReactions === undefined
+      ) {
         return {
           response: {
             $case: 'invalidRequest',

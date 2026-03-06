@@ -6,6 +6,7 @@ import {
 import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
+  SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
   User
 } from '../../types'
@@ -49,6 +50,19 @@ const DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBIL
     RPCBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
 }
 
+// Situation reactions visibility mappings
+// RPC enum values are prepared for when @dcl/protocol adds the SituationReactionsVisibility enum
+const RPC_SITUATION_REACTIONS_VISIBILITY_TO_DB: Record<number, DBSituationReactionsVisibility | undefined> = {
+  0: DBSituationReactionsVisibility.SHOW,
+  1: DBSituationReactionsVisibility.HIDE,
+  [-1]: undefined // UNRECOGNIZED
+}
+
+const DB_SITUATION_REACTIONS_VISIBILITY_TO_RPC: Record<DBSituationReactionsVisibility, number> = {
+  [DBSituationReactionsVisibility.SHOW]: 0,
+  [DBSituationReactionsVisibility.HIDE]: 1
+}
+
 export class InvalidSocialSettingsError extends Error {
   constructor(message: string) {
     super(message)
@@ -62,8 +76,9 @@ export function convertDBSettingsToRPCSettings(settings: DBSocialSettings): RPCS
     blockedUsersMessagesVisibility:
       DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBILITY[
         settings.blocked_users_messages_visibility
-      ]
-  }
+      ],
+    showSituationReactions: DB_SITUATION_REACTIONS_VISIBILITY_TO_RPC[settings.show_situation_reactions]
+  } as RPCSocialSettings
 }
 
 export function convertRPCSettingsIntoDBSettings(
@@ -78,6 +93,13 @@ export function convertRPCSettingsIntoDBSettings(
   if (settings.blockedUsersMessagesVisibility !== undefined) {
     dbSettings.blocked_users_messages_visibility = convertRPCBlockedUsersMessagesVisibilityIntoDBSetting(
       settings.blockedUsersMessagesVisibility
+    )
+  }
+
+  const showSituationReactions = (settings as Record<string, unknown>).showSituationReactions
+  if (showSituationReactions !== undefined) {
+    dbSettings.show_situation_reactions = convertRPCSituationReactionsVisibilityIntoDBSetting(
+      showSituationReactions as number
     )
   }
 
@@ -104,11 +126,22 @@ function convertRPCBlockedUsersMessagesVisibilityIntoDBSetting(
   return dbVisibility
 }
 
+function convertRPCSituationReactionsVisibilityIntoDBSetting(
+  visibility: number
+): DBSituationReactionsVisibility {
+  const dbVisibility = RPC_SITUATION_REACTIONS_VISIBILITY_TO_DB[visibility]
+  if (dbVisibility === undefined) {
+    throw new InvalidSocialSettingsError('Unknown situation reactions visibility setting')
+  }
+  return dbVisibility
+}
+
 export function getDefaultSettings(address: string): DBSocialSettings {
   return {
     address,
     private_messages_privacy: DEFAULT_DB_PRIVATE_MESSAGES_PRIVACY,
-    blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+    blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+    show_situation_reactions: DBSituationReactionsVisibility.SHOW
   }
 }
 

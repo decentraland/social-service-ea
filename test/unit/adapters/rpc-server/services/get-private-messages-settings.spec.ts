@@ -9,6 +9,7 @@ import {
   IFriendsDatabaseComponent,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
+  SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
   RpcServerContext
 } from '../../../../../src/types'
@@ -55,12 +56,14 @@ describe('getPrivateMessagesSettingsService', () => {
         {
           address: testAddress1,
           private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-          blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: DBSituationReactionsVisibility.SHOW
         },
         {
           address: testAddress2,
           private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+          blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+          show_situation_reactions: DBSituationReactionsVisibility.SHOW
         }
       ]
 
@@ -99,7 +102,8 @@ describe('getPrivateMessagesSettingsService', () => {
         {
           address: testAddress1,
           private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-          blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+          blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+          show_situation_reactions: DBSituationReactionsVisibility.SHOW
         }
       ]
 

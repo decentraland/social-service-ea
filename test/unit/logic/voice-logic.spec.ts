@@ -22,7 +22,8 @@ import {
   IPubSubComponent,
   IVoiceDatabaseComponent,
   PrivateMessagesPrivacy,
-  PrivateVoiceChat
+  PrivateVoiceChat,
+  SituationReactionsVisibility
 } from '../../../src/types'
 import { createSettingsMockedComponent } from '../../mocks/components/settings'
 import { ISettingsComponent } from '../../../src/logic/settings'
@@ -121,12 +122,14 @@ describe('when starting a private voice chat', () => {
         {
           address: callerAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ONLY_FRIENDS,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         },
         {
           address: calleeAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         }
       ])
     })
@@ -177,12 +180,14 @@ describe('when starting a private voice chat', () => {
         {
           address: callerAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         },
         {
           address: calleeAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ONLY_FRIENDS,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         }
       ])
     })
@@ -233,12 +238,14 @@ describe('when starting a private voice chat', () => {
         {
           address: callerAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         },
         {
           address: calleeAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         }
       ])
     })

@@ -9,6 +9,7 @@ import {
 import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
+  SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
   RpcServerContext
 } from '../../../../../src/types'
@@ -50,7 +51,8 @@ describe('getSocialSettingsService', () => {
     const mockSettings: DBSocialSettings = {
       address: testAddress,
       private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+      show_situation_reactions: DBSituationReactionsVisibility.SHOW
     }
     getUsersSettingsMock.mockResolvedValueOnce([mockSettings])
 
