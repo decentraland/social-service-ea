@@ -17,15 +17,12 @@ export async function createPlacesApiAdapter(
     getDestinations: async (placeIds: string[], worldNames: string[]): Promise<PlacesApiResponse['data']> => {
       if (placeIds.length === 0 && worldNames.length === 0) return []
 
-      const params = worldNames.map((n) => `world_names=${encodeURIComponent(n)}`).join('&')
-      const url = `${placesApiUrl}/api/destinations${params ? '?' + params : ''}`
-
-      const response = await fetcher.fetch(url, {
+      const response = await fetcher.fetch(`${placesApiUrl}/api/destinations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(placeIds)
+        body: JSON.stringify([...placeIds, ...worldNames])
       })
 
       if (!response.ok) {

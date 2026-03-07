@@ -1,7 +1,7 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
-import { CommunityPlace, CommunityPlaceWithDetails, CommunityPrivacyEnum, ICommunityPlacesComponent } from './types'
+import { CommunityPlaceWithDetails, CommunityPrivacyEnum, ICommunityPlacesComponent } from './types'
 import { separatePositionsAndWorlds } from '../../utils/places'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 
@@ -24,7 +24,7 @@ export async function createCommunityPlacesComponent(
 
     const uniquePlaceIds = Array.from(new Set(placeIds))
     const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
-    const worldNameIds = uniquePlaceIds.filter((id) => !UUID_REGEX.test(id))
+    const worldNameIds = uniquePlaceIds.filter((id) => id.endsWith('.dcl.eth'))
 
     const places = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
 
@@ -134,7 +134,7 @@ export async function createCommunityPlacesComponent(
       if (places.length === 0) return { places, totalPlaces }
 
       const uuidIds = places.map((p) => p.id).filter((id) => UUID_REGEX.test(id))
-      const worldNameIds = places.map((p) => p.id).filter((id) => !UUID_REGEX.test(id))
+      const worldNameIds = places.map((p) => p.id).filter((id) => id.endsWith('.dcl.eth'))
 
       const detailsMap = new Map<string, { title: string; positions: string[]; world: boolean; world_name: string }>()
       try {
@@ -201,7 +201,7 @@ export async function createCommunityPlacesComponent(
 
         const uniquePlaceIds = Array.from(new Set(placeIds))
         const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
-        const worldNameIds = uniquePlaceIds.filter((id) => !UUID_REGEX.test(id))
+        const worldNameIds = uniquePlaceIds.filter((id) => id.endsWith('.dcl.eth'))
 
         const allPlacesData = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
 
