@@ -942,5 +942,23 @@ describe('Community Places Component', () => {
         expect(mockPlacesApi.getDestinations).toHaveBeenCalledWith([PLACE_UUID_1], [worldName])
       })
     })
+
+    describe('and the input contains IDs that are neither UUIDs nor .dcl.eth names', () => {
+      const invalidId = 'not-a-uuid-or-world'
+
+      beforeEach(() => {
+        mockPlacesApi.getDestinations.mockResolvedValueOnce([
+          { id: PLACE_UUID_1, title: 'Place 1', positions: [], owner: mockUserAddress, ...defaultWorldData }
+        ])
+      })
+
+      it('should silently exclude invalid IDs and only send recognized ones to the API', async () => {
+        await expect(
+          communityPlacesComponent.validateOwnership([PLACE_UUID_1, invalidId], mockUserAddress)
+        ).rejects.toThrow(new NotAuthorizedError(`The user ${mockUserAddress} doesn't own all the places`))
+
+        expect(mockPlacesApi.getDestinations).toHaveBeenCalledWith([PLACE_UUID_1], [])
+      })
+    })
   })
 })

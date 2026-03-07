@@ -156,7 +156,7 @@ export async function createCommunityVoiceComponent({
         if (placeIds.length > 0) {
           const uniquePlaceIds = Array.from(new Set(placeIds))
           const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
-          const worldNameIds = uniquePlaceIds.filter((id) => !UUID_REGEX.test(id))
+          const worldNameIds = uniquePlaceIds.filter((id) => id.endsWith('.dcl.eth'))
 
           const placesData = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
 
