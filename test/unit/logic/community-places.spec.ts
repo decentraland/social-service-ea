@@ -943,7 +943,7 @@ describe('Community Places Component', () => {
       })
     })
 
-    describe('and the input contains IDs that are neither UUIDs nor .dcl.eth names', () => {
+    describe('and the input contains IDs that are neither UUIDs nor .eth names', () => {
       const invalidId = 'not-a-uuid-or-world'
 
       beforeEach(() => {
