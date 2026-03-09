@@ -156,9 +156,9 @@ export async function createReferralComponent(
       throw new ReferralInvalidInputError(`Referrer is on the deny list ${context}`)
     }
 
-    const previousInvitations = await referralDb.findReferralProgress({ invitedUser: referrer, limit: 1 })
-    if (previousInvitations.length > 0) {
-      const originalReferrer = previousInvitations[0].referrer
+    const referrerAsInvitedRecords = await referralDb.findReferralProgress({ invitedUser: referrer, limit: 1 })
+    if (referrerAsInvitedRecords.length > 0) {
+      const originalReferrer = referrerAsInvitedRecords[0].referrer
       if (denyList.has(originalReferrer.toLowerCase())) {
         throw new ReferralInvalidInputError(`Referrer is part of a banned referral chain ${context}`)
       }
