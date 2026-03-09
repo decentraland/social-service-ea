@@ -148,6 +148,23 @@ export async function createReferralComponent(
     }
   }
 
+  async function assertReferrerNotBanned(referrer: string, ip: string | null | undefined): Promise<void> {
+    const denyList = await fetchDenyList()
+    const context = ip !== null && ip !== undefined ? `${referrer}, ${ip}` : referrer
+
+    if (denyList.has(referrer.toLowerCase())) {
+      throw new ReferralInvalidInputError(`Referrer is on the deny list ${context}`)
+    }
+
+    const previousInvitations = await referralDb.findReferralProgress({ invitedUser: referrer, limit: 1 })
+    if (previousInvitations.length > 0) {
+      const originalReferrer = previousInvitations[0].referrer
+      if (denyList.has(originalReferrer.toLowerCase())) {
+        throw new ReferralInvalidInputError(`Referrer is part of a banned referral chain ${context}`)
+      }
+    }
+  }
+
   return {
     create: async (referralInput: CreateReferralWithInvitedUser) => {
       const referrer = validateAddress(referralInput.referrer, 'referrer')
@@ -169,11 +186,7 @@ export async function createReferralComponent(
         invitedUserIP
       })
 
-      const denyList = await fetchDenyList()
-
-      if (denyList.has(referrer.toLowerCase())) {
-        throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer}, ${invitedUserIP}`)
-      }
+      await assertReferrerNotBanned(referrer, invitedUserIP)
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
 
@@ -256,17 +269,11 @@ export async function createReferralComponent(
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
 
-      const denyList = await fetchDenyList()
-
       if (!progress.length) {
         throw new ReferralNotFoundError(invitedUser)
       }
 
-      if (denyList.has(progress[0].referrer.toLowerCase())) {
-        throw new ReferralInvalidInputError(
-          `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
-        )
-      }
+      await assertReferrerNotBanned(progress[0].referrer, progress[0].invited_user_ip)
 
       const currentStatus = progress[0].status
       if (currentStatus !== ReferralProgressStatus.PENDING) {
@@ -295,13 +302,8 @@ export async function createReferralComponent(
         return
       }
 
-      const denyList = await fetchDenyList()
+      await assertReferrerNotBanned(progress[0].referrer, progress[0].invited_user_ip)
 
-      if (denyList.has(progress[0].referrer.toLowerCase())) {
-        throw new ReferralInvalidInputError(
-          `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
-        )
-      }
       if (
         progress[0].status === ReferralProgressStatus.TIER_GRANTED ||
         progress[0].status === ReferralProgressStatus.REJECTED_IP_MATCH
