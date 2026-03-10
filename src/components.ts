@@ -46,6 +46,9 @@ import {
   createCommunityPostsComponent,
   createCommunityRankingComponent
 } from './logic/community'
+import { createUserModerationDBComponent } from './adapters/user-moderation-db'
+import { createUserModerationComponent } from './logic/user-moderation'
+import { createModeratorComponent } from './logic/moderator'
 import { createReferralDBComponent } from './adapters/referral-db'
 import { createReferralComponent } from './logic/referral'
 import { createMemoryQueueComponent } from '@dcl/memory-queue-component'
@@ -138,6 +141,9 @@ export async function initComponents(): Promise<AppComponents> {
 
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
+  const userModerationDb = createUserModerationDBComponent({ pg, logs })
+  const userModeration = createUserModerationComponent({ userModerationDb, logs })
+
   const referralDb = await createReferralDBComponent({ pg, logs, config })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
@@ -145,6 +151,8 @@ export async function initComponents(): Promise<AppComponents> {
   const serviceBaseUrl = (await config.getString('SERVICE_BASE_URL')) || 'https://social-service-ea.decentraland.zone'
   const features = await createFeaturesComponent({ config, logs, fetch: fetcher }, serviceBaseUrl)
   const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
+
+  const moderator = await createModeratorComponent({ featureFlags, logs })
 
   const email = await createEmailComponent({ fetcher, config })
   const rewards = await createRewardComponent({ fetcher, config })
@@ -383,12 +391,15 @@ export async function initComponents(): Promise<AppComponents> {
     memoryCache,
     queueProcessor,
     metrics,
+    moderator,
     nats,
     peerTracking,
     peersStats,
     peersSynchronizer,
     pg,
     placesApi,
+    userModeration,
+    userModerationDb,
     pubsub,
     queue,
     communityRanking,

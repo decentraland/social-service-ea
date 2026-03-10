@@ -53,6 +53,7 @@ import { SubscriptionHandlerParams, UpdatesMessageHandler } from '../logic/updat
 import { PlacesApiResponse } from '../adapters/places-api'
 import { RewardAttributes } from '../logic/referral/types'
 import { CommunityVoiceChatProfileData } from '../logic/community-voice/types'
+import { UserBan, UserWarning, BanStatus, CreateBanInput, CreateWarningInput } from '../logic/user-moderation/types'
 
 export interface IRpcClient extends IBaseComponent {
   client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
@@ -453,4 +454,14 @@ export type IRewardComponent = IBaseComponent & {
 
 export type IEmailComponent = IBaseComponent & {
   sendEmail(email: string, subject: string, content: string): Promise<void>
+}
+
+export interface IUserModerationDatabaseComponent {
+  createBan(input: CreateBanInput): Promise<UserBan>
+  liftBan(address: string, liftedBy: string): Promise<boolean>
+  isPlayerBanned(address: string): Promise<BanStatus>
+  getActiveBans(): Promise<UserBan[]>
+  createWarning(input: CreateWarningInput): Promise<UserWarning>
+  getPlayerWarnings(address: string): Promise<UserWarning[]>
+  getBanHistory(address: string): Promise<UserBan[]>
 }

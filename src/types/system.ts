@@ -37,7 +37,8 @@ import {
   IRewardComponent,
   IEmailComponent,
   ICdnCacheInvalidatorComponent,
-  IRegistryComponent
+  IRegistryComponent,
+  IUserModerationDatabaseComponent
 } from './components'
 import { ICommunityVoiceChatCacheComponent } from '../logic/community-voice/community-voice-cache'
 import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/community-voice-polling'
@@ -68,6 +69,8 @@ import { IJobComponent } from '@dcl/job-component'
 import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
+import { IModeratorComponent } from '../logic/moderator'
+import { IUserModerationComponent } from '../logic/user-moderation'
 import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
 import { IFeatureFlagsAdapter } from '../adapters/feature-flags'
@@ -115,6 +118,7 @@ export type BaseComponents = {
   httpServer: IHttpServerComponent<GlobalContext>
   logs: ILoggerComponent
   memoryCache: ICacheComponent
+  moderator: IModeratorComponent
   metrics: IMetricsComponent<MetricsDeclaration>
   nats: INatsComponent
   peerTracking: IPeerTrackingComponent
@@ -122,6 +126,8 @@ export type BaseComponents = {
   peersSynchronizer: IPeersSynchronizer
   pg: IPgComponent
   placesApi: IPlacesApiComponent
+  userModeration: IUserModerationComponent
+  userModerationDb: IUserModerationDatabaseComponent
   pubsub: IPubSubComponent
   queue: IQueueComponent
   redis: IRedisComponent & ICacheComponent

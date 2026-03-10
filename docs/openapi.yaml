@@ -1959,3 +1959,233 @@ paths:
                 $ref: './schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
+
+  /v1/moderation/users/{address}/bans:
+    post:
+      operationId: banPlayer
+      summary: Ban a user
+      description: |
+        Bans a user from the platform. Requires Signed Fetch authentication to identify the moderator.
+        Returns 409 if the user is already banned.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the user to ban.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas.yaml#/components/schemas/BanPlayerRequest'
+      responses:
+        '201':
+          description: User banned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: './schemas.yaml#/components/schemas/UserBan'
+        '400':
+          description: Bad request - missing or invalid fields
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '409':
+          description: User is already banned
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - User Moderation
+    delete:
+      operationId: liftBan
+      summary: Lift a user's ban
+      description: |
+        Lifts an active ban for a user. Requires Signed Fetch authentication to identify the moderator.
+        Returns 404 if no active ban exists for the user.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the user whose ban to lift.
+      responses:
+        '204':
+          description: Ban lifted successfully
+        '404':
+          description: No active ban found for user
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - User Moderation
+    get:
+      operationId: getBanStatus
+      summary: Get ban status for a user
+      description: |
+        Returns the ban status for a user, including the ban details if active.
+        Authentication is optional.
+      security:
+        - SignedFetch: []
+        - {}
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the user to check.
+      responses:
+        '200':
+          description: Ban status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: './schemas.yaml#/components/schemas/BanStatus'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - User Moderation
+
+  /v1/moderation/users/{address}/warnings:
+    post:
+      operationId: warnPlayer
+      summary: Warn a user
+      description: |
+        Issues a warning to a user. Requires Signed Fetch authentication to identify the moderator.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the user to warn.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas.yaml#/components/schemas/WarnPlayerRequest'
+      responses:
+        '201':
+          description: Warning issued successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: './schemas.yaml#/components/schemas/UserWarning'
+        '400':
+          description: Bad request - missing or invalid fields
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - User Moderation
+    get:
+      operationId: getPlayerWarnings
+      summary: Get warnings for a user
+      description: |
+        Returns all warnings for a user, ordered by most recent first.
+        Requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address of the user.
+      responses:
+        '200':
+          description: Warnings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: './schemas.yaml#/components/schemas/UserWarning'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - User Moderation
+
+  /v1/moderation/bans:
+    get:
+      operationId: listActiveBans
+      summary: List all active bans
+      description: |
+        Returns all currently active bans, ordered by most recent first.
+        Requires Signed Fetch authentication.
+      security:
+        - SignedFetch: []
+      responses:
+        '200':
+          description: Active bans retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: './schemas.yaml#/components/schemas/UserBan'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - User Moderation
