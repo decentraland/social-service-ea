@@ -85,6 +85,7 @@ import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
 import { createUserModerationDBComponent } from '../src/adapters/user-moderation-db'
 import { createUserModerationComponent } from '../src/logic/user-moderation/component'
 import { createModeratorComponent } from '../src/logic/moderator'
+import { FeatureFlag, IFeatureFlagsAdapter } from '../src/adapters/feature-flags'
 import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
 
 export const TEST_MODERATOR_ACCOUNT = createUnsafeIdentity()
@@ -342,7 +343,16 @@ async function initComponents(): Promise<TestComponents> {
 
   const userModeration = createUserModerationComponent({ userModerationDb, logs })
 
-  const moderator = await createModeratorComponent([TEST_MODERATOR_ACCOUNT.address], logs)
+  const moderatorFeatureFlags: IFeatureFlagsAdapter = {
+    ...featureFlags,
+    getVariants: async <T>(feature: FeatureFlag): Promise<T | undefined> => {
+      if (feature === FeatureFlag.PLATFORM_USER_MODERATORS) {
+        return [TEST_MODERATOR_ACCOUNT.address] as T
+      }
+      return featureFlags.getVariants<T>(feature)
+    }
+  }
+  const moderator = await createModeratorComponent({ featureFlags: moderatorFeatureFlags, logs })
 
   return {
     aiCompliance,

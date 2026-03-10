@@ -144,9 +144,6 @@ export async function initComponents(): Promise<AppComponents> {
   const userModerationDb = createUserModerationDBComponent({ pg, logs })
   const userModeration = createUserModerationComponent({ userModerationDb, logs })
 
-  const moderatorAllowlist = (await config.getString('MODERATOR_ALLOWLIST')) || ''
-  const moderatorAddresses = moderatorAllowlist.split(',').filter((a) => a.trim().length > 0)
-  const moderator = await createModeratorComponent(moderatorAddresses, logs)
   const referralDb = await createReferralDBComponent({ pg, logs, config })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
@@ -154,6 +151,8 @@ export async function initComponents(): Promise<AppComponents> {
   const serviceBaseUrl = (await config.getString('SERVICE_BASE_URL')) || 'https://social-service-ea.decentraland.zone'
   const features = await createFeaturesComponent({ config, logs, fetch: fetcher }, serviceBaseUrl)
   const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
+
+  const moderator = await createModeratorComponent({ featureFlags, logs })
 
   const email = await createEmailComponent({ fetcher, config })
   const rewards = await createRewardComponent({ fetcher, config })

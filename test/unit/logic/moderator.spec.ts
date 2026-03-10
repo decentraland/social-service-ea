@@ -1,8 +1,10 @@
+import { FeatureFlag, IFeatureFlagsAdapter } from '../../../src/adapters/feature-flags'
 import { createModeratorComponent } from '../../../src/logic/moderator'
 import { IModeratorComponent } from '../../../src/logic/moderator/types'
 
 describe('moderator-component', () => {
   let mockLogs: any
+  let mockFeatureFlags: jest.Mocked<IFeatureFlagsAdapter>
 
   beforeEach(() => {
     mockLogs = {
@@ -14,6 +16,10 @@ describe('moderator-component', () => {
         warn: jest.fn()
       })
     }
+    mockFeatureFlags = {
+      isEnabled: jest.fn(),
+      getVariants: jest.fn()
+    } as any
   })
 
   afterEach(() => {
@@ -26,6 +32,11 @@ describe('moderator-component', () => {
     } as any
   }
 
+  function createMockFeatureFlags(addresses: string[]): jest.Mocked<IFeatureFlagsAdapter> {
+    mockFeatureFlags.getVariants.mockResolvedValue(addresses)
+    return mockFeatureFlags
+  }
+
   describe('when an allowlisted address makes a request', () => {
     let component: IModeratorComponent
     let moderatorAddress: string
@@ -33,13 +44,14 @@ describe('moderator-component', () => {
 
     beforeEach(async () => {
       moderatorAddress = '0x1234567890abcdef1234567890abcdef12345678'
-      component = await createModeratorComponent([moderatorAddress], mockLogs)
+      component = await createModeratorComponent({ featureFlags: createMockFeatureFlags([moderatorAddress]), logs: mockLogs })
       next = jest.fn().mockResolvedValue({ status: 200, body: { ok: true } })
     })
 
     it('should call next() and return its response', async () => {
       const result = await component.moderatorAuthMiddleware(createMockContext(moderatorAddress), next)
 
+      expect(mockFeatureFlags.getVariants).toHaveBeenCalledWith(FeatureFlag.PLATFORM_USER_MODERATORS)
       expect(next).toHaveBeenCalled()
       expect(result).toEqual({ status: 200, body: { ok: true } })
     })
@@ -50,7 +62,10 @@ describe('moderator-component', () => {
     let next: jest.Mock
 
     beforeEach(async () => {
-      component = await createModeratorComponent(['0x1234567890abcdef1234567890abcdef12345678'], mockLogs)
+      component = await createModeratorComponent({
+        featureFlags: createMockFeatureFlags(['0x1234567890abcdef1234567890abcdef12345678']),
+        logs: mockLogs
+      })
       next = jest.fn()
     })
 
@@ -74,7 +89,10 @@ describe('moderator-component', () => {
       let next: jest.Mock
 
       beforeEach(async () => {
-        component = await createModeratorComponent(['0x1234567890abcdef1234567890abcdef12345678'], mockLogs)
+        component = await createModeratorComponent({
+          featureFlags: createMockFeatureFlags(['0x1234567890abcdef1234567890abcdef12345678']),
+          logs: mockLogs
+      })
         next = jest.fn().mockResolvedValue({ status: 200, body: { ok: true } })
       })
 
@@ -94,7 +112,10 @@ describe('moderator-component', () => {
       let next: jest.Mock
 
       beforeEach(async () => {
-        component = await createModeratorComponent(['0x1234567890ABCDEF1234567890ABCDEF12345678'], mockLogs)
+        component = await createModeratorComponent({
+          featureFlags: createMockFeatureFlags(['0x1234567890ABCDEF1234567890ABCDEF12345678']),
+          logs: mockLogs
+      })
         next = jest.fn().mockResolvedValue({ status: 200, body: { ok: true } })
       })
 
@@ -110,12 +131,36 @@ describe('moderator-component', () => {
     })
   })
 
-  describe('when the allowlist is empty', () => {
+  describe('when the feature flag returns no addresses', () => {
     let component: IModeratorComponent
     let next: jest.Mock
 
     beforeEach(async () => {
-      component = await createModeratorComponent([], mockLogs)
+      component = await createModeratorComponent({ featureFlags: createMockFeatureFlags([]), logs: mockLogs })
+      next = jest.fn()
+    })
+
+    it('should respond with a 401 and the unauthorized error', async () => {
+      const result = await component.moderatorAuthMiddleware(
+        createMockContext('0x1234567890abcdef1234567890abcdef12345678'),
+        next
+      )
+
+      expect(next).not.toHaveBeenCalled()
+      expect(result).toEqual({
+        status: 401,
+        body: { error: 'You are not authorized to access this resource' }
+      })
+    })
+  })
+
+  describe('when the feature flag returns undefined', () => {
+    let component: IModeratorComponent
+    let next: jest.Mock
+
+    beforeEach(async () => {
+      mockFeatureFlags.getVariants.mockResolvedValue(undefined)
+      component = await createModeratorComponent({ featureFlags: mockFeatureFlags, logs: mockLogs })
       next = jest.fn()
     })
 
@@ -139,7 +184,10 @@ describe('moderator-component', () => {
     let context: any
 
     beforeEach(async () => {
-      component = await createModeratorComponent(['0x1234567890abcdef1234567890abcdef12345678'], mockLogs)
+      component = await createModeratorComponent({
+        featureFlags: createMockFeatureFlags(['0x1234567890abcdef1234567890abcdef12345678']),
+        logs: mockLogs
+      })
       next = jest.fn()
       context = { verification: undefined }
     })
@@ -161,7 +209,10 @@ describe('moderator-component', () => {
     let context: any
 
     beforeEach(async () => {
-      component = await createModeratorComponent(['0x1234567890abcdef1234567890abcdef12345678'], mockLogs)
+      component = await createModeratorComponent({
+        featureFlags: createMockFeatureFlags(['0x1234567890abcdef1234567890abcdef12345678']),
+        logs: mockLogs
+      })
       next = jest.fn()
       context = { verification: { auth: undefined } }
     })
@@ -177,7 +228,7 @@ describe('moderator-component', () => {
     })
   })
 
-  describe('when invalid addresses are in the constructor', () => {
+  describe('when invalid addresses are in the feature flag', () => {
     let logger: any
     let component: IModeratorComponent
     let validAddress: string
@@ -192,12 +243,10 @@ describe('moderator-component', () => {
         warn: jest.fn()
       }
       mockLogs.getLogger.mockReturnValue(logger)
-      component = await createModeratorComponent([validAddress, 'not-an-address', ''], mockLogs)
-    })
-
-    it('should log a warning for non-empty invalid addresses and not for empty strings', () => {
-      expect(logger.warn).toHaveBeenCalledWith('Filtering out invalid moderator address: not-an-address')
-      expect(logger.warn).toHaveBeenCalledTimes(1)
+      component = await createModeratorComponent({
+        featureFlags: createMockFeatureFlags([validAddress, 'not-an-address', '']),
+        logs: mockLogs
+      })
     })
 
     describe('and a valid address makes a request', () => {
