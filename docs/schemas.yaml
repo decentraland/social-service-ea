@@ -1029,7 +1029,8 @@ components:
         duration:
           type: number
           description: 'Ban duration in milliseconds. Omit for permanent ban.'
-          exclusiveMinimum: 0
+          minimum: 0
+          exclusiveMinimum: true
         customMessage:
           type: string
           description: 'Optional custom message shown to the banned user'
@@ -1043,4 +1044,3 @@ components:
           type: string
           minLength: 1
           description: 'Reason for the warning'
-              description: 'List of communities that exist and are visible to the user'
