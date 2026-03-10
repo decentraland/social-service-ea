@@ -110,7 +110,7 @@ test('Remove Community Place Controller', function ({ components, spyComponents,
 
       describe('and the community exists', () => {
         beforeEach(async () => {
-          stubComponents.placesApi.getPlaces.resolves([
+          stubComponents.placesApi.getDestinations.resolves([
             {
               id: placeId,
               title: placeId,
