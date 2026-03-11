@@ -31,6 +31,11 @@ info:
     - Monitor referral progress and rewards
     - Email association for referral campaigns
 
+    ### 🔇 User Mutes
+    - Mute and unmute other users
+    - List muted users with pagination and filtering
+    - Filter by single address or multiple addresses
+
     ### 👥 Social Features
     - **Friendship management** (via RPC/gRPC - not covered in this REST API)
     - **Blocking and privacy controls** (via RPC/gRPC)
@@ -1959,3 +1964,139 @@ paths:
                 $ref: './schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - Communities
+
+  /v1/mutes:
+    post:
+      operationId: addUserMute
+      summary: Mute a user
+      description: |
+        Mutes a user by adding a mute record. The muter is identified via Signed Fetch authentication.
+        Muting yourself returns a 400 error. Muting an already-muted user is idempotent (returns 204).
+      security:
+        - SignedFetch: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - muted_address
+              properties:
+                muted_address:
+                  type: string
+                  description: Ethereum address of the user to mute
+                  example: '0x0000000000000000000000000000000000000001'
+      responses:
+        '204':
+          description: User muted successfully
+        '400':
+          description: Invalid request (invalid address, self-mute, or missing authentication)
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - User Mutes
+
+    delete:
+      operationId: removeUserMute
+      summary: Unmute a user
+      description: |
+        Removes a mute record for a user. The muter is identified via Signed Fetch authentication.
+        Unmuting a user that is not muted is a no-op (returns 204).
+      security:
+        - SignedFetch: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - muted_address
+              properties:
+                muted_address:
+                  type: string
+                  description: Ethereum address of the user to unmute
+                  example: '0x0000000000000000000000000000000000000001'
+      responses:
+        '204':
+          description: User unmuted successfully
+        '400':
+          description: Invalid request (invalid address or missing authentication)
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - User Mutes
+
+    get:
+      operationId: getUserMutes
+      summary: Get muted users
+      description: |
+        Returns a paginated list of users muted by the authenticated user.
+        Supports filtering by a single address or multiple addresses.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+          description: Number of results per page
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Number of results to skip
+        - name: address
+          in: query
+          schema:
+            type: string
+          description: Filter by a single muted address
+        - name: addresses
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          description: Filter by multiple muted addresses (e.g. `?addresses=0x1&addresses=0x2`)
+      responses:
+        '200':
+          description: List of muted users
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetUserMutes200OkResponse'
+        '400':
+          description: Missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - User Mutes

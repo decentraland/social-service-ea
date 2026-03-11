@@ -68,6 +68,8 @@ import { IJobComponent } from '@dcl/job-component'
 import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
+import { IUserMutesComponent } from '../logic/user-mutes'
+import { IUserMutesDatabaseComponent } from './components'
 import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
 import { IFeatureFlagsAdapter } from '../adapters/feature-flags'
@@ -150,6 +152,8 @@ export type BaseComponents = {
   slack: ISlackComponent
   schemaValidator: ISchemaValidatorComponent<GlobalContext>
   queueProcessor: IQueueConsumerComponent
+  userMutesDb: IUserMutesDatabaseComponent
+  userMutes: IUserMutesComponent
 }
 
 // components used in runtime

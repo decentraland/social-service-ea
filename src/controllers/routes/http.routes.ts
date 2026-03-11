@@ -36,7 +36,10 @@ import {
   deleteCommunityPostHandler,
   likeCommunityPostHandler,
   unlikeCommunityPostHandler,
-  getMemberCommunitiesByIdsHandler
+  getMemberCommunitiesByIdsHandler,
+  addUserMuteHandler,
+  removeUserMuteHandler,
+  getUserMutesHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
@@ -169,6 +172,11 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
     schemaValidator.withSchemaValidatorMiddleware(UpdateCommunityRequestStatusSchema),
     updateCommunityRequestStatusHandler
   )
+
+  // User mute routes
+  router.get('/v1/mutes', signedFetchMiddleware(), getUserMutesHandler)
+  router.post('/v1/mutes', signedFetchMiddleware(), addUserMuteHandler)
+  router.delete('/v1/mutes', signedFetchMiddleware(), removeUserMuteHandler)
 
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)
