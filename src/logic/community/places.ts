@@ -1,9 +1,11 @@
 import { NotAuthorizedError } from '@dcl/platform-server-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
-import { CommunityPlace, CommunityPrivacyEnum, ICommunityPlacesComponent } from './types'
+import { CommunityPlaceWithDetails, CommunityPrivacyEnum, ICommunityPlacesComponent } from './types'
 import { separatePositionsAndWorlds } from '../../utils/places'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
+
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
 export async function createCommunityPlacesComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'communityRoles' | 'placesApi' | 'logs'>
@@ -21,9 +23,19 @@ export async function createCommunityPlacesComponent(
     }
 
     const uniquePlaceIds = Array.from(new Set(placeIds))
-    const places = await placesApi.getPlaces(uniquePlaceIds)
+    const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
+    const worldNameIds = uniquePlaceIds.filter((id) => id.endsWith('.eth')) // world names can be DCL names (*.dcl.eth) or ENS names (*.eth)
 
-    const splitPlacesByOwnership = places?.reduce(
+    const places = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
+
+    logger.info('Places API response for ownership validation', {
+      requestedIds: uniquePlaceIds.join(','),
+      requestedCount: uniquePlaceIds.length,
+      returnedCount: places.length,
+      placeOwners: places.map((p) => `${p.id}:${p.owner ?? 'null'}`).join('|')
+    })
+
+    const splitPlacesByOwnership = places.reduce(
       (acc, place) => {
         if (place.owner?.toLowerCase() === userAddress.toLowerCase()) {
           acc.ownedPlaces.push(place.id)
@@ -35,8 +47,8 @@ export async function createCommunityPlacesComponent(
       { ownedPlaces: [] as string[], notOwnedPlaces: [] as string[] }
     )
 
-    const ownedPlaces = splitPlacesByOwnership?.ownedPlaces ?? []
-    const notOwnedPlaces = splitPlacesByOwnership?.notOwnedPlaces ?? []
+    const ownedPlaces = splitPlacesByOwnership.ownedPlaces
+    const notOwnedPlaces = splitPlacesByOwnership.notOwnedPlaces
     const isValid = ownedPlaces.length === uniquePlaceIds.length
 
     logger.info('Places ownership validation', {
@@ -89,7 +101,7 @@ export async function createCommunityPlacesComponent(
         userAddress?: EthAddress
         pagination: PaginatedParameters
       }
-    ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }> => {
+    ): Promise<{ places: CommunityPlaceWithDetails[]; totalPlaces: number }> => {
       const communityExists = await communitiesDb.communityExists(communityId, { onlyPublic: !options.userAddress })
 
       if (!communityExists) {
@@ -119,14 +131,31 @@ export async function createCommunityPlacesComponent(
       const places = await communitiesDb.getCommunityPlaces(communityId, options.pagination)
       const totalPlaces = await communitiesDb.getCommunityPlacesCount(communityId)
 
-      return { places, totalPlaces }
+      if (places.length === 0) return { places, totalPlaces }
+
+      const uuidIds = places.map((p) => p.id).filter((id) => UUID_REGEX.test(id))
+      const worldNameIds = places.map((p) => p.id).filter((id) => id.endsWith('.eth')) // world names can be DCL names (*.dcl.eth) or ENS names (*.eth)
+
+      const detailsMap = new Map<string, { title: string; positions: string[]; world: boolean; world_name: string }>()
+      try {
+        const allData = await placesApi.getDestinations(uuidIds, worldNameIds)
+        for (const place of allData ?? []) {
+          detailsMap.set(place.id, place)
+        }
+      } catch (error) {
+        logger.warn(`Failed to enrich places for community ${communityId}: ${error}`)
+        return { places, totalPlaces }
+      }
+
+      const enrichedPlaces = places.map((p) => ({ ...p, ...detailsMap.get(p.id) }))
+      return { places: enrichedPlaces, totalPlaces }
     },
 
     validateAndAddPlaces: async (communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void> => {
       await validateCommunityExists(communityId)
       await communityRoles.validatePermissionToAddPlacesToCommunity(communityId, placesOwner)
-      await validateOwnership(placeIds, placesOwner)
-      await addPlaces(communityId, placesOwner, placeIds)
+      const { ownedPlaces } = await validateOwnership(placeIds, placesOwner)
+      await addPlaces(communityId, placesOwner, ownedPlaces)
     },
 
     addPlaces,
@@ -171,10 +200,13 @@ export async function createCommunityPlacesComponent(
         }
 
         const uniquePlaceIds = Array.from(new Set(placeIds))
-        const placesData = await placesApi.getPlaces(uniquePlaceIds)
+        const uuidIds = uniquePlaceIds.filter((id) => UUID_REGEX.test(id))
+        const worldNameIds = uniquePlaceIds.filter((id) => id.endsWith('.eth')) // world names can be DCL names (*.dcl.eth) or ENS names (*.eth)
 
-        if (placesData) {
-          return separatePositionsAndWorlds(placesData)
+        const allPlacesData = (await placesApi.getDestinations(uuidIds, worldNameIds)) ?? []
+
+        if (allPlacesData.length > 0) {
+          return separatePositionsAndWorlds(allPlacesData)
         }
 
         return { positions: [], worlds: [] }

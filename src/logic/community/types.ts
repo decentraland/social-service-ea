@@ -145,7 +145,7 @@ export interface ICommunityPlacesComponent {
       userAddress?: EthAddress
       pagination: PaginatedParameters
     }
-  ): Promise<{ places: Pick<CommunityPlace, 'id'>[]; totalPlaces: number }>
+  ): Promise<{ places: CommunityPlaceWithDetails[]; totalPlaces: number }>
   validateAndAddPlaces(communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void>
   addPlaces(communityId: string, placesOwner: EthAddress, placeIds: string[]): Promise<void>
   removePlace(communityId: string, userAddress: EthAddress, placeId: string): Promise<void>
@@ -437,6 +437,13 @@ export type CommunityPlace = {
   communityId: string
   addedBy: string
   addedAt: Date
+}
+
+export type CommunityPlaceWithDetails = Pick<CommunityPlace, 'id'> & {
+  title?: string
+  positions?: string[]
+  world?: boolean
+  world_name?: string
 }
 
 export enum CommunityRequestStatus {

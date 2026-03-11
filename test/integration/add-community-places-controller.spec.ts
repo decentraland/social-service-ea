@@ -112,7 +112,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
               memberAddress: userAddress,
               role: CommunityRole.Moderator
             })
-            stubComponents.placesApi.getPlaces.resolves(
+            stubComponents.placesApi.getDestinations.resolves(
               mockPlaceIds.map((placeId) => ({
                 id: placeId,
                 title: placeId,
@@ -139,7 +139,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
           })
 
           it('should respond with a 401 status code when user does not own the places', async () => {
-            stubComponents.placesApi.getPlaces.resolves(
+            stubComponents.placesApi.getDestinations.resolves(
               mockPlaceIds.map((placeId) => ({
                 id: placeId,
                 title: placeId,
@@ -177,7 +177,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
               memberAddress: userAddress,
               role: CommunityRole.Owner
             })
-            stubComponents.placesApi.getPlaces.resolves(
+            stubComponents.placesApi.getDestinations.resolves(
               mockPlaceIds.map((placeId) => ({
                 id: placeId,
                 title: placeId,
@@ -190,7 +190,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
           })
 
           afterEach(() => {
-            stubComponents.placesApi.getPlaces.reset()
+            stubComponents.placesApi.getDestinations.reset()
           })
 
           it('should respond with a 204 status code when adding places', async () => {
@@ -222,7 +222,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
             memberAddress: userAddress,
             role: CommunityRole.Owner
           })
-          spyComponents.placesApi.getPlaces.mockRejectedValue(new Error('Unable to get places'))
+          spyComponents.placesApi.getDestinations.mockRejectedValue(new Error('Unable to get places'))
         })
 
         it('should respond with a 500 status code', async () => {
@@ -240,7 +240,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
             memberAddress: userAddress,
             role: CommunityRole.Owner
           })
-          stubComponents.placesApi.getPlaces.resolves(undefined)
+          stubComponents.placesApi.getDestinations.resolves(undefined)
         })
 
         it('should respond with a 401 status code when places API returns null', async () => {

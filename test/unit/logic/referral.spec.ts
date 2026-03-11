@@ -147,6 +147,7 @@ describe('referral-component', () => {
       beforeEach(() => {
         mockCreatedAt = Date.now()
         mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([])
         mockReferralDb.createReferral.mockResolvedValueOnce({
           referrer: validReferrer,
           invited_user: validInvitedUser,
@@ -365,6 +366,7 @@ describe('referral-component', () => {
 
       describe('and referrals are within 5 minutes', () => {
         beforeEach(() => {
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([])
           mockReferralDb.findReferralProgress.mockResolvedValueOnce([
             {
               referrer: validReferrer.toLowerCase(),
@@ -409,6 +411,7 @@ describe('referral-component', () => {
 
         beforeEach(() => {
           oldCreatedAt = newCreatedAt - 6 * 60 * 1000 // 6 minutes earlier
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([])
           mockReferralDb.findReferralProgress.mockResolvedValueOnce([
             {
               referrer: validReferrer.toLowerCase(),
@@ -438,6 +441,7 @@ describe('referral-component', () => {
 
       describe('and there is only one referral', () => {
         beforeEach(() => {
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([])
           mockReferralDb.findReferralProgress.mockResolvedValueOnce([
             {
               referrer: validReferrer.toLowerCase(),
@@ -465,6 +469,7 @@ describe('referral-component', () => {
         beforeEach(() => {
           mockSlack.sendMessage.mockResolvedValueOnce(undefined)
           mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([])
           mockReferralDb.createReferral.mockResolvedValueOnce({
             referrer: validReferrer,
             invited_user: validInvitedUser,
@@ -530,6 +535,7 @@ describe('referral-component', () => {
       describe('and the invited user has been created with a non rejected status', () => {
         beforeEach(() => {
           mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([])
           mockReferralDb.createReferral.mockResolvedValueOnce({
             referrer: validReferrer,
             invited_user: validInvitedUser,
@@ -603,6 +609,7 @@ describe('referral-component', () => {
       beforeEach(() => {
         jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network error'))
         mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([])
         mockReferralDb.createReferral.mockResolvedValueOnce({
           referrer: validReferrer,
           invited_user: validInvitedUser,
@@ -640,6 +647,10 @@ describe('referral-component', () => {
 
   describe('when updating referral progress', () => {
     const validInvitedUser = '0x1234567890123456789012345678901234567890'
+
+    beforeEach(() => {
+      mockReferralDb.findReferralProgress.mockResolvedValue([])
+    })
 
     describe('with valid data and pending status', () => {
       beforeEach(() => {
@@ -756,6 +767,7 @@ describe('referral-component', () => {
         expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
       })
     })
+
   })
 
   describe('when finalizing referral', () => {
@@ -768,6 +780,7 @@ describe('referral-component', () => {
         ok: true,
         json: () => Promise.resolve({ users: [] })
       } as any)
+      mockReferralDb.findReferralProgress.mockResolvedValue([])
     })
 
     describe(`with valid signed up status and 3 login days in Redis cache`, () => {
@@ -1524,6 +1537,116 @@ describe('referral-component', () => {
 
         expect(jest.mocked(global.fetch)).toHaveBeenCalledWith('https://config.decentraland.org/denylist.json')
         expect(mockReferralDb.setReferralEmail).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('and the referrer is part of a banned referral chain', () => {
+    const bannedOriginalReferrer = '0x1111111111111111111111111111111111111111'
+    const referrerPreviouslyInvited = '0x3333333333333333333333333333333333333333'
+    const invitedUser = '0x1234567890123456789012345678901234567890'
+
+    beforeEach(() => {
+      jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ users: [{ wallet: bannedOriginalReferrer.toLowerCase() }] })
+      } as any)
+    })
+
+    describe('when creating a referral', () => {
+      it('should throw ReferralInvalidInputError', async () => {
+        mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: bannedOriginalReferrer.toLowerCase(),
+            invited_user: referrerPreviouslyInvited.toLowerCase(),
+            status: ReferralProgressStatus.PENDING,
+            created_at: Date.now()
+          }
+        ])
+
+        await expect(
+          referralComponent.create({ referrer: referrerPreviouslyInvited, invitedUser, invitedUserIP: '192.168.1.1' })
+        ).rejects.toThrow(
+          new ReferralInvalidInputError(
+            `Referrer is part of a banned referral chain ${referrerPreviouslyInvited.toLowerCase()}, 192.168.1.1`
+          )
+        )
+
+        expect(mockReferralDb.findReferralProgress).toHaveBeenCalledWith({
+          invitedUser: referrerPreviouslyInvited.toLowerCase(),
+          limit: 1
+        })
+        expect(mockReferralDb.createReferral).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when updating referral progress', () => {
+      it('should throw ReferralInvalidInputError', async () => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: referrerPreviouslyInvited.toLowerCase(),
+            invited_user: invitedUser,
+            status: ReferralProgressStatus.PENDING,
+            invited_user_ip: '192.168.1.1'
+          }
+        ])
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: bannedOriginalReferrer.toLowerCase(),
+            invited_user: referrerPreviouslyInvited.toLowerCase(),
+            status: ReferralProgressStatus.PENDING,
+            created_at: Date.now()
+          }
+        ])
+
+        await expect(
+          referralComponent.updateProgress(invitedUser, ReferralProgressStatus.SIGNED_UP)
+        ).rejects.toThrow(
+          new ReferralInvalidInputError(
+            `Referrer is part of a banned referral chain ${referrerPreviouslyInvited.toLowerCase()}, 192.168.1.1`
+          )
+        )
+
+        expect(mockReferralDb.findReferralProgress).toHaveBeenCalledWith({
+          invitedUser: referrerPreviouslyInvited.toLowerCase(),
+          limit: 1
+        })
+        expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when finalizing referral', () => {
+      it('should throw ReferralInvalidInputError', async () => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: referrerPreviouslyInvited.toLowerCase(),
+            invited_user: invitedUser,
+            status: ReferralProgressStatus.SIGNED_UP,
+            invited_user_ip: '192.168.1.1'
+          }
+        ])
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: bannedOriginalReferrer.toLowerCase(),
+            invited_user: referrerPreviouslyInvited.toLowerCase(),
+            status: ReferralProgressStatus.PENDING,
+            created_at: Date.now()
+          }
+        ])
+
+        await expect(referralComponent.finalizeReferral(invitedUser)).rejects.toThrow(
+          new ReferralInvalidInputError(
+            `Referrer is part of a banned referral chain ${referrerPreviouslyInvited.toLowerCase()}, 192.168.1.1`
+          )
+        )
+
+        expect(mockReferralDb.findReferralProgress).toHaveBeenCalledWith({
+          invitedUser: referrerPreviouslyInvited.toLowerCase(),
+          limit: 1
+        })
+        expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
       })
     })
   })

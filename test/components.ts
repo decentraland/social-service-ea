@@ -84,6 +84,13 @@ import { createInMemoryCacheComponent } from '../src/adapters/memory-cache'
 import { createMockCommunityBroadcasterComponent } from './mocks/communities'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
+import { createUserModerationDBComponent } from '../src/adapters/user-moderation-db'
+import { createUserModerationComponent } from '../src/logic/user-moderation/component'
+import { createModeratorComponent } from '../src/logic/moderator'
+import { FeatureFlag, IFeatureFlagsAdapter } from '../src/adapters/feature-flags'
+import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
+
+export const TEST_MODERATOR_ACCOUNT = createUnsafeIdentity()
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -336,6 +343,21 @@ async function initComponents(): Promise<TestComponents> {
   const userMutes = await createUserMutesComponent({ userMutesDb, logs })
   const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
 
+  const userModerationDb = createUserModerationDBComponent({ pg, logs })
+
+  const userModeration = createUserModerationComponent({ userModerationDb, logs })
+
+  const moderatorFeatureFlags: IFeatureFlagsAdapter = {
+    ...featureFlags,
+    getVariants: async <T>(feature: FeatureFlag): Promise<T | undefined> => {
+      if (feature === FeatureFlag.PLATFORM_USER_MODERATORS) {
+        return [TEST_MODERATOR_ACCOUNT.address] as T
+      }
+      return featureFlags.getVariants<T>(feature)
+    }
+  }
+  const moderator = await createModeratorComponent({ featureFlags: moderatorFeatureFlags, logs })
+
   return {
     aiCompliance,
     analytics,
@@ -376,6 +398,7 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     memoryCache,
     metrics,
+    moderator,
     queueProcessor,
     nats,
     peerTracking,
@@ -407,6 +430,8 @@ async function initComponents(): Promise<TestComponents> {
     voiceDb,
     worldsStats,
     wsPool,
-    schemaValidator
+    schemaValidator,
+    userModerationDb,
+    userModeration
   }
 }

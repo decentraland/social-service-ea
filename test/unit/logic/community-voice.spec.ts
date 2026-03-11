@@ -94,7 +94,7 @@ describe('Community Voice Logic', () => {
     } as jest.Mocked<ICommunityVoiceChatCacheComponent>
 
     mockPlacesApi = {
-      getPlaces: jest.fn()
+      getDestinations: jest.fn()
     }
 
     mockCommunityThumbnail = {
@@ -161,7 +161,7 @@ describe('Community Voice Logic', () => {
           })
           mockCommunityThumbnail.getThumbnail.mockResolvedValue('test-community.jpg')
           mockCommunitiesDb.getCommunityPlaces!.mockResolvedValue([{ id: 'place-1' }, { id: 'place-2' }])
-          mockPlacesApi.getPlaces.mockResolvedValue([
+          mockPlacesApi.getDestinations.mockResolvedValue([
             { id: 'place-1', title: 'Place 1', positions: ['1,1', '1,2'], owner: '0x123' },
             { id: 'place-2', title: 'Place 2', positions: ['2,1', '2,2'], owner: '0x123' }
           ])
@@ -261,7 +261,7 @@ describe('Community Voice Logic', () => {
           })
           mockCommunityThumbnail.getThumbnail.mockResolvedValue('test-community.jpg')
           mockCommunitiesDb.getCommunityPlaces!.mockResolvedValue([{ id: 'place-1' }, { id: 'place-2' }])
-          mockPlacesApi.getPlaces.mockResolvedValue([
+          mockPlacesApi.getDestinations.mockResolvedValue([
             { id: 'place-1', title: 'Place 1', positions: ['1,1', '1,2'], owner: '0x123' },
             { id: 'place-2', title: 'Place 2', positions: ['2,1', '2,2'], owner: '0x123' }
           ])
@@ -371,7 +371,7 @@ describe('Community Voice Logic', () => {
           beforeEach(() => {
             mockRegistry.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
             mockCommunitiesDb.getCommunityPlaces!.mockResolvedValue([{ id: 'place-1' }])
-            mockPlacesApi.getPlaces.mockRejectedValue(new Error('PlacesApi failed'))
+            mockPlacesApi.getDestinations.mockRejectedValue(new Error('PlacesApi failed'))
           })
 
           it('should successfully start a community voice chat without positions', async () => {
