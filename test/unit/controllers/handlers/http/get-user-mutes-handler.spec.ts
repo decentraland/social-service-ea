@@ -113,15 +113,15 @@ describe('when the component throws an error', () => {
     mockUserMutes.getMutedUsers.mockRejectedValue(new Error('Unexpected error'))
   })
 
-  it('should return 500', async () => {
+  it('should throw the error', async () => {
     const url = new URL('http://localhost/v1/mutes')
 
-    const result = await getUserMutesHandler({
-      components: { userMutes: mockUserMutes, logs: mockLogs },
-      url,
-      verification: { auth: '0x1234567890123456789012345678901234567890' } as any
-    })
-
-    expect(result.status).toBe(500)
+    await expect(
+      getUserMutesHandler({
+        components: { userMutes: mockUserMutes, logs: mockLogs },
+        url,
+        verification: { auth: '0x1234567890123456789012345678901234567890' } as any
+      })
+    ).rejects.toThrow('Unexpected error')
   })
 })
