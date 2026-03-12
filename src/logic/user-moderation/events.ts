@@ -2,6 +2,7 @@ import { Events, UserBanCreatedEvent, UserWarningCreatedEvent } from '@dcl/schem
 import { IPublisherComponent } from '@dcl/sns-component'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { UserBan, UserWarning } from './types'
+import { retry } from '../../utils/retrier'
 
 export function createBanEvent(ban: UserBan): UserBanCreatedEvent {
   return {
@@ -43,7 +44,9 @@ export async function publishModerationEvent(
   logger: ILoggerComponent.ILogger
 ): Promise<void> {
   try {
-    await sns.publishMessage(event)
+    await retry(async () => {
+      await sns.publishMessage(event)
+    })
   } catch (error: any) {
     logger.error('Failed to publish moderation event', {
       error: error.message,
