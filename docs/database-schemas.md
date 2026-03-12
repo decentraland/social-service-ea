@@ -359,8 +359,7 @@ Stores mute relationships between users. Records who muted whom and when.
 
 ### Indexes
 
-- **Composite Primary Key**: `(muter_address, muted_address)` - One mute per user pair
-- **Index**: `idx_user_mutes_muter_address` on `muter_address` - For efficient lookup of all users muted by a given user
+- **Composite Primary Key**: `(muter_address, muted_address)` - One mute per user pair. The leading column (`muter_address`) supports efficient lookups of all users muted by a given user.
 
 ### Business Rules
 
