@@ -907,6 +907,32 @@ components:
           maxItems: 50
           description: 'List of community IDs to validate (max 50)'
 
+    GetUserMutes200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - address
+                      - muted_at
+                    properties:
+                      address:
+                        type: string
+                        description: 'Ethereum address of the muted user'
+                      muted_at:
+                        type: string
+                        format: date-time
+                        description: 'When the user was muted'
+
     GetMemberCommunitiesByIds200OkResponse:
       type: object
       required:

@@ -37,6 +37,9 @@ import {
   likeCommunityPostHandler,
   unlikeCommunityPostHandler,
   getMemberCommunitiesByIdsHandler,
+  addUserMuteHandler,
+  removeUserMuteHandler,
+  getUserMutesHandler,
   banPlayerHandler,
   liftBanHandler,
   banStatusHandler,
@@ -179,6 +182,11 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
     schemaValidator.withSchemaValidatorMiddleware(UpdateCommunityRequestStatusSchema),
     updateCommunityRequestStatusHandler
   )
+
+  // User mute routes
+  router.get('/v1/mutes', signedFetchMiddleware(), getUserMutesHandler)
+  router.post('/v1/mutes', signedFetchMiddleware(), addUserMuteHandler)
+  router.delete('/v1/mutes', signedFetchMiddleware(), removeUserMuteHandler)
 
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)

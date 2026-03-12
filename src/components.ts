@@ -75,6 +75,8 @@ import { createSqsComponent } from '@dcl/sqs-component'
 import { createSnsComponent } from '@dcl/sns-component'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 import { createRegistryComponent } from './adapters/registry'
+import { createUserMutesDBComponent } from './adapters/user-mutes-db'
+import { createUserMutesComponent } from './logic/user-mutes'
 import { createSqsHandlers } from './controllers/handlers/sqs/handler'
 import { withSuppressedTracing, withoutTracing } from './utils/tracing'
 
@@ -140,6 +142,7 @@ export async function initComponents(): Promise<AppComponents> {
   )
 
   const friendsDb = createFriendsDBComponent({ pg, logs })
+  const userMutesDb = createUserMutesDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const userModerationDb = createUserModerationDBComponent({ pg, logs })
   const userModeration = createUserModerationComponent({ userModerationDb, logs })
@@ -296,6 +299,7 @@ export async function initComponents(): Promise<AppComponents> {
     { repeat: true, startupDelay: 30 * 60 * 1000 } // Start after 30 minutes delay
   )
 
+  const userMutes = await createUserMutesComponent({ userMutesDb, logs })
   const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
   const updateHandler = createUpdateHandlerComponent({
     logs,
@@ -421,6 +425,8 @@ export async function initComponents(): Promise<AppComponents> {
     voiceDb,
     worldsStats,
     wsPool,
-    schemaValidator
+    schemaValidator,
+    userMutesDb,
+    userMutes
   }
 }

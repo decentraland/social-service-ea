@@ -66,6 +66,16 @@ export type IRPCServerComponent = IBaseComponent & {
   detachUser(address: string): void
   setServiceCreators(creators: RpcServiceCreators): void
 }
+
+export interface IUserMutesDatabaseComponent {
+  addMute(muterAddress: string, mutedAddress: string): Promise<{ muted_at: Date }>
+  removeMute(muterAddress: string, mutedAddress: string): Promise<void>
+  getMutedUsers(
+    muterAddress: string,
+    options?: { pagination?: Pagination; address?: string; addresses?: string[] }
+  ): Promise<{ mutes: { address: string; muted_at: Date }[]; total: number }>
+}
+
 export interface IFriendsDatabaseComponent {
   createFriendship(
     users: [string, string],

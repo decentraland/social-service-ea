@@ -34,6 +34,8 @@ import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
 import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
+import { createUserMutesDBComponent } from '../src/adapters/user-mutes-db'
+import { createUserMutesComponent } from '../src/logic/user-mutes'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
 import {
   mockPeersSynchronizer,
@@ -157,6 +159,7 @@ async function initComponents(): Promise<TestComponents> {
       }
     }
   )
+  const userMutesDb = createUserMutesDBComponent({ pg, logs })
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const voiceDb = await createVoiceDBComponent({ pg, config })
@@ -337,6 +340,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const wsPool = createWsPoolComponent({ logs, metrics })
 
+  const userMutes = await createUserMutesComponent({ userMutesDb, logs })
   const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
 
   const userModerationDb = createUserModerationDBComponent({ pg, logs })
@@ -419,6 +423,8 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     tracing: mockTracing,
     updateHandler,
+    userMutes,
+    userMutesDb,
     uwsServer,
     voice,
     voiceDb,
