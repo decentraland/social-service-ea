@@ -1,11 +1,13 @@
 import {
   PrivateMessagePrivacySetting as RPCPrivateMessagePrivacySetting,
   SocialSettings as RPCSocialSettings,
-  BlockedUsersMessagesVisibilitySetting as RPCBlockedUsersMessagesVisibilitySetting
+  BlockedUsersMessagesVisibilitySetting as RPCBlockedUsersMessagesVisibilitySetting,
+  SituationReactionsVisibility as RPCSituationReactionsVisibility
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
+  SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
   User
 } from '../../types'
@@ -32,6 +34,15 @@ const RPC_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_DB_BLOCKED_USERS_MESSAGES_VISIBIL
   [RPCBlockedUsersMessagesVisibilitySetting.UNRECOGNIZED]: undefined
 }
 
+const RPC_SITUATION_REACTIONS_VISIBILITY_TO_DB: Record<
+  RPCSituationReactionsVisibility,
+  DBSituationReactionsVisibility | undefined
+> = {
+  [RPCSituationReactionsVisibility.SHOW]: DBSituationReactionsVisibility.SHOW,
+  [RPCSituationReactionsVisibility.HIDE]: DBSituationReactionsVisibility.HIDE,
+  [RPCSituationReactionsVisibility.UNRECOGNIZED]: undefined
+}
+
 const DB_PRIVATE_MESSAGE_PRIVACY_TO_RPC_PRIVATE_MESSAGE_PRIVACY: Record<
   DBPrivateMessagesPrivacy,
   RPCPrivateMessagePrivacySetting
@@ -49,6 +60,14 @@ const DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBIL
     RPCBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
 }
 
+const DB_SITUATION_REACTIONS_VISIBILITY_TO_RPC: Record<
+  DBSituationReactionsVisibility,
+  RPCSituationReactionsVisibility
+> = {
+  [DBSituationReactionsVisibility.SHOW]: RPCSituationReactionsVisibility.SHOW,
+  [DBSituationReactionsVisibility.HIDE]: RPCSituationReactionsVisibility.HIDE
+}
+
 export class InvalidSocialSettingsError extends Error {
   constructor(message: string) {
     super(message)
@@ -62,7 +81,8 @@ export function convertDBSettingsToRPCSettings(settings: DBSocialSettings): RPCS
     blockedUsersMessagesVisibility:
       DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBILITY[
         settings.blocked_users_messages_visibility
-      ]
+      ],
+    showSituationReactions: DB_SITUATION_REACTIONS_VISIBILITY_TO_RPC[settings.show_situation_reactions]
   }
 }
 
@@ -78,6 +98,12 @@ export function convertRPCSettingsIntoDBSettings(
   if (settings.blockedUsersMessagesVisibility !== undefined) {
     dbSettings.blocked_users_messages_visibility = convertRPCBlockedUsersMessagesVisibilityIntoDBSetting(
       settings.blockedUsersMessagesVisibility
+    )
+  }
+
+  if (settings.showSituationReactions !== undefined) {
+    dbSettings.show_situation_reactions = convertRPCSituationReactionsVisibilityIntoDBSetting(
+      settings.showSituationReactions
     )
   }
 
@@ -104,11 +130,22 @@ function convertRPCBlockedUsersMessagesVisibilityIntoDBSetting(
   return dbVisibility
 }
 
+function convertRPCSituationReactionsVisibilityIntoDBSetting(
+  visibility: RPCSituationReactionsVisibility
+): DBSituationReactionsVisibility {
+  const dbVisibility = RPC_SITUATION_REACTIONS_VISIBILITY_TO_DB[visibility]
+  if (dbVisibility === undefined) {
+    throw new InvalidSocialSettingsError('Unknown situation reactions visibility setting')
+  }
+  return dbVisibility
+}
+
 export function getDefaultSettings(address: string): DBSocialSettings {
   return {
     address,
     private_messages_privacy: DEFAULT_DB_PRIVATE_MESSAGES_PRIVACY,
-    blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+    blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+    show_situation_reactions: DBSituationReactionsVisibility.SHOW
   }
 }
 
