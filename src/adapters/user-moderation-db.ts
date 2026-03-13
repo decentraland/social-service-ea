@@ -34,17 +34,20 @@ export function createUserModerationDBComponent(
       return result.rows[0]
     },
 
-    async liftBan(address: string, liftedBy: string): Promise<boolean> {
+    async liftBan(address: string, liftedBy: string): Promise<UserBan | null> {
       const now = new Date()
 
       const query = SQL`
         UPDATE user_bans
         SET lifted_at = ${now}, lifted_by = ${liftedBy}
         WHERE banned_address = ${address}
-          AND `.append(activeBanFilter())
+          AND `
+        .append(activeBanFilter())
+        .append(` RETURNING `)
+        .append(BAN_SELECT_FIELDS)
 
-      const result = await pg.query(query)
-      return result.rowCount > 0
+      const result = await pg.query<UserBan>(query)
+      return result.rows[0] ?? null
     },
 
     async isPlayerBanned(address: string): Promise<BanStatus> {

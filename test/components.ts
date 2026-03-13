@@ -345,7 +345,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const userModerationDb = createUserModerationDBComponent({ pg, logs })
 
-  const userModeration = createUserModerationComponent({ userModerationDb, logs })
+  const userModeration = createUserModerationComponent({ userModerationDb, logs, sns })
 
   const moderatorFeatureFlags: IFeatureFlagsAdapter = {
     ...featureFlags,

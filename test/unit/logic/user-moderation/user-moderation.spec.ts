@@ -1,35 +1,19 @@
-import { createUserModerationComponent } from '../../../src/logic/user-moderation'
-import { PlayerAlreadyBannedError, BanNotFoundError } from '../../../src/logic/user-moderation/errors'
-import { IUserModerationComponent, UserBan, UserWarning } from '../../../src/logic/user-moderation/types'
-import { IUserModerationDatabaseComponent } from '../../../src/types/components'
+import { Events } from '@dcl/schemas'
+import { IPublisherComponent } from '@dcl/sns-component'
+import { createSNSMockedComponent, createLogsMockedComponent } from '../../../mocks/components'
+import { createUserModerationComponent } from '../../../../src/logic/user-moderation'
+import { PlayerAlreadyBannedError, BanNotFoundError } from '../../../../src/logic/user-moderation/errors'
+import { IUserModerationComponent, UserBan, UserWarning } from '../../../../src/logic/user-moderation/types'
+import { IUserModerationDatabaseComponent } from '../../../../src/types/components'
+import { ILoggerComponent } from '@well-known-components/interfaces'
+import { makeBan, makeWarning } from './utils'
 
-const makeBan = (overrides: Partial<UserBan> = {}): UserBan => ({
-  id: 'ban-id',
-  bannedAddress: '0xabc',
-  bannedBy: '0xadmin',
-  reason: 'Violation',
-  customMessage: null,
-  bannedAt: new Date('2025-01-01'),
-  expiresAt: null,
-  liftedAt: null,
-  liftedBy: null,
-  createdAt: new Date('2025-01-01'),
-  ...overrides
-})
-
-const makeWarning = (overrides: Partial<UserWarning> = {}): UserWarning => ({
-  id: 'warning-id',
-  warnedAddress: '0xabc',
-  warnedBy: '0xadmin',
-  reason: 'Minor violation',
-  warnedAt: new Date('2025-01-01'),
-  createdAt: new Date('2025-01-01'),
-  ...overrides
-})
+const flushPromises = () => new Promise(setImmediate)
 
 describe('user-moderation-component', () => {
   let mockUserModerationDb: jest.Mocked<IUserModerationDatabaseComponent>
-  let mockLogs: any
+  let mockSns: jest.Mocked<IPublisherComponent>
+  let mockLogs: jest.Mocked<ILoggerComponent>
   let component: IUserModerationComponent
 
   beforeEach(() => {
@@ -43,19 +27,14 @@ describe('user-moderation-component', () => {
       getBanHistory: jest.fn()
     }
 
-    mockLogs = {
-      getLogger: jest.fn().mockReturnValue({
-        log: jest.fn(),
-        debug: jest.fn(),
-        error: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn()
-      })
-    }
+    mockSns = createSNSMockedComponent({})
+
+    mockLogs = createLogsMockedComponent({})
 
     component = createUserModerationComponent({
       userModerationDb: mockUserModerationDb,
-      logs: mockLogs
+      logs: mockLogs,
+      sns: mockSns
     })
   })
 
@@ -85,6 +64,29 @@ describe('user-moderation-component', () => {
           expiresAt: undefined
         })
       })
+
+      it('should publish a USER_BAN_CREATED event with correct metadata', async () => {
+        await component.banPlayer('0xABC', '0xADMIN', 'Violation')
+
+        await flushPromises()
+
+        expect(mockSns.publishMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: Events.Type.MODERATION,
+            subType: Events.SubType.Moderation.USER_BAN_CREATED,
+            key: ban.id,
+            timestamp: expect.any(Number),
+            metadata: expect.objectContaining({
+              id: ban.id,
+              bannedAddress: ban.bannedAddress,
+              bannedBy: ban.bannedBy,
+              reason: ban.reason,
+              bannedAt: ban.bannedAt.getTime(),
+              expiresAt: null
+            })
+          })
+        )
+      })
     })
 
     describe('and a duration is provided', () => {
@@ -108,6 +110,20 @@ describe('user-moderation-component', () => {
           })
         )
       })
+
+      it('should publish a USER_BAN_CREATED event with expiresAt as unix ms', async () => {
+        await component.banPlayer('0xABC', '0xADMIN', 'Violation', duration)
+
+        await flushPromises()
+
+        expect(mockSns.publishMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              expiresAt: ban.expiresAt!.getTime()
+            })
+          })
+        )
+      })
     })
 
     describe('and a custom message is provided', () => {
@@ -125,6 +141,20 @@ describe('user-moderation-component', () => {
         expect(mockUserModerationDb.createBan).toHaveBeenCalledWith(
           expect.objectContaining({
             customMessage: 'You have been banned'
+          })
+        )
+      })
+
+      it('should include customMessage in the published SNS event', async () => {
+        await component.banPlayer('0xABC', '0xADMIN', 'Violation', undefined, 'You have been banned')
+
+        await flushPromises()
+
+        expect(mockSns.publishMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              customMessage: 'You have been banned'
+            })
           })
         )
       })
@@ -146,6 +176,12 @@ describe('user-moderation-component', () => {
         await expect(component.banPlayer('0xABC', '0xADMIN', 'Violation')).rejects.toThrow()
 
         expect(mockUserModerationDb.createBan).not.toHaveBeenCalled()
+      })
+
+      it('should not publish an SNS event', async () => {
+        await expect(component.banPlayer('0xABC', '0xADMIN', 'Violation')).rejects.toThrow(PlayerAlreadyBannedError)
+
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
       })
     })
 
@@ -183,12 +219,32 @@ describe('user-moderation-component', () => {
         )
       })
     })
+
+    describe('and SNS publish fails', () => {
+      let ban: UserBan
+
+      beforeEach(() => {
+        ban = makeBan()
+        mockUserModerationDb.isPlayerBanned.mockResolvedValueOnce({ isBanned: false })
+        mockUserModerationDb.createBan.mockResolvedValueOnce(ban)
+        mockSns.publishMessage.mockRejectedValueOnce(new Error('SNS error'))
+      })
+
+      it('should not fail the ban operation', async () => {
+        const result = await component.banPlayer('0xABC', '0xADMIN', 'Violation')
+
+        expect(result).toEqual(ban)
+      })
+    })
   })
 
   describe('when lifting a ban', () => {
     describe('and an active ban exists', () => {
+      let ban: UserBan
+
       beforeEach(() => {
-        mockUserModerationDb.liftBan.mockResolvedValueOnce(true)
+        ban = makeBan({ liftedAt: new Date('2025-06-01'), liftedBy: '0xadmin' })
+        mockUserModerationDb.liftBan.mockResolvedValueOnce(ban)
       })
 
       it('should delegate to the adapter with normalized addresses', async () => {
@@ -196,15 +252,56 @@ describe('user-moderation-component', () => {
 
         expect(mockUserModerationDb.liftBan).toHaveBeenCalledWith('0xabc', '0xadmin')
       })
+
+      it('should publish a USER_BAN_LIFTED event with correct metadata', async () => {
+        await component.liftBan('0xABC', '0xADMIN')
+
+        await flushPromises()
+
+        expect(mockSns.publishMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: Events.Type.MODERATION,
+            subType: Events.SubType.Moderation.USER_BAN_LIFTED,
+            key: ban.id,
+            timestamp: expect.any(Number),
+            metadata: expect.objectContaining({
+              id: ban.id,
+              bannedAddress: ban.bannedAddress,
+              liftedBy: ban.liftedBy,
+              liftedAt: ban.liftedAt!.getTime()
+            })
+          })
+        )
+      })
     })
 
     describe('and no active ban exists', () => {
       beforeEach(() => {
-        mockUserModerationDb.liftBan.mockResolvedValueOnce(false)
+        mockUserModerationDb.liftBan.mockResolvedValueOnce(null)
       })
 
       it('should throw BanNotFoundError', async () => {
         await expect(component.liftBan('0xABC', '0xADMIN')).rejects.toThrow(BanNotFoundError)
+      })
+
+      it('should not publish an SNS event', async () => {
+        await expect(component.liftBan('0xABC', '0xADMIN')).rejects.toThrow(BanNotFoundError)
+
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and SNS publish fails', () => {
+      let ban: UserBan
+
+      beforeEach(() => {
+        ban = makeBan({ liftedAt: new Date('2025-06-01'), liftedBy: '0xadmin' })
+        mockUserModerationDb.liftBan.mockResolvedValueOnce(ban)
+        mockSns.publishMessage.mockRejectedValueOnce(new Error('SNS error'))
+      })
+
+      it('should not fail the lift operation', async () => {
+        await expect(component.liftBan('0xABC', '0xADMIN')).resolves.toBeUndefined()
       })
     })
   })
@@ -230,6 +327,39 @@ describe('user-moderation-component', () => {
         warnedAddress: '0xabc',
         warnedBy: '0xadmin',
         reason: 'Minor violation'
+      })
+    })
+
+    it('should publish a USER_WARNING_CREATED event with correct metadata', async () => {
+      await component.warnPlayer('0xABC', 'Minor violation', '0xADMIN')
+
+      await flushPromises()
+
+      expect(mockSns.publishMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: Events.Type.MODERATION,
+          subType: Events.SubType.Moderation.USER_WARNING_CREATED,
+          key: 'warning-id',
+          timestamp: expect.any(Number),
+          metadata: expect.objectContaining({
+            id: 'warning-id',
+            warnedAddress: '0xabc',
+            warnedBy: '0xadmin',
+            reason: 'Minor violation'
+          })
+        })
+      )
+    })
+
+    describe('and SNS publish fails', () => {
+      beforeEach(() => {
+        mockSns.publishMessage.mockRejectedValueOnce(new Error('SNS error'))
+      })
+
+      it('should not fail the warn operation', async () => {
+        const result = await component.warnPlayer('0xABC', 'Minor violation', '0xADMIN')
+
+        expect(result).toEqual(makeWarning())
       })
     })
   })

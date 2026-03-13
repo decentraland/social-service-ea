@@ -145,11 +145,12 @@ export async function initComponents(): Promise<AppComponents> {
   const userMutesDb = createUserMutesDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const userModerationDb = createUserModerationDBComponent({ pg, logs })
-  const userModeration = createUserModerationComponent({ userModerationDb, logs })
 
   const referralDb = await createReferralDBComponent({ pg, logs, config })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
   const sns = await createSnsComponent({ config })
+
+  const userModeration = createUserModerationComponent({ userModerationDb, logs, sns })
 
   const serviceBaseUrl = (await config.getString('SERVICE_BASE_URL')) || 'https://social-service-ea.decentraland.zone'
   const features = await createFeaturesComponent({ config, logs, fetch: fetcher }, serviceBaseUrl)
