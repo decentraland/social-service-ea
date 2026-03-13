@@ -1,14 +1,14 @@
 import { Events } from '@dcl/schemas'
 import { IPublisherComponent } from '@dcl/sns-component'
 import { createSNSMockedComponent, createLogsMockedComponent } from '../../../mocks/components'
-import { createBanEvent, createWarningEvent, publishModerationEvent } from '../../../../src/logic/user-moderation/events'
+import { createBanEvent, createBanLiftedEvent, createWarningEvent, publishModerationEvent } from '../../../../src/logic/user-moderation/events'
 import { UserBan, UserWarning } from '../../../../src/logic/user-moderation/types'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { makeBan, makeWarning } from './utils'
 
 describe('user-moderation events', () => {
-  describe('createBanEvent', () => {
-    describe('when creating a ban event without expiration or custom message', () => {
+  describe('when creating a ban event', () => {
+    describe('and it does not have an expiration or custom message', () => {
       let ban: UserBan
       let result: ReturnType<typeof createBanEvent>
 
@@ -62,7 +62,7 @@ describe('user-moderation events', () => {
       })
     })
 
-    describe('when creating a ban event with an expiration date', () => {
+    describe('and it has an expiration date', () => {
       let ban: UserBan
       let result: ReturnType<typeof createBanEvent>
 
@@ -80,7 +80,7 @@ describe('user-moderation events', () => {
       })
     })
 
-    describe('when creating a ban event with a custom message', () => {
+    describe('and it has a custom message', () => {
       let ban: UserBan
       let result: ReturnType<typeof createBanEvent>
 
@@ -99,55 +99,101 @@ describe('user-moderation events', () => {
     })
   })
 
-  describe('createWarningEvent', () => {
-    describe('when creating a warning event', () => {
-      let warning: UserWarning
-      let result: ReturnType<typeof createWarningEvent>
+  describe('when creating a warning event', () => {
+    let warning: UserWarning
+    let result: ReturnType<typeof createWarningEvent>
 
-      beforeEach(() => {
-        warning = makeWarning()
-        result = createWarningEvent(warning)
-      })
+    beforeEach(() => {
+      warning = makeWarning()
+      result = createWarningEvent(warning)
+    })
 
-      afterEach(() => {
-        jest.resetAllMocks()
-      })
+    afterEach(() => {
+      jest.resetAllMocks()
+    })
 
-      it('should set the event type to MODERATION', () => {
-        expect(result.type).toBe(Events.Type.MODERATION)
-      })
+    it('should set the event type to MODERATION', () => {
+      expect(result.type).toBe(Events.Type.MODERATION)
+    })
 
-      it('should set the subType to USER_WARNING_CREATED', () => {
-        expect(result.subType).toBe(Events.SubType.Moderation.USER_WARNING_CREATED)
-      })
+    it('should set the subType to USER_WARNING_CREATED', () => {
+      expect(result.subType).toBe(Events.SubType.Moderation.USER_WARNING_CREATED)
+    })
 
-      it('should set the key to the warning id', () => {
-        expect(result.key).toBe(warning.id)
-      })
+    it('should set the key to the warning id', () => {
+      expect(result.key).toBe(warning.id)
+    })
 
-      it('should include the warning id in the metadata', () => {
-        expect(result.metadata.id).toBe(warning.id)
-      })
+    it('should include the warning id in the metadata', () => {
+      expect(result.metadata.id).toBe(warning.id)
+    })
 
-      it('should include the warnedAddress in the metadata', () => {
-        expect(result.metadata.warnedAddress).toBe(warning.warnedAddress)
-      })
+    it('should include the warnedAddress in the metadata', () => {
+      expect(result.metadata.warnedAddress).toBe(warning.warnedAddress)
+    })
 
-      it('should include the warnedBy in the metadata', () => {
-        expect(result.metadata.warnedBy).toBe(warning.warnedBy)
-      })
+    it('should include the warnedBy in the metadata', () => {
+      expect(result.metadata.warnedBy).toBe(warning.warnedBy)
+    })
 
-      it('should include the reason in the metadata', () => {
-        expect(result.metadata.reason).toBe(warning.reason)
-      })
+    it('should include the reason in the metadata', () => {
+      expect(result.metadata.reason).toBe(warning.reason)
+    })
 
-      it('should include the warnedAt timestamp in the metadata', () => {
-        expect(result.metadata.warnedAt).toBe(warning.warnedAt.getTime())
-      })
+    it('should include the warnedAt timestamp in the metadata', () => {
+      expect(result.metadata.warnedAt).toBe(warning.warnedAt.getTime())
     })
   })
 
-  describe('publishModerationEvent', () => {
+  describe('when the ban has not been lifted', () => {
+    it('should throw an error', () => {
+      expect(() => createBanLiftedEvent(makeBan())).toThrow('Ban ban-id is not lifted')
+    })
+  })
+
+  describe('when creating a ban lifted event', () => {
+    let ban: UserBan
+    let result: ReturnType<typeof createBanLiftedEvent>
+
+    beforeEach(() => {
+      ban = makeBan({ liftedAt: new Date('2025-06-01'), liftedBy: '0xmoderator' })
+      result = createBanLiftedEvent(ban)
+    })
+
+    afterEach(() => {
+      jest.resetAllMocks()
+    })
+
+    it('should set the event type to MODERATION', () => {
+      expect(result.type).toBe(Events.Type.MODERATION)
+    })
+
+    it('should set the subType to USER_BAN_LIFTED', () => {
+      expect(result.subType).toBe(Events.SubType.Moderation.USER_BAN_LIFTED)
+    })
+
+    it('should set the key to the ban id', () => {
+      expect(result.key).toBe(ban.id)
+    })
+
+    it('should include the ban id in the metadata', () => {
+      expect(result.metadata.id).toBe(ban.id)
+    })
+
+    it('should include the bannedAddress in the metadata', () => {
+      expect(result.metadata.bannedAddress).toBe(ban.bannedAddress)
+    })
+
+    it('should include the liftedBy in the metadata', () => {
+      expect(result.metadata.liftedBy).toBe(ban.liftedBy)
+    })
+
+    it('should include the liftedAt timestamp in the metadata', () => {
+      expect(result.metadata.liftedAt).toBe(ban.liftedAt!.getTime())
+    })
+  })
+
+  describe('when publishing a moderation event', () => {
     let mockSns: jest.Mocked<IPublisherComponent>
     let mockLogger: jest.Mocked<ILoggerComponent.ILogger>
 
@@ -155,7 +201,7 @@ describe('user-moderation events', () => {
       jest.resetAllMocks()
     })
 
-    describe('when publishing a moderation event successfully', () => {
+    describe('and it succeeds', () => {
       let ban: UserBan
       let event: ReturnType<typeof createBanEvent>
 
@@ -172,7 +218,7 @@ describe('user-moderation events', () => {
       })
     })
 
-    describe('when publishing a moderation event fails after all retries', () => {
+    describe('and it fails after all retries', () => {
       let warning: UserWarning
       let event: ReturnType<typeof createWarningEvent>
 

@@ -1,4 +1,4 @@
-import { Events, UserBanCreatedEvent, UserWarningCreatedEvent } from '@dcl/schemas'
+import { Events, UserBanCreatedEvent, UserBanLiftedEvent, UserWarningCreatedEvent } from '@dcl/schemas'
 import { IPublisherComponent } from '@dcl/sns-component'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 import { UserBan, UserWarning } from './types'
@@ -22,6 +22,25 @@ export function createBanEvent(ban: UserBan): UserBanCreatedEvent {
   }
 }
 
+export function createBanLiftedEvent(ban: UserBan): UserBanLiftedEvent {
+  if (!ban.liftedBy || !ban.liftedAt) {
+    throw new Error(`Ban ${ban.id} is not lifted`)
+  }
+
+  return {
+    type: Events.Type.MODERATION,
+    subType: Events.SubType.Moderation.USER_BAN_LIFTED,
+    key: ban.id,
+    timestamp: Date.now(),
+    metadata: {
+      id: ban.id,
+      bannedAddress: ban.bannedAddress,
+      liftedBy: ban.liftedBy,
+      liftedAt: ban.liftedAt.getTime()
+    }
+  }
+}
+
 export function createWarningEvent(warning: UserWarning): UserWarningCreatedEvent {
   return {
     type: Events.Type.MODERATION,
@@ -40,7 +59,7 @@ export function createWarningEvent(warning: UserWarning): UserWarningCreatedEven
 
 export async function publishModerationEvent(
   sns: IPublisherComponent,
-  event: UserBanCreatedEvent | UserWarningCreatedEvent,
+  event: UserBanCreatedEvent | UserBanLiftedEvent | UserWarningCreatedEvent,
   logger: ILoggerComponent.ILogger
 ): Promise<void> {
   try {

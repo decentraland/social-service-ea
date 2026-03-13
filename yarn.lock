@@ -1170,9 +1170,9 @@
     ajv-errors "^3.0.0"
     ajv-keywords "^5.1.0"
 
-"@dcl/schemas@https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/moderation-events/dcl-schemas-25.0.1-23017656254.commit-b419adc.tgz":
-  version "25.0.1-23017656254.commit-b419adc"
-  resolved "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/moderation-events/dcl-schemas-25.0.1-23017656254.commit-b419adc.tgz#b8e74769fcbe8d65cf586ff00717f606b91ed93d"
+"@dcl/schemas@https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/moderation-events/dcl-schemas-25.0.1-23062351829.commit-0121346.tgz":
+  version "25.0.1-23062351829.commit-0121346"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/schemas/branch/feat/moderation-events/dcl-schemas-25.0.1-23062351829.commit-0121346.tgz#267acac07993509167281c57a86368a51e910f38"
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"

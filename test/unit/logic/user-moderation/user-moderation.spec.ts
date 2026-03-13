@@ -240,8 +240,11 @@ describe('user-moderation-component', () => {
 
   describe('when lifting a ban', () => {
     describe('and an active ban exists', () => {
+      let ban: UserBan
+
       beforeEach(() => {
-        mockUserModerationDb.liftBan.mockResolvedValueOnce(true)
+        ban = makeBan({ liftedAt: new Date('2025-06-01'), liftedBy: '0xadmin' })
+        mockUserModerationDb.liftBan.mockResolvedValueOnce(ban)
       })
 
       it('should delegate to the adapter with normalized addresses', async () => {
@@ -249,15 +252,56 @@ describe('user-moderation-component', () => {
 
         expect(mockUserModerationDb.liftBan).toHaveBeenCalledWith('0xabc', '0xadmin')
       })
+
+      it('should publish a USER_BAN_LIFTED event with correct metadata', async () => {
+        await component.liftBan('0xABC', '0xADMIN')
+
+        await flushPromises()
+
+        expect(mockSns.publishMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: Events.Type.MODERATION,
+            subType: Events.SubType.Moderation.USER_BAN_LIFTED,
+            key: ban.id,
+            timestamp: expect.any(Number),
+            metadata: expect.objectContaining({
+              id: ban.id,
+              bannedAddress: ban.bannedAddress,
+              liftedBy: ban.liftedBy,
+              liftedAt: ban.liftedAt!.getTime()
+            })
+          })
+        )
+      })
     })
 
     describe('and no active ban exists', () => {
       beforeEach(() => {
-        mockUserModerationDb.liftBan.mockResolvedValueOnce(false)
+        mockUserModerationDb.liftBan.mockResolvedValueOnce(null)
       })
 
       it('should throw BanNotFoundError', async () => {
         await expect(component.liftBan('0xABC', '0xADMIN')).rejects.toThrow(BanNotFoundError)
+      })
+
+      it('should not publish an SNS event', async () => {
+        await expect(component.liftBan('0xABC', '0xADMIN')).rejects.toThrow(BanNotFoundError)
+
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and SNS publish fails', () => {
+      let ban: UserBan
+
+      beforeEach(() => {
+        ban = makeBan({ liftedAt: new Date('2025-06-01'), liftedBy: '0xadmin' })
+        mockUserModerationDb.liftBan.mockResolvedValueOnce(ban)
+        mockSns.publishMessage.mockRejectedValueOnce(new Error('SNS error'))
+      })
+
+      it('should not fail the lift operation', async () => {
+        await expect(component.liftBan('0xABC', '0xADMIN')).resolves.toBeUndefined()
       })
     })
   })
