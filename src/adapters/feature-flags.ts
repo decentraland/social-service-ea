@@ -15,10 +15,7 @@ export enum FeatureFlag {
    * @example
    * Variant value: "0x1234567890123456789012345678901234567890,0x1234567890123456789012345678901234567891"
    */
-  COMMUNITIES_GLOBAL_MODERATORS = 'communities_global_moderators',
-  // Feature flag for platform user moderators.
-  // The variant should contain a comma-separated list of wallet addresses.
-  PLATFORM_USER_MODERATORS = 'platform_user_moderators'
+  COMMUNITIES_GLOBAL_MODERATORS = 'communities_global_moderators'
 }
 
 export type IFeatureFlagsAdapter = IBaseComponent & {
@@ -43,8 +40,7 @@ export async function createFeatureFlagsAdapter(
       const [isEnabled, isDevEnabled] = await Promise.all([
         features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE),
         features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE),
-        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS),
-        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.PLATFORM_USER_MODERATORS)
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
       ])
 
       logger.debug(`Refreshed feature flags`, {
