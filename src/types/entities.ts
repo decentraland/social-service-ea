@@ -18,6 +18,7 @@ export type SocialSettings = {
   address: string
   private_messages_privacy: PrivateMessagesPrivacy
   blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting
+  show_situation_reactions: SituationReactionsVisibility
 }
 
 export enum PrivateMessagesPrivacy {
@@ -28,6 +29,11 @@ export enum PrivateMessagesPrivacy {
 export enum BlockedUsersMessagesVisibilitySetting {
   SHOW_MESSAGES = 'show_messages',
   DO_NOT_SHOW_MESSAGES = 'do_not_show_messages'
+}
+
+export enum SituationReactionsVisibility {
+  SHOW = 'show',
+  HIDE = 'hide'
 }
 
 export type User = {

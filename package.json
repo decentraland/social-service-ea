@@ -53,7 +53,7 @@
     "@dcl/memory-queue-component": "^2.0.0",
     "@dcl/platform-crypto-middleware": "^1.1.0",
     "@dcl/platform-server-commons": "^1.0.1",
-    "@dcl/protocol": "next",
+    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-22759287695.commit-d2351e7.tgz",
     "@dcl/queue-consumer-component": "^1.0.0",
     "@dcl/rpc": "^1.1.2",
     "@dcl/schema-validator-component": "^0.2.0",

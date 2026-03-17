@@ -10,6 +10,7 @@ import {
   IFriendsDatabaseComponent,
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
   PrivateMessagesPrivacy as DBPrivateMessagesPrivacy,
+  SituationReactionsVisibility as DBSituationReactionsVisibility,
   SocialSettings as DBSocialSettings,
   RpcServerContext,
   ICommsGatekeeperComponent
@@ -63,7 +64,8 @@ describe('upsertSocialSettingsService', () => {
     const resultDBSettings: DBSocialSettings = {
       address: testAddress,
       private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+      show_situation_reactions: DBSituationReactionsVisibility.SHOW
     }
 
     commsGatekeeperMock.mockResolvedValueOnce()
@@ -92,7 +94,8 @@ describe('upsertSocialSettingsService', () => {
     const resultDBSettings: DBSocialSettings = {
       address: testAddress,
       private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
-      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+      show_situation_reactions: DBSituationReactionsVisibility.SHOW
     }
 
     commsGatekeeperMock.mockResolvedValueOnce()
@@ -122,7 +125,8 @@ describe('upsertSocialSettingsService', () => {
     const expectedDBSettings: DBSocialSettings = {
       address: testAddress,
       private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+      show_situation_reactions: DBSituationReactionsVisibility.SHOW
     }
 
     commsGatekeeperMock.mockResolvedValueOnce()
@@ -151,7 +155,8 @@ describe('upsertSocialSettingsService', () => {
     const expectedDBSettings: DBSocialSettings = {
       address: testAddress,
       private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+      show_situation_reactions: DBSituationReactionsVisibility.SHOW
     }
 
     commsGatekeeperMock.mockResolvedValueOnce()
@@ -169,7 +174,8 @@ describe('upsertSocialSettingsService', () => {
     const expectedDBSettings: DBSocialSettings = {
       address: testAddress,
       private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
-      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+      show_situation_reactions: DBSituationReactionsVisibility.SHOW
     }
 
     commsGatekeeperMock.mockResolvedValueOnce()
@@ -187,7 +193,8 @@ describe('upsertSocialSettingsService', () => {
     const expectedDBSettings: DBSocialSettings = {
       address: testAddress,
       private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+      show_situation_reactions: DBSituationReactionsVisibility.SHOW
     }
 
     upsertSocialSettingsMock.mockResolvedValueOnce(expectedDBSettings)
