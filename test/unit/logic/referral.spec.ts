@@ -1650,4 +1650,153 @@ describe('referral-component', () => {
       })
     })
   })
+
+  describe('and the referrer is part of a deep banned referral chain (multi-hop)', () => {
+    const bannedWallet = '0x1111111111111111111111111111111111111111'
+    const intermediateA = '0x2222222222222222222222222222222222222222'
+    const intermediateB = '0x3333333333333333333333333333333333333333'
+    const referrer = '0x4444444444444444444444444444444444444444'
+    const invitedUser = '0x5555555555555555555555555555555555555555'
+
+    describe('when banned wallet is 3 hops up (Banned → A → B → referrer)', () => {
+      beforeEach(() => {
+        jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ users: [{ wallet: bannedWallet.toLowerCase() }] })
+        } as any)
+      })
+
+      it('should detect the banned wallet and reject the referral', async () => {
+        mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        // Chain walk: referrer → intermediateB → intermediateA → bannedWallet
+        mockReferralDb.findReferralProgress
+          .mockResolvedValueOnce([
+            {
+              referrer: intermediateB.toLowerCase(),
+              invited_user: referrer.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
+          .mockResolvedValueOnce([
+            {
+              referrer: intermediateA.toLowerCase(),
+              invited_user: intermediateB.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
+          .mockResolvedValueOnce([
+            {
+              referrer: bannedWallet.toLowerCase(),
+              invited_user: intermediateA.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
+
+        await expect(
+          referralComponent.create({ referrer, invitedUser, invitedUserIP: '10.0.0.1' })
+        ).rejects.toThrow(
+          new ReferralInvalidInputError(
+            `Referrer is part of a banned referral chain ${referrer.toLowerCase()}, 10.0.0.1`
+          )
+        )
+
+        expect(mockReferralDb.createReferral).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when intermediate record is missing (Banned → A [not in DB] → B → referrer)', () => {
+      beforeEach(() => {
+        jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ users: [{ wallet: bannedWallet.toLowerCase() }] })
+        } as any)
+      })
+
+      it('should stop at the missing record and allow the referral', async () => {
+        mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        // Chain walk: referrer → intermediateB → (no record for intermediateA)
+        mockReferralDb.findReferralProgress
+          .mockResolvedValueOnce([
+            {
+              referrer: intermediateB.toLowerCase(),
+              invited_user: referrer.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
+          .mockResolvedValueOnce([
+            {
+              referrer: intermediateA.toLowerCase(),
+              invited_user: intermediateB.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
+          .mockResolvedValueOnce([]) // intermediateA has no record as invited user — chain breaks
+          .mockResolvedValueOnce([]) // findReferralProgress for recent invitations check
+
+        mockReferralDb.createReferral.mockResolvedValueOnce({
+          referrer: referrer.toLowerCase(),
+          invited_user: invitedUser.toLowerCase(),
+          status: ReferralProgressStatus.PENDING,
+          created_at: Date.now()
+        })
+
+        const result = await referralComponent.create({ referrer, invitedUser, invitedUserIP: '10.0.0.1' })
+
+        expect(result.status).toEqual(ReferralProgressStatus.PENDING)
+        expect(mockReferralDb.createReferral).toHaveBeenCalled()
+      })
+    })
+
+    describe('when a circular referral chain is detected', () => {
+      const circularA = '0x6666666666666666666666666666666666666666'
+      const circularB = '0x7777777777777777777777777777777777777777'
+
+      beforeEach(() => {
+        jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ users: [] })
+        } as any)
+      })
+
+      it('should break out of the loop and allow the referral', async () => {
+        mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        // Chain walk: circularA → circularB → circularA (loop!)
+        mockReferralDb.findReferralProgress
+          .mockResolvedValueOnce([
+            {
+              referrer: circularB.toLowerCase(),
+              invited_user: circularA.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
+          .mockResolvedValueOnce([
+            {
+              referrer: circularA.toLowerCase(),
+              invited_user: circularB.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
+          .mockResolvedValueOnce([]) // findReferralProgress for recent invitations check
+
+        mockReferralDb.createReferral.mockResolvedValueOnce({
+          referrer: circularA.toLowerCase(),
+          invited_user: invitedUser.toLowerCase(),
+          status: ReferralProgressStatus.PENDING,
+          created_at: Date.now()
+        })
+
+        const result = await referralComponent.create({ referrer: circularA, invitedUser, invitedUserIP: '10.0.0.1' })
+
+        expect(result.status).toEqual(ReferralProgressStatus.PENDING)
+        expect(mockReferralDb.createReferral).toHaveBeenCalled()
+      })
+    })
+  })
 })
