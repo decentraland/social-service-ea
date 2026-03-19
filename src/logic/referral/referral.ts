@@ -14,7 +14,8 @@ import type { AppComponents } from '../../types/system'
 import {
   referral100InvitesReachedMessage,
   referralIpMatchRejectionMessage,
-  referralSuspiciousTimingMessage
+  referralSuspiciousTimingMessage,
+  referralBannedChainRejectionMessage
 } from '../../utils/slackMessages'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
@@ -148,7 +149,11 @@ export async function createReferralComponent(
     }
   }
 
-  async function assertReferrerNotBanned(referrer: string, ip: string | null | undefined): Promise<void> {
+  async function assertReferrerNotBanned(
+    referrer: string,
+    ip: string | null | undefined,
+    invitedUser?: string
+  ): Promise<void> {
     const denyList = await fetchDenyList()
     const context = ip !== null && ip !== undefined ? `${referrer}, ${ip}` : referrer
 
@@ -160,6 +165,28 @@ export async function createReferralComponent(
     if (referrerAsInvitedRecords.length > 0) {
       const originalReferrer = referrerAsInvitedRecords[0].referrer
       if (denyList.has(originalReferrer.toLowerCase())) {
+        const chainPath = `\`${originalReferrer}\` (banned) → \`${referrer}\` (blocked)`
+
+        try {
+          await slack.sendMessage(
+            referralBannedChainRejectionMessage(
+              referrer,
+              invitedUser || 'N/A',
+              originalReferrer,
+              chainPath,
+              isDev,
+              REFERRAL_METABASE_DASHBOARD
+            )
+          )
+        } catch (error) {
+          logger.warn('Failed to send banned chain rejection Slack notification', {
+            referrer,
+            invitedUser: invitedUser || 'N/A',
+            bannedWallet: originalReferrer,
+            error: error instanceof Error ? error.message : String(error)
+          })
+        }
+
         throw new ReferralInvalidInputError(`Referrer is part of a banned referral chain ${context}`)
       }
     }
@@ -186,7 +213,7 @@ export async function createReferralComponent(
         invitedUserIP
       })
 
-      await assertReferrerNotBanned(referrer, invitedUserIP)
+      await assertReferrerNotBanned(referrer, invitedUserIP, invitedUser)
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
 
@@ -273,7 +300,7 @@ export async function createReferralComponent(
         throw new ReferralNotFoundError(invitedUser)
       }
 
-      await assertReferrerNotBanned(progress[0].referrer, progress[0].invited_user_ip)
+      await assertReferrerNotBanned(progress[0].referrer, progress[0].invited_user_ip, invitedUser)
 
       const currentStatus = progress[0].status
       if (currentStatus !== ReferralProgressStatus.PENDING) {
@@ -302,7 +329,7 @@ export async function createReferralComponent(
         return
       }
 
-      await assertReferrerNotBanned(progress[0].referrer, progress[0].invited_user_ip)
+      await assertReferrerNotBanned(progress[0].referrer, progress[0].invited_user_ip, invitedUser)
 
       if (
         progress[0].status === ReferralProgressStatus.TIER_GRANTED ||

@@ -12,7 +12,8 @@ import { RewardStatus } from '../../../src/logic/referral/types'
 import {
   referralIpMatchRejectionMessage,
   referral100InvitesReachedMessage,
-  referralSuspiciousTimingMessage
+  referralSuspiciousTimingMessage,
+  referralBannedChainRejectionMessage
 } from '../../../src/utils/slackMessages'
 import { IPublisherComponent } from '@dcl/sns-component'
 import { createSNSMockedComponent } from '../../mocks/components'
@@ -1554,7 +1555,7 @@ describe('referral-component', () => {
     })
 
     describe('when creating a referral', () => {
-      it('should throw ReferralInvalidInputError', async () => {
+      it('should throw ReferralInvalidInputError and send Slack alert', async () => {
         mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
           {
@@ -1578,11 +1579,49 @@ describe('referral-component', () => {
           limit: 1
         })
         expect(mockReferralDb.createReferral).not.toHaveBeenCalled()
+        expect(mockSlack.sendMessage).toHaveBeenCalledWith(
+          referralBannedChainRejectionMessage(
+            referrerPreviouslyInvited.toLowerCase(),
+            invitedUser.toLowerCase(),
+            bannedOriginalReferrer.toLowerCase(),
+            `\`${bannedOriginalReferrer.toLowerCase()}\` (banned) → \`${referrerPreviouslyInvited.toLowerCase()}\` (blocked)`,
+            true,
+            'https://dashboard.decentraland.systems/1234'
+          )
+        )
+      })
+
+      it('should still throw error when Slack notification fails', async () => {
+        mockSlack.sendMessage.mockRejectedValueOnce(new Error('Slack service unavailable'))
+        mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: bannedOriginalReferrer.toLowerCase(),
+            invited_user: referrerPreviouslyInvited.toLowerCase(),
+            status: ReferralProgressStatus.PENDING,
+            created_at: Date.now()
+          }
+        ])
+
+        await expect(
+          referralComponent.create({ referrer: referrerPreviouslyInvited, invitedUser, invitedUserIP: '192.168.1.1' })
+        ).rejects.toThrow(
+          new ReferralInvalidInputError(
+            `Referrer is part of a banned referral chain ${referrerPreviouslyInvited.toLowerCase()}, 192.168.1.1`
+          )
+        )
+
+        expect(mockLogger.warn).toHaveBeenCalledWith('Failed to send banned chain rejection Slack notification', {
+          referrer: referrerPreviouslyInvited.toLowerCase(),
+          invitedUser: invitedUser.toLowerCase(),
+          bannedWallet: bannedOriginalReferrer.toLowerCase(),
+          error: 'Slack service unavailable'
+        })
       })
     })
 
     describe('when updating referral progress', () => {
-      it('should throw ReferralInvalidInputError', async () => {
+      it('should throw ReferralInvalidInputError and send Slack alert', async () => {
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
           {
             referrer: referrerPreviouslyInvited.toLowerCase(),
@@ -1613,11 +1652,21 @@ describe('referral-component', () => {
           limit: 1
         })
         expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
+        expect(mockSlack.sendMessage).toHaveBeenCalledWith(
+          referralBannedChainRejectionMessage(
+            referrerPreviouslyInvited.toLowerCase(),
+            invitedUser.toLowerCase(),
+            bannedOriginalReferrer.toLowerCase(),
+            `\`${bannedOriginalReferrer.toLowerCase()}\` (banned) → \`${referrerPreviouslyInvited.toLowerCase()}\` (blocked)`,
+            true,
+            'https://dashboard.decentraland.systems/1234'
+          )
+        )
       })
     })
 
     describe('when finalizing referral', () => {
-      it('should throw ReferralInvalidInputError', async () => {
+      it('should throw ReferralInvalidInputError and send Slack alert', async () => {
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
           {
             referrer: referrerPreviouslyInvited.toLowerCase(),
@@ -1647,6 +1696,16 @@ describe('referral-component', () => {
         })
         expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
         expect(mockSns.publishMessage).not.toHaveBeenCalled()
+        expect(mockSlack.sendMessage).toHaveBeenCalledWith(
+          referralBannedChainRejectionMessage(
+            referrerPreviouslyInvited.toLowerCase(),
+            invitedUser.toLowerCase(),
+            bannedOriginalReferrer.toLowerCase(),
+            `\`${bannedOriginalReferrer.toLowerCase()}\` (banned) → \`${referrerPreviouslyInvited.toLowerCase()}\` (blocked)`,
+            true,
+            'https://dashboard.decentraland.systems/1234'
+          )
+        )
       })
     })
   })
