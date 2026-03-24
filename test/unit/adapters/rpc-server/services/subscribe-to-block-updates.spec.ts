@@ -1,7 +1,7 @@
 import { subscribeToBlockUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-block-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { ICacheComponent, IRedisComponent, RpcServerContext } from '../../../../../src/types'
-import { createMockUpdateHandlerComponent, mockConfig } from '../../../../mocks/components'
+import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { createRedisMock } from '../../../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
@@ -24,7 +24,7 @@ describe('when subscribing to block updates', () => {
   beforeEach(() => {
     redis = createRedisMock({})
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ redis, logs, config: mockConfig })
+    subscribersContext = createSubscribersContext({ redis, logs })
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     subscribeToBlockUpdates = subscribeToBlockUpdatesService({

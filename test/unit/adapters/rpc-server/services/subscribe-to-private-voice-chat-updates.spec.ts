@@ -8,7 +8,7 @@ import {
   RpcServerContext,
   SubscriptionEventsEmitter
 } from '../../../../../src/types'
-import { createLogsMockedComponent, createMockUpdateHandlerComponent, mockConfig } from '../../../../mocks/components'
+import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { createRedisMock } from '../../../../mocks/components/redis'
 import {
@@ -41,7 +41,7 @@ describe('when subscribing to private voice chat updates', () => {
 
     rpcContext = {
       address: callerAddress,
-      subscribersContext: createSubscribersContext({ redis, logs, config: mockConfig })
+      subscribersContext: createSubscribersContext({ redis, logs })
     }
   })
 
