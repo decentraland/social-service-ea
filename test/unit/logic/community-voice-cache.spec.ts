@@ -24,7 +24,8 @@ describe('Community Voice Chat Cache Component', () => {
 
     const mockRedisClient = {
       keys: mockRedisKeys,
-      del: mockRedisDel
+      del: mockRedisDel,
+      scanIterator: jest.fn()
     }
 
     mockComponents = {
@@ -220,7 +221,11 @@ describe('Community Voice Chat Cache Component', () => {
         const inactiveChat = { communityId: 'inactive-1', isActive: false, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
         const activeChat2 = { communityId: 'active-2', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
         const keys = ['community-voice-chat:active-1', 'community-voice-chat:inactive-1', 'community-voice-chat:active-2']
-        mockRedisKeys.mockResolvedValue(keys)
+        ;(mockComponents.redis.client as any).scanIterator.mockReturnValue(
+          (async function* () {
+            for (const key of keys) yield key
+          })()
+        )
         mockRedisGet
           .mockResolvedValueOnce(activeChat1)
           .mockResolvedValueOnce(inactiveChat)
@@ -237,7 +242,11 @@ describe('Community Voice Chat Cache Component', () => {
 
     describe('when there are no active voice chats', () => {
       beforeEach(() => {
-        mockRedisKeys.mockResolvedValue(['community-voice-chat:inactive-1'])
+        ;(mockComponents.redis.client as any).scanIterator.mockReturnValue(
+          (async function* () {
+            yield 'community-voice-chat:inactive-1'
+          })()
+        )
         mockRedisGet.mockResolvedValue({
           communityId: 'inactive-1',
           isActive: false,
@@ -255,7 +264,9 @@ describe('Community Voice Chat Cache Component', () => {
 
     describe('when Redis throws an error', () => {
       beforeEach(() => {
-        mockRedisKeys.mockRejectedValue(new Error('Redis error'))
+        ;(mockComponents.redis.client as any).scanIterator.mockImplementation(() => {
+          throw new Error('Redis error')
+        })
       })
 
       it('should handle Redis errors gracefully', async () => {

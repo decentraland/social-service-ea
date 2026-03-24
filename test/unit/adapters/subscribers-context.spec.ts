@@ -3,15 +3,20 @@ import mitt from 'mitt'
 import { ICacheComponent, IRedisComponent, SubscriptionEventsEmitter } from '../../../src/types'
 import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
-import { ILoggerComponent } from '@well-known-components/interfaces'
+import { createMockConfigComponent } from '../../mocks/components/config'
+import { ILoggerComponent, IConfigComponent } from '@well-known-components/interfaces'
 
 describe('SubscribersContext Component', () => {
   let mockRedis: jest.Mocked<IRedisComponent & ICacheComponent>
   let mockLogs: jest.Mocked<ILoggerComponent>
+  let mockConfig: jest.Mocked<IConfigComponent>
 
   beforeEach(() => {
     mockRedis = createRedisMock({})
     mockLogs = createLogsMockedComponent()
+    mockConfig = createMockConfigComponent({
+      getNumber: jest.fn().mockResolvedValue(undefined)
+    })
   })
 
   afterEach(() => {
@@ -20,7 +25,7 @@ describe('SubscribersContext Component', () => {
 
   function createTestContext() {
     return {
-      context: createSubscribersContext({ redis: mockRedis, logs: mockLogs }),
+      context: createSubscribersContext({ redis: mockRedis, logs: mockLogs, config: mockConfig }),
       subscriber: mitt<SubscriptionEventsEmitter>(),
       address: '0x123'
     }
@@ -36,13 +41,13 @@ describe('SubscribersContext Component', () => {
 
   describe('when managing subscribers', () => {
     describe('and adding a subscriber', () => {
-      it('should add a new subscriber locally and to Redis', async () => {
+      it('should add a new subscriber locally and to Redis with TTL', async () => {
         const { context, subscriber, address } = createTestContext()
 
         await context.addSubscriber(address, subscriber)
 
         expect(context.getSubscribers()[address]).toBe(subscriber)
-        expect(mockRedis.sAdd).toHaveBeenCalledWith('online_subscribers', address)
+        expect(mockRedis.put).toHaveBeenCalledWith(`subscriber:${address}`, '1', { EX: 300 })
       })
 
       it('should preserve existing subscriber when adding duplicate', async () => {
@@ -54,7 +59,7 @@ describe('SubscribersContext Component', () => {
 
         expect(context.getSubscribers()[address]).toBe(subscriber)
         // Should still attempt to add to Redis (idempotent)
-        expect(mockRedis.sAdd).toHaveBeenCalledTimes(2)
+        expect(mockRedis.put).toHaveBeenCalledTimes(2)
       })
     })
 
@@ -68,7 +73,7 @@ describe('SubscribersContext Component', () => {
 
         expect(context.getSubscribers()[address]).toBeUndefined()
         expect(clearSpy).toHaveBeenCalled()
-        expect(mockRedis.sRem).toHaveBeenCalledWith('online_subscribers', address)
+        expect(mockRedis.client.del).toHaveBeenCalledWith(`subscriber:${address}`)
       })
 
       it('should handle removing non-existent subscriber gracefully', async () => {
@@ -77,27 +82,40 @@ describe('SubscribersContext Component', () => {
         await context.removeSubscriber(address)
 
         expect(context.getSubscribers()[address]).toBeUndefined()
-        expect(mockRedis.sRem).toHaveBeenCalledWith('online_subscribers', address)
+        expect(mockRedis.client.del).toHaveBeenCalledWith(`subscriber:${address}`)
       })
     })
   })
 
   describe('when querying subscribers', () => {
     describe('and getting global subscriber addresses', () => {
-      it('should return addresses from Redis', async () => {
+      it('should return addresses from Redis using SCAN', async () => {
         const { context } = createTestContext()
-        const expectedAddresses = ['0x123', '0x456', '0x789']
-        mockRedis.sMembers.mockResolvedValueOnce(expectedAddresses)
+        const scanKeys = ['subscriber:0x123', 'subscriber:0x456', 'subscriber:0x789']
+
+        // Mock scanIterator as an async generator
+        ;(mockRedis.client.scanIterator as jest.Mock).mockReturnValue(
+          (async function* () {
+            for (const key of scanKeys) {
+              yield key
+            }
+          })()
+        )
 
         const addresses = await context.getSubscribersAddresses()
 
-        expect(addresses).toEqual(expectedAddresses)
-        expect(mockRedis.sMembers).toHaveBeenCalledWith('online_subscribers')
+        expect(addresses).toEqual(['0x123', '0x456', '0x789'])
+        expect(mockRedis.client.scanIterator).toHaveBeenCalledWith({
+          MATCH: 'subscriber:*',
+          COUNT: 200
+        })
       })
 
       it('should fallback to local subscribers when Redis fails', async () => {
         const { context, subscriber, address } = createTestContext()
-        mockRedis.sMembers.mockRejectedValueOnce(new Error('Redis error'))
+        ;(mockRedis.client.scanIterator as jest.Mock).mockImplementation(() => {
+          throw new Error('Redis error')
+        })
 
         await context.addSubscriber(address, subscriber)
         const addresses = await context.getSubscribersAddresses()
@@ -137,14 +155,14 @@ describe('SubscribersContext Component', () => {
         expect(newSubscriber.all).toBeDefined()
       })
 
-      it('should add new subscriber to Redis for global tracking', async () => {
+      it('should add new subscriber key to Redis with TTL', async () => {
         const { context, address } = createTestContext()
 
         context.getOrAddSubscriber(address)
 
         // Wait for the async Redis call
         await new Promise((resolve) => setTimeout(resolve, 10))
-        expect(mockRedis.sAdd).toHaveBeenCalledWith('online_subscribers', address)
+        expect(mockRedis.put).toHaveBeenCalledWith(`subscriber:${address}`, '1', { EX: 300 })
       })
     })
   })
@@ -207,9 +225,11 @@ describe('SubscribersContext Component', () => {
   })
 
   describe('when stopping the component', () => {
-    it('should remove all local subscribers from Redis', async () => {
+    it('should remove all local subscriber keys from Redis', async () => {
       const { context } = createTestContext()
       const addresses = ['0x123', '0x456']
+
+      await context.start?.({} as any)
 
       for (const address of addresses) {
         await context.addSubscriber(address, mitt())
@@ -217,7 +237,7 @@ describe('SubscribersContext Component', () => {
 
       await context.stop?.()
 
-      expect(mockRedis.sRem).toHaveBeenCalledWith('online_subscribers', addresses)
+      expect(mockRedis.client.del).toHaveBeenCalledWith(addresses.map((a) => `subscriber:${a}`))
       expect(context.getSubscribers()).toEqual({})
     })
 
@@ -225,6 +245,8 @@ describe('SubscribersContext Component', () => {
       const { context } = createTestContext()
       const addresses = ['0x123', '0x456']
       const generators: { destroy: jest.Mock }[] = []
+
+      await context.start?.({} as any)
 
       for (const address of addresses) {
         await context.addSubscriber(address, mitt())
@@ -238,6 +260,17 @@ describe('SubscribersContext Component', () => {
       for (const gen of generators) {
         expect(gen.destroy).toHaveBeenCalledTimes(1)
       }
+    })
+
+    it('should clear heartbeat interval on stop', async () => {
+      const { context } = createTestContext()
+      const clearIntervalSpy = jest.spyOn(global, 'clearInterval')
+
+      await context.start?.({} as any)
+      await context.stop?.()
+
+      expect(clearIntervalSpy).toHaveBeenCalled()
+      clearIntervalSpy.mockRestore()
     })
   })
 })

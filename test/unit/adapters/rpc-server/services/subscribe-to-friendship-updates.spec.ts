@@ -1,7 +1,7 @@
 import { subscribeToFriendshipUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-friendship-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { Action, ICacheComponent, IRedisComponent, RpcServerContext } from '../../../../../src/types'
-import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
+import { createMockUpdateHandlerComponent, mockConfig } from '../../../../mocks/components'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
@@ -29,7 +29,7 @@ describe('when subscribing to friendship updates', () => {
   beforeEach(() => {
     redis = createRedisMock({})
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ redis, logs })
+    subscribersContext = createSubscribersContext({ redis, logs, config: mockConfig })
     mockUpdateHandler = createMockUpdateHandlerComponent({})
     mockFriendProfile = createMockProfile('0x456')
 

@@ -3,10 +3,17 @@ import { ISubscribersContext, Subscribers, SubscriptionEventsEmitter } from '../
 import { normalizeAddress } from '../../utils/address'
 import { AppComponents } from '../../types/system'
 
-const SUBSCRIBERS_SET_KEY = 'online_subscribers'
+const SUBSCRIBER_KEY_PREFIX = 'subscriber:'
 
-export function createSubscribersContext(components: Pick<AppComponents, 'redis' | 'logs'>): ISubscribersContext {
-  const { redis, logs } = components
+// Default TTL for subscriber keys in seconds (5 minutes)
+const DEFAULT_SUBSCRIBER_TTL_SECONDS = 300
+// Default heartbeat interval in milliseconds (2 minutes)
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 120_000
+
+export function createSubscribersContext(
+  components: Pick<AppComponents, 'redis' | 'logs' | 'config'>
+): ISubscribersContext {
+  const { redis, logs, config } = components
   const logger = logs.getLogger('subscribers-context')
 
   // Local in-memory emitters for WebSocket connections on this instance
@@ -15,6 +22,14 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
   // Track active emitterToAsyncGenerator instances per subscriber so we can
   // synchronously terminate them when the subscriber disconnects.
   const subscriberGenerators = new Map<string, Set<{ destroy(): void }>>()
+
+  let subscriberTtlSeconds = DEFAULT_SUBSCRIBER_TTL_SECONDS
+  let heartbeatIntervalMs = DEFAULT_HEARTBEAT_INTERVAL_MS
+  let heartbeatInterval: NodeJS.Timeout | null = null
+
+  function getSubscriberKey(address: string): string {
+    return `${SUBSCRIBER_KEY_PREFIX}${address}`
+  }
 
   function addLocalSubscriber(address: string, subscriber: Emitter<SubscriptionEventsEmitter>): void {
     const normalizedAddress = normalizeAddress(address)
@@ -45,20 +60,68 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
     }
   }
 
+  /**
+   * Refreshes the TTL for all local subscribers in Redis.
+   * This ensures that subscriber keys auto-expire if the instance crashes
+   * without running stop().
+   */
+  async function refreshSubscriberTTLs(): Promise<void> {
+    const localAddresses = Object.keys(localSubscribers)
+    if (localAddresses.length === 0) return
+
+    let refreshed = 0
+    for (const address of localAddresses) {
+      try {
+        await redis.put(getSubscriberKey(address), '1', { EX: subscriberTtlSeconds })
+        refreshed++
+      } catch (error: any) {
+        logger.error('Failed to refresh subscriber TTL', {
+          address,
+          error: error?.message || error
+        })
+      }
+    }
+    logger.debug(`Refreshed TTL for ${refreshed}/${localAddresses.length} subscribers`)
+  }
+
   return {
     async start() {
-      logger.info('Subscribers context started')
+      subscriberTtlSeconds =
+        (await config.getNumber('SUBSCRIBER_TTL_SECONDS')) || DEFAULT_SUBSCRIBER_TTL_SECONDS
+      heartbeatIntervalMs =
+        (await config.getNumber('SUBSCRIBER_HEARTBEAT_INTERVAL_MS')) || DEFAULT_HEARTBEAT_INTERVAL_MS
+
+      // Start periodic heartbeat to refresh subscriber TTLs
+      heartbeatInterval = setInterval(() => {
+        refreshSubscriberTTLs().catch((error: any) => {
+          logger.error('Error during subscriber heartbeat', { error: error?.message || error })
+        })
+      }, heartbeatIntervalMs)
+
+      logger.info('Subscribers context started', {
+        subscriberTtlSeconds,
+        heartbeatIntervalMs
+      })
     },
 
     async stop() {
-      // Clean up all local subscribers from Redis on shutdown
+      // Stop heartbeat
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval)
+        heartbeatInterval = null
+      }
+
+      // Clean up all local subscriber keys from Redis on shutdown
       const localAddresses = Object.keys(localSubscribers).map(normalizeAddress)
       if (localAddresses.length > 0) {
         try {
-          await redis.sRem(SUBSCRIBERS_SET_KEY, localAddresses)
-          logger.info(`Removed ${localAddresses.length} subscribers from Redis on shutdown`)
+          const keys = localAddresses.map(getSubscriberKey)
+          await redis.client.del(keys)
+          logger.info(`Removed ${localAddresses.length} subscriber keys from Redis on shutdown`)
         } catch (error: any) {
-          logger.error('Failed to remove subscribers from Redis on shutdown', { error: error?.message || error })
+          logger.error('Failed to remove subscriber keys from Redis on shutdown', {
+            error: error?.message || error
+          })
         }
       }
 
@@ -83,8 +146,16 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
 
     async getSubscribersAddresses(): Promise<string[]> {
       try {
-        const addresses = await redis.sMembers(SUBSCRIBERS_SET_KEY)
-        return addresses.map(normalizeAddress)
+        // Use SCAN instead of sMembers on a single SET to avoid loading all keys at once.
+        // Each subscriber is stored as a separate key with TTL, so stale entries auto-expire.
+        const addresses: string[] = []
+        for await (const key of redis.client.scanIterator({
+          MATCH: `${SUBSCRIBER_KEY_PREFIX}*`,
+          COUNT: 200
+        })) {
+          addresses.push(normalizeAddress(key.slice(SUBSCRIBER_KEY_PREFIX.length)))
+        }
+        return addresses
       } catch (error: any) {
         logger.error('Failed to get subscribers from Redis, falling back to local', {
           error: error?.message || error
@@ -100,12 +171,14 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
       if (!localSubscribers[normalizedAddress]) {
         addLocalSubscriber(normalizedAddress, mitt<SubscriptionEventsEmitter>())
         // Also add to Redis for global tracking (fire-and-forget)
-        redis.sAdd(SUBSCRIBERS_SET_KEY, normalizedAddress).catch((error: any) => {
-          logger.error('Failed to add subscriber to Redis via getOrAddSubscriber', {
-            address: normalizedAddress,
-            error: error?.message || error
+        redis
+          .put(getSubscriberKey(normalizedAddress), '1', { EX: subscriberTtlSeconds })
+          .catch((error: any) => {
+            logger.error('Failed to add subscriber key to Redis via getOrAddSubscriber', {
+              address: normalizedAddress,
+              error: error?.message || error
+            })
           })
-        })
       }
 
       return localSubscribers[normalizedAddress]
@@ -119,11 +192,11 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
         localSubscribers[normalizedAddress] = subscriber
       }
 
-      // Add to Redis set for global tracking
+      // Add subscriber key to Redis with TTL
       try {
-        await redis.sAdd(SUBSCRIBERS_SET_KEY, normalizedAddress)
+        await redis.put(getSubscriberKey(normalizedAddress), '1', { EX: subscriberTtlSeconds })
       } catch (error: any) {
-        logger.error('Failed to add subscriber to Redis', {
+        logger.error('Failed to add subscriber key to Redis', {
           address: normalizedAddress,
           error: error?.message || error
         })
@@ -136,11 +209,11 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
       // Remove from local emitters
       removeLocalSubscriber(normalizedAddress)
 
-      // Remove from Redis set
+      // Remove subscriber key from Redis
       try {
-        await redis.sRem(SUBSCRIBERS_SET_KEY, normalizedAddress)
+        await redis.client.del(getSubscriberKey(normalizedAddress))
       } catch (error: any) {
-        logger.error('Failed to remove subscriber from Redis', {
+        logger.error('Failed to remove subscriber key from Redis', {
           address: normalizedAddress,
           error: error?.message || error
         })

@@ -108,7 +108,12 @@ export function createCommunityVoiceChatCacheComponent({
 
   async function getActiveCommunityVoiceChats(): Promise<CachedCommunityVoiceChat[]> {
     try {
-      const keys = await redis.client.keys(`${CACHE_PREFIX}*`)
+      // Use SCAN instead of KEYS to avoid blocking Redis and loading all keys at once
+      const keys: string[] = []
+      for await (const key of redis.client.scanIterator({ MATCH: `${CACHE_PREFIX}*`, COUNT: 100 })) {
+        keys.push(key)
+      }
+
       if (keys.length === 0) {
         return []
       }

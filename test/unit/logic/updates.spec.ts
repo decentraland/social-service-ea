@@ -18,6 +18,8 @@ import { createMockProfile, mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
 import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
+import { createMockConfigComponent } from '../../mocks/components/config'
+import { setupSubscriberRedisMock } from '../../mocks/components/subscriber-redis-mock'
 import { VoiceChatStatus } from '../../../src/logic/voice/types'
 import { ICommunityMembersComponent } from '../../../src/logic/community/types'
 import { createMockCommunityMembersComponent } from '../../mocks/communities'
@@ -37,20 +39,14 @@ describe('Updates Handlers', () => {
     logger = mockLogs.getLogger('test')
     mockRedis = createRedisMock({})
 
-    // Set up Redis mock with state tracking
-    const addressesSet = new Set<string>()
-    mockRedis.sAdd.mockImplementation(async (_key: string, address: string) => {
-      addressesSet.add(address)
-      return 1
-    })
-    mockRedis.sRem.mockImplementation(async (_key: string, addresses: string | string[]) => {
-      const toRemove = Array.isArray(addresses) ? addresses : [addresses]
-      toRemove.forEach((addr) => addressesSet.delete(addr))
-      return toRemove.length
-    })
-    mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
+    // Set up Redis mock with state tracking for TTL-based subscriber keys
+    setupSubscriberRedisMock(mockRedis)
 
-    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs })
+    const mockConfigComponent = createMockConfigComponent({
+      getNumber: jest.fn().mockResolvedValue(undefined)
+    })
+
+    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, config: mockConfigComponent })
     await subscribersContext.addSubscriber('0x456', mitt<SubscriptionEventsEmitter>())
     await subscribersContext.addSubscriber('0x789', mitt<SubscriptionEventsEmitter>())
 
@@ -1179,20 +1175,14 @@ describe('Updates Handlers', () => {
 
       mockRegistry.getProfile.mockResolvedValue(mockProfile)
 
-      // Set up Redis mock with state tracking (reuse the outer scope mockRedis/mockLogs)
-      const addressesSet = new Set<string>()
-      mockRedis.sAdd.mockImplementation(async (_key: string, address: string) => {
-        addressesSet.add(address)
-        return 1
-      })
-      mockRedis.sRem.mockImplementation(async (_key: string, addresses: string | string[]) => {
-        const toRemove = Array.isArray(addresses) ? addresses : [addresses]
-        toRemove.forEach((addr) => addressesSet.delete(addr))
-        return toRemove.length
-      })
-      mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
+      // Set up Redis mock with state tracking for TTL-based subscriber keys
+      setupSubscriberRedisMock(mockRedis)
 
-      subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs })
+      const mockConfigComponent = createMockConfigComponent({
+        getNumber: jest.fn().mockResolvedValue(undefined)
+      })
+
+      subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, config: mockConfigComponent })
       await subscribersContext.addSubscriber('0x123', eventEmitter)
 
       rpcContext = {

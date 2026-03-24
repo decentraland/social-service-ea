@@ -35,7 +35,7 @@ export function initSentry() {
   }
 
   const tracesSampleRate = Number(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.001
-  const profileSessionSampleRate = Number(process.env.SENTRY_PROFILE_SESSION_SAMPLE_RATE) || 0.1
+  const profileSessionSampleRate = Number(process.env.SENTRY_PROFILE_SESSION_SAMPLE_RATE) || 0.01
 
   const profileLifecycleEnv = process.env.SENTRY_PROFILE_LIFECYCLE
   const profileLifecycle: 'manual' | 'trace' =

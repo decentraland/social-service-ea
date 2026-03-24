@@ -11,6 +11,7 @@ import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import { mockConfig, mockFriendsDB, mockMetrics, mockPubSub, mockUWs } from '../../mocks/components'
 import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
+import { setupSubscriberRedisMock } from '../../mocks/components/subscriber-redis-mock'
 import {
   BLOCK_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
@@ -49,20 +50,10 @@ describe('createRpcServerComponent', () => {
     mockRedis = createRedisMock({})
     mockLogs = createLogsMockedComponent()
 
-    // Set up Redis mock with state tracking
-    const addressesSet = new Set<string>()
-    mockRedis.sAdd.mockImplementation(async (_key: string, address: string) => {
-      addressesSet.add(address)
-      return 1
-    })
-    mockRedis.sRem.mockImplementation(async (_key: string, addresses: string | string[]) => {
-      const toRemove = Array.isArray(addresses) ? addresses : [addresses]
-      toRemove.forEach((addr) => addressesSet.delete(addr))
-      return toRemove.length
-    })
-    mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
+    // Set up Redis mock with state tracking for TTL-based subscriber keys
+    setupSubscriberRedisMock(mockRedis)
 
-    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs })
+    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, config: mockConfig })
 
     rpcServerMock = createRpcServer({
       logger: mockLogs.getLogger('rpcServer-test')

@@ -42,4 +42,4 @@ RUN echo "" > /app/.env
 #            and: https://www.ctl.io/developers/blog/post/gracefully-stopping-docker-containers/
 ENTRYPOINT ["tini", "--"]
 # Run the program under Tini
-CMD [ "/usr/local/bin/node", "--inspect=0.0.0.0:9229", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
+CMD [ "/usr/local/bin/node", "--max-old-space-size=384", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]

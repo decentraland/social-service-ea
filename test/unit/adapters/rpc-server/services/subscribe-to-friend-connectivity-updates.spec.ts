@@ -4,7 +4,8 @@ import {
   mockFriendsDB,
   createMockPeersStatsComponent,
   createMockUpdateHandlerComponent,
-  mockRegistry
+  mockRegistry,
+  mockConfig
 } from '../../../../mocks/components'
 import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-friend-connectivity-updates'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
@@ -33,7 +34,7 @@ describe('when subscribing to friend connectivity updates', () => {
   beforeEach(() => {
     redis = createRedisMock({})
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ redis, logs })
+    subscribersContext = createSubscribersContext({ redis, logs, config: mockConfig })
     mockUpdateHandler = createMockUpdateHandlerComponent({})
     mockPeersStats = createMockPeersStatsComponent()
     mockFriendProfile = createMockProfile('0x456')
