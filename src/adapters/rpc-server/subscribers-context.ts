@@ -86,8 +86,7 @@ export function createSubscribersContext(
 
   return {
     async start() {
-      subscriberTtlSeconds =
-        (await config.getNumber('SUBSCRIBER_TTL_SECONDS')) || DEFAULT_SUBSCRIBER_TTL_SECONDS
+      subscriberTtlSeconds = (await config.getNumber('SUBSCRIBER_TTL_SECONDS')) || DEFAULT_SUBSCRIBER_TTL_SECONDS
       heartbeatIntervalMs =
         (await config.getNumber('SUBSCRIBER_HEARTBEAT_INTERVAL_MS')) || DEFAULT_HEARTBEAT_INTERVAL_MS
 
@@ -171,14 +170,12 @@ export function createSubscribersContext(
       if (!localSubscribers[normalizedAddress]) {
         addLocalSubscriber(normalizedAddress, mitt<SubscriptionEventsEmitter>())
         // Also add to Redis for global tracking (fire-and-forget)
-        redis
-          .put(getSubscriberKey(normalizedAddress), '1', { EX: subscriberTtlSeconds })
-          .catch((error: any) => {
-            logger.error('Failed to add subscriber key to Redis via getOrAddSubscriber', {
-              address: normalizedAddress,
-              error: error?.message || error
-            })
+        redis.put(getSubscriberKey(normalizedAddress), '1', { EX: subscriberTtlSeconds }).catch((error: any) => {
+          logger.error('Failed to add subscriber key to Redis via getOrAddSubscriber', {
+            address: normalizedAddress,
+            error: error?.message || error
           })
+        })
       }
 
       return localSubscribers[normalizedAddress]
