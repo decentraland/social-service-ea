@@ -6,6 +6,7 @@ describe('Community Voice Chat Cache Component', () => {
   let mockComponents: Pick<AppComponents, 'logs' | 'redis'>
   let mockRedisGet: jest.MockedFunction<any>
   let mockRedisPut: jest.MockedFunction<any>
+  let mockRedisMGet: jest.MockedFunction<any>
   let mockRedisScanIterator: jest.MockedFunction<any>
   let mockRedisDel: jest.MockedFunction<any>
 
@@ -19,6 +20,7 @@ describe('Community Voice Chat Cache Component', () => {
     
     mockRedisGet = jest.fn()
     mockRedisPut = jest.fn()
+    mockRedisMGet = jest.fn()
     mockRedisScanIterator = jest.fn()
     mockRedisDel = jest.fn()
 
@@ -39,6 +41,7 @@ describe('Community Voice Chat Cache Component', () => {
       redis: {
         put: mockRedisPut,
         get: mockRedisGet,
+        mGet: mockRedisMGet,
         client: mockRedisClient
       }
     } as any
@@ -214,21 +217,18 @@ describe('Community Voice Chat Cache Component', () => {
 
   describe('when retrieving active community voice chats', () => {
     describe('when there are active and inactive chats', () => {
-      
+      const activeChat1 = { communityId: 'active-1', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
+      const inactiveChat = { communityId: 'inactive-1', isActive: false, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
+      const activeChat2 = { communityId: 'active-2', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
+
       beforeEach(() => {
-        const activeChat1 = { communityId: 'active-1', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
-        const inactiveChat = { communityId: 'inactive-1', isActive: false, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
-        const activeChat2 = { communityId: 'active-2', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
         const keys = ['community-voice-chat:active-1', 'community-voice-chat:inactive-1', 'community-voice-chat:active-2']
         mockRedisScanIterator.mockReturnValue(
           (async function* () {
             for (const key of keys) yield key
           })()
         )
-        mockRedisGet
-          .mockResolvedValueOnce(activeChat1)
-          .mockResolvedValueOnce(inactiveChat)
-          .mockResolvedValueOnce(activeChat2)
+        mockRedisMGet.mockResolvedValue([activeChat1, inactiveChat, activeChat2])
       })
 
       it('should return only active voice chats', async () => {
@@ -236,6 +236,16 @@ describe('Community Voice Chat Cache Component', () => {
 
         expect(active).toHaveLength(2)
         expect(active.map((c) => c.communityId)).toEqual(expect.arrayContaining(['active-1', 'active-2']))
+      })
+
+      it('should call mGet with all scanned keys', async () => {
+        await cache.getActiveCommunityVoiceChats()
+
+        expect(mockRedisMGet).toHaveBeenCalledWith([
+          'community-voice-chat:active-1',
+          'community-voice-chat:inactive-1',
+          'community-voice-chat:active-2'
+        ])
       })
     })
 
@@ -246,12 +256,12 @@ describe('Community Voice Chat Cache Component', () => {
             yield 'community-voice-chat:inactive-1'
           })()
         )
-        mockRedisGet.mockResolvedValue({
+        mockRedisMGet.mockResolvedValue([{
           communityId: 'inactive-1',
           isActive: false,
           lastChecked: FIXED_LAST_CHECKED,
           createdAt: FIXED_CREATED_AT
-        })
+        }])
       })
 
       it('should return empty array when no active voice chats exist', async () => {
