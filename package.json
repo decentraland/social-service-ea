@@ -6,7 +6,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node --max-old-space-size=384 --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
+    "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
     "dev": "nodemon --watch 'src/**' --ext 'ts,json' --ignore 'src/**/*.spec.ts' --ignore 'src/migrations' --exec 'ts-node src/index.ts'",
     "pretest": "yarn test:integration:before",
     "test": "jest --forceExit --detectOpenHandles --coverage --verbose -c jest.config.all.js",

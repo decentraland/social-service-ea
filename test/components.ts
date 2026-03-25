@@ -164,7 +164,7 @@ async function initComponents(): Promise<TestComponents> {
   const registry = await createRegistryComponent({ fetcher, config, redis, logs })
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
-  const subscribersContext = createSubscribersContext({ redis, logs })
+  const subscribersContext = createSubscribersContext({ redis, logs, config })
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })

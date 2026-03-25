@@ -6,7 +6,7 @@ describe('Community Voice Chat Cache Component', () => {
   let mockComponents: Pick<AppComponents, 'logs' | 'redis'>
   let mockRedisGet: jest.MockedFunction<any>
   let mockRedisPut: jest.MockedFunction<any>
-  let mockRedisKeys: jest.MockedFunction<any>
+  let mockRedisScanIterator: jest.MockedFunction<any>
   let mockRedisDel: jest.MockedFunction<any>
 
   // Fixed timestamps to avoid test flakiness
@@ -19,13 +19,12 @@ describe('Community Voice Chat Cache Component', () => {
     
     mockRedisGet = jest.fn()
     mockRedisPut = jest.fn()
-    mockRedisKeys = jest.fn()
+    mockRedisScanIterator = jest.fn()
     mockRedisDel = jest.fn()
 
     const mockRedisClient = {
-      keys: mockRedisKeys,
-      del: mockRedisDel,
-      scanIterator: jest.fn()
+      scanIterator: mockRedisScanIterator,
+      del: mockRedisDel
     }
 
     mockComponents = {
@@ -221,7 +220,7 @@ describe('Community Voice Chat Cache Component', () => {
         const inactiveChat = { communityId: 'inactive-1', isActive: false, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
         const activeChat2 = { communityId: 'active-2', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
         const keys = ['community-voice-chat:active-1', 'community-voice-chat:inactive-1', 'community-voice-chat:active-2']
-        ;(mockComponents.redis.client as any).scanIterator.mockReturnValue(
+        mockRedisScanIterator.mockReturnValue(
           (async function* () {
             for (const key of keys) yield key
           })()
@@ -242,7 +241,7 @@ describe('Community Voice Chat Cache Component', () => {
 
     describe('when there are no active voice chats', () => {
       beforeEach(() => {
-        ;(mockComponents.redis.client as any).scanIterator.mockReturnValue(
+        mockRedisScanIterator.mockReturnValue(
           (async function* () {
             yield 'community-voice-chat:inactive-1'
           })()
@@ -264,7 +263,7 @@ describe('Community Voice Chat Cache Component', () => {
 
     describe('when Redis throws an error', () => {
       beforeEach(() => {
-        ;(mockComponents.redis.client as any).scanIterator.mockImplementation(() => {
+        mockRedisScanIterator.mockImplementation(() => {
           throw new Error('Redis error')
         })
       })
