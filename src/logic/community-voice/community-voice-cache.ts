@@ -108,26 +108,18 @@ export function createCommunityVoiceChatCacheComponent({
 
   async function getActiveCommunityVoiceChats(): Promise<CachedCommunityVoiceChat[]> {
     try {
-      const keys = await redis.client.keys(`${CACHE_PREFIX}*`)
+      // Use SCAN instead of KEYS to avoid blocking Redis and loading all keys at once
+      const keys: string[] = []
+      for await (const key of redis.client.scanIterator({ MATCH: `${CACHE_PREFIX}*`, COUNT: 100 })) {
+        keys.push(key)
+      }
+
       if (keys.length === 0) {
         return []
       }
 
-      const chats = await Promise.all(
-        keys.map(async (key) => {
-          try {
-            const chat = await redis.get<CachedCommunityVoiceChat>(key)
-            return chat?.isActive ? chat : null
-          } catch (error) {
-            logger.warn(`Error getting cached chat for key ${key}`, {
-              error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-            })
-            return null
-          }
-        })
-      )
-
-      return chats.filter((chat): chat is CachedCommunityVoiceChat => chat !== null)
+      const chats = await redis.mGet<CachedCommunityVoiceChat>(keys)
+      return chats.filter((chat) => chat.isActive)
     } catch (error) {
       logger.error(`Error getting active community voice chats from cache`, {
         error: isErrorWithMessage(error) ? error.message : 'Unknown error'
