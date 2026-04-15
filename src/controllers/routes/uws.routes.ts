@@ -22,9 +22,6 @@ export async function setupUWSRoutes(components: AppComponents | TestComponents)
         const result = await h.f(res, req)
 
         status = result.status ?? 200
-        if (!res.aborted) {
-          res.writeStatus(`${status}`)
-        }
 
         const headers = new Headers(result.headers ?? {})
 
@@ -32,22 +29,29 @@ export async function setupUWSRoutes(components: AppComponents | TestComponents)
           headers.set('Access-Control-Allow-Origin', '*')
         }
 
-        headers.forEach((v, k) => !res.aborted && res.writeHeader(k, v))
-
         if (!res.aborted) {
-          if (result.body === undefined) {
-            res.end()
-          } else if (typeof result.body === 'string') {
-            res.end(result.body)
-          } else {
-            res.writeHeader('content-type', 'application/json')
-            res.end(JSON.stringify(result.body))
-          }
+          // All writes must happen inside cork() to avoid uWS warnings about
+          // writes outside corked callbacks, which can also hold object references
+          // longer than necessary under GC pressure.
+          res.cork(() => {
+            res.writeStatus(`${status}`)
+            headers.forEach((v, k) => res.writeHeader(k, v))
+            if (result.body === undefined) {
+              res.end()
+            } else if (typeof result.body === 'string') {
+              res.end(result.body)
+            } else {
+              res.writeHeader('content-type', 'application/json')
+              res.end(JSON.stringify(result.body))
+            }
+          })
         }
       } catch (err) {
         if (!res.aborted) {
-          res.writeStatus(`${status}`)
-          res.end()
+          res.cork(() => {
+            res.writeStatus(`${status}`)
+            res.end()
+          })
         }
       } finally {
         onRequestEnd(metrics, labels, status, end)
@@ -72,18 +76,22 @@ export async function setupUWSRoutes(components: AppComponents | TestComponents)
 
   uwsServer.app.any('/health/live', (res, req) => {
     const { end, labels } = onRequestStart(metrics, req.getMethod(), '/health/live')
-    res.writeStatus('200 OK')
-    res.writeHeader('Access-Control-Allow-Origin', '*')
-    res.end('alive')
+    res.cork(() => {
+      res.writeStatus('200 OK')
+      res.writeHeader('Access-Control-Allow-Origin', '*')
+      res.end('alive')
+    })
     onRequestEnd(metrics, labels, 200, end)
   })
 
   uwsServer.app.any('/*', (res, req) => {
     const { end, labels } = onRequestStart(metrics, req.getMethod(), '')
-    res.writeStatus('404 Not Found')
-    res.writeHeader('Access-Control-Allow-Origin', '*')
-    res.writeHeader('content-type', 'application/json')
-    res.end(JSON.stringify({ error: 'Not Found' }))
+    res.cork(() => {
+      res.writeStatus('404 Not Found')
+      res.writeHeader('Access-Control-Allow-Origin', '*')
+      res.writeHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ error: 'Not Found' }))
+    })
     onRequestEnd(metrics, labels, 404, end)
   })
 }

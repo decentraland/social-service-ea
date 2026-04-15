@@ -282,6 +282,7 @@ export interface IRedisComponent extends IBaseComponent {
   sAdd: (key: string, member: string) => Promise<number>
   sRem: (key: string, members: string | string[]) => Promise<number>
   sMembers: (key: string) => Promise<string[]>
+  sCard: (key: string) => Promise<number>
 }
 
 export interface ICacheComponent extends IBaseCacheComponent {

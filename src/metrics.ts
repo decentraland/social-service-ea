@@ -99,6 +99,22 @@ export const metricDeclarations = {
     type: IMetricsComponent.GaugeType,
     help: 'Ratio of message queue size to uWebSocket buffered amount'
   },
+  subscribers_local_count: {
+    type: IMetricsComponent.GaugeType,
+    help: 'Number of local in-memory subscriber emitters'
+  },
+  subscribers_generators_count: {
+    type: IMetricsComponent.GaugeType,
+    help: 'Number of active async generators across all subscribers'
+  },
+  subscribers_redis_set_size: {
+    type: IMetricsComponent.GaugeType,
+    help: 'Number of subscribers in the Redis online_subscribers set'
+  },
+  subscribers_stale_cleaned: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of stale subscribers removed by reconciliation'
+  },
   ai_compliance_validation_duration_seconds: {
     type: IMetricsComponent.HistogramType,
     help: 'Duration of AI compliance validation in seconds',

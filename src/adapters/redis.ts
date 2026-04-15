@@ -104,6 +104,15 @@ export async function createRedisComponent(
     }
   }
 
+  async function sCard(key: string): Promise<number> {
+    try {
+      return await client.sCard(key)
+    } catch (err: any) {
+      logger.error(`Error getting cardinality of set "${key}"`, err)
+      throw err
+    }
+  }
+
   return {
     client,
     start,
@@ -113,6 +122,7 @@ export async function createRedisComponent(
     put,
     sAdd,
     sRem,
-    sMembers
+    sMembers,
+    sCard
   }
 }

@@ -184,7 +184,8 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   const storage = await createS3Adapter({ config })
-  const subscribersContext = createSubscribersContext({ redis, logs })
+  const wsPool = createWsPoolComponent({ logs, metrics })
+  const subscribersContext = createSubscribersContext({ redis, logs, metrics, config }, wsPool)
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
 
@@ -318,8 +319,6 @@ export async function initComponents(): Promise<AppComponents> {
   const peerTracking = withSuppressedTracing(
     await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   )
-  const wsPool = createWsPoolComponent({ logs, metrics })
-
   const expirePrivateVoiceChatJob = createJobComponent(
     { logs },
     // wrap function itself since it is executed in different context (setImmediate)

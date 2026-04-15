@@ -11,6 +11,7 @@ import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import { mockConfig, mockFriendsDB, mockMetrics, mockPubSub, mockUWs } from '../../mocks/components'
 import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
+import { createWsPoolMockedComponent } from '../../mocks/components/ws-pool'
 import {
   BLOCK_UPDATES_CHANNEL,
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
@@ -62,7 +63,7 @@ describe('createRpcServerComponent', () => {
     })
     mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
 
-    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs })
+    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
 
     rpcServerMock = createRpcServer({
       logger: mockLogs.getLogger('rpcServer-test')

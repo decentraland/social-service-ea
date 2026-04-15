@@ -18,6 +18,9 @@ import { createMockProfile, mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
 import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
+import { mockMetrics } from '../../mocks/components/metrics'
+import { mockConfig } from '../../mocks/components/config'
+import { createWsPoolMockedComponent } from '../../mocks/components/ws-pool'
 import { VoiceChatStatus } from '../../../src/logic/voice/types'
 import { ICommunityMembersComponent } from '../../../src/logic/community/types'
 import { createMockCommunityMembersComponent } from '../../mocks/communities'
@@ -49,8 +52,16 @@ describe('Updates Handlers', () => {
       return toRemove.length
     })
     mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
+    ;(mockRedis.client as any).sScanIterator = jest.fn().mockImplementation(() => {
+      const addresses = Array.from(addressesSet)
+      return (async function* () {
+        for (const addr of addresses) {
+          yield addr
+        }
+      })()
+    })
 
-    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs })
+    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     await subscribersContext.addSubscriber('0x456', mitt<SubscriptionEventsEmitter>())
     await subscribersContext.addSubscriber('0x789', mitt<SubscriptionEventsEmitter>())
 
@@ -1191,8 +1202,16 @@ describe('Updates Handlers', () => {
         return toRemove.length
       })
       mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
+      ;(mockRedis.client as any).sScanIterator = jest.fn().mockImplementation(() => {
+        const addresses = Array.from(addressesSet)
+        return (async function* () {
+          for (const addr of addresses) {
+            yield addr
+          }
+        })()
+      })
 
-      subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs })
+      subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
       await subscribersContext.addSubscriber('0x123', eventEmitter)
 
       rpcContext = {

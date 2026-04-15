@@ -3,6 +3,9 @@ import mitt from 'mitt'
 import { ICacheComponent, IRedisComponent, SubscriptionEventsEmitter } from '../../../src/types'
 import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
+import { mockMetrics } from '../../mocks/components/metrics'
+import { mockConfig } from '../../mocks/components/config'
+import { createWsPoolMockedComponent } from '../../mocks/components/ws-pool'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('SubscribersContext Component', () => {
@@ -20,7 +23,7 @@ describe('SubscribersContext Component', () => {
 
   function createTestContext() {
     return {
-      context: createSubscribersContext({ redis: mockRedis, logs: mockLogs }),
+      context: createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent()),
       subscriber: mitt<SubscriptionEventsEmitter>(),
       address: '0x123'
     }
@@ -84,20 +87,32 @@ describe('SubscribersContext Component', () => {
 
   describe('when querying subscribers', () => {
     describe('and getting global subscriber addresses', () => {
-      it('should return addresses from Redis', async () => {
+      it('should return addresses from Redis using sScanIterator', async () => {
         const { context } = createTestContext()
         const expectedAddresses = ['0x123', '0x456', '0x789']
-        mockRedis.sMembers.mockResolvedValueOnce(expectedAddresses)
+
+        // Mock sScanIterator to return an async iterable
+        ;(mockRedis.client as any).sScanIterator = jest.fn().mockReturnValue(
+          (async function* () {
+            for (const addr of expectedAddresses) {
+              yield addr
+            }
+          })()
+        )
 
         const addresses = await context.getSubscribersAddresses()
 
         expect(addresses).toEqual(expectedAddresses)
-        expect(mockRedis.sMembers).toHaveBeenCalledWith('online_subscribers')
+        expect((mockRedis.client as any).sScanIterator).toHaveBeenCalledWith('online_subscribers', { COUNT: 100 })
       })
 
       it('should fallback to local subscribers when Redis fails', async () => {
         const { context, subscriber, address } = createTestContext()
-        mockRedis.sMembers.mockRejectedValueOnce(new Error('Redis error'))
+
+        // Mock sScanIterator to throw
+        ;(mockRedis.client as any).sScanIterator = jest.fn().mockImplementation(() => {
+          throw new Error('Redis error')
+        })
 
         await context.addSubscriber(address, subscriber)
         const addresses = await context.getSubscribersAddresses()

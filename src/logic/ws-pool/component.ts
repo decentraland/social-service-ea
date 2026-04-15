@@ -1,6 +1,8 @@
 import { WebSocket } from 'uWebSockets.js'
 import { STOP_COMPONENT } from '@well-known-components/interfaces'
 import { AppComponents, WsUserData } from '../../types'
+import { isAuthenticated } from '../../utils/wsUserData'
+import { normalizeAddress } from '../../utils/address'
 import { IWsPoolComponent } from './types'
 
 export function createWsPoolComponent(components: Pick<AppComponents, 'metrics' | 'logs'>): IWsPoolComponent {
@@ -50,9 +52,29 @@ export function createWsPoolComponent(components: Pick<AppComponents, 'metrics' 
     }
   }
 
+  /**
+   * Returns the normalized addresses of all currently authenticated WebSocket connections.
+   * Used by the reconciliation sweep to identify stale local subscribers.
+   */
+  function getAuthenticatedAddresses(): string[] {
+    const addresses: string[] = []
+    for (const ws of connections.values()) {
+      try {
+        const data = ws.getUserData()
+        if (isAuthenticated(data)) {
+          addresses.push(normalizeAddress(data.address))
+        }
+      } catch {
+        // getUserData() can throw if the socket was closed — skip it
+      }
+    }
+    return addresses
+  }
+
   return {
     registerConnection,
     unregisterConnection,
+    getAuthenticatedAddresses,
     [STOP_COMPONENT]: stop
   }
 }
