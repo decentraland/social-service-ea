@@ -31,10 +31,6 @@ ENV COMMIT_HASH=${COMMIT_HASH:-local}
 ARG CURRENT_VERSION=Unknown
 ENV CURRENT_VERSION=${CURRENT_VERSION:-Unknown}
 
-# Set V8 heap limit to 75% of container memory (prod=1024MB, so 768MB).
-# Override at deploy time via environment variable for non-prod (e.g. 384 for 512MB containers).
-ENV NODE_OPTIONS="--max-old-space-size=768"
-
 WORKDIR /app
 COPY --from=builderenv /app /app
 
@@ -46,4 +42,5 @@ RUN echo "" > /app/.env
 #            and: https://www.ctl.io/developers/blog/post/gracefully-stopping-docker-containers/
 ENTRYPOINT ["tini", "--"]
 # Run the program under Tini
-CMD [ "/usr/local/bin/node", "--inspect=0.0.0.0:9229", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
+# V8 heap limit set to 75% of prod container memory (1024MB → 768MB).
+CMD [ "/usr/local/bin/node", "--max-old-space-size=768", "--inspect=0.0.0.0:9229", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
