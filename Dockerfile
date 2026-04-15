@@ -31,6 +31,10 @@ ENV COMMIT_HASH=${COMMIT_HASH:-local}
 ARG CURRENT_VERSION=Unknown
 ENV CURRENT_VERSION=${CURRENT_VERSION:-Unknown}
 
+# Set V8 heap limit to 75% of container memory (prod=1024MB, so 768MB).
+# Override at deploy time via environment variable for non-prod (e.g. 384 for 512MB containers).
+ENV NODE_OPTIONS="--max-old-space-size=768"
+
 WORKDIR /app
 COPY --from=builderenv /app /app
 

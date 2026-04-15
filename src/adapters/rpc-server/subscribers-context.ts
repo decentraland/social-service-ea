@@ -16,6 +16,10 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
   // synchronously terminate them when the subscriber disconnects.
   const subscriberGenerators = new Map<string, Set<{ destroy(): void }>>()
 
+  // Track active subscriptions per address to prevent duplicate stream subscriptions.
+  // Key: address, Value: set of event names with an active subscription.
+  const activeSubscriptions = new Map<string, Set<string>>()
+
   function addLocalSubscriber(address: string, subscriber: Emitter<SubscriptionEventsEmitter>): void {
     const normalizedAddress = normalizeAddress(address)
     if (!localSubscribers[normalizedAddress]) {
@@ -40,6 +44,7 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
       // Destroy generators first so pending next() calls resolve before
       // we clear the emitter handlers (prevents the deadlock).
       destroyGeneratorsForAddress(normalizedAddress)
+      activeSubscriptions.delete(normalizedAddress)
       localSubscribers[normalizedAddress].all.clear()
       delete localSubscribers[normalizedAddress]
     }
@@ -164,6 +169,32 @@ export function createSubscribersContext(components: Pick<AppComponents, 'redis'
         generators.delete(generator)
         if (generators.size === 0) {
           subscriberGenerators.delete(normalizedAddress)
+        }
+      }
+    },
+
+    hasActiveSubscription(address: string, eventName: string): boolean {
+      const normalizedAddress = normalizeAddress(address)
+      return activeSubscriptions.get(normalizedAddress)?.has(eventName) ?? false
+    },
+
+    setActiveSubscription(address: string, eventName: string): void {
+      const normalizedAddress = normalizeAddress(address)
+      let events = activeSubscriptions.get(normalizedAddress)
+      if (!events) {
+        events = new Set()
+        activeSubscriptions.set(normalizedAddress, events)
+      }
+      events.add(eventName)
+    },
+
+    clearActiveSubscription(address: string, eventName: string): void {
+      const normalizedAddress = normalizeAddress(address)
+      const events = activeSubscriptions.get(normalizedAddress)
+      if (events) {
+        events.delete(eventName)
+        if (events.size === 0) {
+          activeSubscriptions.delete(normalizedAddress)
         }
       }
     }
