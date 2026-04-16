@@ -15,6 +15,9 @@ import {
 import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { createRedisMock } from '../../../../mocks/components/redis'
+import { mockMetrics } from '../../../../mocks/components/metrics'
+import { mockConfig } from '../../../../mocks/components/config'
+import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
 
 describe('when subscribing to community voice chat updates', () => {
   let logs: jest.Mocked<ILoggerComponent>
@@ -40,7 +43,7 @@ describe('when subscribing to community voice chat updates', () => {
 
     rpcContext = {
       address: userAddress,
-      subscribersContext: createSubscribersContext({ redis, logs })
+      subscribersContext: createSubscribersContext({ redis, logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     }
   })
 

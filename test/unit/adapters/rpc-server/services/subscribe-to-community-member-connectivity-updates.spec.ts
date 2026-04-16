@@ -5,6 +5,9 @@ import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { createRedisMock } from '../../../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
+import { mockMetrics } from '../../../../mocks/components/metrics'
+import { mockConfig } from '../../../../mocks/components/config'
+import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { CommunityMemberConnectivityUpdate } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { ILoggerComponent } from '@well-known-components/interfaces'
@@ -28,7 +31,7 @@ describe('when subscribing to community member connectivity updates', () => {
   beforeEach(() => {
     redis = createRedisMock({})
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ redis, logs })
+    subscribersContext = createSubscribersContext({ redis, logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     subscribeToCommunityMemberConnectivityUpdates = subscribeToCommunityMemberConnectivityUpdatesService({

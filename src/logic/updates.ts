@@ -343,8 +343,21 @@ export function createUpdateHandlerComponent(
     parseArgs = []
   }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
     const normalizedAddress = normalizeAddress(rpcContext.address)
-    const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
     const eventNameString = String(eventName)
+
+    // Guard against duplicate subscriptions for the same (address, event) pair.
+    // Clients can call the same stream RPC multiple times on a single connection,
+    // each creating an additional generator + value queue that doubles memory usage.
+    if (rpcContext.subscribersContext.hasActiveSubscription(normalizedAddress, eventNameString)) {
+      logger.warn('Duplicate subscription detected, ignoring', {
+        address: normalizedAddress,
+        event: eventNameString
+      })
+      return
+    }
+    rpcContext.subscribersContext.setActiveSubscription(normalizedAddress, eventNameString)
+
+    const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
 
     const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
     rpcContext.subscribersContext.registerGenerator(normalizedAddress, updatesGenerator)
@@ -382,6 +395,7 @@ export function createUpdateHandlerComponent(
     } finally {
       await updatesGenerator.return(undefined)
       rpcContext.subscribersContext.unregisterGenerator(normalizedAddress, updatesGenerator)
+      rpcContext.subscribersContext.clearActiveSubscription(normalizedAddress, eventNameString)
     }
   }
 

@@ -42,4 +42,5 @@ RUN echo "" > /app/.env
 #            and: https://www.ctl.io/developers/blog/post/gracefully-stopping-docker-containers/
 ENTRYPOINT ["tini", "--"]
 # Run the program under Tini
-CMD [ "/usr/local/bin/node", "--inspect=0.0.0.0:9229", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
+# V8 heap limit set to 75% of prod container memory (1024MB → 768MB).
+CMD [ "/usr/local/bin/node", "--max-old-space-size=768", "--inspect=0.0.0.0:9229", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]

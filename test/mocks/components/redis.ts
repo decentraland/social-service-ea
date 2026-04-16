@@ -23,7 +23,8 @@ jest.mock('redis', () => {
     sAdd: jest.fn(),
     sRem: jest.fn(),
     sMembers: jest.fn(),
-    sCard: jest.fn()
+    sCard: jest.fn(),
+    sScanIterator: jest.fn().mockReturnValue((async function* () {})())
   }
 
   return {
@@ -41,7 +42,8 @@ export const mockRedis: jest.Mocked<IRedisComponent & ICacheComponent> = {
   put: jest.fn(),
   sAdd: jest.fn(),
   sRem: jest.fn(),
-  sMembers: jest.fn()
+  sMembers: jest.fn(),
+  sCard: jest.fn().mockResolvedValue(0)
 }
 
 export const createRedisMock = ({
@@ -74,7 +76,8 @@ export const createRedisMock = ({
     sAdd: jest.fn(),
     sRem: jest.fn(),
     sMembers: jest.fn(),
-    sCard: jest.fn()
+    sCard: jest.fn(),
+    sScanIterator: jest.fn().mockReturnValue((async function* () {})())
   }
 
   return {
@@ -96,6 +99,7 @@ export const createRedisMock = ({
       }),
     sAdd: sAdd || jest.fn().mockResolvedValue(1),
     sRem: sRem || jest.fn().mockResolvedValue(1),
-    sMembers: sMembers || jest.fn().mockResolvedValue([])
+    sMembers: sMembers || jest.fn().mockResolvedValue([]),
+    sCard: jest.fn().mockResolvedValue(0)
   }
 }

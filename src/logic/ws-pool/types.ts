@@ -5,4 +5,5 @@ import { WsUserData } from '../../types'
 export interface IWsPoolComponent extends IBaseComponent {
   registerConnection: (ws: WebSocket<WsUserData>) => void
   unregisterConnection: (data: WsUserData) => void
+  getAuthenticatedAddresses: () => string[]
 }

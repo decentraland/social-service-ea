@@ -34,25 +34,54 @@ export async function registerWsHandler(
     Object.assign(data, { ...data, ...newData })
   }
 
+  function safeCloseTransport(data: WsAuthenticatedUserData, wsConnectionId: string) {
+    try {
+      data.transport.close()
+    } catch (error: any) {
+      logger.error('Error closing transport during cleanup', {
+        error: error.message,
+        address: data.address,
+        wsConnectionId
+      })
+      tracing.captureException(error as Error, { address: data.address, wsConnectionId })
+    }
+  }
+
+  function safeDetachUser(address: string, wsConnectionId: string) {
+    try {
+      rpcServer.detachUser(address)
+    } catch (error: any) {
+      logger.error('Error detaching user during cleanup', {
+        error: error.message,
+        address,
+        wsConnectionId
+      })
+      tracing.captureException(error as Error, { address, wsConnectionId })
+    }
+  }
+
+  function safeClearEmitter(data: WsAuthenticatedUserData, wsConnectionId: string) {
+    try {
+      data.eventEmitter.all.clear()
+    } catch (error: any) {
+      logger.error('Error clearing event emitter during cleanup', {
+        error: error.message,
+        address: data.address,
+        wsConnectionId
+      })
+    }
+  }
+
   function cleanupConnection(data: WsUserData, code: number) {
     const { wsConnectionId } = data
 
     if (isAuthenticated(data)) {
-      try {
-        data.transport.close()
-        rpcServer.detachUser(data.address)
-        data.eventEmitter.all.clear()
-      } catch (error: any) {
-        tracing.captureException(error as Error, {
-          address: getAddress(data),
-          wsConnectionId
-        })
-        logger.error('Error during connection cleanup', {
-          error: error.message,
-          address: getAddress(data),
-          wsConnectionId
-        })
-      }
+      // Each step is independent — a failure in one must not prevent the others.
+      // Previously these were in a single try/catch, so a throw in transport.close()
+      // would skip detachUser() and emitter.clear(), permanently leaking the subscriber.
+      safeCloseTransport(data, wsConnectionId)
+      safeDetachUser(data.address, wsConnectionId)
+      safeClearEmitter(data, wsConnectionId)
     }
 
     if (isNotAuthenticated(data) && data.timeout) {
