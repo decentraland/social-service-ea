@@ -1,5 +1,5 @@
 
-FROM node:20-alpine AS builderenv
+FROM node:24-alpine AS builderenv
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN yarn install --prod --frozen-lockfile
 
 ########################## END OF BUILD STAGE ##########################
 
-FROM node:20-alpine
+FROM node:24-alpine
 
 RUN apk update && \
     apk add --no-cache wget tini libstdc++ gcompat && \

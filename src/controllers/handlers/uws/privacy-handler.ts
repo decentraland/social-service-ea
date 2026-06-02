@@ -1,5 +1,5 @@
 import { EthAddress } from '@dcl/schemas'
-import { HttpRequest, HttpResponse } from '@well-known-components/uws-http-server'
+import { HttpRequest, HttpResponse } from '@dcl/uws-http-server'
 import { AppComponents, PrivateMessagesPrivacy } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
 

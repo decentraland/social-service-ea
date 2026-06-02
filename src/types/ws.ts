@@ -1,5 +1,5 @@
 import { Emitter } from 'mitt'
-import { WebSocket } from '@well-known-components/uws-http-server'
+import { WebSocket } from '@dcl/uws-http-server'
 import { IUWebSocketEventMap } from '../utils/UWebSocketTransport'
 import { Transport } from '@dcl/rpc'
 

@@ -2,7 +2,7 @@
   "name": "social-service-ea",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=20.12.1"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -61,6 +61,7 @@
     "@dcl/slack-component": "^1.0.1",
     "@dcl/sns-component": "^2.1.0",
     "@dcl/sqs-component": "^2.0.3",
+    "@dcl/uws-http-server": "^1.0.0",
     "@sentry/node": "^10.37.0",
     "@sentry/profiling-node": "^10.37.0",
     "@well-known-components/env-config-provider": "^1.2.0",
@@ -72,7 +73,6 @@
     "@well-known-components/multipart-wrapper": "^1.0.3",
     "@well-known-components/nats-component": "^2.0.0",
     "@well-known-components/pg-component": "^0.2.2",
-    "@well-known-components/uws-http-server": "^0.0.2",
     "dcl-catalyst-client": "^21.10.3",
     "decentraland-crypto-fetch": "^2.0.1",
     "dotenv": "^16.4.7",

@@ -1,7 +1,7 @@
 import mitt from 'mitt'
 import { randomUUID } from 'crypto'
 import { WebSocket } from 'uWebSockets.js'
-import { onRequestEnd, onRequestStart } from '@well-known-components/uws-http-server'
+import { onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
 import { verify } from '@dcl/platform-crypto-middleware'
 import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'

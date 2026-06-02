@@ -9,7 +9,7 @@ import {
 import { createConfigComponent, createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createLogComponent } from '@well-known-components/logger'
-import { createUWsComponent } from '@well-known-components/uws-http-server'
+import { createUWsComponent } from '@dcl/uws-http-server'
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createAnalyticsComponent } from '@dcl/analytics-component'
 import { createPgComponent } from '../src/adapters/pg'
