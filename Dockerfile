@@ -1,10 +1,10 @@
 
-FROM node:24-alpine AS builderenv
+FROM node:24-trixie-slim AS builderenv
 
 WORKDIR /app
 
 # some packages require a build step
-RUN apk update && apk add --no-cache wget
+RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/*
 
 # build the app
 COPY . /app
@@ -16,11 +16,11 @@ RUN yarn install --prod --frozen-lockfile
 
 ########################## END OF BUILD STAGE ##########################
 
-FROM node:24-alpine
+FROM node:24-trixie-slim
 
-RUN apk update && \
-    apk add --no-cache wget tini libstdc++ gcompat && \
-    rm -rf /var/cache/apk/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget tini && \
+    rm -rf /var/lib/apt/lists/*
 
 # NODE_ENV is used to configure some runtime options, like JSON logger
 ENV NODE_ENV=production
