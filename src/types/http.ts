@@ -1,5 +1,5 @@
 import type { IHttpServerComponent } from '@well-known-components/interfaces'
-import { HttpRequest, HttpResponse } from '@well-known-components/uws-http-server'
+import { HttpRequest, HttpResponse } from '@dcl/uws-http-server'
 import { AppComponents } from './system'
 import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
 import { FormDataContext } from '@well-known-components/multipart-wrapper'

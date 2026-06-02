@@ -1,10 +1,4 @@
-import {
-  HttpRequest,
-  HttpResponse,
-  createMetricsHandler,
-  onRequestEnd,
-  onRequestStart
-} from '@well-known-components/uws-http-server'
+import { HttpRequest, HttpResponse, createMetricsHandler, onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
 import { AppComponents, IHandler, TestComponents } from '../../types'
 import { createStatusHandler, registerWsHandler, createPrivacyHandler } from '../handlers/uws'
 

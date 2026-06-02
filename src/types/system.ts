@@ -6,7 +6,7 @@ import type {
   IHttpServerComponent
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from '../metrics'
-import { IUWsComponent } from '@well-known-components/uws-http-server'
+import { IUWsComponent } from '@dcl/uws-http-server'
 import { INatsComponent } from '@well-known-components/nats-component/dist/types'
 import { IFeaturesComponent } from '@well-known-components/features-component'
 import { IAnalyticsComponent } from '@dcl/analytics-component'

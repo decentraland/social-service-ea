@@ -1,10 +1,14 @@
 
-FROM node:20-alpine AS builderenv
+# Base image is Debian Trixie (glibc 2.41), NOT alpine or node:24-slim (bookworm,
+# glibc 2.36). @dcl/uws-http-server bundles uWebSockets.js, whose prebuilt binaries
+# are glibc-only and require GLIBC >= 2.38: they fail to load on bookworm and
+# segfault on alpine (musl), even with gcompat.
+FROM node:24-trixie-slim AS builderenv
 
 WORKDIR /app
 
 # some packages require a build step
-RUN apk update && apk add --no-cache wget
+RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/*
 
 # build the app
 COPY . /app
@@ -16,11 +20,12 @@ RUN yarn install --prod --frozen-lockfile
 
 ########################## END OF BUILD STAGE ##########################
 
-FROM node:20-alpine
+# Debian Trixie (glibc 2.41) — required by uWebSockets.js, see note on the builder stage above.
+FROM node:24-trixie-slim
 
-RUN apk update && \
-    apk add --no-cache wget tini libstdc++ gcompat && \
-    rm -rf /var/cache/apk/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget tini && \
+    rm -rf /var/lib/apt/lists/*
 
 # NODE_ENV is used to configure some runtime options, like JSON logger
 ENV NODE_ENV=production

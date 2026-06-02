@@ -1220,6 +1220,14 @@
     ts-poet "^6.4.1"
     ts-proto-descriptors "^1.15.0"
 
+"@dcl/uws-http-server@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@dcl/uws-http-server/-/uws-http-server-1.0.0.tgz#fb0dd4a1eeed3f6a490024414afd39d688c2e136"
+  integrity sha512-J41t2CJzT9ndG9L0sJeY3MEM6iH8X5VxhpBrzWzsrgUW1lJf3MPcdz84Ex56ETcPoovKK4yGRhV+3rniks64Dw==
+  dependencies:
+    "@well-known-components/interfaces" "^1.5.2"
+    uWebSockets.js "github:uNetworking/uWebSockets.js#v20.68.0"
+
 "@emnapi/core@^1.4.3":
   version "1.7.1"
   resolved "https://registry.yarnpkg.com/@emnapi/core/-/core-1.7.1.tgz#3a79a02dbc84f45884a1806ebb98e5746bdfaac4"
@@ -3551,14 +3559,6 @@
     node-fetch "2.x"
     sinon "^18.0.0"
     ts-jest "^29.1.0"
-
-"@well-known-components/uws-http-server@^0.0.2":
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/@well-known-components/uws-http-server/-/uws-http-server-0.0.2.tgz#5ba577fd895bd63b67936b15f7803b2b7e9c1149"
-  integrity sha512-zwq7kpXnr+ml3py1bcuU3ILOGVO+6tg5e8+pf01G2wudWQlLMV3Cp66/U8tlrAFgIo5Ob7ZQmKdAnCQpHm9gFA==
-  dependencies:
-    "@well-known-components/interfaces" "^1.4.3"
-    uWebSockets.js "github:uNetworking/uWebSockets.js#v20.43.0"
 
 abort-controller@^3.0.0:
   version "3.0.0"
@@ -6910,9 +6910,9 @@ typescript@^5.4.5:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.9.3.tgz#5b4f59e15310ab17a216f5d6cf53ee476ede670f"
   integrity sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==
 
-"uWebSockets.js@github:uNetworking/uWebSockets.js#v20.43.0":
-  version "20.43.0"
-  resolved "https://codeload.github.com/uNetworking/uWebSockets.js/tar.gz/1977b5039938ad863d42fc4958d48c17e5a1fa06"
+"uWebSockets.js@github:uNetworking/uWebSockets.js#v20.68.0":
+  version "20.68.0"
+  resolved "https://codeload.github.com/uNetworking/uWebSockets.js/tar.gz/624987739d4da0acb628aaf2a10fc43e7ce27c5c"
 
 uglify-js@^3.1.4:
   version "3.19.3"
