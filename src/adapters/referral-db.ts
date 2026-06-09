@@ -85,7 +85,7 @@ export async function createReferralDBComponent(
   const updateReferralProgress = async (
     invited_user: string,
     status: ReferralProgressStatus.SIGNED_UP | ReferralProgressStatus.TIER_GRANTED
-  ): Promise<void> => {
+  ): Promise<number> => {
     logger.debug(`Updating referral_progress for invited_user ${invited_user} with ${status}`)
     const fields: SQLStatement[] = []
     const now = Date.now()
@@ -103,8 +103,14 @@ export async function createReferralDBComponent(
       query = query.append(f)
     })
     query = query.append(SQL` WHERE invited_user = ${invited_user.toLowerCase()}`)
+    // Guard the tier-granted transition so it can only happen once: concurrent
+    // finalize calls for the same user must not each grant the referrer a reward.
+    if (status === ReferralProgressStatus.TIER_GRANTED) {
+      query = query.append(SQL` AND tier_granted = false`)
+    }
 
-    await pg.query(query)
+    const result = await pg.query(query)
+    return result.rowCount
   }
 
   async function hasReferralProgress(invited_user: string): Promise<boolean> {

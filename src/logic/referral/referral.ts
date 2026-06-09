@@ -342,7 +342,17 @@ export async function createReferralComponent(
         newStatus: ReferralProgressStatus.TIER_GRANTED
       })
 
-      await referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+      const granted = await referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+
+      // If no row transitioned, another concurrent finalize already granted this
+      // referral. Stop here to avoid sending the referrer a duplicate reward.
+      if (!granted) {
+        logger.info('Referral already finalized by a concurrent request, skipping reward', {
+          invitedUser,
+          referrer
+        })
+        return
+      }
 
       const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
 

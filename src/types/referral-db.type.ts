@@ -8,7 +8,7 @@ export interface IReferralDatabaseComponent {
   updateReferralProgress(
     invitedUser: string,
     status: ReferralProgressStatus.SIGNED_UP | ReferralProgressStatus.TIER_GRANTED
-  ): Promise<void>
+  ): Promise<number>
   hasReferralProgress(invitedUser: string): Promise<boolean>
   listAllReferralProgress(filter?: Pick<ReferralProgressFilter, 'limit' | 'offset'>): Promise<ReferralProgress[]>
   countAcceptedInvitesByReferrer(referrer: string): Promise<number>
