@@ -661,7 +661,7 @@ describe('referral-component', () => {
             status: ReferralProgressStatus.PENDING
           }
         ])
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
       })
 
       it('should update progress to signed up', async () => {
@@ -792,7 +792,7 @@ describe('referral-component', () => {
             status: ReferralProgressStatus.SIGNED_UP
           }
         ])
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
         mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
       })
@@ -894,7 +894,7 @@ describe('referral-component', () => {
             status: ReferralProgressStatus.SIGNED_UP
           }
         ])
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
         mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
       })
@@ -926,7 +926,7 @@ describe('referral-component', () => {
             status: ReferralProgressStatus.SIGNED_UP
           }
         ])
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
         mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05'])
       })
@@ -968,7 +968,7 @@ describe('referral-component', () => {
               status: ReferralProgressStatus.SIGNED_UP
             }
           ])
-          mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+          mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
           mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
           mockRewards.sendReward.mockResolvedValueOnce([
@@ -1010,6 +1010,33 @@ describe('referral-component', () => {
       })
     })
 
+    describe('when a concurrent finalize already granted the tier', () => {
+      beforeEach(() => {
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+          {
+            referrer: validReferrer,
+            invited_user: validInvitedUser,
+            status: ReferralProgressStatus.SIGNED_UP
+          }
+        ])
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        // The guarded UPDATE affects no rows because another request already granted it.
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(0)
+      })
+
+      it('should not send a reward nor publish an event', async () => {
+        await referralComponent.finalizeReferral(validInvitedUser)
+
+        expect(mockReferralDb.updateReferralProgress).toHaveBeenCalledWith(
+          validInvitedUser.toLowerCase(),
+          ReferralProgressStatus.TIER_GRANTED
+        )
+        expect(mockReferralDb.countAcceptedInvitesByReferrer).not.toHaveBeenCalled()
+        expect(mockRewards.sendReward).not.toHaveBeenCalled()
+        expect(mockSns.publishMessage).not.toHaveBeenCalled()
+      })
+    })
+
     describe('when referral does not reach a tier milestone', () => {
       describe.each([
         { invitedUsers: 1, tier: 1 },
@@ -1030,7 +1057,7 @@ describe('referral-component', () => {
               status: ReferralProgressStatus.SIGNED_UP
             }
           ])
-          mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+          mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
           mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
         })
@@ -1067,7 +1094,7 @@ describe('referral-component', () => {
               status: ReferralProgressStatus.SIGNED_UP
             }
           ])
-          mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+          mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
           mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
         })
@@ -1112,7 +1139,7 @@ describe('referral-component', () => {
       })
 
       it('should not process the referral and not publish event', async () => {
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
 
         await referralComponent.finalizeReferral(validInvitedUser)
@@ -1139,7 +1166,7 @@ describe('referral-component', () => {
             status: ReferralProgressStatus.SIGNED_UP
           }
         ])
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
         mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
         mockSns.publishMessage.mockRejectedValueOnce(new Error('SNS publish failed'))
@@ -1165,7 +1192,7 @@ describe('referral-component', () => {
             status: ReferralProgressStatus.SIGNED_UP
           }
         ])
-        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
         mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
       })
@@ -1189,7 +1216,7 @@ describe('referral-component', () => {
               status: ReferralProgressStatus.SIGNED_UP
             }
           ])
-          mockReferralDb.updateReferralProgress.mockResolvedValueOnce(undefined)
+          mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
           mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
         })
