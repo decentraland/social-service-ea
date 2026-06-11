@@ -42,7 +42,7 @@ export interface ICommunitiesComponent {
   ): Promise<GetCommunitiesWithTotal<CommunitySearchResult>>
   getMemberCommunities(
     memberAddress: string,
-    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
   ): Promise<GetCommunitiesWithTotal<MemberCommunity>>
   getAllCommunitiesForModeration(
     options: GetCommunitiesOptions
@@ -385,6 +385,8 @@ export type GetCommunitiesOptions = {
   roles?: CommunityRole[]
   communityIds?: string[]
   includeUnlisted?: boolean
+  /** Restrict results to communities anyone can see: public privacy AND listed visibility. */
+  onlyPublicVisible?: boolean
 }
 
 export type GetCommunityMembersOptions = {

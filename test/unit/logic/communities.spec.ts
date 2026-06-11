@@ -862,6 +862,25 @@ describe('Community Component', () => {
       expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(memberAddress, options)
       expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(memberAddress, { onlyMemberOf: true })
     })
+
+    describe('and only publicly visible communities are requested', () => {
+      it('should forward the restriction to both the listing and the count queries', async () => {
+        const restrictedOptions = { ...options, onlyPublicVisible: true }
+
+        const result = await communityComponent.getMemberCommunities(memberAddress, restrictedOptions)
+
+        expect(result).toEqual({
+          communities: mockMemberCommunities,
+          total: 1
+        })
+
+        expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(memberAddress, restrictedOptions)
+        expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(memberAddress, {
+          onlyMemberOf: true,
+          onlyPublicVisible: true
+        })
+      })
+    })
   })
 
   describe('when creating a community', () => {

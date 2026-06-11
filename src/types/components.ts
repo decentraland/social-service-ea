@@ -160,7 +160,7 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>[]>
   getCommunitiesCount(
     memberAddress: EthAddress,
-    options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds'>
+    options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'onlyPublicVisible'>
   ): Promise<number>
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
@@ -188,7 +188,7 @@ export interface ICommunitiesDatabaseComponent {
   getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number>
   getMemberCommunities(
     memberAddress: EthAddress,
-    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
   ): Promise<MemberCommunity[]>
   getOnlineMembersFromUserCommunities(
     userAddress: EthAddress,

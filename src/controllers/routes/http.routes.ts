@@ -99,7 +99,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.post('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), banMemberHandler)
   router.delete('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), unbanMemberHandler)
 
-  router.get('/v1/members/:address/communities', signedFetchMiddleware(), getMemberCommunitiesHandler)
+  router.get('/v1/members/:address/communities', signedFetchMiddleware({ optional: true }), getMemberCommunitiesHandler)
 
   if (API_ADMIN_TOKEN) {
     router.post(

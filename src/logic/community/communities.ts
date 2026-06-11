@@ -327,11 +327,15 @@ export function createCommunityComponent(
 
     getMemberCommunities: async (
       memberAddress: string,
-      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
     ): Promise<GetCommunitiesWithTotal<MemberCommunity>> => {
       const [communities, total] = await Promise.all([
         communitiesDb.getMemberCommunities(memberAddress, options),
-        communitiesDb.getCommunitiesCount(memberAddress, { onlyMemberOf: true, roles: options.roles })
+        communitiesDb.getCommunitiesCount(memberAddress, {
+          onlyMemberOf: true,
+          roles: options.roles,
+          onlyPublicVisible: options.onlyPublicVisible
+        })
       ])
 
       return { communities, total }
