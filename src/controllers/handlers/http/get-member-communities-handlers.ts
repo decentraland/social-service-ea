@@ -17,7 +17,7 @@ export async function getMemberCommunitiesHandler(
     params: { address: memberAddress },
     verification
   } = context
-  const logger = logs.getLogger('get-member-communities-handler')
+  const logger = logs.getLogger('get-community-members-handler')
 
   logger.info(`Getting communities that ${memberAddress} is a member of`)
 
