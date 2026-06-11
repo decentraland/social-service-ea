@@ -385,9 +385,12 @@ export function createCommunitiesDBComponent(
 
     async getCommunitiesCount(
       memberAddress: EthAddress,
-      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'includeUnlisted'>
+      options?: Pick<
+        GetCommunitiesOptions,
+        'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'includeUnlisted' | 'onlyPublicVisible'
+      >
     ): Promise<number> {
-      const { search, onlyMemberOf, roles, communityIds, includeUnlisted } = options ?? {}
+      const { search, onlyMemberOf, roles, communityIds, includeUnlisted, onlyPublicVisible } = options ?? {}
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
@@ -406,6 +409,7 @@ export function createCommunitiesDBComponent(
           // Otherwise, exclude unlisted communities from public listings
           onlyMemberOf || includeUnlisted ? SQL`` : SQL` AND c.unlisted = false`
         )
+        .append(onlyPublicVisible ? SQL` AND c.private = false AND c.unlisted = false` : SQL``)
         .append(SQL` AND cb.banned_address IS NULL`)
 
       if (search) {
@@ -470,12 +474,12 @@ export function createCommunitiesDBComponent(
 
     async getMemberCommunities(
       memberAddress: EthAddress,
-      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
     ): Promise<MemberCommunity[]> {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const baseQuery = SQL`
-        SELECT 
+        SELECT
           c.id,
           c.name,
           c.owner_address as "ownerAddress",
@@ -485,6 +489,7 @@ export function createCommunitiesDBComponent(
       `
         .append(options.roles ? SQL` AND cm.role = ANY(${options.roles})` : SQL``)
         .append(SQL` WHERE c.active = true`)
+        .append(options.onlyPublicVisible ? SQL` AND c.private = false AND c.unlisted = false` : SQL``)
 
       const query = withSearchAndPagination(baseQuery, {
         sortBy: 'role',

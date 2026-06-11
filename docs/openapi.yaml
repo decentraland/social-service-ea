@@ -691,8 +691,14 @@ paths:
       operationId: getMemberCommunities
       summary: List communities for a member
       description: |
-        Lists all communities a member belongs to.
-        This endpoint requires Signed Fetch authentication.
+        Lists communities a member belongs to.
+        This endpoint has optional Signed Fetch authentication.
+
+        **Visibility Rules:**
+        - When the authenticated caller is the member themselves, all of their communities are returned.
+        - Any other caller (another user or an unauthenticated request) only gets the member's
+          publicly visible communities: public privacy AND listed visibility. Private and unlisted
+          memberships are never exposed to third parties.
       security:
         - SignedFetch: []
       parameters:
@@ -722,7 +728,7 @@ paths:
               schema:
                 $ref: './schemas.yaml#/components/schemas/GetMemberCommunities200OkResponse'
         '401':
-          description: Unauthorized - Signed Fetch required
+          description: Unauthorized - Invalid Signed Fetch request
           content:
             application/json:
               schema:
