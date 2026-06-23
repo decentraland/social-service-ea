@@ -112,7 +112,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
               memberAddress: userAddress,
               role: CommunityRole.Moderator
             })
-            stubComponents.placesApi.getDestinations.resolves(
+            stubComponents.placesApi.getDestinations.mockResolvedValue(
               mockPlaceIds.map((placeId) => ({
                 id: placeId,
                 title: placeId,
@@ -139,7 +139,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
           })
 
           it('should respond with a 401 status code when user does not own the places', async () => {
-            stubComponents.placesApi.getDestinations.resolves(
+            stubComponents.placesApi.getDestinations.mockResolvedValue(
               mockPlaceIds.map((placeId) => ({
                 id: placeId,
                 title: placeId,
@@ -177,7 +177,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
               memberAddress: userAddress,
               role: CommunityRole.Owner
             })
-            stubComponents.placesApi.getDestinations.resolves(
+            stubComponents.placesApi.getDestinations.mockResolvedValue(
               mockPlaceIds.map((placeId) => ({
                 id: placeId,
                 title: placeId,
@@ -190,7 +190,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
           })
 
           afterEach(() => {
-            stubComponents.placesApi.getDestinations.reset()
+            stubComponents.placesApi.getDestinations.mockReset()
           })
 
           it('should respond with a 204 status code when adding places', async () => {
@@ -240,7 +240,7 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
             memberAddress: userAddress,
             role: CommunityRole.Owner
           })
-          stubComponents.placesApi.getDestinations.resolves(undefined)
+          stubComponents.placesApi.getDestinations.mockResolvedValue(undefined)
         })
 
         it('should respond with a 401 status code when places API returns null', async () => {

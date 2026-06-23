@@ -1,4 +1,4 @@
-import type { IHttpServerComponent } from '@well-known-components/interfaces'
+import type { IHttpServerComponent } from '@dcl/core-commons'
 import { Emitter } from 'mitt'
 import {
   CommunityVoiceChatUpdate,

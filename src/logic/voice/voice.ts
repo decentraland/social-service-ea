@@ -190,7 +190,9 @@ export async function createVoiceComponent({
           status: VoiceChatStatus.ENDED
         })
         analytics.fireEvent(AnalyticsEvent.END_CALL, {
-          call_id: callId
+          call_id: callId,
+          user_id: privateVoiceChat.caller_address,
+          receiver_id: privateVoiceChat.callee_address
         })
         return
       }
@@ -205,15 +207,18 @@ export async function createVoiceComponent({
     }
 
     // Notify the other user that the call ended and send the event to the analytics
+    const otherUserInVoiceChat = usersInVoiceChat.find((user) => user !== address)
     await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
       callId,
       // Set the caller address to the other user in the voice chat
       // We don't know if it's the callee or the caller, but the event handler will resolve it
-      callerAddress: usersInVoiceChat.find((user) => user !== address),
+      callerAddress: otherUserInVoiceChat,
       status: VoiceChatStatus.ENDED
     })
     analytics.fireEvent(AnalyticsEvent.END_CALL, {
-      call_id: callId
+      call_id: callId,
+      user_id: address,
+      receiver_id: otherUserInVoiceChat ?? ''
     })
   }
 

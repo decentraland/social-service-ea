@@ -1,6 +1,7 @@
+import { IHttpServerComponent } from '@dcl/core-commons'
 import { Router } from '@dcl/http-server'
 import { GlobalContext } from '../../types'
-import { bearerTokenMiddleware, errorHandler } from '@dcl/platform-server-commons'
+import { bearerTokenMiddleware, errorHandler } from '@dcl/http-commons'
 import {
   getCommunityHandler,
   getCommunitiesHandler,
@@ -41,7 +42,7 @@ import {
   removeUserMuteHandler,
   getUserMutesHandler
 } from '../handlers/http'
-import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
+import { wellKnownComponents } from '@dcl/crypto-middleware'
 import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
 import {
@@ -114,8 +115,19 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.get('/v1/members/:address/invites', signedFetchMiddleware(), getCommunityInvitesHandler)
 
-  router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
-  router.put('/v1/communities/:id', signedFetchMiddleware(), multipartParserWrapper(updateCommunityHandler))
+  // @well-known-components/multipart-wrapper types its wrapped handler against node-fetch's
+  // IHttpServerComponent, while @dcl/http-server v2 routes the native fetch context. The wrapper only
+  // consumes the parsed form data and request metadata, so cast to the native handler type here.
+  router.post(
+    '/v1/communities',
+    signedFetchMiddleware(),
+    multipartParserWrapper(createCommunityHandler) as unknown as IHttpServerComponent.IRequestHandler<GlobalContext>
+  )
+  router.put(
+    '/v1/communities/:id',
+    signedFetchMiddleware(),
+    multipartParserWrapper(updateCommunityHandler) as unknown as IHttpServerComponent.IRequestHandler<GlobalContext>
+  )
   router.patch(
     '/v1/communities/:id',
     signedFetchMiddleware(),

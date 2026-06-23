@@ -1,5 +1,6 @@
 import { createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
+import type { IFetchComponent as IWkcFetchComponent } from '@well-known-components/interfaces'
 import { AppComponents, ICatalystClientComponent, ICatalystClientRequestOptions, OwnedName } from '../types'
 import { retry } from '../utils/retrier'
 import { shuffleArray } from '../utils/array'
@@ -18,7 +19,13 @@ export async function createCatalystClient({
   const contractNetwork = env === 'prd' ? L1_MAINNET : L1_TESTNET
 
   function getLambdasClientOrDefault(lambdasServerUrl?: string): LambdasClient {
-    return createLambdasClient({ fetcher, url: lambdasServerUrl ?? loadBalancer })
+    // dcl-catalyst-client types `fetcher` against node-fetch's IFetchComponent, while the app now uses
+    // the native-fetch IFetchComponent from @dcl/core-commons. They are runtime-compatible (the client
+    // only calls `fetch(url, init)`), so cast at this boundary.
+    return createLambdasClient({
+      fetcher: fetcher as unknown as IWkcFetchComponent,
+      url: lambdasServerUrl ?? loadBalancer
+    })
   }
 
   function rotateLambdasServerClient<T>(

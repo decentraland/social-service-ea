@@ -1,4 +1,4 @@
-import { IHttpServerComponent } from '@well-known-components/interfaces'
+import { IHttpServerComponent } from '@dcl/core-commons'
 import {
   CommunityNotFoundError,
   CommunityMemberNotFoundError,
@@ -10,7 +10,7 @@ import {
   AIComplianceError,
   CommunityPostNotFoundError
 } from '../../logic/community'
-import { ComponentsWithLogger } from '@dcl/platform-server-commons/dist/types'
+import { ComponentsWithLogger } from '@dcl/http-commons/dist/types'
 
 export async function communitiesErrorsHandler(
   _ctx: IHttpServerComponent.DefaultContext<ComponentsWithLogger>,

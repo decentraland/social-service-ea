@@ -24,7 +24,7 @@ test('Update Community Controller', async function ({ components, stubComponents
       identity = await createTestIdentity()
 
       // Mock AI compliance to return compliant by default for community creation
-      stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+      stubComponents.communityComplianceValidator.validateCommunityContent.mockResolvedValue(undefined)
 
       // Mock catalyst client for community creation
       spyComponents.catalystClient.getOwnedNames.mockResolvedValue([
@@ -92,7 +92,7 @@ test('Update Community Controller', async function ({ components, stubComponents
         describe('when AI compliance validation passes', () => {
           beforeEach(async () => {
             // Mock AI compliance to return compliant by default
-            stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+            stubComponents.communityComplianceValidator.validateCommunityContent.mockResolvedValue(undefined)
 
             // Mock owner name - needed for the update flow when querying current community
             spyComponents.communityOwners.getOwnerName.mockResolvedValue('Test Owner')
@@ -260,7 +260,7 @@ test('Update Community Controller', async function ({ components, stubComponents
             beforeEach(async () => {
               newPlaceIds = [randomUUID(), randomUUID()]
 
-              stubComponents.fetcher.fetch.onFirstCall().resolves({
+              stubComponents.fetcher.fetch.mockResolvedValueOnce({
                 ok: true,
                 status: 200,
                 json: () =>
@@ -329,7 +329,7 @@ test('Update Community Controller', async function ({ components, stubComponents
             beforeEach(() => {
               initialPlaceIds = [randomUUID(), randomUUID()]
 
-              stubComponents.fetcher.fetch.onFirstCall().resolves({
+              stubComponents.fetcher.fetch.mockResolvedValueOnce({
                 ok: true,
                 status: 200,
                 json: () =>
@@ -564,7 +564,7 @@ test('Update Community Controller', async function ({ components, stubComponents
         describe('and AI compliance validation fails', () => {
           beforeEach(async () => {
             // Mock AI compliance to return non-compliant
-            stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
+            stubComponents.communityComplianceValidator.validateCommunityContent.mockRejectedValue(
               new CommunityNotCompliantError(
                 "Community content violates Decentraland's Code of Ethics",
                 { name: ['Contains inappropriate language', 'Promotes violence'] },
@@ -613,7 +613,7 @@ test('Update Community Controller', async function ({ components, stubComponents
 
         describe('and AI compliance validation fails with AIComplianceError', () => {
           beforeEach(async () => {
-            stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
+            stubComponents.communityComplianceValidator.validateCommunityContent.mockRejectedValue(
               new AIComplianceError('AI compliance validation failed')
             )
           })

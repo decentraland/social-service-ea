@@ -1,7 +1,7 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityMemberProfile } from '../../../logic/community/types'
-import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { getPaginationParams, NotAuthorizedError } from '@dcl/http-commons'
 import { PaginatedResponse } from '@dcl/schemas'
 import { getPaginationResultProperties } from '../../../utils/pagination'
 import { parseRequestTypeFilter } from '../../../logic/community/utils'

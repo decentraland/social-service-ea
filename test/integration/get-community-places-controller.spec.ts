@@ -3,7 +3,6 @@ import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { mockCommunity } from '../mocks/communities'
 import { randomUUID } from 'crypto'
-import { Response } from '@well-known-components/interfaces'
 
 test('Get Community Places Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)

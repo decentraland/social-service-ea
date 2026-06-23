@@ -1,5 +1,5 @@
 import type { IBaseComponent, ICacheComponent as IBaseCacheComponent } from '@well-known-components/interfaces'
-import { IPgComponent as IBasePgComponent } from '@well-known-components/pg-component'
+import { IPgComponent as IBasePgComponent } from '@dcl/pg-component'
 import { WebSocketServer } from 'ws'
 import { Emitter } from 'mitt'
 import { Transport } from '@dcl/rpc'

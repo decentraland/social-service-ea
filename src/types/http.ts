@@ -1,7 +1,7 @@
-import type { IHttpServerComponent } from '@well-known-components/interfaces'
+import type { IHttpServerComponent } from '@dcl/core-commons'
 import { HttpRequest, HttpResponse } from '@dcl/uws-http-server'
 import { AppComponents } from './system'
-import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
+import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
 import { FormDataContext } from '@well-known-components/multipart-wrapper'
 
 export type HandlerContextWithPath<

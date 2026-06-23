@@ -1,6 +1,6 @@
 import { IBaseComponent, START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { AppComponents } from '../types'
-import { ApplicationName } from '@well-known-components/features-component'
+import { ApplicationName } from '@dcl/features-component'
 
 export enum FeatureFlag {
   // Feature flag to enable/disable AI compliance for communities.

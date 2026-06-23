@@ -1,3 +1,4 @@
+import type { IFetchComponent as IWkcFetchComponent } from '@well-known-components/interfaces'
 import { createCatalystClient } from '../../../src/adapters/catalyst-client'
 import { ICatalystClientComponent } from '../../../src/types'
 import { createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
@@ -43,7 +44,10 @@ describe('catalyst-client', () => {
       fetcher: mockFetcher,
       config: mockConfig
     })
-    lambdasClientMock = createLambdasClient({ fetcher: mockFetcher, url: CATALYST_LAMBDAS_LOAD_BALANCER_URL })
+    lambdasClientMock = createLambdasClient({
+      fetcher: mockFetcher as unknown as IWkcFetchComponent,
+      url: CATALYST_LAMBDAS_LOAD_BALANCER_URL
+    })
 
     jest.useFakeTimers()
   })

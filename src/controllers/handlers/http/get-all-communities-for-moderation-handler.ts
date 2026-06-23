@@ -1,4 +1,4 @@
-import { getPaginationParams } from '@dcl/platform-server-commons'
+import { getPaginationParams } from '@dcl/http-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'

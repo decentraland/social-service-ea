@@ -1,7 +1,7 @@
 import { removeUserMuteHandler } from '../../../../../src/controllers/handlers/http/remove-user-mute-handler'
 import { createUserMutesMockedComponent } from '../../../../mocks/components/user-mutes'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 
 let mockUserMutes: ReturnType<typeof createUserMutesMockedComponent>
 let mockLogs: ReturnType<typeof createLogsMockedComponent>

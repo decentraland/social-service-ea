@@ -1,4 +1,4 @@
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 import fileType from 'file-type'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '.'
 import { AppComponents } from '../../types/system'

@@ -204,7 +204,7 @@ test('Create Community Controller', async function ({ components, stubComponents
           describe('and AI compliance validation passes', () => {
             beforeEach(async () => {
               // Mock AI compliance to return compliant by default
-              stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+              stubComponents.communityComplianceValidator.validateCommunityContent.mockResolvedValue(undefined)
             })
 
             describe('and places are provided', () => {
@@ -221,7 +221,7 @@ test('Create Community Controller', async function ({ components, stubComponents
 
               describe('and the places are owned by the user', () => {
                 beforeEach(async () => {
-                  stubComponents.fetcher.fetch.onFirstCall().resolves({
+                  stubComponents.fetcher.fetch.mockResolvedValueOnce({
                     ok: true,
                     status: 200,
                     json: () =>
@@ -450,7 +450,7 @@ test('Create Community Controller', async function ({ components, stubComponents
           describe('and AI compliance validation fails', () => {
             beforeEach(async () => {
               // Mock AI compliance to return non-compliant
-              stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
+              stubComponents.communityComplianceValidator.validateCommunityContent.mockRejectedValue(
                 new CommunityNotCompliantError(
                   "Community content violates Decentraland's Code of Ethics",
                   { name: ['Contains inappropriate language', 'Promotes violence'] },
@@ -478,7 +478,7 @@ test('Create Community Controller', async function ({ components, stubComponents
 
           describe('and AI compliance validation fails with AIComplianceError', () => {
             beforeEach(async () => {
-              stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
+              stubComponents.communityComplianceValidator.validateCommunityContent.mockRejectedValue(
                 new AIComplianceError('AI compliance validation failed')
               )
             })
