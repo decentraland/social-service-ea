@@ -2106,3 +2106,370 @@ paths:
                 $ref: './schemas.yaml#/components/schemas/ErrorResponse'
       tags:
         - User Mutes
+
+  /v2/communities:
+    get:
+      operationId: listCommunitiesV2
+      summary: List communities (v2, address-only)
+      description: |
+        Same as GET /v1/communities but the response contains only addresses: the owner
+        address (no owner name) and mutual-friend addresses (string[]) instead of friend
+        profiles. The `minimal` search branch is unchanged (it already returns no profile
+        information).
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: onlyMemberOf
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: onlyWithActiveVoiceChat
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Communities found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetCommunitiesV2200OkResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities v2
+
+  /v2/communities/{id}:
+    get:
+      operationId: getCommunityByIdV2
+      summary: Get community by ID (v2, address-only)
+      description: |
+        Same as GET /v1/communities/{id} but the response contains only the owner address
+        (no owner name). Never fails when the owner profile cannot be resolved.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+      responses:
+        '200':
+          description: Community found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetCommunityByIdV2200OkResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities v2
+
+  /v2/communities/{id}/members:
+    get:
+      operationId: listCommunityMembersV2
+      summary: List community members (v2, address-only)
+      description: |
+        Same as GET /v1/communities/{id}/members but returns the member addresses (and
+        friendship status) only, without any profile information. Members whose profile is
+        missing are NOT dropped.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: onlyOnline
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Members found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetCommunityMembersV2200OkResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities v2
+
+  /v2/communities/{id}/bans:
+    get:
+      operationId: listBannedMembersV2
+      summary: List banned members (v2, address-only)
+      description: |
+        Same as GET /v1/communities/{id}/bans but returns the banned member addresses (and
+        friendship status) only, without any profile information.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Banned members found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetBannedMembersV2200OkResponse'
+        '401':
+          description: Unauthorized - Signed Fetch required
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities v2
+
+  /v2/communities/{id}/requests:
+    get:
+      operationId: getCommunityRequestsV2
+      summary: Get community requests (v2, address-only)
+      description: |
+        Same as GET /v1/communities/{id}/requests but returns the requesting member
+        addresses (and friendship status) only, without any profile information.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [invite, request_to_join]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Community requests found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetCommunityRequestsV2200OkResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities v2
+
+  /v2/members/{address}/requests:
+    get:
+      operationId: getMemberRequestsV2
+      summary: Get member requests (v2, address-only)
+      description: |
+        Same as GET /v1/members/{address}/requests but each request's community carries the
+        owner address (no owner name) and mutual-friend addresses (string[]).
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The address of the member.
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [invite, request_to_join]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Member requests found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetMemberRequestsV2200OkResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities v2
+
+  /v2/communities/{id}/posts:
+    get:
+      operationId: getCommunityPostsV2
+      summary: Get community posts (v2, address-only)
+      description: |
+        Same as GET /v1/communities/{id}/posts but returns the post author addresses only,
+        without any profile information.
+      security:
+        - SignedFetch: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the community.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Posts found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/GetCommunityPostsV2200OkResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: Community not found
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+      tags:
+        - Communities v2

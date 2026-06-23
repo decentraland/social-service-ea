@@ -2,15 +2,20 @@ import { NotAuthorizedError, InvalidRequestError } from '@dcl/platform-server-co
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError } from './errors'
 import {
+  CommunityMember,
   CommunityMemberProfile,
+  CommunityMemberV2,
   GetCommunityMembersOptions,
   ICommunityMembersComponent,
   CommunityPrivacyEnum
 } from './types'
-import { mapMembersWithProfiles } from './utils'
+import { mapMembersWithProfiles, mapMembersWithFriendshipStatus } from './utils'
 import { EthAddress, Events } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  ConnectivityStatus,
+  FriendshipStatus
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { AnalyticsEvent } from '../../types/analytics'
 
 export async function createCommunityMembersComponent(
@@ -58,7 +63,22 @@ export async function createCommunityMembersComponent(
     return mapMembersWithProfiles(userAddress, members, profiles) as (T & CommunityMemberProfile)[]
   }
 
-  const filterAndCountCommunityMembers = async (id: string, options: GetCommunityMembersOptions) => {
+  const aggregateWithFriendshipStatus = <T extends { memberAddress: EthAddress }>(
+    userAddress: EthAddress | undefined,
+    members: T[]
+  ): (T & { friendshipStatus: FriendshipStatus })[] => {
+    return mapMembersWithFriendshipStatus(userAddress, members)
+  }
+
+  /**
+   * Shared base fetch for the community members endpoints. Performs the existence,
+   * privacy and permission checks, resolves the online-peers filter and reads the
+   * members from the database WITHOUT any profile enrichment.
+   */
+  const fetchCommunityMembers = async (
+    id: string,
+    options: GetCommunityMembersOptions
+  ): Promise<{ members: CommunityMember[]; totalMembers: number }> => {
     const { pagination, onlyOnline, as: userAddress, byPassPrivacy } = options
     const communityExists = await communitiesDb.communityExists(id, { onlyPublic: !userAddress && !byPassPrivacy })
 
@@ -96,9 +116,7 @@ export async function createCommunityMembersComponent(
     })
     const totalMembers = await communitiesDb.getCommunityMembersCount(id, { filterByMembers: onlinePeers })
 
-    const membersWithProfile = await aggregateWithProfiles(userAddress, communityMembers)
-
-    return { members: membersWithProfile, totalMembers }
+    return { members: communityMembers, totalMembers }
   }
 
   const transferOwnership = async (
@@ -149,7 +167,17 @@ export async function createCommunityMembersComponent(
       id: string,
       options: GetCommunityMembersOptions
     ): Promise<{ members: CommunityMemberProfile[]; totalMembers: number }> => {
-      return filterAndCountCommunityMembers(id, options)
+      const { members, totalMembers } = await fetchCommunityMembers(id, options)
+      const membersWithProfile = await aggregateWithProfiles(options.as, members)
+      return { members: membersWithProfile, totalMembers }
+    },
+
+    getCommunityMembersWithoutProfiles: async (
+      id: string,
+      options: GetCommunityMembersOptions
+    ): Promise<{ members: CommunityMemberV2[]; totalMembers: number }> => {
+      const { members, totalMembers } = await fetchCommunityMembers(id, options)
+      return { members: aggregateWithFriendshipStatus(options.as, members), totalMembers }
     },
 
     async *getOnlineMembersFromCommunity(
@@ -364,6 +392,7 @@ export async function createCommunityMembersComponent(
       await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
     },
 
-    aggregateWithProfiles
+    aggregateWithProfiles,
+    aggregateWithFriendshipStatus
   }
 }

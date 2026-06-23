@@ -1,8 +1,14 @@
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { AppComponents } from '../../types'
 import { CommunityNotFoundError } from './errors'
-import { BannedMemberProfile, ICommunityBansComponent, CommunityPrivacyEnum } from './types'
-import { mapMembersWithProfiles } from './utils'
+import {
+  BannedMember,
+  BannedMemberProfile,
+  BannedMemberV2,
+  ICommunityBansComponent,
+  CommunityPrivacyEnum
+} from './types'
+import { mapMembersWithProfiles, mapMembersWithFriendshipStatus } from './utils'
 import { EthAddress, Events, PaginatedParameters } from '@dcl/schemas'
 import { COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { AnalyticsEvent } from '../../types/analytics'
@@ -34,6 +40,30 @@ export async function createCommunityBansComponent(
   } = components
 
   const logger = logs.getLogger('community-bans-component')
+
+  /**
+   * Shared base fetch for the banned members endpoints. Validates the community exists
+   * and the caller's permission, then reads the banned members from the database WITHOUT
+   * any profile enrichment.
+   */
+  const fetchBannedMembers = async (
+    id: string,
+    userAddress: EthAddress,
+    pagination: Required<PaginatedParameters>
+  ): Promise<{ members: BannedMember[]; totalMembers: number }> => {
+    const community = await communitiesDb.getCommunity(id)
+
+    if (!community) {
+      throw new CommunityNotFoundError(id)
+    }
+
+    await communityRoles.validatePermissionToGetBannedMembers(id, userAddress)
+
+    const bannedMembers = await communitiesDb.getBannedMembers(id, userAddress, pagination)
+    const totalBannedMembers = await communitiesDb.getBannedMembersCount(id)
+
+    return { members: bannedMembers, totalMembers: totalBannedMembers }
+  }
 
   return {
     banMember: async (communityId: string, bannerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
@@ -119,21 +149,22 @@ export async function createCommunityBansComponent(
       userAddress: EthAddress,
       pagination: Required<PaginatedParameters>
     ): Promise<{ members: BannedMemberProfile[]; totalMembers: number }> => {
-      const community = await communitiesDb.getCommunity(id)
+      const { members, totalMembers } = await fetchBannedMembers(id, userAddress, pagination)
 
-      if (!community) {
-        throw new CommunityNotFoundError(id)
-      }
+      const profiles = await registry.getProfiles(members.map((member) => member.memberAddress))
+      const membersWithProfile = mapMembersWithProfiles(userAddress, members, profiles)
 
-      await communityRoles.validatePermissionToGetBannedMembers(id, userAddress)
+      return { members: membersWithProfile, totalMembers }
+    },
 
-      const bannedMembers = await communitiesDb.getBannedMembers(id, userAddress, pagination)
-      const totalBannedMembers = await communitiesDb.getBannedMembersCount(id)
+    getBannedMembersWithoutProfiles: async (
+      id: string,
+      userAddress: EthAddress,
+      pagination: Required<PaginatedParameters>
+    ): Promise<{ members: BannedMemberV2[]; totalMembers: number }> => {
+      const { members, totalMembers } = await fetchBannedMembers(id, userAddress, pagination)
 
-      const profiles = await registry.getProfiles(bannedMembers.map((member) => member.memberAddress))
-      const membersWithProfile = mapMembersWithProfiles(userAddress, bannedMembers, profiles)
-
-      return { members: membersWithProfile, totalMembers: totalBannedMembers }
+      return { members: mapMembersWithFriendshipStatus(userAddress, members), totalMembers }
     }
   }
 }

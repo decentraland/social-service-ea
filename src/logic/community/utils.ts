@@ -14,7 +14,13 @@ import {
   CommunityVoiceChatStatus,
   CommunityRequestType,
   CommunityPrivacyEnum,
-  MemberProfileInfo
+  MemberProfileInfo,
+  AggregatedCommunityV2,
+  AggregatedCommunityWithMemberAndVoiceChatDataV2,
+  CommunityWithUserInformationV2,
+  CommunityWithUserInformationAndVoiceChatV2,
+  CommunityPublicInformationV2,
+  CommunityPublicInformationWithVoiceChatV2
 } from './types'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { getFriendshipRequestStatus } from '../friends'
@@ -125,6 +131,92 @@ export const toPublicCommunityWithVoiceChat = (
   }
 }
 
+// ---- v2 (address-only) community mappers ----
+// These mirror the v1 mappers above but never inflate the owner address into an owner
+// name and keep mutual friends as plain addresses (`friends: string[]`). v2 community
+// rows carry no `ownerName`, so nothing profile-derived ends up in the response.
+
+export const toCommunityWithMembersCountV2 = (
+  community: AggregatedCommunityV2 & { role: CommunityRole },
+  membersCount: number,
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): AggregatedCommunityWithMemberAndVoiceChatDataV2 => {
+  return withMembersCount({
+    ...community,
+    ownerAddress: community.ownerAddress,
+    membersCount,
+    voiceChatStatus
+  })
+}
+
+export const toCommunityWithUserInformationV2 = (
+  community: Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>
+): CommunityWithUserInformationV2 => {
+  return {
+    ...toBaseCommunity(community),
+    friends: community.friends
+  }
+}
+
+export const toCommunityWithUserInformationAndVoiceChatV2 = (
+  community: Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>,
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityWithUserInformationAndVoiceChatV2 => {
+  const baseResult = toCommunityWithUserInformationV2(community)
+
+  const shouldIncludeVoiceChat =
+    community.privacy !== CommunityPrivacyEnum.Private || community.role !== CommunityRole.None
+
+  return {
+    ...baseResult,
+    voiceChatStatus:
+      shouldIncludeVoiceChat && !!voiceChatStatus
+        ? voiceChatStatus
+        : {
+            isActive: false,
+            participantCount: 0,
+            moderatorCount: 0
+          }
+  }
+}
+
+export const toCommunityResultsWithVoiceChatV2 = (
+  communities: Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>[],
+  voiceChatStatuses: Record<string, CommunityVoiceChatStatus> | undefined
+): CommunityWithUserInformationAndVoiceChatV2[] => {
+  const safeVoiceChatStatuses = voiceChatStatuses || {}
+  return communities.map((community) =>
+    toCommunityWithUserInformationAndVoiceChatV2(community, safeVoiceChatStatuses[community.id] || null)
+  )
+}
+
+export const toPublicCommunityWithVoiceChatV2 = (
+  community: CommunityPublicInformationV2,
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityPublicInformationWithVoiceChatV2 => {
+  return {
+    ...toBaseCommunity(community),
+    voiceChatStatus
+  }
+}
+
+const computeFriendshipStatus = (
+  member: { lastFriendshipAction?: Action; actingUser?: EthAddress },
+  userAddress: EthAddress | undefined
+): FriendshipStatus => {
+  const { lastFriendshipAction, actingUser } = member
+
+  if (lastFriendshipAction && actingUser && userAddress) {
+    const friendshipAction: Pick<FriendshipAction, 'action' | 'acting_user'> = {
+      action: lastFriendshipAction,
+      acting_user: actingUser
+    }
+    return getFriendshipRequestStatus(friendshipAction, userAddress)
+  }
+
+  return FriendshipStatus.NONE
+}
+
 export const mapMembersWithProfiles = <
   T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress }
 >(
@@ -136,16 +228,7 @@ export const mapMembersWithProfiles = <
   return members
     .map((member) => {
       const memberProfile = profileMap.get(member.memberAddress)
-      const { lastFriendshipAction, actingUser } = member
-      let friendshipStatus: FriendshipStatus = FriendshipStatus.NONE
-
-      if (lastFriendshipAction && actingUser && userAddress) {
-        const friendshipAction: Pick<FriendshipAction, 'action' | 'acting_user'> = {
-          action: lastFriendshipAction,
-          acting_user: actingUser
-        }
-        friendshipStatus = getFriendshipRequestStatus(friendshipAction, userAddress)
-      }
+      const friendshipStatus = computeFriendshipStatus(member, userAddress)
 
       if (!memberProfile) {
         return undefined
@@ -163,6 +246,22 @@ export const mapMembersWithProfiles = <
       } as T & MemberProfileInfo
     })
     .filter((member): member is T & MemberProfileInfo => member !== undefined)
+}
+
+/**
+ * v2 mapper: attaches the friendship status to each member WITHOUT fetching any profile
+ * and WITHOUT dropping members. Returns only the base entity plus `friendshipStatus`.
+ */
+export const mapMembersWithFriendshipStatus = <
+  T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress }
+>(
+  userAddress: EthAddress | undefined,
+  members: T[]
+): (T & { friendshipStatus: FriendshipStatus })[] => {
+  return members.map((member) => ({
+    ...member,
+    friendshipStatus: computeFriendshipStatus(member, userAddress)
+  }))
 }
 
 export const getCommunityThumbnailPath = (communityId: string) => {

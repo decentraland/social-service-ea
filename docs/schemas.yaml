@@ -955,3 +955,405 @@ components:
                     format: uuid
                     description: 'Unique identifier of a valid and visible community'
               description: 'List of communities that exist and are visible to the user'
+
+    # ---- v2 (address-only) responses ----
+    # Same shapes as their v1 counterparts but WITHOUT any Catalyst profile information
+    # (no name/profilePictureUrl/hasClaimedName/nameColor, no ownerName, no author profile
+    # fields). Mutual friends are returned as plain addresses (string[]).
+
+    GetCommunitiesV2200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - description
+                      - ownerAddress
+                      - privacy
+                      - visibility
+                      - active
+                      - membersCount
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      description:
+                        type: string
+                      ownerAddress:
+                        type: string
+                        description: 'ETH Address of the community owner'
+                      privacy:
+                        type: string
+                        enum: [public, private]
+                      visibility:
+                        type: string
+                        enum: [all, unlisted]
+                      active:
+                        type: boolean
+                      membersCount:
+                        type: integer
+                      thumbnails:
+                        type: object
+                        additionalProperties:
+                          type: string
+                        description: 'Map of thumbnail URLs by size/type'
+                      friends:
+                        type: array
+                        items:
+                          type: string
+                        description: |
+                          Addresses of friends who are members of this community.
+                          Only present when the user is signed in.
+                      role:
+                        type: string
+                        enum: [owner, moderator, member, none]
+                        description: |
+                          The role of the user in the community.
+                          Only present when the user is signed in.
+                      voiceChatStatus:
+                        type: object
+                        nullable: true
+                        properties:
+                          isActive:
+                            type: boolean
+                          participantCount:
+                            type: integer
+                          moderatorCount:
+                            type: integer
+                        description: 'Voice chat status for the community (null if no active voice chat)'
+
+    GetCommunityByIdV2200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - name
+            - description
+            - ownerAddress
+            - privacy
+            - visibility
+            - active
+            - membersCount
+            - role
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
+            ownerAddress:
+              type: string
+              description: 'ETH Address of the community owner'
+            privacy:
+              type: string
+              enum: [public, private]
+            visibility:
+              type: string
+              enum: [all, unlisted]
+            active:
+              type: boolean
+              description: 'Whether the community is active or it was logically deleted'
+            membersCount:
+              type: integer
+              description: 'Number of members in the community'
+            role:
+              type: string
+              enum: [owner, moderator, member, none]
+              description: 'Role of the authenticated user in this community'
+            thumbnails:
+              type: object
+              additionalProperties:
+                type: string
+              description: 'Map of thumbnail URLs by size/type'
+            voiceChatStatus:
+              type: object
+              nullable: true
+              properties:
+                isActive:
+                  type: boolean
+                participantCount:
+                  type: integer
+                moderatorCount:
+                  type: integer
+              description: 'Voice chat status for the community (null if no active voice chat)'
+
+    GetCommunityMembersV2200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - communityId
+                      - memberAddress
+                      - role
+                      - joinedAt
+                      - friendshipStatus
+                    properties:
+                      communityId:
+                        type: string
+                        description: 'ID of the community'
+                      memberAddress:
+                        type: string
+                        description: 'ETH Address of the member'
+                      role:
+                        type: string
+                        enum: [owner, moderator, member]
+                        description: 'Role of the member in the community'
+                      joinedAt:
+                        type: string
+                        format: date-time
+                        description: 'When the member joined the community'
+                      friendshipStatus:
+                        type: integer
+                        description: 'Friendship status code between the authenticated user and the member'
+
+    GetBannedMembersV2200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - communityId
+                      - memberAddress
+                      - bannedAt
+                      - bannedBy
+                      - friendshipStatus
+                    properties:
+                      communityId:
+                        type: string
+                        description: 'ID of the community'
+                      memberAddress:
+                        type: string
+                        description: 'ETH Address of the banned member'
+                      bannedAt:
+                        type: string
+                        format: date-time
+                        description: 'When the member was banned'
+                      bannedBy:
+                        type: string
+                        description: 'ETH Address of the member who issued the ban'
+                      friendshipStatus:
+                        type: integer
+                        description: 'Friendship status code between the authenticated user and the banned member'
+
+    GetCommunityRequestsV2200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - communityId
+                      - memberAddress
+                      - type
+                      - status
+                      - friendshipStatus
+                    properties:
+                      id:
+                        type: string
+                        description: 'Unique identifier of the community request'
+                      communityId:
+                        type: string
+                        description: 'ID of the community'
+                      memberAddress:
+                        type: string
+                        description: 'ETH address of the member who made/received the request'
+                      type:
+                        type: string
+                        enum: [invite, request_to_join]
+                        description: 'Type of request'
+                      status:
+                        type: string
+                        enum: [pending, accepted, rejected, cancelled]
+                        description: 'Status of the request'
+                      friendshipStatus:
+                        type: integer
+                        description: 'Friendship status code between the authenticated user and the member'
+
+    GetMemberRequestsV2200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PaginatedResponse'
+            - type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - communityId
+                      - memberAddress
+                      - type
+                      - status
+                      - name
+                      - description
+                      - ownerAddress
+                      - privacy
+                      - membersCount
+                      - role
+                      - active
+                      - friends
+                      - voiceChatStatus
+                    properties:
+                      id:
+                        type: string
+                        description: 'Unique identifier of the community request'
+                      communityId:
+                        type: string
+                        description: 'ID of the community'
+                      memberAddress:
+                        type: string
+                        description: 'ETH address of the member for whom the request was made'
+                      type:
+                        type: string
+                        enum: [invite, request_to_join]
+                        description: 'Type of request (invite received or join request sent)'
+                      status:
+                        type: string
+                        enum: [pending, accepted, rejected, cancelled]
+                        description: 'Status of the request'
+                      name:
+                        type: string
+                        description: 'Name of the community'
+                      description:
+                        type: string
+                        description: 'Description of the community'
+                      ownerAddress:
+                        type: string
+                        description: 'ETH address of the community owner'
+                      privacy:
+                        type: string
+                        enum: [public, private]
+                        description: 'Privacy setting of the community'
+                      membersCount:
+                        type: integer
+                        description: 'Total number of members in the community'
+                      role:
+                        type: string
+                        enum: [none, Member, Moderator, Owner]
+                        description: 'Current role of the user in this community'
+                      active:
+                        type: boolean
+                        description: 'Whether the community is active'
+                      friends:
+                        type: array
+                        items:
+                          type: string
+                        description: 'Addresses of friends who are members of this community'
+                      voiceChatStatus:
+                        type: object
+                        required:
+                          - isActive
+                          - participantCount
+                          - moderatorCount
+                        properties:
+                          isActive:
+                            type: boolean
+                          participantCount:
+                            type: integer
+                          moderatorCount:
+                            type: integer
+                        description: 'Voice chat status information for the community'
+
+    CommunityPostV2:
+      type: object
+      required:
+        - id
+        - communityId
+        - authorAddress
+        - content
+        - createdAt
+        - likesCount
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 'Unique post identifier'
+        communityId:
+          type: string
+          format: uuid
+          description: 'ID of the community this post belongs to'
+        authorAddress:
+          type: string
+          description: 'Ethereum address of the post author'
+        content:
+          type: string
+          description: 'Post content (1-1000 characters)'
+        createdAt:
+          type: string
+          format: date-time
+          description: 'When the post was created'
+        likesCount:
+          type: integer
+          description: 'Number of likes on this post'
+        isLikedByUser:
+          type: boolean
+          description: 'Whether the authenticated user has liked this post (only present when user is authenticated)'
+
+    GetCommunityPostsV2200OkResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - posts
+            - total
+          properties:
+            posts:
+              type: array
+              items:
+                $ref: '#/components/schemas/CommunityPostV2'
+            total:
+              type: integer
+              description: 'Total number of posts in the community'

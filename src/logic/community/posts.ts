@@ -80,6 +80,34 @@ export function createCommunityPostsComponent(
     }
   }
 
+  /**
+   * Shared base fetch for the community posts endpoints. Validates the community exists
+   * and the caller's access, then reads the posts (with like info) from the database
+   * WITHOUT any author-profile enrichment.
+   */
+  async function fetchPosts(
+    communityId: string,
+    options: GetCommunityPostsOptions
+  ): Promise<{ posts: CommunityPostWithLikes[]; total: number }> {
+    const community = await communitiesDb.getCommunity(communityId, options.userAddress)
+    if (!community) {
+      throw new CommunityNotFoundError(communityId)
+    }
+
+    if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
+      throw new NotAuthorizedError(
+        `${options.userAddress} is not a member of private community ${communityId}. You need to be a member to get posts in this community.`
+      )
+    }
+
+    const [posts, total] = await Promise.all([
+      communitiesDb.getPosts(communityId, options),
+      communitiesDb.getPostsCount(communityId)
+    ])
+
+    return { posts, total }
+  }
+
   return {
     async createPost(communityId: string, authorAddress: EthAddress, content: string): Promise<CommunityPost> {
       const community = await communitiesDb.getCommunity(communityId, authorAddress)
@@ -126,21 +154,7 @@ export function createCommunityPostsComponent(
       communityId: string,
       options: GetCommunityPostsOptions
     ): Promise<{ posts: CommunityPostWithProfile[]; total: number }> {
-      const community = await communitiesDb.getCommunity(communityId, options.userAddress)
-      if (!community) {
-        throw new CommunityNotFoundError(communityId)
-      }
-
-      if (community.privacy === CommunityPrivacyEnum.Private && community.role === CommunityRole.None) {
-        throw new NotAuthorizedError(
-          `${options.userAddress} is not a member of private community ${communityId}. You need to be a member to get posts in this community.`
-        )
-      }
-
-      const [posts, total] = await Promise.all([
-        communitiesDb.getPosts(communityId, options),
-        communitiesDb.getPostsCount(communityId)
-      ])
+      const { posts, total } = await fetchPosts(communityId, options)
 
       const postsWithProfiles = await aggregatePostsWithProfiles(posts)
 
@@ -148,6 +162,13 @@ export function createCommunityPostsComponent(
         posts: postsWithProfiles,
         total
       }
+    },
+
+    async getPostsWithoutProfiles(
+      communityId: string,
+      options: GetCommunityPostsOptions
+    ): Promise<{ posts: CommunityPostWithLikes[]; total: number }> {
+      return fetchPosts(communityId, options)
     },
 
     async deletePost(postId: string, deleterAddress: EthAddress): Promise<void> {
