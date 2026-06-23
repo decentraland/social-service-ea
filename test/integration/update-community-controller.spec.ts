@@ -9,7 +9,6 @@ import {
   makeAuthenticatedMultipartRequest
 } from './utils/auth'
 import { randomUUID } from 'crypto'
-import FormData from 'form-data'
 import { AIComplianceError, CommunityNotCompliantError } from '../../src/logic/community/errors'
 
 test('Update Community Controller', async function ({ components, stubComponents, spyComponents }) {
@@ -51,7 +50,7 @@ test('Update Community Controller', async function ({ components, stubComponents
       const createResponse = await components.localHttpFetch.fetch('/v1/communities', {
         method: 'POST',
         headers: createHeaders,
-        body: createForm as any
+        body: createForm
       })
 
       const createBody = await createResponse.json()
@@ -785,7 +784,7 @@ test('Update Community Controller', async function ({ components, stubComponents
           const response = await components.localHttpFetch.fetch(`/v1/communities/${communityId}`, {
             method: 'PUT',
             headers,
-            body: form as any
+            body: form
           })
 
           expect(response.status).toBe(400)
@@ -802,7 +801,7 @@ test('Update Community Controller', async function ({ components, stubComponents
           const response = await components.localHttpFetch.fetch(`/v1/communities/${communityId}`, {
             method: 'PUT',
             headers,
-            body: form as any
+            body: form
           })
 
           expect(response.status).toBe(400)

@@ -43,7 +43,7 @@ import {
   getUserMutesHandler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/crypto-middleware'
-import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
+import { multipartParserWrapper } from '../../utils/multipart'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
 import {
   UpdateMemberRoleSchema,
@@ -115,9 +115,8 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.get('/v1/members/:address/invites', signedFetchMiddleware(), getCommunityInvitesHandler)
 
-  // @well-known-components/multipart-wrapper types its wrapped handler against node-fetch's
-  // IHttpServerComponent, while @dcl/http-server v2 routes the native fetch context. The wrapper only
-  // consumes the parsed form data and request metadata, so cast to the native handler type here.
+  // The multipart wrapper enriches the context with the parsed form data but is otherwise
+  // path/verification-agnostic, so cast to the route handler type expected by the router.
   router.post(
     '/v1/communities',
     signedFetchMiddleware(),

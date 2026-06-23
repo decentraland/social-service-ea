@@ -2,7 +2,7 @@ import type { IHttpServerComponent } from '@dcl/core-commons'
 import { HttpRequest, HttpResponse } from '@dcl/uws-http-server'
 import { AppComponents } from './system'
 import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
-import { FormDataContext } from '@well-known-components/multipart-wrapper'
+import { FormDataContext } from '../utils/multipart'
 
 export type HandlerContextWithPath<
   ComponentNames extends keyof AppComponents,
