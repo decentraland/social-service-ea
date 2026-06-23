@@ -201,12 +201,12 @@ test('Add Community Place Controller', function ({ components, spyComponents, st
           })
 
           it('should respond with a 204 status code when adding a place that already exists', async () => {
-            Array.from({ length: 2 }).forEach(async () => {
+            for (let attempt = 0; attempt < 2; attempt++) {
               const response = await makeRequest(identity, `/v1/communities/${communityId}/places`, 'POST', {
                 placeIds: mockPlaceIds
               })
               expect(response.status).toBe(204)
-            })
+            }
 
             const response = await makeRequest(identity, `/v1/communities/${communityId}/places`)
             const result = await response.json()
