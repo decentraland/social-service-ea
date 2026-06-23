@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { CommunityPrivacyEnum } from '../../src/logic/community'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
@@ -99,6 +100,34 @@ test('Get Community Controller v2', function ({ components, spyComponents }) {
         })
       )
       expect(body.data).not.toHaveProperty('ownerName')
+    })
+  })
+
+  describe('when getting a community (v2) that does not exist', () => {
+    it('should respond with a 404 status code', async () => {
+      const { localHttpFetch } = components
+      const response = await localHttpFetch.fetch(`/v2/communities/${randomUUID()}`)
+      expect(response.status).toBe(404)
+    })
+  })
+
+  describe('when getting a community (v2) and the underlying fetch fails', () => {
+    beforeEach(async () => {
+      const { id } = await components.communitiesDb.createCommunity({
+        name: 'Test Community',
+        description: 'Test Description',
+        owner_address: address,
+        private: false,
+        active: true,
+        unlisted: false
+      })
+      communityId = id
+      spyComponents.communities.getCommunityWithoutProfile.mockRejectedValue(new Error('Unable to get community'))
+    })
+
+    it('should respond with a 500 status code', async () => {
+      const response = await makeRequest(identity, `/v2/communities/${communityId}`)
+      expect(response.status).toBe(500)
     })
   })
 })

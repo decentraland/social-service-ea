@@ -105,4 +105,78 @@ test('Get Community Requests Controller v2', function ({ components, spyComponen
       expect(response.status).toBe(401)
     })
   })
+
+  describe('when getting community requests (v2) as a regular member', () => {
+    let memberIdentity: Identity
+
+    beforeEach(async () => {
+      const result = await components.communitiesDb.createCommunity(
+        mockCommunity({
+          name: 'Test Community',
+          description: 'Test Description',
+          owner_address: ownerAddress,
+          private: true
+        })
+      )
+      communityId = result.id
+      memberIdentity = await createTestIdentity()
+      await components.communitiesDb.addCommunityMember({
+        communityId,
+        memberAddress: memberIdentity.realAccount.address.toLowerCase(),
+        role: CommunityRole.Member
+      })
+    })
+
+    afterEach(async () => {
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
+        memberIdentity.realAccount.address.toLowerCase()
+      ])
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+    })
+
+    it('should respond with a 401 status code', async () => {
+      const response = await makeRequest(memberIdentity, `/v2/communities/${communityId}/requests`)
+      expect(response.status).toBe(401)
+    })
+  })
+
+  describe('when getting community requests (v2) as the owner and there are no requests', () => {
+    beforeEach(async () => {
+      const result = await components.communitiesDb.createCommunity(
+        mockCommunity({
+          name: 'Test Community',
+          description: 'Test Description',
+          owner_address: ownerAddress,
+          private: true
+        })
+      )
+      communityId = result.id
+      await components.communitiesDb.addCommunityMember({
+        communityId,
+        memberAddress: ownerAddress,
+        role: CommunityRole.Owner
+      })
+    })
+
+    afterEach(async () => {
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [ownerAddress])
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+    })
+
+    it('should return an empty, paginated result with a 200 status code', async () => {
+      const response = await makeRequest(ownerIdentity, `/v2/communities/${communityId}/requests?limit=10&offset=0`)
+      expect(response.status).toBe(200)
+      const result = await response.json()
+      expect(result.data.results).toEqual([])
+      expect(result.data.total).toBe(0)
+      expect(result.data.page).toBe(1)
+      expect(result.data.pages).toBe(0)
+    })
+
+    it('should respond with a 500 status code when the underlying fetch fails', async () => {
+      spyComponents.communityRequests.getCommunityRequests.mockRejectedValue(new Error('Unable to get requests'))
+      const response = await makeRequest(ownerIdentity, `/v2/communities/${communityId}/requests`)
+      expect(response.status).toBe(500)
+    })
+  })
 })

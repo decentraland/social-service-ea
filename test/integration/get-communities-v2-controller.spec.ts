@@ -72,5 +72,97 @@ test('Get Communities Controller v2', function ({ components, spyComponents }) {
       expect(spyComponents.registry.getProfiles).not.toHaveBeenCalled()
       expect(spyComponents.communityOwners.getOwnersNames).not.toHaveBeenCalled()
     })
+
+    it('should accept a roles filter and return the matching community with a 200 status code', async () => {
+      const response = await makeRequest(identity, `/v2/communities?roles=owner`)
+      expect(response.status).toBe(200)
+      const body = await response.json()
+      expect(body.data.results.find((c: any) => c.id === communityId)).toEqual(
+        expect.objectContaining({ id: communityId, ownerAddress: address, role: CommunityRole.Owner })
+      )
+    })
+  })
+
+  describe('when getting communities (v2) without signing the request', () => {
+    const publicOwnerAddress = '0x0000000000000000000000000000000000000abc'
+
+    beforeEach(async () => {
+      const community = await components.communitiesDb.createCommunity({
+        name: 'Public Listed Community',
+        description: 'Test Description',
+        owner_address: publicOwnerAddress,
+        private: false,
+        active: true,
+        unlisted: false
+      })
+      communityId = community.id
+    })
+
+    afterEach(async () => {
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+    })
+
+    it('should return the public community with the owner address but no owner name', async () => {
+      const { localHttpFetch } = components
+      const response = await localHttpFetch.fetch(`/v2/communities`)
+      expect(response.status).toBe(200)
+      const body = await response.json()
+      const community = body.data.results.find((c: any) => c.id === communityId)
+      expect(community).toEqual(expect.objectContaining({ id: communityId, ownerAddress: publicOwnerAddress }))
+      expect(community).not.toHaveProperty('ownerName')
+    })
+
+    it('should not call the registry to resolve owner profiles', async () => {
+      const { localHttpFetch } = components
+      await localHttpFetch.fetch(`/v2/communities`)
+      expect(spyComponents.communityOwners.getOwnersNames).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when getting communities (v2) with the minimal flag', () => {
+    describe('and the request is not signed', () => {
+      it('should respond with a 401 status code', async () => {
+        const { localHttpFetch } = components
+        const response = await localHttpFetch.fetch(`/v2/communities?minimal=true`)
+        expect(response.status).toBe(401)
+      })
+    })
+
+    describe('and the search query is too short', () => {
+      it('should respond with a 400 status code', async () => {
+        const response = await makeRequest(identity, `/v2/communities?minimal=true&search=ab`)
+        expect(response.status).toBe(400)
+      })
+    })
+
+    describe('and the request is valid', () => {
+      beforeEach(() => {
+        spyComponents.communities.searchCommunities.mockResolvedValue({
+          communities: [{ id: 'minimal-id', name: 'Minimal Community', membersCount: 3, privacy: 'public' as any }],
+          total: 1
+        })
+      })
+
+      it('should return the minimal (profile-free) search results with a 200 status code', async () => {
+        const response = await makeRequest(identity, `/v2/communities?minimal=true&search=test`)
+        expect(response.status).toBe(200)
+        const body = await response.json()
+        expect(body.data.results).toEqual([
+          { id: 'minimal-id', name: 'Minimal Community', membersCount: 3, privacy: 'public' }
+        ])
+        expect(body.data.total).toBe(1)
+      })
+    })
+  })
+
+  describe('when getting communities (v2) and the underlying fetch fails', () => {
+    beforeEach(() => {
+      spyComponents.communities.getCommunitiesWithoutProfiles.mockRejectedValue(new Error('Unable to get communities'))
+    })
+
+    it('should respond with a 500 status code', async () => {
+      const response = await makeRequest(identity, `/v2/communities`)
+      expect(response.status).toBe(500)
+    })
   })
 })

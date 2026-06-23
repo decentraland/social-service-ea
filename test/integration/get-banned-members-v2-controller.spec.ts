@@ -103,5 +103,26 @@ test('Get Banned Members Controller v2', function ({ components, spyComponents }
         expect(response.status).toBe(401)
       })
     })
+
+    describe('when the community does not exist', () => {
+      it('should respond with a 404 status code', async () => {
+        const nonExistentCommunityId = uuidv4()
+        const response = await makeRequest(identity, `/v2/communities/${nonExistentCommunityId}/bans`)
+        expect(response.status).toBe(404)
+      })
+    })
+
+    describe('when the underlying fetch fails', () => {
+      beforeEach(() => {
+        spyComponents.communityBans.getBannedMembersWithoutProfiles.mockRejectedValue(
+          new Error('Unable to get banned members')
+        )
+      })
+
+      it('should respond with a 500 status code', async () => {
+        const response = await makeRequest(identity, `/v2/communities/${communityId}/bans`)
+        expect(response.status).toBe(500)
+      })
+    })
   })
 })

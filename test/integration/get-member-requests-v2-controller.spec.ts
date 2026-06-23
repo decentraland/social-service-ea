@@ -93,4 +93,23 @@ test('Get Member Requests Controller v2', function ({ components, spyComponents 
       expect(response.status).toBe(401)
     })
   })
+
+  describe('when the request is not signed', () => {
+    it('should respond with a 400 status code', async () => {
+      const { localHttpFetch } = components
+      const response = await localHttpFetch.fetch(`/v2/members/${address}/requests`)
+      expect(response.status).toBe(400)
+    })
+  })
+
+  describe('when the underlying fetch fails', () => {
+    beforeEach(() => {
+      spyComponents.communityRequests.getMemberRequests.mockRejectedValue(new Error('Unable to get requests'))
+    })
+
+    it('should respond with a 500 status code', async () => {
+      const response = await makeRequest(identity, `/v2/members/${address}/requests`)
+      expect(response.status).toBe(500)
+    })
+  })
 })

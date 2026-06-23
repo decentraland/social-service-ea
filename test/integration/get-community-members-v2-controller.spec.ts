@@ -166,5 +166,85 @@ test('Get Community Members Controller v2', function ({ components, spyComponent
         expect(response.status).toBe(401)
       })
     })
+
+    describe('when the request is signed and only online members are requested', () => {
+      let response: Response
+
+      beforeEach(async () => {
+        spyComponents.peersStats.getConnectedPeers.mockResolvedValue([firstMemberAddress])
+        response = await makeRequest(identity, `/v2/communities/${communityId}/members?onlyOnline=true`)
+      })
+
+      it('should return only the online members with a 200 status code', async () => {
+        expect(response.status).toBe(200)
+        const result = await response.json()
+        expect(result.data.total).toBe(1)
+        expect(result.data.results).toEqual([
+          expect.objectContaining({
+            communityId,
+            memberAddress: firstMemberAddress,
+            role: CommunityRole.Member,
+            friendshipStatus: FriendshipStatus.REQUEST_SENT
+          })
+        ])
+      })
+    })
+
+    describe('when an unsigned request carries a valid admin token for a private community', () => {
+      let privateCommunityId: string
+
+      beforeEach(async () => {
+        privateCommunityId = (
+          await components.communitiesDb.createCommunity({
+            name: 'Private Community',
+            description: 'Private Description',
+            private: true,
+            unlisted: false,
+            active: true,
+            owner_address: ownerAddress
+          })
+        ).id
+        await components.communitiesDb.addCommunityMember({
+          communityId: privateCommunityId,
+          memberAddress: ownerAddress,
+          role: CommunityRole.Owner
+        })
+      })
+
+      afterEach(async () => {
+        await components.communitiesDbHelper.forceCommunityMemberRemoval(privateCommunityId, [ownerAddress])
+        await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
+      })
+
+      it('should bypass privacy and return the members with a 200 status code', async () => {
+        const { localHttpFetch, config } = components
+        const API_ADMIN_TOKEN = await config.getString('API_ADMIN_TOKEN')
+        const response = await localHttpFetch.fetch(`/v2/communities/${privateCommunityId}/members`, {
+          headers: { Authorization: `Bearer ${API_ADMIN_TOKEN}` }
+        })
+        expect(response.status).toBe(200)
+        const result = await response.json()
+        expect(result.data.results).toEqual([
+          expect.objectContaining({
+            communityId: privateCommunityId,
+            memberAddress: ownerAddress,
+            role: CommunityRole.Owner
+          })
+        ])
+      })
+    })
+
+    describe('when the underlying fetch fails', () => {
+      beforeEach(() => {
+        spyComponents.communityMembers.getCommunityMembersWithoutProfiles.mockRejectedValue(
+          new Error('Unable to get community members')
+        )
+      })
+
+      it('should respond with a 500 status code', async () => {
+        const response = await makeRequest(identity, `/v2/communities/${communityId}/members`)
+        expect(response.status).toBe(500)
+      })
+    })
   })
 })

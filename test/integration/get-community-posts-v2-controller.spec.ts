@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { Response } from '@well-known-components/interfaces'
@@ -98,6 +100,85 @@ test('Get Community Posts Controller v2', function ({ components, spyComponents 
     it('should respond with a 401 status code', async () => {
       const response = await makeRequest(nonMemberIdentity, `/v2/communities/${communityId}/posts`)
       expect(response.status).toBe(401)
+    })
+  })
+
+  describe('when getting posts (v2) as a member of a private community', () => {
+    let memberIdentity: Identity
+    let memberAddress: string
+
+    beforeEach(async () => {
+      memberIdentity = await createTestIdentity()
+      memberAddress = memberIdentity.realAccount.address.toLowerCase()
+      const community = await components.communitiesDb.createCommunity({
+        name: 'Private Community',
+        description: 'A private community',
+        owner_address: ownerAddress,
+        private: true,
+        unlisted: false,
+        active: true
+      })
+      communityId = community.id
+      await components.communitiesDb.addCommunityMember({
+        communityId,
+        memberAddress,
+        role: CommunityRole.Member
+      })
+      await components.communitiesDb.createPost({
+        communityId,
+        authorAddress: ownerAddress,
+        content: 'Post in private community'
+      })
+      spyComponents.registry.getProfiles.mockResolvedValue([])
+    })
+
+    afterEach(async () => {
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [memberAddress])
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+    })
+
+    it('should return the posts with the author address and a 200 status code', async () => {
+      const response = await makeRequest(memberIdentity, `/v2/communities/${communityId}/posts`)
+      expect(response.status).toBe(200)
+      const body = await response.json()
+      expect(body.data.total).toBe(1)
+      expect(body.data.posts[0]).toEqual(
+        expect.objectContaining({ communityId, authorAddress: ownerAddress, content: 'Post in private community' })
+      )
+      expect(body.data.posts[0]).not.toHaveProperty('authorName')
+    })
+  })
+
+  describe('when getting posts (v2) from a community that does not exist', () => {
+    it('should respond with a 404 status code', async () => {
+      const { localHttpFetch } = components
+      const response = await localHttpFetch.fetch(`/v2/communities/${randomUUID()}/posts`)
+      expect(response.status).toBe(404)
+    })
+  })
+
+  describe('when the underlying fetch fails', () => {
+    beforeEach(async () => {
+      const community = await components.communitiesDb.createCommunity({
+        name: 'Public Community',
+        description: 'A public community',
+        owner_address: ownerAddress,
+        private: false,
+        unlisted: false,
+        active: true
+      })
+      communityId = community.id
+      spyComponents.communityPosts.getPostsWithoutProfiles.mockRejectedValue(new Error('Unable to get posts'))
+    })
+
+    afterEach(async () => {
+      await components.communitiesDbHelper.forceCommunityRemoval(communityId)
+    })
+
+    it('should respond with a 500 status code', async () => {
+      const { localHttpFetch } = components
+      const response = await localHttpFetch.fetch(`/v2/communities/${communityId}/posts`)
+      expect(response.status).toBe(500)
     })
   })
 })
