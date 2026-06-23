@@ -86,6 +86,15 @@ test('Get Banned Members Controller v2', function ({ components, spyComponents }
         }
       })
 
+      it('should not leak the internal friendship-action fields', async () => {
+        const result = await response.json()
+        // the banned member has an accepted friendship, so these fields exist on the DB row
+        for (const member of result.data.results) {
+          expect(member).not.toHaveProperty('lastFriendshipAction')
+          expect(member).not.toHaveProperty('actingUser')
+        }
+      })
+
       it('should not call the registry to fetch profiles', async () => {
         expect(spyComponents.registry.getProfiles).not.toHaveBeenCalled()
       })

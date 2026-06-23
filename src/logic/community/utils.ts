@@ -251,6 +251,8 @@ export const mapMembersWithProfiles = <
 /**
  * v2 mapper: attaches the friendship status to each member WITHOUT fetching any profile
  * and WITHOUT dropping members. Returns only the base entity plus `friendshipStatus`.
+ * The internal `lastFriendshipAction`/`actingUser` fields (used only to derive the status)
+ * are stripped so they don't leak into the address-only response.
  */
 export const mapMembersWithFriendshipStatus = <
   T extends { memberAddress: EthAddress; lastFriendshipAction?: Action; actingUser?: EthAddress }
@@ -258,10 +260,11 @@ export const mapMembersWithFriendshipStatus = <
   userAddress: EthAddress | undefined,
   members: T[]
 ): (T & { friendshipStatus: FriendshipStatus })[] => {
-  return members.map((member) => ({
-    ...member,
-    friendshipStatus: computeFriendshipStatus(member, userAddress)
-  }))
+  return members.map((member) => {
+    const friendshipStatus = computeFriendshipStatus(member, userAddress)
+    const { lastFriendshipAction, actingUser, ...rest } = member
+    return { ...rest, friendshipStatus } as T & { friendshipStatus: FriendshipStatus }
+  })
 }
 
 export const getCommunityThumbnailPath = (communityId: string) => {

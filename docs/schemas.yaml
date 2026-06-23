@@ -1050,7 +1050,6 @@ components:
             - visibility
             - active
             - membersCount
-            - role
           properties:
             id:
               type: string
@@ -1151,7 +1150,6 @@ components:
                       - communityId
                       - memberAddress
                       - bannedAt
-                      - bannedBy
                       - friendshipStatus
                     properties:
                       communityId:
@@ -1164,9 +1162,6 @@ components:
                         type: string
                         format: date-time
                         description: 'When the member was banned'
-                      bannedBy:
-                        type: string
-                        description: 'ETH Address of the member who issued the ban'
                       friendshipStatus:
                         type: integer
                         description: 'Friendship status code between the authenticated user and the banned member'
@@ -1279,7 +1274,7 @@ components:
                         description: 'Total number of members in the community'
                       role:
                         type: string
-                        enum: [none, Member, Moderator, Owner]
+                        enum: [owner, moderator, member, none]
                         description: 'Current role of the user in this community'
                       active:
                         type: boolean
