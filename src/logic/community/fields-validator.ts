@@ -34,14 +34,16 @@ export async function createCommunityFieldsValidatorComponent(
 
       let placeIds: string[] | undefined = undefined
       if (placeIdsField) {
+        let parsedPlaceIds: unknown
         try {
-          placeIds = JSON.parse(placeIdsField)
-          if (!Array.isArray(placeIds)) {
-            throw new InvalidRequestError('placeIds must be a valid JSON array')
-          }
+          parsedPlaceIds = JSON.parse(placeIdsField)
         } catch (error) {
           throw new InvalidRequestError('placeIds must be a valid JSON array')
         }
+        if (!Array.isArray(parsedPlaceIds) || !parsedPlaceIds.every((id) => typeof id === 'string')) {
+          throw new InvalidRequestError('placeIds must be a valid JSON array')
+        }
+        placeIds = parsedPlaceIds
       }
 
       if (requireName || name !== undefined) {

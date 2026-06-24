@@ -4,36 +4,19 @@ import { createMockProfile } from '../mocks/profile'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { makeAuthenticatedMultipartRequest } from './utils/auth'
 import { randomUUID } from 'crypto'
-import { Jimp, rgbaToInt } from 'jimp'
+import { Jimp } from 'jimp'
 import { AIComplianceError, CommunityNotCompliantError } from '../../src/logic/community/errors'
 
-export async function createLargeThumbnailBuffer(targetSize = 501 * 1024): Promise<Buffer> {
-  let width = 1000
-  let height = 1000
-  let buffer: Buffer
-
-  while (true) {
-    const image = new Jimp({ width, height })
-    // Fill with random pixels to avoid compression
-    for (let x = 0; x < width; x++) {
-      for (let y = 0; y < height; y++) {
-        const color = rgbaToInt(
-          Math.floor(Math.random() * 256),
-          Math.floor(Math.random() * 256),
-          Math.floor(Math.random() * 256),
-          255
-        )
-        image.setPixelColor(color, x, y)
-      }
-    }
-    buffer = await image.getBuffer('image/png')
-    if (buffer.length >= targetSize) break
-    // Increase size for next iteration
-    width += 100
-    height += 100
+export async function createLargeThumbnailBuffer(targetSize = 600 * 1024): Promise<Buffer> {
+  // Produce a valid PNG larger than the 500KB thumbnail limit but under the 1MB request body
+  // cap, so this exercises the thumbnail size validation specifically. We pad a small valid PNG
+  // up to the target size (file-type still detects PNG from the header); this is deterministic
+  // and fast, unlike generating a multi-megabyte random image.
+  const png = await new Jimp({ width: 16, height: 16 }).getBuffer('image/png')
+  if (png.length >= targetSize) {
+    return png
   }
-
-  return buffer
+  return Buffer.concat([png, Buffer.alloc(targetSize - png.length)])
 }
 
 test('Create Community Controller', async function ({ components, stubComponents, spyComponents }) {
