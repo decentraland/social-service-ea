@@ -1,5 +1,5 @@
 import { CommunityRole } from '../../../src/types'
-import { NotAuthorizedError, InvalidRequestError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockCatalystClient, mockRegistry, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'

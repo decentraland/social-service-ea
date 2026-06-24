@@ -1,4 +1,4 @@
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { AppComponents, CommunityRole } from '../../types'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from './errors'
 import { CommunityPlaceWithDetails, CommunityPrivacyEnum, ICommunityPlacesComponent } from './types'

@@ -1,5 +1,5 @@
-import { validateMetricsDeclaration } from '@well-known-components/metrics'
-import { getDefaultHttpMetrics } from '@dcl/uws-http-server'
+import { validateMetricsDeclaration } from '@dcl/metrics'
+import { getDefaultHttpMetrics } from '@dcl/http-server'
 import { metricDeclarations as logsMetricsDeclarations } from '@well-known-components/logger'
 import { IMetricsComponent } from '@well-known-components/interfaces'
 

@@ -9,7 +9,7 @@ import {
   CommunityPrivacyEnum
 } from './types'
 import { CommunityNotFoundError, CommunityPostNotFoundError } from './errors'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { normalizeAddress } from '../../utils/address'
 import { getProfileName, getProfileUserId, getProfileHasClaimedName, getProfilePictureUrl } from '../profiles'
 import { CommunityRole } from '../../types/entities'

@@ -1,7 +1,7 @@
 import { addUserMuteHandler } from '../../../../../src/controllers/handlers/http/add-user-mute-handler'
 import { createUserMutesMockedComponent } from '../../../../mocks/components/user-mutes'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 import { SelfMuteError } from '../../../../../src/logic/user-mutes/errors'
 
 let mockUserMutes: ReturnType<typeof createUserMutesMockedComponent>

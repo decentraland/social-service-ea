@@ -1,5 +1,5 @@
 import { CommunityRole } from '../../../src/types/entities'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityNotFoundError, CommunityPlaceNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { createPlacesApiAdapterMockComponent, createLogsMockedComponent } from '../../mocks/components'

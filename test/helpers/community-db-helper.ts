@@ -1,4 +1,4 @@
-import { IPgComponent } from '@well-known-components/pg-component'
+import { IPgComponent } from '@dcl/pg-component'
 import SQL from 'sql-template-strings'
 import { normalizeAddress } from '../../src/utils/address'
 import { ICommunitiesDbHelperComponent } from '../../src/types/components'

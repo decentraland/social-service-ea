@@ -1,11 +1,16 @@
-import { IBaseComponent } from '@well-known-components/interfaces'
-import { createPgComponent as createBasePgComponent, Options } from '@well-known-components/pg-component'
+import {
+  IBaseComponent,
+  IConfigComponent,
+  ILoggerComponent,
+  IMetricsComponent
+} from '@well-known-components/interfaces'
+import { createPgComponent as createBasePgComponent, Options } from '@dcl/pg-component'
 import { PoolClient } from 'pg'
 import { IPgComponent } from '../types'
 import { SQLStatement } from 'sql-template-strings'
 
 export async function createPgComponent(
-  components: createBasePgComponent.NeededComponents,
+  components: { config: IConfigComponent; logs: ILoggerComponent; metrics?: IMetricsComponent<string> },
   options?: Options
 ): Promise<IPgComponent & IBaseComponent> {
   const pg = await createBasePgComponent(components, options)

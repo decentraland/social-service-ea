@@ -22,13 +22,13 @@ test('Create Community Post Controller', async function ({ components, stubCompo
       nonMemberIdentity = await createTestIdentity()
 
       // Mock AI compliance validator
-      stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+      stubComponents.communityComplianceValidator.validateCommunityContent.mockResolvedValue(undefined)
 
       // Mock catalyst client for community creation
-      stubComponents.catalystClient.getOwnedNames.resolves([
+      stubComponents.catalystClient.getOwnedNames.mockResolvedValue([
         { id: '1', name: 'OwnerName', contractAddress: '0x123', tokenId: '1' }
       ])
-      stubComponents.registry.getProfile.resolves(
+      stubComponents.registry.getProfile.mockResolvedValue(
         createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
       )
 

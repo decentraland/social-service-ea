@@ -6,7 +6,7 @@ import { isErrorWithMessage, errorMessageOrDefault } from '../../utils/errors'
 import { separatePositionsAndWorlds } from '../../utils/places'
 import { ActiveCommunityVoiceChat, CommunityPrivacyEnum } from '../community/types'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import {
   CommunityVoiceChatNotFoundError,
   CommunityVoiceChatAlreadyActiveError,

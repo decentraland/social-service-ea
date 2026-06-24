@@ -7,7 +7,6 @@ import { Action } from '../../src/types/entities'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createFriendshipRequest, createOrUpsertActiveFriendship } from './utils/friendships'
 import { removeFriendship } from './utils/friendships'
-import { Response } from '@well-known-components/interfaces'
 
 test('Get Community Members Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)

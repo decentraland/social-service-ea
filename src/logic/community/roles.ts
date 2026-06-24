@@ -1,4 +1,4 @@
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityRole, CommunityPermission } from '../../types/entities'
 import { AppComponents } from '../../types/system'
 import { ICommunityRolesComponent, CommunityPost } from './types'

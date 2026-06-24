@@ -18,7 +18,10 @@ export async function createCatalystClient({
   const contractNetwork = env === 'prd' ? L1_MAINNET : L1_TESTNET
 
   function getLambdasClientOrDefault(lambdasServerUrl?: string): LambdasClient {
-    return createLambdasClient({ fetcher, url: lambdasServerUrl ?? loadBalancer })
+    return createLambdasClient({
+      fetcher,
+      url: lambdasServerUrl ?? loadBalancer
+    })
   }
 
   function rotateLambdasServerClient<T>(

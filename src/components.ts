@@ -6,8 +6,8 @@ import {
 } from '@dcl/http-server'
 import { createConfigComponent, createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
-import { createMetricsComponent } from '@well-known-components/metrics'
-import { createFetchComponent } from '@well-known-components/fetch-component'
+import { createMetricsComponent } from '@dcl/metrics'
+import { createFetchComponent } from '@dcl/fetch-component'
 import { createAnalyticsComponent } from '@dcl/analytics-component'
 import { createPgComponent } from './adapters/pg'
 import { AppComponents, GlobalContext } from './types'
@@ -64,7 +64,7 @@ import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/
 import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
 import { createSlackComponent } from '@dcl/slack-component'
 import { createAIComplianceComponent } from './adapters/ai-compliance'
-import { createFeaturesComponent } from '@well-known-components/features-component'
+import { createFeaturesComponent } from '@dcl/features-component'
 import { createFeatureFlagsAdapter } from './adapters/feature-flags'
 import { createInMemoryCacheComponent } from './adapters/memory-cache'
 import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
@@ -111,17 +111,13 @@ export async function initComponents(): Promise<AppComponents> {
   const memoryCache = createInMemoryCacheComponent()
   const schemaValidator = createSchemaValidatorComponent({ ensureJsonContentType: false })
 
-  await instrumentHttpServerWithPromClientRegistry({ server: httpServer, metrics, config, registry: metrics.registry! })
+  await instrumentHttpServerWithPromClientRegistry({
+    server: httpServer,
+    metrics,
+    config,
+    registry: metrics.registry as NonNullable<typeof metrics.registry>
+  })
 
-  let databaseUrl: string | undefined = await config.getString('PG_COMPONENT_PSQL_CONNECTION_STRING')
-  if (!databaseUrl) {
-    const dbUser = await config.requireString('PG_COMPONENT_PSQL_USER')
-    const dbDatabaseName = await config.requireString('PG_COMPONENT_PSQL_DATABASE')
-    const dbPort = await config.requireString('PG_COMPONENT_PSQL_PORT')
-    const dbHost = await config.requireString('PG_COMPONENT_PSQL_HOST')
-    const dbPassword = await config.requireString('PG_COMPONENT_PSQL_PASSWORD')
-    databaseUrl = `postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbDatabaseName}`
-  }
   const privateVoiceChatJobInterval = await config.requireNumber('PRIVATE_VOICE_CHAT_JOB_INTERVAL')
   const communityVoiceChatPollingJobInterval = await config.requireNumber('COMMUNITY_VOICE_CHAT_POLLING_JOB_INTERVAL')
 
@@ -129,7 +125,6 @@ export async function initComponents(): Promise<AppComponents> {
     { logs, config, metrics },
     {
       migration: {
-        databaseUrl,
         dir: resolve(__dirname, 'migrations'),
         migrationsTable: 'pgmigrations',
         ignorePattern: '.*\\.map',

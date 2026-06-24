@@ -43,7 +43,10 @@ describe('catalyst-client', () => {
       fetcher: mockFetcher,
       config: mockConfig
     })
-    lambdasClientMock = createLambdasClient({ fetcher: mockFetcher, url: CATALYST_LAMBDAS_LOAD_BALANCER_URL })
+    lambdasClientMock = createLambdasClient({
+      fetcher: mockFetcher,
+      url: CATALYST_LAMBDAS_LOAD_BALANCER_URL
+    })
 
     jest.useFakeTimers()
   })
