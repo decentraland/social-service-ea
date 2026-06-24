@@ -1,5 +1,5 @@
 import { InvalidRequestError } from '@dcl/http-commons'
-import { multipartParserWrapper, MAX_MULTIPART_BYTES } from '../../../src/utils/multipart'
+import { multipartParserWrapper, sanitizeFilename, MAX_MULTIPART_BYTES } from '../../../src/utils/multipart'
 
 function buildContext(request: Request): any {
   return {
@@ -116,6 +116,32 @@ describe('when wrapping a handler with the multipart parser', () => {
 
     it('should reject with an InvalidRequestError instead of surfacing a 500', async () => {
       await expect(wrapped(context)).rejects.toThrow(InvalidRequestError)
+    })
+  })
+})
+
+describe('when sanitizing an uploaded filename', () => {
+  describe('and the filename has no path components', () => {
+    it('should return the name unchanged', () => {
+      expect(sanitizeFilename('thumbnail.png')).toBe('thumbnail.png')
+    })
+  })
+
+  describe('and the filename contains a POSIX path', () => {
+    it('should return only the basename', () => {
+      expect(sanitizeFilename('../../../etc/passwd')).toBe('passwd')
+    })
+  })
+
+  describe('and the filename contains a Windows path', () => {
+    it('should return only the basename', () => {
+      expect(sanitizeFilename('C:\\Windows\\system32\\evil.png')).toBe('evil.png')
+    })
+  })
+
+  describe('and the filename hides a separator after a newline', () => {
+    it('should still strip the directory components', () => {
+      expect(sanitizeFilename('evil\n../../secret.png')).toBe('secret.png')
     })
   })
 })

@@ -44,11 +44,16 @@ export type FormDataContext<T> = IHttpServerComponent.DefaultContext<T> & {
 }
 
 /**
- * Strips any directory components a client may have embedded in a filename so the value can
- * never be used to traverse the filesystem if a caller later derives a path from it.
+ * Returns just the basename of a client-supplied filename, stripping any directory components
+ * so the value can never be used to traverse the filesystem if a caller later derives a path
+ * from it. Splitting on the separators (rather than a `/^.*[\\/]/` replace) also strips
+ * separators that follow a newline, which a `.`-based regex would skip.
+ *
+ * @public
  */
-function sanitizeFilename(name: string): string {
-  return name.replace(/^.*[\\/]/, '')
+export function sanitizeFilename(name: string): string {
+  const segments = name.split(/[\\/]/)
+  return segments[segments.length - 1] ?? ''
 }
 
 /**
