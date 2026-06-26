@@ -1,7 +1,6 @@
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
-import { Response } from '@well-known-components/interfaces'
 
 test('Get Communities Controller v2', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)

@@ -3,7 +3,6 @@ import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
 import { mockCommunity } from '../mocks/communities'
 import { CommunityRole } from '../../src/types'
-import { Response } from '@well-known-components/interfaces'
 
 const PROFILE_FIELDS = ['ownerName', 'name']
 

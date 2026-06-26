@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
-import { Response } from '@well-known-components/interfaces'
 
 const AUTHOR_PROFILE_FIELDS = ['authorName', 'authorProfilePictureUrl', 'authorHasClaimedName']
 

@@ -4,7 +4,6 @@ import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/
 import { v4 as uuidv4 } from 'uuid'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createFriendshipRequest, removeFriendship } from './utils/friendships'
-import { Response } from '@well-known-components/interfaces'
 
 const PROFILE_FIELDS = ['name', 'profilePictureUrl', 'hasClaimedName', 'nameColor']
 

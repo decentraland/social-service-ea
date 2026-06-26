@@ -4,7 +4,6 @@ import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/
 import { mockCommunity } from '../mocks/communities'
 import { CommunityRole } from '../../src/types'
 import { FriendshipStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { Response } from '@well-known-components/interfaces'
 
 const PROFILE_FIELDS = ['name', 'profilePictureUrl', 'hasClaimedName', 'nameColor']
 
