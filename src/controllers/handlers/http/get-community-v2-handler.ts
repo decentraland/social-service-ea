@@ -5,7 +5,7 @@ import {
   AggregatedCommunityWithMemberAndVoiceChatDataV2,
   CommunityPublicInformationWithVoiceChatV2
 } from '../../../logic/community'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 
 /**
  * v2 of {@link getCommunityHandler}: returns the owner address only (no owner name) and

@@ -1,6 +1,6 @@
-import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
+import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types/http'
-import { getPaginationParams, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { getPaginationParams, NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityPostWithLikes } from '../../../logic/community/types'
 import { CommunityNotFoundError } from '../../../logic/community/errors'
 import { errorMessageOrDefault } from '../../../utils/errors'
