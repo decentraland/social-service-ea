@@ -975,14 +975,14 @@ components:
                   type: array
                   items:
                     type: object
+                    description: |
+                      A community. In the default (full) listing every field below is present.
+                      When `minimal=true`, only `id`, `name`, `membersCount`, and `privacy` are
+                      returned and the remaining fields are omitted.
                     required:
                       - id
                       - name
-                      - description
-                      - ownerAddress
                       - privacy
-                      - visibility
-                      - active
                       - membersCount
                     properties:
                       id:
@@ -1236,6 +1236,7 @@ components:
                       - membersCount
                       - role
                       - active
+                      - visibility
                       - friends
                       - voiceChatStatus
                     properties:
@@ -1279,6 +1280,15 @@ components:
                       active:
                         type: boolean
                         description: 'Whether the community is active'
+                      visibility:
+                        type: string
+                        enum: [all, unlisted]
+                        description: 'Community visibility setting'
+                      thumbnails:
+                        type: object
+                        additionalProperties:
+                          type: string
+                        description: 'Map of thumbnail URLs by size/type'
                       friends:
                         type: array
                         items:

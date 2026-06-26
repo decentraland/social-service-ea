@@ -51,9 +51,7 @@ export async function getCommunitiesV2Handler(
           `Search query must be at least ${MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE} characters when using minimal`
         )
       }
-    }
 
-    if (minimal) {
       const limit = Math.min(pagination.limit, MAX_LIMIT_FOR_MINIMAL_RESPONSE)
 
       logger.info('Searching communities (v2) with minimal response', {

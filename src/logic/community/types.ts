@@ -591,18 +591,8 @@ export type MemberCommunityRequest = WithCommonFriends<{
  * v2 (address-only) member-community request: same as MemberCommunityRequest but without
  * the owner's profile name and with mutual friends as plain addresses (`friends: string[]`).
  */
-export type MemberCommunityRequestV2 = {
-  id: string
-  communityId: string
-  thumbnails?: Record<string, string>
-  name: string
-  description: string
-  ownerAddress: string
-  privacy: CommunityPrivacyEnum
-  membersCount: number
-  type: CommunityRequestType
-  friends: string[]
-}
+export type MemberCommunityRequestV2 = Omit<CommunityWithUserInformationAndVoiceChatV2, 'id' | 'isHostingLiveEvent'> &
+  MemberRequest
 
 export interface ActiveCommunityVoiceChat {
   communityId: string

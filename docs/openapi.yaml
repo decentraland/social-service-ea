@@ -2144,6 +2144,27 @@ paths:
           required: false
           schema:
             type: boolean
+          description: Filter to show only communities with active voice chats. Ignored when `minimal=true`.
+        - name: minimal
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |
+            When `true`, returns only `id`, `name`, `membersCount`, and `privacy` for fast lookups.
+            Requires authentication and a `search` parameter with at least 3 characters.
+            Supports pagination with `limit` (max 50) and `offset`. Other filters
+            (`onlyMemberOf`, `onlyWithActiveVoiceChat`, `roles`) are ignored.
+        - name: roles
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [owner, moderator, member, none]
+          description: Filter communities by the authenticated user's role (can specify multiple). Ignored when `minimal=true`.
       responses:
         '200':
           description: Communities found

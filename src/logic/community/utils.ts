@@ -43,6 +43,27 @@ const toBaseCommunity = <T extends { membersCount: number | string }>(community:
   }
 }
 
+/**
+ * Resolves the voice chat status to expose for a community: the real status when voice
+ * chat is visible to the caller (a public community, or any member of a private one) and
+ * is actually active, otherwise a zeroed/inactive default. Shared by the v1 and v2 mappers.
+ */
+const resolveVoiceChatStatus = (
+  community: { privacy: CommunityPrivacyEnum; role: CommunityRole },
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityVoiceChatStatus => {
+  const shouldIncludeVoiceChat =
+    community.privacy !== CommunityPrivacyEnum.Private || community.role !== CommunityRole.None
+
+  return shouldIncludeVoiceChat && !!voiceChatStatus
+    ? voiceChatStatus
+    : {
+        isActive: false,
+        participantCount: 0,
+        moderatorCount: 0
+      }
+}
+
 export const toCommunityWithMembersCount = (
   community: AggregatedCommunity & { role: CommunityRole },
   membersCount: number,
@@ -80,20 +101,9 @@ export const toCommunityWithUserInformationAndVoiceChat = (
 ): CommunityWithUserInformationAndVoiceChat => {
   const baseResult = toCommunityWithUserInformation(community, profilesMap)
 
-  const shouldIncludeVoiceChat =
-    community.privacy !== CommunityPrivacyEnum.Private || community.role !== CommunityRole.None
-
   return {
     ...baseResult,
-    voiceChatStatus:
-      shouldIncludeVoiceChat && !!voiceChatStatus
-        ? voiceChatStatus
-        : // If voice chat is not included, return default values
-          {
-            isActive: false,
-            participantCount: 0,
-            moderatorCount: 0
-          }
+    voiceChatStatus: resolveVoiceChatStatus(community, voiceChatStatus)
   }
 }
 
@@ -164,19 +174,9 @@ export const toCommunityWithUserInformationAndVoiceChatV2 = (
 ): CommunityWithUserInformationAndVoiceChatV2 => {
   const baseResult = toCommunityWithUserInformationV2(community)
 
-  const shouldIncludeVoiceChat =
-    community.privacy !== CommunityPrivacyEnum.Private || community.role !== CommunityRole.None
-
   return {
     ...baseResult,
-    voiceChatStatus:
-      shouldIncludeVoiceChat && !!voiceChatStatus
-        ? voiceChatStatus
-        : {
-            isActive: false,
-            participantCount: 0,
-            moderatorCount: 0
-          }
+    voiceChatStatus: resolveVoiceChatStatus(community, voiceChatStatus)
   }
 }
 
