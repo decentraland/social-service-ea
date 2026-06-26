@@ -9,6 +9,7 @@ import {
   CommunityRequestType,
   ICommunityRequestsComponent,
   MemberCommunityRequest,
+  MemberCommunityRequestV2,
   ListCommunityRequestsOptions,
   RequestActionOptions
 } from './types'
@@ -379,6 +380,38 @@ export function createCommunityRequestsComponent(
       .filter(Boolean) as MemberCommunityRequest[]
   }
 
+  async function aggregateRequestsWithCommunitiesWithoutProfiles(
+    memberAddress: string,
+    requests: MemberRequest[]
+  ): Promise<MemberCommunityRequestV2[]> {
+    if (requests.length === 0) {
+      return []
+    }
+
+    const communityIds = requests.map((request) => request.communityId)
+    const { communities: communityData } = await communities.getCommunitiesWithoutProfiles(memberAddress, {
+      communityIds,
+      pagination: { limit: communityIds.length, offset: 0 },
+      includeUnlisted: true
+    })
+
+    return requests
+      .map((request) => {
+        const community = communityData.find((community) => community.id === request.communityId)
+        if (!community) {
+          logger.warn(`Community ${request.communityId} not found for request ${request.id}`)
+          return undefined
+        }
+
+        const { id, ...communityWithoutId } = community // prevent id override
+        return {
+          ...communityWithoutId,
+          ...request
+        } as MemberCommunityRequestV2
+      })
+      .filter(Boolean) as MemberCommunityRequestV2[]
+  }
+
   async function notifyAboutNewRequest(
     request: MemberRequest,
     communityId: string,
@@ -404,6 +437,7 @@ export function createCommunityRequestsComponent(
     getMemberRequests,
     getCommunityRequests,
     updateRequestStatus,
-    aggregateRequestsWithCommunities
+    aggregateRequestsWithCommunities,
+    aggregateRequestsWithCommunitiesWithoutProfiles
   }
 }

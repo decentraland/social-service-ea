@@ -40,7 +40,14 @@ import {
   getMemberCommunitiesByIdsHandler,
   addUserMuteHandler,
   removeUserMuteHandler,
-  getUserMutesHandler
+  getUserMutesHandler,
+  getCommunityV2Handler,
+  getCommunitiesV2Handler,
+  getCommunityMembersV2Handler,
+  getBannedMembersV2Handler,
+  getCommunityRequestsV2Handler,
+  getMemberRequestsV2Handler,
+  getCommunityPostsV2Handler
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/crypto-middleware'
 import { multipartParserWrapper } from '../../utils/multipart'
@@ -194,6 +201,16 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   // Moderation endpoints
   router.get('/v1/moderation/communities', signedFetchMiddleware(), getAllCommunitiesForModerationHandler)
+
+  // v2 endpoints: same behavior as their v1 counterparts but the responses contain only
+  // addresses (no Catalyst profile information). Same middleware as the v1 routes.
+  router.get('/v2/communities/:id', signedFetchMiddleware({ optional: true }), getCommunityV2Handler)
+  router.get('/v2/communities', signedFetchMiddleware({ optional: true }), getCommunitiesV2Handler)
+  router.get('/v2/communities/:id/members', signedFetchMiddleware({ optional: true }), getCommunityMembersV2Handler)
+  router.get('/v2/communities/:id/bans', signedFetchMiddleware(), getBannedMembersV2Handler)
+  router.get('/v2/members/:address/requests', signedFetchMiddleware(), getMemberRequestsV2Handler)
+  router.get('/v2/communities/:id/requests', signedFetchMiddleware(), getCommunityRequestsV2Handler)
+  router.get('/v2/communities/:id/posts', signedFetchMiddleware({ optional: true }), getCommunityPostsV2Handler)
 
   return router
 }
