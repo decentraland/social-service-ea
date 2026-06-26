@@ -1,5 +1,5 @@
 import { EthAddress } from '@dcl/schemas/dist/misc'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse

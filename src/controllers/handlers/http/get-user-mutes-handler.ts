@@ -1,8 +1,8 @@
-import { getPaginationParams } from '@dcl/platform-server-commons'
+import { getPaginationParams } from '@dcl/http-commons'
 import { HandlerContextWithPath } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { getPaginationResultProperties } from '../../../utils/pagination'
-import { IHttpServerComponent } from '@well-known-components/interfaces'
+import { IHttpServerComponent } from '@dcl/core-commons'
 
 export async function getUserMutesHandler(
   context: Pick<HandlerContextWithPath<'userMutes' | 'logs', '/v1/mutes'>, 'components' | 'url' | 'verification'>

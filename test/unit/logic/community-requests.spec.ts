@@ -18,7 +18,7 @@ import {
   CommunityDB,
   CommunityVisibilityEnum
 } from '../../../src/logic/community'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { createCommunityRequestsComponent } from '../../../src/logic/community/requests'
 import { createMockedPubSubComponent, mockLogs } from '../../mocks/components'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'

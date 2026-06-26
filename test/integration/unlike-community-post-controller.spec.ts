@@ -20,11 +20,11 @@ test('Unlike Community Post Controller', function ({ components, stubComponents,
       memberIdentity = await createTestIdentity()
 
       // Stub catalyst client responses
-      stubComponents.catalystClient.getOwnedNames.resolves([])
-      stubComponents.registry.getProfile.resolves(
+      stubComponents.catalystClient.getOwnedNames.mockResolvedValue([])
+      stubComponents.registry.getProfile.mockResolvedValue(
         createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
       )
-      stubComponents.registry.getProfiles.resolves([
+      stubComponents.registry.getProfiles.mockResolvedValue([
         createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
       ])
 

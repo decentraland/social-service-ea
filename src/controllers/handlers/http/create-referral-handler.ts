@@ -1,5 +1,5 @@
-import { IHttpServerComponent } from '@well-known-components/interfaces'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { IHttpServerComponent } from '@dcl/core-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import {
   ReferralInvalidInputError,

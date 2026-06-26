@@ -3,7 +3,7 @@ import { createCommunityRolesComponent, ROLE_ACTION_TRANSITIONS } from '../../..
 import { OWNER_PERMISSIONS, MODERATOR_PERMISSIONS, COMMUNITY_ROLES } from '../../../src/logic/community/roles'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs } from '../../mocks/components/logs'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { ICommunityRolesComponent } from '../../../src/logic/community'
 
 describe('Community Roles Component', () => {

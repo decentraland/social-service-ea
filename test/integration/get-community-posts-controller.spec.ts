@@ -21,13 +21,13 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
       nonMemberIdentity = await createTestIdentity()
 
       // Stub Catalyst client responses
-      stubComponents.catalystClient.getOwnedNames.resolves([
+      stubComponents.catalystClient.getOwnedNames.mockResolvedValue([
         { id: '1', name: 'OwnerName', contractAddress: '0x123', tokenId: '1' },
         { id: '2', name: 'MemberName', contractAddress: '0x123', tokenId: '2' },
         { id: '3', name: 'NonMemberName', contractAddress: '0x123', tokenId: '3' }
       ])
 
-      stubComponents.registry.getProfiles.resolves([
+      stubComponents.registry.getProfiles.mockResolvedValue([
         createMockProfileWithDetails(ownerIdentity.realAccount.address.toLowerCase(), { name: 'OwnerName' }),
         createMockProfileWithDetails(memberIdentity.realAccount.address.toLowerCase(), { name: 'MemberName' }),
         createMockProfileWithDetails(nonMemberIdentity.realAccount.address.toLowerCase(), { name: 'NonMemberName' })
@@ -227,11 +227,11 @@ test('Get Community Posts Controller', async function ({ components, stubCompone
 
       beforeEach(async () => {
         // Stub catalyst client responses
-        stubComponents.catalystClient.getOwnedNames.resolves([])
-        stubComponents.registry.getProfile.resolves(
+        stubComponents.catalystClient.getOwnedNames.mockResolvedValue([])
+        stubComponents.registry.getProfile.mockResolvedValue(
           createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
         )
-        stubComponents.registry.getProfiles.resolves([
+        stubComponents.registry.getProfiles.mockResolvedValue([
           createMockProfile(ownerIdentity.realAccount.address.toLowerCase())
         ])
 

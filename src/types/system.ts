@@ -1,14 +1,9 @@
-import type {
-  IConfigComponent,
-  ILoggerComponent,
-  IMetricsComponent,
-  IFetchComponent,
-  IHttpServerComponent
-} from '@well-known-components/interfaces'
+import type { IConfigComponent, ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
+import type { IFetchComponent, IHttpServerComponent } from '@dcl/core-commons'
 import { metricDeclarations } from '../metrics'
 import { IUWsComponent } from '@dcl/uws-http-server'
 import { INatsComponent } from '@well-known-components/nats-component/dist/types'
-import { IFeaturesComponent } from '@well-known-components/features-component'
+import { IFeaturesComponent } from '@dcl/features-component'
 import { IAnalyticsComponent } from '@dcl/analytics-component'
 import {
   IFriendsDatabaseComponent,

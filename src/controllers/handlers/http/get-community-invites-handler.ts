@@ -1,4 +1,4 @@
-import { InvalidRequestError } from '@dcl/platform-server-commons/dist/errors'
+import { InvalidRequestError } from '@dcl/http-commons'
 import { EthAddress } from '@dcl/schemas'
 import { Community } from '../../../logic/community'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'

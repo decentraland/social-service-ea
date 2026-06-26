@@ -1,4 +1,4 @@
-import { IPgComponent } from '@well-known-components/pg-component'
+import { IPgComponent } from '@dcl/pg-component'
 
 export class TestCleanup {
   private tableData: Record<string, any[]> = {}

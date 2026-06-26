@@ -1,4 +1,4 @@
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { EthAddress } from '@dcl/schemas'
 import { normalizeAddress } from '../../../utils/address'
