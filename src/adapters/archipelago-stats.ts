@@ -1,5 +1,6 @@
 import { AppComponents, IArchipelagoStatsComponent } from '../types'
 import { PEERS_CACHE_KEY } from '../utils/peers'
+import { fetchJson } from '../utils/fetch'
 
 export async function createArchipelagoStatsComponent({
   logs,
@@ -13,13 +14,10 @@ export async function createArchipelagoStatsComponent({
   return {
     async fetchPeers() {
       try {
-        const response = await fetcher.fetch(`${url}/peers`)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching peers: ${response.statusText}`)
-        }
-
-        const { peers } = await response.json()
+        const { peers } = await fetchJson<{ peers: { id: string }[] }>(
+          () => fetcher.fetch(`${url}/peers`),
+          (r) => new Error(`Error fetching peers: ${r.statusText}`)
+        )
 
         return peers.map((peer: { id: string }) => peer.id)
       } catch (error: any) {

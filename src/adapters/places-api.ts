@@ -1,4 +1,5 @@
 import { AppComponents, IPlacesApiComponent } from '../types'
+import { fetchJson } from '../utils/fetch'
 
 export type PlacesApiResponse = {
   total?: number
@@ -17,19 +18,17 @@ export async function createPlacesApiAdapter(
     getDestinations: async (placeIds: string[], worldNames: string[]): Promise<PlacesApiResponse['data']> => {
       if (placeIds.length === 0 && worldNames.length === 0) return []
 
-      const response = await fetcher.fetch(`${placesApiUrl}/api/destinations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify([...placeIds, ...worldNames])
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to get destinations')
-      }
-
-      const parsedResponse = (await response.json()) as PlacesApiResponse
+      const parsedResponse = await fetchJson<PlacesApiResponse>(
+        () =>
+          fetcher.fetch(`${placesApiUrl}/api/destinations`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify([...placeIds, ...worldNames])
+          }),
+        () => new Error('Failed to get destinations')
+      )
 
       return parsedResponse.data ?? []
     }

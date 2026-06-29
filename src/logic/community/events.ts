@@ -1,5 +1,6 @@
 import { AppComponents } from '../../types'
 import { ICommunityEventsComponent } from './types'
+import { discardResponseBody } from '../../utils/fetch'
 
 type Event = {
   id: string
@@ -76,6 +77,7 @@ export async function createCommunityEventsComponent(
       const response = await fetcher.fetch(url)
 
       if (!response.ok) {
+        await discardResponseBody(response)
         logger.error('Failed to check live events', { communityId, status: response.status })
         return false
       }

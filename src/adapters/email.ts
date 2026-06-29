@@ -1,4 +1,5 @@
 import { AppComponents, IEmailComponent } from '../types'
+import { fetchVoid } from '../utils/fetch'
 
 export async function createEmailComponent(
   components: Pick<AppComponents, 'fetcher' | 'config'>
@@ -10,21 +11,19 @@ export async function createEmailComponent(
 
   async function sendEmail(email: string, subject: string, content: string): Promise<void> {
     const url = new URL('/notifications/email', notificationUrl).toString()
-    const response = await fetcher.fetch(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${internalApiKey}`
-      },
-      body: JSON.stringify({ subject, content, email })
-    })
-
-    if (response.ok) {
-      return
-    }
-
-    throw new Error(`Failed to fetch ${url}: ${response.status} ${await response.text()}`)
+    await fetchVoid(
+      () =>
+        fetcher.fetch(url, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${internalApiKey}`
+          },
+          body: JSON.stringify({ subject, content, email })
+        }),
+      async (r) => new Error(`Failed to fetch ${url}: ${r.status} ${await r.text()}`)
+    )
   }
 
   return {

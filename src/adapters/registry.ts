@@ -2,6 +2,7 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { AppComponents, IRegistryComponent } from '../types'
 import { extractMinimalProfile, getProfileUserId } from '../logic/profiles'
 import { withoutTracing } from '../utils/tracing'
+import { fetchJson } from '../utils/fetch'
 
 export const PROFILE_CACHE_PREFIX = 'catalyst:minimal:profile:'
 
@@ -55,16 +56,14 @@ export async function createRegistryComponent({
     let validProfiles: Profile[] = []
 
     if (idsToFetch.length > 0) {
-      const response = await fetcher.fetch(`${registryUrl}/profiles`, {
-        method: 'POST',
-        body: JSON.stringify({ ids: idsToFetch })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch profiles from registry: ${response.statusText}`)
-      }
-
-      const registryResults = (await response.json()) as Profile[]
+      const registryResults = await fetchJson<Profile[]>(
+        () =>
+          fetcher.fetch(`${registryUrl}/profiles`, {
+            method: 'POST',
+            body: JSON.stringify({ ids: idsToFetch })
+          }),
+        (r) => new Error(`Failed to fetch profiles from registry: ${r.statusText}`)
+      )
 
       const minimalProfiles = registryResults.map(extractMinimalProfile).filter(Boolean) as Profile[]
       validProfiles = minimalProfiles
@@ -95,16 +94,14 @@ export async function createRegistryComponent({
       return cachedProfile
     }
 
-    const response = await fetcher.fetch(`${registryUrl}/profiles`, {
-      method: 'POST',
-      body: JSON.stringify({ ids: [id] })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch profile from registry: ${response.statusText}`)
-    }
-
-    const registryResults = (await response.json()) as Profile[]
+    const registryResults = await fetchJson<Profile[]>(
+      () =>
+        fetcher.fetch(`${registryUrl}/profiles`, {
+          method: 'POST',
+          body: JSON.stringify({ ids: [id] })
+        }),
+      (r) => new Error(`Failed to fetch profile from registry: ${r.statusText}`)
+    )
 
     if (registryResults.length === 0) {
       throw new Error(`Profile not found: ${id}`)
