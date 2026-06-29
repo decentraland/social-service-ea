@@ -2,7 +2,7 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createUpdateHandlerComponent } from '../../../src/logic/updates'
 import { mockRegistry, mockFriendsDB } from '../../mocks/components'
-import mitt, { Emitter } from 'mitt'
+import { Emitter } from 'mitt'
 import {
   Action,
   IUpdateHandlerComponent,
@@ -62,8 +62,8 @@ describe('Updates Handlers', () => {
     })
 
     subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
-    await subscribersContext.addSubscriber('0x456', mitt<SubscriptionEventsEmitter>())
-    await subscribersContext.addSubscriber('0x789', mitt<SubscriptionEventsEmitter>())
+    subscribersContext.addConnection('0x456', 'conn-456')
+    subscribersContext.addConnection('0x789', 'conn-789')
 
     mockCommunityMembers = createMockCommunityMembersComponent({})
     mockRegistry.getProfile.mockResolvedValue(createMockProfile('0x456'))
@@ -538,7 +538,7 @@ describe('Updates Handlers', () => {
         describe('and the affected member is not subscribed', () => {
           beforeEach(() => {
             // Remove the affected member from subscribers
-            subscribersContext.removeSubscriber('0x123')
+            subscribersContext.removeConnection('0x123', 'conn-123')
           })
 
           it('should not emit any updates to other members or the affected member', async () => {
@@ -573,7 +573,7 @@ describe('Updates Handlers', () => {
         describe('and the affected member is not subscribed', () => {
           beforeEach(() => {
             // Remove the affected member from subscribers
-            subscribersContext.removeSubscriber('0x123')
+            subscribersContext.removeConnection('0x123', 'conn-123')
           })
 
           it('should emit connectivity update to all online members but not notify the affected member', async () => {
@@ -656,7 +656,7 @@ describe('Updates Handlers', () => {
         describe('and the affected member is not subscribed', () => {
           beforeEach(() => {
             // Remove the affected member from subscribers
-            subscribersContext.removeSubscriber('0x123')
+            subscribersContext.removeConnection('0x123', 'conn-123')
           })
 
           it('should emit connectivity update to all online members across multiple batches but not notify the affected member', async () => {
@@ -1185,7 +1185,6 @@ describe('Updates Handlers', () => {
   })
 
   describe('when handling subscription updates', () => {
-    let eventEmitter: Emitter<SubscriptionEventsEmitter>
     let parser: jest.Mock
     let rpcContext: RpcServerContext
     let subscribersContext: ISubscribersContext
@@ -1195,7 +1194,6 @@ describe('Updates Handlers', () => {
     beforeEach(async () => {
       friendshipUpdate = { id: '1', to: '0x456', from: '0x123', action: Action.REQUEST, timestamp: Date.now() }
       blockUpdate = { blockerAddress: '0x456', blockedAddress: '0x123', isBlocked: true }
-      eventEmitter = mitt<SubscriptionEventsEmitter>()
       parser = jest.fn()
 
       mockRegistry.getProfile.mockResolvedValue(mockProfile)
@@ -1222,10 +1220,11 @@ describe('Updates Handlers', () => {
       })
 
       subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
-      await subscribersContext.addSubscriber('0x123', eventEmitter)
+      subscribersContext.addConnection('0x123', 'conn-123')
 
       rpcContext = {
         address: '0x123',
+        wsConnectionId: 'conn-123',
         subscribersContext
       }
     })
@@ -1237,7 +1236,7 @@ describe('Updates Handlers', () => {
       beforeEach(async () => {
         mockMetrics.increment.mockClear()
         clearActiveSubscriptionSpy = jest.spyOn(rpcContext.subscribersContext, 'clearActiveSubscription')
-        rpcContext.subscribersContext.setActiveSubscription('0x123', 'friendshipUpdate')
+        rpcContext.subscribersContext.setActiveSubscription('conn-123', 'friendshipUpdate')
 
         const generator = updateHandler.handleSubscriptionUpdates({
           rpcContext,
@@ -1531,7 +1530,7 @@ describe('Updates Handlers', () => {
 
         // First next() starts the generator and triggers registration
         const resultPromise = generator.next()
-        expect(registerSpy).toHaveBeenCalledWith('0x123', expect.objectContaining({ destroy: expect.any(Function) }))
+        expect(registerSpy).toHaveBeenCalledWith('conn-123', expect.objectContaining({ destroy: expect.any(Function) }))
 
         rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
         await resultPromise
@@ -1539,7 +1538,7 @@ describe('Updates Handlers', () => {
         // Return the generator to trigger finally block
         await generator.return(undefined)
 
-        expect(unregisterSpy).toHaveBeenCalledWith('0x123', expect.objectContaining({ destroy: expect.any(Function) }))
+        expect(unregisterSpy).toHaveBeenCalledWith('conn-123', expect.objectContaining({ destroy: expect.any(Function) }))
       })
 
       it('should unregister generator even when an error occurs', async () => {
@@ -1584,9 +1583,9 @@ describe('Updates Handlers', () => {
 
     describe('and there are online community members', () => {
       beforeEach(() => {
-        subscribersContext.addSubscriber('0xmember1', mitt<SubscriptionEventsEmitter>())
-        subscribersContext.addSubscriber('0xmember2', mitt<SubscriptionEventsEmitter>())
-        subscribersContext.addSubscriber('0xmember3', mitt<SubscriptionEventsEmitter>())
+        subscribersContext.addConnection('0xmember1', 'conn-member1')
+        subscribersContext.addConnection('0xmember2', 'conn-member2')
+        subscribersContext.addConnection('0xmember3', 'conn-member3')
       })
 
       it('should notify all online community members about the deletion', async () => {

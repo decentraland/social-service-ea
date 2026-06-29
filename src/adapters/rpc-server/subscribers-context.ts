@@ -319,37 +319,6 @@ export function createSubscribersContext(
       return true
     },
 
-    // Compatibility/test helpers. Production code uses addConnection/removeConnection for the
-    // reference-counted, per-connection lifecycle; these operate at the address level and do
-    // not track a connection, so prefer the connection-scoped methods outside of tests.
-    async addSubscriber(address: string, subscriber: Emitter<SubscriptionEventsEmitter>): Promise<void> {
-      const normalizedAddress = normalizeAddress(address)
-      if (!localSubscribers[normalizedAddress]) {
-        localSubscribers[normalizedAddress] = subscriber
-      }
-      try {
-        await redis.sAdd(SUBSCRIBERS_SET_KEY, normalizedAddress)
-      } catch (error: any) {
-        logger.error('Failed to add subscriber to Redis', {
-          address: normalizedAddress,
-          error: error?.message || error
-        })
-      }
-    },
-
-    async removeSubscriber(address: string): Promise<void> {
-      const normalizedAddress = normalizeAddress(address)
-      removeLocalSubscriber(normalizedAddress)
-      try {
-        await redis.sRem(SUBSCRIBERS_SET_KEY, normalizedAddress)
-      } catch (error: any) {
-        logger.error('Failed to remove subscriber from Redis', {
-          address: normalizedAddress,
-          error: error?.message || error
-        })
-      }
-    },
-
     registerGenerator(wsConnectionId: string, generator: { destroy(): void }): void {
       let generators = subscriberGenerators.get(wsConnectionId)
       if (!generators) {

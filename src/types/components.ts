@@ -366,10 +366,6 @@ export type ISubscribersContext = IBaseComponent & {
    * (the shared emitter is cleared and the address is removed from the Redis online set).
    */
   removeConnection: (address: string, wsConnectionId: string) => boolean
-  /** Compatibility/test helper — prefer addConnection. Registers a local emitter + marks online. */
-  addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => Promise<void>
-  /** Compatibility/test helper — prefer removeConnection. Tears down all of an address's state. */
-  removeSubscriber: (address: string) => Promise<void>
   registerGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
   unregisterGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
   hasActiveSubscription: (wsConnectionId: string, eventName: string) => boolean

@@ -347,11 +347,19 @@ export function createUpdateHandlerComponent(
   }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
     const normalizedAddress = normalizeAddress(rpcContext.address)
     const eventNameString = String(eventName)
-    // Dedup + generator tracking are scoped per CONNECTION (not per address): the same
-    // address can be connected from multiple places at once (website + client), and each
-    // connection must get its own working subscription. Falls back to the address only if a
-    // context somehow lacks a connection id (e.g. a unit test).
-    const connectionId = rpcContext.wsConnectionId ?? normalizedAddress
+
+    // Subscriptions are scoped per CONNECTION: the same address can be connected from
+    // multiple places at once (website + client) and each connection gets its own stream.
+    // wsConnectionId is always set in production (assigned at WS upgrade and threaded through
+    // attachUser/attachTransport); fail loud rather than silently mis-key if it is missing.
+    const connectionId = rpcContext.wsConnectionId
+    if (!connectionId) {
+      logger.error('Cannot handle subscription without a wsConnectionId', {
+        address: normalizedAddress,
+        event: eventNameString
+      })
+      return
+    }
 
     // Guard against the SAME connection opening the same stream twice — each extra generator
     // allocates another value queue and doubles that connection's memory.
@@ -363,13 +371,25 @@ export function createUpdateHandlerComponent(
       logger.debug('Duplicate subscription detected, ignoring', {
         address: normalizedAddress,
         event: eventNameString,
-        wsConnectionId: rpcContext.wsConnectionId ?? 'unknown'
+        wsConnectionId: connectionId
       })
       return
     }
-    rpcContext.subscribersContext.setActiveSubscription(connectionId, eventNameString)
 
-    const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
+    // The shared per-address emitter is created when the connection attaches (addConnection).
+    // If it's gone, the connection is no longer attached — don't resurrect an orphan emitter
+    // that would be invisible to the Redis-backed online set / fan-out.
+    const eventEmitter = rpcContext.subscribersContext.getSubscriber(normalizedAddress)
+    if (!eventEmitter) {
+      logger.warn('No subscriber emitter for address; connection no longer attached', {
+        address: normalizedAddress,
+        event: eventNameString,
+        wsConnectionId: connectionId
+      })
+      return
+    }
+
+    rpcContext.subscribersContext.setActiveSubscription(connectionId, eventNameString)
 
     const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
     rpcContext.subscribersContext.registerGenerator(connectionId, updatesGenerator)
@@ -407,7 +427,7 @@ export function createUpdateHandlerComponent(
       logger.info('Cleaning up subscription', {
         address: normalizedAddress,
         event: eventNameString,
-        wsConnectionId: rpcContext.wsConnectionId ?? 'unknown'
+        wsConnectionId: connectionId
       })
       await updatesGenerator.return(undefined)
       rpcContext.subscribersContext.unregisterGenerator(connectionId, updatesGenerator)
