@@ -16,7 +16,7 @@ import {
   referralIpMatchRejectionMessage,
   referralSuspiciousTimingMessage
 } from '../../utils/slackMessages'
-import { discardResponseBody } from '../../utils/fetch'
+import { fetchJson } from '../../utils/fetch'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
@@ -132,12 +132,10 @@ export async function createReferralComponent(
 
   async function fetchDenyList(): Promise<Set<string>> {
     try {
-      const response = await fetch('https://config.decentraland.org/denylist.json')
-      if (!response.ok) {
-        await discardResponseBody(response)
-        throw new Error(`Failed to fetch deny list, status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await fetchJson<{ users?: { wallet: string }[] }>(
+        () => fetch('https://config.decentraland.org/denylist.json'),
+        (r) => new Error(`Failed to fetch deny list, status: ${r.status}`)
+      )
       if (data.users && Array.isArray(data.users)) {
         return new Set(data.users.map((user: { wallet: string }) => user.wallet.toLocaleLowerCase()))
       } else {
