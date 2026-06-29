@@ -49,7 +49,7 @@ export async function registerWsHandler(
 
   function safeDetachUser(address: string, wsConnectionId: string) {
     try {
-      rpcServer.detachUser(address)
+      rpcServer.detachUser(address, wsConnectionId)
     } catch (error: any) {
       logger.error('Error detaching user during cleanup', {
         error: error.message,
@@ -147,7 +147,7 @@ export async function registerWsHandler(
           wsConnectionId: data.wsConnectionId,
           address
         })
-        rpcServer.detachUser(address)
+        rpcServer.detachUser(address, data.wsConnectionId)
       })
 
       transport.on('error', (error: unknown) => {

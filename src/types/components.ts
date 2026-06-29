@@ -61,8 +61,8 @@ export interface IRpcClient extends IBaseComponent {
 }
 
 export type IRPCServerComponent = IBaseComponent & {
-  attachUser(user: { transport: Transport; address: string; wsConnectionId?: string }): void
-  detachUser(address: string): void
+  attachUser(user: { transport: Transport; address: string; wsConnectionId: string }): void
+  detachUser(address: string, wsConnectionId: string): void
   setServiceCreators(creators: RpcServiceCreators): void
 }
 
@@ -350,14 +350,31 @@ export type ISubscribersContext = IBaseComponent & {
    * Use this in update handlers to avoid creating orphaned emitters.
    */
   getSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter> | undefined
+  /**
+   * Ensure and return the shared per-address emitter. No Redis side effects — the online
+   * entry is reference-counted by addConnection/removeConnection.
+   */
   getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
+  /**
+   * Register a live connection for an address. Marks the address online in Redis on the
+   * first connection. Multiple concurrent connections per address are supported.
+   */
+  addConnection: (address: string, wsConnectionId: string) => void
+  /**
+   * Remove a connection for an address. Tears down only that connection's generators and
+   * active-subscription state. Returns true if it was the last connection for the address
+   * (the shared emitter is cleared and the address is removed from the Redis online set).
+   */
+  removeConnection: (address: string, wsConnectionId: string) => boolean
+  /** Compatibility/test helper — prefer addConnection. Registers a local emitter + marks online. */
   addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => Promise<void>
+  /** Compatibility/test helper — prefer removeConnection. Tears down all of an address's state. */
   removeSubscriber: (address: string) => Promise<void>
-  registerGenerator: (address: string, generator: { destroy(): void }) => void
-  unregisterGenerator: (address: string, generator: { destroy(): void }) => void
-  hasActiveSubscription: (address: string, eventName: string) => boolean
-  setActiveSubscription: (address: string, eventName: string) => void
-  clearActiveSubscription: (address: string, eventName: string) => void
+  registerGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
+  unregisterGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
+  hasActiveSubscription: (wsConnectionId: string, eventName: string) => boolean
+  setActiveSubscription: (wsConnectionId: string, eventName: string) => void
+  clearActiveSubscription: (wsConnectionId: string, eventName: string) => void
 }
 
 export type ITracingComponent = IBaseComponent & {

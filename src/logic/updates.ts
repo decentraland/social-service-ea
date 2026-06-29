@@ -347,11 +347,15 @@ export function createUpdateHandlerComponent(
   }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
     const normalizedAddress = normalizeAddress(rpcContext.address)
     const eventNameString = String(eventName)
+    // Dedup + generator tracking are scoped per CONNECTION (not per address): the same
+    // address can be connected from multiple places at once (website + client), and each
+    // connection must get its own working subscription. Falls back to the address only if a
+    // context somehow lacks a connection id (e.g. a unit test).
+    const connectionId = rpcContext.wsConnectionId ?? normalizedAddress
 
-    // Guard against duplicate subscriptions for the same (address, event) pair.
-    // Clients can call the same stream RPC multiple times on a single connection,
-    // each creating an additional generator + value queue that doubles memory usage.
-    if (rpcContext.subscribersContext.hasActiveSubscription(normalizedAddress, eventNameString)) {
+    // Guard against the SAME connection opening the same stream twice — each extra generator
+    // allocates another value queue and doubles that connection's memory.
+    if (rpcContext.subscribersContext.hasActiveSubscription(connectionId, eventNameString)) {
       // Expected, benign outcome — the guard is doing its job. But it can fire at very high
       // frequency during reconnect/re-subscribe churn, so count it as a metric (for alerting
       // and graphing) and keep the per-occurrence line at debug so it never floods the logs.
@@ -363,12 +367,12 @@ export function createUpdateHandlerComponent(
       })
       return
     }
-    rpcContext.subscribersContext.setActiveSubscription(normalizedAddress, eventNameString)
+    rpcContext.subscribersContext.setActiveSubscription(connectionId, eventNameString)
 
     const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
 
     const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
-    rpcContext.subscribersContext.registerGenerator(normalizedAddress, updatesGenerator)
+    rpcContext.subscribersContext.registerGenerator(connectionId, updatesGenerator)
 
     try {
       for await (const update of updatesGenerator) {
@@ -406,8 +410,8 @@ export function createUpdateHandlerComponent(
         wsConnectionId: rpcContext.wsConnectionId ?? 'unknown'
       })
       await updatesGenerator.return(undefined)
-      rpcContext.subscribersContext.unregisterGenerator(normalizedAddress, updatesGenerator)
-      rpcContext.subscribersContext.clearActiveSubscription(normalizedAddress, eventNameString)
+      rpcContext.subscribersContext.unregisterGenerator(connectionId, updatesGenerator)
+      rpcContext.subscribersContext.clearActiveSubscription(connectionId, eventNameString)
     }
   }
 

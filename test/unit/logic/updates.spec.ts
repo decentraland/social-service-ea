@@ -407,7 +407,8 @@ describe('Updates Handlers', () => {
             status: ConnectivityStatus.ONLINE
           }
 
-          // Add the third subscriber for the test
+          // Add the third subscriber for the test (online so the handlers consider it)
+          subscribersContext.addConnection('0x999', 'conn-999')
           const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
           const emitSpy999 = jest.spyOn(subscriber999, 'emit')
 
@@ -489,6 +490,9 @@ describe('Updates Handlers', () => {
     let emitSpy123: jest.SpyInstance
 
     beforeEach(() => {
+      // 0x456/0x789 are marked online by the top-level beforeEach; mark 0x123 online too so
+      // it is included in the Redis online set the handlers consult.
+      subscribersContext.addConnection('0x123', 'conn-123')
       subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
       subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
       subscriber123 = subscribersContext.getOrAddSubscriber('0x123')
@@ -618,7 +622,8 @@ describe('Updates Handlers', () => {
               status
             }
 
-            // Add the third subscriber for the test
+            // Add the third subscriber for the test (online so the handlers consider it)
+            subscribersContext.addConnection('0x999', 'conn-999')
             const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
             const emitSpy999 = jest.spyOn(subscriber999, 'emit')
 
@@ -661,7 +666,8 @@ describe('Updates Handlers', () => {
               status
             }
 
-            // Add the third subscriber for the test
+            // Add the third subscriber for the test (online so the handlers consider it)
+            subscribersContext.addConnection('0x999', 'conn-999')
             const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
             const emitSpy999 = jest.spyOn(subscriber999, 'emit')
 
@@ -984,6 +990,9 @@ describe('Updates Handlers', () => {
     let emitSpy123: jest.SpyInstance
 
     beforeEach(() => {
+      // 0x456/0x789 are marked online by the top-level beforeEach; mark 0x123 online too so
+      // it is included in the Redis online set the handlers consult.
+      subscribersContext.addConnection('0x123', 'conn-123')
       subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
       subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
       subscriber123 = subscribersContext.getOrAddSubscriber('0x123')
@@ -1258,6 +1267,53 @@ describe('Updates Handlers', () => {
 
       it('should not clear the existing active subscription', () => {
         expect(clearActiveSubscriptionSpy).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the same address is connected from two different connections', () => {
+      let resultPromiseA: Promise<IteratorResult<unknown, unknown>>
+      let resultPromiseB: Promise<IteratorResult<unknown, unknown>>
+
+      beforeEach(() => {
+        mockMetrics.increment.mockClear()
+        parser.mockResolvedValue({ parsed: true })
+
+        const contextA: RpcServerContext = { address: '0x123', wsConnectionId: 'conn-A', subscribersContext }
+        const contextB: RpcServerContext = { address: '0x123', wsConnectionId: 'conn-B', subscribersContext }
+
+        const generatorA = updateHandler.handleSubscriptionUpdates({
+          rpcContext: contextA,
+          eventName: 'friendshipUpdate',
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser
+        })
+        const generatorB = updateHandler.handleSubscriptionUpdates({
+          rpcContext: contextB,
+          eventName: 'friendshipUpdate',
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser
+        })
+
+        // Starting both generators runs the dedup guard and registers each connection's
+        // listener on the shared per-address emitter. The returned promises resolve once an
+        // update is emitted.
+        resultPromiseA = generatorA.next()
+        resultPromiseB = generatorB.next()
+      })
+
+      it('should not reject the second connection as a duplicate', () => {
+        expect(mockMetrics.increment).not.toHaveBeenCalledWith('subscription_duplicates_total', {
+          event: 'friendshipUpdate'
+        })
+      })
+
+      it('should deliver an emitted update to both connections', async () => {
+        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+
+        expect((await resultPromiseA).value).toEqual({ parsed: true })
+        expect((await resultPromiseB).value).toEqual({ parsed: true })
       })
     })
 

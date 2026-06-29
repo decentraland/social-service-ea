@@ -99,23 +99,21 @@ export async function createRpcServerComponent({
       }
     },
     attachUser({ transport, address, wsConnectionId }) {
-      const eventEmitter = subscribersContext.getOrAddSubscriber(address)
-      subscribersContext.addSubscriber(address, eventEmitter).catch((error) => {
-        logger.error('Failed to add subscriber', { address, error })
-      })
+      // Register this connection for the address (supports multiple concurrent connections
+      // per address, e.g. website + client). Marks the address online on the first one.
+      subscribersContext.addConnection(address, wsConnectionId)
       rpcServer.attachTransport(transport, {
         subscribersContext,
         address,
         wsConnectionId
       })
     },
-    detachUser(address) {
-      // Check if the user is subscribed locally before detaching
-      if (subscribersContext.getLocalSubscribersAddresses().find((a) => a === address)) {
-        // End all calls that the user is involved in
-        subscribersContext.removeSubscriber(address).catch((error) => {
-          logger.error('Failed to remove subscriber', { address, error })
-        })
+    detachUser(address, wsConnectionId) {
+      // Tear down only THIS connection. removeConnection returns true when it was the user's
+      // last connection — only then do we end their voice chat and mark them offline, so
+      // closing one session (e.g. the website) doesn't disrupt another (e.g. the client).
+      const wasLastConnection = subscribersContext.removeConnection(address, wsConnectionId)
+      if (wasLastConnection) {
         voice.endIncomingOrOutgoingPrivateVoiceChatForUser(address).catch((_) => {
           // Do nothing
         })

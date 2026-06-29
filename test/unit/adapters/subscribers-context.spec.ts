@@ -1,6 +1,5 @@
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
-import mitt from 'mitt'
-import { ICacheComponent, IRedisComponent, SubscriptionEventsEmitter } from '../../../src/types'
+import { ICacheComponent, IRedisComponent } from '../../../src/types'
 import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
 import { mockMetrics } from '../../mocks/components/metrics'
@@ -23,8 +22,10 @@ describe('SubscribersContext Component', () => {
 
   function createTestContext() {
     return {
-      context: createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent()),
-      subscriber: mitt<SubscriptionEventsEmitter>(),
+      context: createSubscribersContext(
+        { redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig },
+        createWsPoolMockedComponent()
+      ),
       address: '0x123'
     }
   }
@@ -37,50 +38,109 @@ describe('SubscribersContext Component', () => {
     })
   })
 
-  describe('when managing subscribers', () => {
-    describe('and adding a subscriber', () => {
-      it('should add a new subscriber locally and to Redis', async () => {
-        const { context, subscriber, address } = createTestContext()
+  describe('when adding connections for an address', () => {
+    describe('and it is the first connection for the address', () => {
+      let context: ReturnType<typeof createTestContext>['context']
+      let address: string
 
-        await context.addSubscriber(address, subscriber)
-
-        expect(context.getSubscribers()[address]).toBe(subscriber)
-        expect(mockRedis.sAdd).toHaveBeenCalledWith('online_subscribers', address)
+      beforeEach(() => {
+        ;({ context, address } = createTestContext())
+        context.addConnection(address, 'conn-1')
       })
 
-      it('should preserve existing subscriber when adding duplicate', async () => {
-        const { context, subscriber, address } = createTestContext()
-        const newSubscriber = mitt<SubscriptionEventsEmitter>()
+      it('should create the shared emitter for the address', () => {
+        expect(context.getSubscriber(address)).toBeDefined()
+      })
 
-        await context.addSubscriber(address, subscriber)
-        await context.addSubscriber(address, newSubscriber)
-
-        expect(context.getSubscribers()[address]).toBe(subscriber)
-        // Should still attempt to add to Redis (idempotent)
-        expect(mockRedis.sAdd).toHaveBeenCalledTimes(2)
+      it('should mark the address online in Redis', () => {
+        expect(mockRedis.sAdd).toHaveBeenCalledWith('online_subscribers', address)
       })
     })
 
-    describe('and removing a subscriber', () => {
-      it('should remove existing subscriber locally and from Redis', async () => {
-        const { context, subscriber, address } = createTestContext()
-        const clearSpy = jest.spyOn(subscriber.all, 'clear')
+    describe('and a second connection for the same address is added', () => {
+      let context: ReturnType<typeof createTestContext>['context']
+      let address: string
 
-        await context.addSubscriber(address, subscriber)
-        await context.removeSubscriber(address)
-
-        expect(context.getSubscribers()[address]).toBeUndefined()
-        expect(clearSpy).toHaveBeenCalled()
-        expect(mockRedis.sRem).toHaveBeenCalledWith('online_subscribers', address)
+      beforeEach(() => {
+        ;({ context, address } = createTestContext())
+        context.addConnection(address, 'conn-1')
+        context.addConnection(address, 'conn-2')
       })
 
-      it('should handle removing non-existent subscriber gracefully', async () => {
-        const { context, address } = createTestContext()
+      it('should not mark the address online in Redis a second time', () => {
+        expect(mockRedis.sAdd).toHaveBeenCalledTimes(1)
+      })
 
-        await context.removeSubscriber(address)
+      it('should keep a single shared emitter for the address', () => {
+        expect(context.getLocalSubscribersAddresses()).toEqual([address])
+      })
+    })
+  })
 
-        expect(context.getSubscribers()[address]).toBeUndefined()
+  describe('when removing connections for an address', () => {
+    describe('and other connections for the address remain', () => {
+      let context: ReturnType<typeof createTestContext>['context']
+      let address: string
+      let wasLast: boolean
+
+      beforeEach(() => {
+        ;({ context, address } = createTestContext())
+        context.addConnection(address, 'conn-1')
+        context.addConnection(address, 'conn-2')
+        wasLast = context.removeConnection(address, 'conn-1')
+      })
+
+      it('should report that it was not the last connection', () => {
+        expect(wasLast).toBe(false)
+      })
+
+      it('should keep the shared emitter alive', () => {
+        expect(context.getSubscriber(address)).toBeDefined()
+      })
+
+      it('should not remove the address from Redis', () => {
+        expect(mockRedis.sRem).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and it is the last connection for the address', () => {
+      let context: ReturnType<typeof createTestContext>['context']
+      let address: string
+      let wasLast: boolean
+
+      beforeEach(() => {
+        ;({ context, address } = createTestContext())
+        context.addConnection(address, 'conn-1')
+        wasLast = context.removeConnection(address, 'conn-1')
+      })
+
+      it('should report that it was the last connection', () => {
+        expect(wasLast).toBe(true)
+      })
+
+      it('should clear the shared emitter', () => {
+        expect(context.getSubscriber(address)).toBeUndefined()
+      })
+
+      it('should remove the address from Redis', () => {
         expect(mockRedis.sRem).toHaveBeenCalledWith('online_subscribers', address)
+      })
+    })
+
+    describe('and the connection was already removed', () => {
+      let context: ReturnType<typeof createTestContext>['context']
+      let address: string
+      let wasLast: boolean
+
+      beforeEach(() => {
+        ;({ context, address } = createTestContext())
+        context.addConnection(address, 'conn-1')
+        context.removeConnection(address, 'conn-1')
+        wasLast = context.removeConnection(address, 'conn-1')
+      })
+
+      it('should report that it was not the last connection (idempotent)', () => {
+        expect(wasLast).toBe(false)
       })
     })
   })
@@ -91,7 +151,6 @@ describe('SubscribersContext Component', () => {
         const { context } = createTestContext()
         const expectedAddresses = ['0x123', '0x456', '0x789']
 
-        // Mock sScanIterator to return an async iterable
         ;(mockRedis.client as any).sScanIterator = jest.fn().mockReturnValue(
           (async function* () {
             for (const addr of expectedAddresses) {
@@ -107,14 +166,13 @@ describe('SubscribersContext Component', () => {
       })
 
       it('should fallback to local subscribers when Redis fails', async () => {
-        const { context, subscriber, address } = createTestContext()
+        const { context, address } = createTestContext()
 
-        // Mock sScanIterator to throw
         ;(mockRedis.client as any).sScanIterator = jest.fn().mockImplementation(() => {
           throw new Error('Redis error')
         })
 
-        await context.addSubscriber(address, subscriber)
+        context.addConnection(address, 'conn-1')
         const addresses = await context.getSubscribersAddresses()
 
         expect(addresses).toEqual([address])
@@ -122,28 +180,26 @@ describe('SubscribersContext Component', () => {
     })
 
     describe('and getting local subscriber addresses', () => {
-      it('should return only local subscriber addresses', async () => {
+      it('should return only local subscriber addresses', () => {
         const { context } = createTestContext()
         const addresses = ['0x123', '0x456', '0x789']
 
-        for (const address of addresses) {
-          await context.addSubscriber(address, mitt())
-        }
+        addresses.forEach((address, index) => context.addConnection(address, `conn-${index}`))
 
         expect(context.getLocalSubscribersAddresses()).toEqual(addresses)
       })
     })
 
     describe('and using getOrAddSubscriber', () => {
-      it('should return existing subscriber', async () => {
-        const { context, subscriber, address } = createTestContext()
+      it('should return the existing emitter on subsequent calls', () => {
+        const { context, address } = createTestContext()
 
-        await context.addSubscriber(address, subscriber)
+        const emitter = context.getOrAddSubscriber(address)
 
-        expect(context.getOrAddSubscriber(address)).toBe(subscriber)
+        expect(context.getOrAddSubscriber(address)).toBe(emitter)
       })
 
-      it('should create and return new subscriber if none exists', () => {
+      it('should create and return a new emitter if none exists', () => {
         const { context, address } = createTestContext()
 
         const newSubscriber = context.getOrAddSubscriber(address)
@@ -152,72 +208,118 @@ describe('SubscribersContext Component', () => {
         expect(newSubscriber.all).toBeDefined()
       })
 
-      it('should add new subscriber to Redis for global tracking', async () => {
+      it('should NOT touch Redis (online tracking is reference-counted by addConnection)', () => {
         const { context, address } = createTestContext()
 
         context.getOrAddSubscriber(address)
 
-        // Wait for the async Redis call
-        await new Promise((resolve) => setTimeout(resolve, 10))
-        expect(mockRedis.sAdd).toHaveBeenCalledWith('online_subscribers', address)
+        expect(mockRedis.sAdd).not.toHaveBeenCalled()
       })
     })
   })
 
-  describe('when managing generators', () => {
-    it('should register and unregister generators', async () => {
-      const { context, subscriber, address } = createTestContext()
-      await context.addSubscriber(address, subscriber)
+  describe('when managing generators per connection', () => {
+    it('should destroy a connection generators when that connection is removed', () => {
+      const { context, address } = createTestContext()
+      context.addConnection(address, 'conn-1')
 
-      const mockGenerator = { destroy: jest.fn() }
-      context.registerGenerator(address, mockGenerator)
-      context.unregisterGenerator(address, mockGenerator)
+      const generator = { destroy: jest.fn() }
+      context.registerGenerator('conn-1', generator)
 
-      // After unregister, removing the subscriber should not call destroy
-      await context.removeSubscriber(address)
-      expect(mockGenerator.destroy).not.toHaveBeenCalled()
+      context.removeConnection(address, 'conn-1')
+
+      expect(generator.destroy).toHaveBeenCalledTimes(1)
     })
 
-    it('should call destroy on all registered generators when removing a subscriber', async () => {
-      const { context, subscriber, address } = createTestContext()
-      await context.addSubscriber(address, subscriber)
+    it('should only destroy the removed connection generators, not other connections for the same address', () => {
+      const { context, address } = createTestContext()
+      context.addConnection(address, 'conn-1')
+      context.addConnection(address, 'conn-2')
 
-      const gen1 = { destroy: jest.fn() }
-      const gen2 = { destroy: jest.fn() }
-      context.registerGenerator(address, gen1)
-      context.registerGenerator(address, gen2)
+      const generatorForConnection1 = { destroy: jest.fn() }
+      const generatorForConnection2 = { destroy: jest.fn() }
+      context.registerGenerator('conn-1', generatorForConnection1)
+      context.registerGenerator('conn-2', generatorForConnection2)
 
-      await context.removeSubscriber(address)
+      context.removeConnection(address, 'conn-1')
 
-      expect(gen1.destroy).toHaveBeenCalledTimes(1)
-      expect(gen2.destroy).toHaveBeenCalledTimes(1)
+      expect(generatorForConnection1.destroy).toHaveBeenCalledTimes(1)
+      expect(generatorForConnection2.destroy).not.toHaveBeenCalled()
     })
 
-    it('should call destroy on generators before clearing emitter handlers', async () => {
-      const { context, subscriber, address } = createTestContext()
-      await context.addSubscriber(address, subscriber)
+    it('should not destroy a generator that was unregistered before the connection was removed', () => {
+      const { context, address } = createTestContext()
+      context.addConnection(address, 'conn-1')
+
+      const generator = { destroy: jest.fn() }
+      context.registerGenerator('conn-1', generator)
+      context.unregisterGenerator('conn-1', generator)
+
+      context.removeConnection(address, 'conn-1')
+
+      expect(generator.destroy).not.toHaveBeenCalled()
+    })
+
+    it('should destroy generators before clearing the emitter handlers on the last connection', () => {
+      const { context, address } = createTestContext()
+      context.addConnection(address, 'conn-1')
 
       const callOrder: string[] = []
-      const clearSpy = jest.spyOn(subscriber.all, 'clear').mockImplementation(() => {
+      const emitter = context.getSubscriber(address)!
+      const clearSpy = jest.spyOn(emitter.all, 'clear').mockImplementation(() => {
         callOrder.push('clear')
       })
-      const gen = {
+      const generator = {
         destroy: jest.fn().mockImplementation(() => {
           callOrder.push('destroy')
         })
       }
-      context.registerGenerator(address, gen)
+      context.registerGenerator('conn-1', generator)
 
-      await context.removeSubscriber(address)
+      context.removeConnection(address, 'conn-1')
 
       expect(callOrder).toEqual(['destroy', 'clear'])
       clearSpy.mockRestore()
     })
 
-    it('should handle unregister for non-existent address gracefully', () => {
+    it('should handle unregister for an unknown connection gracefully', () => {
       const { context } = createTestContext()
-      const mockGenerator = { destroy: jest.fn() }
-      expect(() => context.unregisterGenerator('0xnonexistent', mockGenerator)).not.toThrow()
+      const generator = { destroy: jest.fn() }
+
+      expect(() => context.unregisterGenerator('conn-unknown', generator)).not.toThrow()
+    })
+  })
+
+  describe('when tracking active subscriptions per connection', () => {
+    it('should report no active subscription initially', () => {
+      const { context } = createTestContext()
+
+      expect(context.hasActiveSubscription('conn-1', 'friendshipUpdate')).toBe(false)
+    })
+
+    it('should report an active subscription after it is set', () => {
+      const { context } = createTestContext()
+
+      context.setActiveSubscription('conn-1', 'friendshipUpdate')
+
+      expect(context.hasActiveSubscription('conn-1', 'friendshipUpdate')).toBe(true)
+    })
+
+    it('should report no active subscription after it is cleared', () => {
+      const { context } = createTestContext()
+      context.setActiveSubscription('conn-1', 'friendshipUpdate')
+
+      context.clearActiveSubscription('conn-1', 'friendshipUpdate')
+
+      expect(context.hasActiveSubscription('conn-1', 'friendshipUpdate')).toBe(false)
+    })
+
+    it('should track active subscriptions independently per connection', () => {
+      const { context } = createTestContext()
+
+      context.setActiveSubscription('conn-1', 'friendshipUpdate')
+
+      expect(context.hasActiveSubscription('conn-2', 'friendshipUpdate')).toBe(false)
     })
   })
 
@@ -226,9 +328,7 @@ describe('SubscribersContext Component', () => {
       const { context } = createTestContext()
       const addresses = ['0x123', '0x456']
 
-      for (const address of addresses) {
-        await context.addSubscriber(address, mitt())
-      }
+      addresses.forEach((address, index) => context.addConnection(address, `conn-${index}`))
 
       await context.stop?.()
 
@@ -236,22 +336,22 @@ describe('SubscribersContext Component', () => {
       expect(context.getSubscribers()).toEqual({})
     })
 
-    it('should destroy all generators for all subscribers on stop', async () => {
+    it('should destroy all generators for all connections on stop', async () => {
       const { context } = createTestContext()
       const addresses = ['0x123', '0x456']
       const generators: { destroy: jest.Mock }[] = []
 
-      for (const address of addresses) {
-        await context.addSubscriber(address, mitt())
-        const gen = { destroy: jest.fn() }
-        generators.push(gen)
-        context.registerGenerator(address, gen)
-      }
+      addresses.forEach((address, index) => {
+        context.addConnection(address, `conn-${index}`)
+        const generator = { destroy: jest.fn() }
+        generators.push(generator)
+        context.registerGenerator(`conn-${index}`, generator)
+      })
 
       await context.stop?.()
 
-      for (const gen of generators) {
-        expect(gen.destroy).toHaveBeenCalledTimes(1)
+      for (const generator of generators) {
+        expect(generator.destroy).toHaveBeenCalledTimes(1)
       }
     })
   })
