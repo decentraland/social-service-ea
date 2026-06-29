@@ -2,6 +2,7 @@ import { ICommsGatekeeperComponent, AppComponents, PrivateMessagesPrivacy, Commu
 import { CommunityVoiceChatAction, CommunityVoiceChatProfileData } from '../logic/community-voice/types'
 import { CommunityVoiceChatStatus } from '../logic/community/types'
 import { isErrorWithMessage } from '../utils/errors'
+import { drainResponse } from '../utils/fetch'
 
 export class PrivateVoiceChatNotFoundError extends Error {
   constructor(callId: string) {
@@ -41,8 +42,11 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
+
+      await drainResponse(response)
       logger.info(`Updated user private message privacy metadata for user ${address} to ${privateMessagesPrivacy}`)
     } catch (error) {
       logger.error(
@@ -63,6 +67,7 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
@@ -95,6 +100,7 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
@@ -139,6 +145,8 @@ export const createCommsGatekeeperComponent = async ({
       if (response.ok) {
         const data = await response.json()
         usersInVoiceChat = data.users_in_voice_chat
+      } else {
+        await drainResponse(response)
       }
     } catch (error) {
       logger.error(
@@ -191,6 +199,7 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
@@ -246,6 +255,7 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
@@ -278,9 +288,11 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
+      await drainResponse(response)
       logger.info(`Community voice chat room ended for community ${communityId} by ${userAddress}`)
     } catch (error) {
       logger.error(
@@ -316,8 +328,11 @@ export const createCommsGatekeeperComponent = async ({
       )
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
+
+      await drainResponse(response)
     } catch (error) {
       const action = isRaisingHand ? 'request to speak' : 'withdraw speak request'
       logger.error(
@@ -347,8 +362,11 @@ export const createCommsGatekeeperComponent = async ({
       )
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
+
+      await drainResponse(response)
     } catch (error) {
       logger.error(
         `Failed to reject speak request for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
@@ -373,8 +391,11 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
+
+      await drainResponse(response)
     } catch (error) {
       logger.error(
         `Failed to promote speaker for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
@@ -399,8 +420,11 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
+
+      await drainResponse(response)
     } catch (error) {
       logger.error(
         `Failed to demote speaker for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
@@ -450,10 +474,12 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (response.status === 404) {
+        await drainResponse(response)
         return null
       }
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
@@ -496,6 +522,7 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
@@ -540,6 +567,7 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
@@ -569,8 +597,11 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
+
+      await drainResponse(response)
     } catch (error) {
       logger.error(
         `Failed to kick user from community voice chat for user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`
@@ -595,6 +626,7 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
 
@@ -632,8 +664,11 @@ export const createCommsGatekeeperComponent = async ({
       })
 
       if (!response.ok) {
+        await drainResponse(response)
         throw new Error(`Server responded with status ${response.status}`)
       }
+
+      await drainResponse(response)
     } catch (error) {
       logger.error(
         `Failed to ${muted ? 'mute' : 'unmute'} user ${userAddress} in community ${communityId}: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`

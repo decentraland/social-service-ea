@@ -1,5 +1,6 @@
 import { AppComponents, IArchipelagoStatsComponent } from '../types'
 import { PEERS_CACHE_KEY } from '../utils/peers'
+import { drainResponse } from '../utils/fetch'
 
 export async function createArchipelagoStatsComponent({
   logs,
@@ -16,6 +17,7 @@ export async function createArchipelagoStatsComponent({
         const response = await fetcher.fetch(`${url}/peers`)
 
         if (!response.ok) {
+          await drainResponse(response)
           throw new Error(`Error fetching peers: ${response.statusText}`)
         }
 

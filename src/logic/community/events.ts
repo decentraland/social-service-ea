@@ -1,5 +1,6 @@
 import { AppComponents } from '../../types'
 import { ICommunityEventsComponent } from './types'
+import { drainResponse } from '../../utils/fetch'
 
 type Event = {
   id: string
@@ -77,6 +78,7 @@ export async function createCommunityEventsComponent(
 
       if (!response.ok) {
         logger.error('Failed to check live events', { communityId, status: response.status })
+        await drainResponse(response)
         return false
       }
 

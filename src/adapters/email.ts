@@ -1,4 +1,5 @@
 import { AppComponents, IEmailComponent } from '../types'
+import { drainResponse } from '../utils/fetch'
 
 export async function createEmailComponent(
   components: Pick<AppComponents, 'fetcher' | 'config'>
@@ -21,6 +22,7 @@ export async function createEmailComponent(
     })
 
     if (response.ok) {
+      await drainResponse(response)
       return
     }
 
