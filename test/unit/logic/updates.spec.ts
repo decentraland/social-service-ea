@@ -78,7 +78,8 @@ describe('Updates Handlers', () => {
       subscribersContext,
       friendsDb: mockFriendsDB,
       registry: mockRegistry,
-      communityMembers: mockCommunityMembers
+      communityMembers: mockCommunityMembers,
+      metrics: mockMetrics
     })
   })
 
@@ -1220,6 +1221,46 @@ describe('Updates Handlers', () => {
       }
     })
 
+    describe('and an active subscription already exists for the same address and event', () => {
+      let result: IteratorResult<unknown, unknown>
+      let clearActiveSubscriptionSpy: jest.SpyInstance
+
+      beforeEach(async () => {
+        mockMetrics.increment.mockClear()
+        clearActiveSubscriptionSpy = jest.spyOn(rpcContext.subscribersContext, 'clearActiveSubscription')
+        rpcContext.subscribersContext.setActiveSubscription('0x123', 'friendshipUpdate')
+
+        const generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext,
+          eventName: 'friendshipUpdate',
+          shouldRetrieveProfile: true,
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser
+        })
+
+        result = await generator.next()
+      })
+
+      it('should ignore the duplicate and complete the generator without yielding', () => {
+        expect(result.done).toBe(true)
+      })
+
+      it('should increment the duplicate subscriptions metric labelled with the event', () => {
+        expect(mockMetrics.increment).toHaveBeenCalledWith('subscription_duplicates_total', {
+          event: 'friendshipUpdate'
+        })
+      })
+
+      it('should not parse any update', () => {
+        expect(parser).not.toHaveBeenCalled()
+      })
+
+      it('should not clear the existing active subscription', () => {
+        expect(clearActiveSubscriptionSpy).not.toHaveBeenCalled()
+      })
+    })
+
     describe('and the emitter exists in context', () => {
       it('should use existing emitter from context', async () => {
         parser.mockResolvedValueOnce({ parsed: true })
@@ -1329,7 +1370,7 @@ describe('Updates Handlers', () => {
     })
 
     describe('and an error occurs in the generator loop', () => {
-      it('should handle errors in the generator loop', async () => {
+      it('should propagate the error to the caller', async () => {
         const error = new Error('Test error')
         parser.mockRejectedValueOnce(error)
 
@@ -1346,11 +1387,6 @@ describe('Updates Handlers', () => {
         rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
 
         await expect(resultPromise).rejects.toThrow('Test error')
-        expect(logger.error).toHaveBeenCalledWith('Error in generator loop', {
-          error: JSON.stringify(error),
-          address: '0x123',
-          event: 'friendshipUpdate'
-        })
       })
     })
 

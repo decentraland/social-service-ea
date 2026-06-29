@@ -52,9 +52,12 @@ async function processInBatches<T>(
 }
 
 export function createUpdateHandlerComponent(
-  components: Pick<AppComponents, 'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry'>
+  components: Pick<
+    AppComponents,
+    'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry' | 'metrics'
+  >
 ): IUpdateHandlerComponent {
-  const { logs, subscribersContext, friendsDb, communityMembers, registry } = components
+  const { logs, subscribersContext, friendsDb, communityMembers, registry, metrics } = components
   const logger = logs.getLogger('update-handler')
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
@@ -349,9 +352,14 @@ export function createUpdateHandlerComponent(
     // Clients can call the same stream RPC multiple times on a single connection,
     // each creating an additional generator + value queue that doubles memory usage.
     if (rpcContext.subscribersContext.hasActiveSubscription(normalizedAddress, eventNameString)) {
-      logger.warn('Duplicate subscription detected, ignoring', {
+      // Expected, benign outcome — the guard is doing its job. But it can fire at very high
+      // frequency during reconnect/re-subscribe churn, so count it as a metric (for alerting
+      // and graphing) and keep the per-occurrence line at debug so it never floods the logs.
+      metrics.increment('subscription_duplicates_total', { event: eventNameString })
+      logger.debug('Duplicate subscription detected, ignoring', {
         address: normalizedAddress,
-        event: eventNameString
+        event: eventNameString,
+        wsConnectionId: rpcContext.wsConnectionId ?? 'unknown'
       })
       return
     }
@@ -385,14 +393,18 @@ export function createUpdateHandlerComponent(
           logger.error(`Unable to parse ${eventNameString}`, { update: JSON.stringify(update) })
         }
       }
-    } catch (error) {
-      logger.error('Error in generator loop', {
-        error: JSON.stringify(error),
-        address: rpcContext.address,
-        event: eventNameString
-      })
-      throw error
+      // Intentionally no catch here: errors propagate to the per-service subscribe handler,
+      // which logs them with service-specific context and re-throws. A central catch would
+      // double-log every subscription error (and only as JSON.stringify(error) === "{}").
     } finally {
+      // Logged here (not in the per-service handler) so it only fires for subscriptions
+      // that were actually established — the duplicate guard above returns before this
+      // try/finally, so rejected duplicates no longer emit a misleading "cleaning up" line.
+      logger.info('Cleaning up subscription', {
+        address: normalizedAddress,
+        event: eventNameString,
+        wsConnectionId: rpcContext.wsConnectionId ?? 'unknown'
+      })
       await updatesGenerator.return(undefined)
       rpcContext.subscribersContext.unregisterGenerator(normalizedAddress, updatesGenerator)
       rpcContext.subscribersContext.clearActiveSubscription(normalizedAddress, eventNameString)

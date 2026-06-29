@@ -98,14 +98,15 @@ export async function createRpcServerComponent({
         // Don't throw - we want cleanup to continue even if this fails
       }
     },
-    attachUser({ transport, address }) {
+    attachUser({ transport, address, wsConnectionId }) {
       const eventEmitter = subscribersContext.getOrAddSubscriber(address)
       subscribersContext.addSubscriber(address, eventEmitter).catch((error) => {
         logger.error('Failed to add subscriber', { address, error })
       })
       rpcServer.attachTransport(transport, {
         subscribersContext,
-        address
+        address,
+        wsConnectionId
       })
     },
     detachUser(address) {

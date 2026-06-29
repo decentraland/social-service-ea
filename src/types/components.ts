@@ -61,7 +61,7 @@ export interface IRpcClient extends IBaseComponent {
 }
 
 export type IRPCServerComponent = IBaseComponent & {
-  attachUser(user: { transport: Transport; address: string }): void
+  attachUser(user: { transport: Transport; address: string; wsConnectionId?: string }): void
   detachUser(address: string): void
   setServiceCreators(creators: RpcServiceCreators): void
 }

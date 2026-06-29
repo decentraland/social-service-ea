@@ -216,7 +216,8 @@ describe('ws-handler', () => {
         expect(updatedData.authenticating).toBe(false)
         expect(mockRpcServer.attachUser).toHaveBeenCalledWith({
           transport: expect.any(Object),
-          address: '0x123'
+          address: '0x123',
+          wsConnectionId: 'test-client-id'
         })
       })
 
