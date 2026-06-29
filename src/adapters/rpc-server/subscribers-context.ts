@@ -60,6 +60,17 @@ export function createSubscribersContext(
     }
   }
 
+  // Clear and drop the shared per-address emitter. Callers must destroy the address's
+  // generators first so pending next() calls resolve before the handlers are cleared
+  // (prevents the deadlock).
+  function clearAddressEmitter(normalizedAddress: string): void {
+    const emitter = localSubscribers[normalizedAddress]
+    if (emitter) {
+      emitter.all.clear()
+      delete localSubscribers[normalizedAddress]
+    }
+  }
+
   /**
    * Tear down ALL state for an address (every connection it has). Used by the
    * reconciliation sweep and on shutdown — not on a normal single-connection disconnect.
@@ -79,10 +90,7 @@ export function createSubscribersContext(
       connectionsByAddress.delete(normalizedAddress)
     }
 
-    if (localSubscribers[normalizedAddress]) {
-      localSubscribers[normalizedAddress].all.clear()
-      delete localSubscribers[normalizedAddress]
-    }
+    clearAddressEmitter(normalizedAddress)
   }
 
   function getGeneratorsCount(): number {
@@ -281,17 +289,18 @@ export function createSubscribersContext(
     removeConnection(address: string, wsConnectionId: string): boolean {
       const normalizedAddress = normalizeAddress(address)
 
-      // Always tear down this connection's own streams/dedup state (idempotent).
-      destroyGeneratorsForConnection(wsConnectionId)
-      activeSubscriptions.delete(wsConnectionId)
-
       const connectionIds = connectionsByAddress.get(normalizedAddress)
       if (!connectionIds || !connectionIds.has(wsConnectionId)) {
-        // Connection already removed (e.g. close fired twice) — not a meaningful transition.
+        // Connection isn't tracked (e.g. close fired twice) — nothing to tear down.
         return false
       }
 
+      // Tear down only this connection's streams/dedup state. Each generator's destroy()
+      // calls emitter.off for its own handler, so sibling connections are untouched.
+      destroyGeneratorsForConnection(wsConnectionId)
+      activeSubscriptions.delete(wsConnectionId)
       connectionIds.delete(wsConnectionId)
+
       if (connectionIds.size > 0) {
         // Other connections for this address are still alive — keep the emitter & Redis entry.
         return false
@@ -299,10 +308,7 @@ export function createSubscribersContext(
 
       // Last connection for this address: clear the shared emitter and mark offline.
       connectionsByAddress.delete(normalizedAddress)
-      if (localSubscribers[normalizedAddress]) {
-        localSubscribers[normalizedAddress].all.clear()
-        delete localSubscribers[normalizedAddress]
-      }
+      clearAddressEmitter(normalizedAddress)
       redis.sRem(SUBSCRIBERS_SET_KEY, normalizedAddress).catch((error: any) => {
         logger.error('Failed to remove subscriber from Redis', {
           address: normalizedAddress,

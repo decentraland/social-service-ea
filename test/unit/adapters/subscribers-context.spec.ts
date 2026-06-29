@@ -143,6 +143,29 @@ describe('SubscribersContext Component', () => {
         expect(wasLast).toBe(false)
       })
     })
+
+    describe('and the connection is not tracked for the address', () => {
+      let context: ReturnType<typeof createTestContext>['context']
+      let address: string
+      let generator: { destroy: jest.Mock }
+      let wasLast: boolean
+
+      beforeEach(() => {
+        ;({ context, address } = createTestContext())
+        // No addConnection for this id, so the connection is not tracked for the address.
+        generator = { destroy: jest.fn() }
+        context.registerGenerator('untracked-conn', generator)
+        wasLast = context.removeConnection(address, 'untracked-conn')
+      })
+
+      it('should report that it was not the last connection', () => {
+        expect(wasLast).toBe(false)
+      })
+
+      it('should not tear down generators for a connection it is not tracking', () => {
+        expect(generator.destroy).not.toHaveBeenCalled()
+      })
+    })
   })
 
   describe('when querying subscribers', () => {
