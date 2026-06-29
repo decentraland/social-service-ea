@@ -29,10 +29,8 @@ export function subscribeToCommunityMemberConnectivityUpdatesService({
     _request: Empty,
     context: RpcServerContext
   ): AsyncGenerator<CommunityMemberConnectivityUpdate> {
-    let cleanup: (() => void) | undefined
-
     try {
-      cleanup = yield* updateHandler.handleSubscriptionUpdates<
+      yield* updateHandler.handleSubscriptionUpdates<
         CommunityMemberConnectivityUpdate,
         SubscriptionEventsEmitter['communityMemberConnectivityUpdate']
       >({
@@ -46,9 +44,6 @@ export function subscribeToCommunityMemberConnectivityUpdatesService({
     } catch (error: any) {
       logger.error('Error in community member connectivity updates subscription:', error)
       throw error
-    } finally {
-      logger.info('Cleaning up community member connectivity updates subscription')
-      cleanup?.()
     }
   }
 }

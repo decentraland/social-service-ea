@@ -294,7 +294,8 @@ export async function initComponents(): Promise<AppComponents> {
     subscribersContext,
     friendsDb,
     communityMembers,
-    registry
+    registry,
+    metrics
   })
 
   const rpcServer = await createRpcServerComponent({

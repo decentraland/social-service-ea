@@ -158,7 +158,7 @@ export async function registerWsHandler(
         })
       })
 
-      rpcServer.attachUser({ transport, address })
+      rpcServer.attachUser({ transport, address, wsConnectionId: data.wsConnectionId })
     } catch (error: any) {
       logger.error(`Error verifying auth chain: ${error.message}`, {
         wsConnectionId: data.wsConnectionId

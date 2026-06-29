@@ -9,11 +9,9 @@ export function subscribeToBlockUpdatesService({
   const logger = logs.getLogger('subscribe-to-block-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<BlockUpdate> {
-    let cleanup: (() => void) | undefined
-
     // The blocked/unblocked user should know who blocked/unblocked them
     try {
-      cleanup = yield* updateHandler.handleSubscriptionUpdates<BlockUpdate, SubscriptionEventsEmitter['blockUpdate']>({
+      yield* updateHandler.handleSubscriptionUpdates<BlockUpdate, SubscriptionEventsEmitter['blockUpdate']>({
         rpcContext: context,
         eventName: 'blockUpdate',
         shouldRetrieveProfile: false,
@@ -25,9 +23,6 @@ export function subscribeToBlockUpdatesService({
     } catch (error: any) {
       logger.error('Error in block updates subscription:', error)
       throw error
-    } finally {
-      logger.info('Closing block updates subscription')
-      cleanup?.()
     }
   }
 }

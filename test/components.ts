@@ -257,7 +257,8 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     friendsDb,
     communityMembers,
-    registry
+    registry,
+    metrics
   })
   const communityVoice = await createCommunityVoiceComponent({
     logs,

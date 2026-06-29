@@ -115,6 +115,11 @@ export const metricDeclarations = {
     type: IMetricsComponent.CounterType,
     help: 'Number of stale subscribers removed by reconciliation'
   },
+  subscription_duplicates_total: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of duplicate stream subscriptions rejected by the per-(address, event) guard',
+    labelNames: ['event']
+  },
   ai_compliance_validation_duration_seconds: {
     type: IMetricsComponent.HistogramType,
     help: 'Duration of AI compliance validation in seconds',

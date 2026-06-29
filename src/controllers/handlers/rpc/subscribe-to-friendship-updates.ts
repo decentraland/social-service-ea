@@ -9,13 +9,8 @@ export function subscribeToFriendshipUpdatesService({
   const logger = logs.getLogger('subscribe-to-friendship-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendshipUpdate> {
-    let cleanup: (() => void) | undefined
-
     try {
-      cleanup = yield* updateHandler.handleSubscriptionUpdates<
-        FriendshipUpdate,
-        SubscriptionEventsEmitter['friendshipUpdate']
-      >({
+      yield* updateHandler.handleSubscriptionUpdates<FriendshipUpdate, SubscriptionEventsEmitter['friendshipUpdate']>({
         rpcContext: context,
         eventName: 'friendshipUpdate',
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
@@ -27,9 +22,6 @@ export function subscribeToFriendshipUpdatesService({
     } catch (error: any) {
       logger.error('Error in friendship updates subscription:', error)
       throw error
-    } finally {
-      logger.info('Closing friendship updates subscription')
-      cleanup?.()
     }
   }
 }

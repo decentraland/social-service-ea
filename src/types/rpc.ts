@@ -75,5 +75,9 @@ export type Subscribers = Record<string, Emitter<SubscriptionEventsEmitter>>
 
 export type RpcServerContext = {
   address: string
+  // Identifies the WebSocket connection backing this RPC context. Always set in
+  // production (populated by attachUser/attachTransport); optional so test contexts
+  // can omit it. Used to disambiguate which connection issued a subscription.
+  wsConnectionId?: string
   subscribersContext: ISubscribersContext
 }
