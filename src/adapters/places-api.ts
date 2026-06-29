@@ -1,5 +1,5 @@
 import { AppComponents, IPlacesApiComponent } from '../types'
-import { drainResponse } from '../utils/fetch'
+import { discardResponseBody } from '../utils/fetch'
 
 export type PlacesApiResponse = {
   total?: number
@@ -27,7 +27,7 @@ export async function createPlacesApiAdapter(
       })
 
       if (!response.ok) {
-        await drainResponse(response)
+        await discardResponseBody(response)
         throw new Error('Failed to get destinations')
       }
 

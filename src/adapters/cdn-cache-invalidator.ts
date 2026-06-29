@@ -1,6 +1,6 @@
 import { getCommunityThumbnailPath } from '../logic/community'
 import { AppComponents, ICdnCacheInvalidatorComponent } from '../types'
-import { drainResponse } from '../utils/fetch'
+import { discardResponseBody } from '../utils/fetch'
 
 export async function createCdnCacheInvalidatorComponent(
   components: Pick<AppComponents, 'config' | 'fetcher'>
@@ -24,7 +24,7 @@ export async function createCdnCacheInvalidatorComponent(
       }
     })
 
-    await drainResponse(response)
+    await discardResponseBody(response)
   }
 
   return { invalidateThumbnail }

@@ -2,7 +2,7 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { AppComponents, IRegistryComponent } from '../types'
 import { extractMinimalProfile, getProfileUserId } from '../logic/profiles'
 import { withoutTracing } from '../utils/tracing'
-import { drainResponse } from '../utils/fetch'
+import { discardResponseBody } from '../utils/fetch'
 
 export const PROFILE_CACHE_PREFIX = 'catalyst:minimal:profile:'
 
@@ -62,7 +62,7 @@ export async function createRegistryComponent({
       })
 
       if (!response.ok) {
-        await drainResponse(response)
+        await discardResponseBody(response)
         throw new Error(`Failed to fetch profiles from registry: ${response.statusText}`)
       }
 
@@ -103,7 +103,7 @@ export async function createRegistryComponent({
     })
 
     if (!response.ok) {
-      await drainResponse(response)
+      await discardResponseBody(response)
       throw new Error(`Failed to fetch profile from registry: ${response.statusText}`)
     }
 
