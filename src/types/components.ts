@@ -350,14 +350,14 @@ export type ISubscribersContext = IBaseComponent & {
    */
   getSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter> | undefined
   /**
-   * Register a live connection for an address. Marks the address online in Redis on the
+   * Register a live connection for an address, creating the shared emitter on the
    * first connection. Multiple concurrent connections per address are supported.
    */
   addConnection: (address: string, wsConnectionId: string) => void
   /**
    * Remove a connection for an address. Tears down only that connection's generators and
    * active-subscription state. Returns true if it was the last connection for the address
-   * (the shared emitter is cleared and the address is removed from the Redis online set).
+   * (the shared emitter is cleared).
    */
   removeConnection: (address: string, wsConnectionId: string) => boolean
   registerGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
