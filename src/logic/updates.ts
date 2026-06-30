@@ -390,7 +390,7 @@ export function createUpdateHandlerComponent(
 
     // The shared per-address emitter is created when the connection attaches (addConnection).
     // If it's gone, the connection is no longer attached — don't resurrect an orphan emitter
-    // that would be invisible to the Redis-backed online set / fan-out.
+    // that wouldn't be tracked as a live connection and would be invisible to the local fan-out.
     const eventEmitter = rpcContext.subscribersContext.getSubscriber(normalizedAddress)
     if (!eventEmitter) {
       logger.warn('No subscriber emitter for address; connection no longer attached', {

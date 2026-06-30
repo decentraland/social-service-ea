@@ -1278,6 +1278,55 @@ describe('Updates Handlers', () => {
       })
     })
 
+    describe('and the connection identity is missing', () => {
+      it('should not start the subscription and should log an error', async () => {
+        const contextWithoutConnId: RpcServerContext = { address: '0x123', subscribersContext }
+
+        const generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext: contextWithoutConnId,
+          eventName: 'friendshipUpdate',
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser
+        })
+
+        const result = await generator.next()
+
+        expect(result.done).toBe(true)
+        expect(logger.error).toHaveBeenCalledWith('Cannot handle subscription without a wsConnectionId', {
+          address: '0x123',
+          event: 'friendshipUpdate'
+        })
+      })
+    })
+
+    describe('and the address has no emitter (connection no longer attached)', () => {
+      it('should not start the subscription and should log a warning', async () => {
+        const contextWithoutEmitter: RpcServerContext = {
+          address: '0xnoemitter',
+          wsConnectionId: 'conn-detached',
+          subscribersContext
+        }
+
+        const generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext: contextWithoutEmitter,
+          eventName: 'friendshipUpdate',
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser
+        })
+
+        const result = await generator.next()
+
+        expect(result.done).toBe(true)
+        expect(logger.warn).toHaveBeenCalledWith('No subscriber emitter for address; connection no longer attached', {
+          address: '0xnoemitter',
+          event: 'friendshipUpdate',
+          wsConnectionId: 'conn-detached'
+        })
+      })
+    })
+
     describe('and the emitter exists in context', () => {
       it('should use existing emitter from context', async () => {
         parser.mockResolvedValueOnce({ parsed: true })
