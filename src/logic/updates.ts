@@ -103,7 +103,10 @@ export function createUpdateHandlerComponent(
   })
 
   const friendConnectivityUpdateHandler = handleUpdate<'friendConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const friends = await friendsDb.getOnlineFriends(update.address, onlineSubscribers)
 
     // Notify friends about connectivity change, yielding event loop for large friend lists
@@ -120,7 +123,10 @@ export function createUpdateHandlerComponent(
   })
 
   const communityMemberConnectivityUpdateHandler = handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromUserCommunities(update.memberAddress, onlineSubscribers)
 
     for await (const batch of batches) {
@@ -213,7 +219,10 @@ export function createUpdateHandlerComponent(
 
     logger.info('Community member status update', { update: JSON.stringify(update) })
 
-    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromCommunity(
       communityId,
       onlineSubscribers.filter((address) => address !== normalizedMemberAddress)
@@ -255,7 +264,10 @@ export function createUpdateHandlerComponent(
   const communityDeletedUpdateHandler = handleUpdate<'communityDeletedUpdate'>(async (update) => {
     const { communityId } = update
 
-    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromCommunity(communityId, onlineSubscribers)
 
     for await (const batch of batches) {
@@ -282,7 +294,7 @@ export function createUpdateHandlerComponent(
 
     // Get all online subscribers, excluding the creator if present (creator already knows about their action)
     const creatorAddress = update.creatorAddress?.toLowerCase()
-    const allOnlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    const allOnlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
     try {
@@ -348,10 +360,22 @@ export function createUpdateHandlerComponent(
     const normalizedAddress = normalizeAddress(rpcContext.address)
     const eventNameString = String(eventName)
 
-    // Guard against duplicate subscriptions for the same (address, event) pair.
-    // Clients can call the same stream RPC multiple times on a single connection,
-    // each creating an additional generator + value queue that doubles memory usage.
-    if (rpcContext.subscribersContext.hasActiveSubscription(normalizedAddress, eventNameString)) {
+    // Subscriptions are scoped per CONNECTION: the same address can be connected from
+    // multiple places at once (website + client) and each connection gets its own stream.
+    // wsConnectionId is always set in production (assigned at WS upgrade and threaded through
+    // attachUser/attachTransport); fail loud rather than silently mis-key if it is missing.
+    const connectionId = rpcContext.wsConnectionId
+    if (!connectionId) {
+      logger.error('Cannot handle subscription without a wsConnectionId', {
+        address: normalizedAddress,
+        event: eventNameString
+      })
+      return
+    }
+
+    // Guard against the SAME connection opening the same stream twice — each extra generator
+    // allocates another value queue and doubles that connection's memory.
+    if (rpcContext.subscribersContext.hasActiveSubscription(connectionId, eventNameString)) {
       // Expected, benign outcome — the guard is doing its job. But it can fire at very high
       // frequency during reconnect/re-subscribe churn, so count it as a metric (for alerting
       // and graphing) and keep the per-occurrence line at debug so it never floods the logs.
@@ -359,16 +383,28 @@ export function createUpdateHandlerComponent(
       logger.debug('Duplicate subscription detected, ignoring', {
         address: normalizedAddress,
         event: eventNameString,
-        wsConnectionId: rpcContext.wsConnectionId ?? 'unknown'
+        wsConnectionId: connectionId
       })
       return
     }
-    rpcContext.subscribersContext.setActiveSubscription(normalizedAddress, eventNameString)
 
-    const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
+    // The shared per-address emitter is created when the connection attaches (addConnection).
+    // If it's gone, the connection is no longer attached — don't resurrect an orphan emitter
+    // that wouldn't be tracked as a live connection and would be invisible to the local fan-out.
+    const eventEmitter = rpcContext.subscribersContext.getSubscriber(normalizedAddress)
+    if (!eventEmitter) {
+      logger.warn('No subscriber emitter for address; connection no longer attached', {
+        address: normalizedAddress,
+        event: eventNameString,
+        wsConnectionId: connectionId
+      })
+      return
+    }
+
+    rpcContext.subscribersContext.setActiveSubscription(connectionId, eventNameString)
 
     const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
-    rpcContext.subscribersContext.registerGenerator(normalizedAddress, updatesGenerator)
+    rpcContext.subscribersContext.registerGenerator(connectionId, updatesGenerator)
 
     try {
       for await (const update of updatesGenerator) {
@@ -403,11 +439,11 @@ export function createUpdateHandlerComponent(
       logger.info('Cleaning up subscription', {
         address: normalizedAddress,
         event: eventNameString,
-        wsConnectionId: rpcContext.wsConnectionId ?? 'unknown'
+        wsConnectionId: connectionId
       })
       await updatesGenerator.return(undefined)
-      rpcContext.subscribersContext.unregisterGenerator(normalizedAddress, updatesGenerator)
-      rpcContext.subscribersContext.clearActiveSubscription(normalizedAddress, eventNameString)
+      rpcContext.subscribersContext.unregisterGenerator(connectionId, updatesGenerator)
+      rpcContext.subscribersContext.clearActiveSubscription(connectionId, eventNameString)
     }
   }
 

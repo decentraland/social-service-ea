@@ -61,8 +61,8 @@ export interface IRpcClient extends IBaseComponent {
 }
 
 export type IRPCServerComponent = IBaseComponent & {
-  attachUser(user: { transport: Transport; address: string; wsConnectionId?: string }): void
-  detachUser(address: string): void
+  attachUser(user: { transport: Transport; address: string; wsConnectionId: string }): void
+  detachUser(address: string, wsConnectionId: string): void
   setServiceCreators(creators: RpcServiceCreators): void
 }
 
@@ -343,21 +343,28 @@ export interface ICdnCacheInvalidatorComponent {
 
 export type ISubscribersContext = IBaseComponent & {
   getSubscribers: () => Subscribers
-  getSubscribersAddresses: () => Promise<string[]>
   getLocalSubscribersAddresses: () => string[]
   /**
    * Get an existing subscriber without creating one if it doesn't exist.
    * Use this in update handlers to avoid creating orphaned emitters.
    */
   getSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter> | undefined
-  getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
-  addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => Promise<void>
-  removeSubscriber: (address: string) => Promise<void>
-  registerGenerator: (address: string, generator: { destroy(): void }) => void
-  unregisterGenerator: (address: string, generator: { destroy(): void }) => void
-  hasActiveSubscription: (address: string, eventName: string) => boolean
-  setActiveSubscription: (address: string, eventName: string) => void
-  clearActiveSubscription: (address: string, eventName: string) => void
+  /**
+   * Register a live connection for an address, creating the shared emitter on the
+   * first connection. Multiple concurrent connections per address are supported.
+   */
+  addConnection: (address: string, wsConnectionId: string) => void
+  /**
+   * Remove a connection for an address. Tears down only that connection's generators and
+   * active-subscription state. Returns true if it was the last connection for the address
+   * (the shared emitter is cleared).
+   */
+  removeConnection: (address: string, wsConnectionId: string) => boolean
+  registerGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
+  unregisterGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
+  hasActiveSubscription: (wsConnectionId: string, eventName: string) => boolean
+  setActiveSubscription: (wsConnectionId: string, eventName: string) => void
+  clearActiveSubscription: (wsConnectionId: string, eventName: string) => void
 }
 
 export type ITracingComponent = IBaseComponent & {

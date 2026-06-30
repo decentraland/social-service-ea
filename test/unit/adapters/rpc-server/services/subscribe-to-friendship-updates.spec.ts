@@ -1,11 +1,10 @@
 import { subscribeToFriendshipUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-friendship-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { Action, ICacheComponent, IRedisComponent, RpcServerContext } from '../../../../../src/types'
+import { Action, RpcServerContext } from '../../../../../src/types'
 import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
-import { createRedisMock } from '../../../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
 import { mockMetrics } from '../../../../mocks/components/metrics'
 import { mockConfig } from '../../../../mocks/components/config'
@@ -18,7 +17,6 @@ describe('when subscribing to friendship updates', () => {
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
   let mockFriendProfile: any
-  let redis: jest.Mocked<IRedisComponent & ICacheComponent>
   let logs: jest.Mocked<ILoggerComponent>
 
   const mockUpdate = {
@@ -30,9 +28,8 @@ describe('when subscribing to friendship updates', () => {
   }
 
   beforeEach(() => {
-    redis = createRedisMock({})
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ redis, logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     mockUpdateHandler = createMockUpdateHandlerComponent({})
     mockFriendProfile = createMockProfile('0x456')
 

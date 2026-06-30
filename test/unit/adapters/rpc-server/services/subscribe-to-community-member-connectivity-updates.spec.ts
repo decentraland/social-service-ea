@@ -1,9 +1,8 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { ICacheComponent, IRedisComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
+import { RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { subscribeToCommunityMemberConnectivityUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-member-connectivity-updates'
 import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
-import { createRedisMock } from '../../../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
 import { mockMetrics } from '../../../../mocks/components/metrics'
 import { mockConfig } from '../../../../mocks/components/config'
@@ -19,7 +18,6 @@ describe('when subscribing to community member connectivity updates', () => {
   let rpcContext: RpcServerContext
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
-  let redis: jest.Mocked<IRedisComponent & ICacheComponent>
   let logs: jest.Mocked<ILoggerComponent>
 
   const mockUpdate = {
@@ -29,9 +27,8 @@ describe('when subscribing to community member connectivity updates', () => {
   }
 
   beforeEach(() => {
-    redis = createRedisMock({})
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ redis, logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     subscribeToCommunityMemberConnectivityUpdates = subscribeToCommunityMemberConnectivityUpdatesService({

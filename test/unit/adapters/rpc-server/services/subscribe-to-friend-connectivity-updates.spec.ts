@@ -1,5 +1,5 @@
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { ICacheComponent, IRedisComponent, RpcServerContext } from '../../../../../src/types'
+import { RpcServerContext } from '../../../../../src/types'
 import {
   mockFriendsDB,
   createMockPeersStatsComponent,
@@ -11,7 +11,6 @@ import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_ser
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
-import { createRedisMock } from '../../../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
 import { mockMetrics } from '../../../../mocks/components/metrics'
 import { mockConfig } from '../../../../mocks/components/config'
@@ -26,7 +25,6 @@ describe('when subscribing to friend connectivity updates', () => {
   let mockPeersStats: jest.Mocked<IPeersStatsComponent>
   let subscribersContext: any
   let mockFriendProfile: any
-  let redis: jest.Mocked<IRedisComponent & ICacheComponent>
   let logs: jest.Mocked<ILoggerComponent>
 
   const friend = {
@@ -34,9 +32,8 @@ describe('when subscribing to friend connectivity updates', () => {
   }
 
   beforeEach(() => {
-    redis = createRedisMock({})
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ redis, logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     mockUpdateHandler = createMockUpdateHandlerComponent({})
     mockPeersStats = createMockPeersStatsComponent()
     mockFriendProfile = createMockProfile('0x456')

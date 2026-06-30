@@ -293,7 +293,7 @@ describe('ws-handler', () => {
       await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
 
       expect(authData.transport.close).toHaveBeenCalled()
-      expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123')
+      expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123', 'test-client-id')
       expect(mockMetrics.increment).toHaveBeenCalledWith('ws_close_codes', { code: 1000 })
       expect(unregisterConnection).toHaveBeenCalledWith(authData)
       expect(authData.connectionStartTime).toBeDefined()

@@ -1,10 +1,61 @@
 import { createRpcClient, TransportEvents } from '@dcl/rpc'
 import { loadService } from '@dcl/rpc/dist/codegen'
 import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { createTestIdentity, createAuthHeaders } from './auth'
+import { createTestIdentity, createAuthHeaders, Identity } from './auth'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
 import { IRpcClient, type TestComponents } from '../../../src/types'
 import { createWebSocketTransport, Transport } from './transport'
+
+/**
+ * Connects a single authenticated RPC client over a real WebSocket using the GIVEN identity.
+ * Unlike createRpcClientComponent (which mints a fresh random identity per connect), this lets
+ * a test open multiple concurrent connections for the SAME address (e.g. website + client).
+ */
+export async function connectAuthenticatedRpcClient(
+  { config, logs }: Pick<TestComponents, 'config' | 'logs'>,
+  identity: Identity
+): Promise<{
+  client: RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>
+  authAddress: string
+  close: () => void
+}> {
+  const logger = logs.getLogger('test:rpc-multi-client')
+  const port = await config.getString('RPC_SERVER_PORT')
+  const serverUrl = `ws://127.0.0.1:${port}`
+  const headers = createAuthHeaders('get', '/', {}, identity)
+  const authMessage = new TextEncoder().encode(JSON.stringify(headers))
+  const transport = createWebSocketTransport(serverUrl)
+
+  const client = await new Promise<RawClient<FromTsProtoServiceDefinition<typeof SocialServiceDefinition>>>(
+    (resolve, reject) => {
+      const timeoutId = setTimeout(() => reject(new Error('Connection timeout')), 10000)
+      transport.on('connect', async () => {
+        try {
+          transport.sendMessage(authMessage)
+          const rpcClient = await createRpcClient(transport)
+          const rpcPort = await rpcClient.createPort('test-multi-client')
+          const service = loadService(rpcPort, SocialServiceDefinition)
+          clearTimeout(timeoutId)
+          resolve(service)
+        } catch (error) {
+          clearTimeout(timeoutId)
+          reject(error as Error)
+        }
+      })
+      transport.on('error', (error) => {
+        logger.error('Transport error during connect', { error: (error as Error)?.message })
+        clearTimeout(timeoutId)
+        reject(error as Error)
+      })
+    }
+  )
+
+  return {
+    client,
+    authAddress: identity.realAccount.address.toLowerCase(),
+    close: () => transport.close()
+  }
+}
 
 export async function createRpcClientComponent({
   config,

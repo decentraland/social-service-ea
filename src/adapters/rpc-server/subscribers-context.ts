@@ -4,61 +4,92 @@ import { normalizeAddress } from '../../utils/address'
 import { AppComponents } from '../../types/system'
 import { IWsPoolComponent } from '../../logic/ws-pool/types'
 
-const SUBSCRIBERS_SET_KEY = 'online_subscribers'
-
 const METRICS_INTERVAL_MS = 30_000
 const DEFAULT_RECONCILIATION_INTERVAL_MS = 300_000 // 5 minutes
-const SUBSCRIBERS_COUNT_WARNING_THRESHOLD = 10_000
 
+// Fan-out is derived per-instance from the local subscribers (every update is broadcast to
+// every instance via pub/sub, and delivery is local-only), which is crash-safe and avoids
+// cross-instance presence drift — so this component holds no shared/Redis state.
 export function createSubscribersContext(
-  components: Pick<AppComponents, 'redis' | 'logs' | 'metrics' | 'config'>,
+  components: Pick<AppComponents, 'logs' | 'metrics' | 'config'>,
   wsPool: IWsPoolComponent
 ): ISubscribersContext {
-  const { redis, logs, metrics, config } = components
+  const { logs, metrics, config } = components
   const logger = logs.getLogger('subscribers-context')
 
-  // Local in-memory emitters for WebSocket connections on this instance
+  // One shared in-memory emitter per address. The same address can be connected from
+  // multiple places at once (e.g. the website and the in-world client); every connection
+  // for the address attaches its own generators as listeners on this single emitter, so a
+  // pub/sub fan-out is a single emit that reaches all of them.
   const localSubscribers: Subscribers = {}
 
-  // Track active emitterToAsyncGenerator instances per subscriber so we can
-  // synchronously terminate them when the subscriber disconnects.
+  // Active emitterToAsyncGenerator instances per connection, so we can synchronously
+  // terminate exactly one connection's streams on disconnect without touching another
+  // connection for the same address. Key: wsConnectionId.
   const subscriberGenerators = new Map<string, Set<{ destroy(): void }>>()
 
-  // Track active subscriptions per address to prevent duplicate stream subscriptions.
-  // Key: address, Value: set of event names with an active subscription.
+  // Active subscriptions per connection, to prevent a single connection from opening the
+  // same stream twice (each would allocate another generator + value queue). Scoped per
+  // connection so two connections for the same address don't block each other.
+  // Key: wsConnectionId, Value: set of event names with an active subscription.
   const activeSubscriptions = new Map<string, Set<string>>()
+
+  // Live connections per address (reference count). The shared emitter lives as long as at
+  // least one connection for the address is open.
+  // Key: normalized address, Value: set of wsConnectionIds.
+  const connectionsByAddress = new Map<string, Set<string>>()
 
   let metricsInterval: NodeJS.Timeout | null = null
   let reconciliationInterval: NodeJS.Timeout | null = null
 
-  function addLocalSubscriber(address: string, subscriber: Emitter<SubscriptionEventsEmitter>): void {
-    const normalizedAddress = normalizeAddress(address)
+  function ensureEmitter(normalizedAddress: string): Emitter<SubscriptionEventsEmitter> {
     if (!localSubscribers[normalizedAddress]) {
-      localSubscribers[normalizedAddress] = subscriber
+      localSubscribers[normalizedAddress] = mitt<SubscriptionEventsEmitter>()
     }
+    return localSubscribers[normalizedAddress]
   }
 
-  function destroyGeneratorsForAddress(address: string): void {
-    const generators = subscriberGenerators.get(address)
+  function destroyGeneratorsForConnection(wsConnectionId: string): void {
+    const generators = subscriberGenerators.get(wsConnectionId)
     if (generators) {
       for (const gen of generators) {
         gen.destroy()
       }
       generators.clear()
-      subscriberGenerators.delete(address)
+      subscriberGenerators.delete(wsConnectionId)
     }
   }
 
-  function removeLocalSubscriber(address: string): void {
-    const normalizedAddress = normalizeAddress(address)
-    if (localSubscribers[normalizedAddress]) {
-      // Destroy generators first so pending next() calls resolve before
-      // we clear the emitter handlers (prevents the deadlock).
-      destroyGeneratorsForAddress(normalizedAddress)
-      activeSubscriptions.delete(normalizedAddress)
-      localSubscribers[normalizedAddress].all.clear()
+  // Clear and drop the shared per-address emitter. Callers must destroy the address's
+  // generators first so pending next() calls resolve before the handlers are cleared
+  // (prevents the deadlock).
+  function clearAddressEmitter(normalizedAddress: string): void {
+    const emitter = localSubscribers[normalizedAddress]
+    if (emitter) {
+      emitter.all.clear()
       delete localSubscribers[normalizedAddress]
     }
+  }
+
+  /**
+   * Tear down ALL state for an address (every connection it has). Used by the
+   * reconciliation sweep and on shutdown — not on a normal single-connection disconnect.
+   */
+  function removeLocalSubscriber(address: string): void {
+    const normalizedAddress = normalizeAddress(address)
+
+    const connectionIds = connectionsByAddress.get(normalizedAddress)
+    if (connectionIds) {
+      for (const wsConnectionId of connectionIds) {
+        // Destroy generators first so pending next() calls resolve before we clear the
+        // emitter handlers (prevents the deadlock).
+        destroyGeneratorsForConnection(wsConnectionId)
+        activeSubscriptions.delete(wsConnectionId)
+      }
+      connectionsByAddress.delete(normalizedAddress)
+    }
+
+    clearAddressEmitter(normalizedAddress)
   }
 
   function getGeneratorsCount(): number {
@@ -69,28 +100,21 @@ export function createSubscribersContext(
     return count
   }
 
-  async function reportMetrics(): Promise<void> {
+  function reportMetrics(): void {
     try {
-      const localCount = Object.keys(localSubscribers).length
-      const generatorsCount = getGeneratorsCount()
-
-      metrics.observe('subscribers_local_count', {}, localCount)
-      metrics.observe('subscribers_generators_count', {}, generatorsCount)
-
-      // SCARD is O(1) — safe to call frequently
-      const redisCount = await redis.sCard(SUBSCRIBERS_SET_KEY)
-      metrics.observe('subscribers_redis_set_size', {}, redisCount)
+      metrics.observe('subscribers_local_count', {}, Object.keys(localSubscribers).length)
+      metrics.observe('subscribers_generators_count', {}, getGeneratorsCount())
     } catch (error: any) {
       logger.error('Failed to report subscriber metrics', { error: error?.message || error })
     }
   }
 
   /**
-   * Reconciliation sweep: removes local subscribers that no longer have an active
-   * WebSocket connection. This catches edge cases where the cleanup path in
-   * ws-handler failed to call removeSubscriber (e.g. due to a crash or race condition).
+   * Reconciliation sweep: removes local subscribers that no longer have any active
+   * WebSocket connection. This catches edge cases where the cleanup path in ws-handler
+   * failed to call removeConnection (e.g. due to a crash or race condition).
    */
-  async function reconcileStaleSubscribers(): Promise<void> {
+  function reconcileStaleSubscribers(): void {
     try {
       const activeAddresses = new Set(wsPool.getAuthenticatedAddresses())
       const localAddresses = Object.keys(localSubscribers).map(normalizeAddress)
@@ -108,14 +132,6 @@ export function createSubscribersContext(
 
       for (const address of staleAddresses) {
         removeLocalSubscriber(address)
-        try {
-          await redis.sRem(SUBSCRIBERS_SET_KEY, address)
-        } catch (error: any) {
-          logger.error('Failed to remove stale subscriber from Redis', {
-            address,
-            error: error?.message || error
-          })
-        }
       }
 
       metrics.increment('subscribers_stale_cleaned', {}, staleAddresses.length)
@@ -129,13 +145,8 @@ export function createSubscribersContext(
       const reconciliationIntervalMs =
         (await config.getNumber('SUBSCRIBER_RECONCILIATION_INTERVAL_MS')) ?? DEFAULT_RECONCILIATION_INTERVAL_MS
 
-      metricsInterval = setInterval(() => {
-        reportMetrics().catch(() => {})
-      }, METRICS_INTERVAL_MS)
-
-      reconciliationInterval = setInterval(() => {
-        reconcileStaleSubscribers().catch(() => {})
-      }, reconciliationIntervalMs)
+      metricsInterval = setInterval(reportMetrics, METRICS_INTERVAL_MS)
+      reconciliationInterval = setInterval(reconcileStaleSubscribers, reconciliationIntervalMs)
 
       logger.info('Subscribers context started', {
         metricsIntervalMs: METRICS_INTERVAL_MS,
@@ -154,17 +165,6 @@ export function createSubscribersContext(
         reconciliationInterval = null
       }
 
-      // Clean up all local subscribers from Redis on shutdown
-      const localAddresses = Object.keys(localSubscribers).map(normalizeAddress)
-      if (localAddresses.length > 0) {
-        try {
-          await redis.sRem(SUBSCRIBERS_SET_KEY, localAddresses)
-          logger.info(`Removed ${localAddresses.length} subscribers from Redis on shutdown`)
-        } catch (error: any) {
-          logger.error('Failed to remove subscribers from Redis on shutdown', { error: error?.message || error })
-        }
-      }
-
       // Destroy all generators and clear local emitters
       for (const address of Object.keys(localSubscribers)) {
         removeLocalSubscriber(address)
@@ -176,7 +176,7 @@ export function createSubscribersContext(
     getLocalSubscribersAddresses: () => Object.keys(localSubscribers).map(normalizeAddress),
 
     /**
-     * Get an existing subscriber without creating one if it doesn't exist.
+     * Get an existing subscriber emitter without creating one if it doesn't exist.
      * Use this in update handlers to avoid creating orphaned emitters.
      */
     getSubscriber: (address: string): Emitter<SubscriptionEventsEmitter> | undefined => {
@@ -184,128 +184,94 @@ export function createSubscribersContext(
       return localSubscribers[normalizedAddress]
     },
 
-    async getSubscribersAddresses(): Promise<string[]> {
-      try {
-        // Use SSCAN instead of SMEMBERS to avoid loading the entire set at once,
-        // which can spike memory if the set has accumulated stale entries.
-        const addresses: string[] = []
-        for await (const member of redis.client.sScanIterator(SUBSCRIBERS_SET_KEY, { COUNT: 100 })) {
-          addresses.push(member)
-        }
-
-        if (addresses.length > SUBSCRIBERS_COUNT_WARNING_THRESHOLD) {
-          logger.warn('Redis subscribers set is unusually large', {
-            count: addresses.length,
-            threshold: SUBSCRIBERS_COUNT_WARNING_THRESHOLD
-          })
-        }
-
-        return addresses.map(normalizeAddress)
-      } catch (error: any) {
-        logger.error('Failed to get subscribers from Redis, falling back to local', {
-          error: error?.message || error
-        })
-        // Fallback to local subscribers if Redis fails
-        return Object.keys(localSubscribers).map(normalizeAddress)
-      }
-    },
-
-    getOrAddSubscriber: (address: string): Emitter<SubscriptionEventsEmitter> => {
+    /**
+     * Register a live connection for an address, creating the shared emitter if needed.
+     * Supports multiple concurrent connections per address.
+     */
+    addConnection(address: string, wsConnectionId: string): void {
       const normalizedAddress = normalizeAddress(address)
 
-      if (!localSubscribers[normalizedAddress]) {
-        addLocalSubscriber(normalizedAddress, mitt<SubscriptionEventsEmitter>())
-        // Also add to Redis for global tracking (fire-and-forget)
-        redis.sAdd(SUBSCRIBERS_SET_KEY, normalizedAddress).catch((error: any) => {
-          logger.error('Failed to add subscriber to Redis via getOrAddSubscriber', {
-            address: normalizedAddress,
-            error: error?.message || error
-          })
-        })
-      }
+      ensureEmitter(normalizedAddress)
 
-      return localSubscribers[normalizedAddress]
+      let connectionIds = connectionsByAddress.get(normalizedAddress)
+      if (!connectionIds) {
+        connectionIds = new Set()
+        connectionsByAddress.set(normalizedAddress, connectionIds)
+      }
+      connectionIds.add(wsConnectionId)
     },
 
-    async addSubscriber(address: string, subscriber: Emitter<SubscriptionEventsEmitter>): Promise<void> {
+    /**
+     * Remove a connection for an address. Tears down only this connection's generators and
+     * active-subscription state — other connections for the same address are untouched.
+     * Returns true if this was the LAST connection for the address, in which case the shared
+     * emitter is cleared.
+     */
+    removeConnection(address: string, wsConnectionId: string): boolean {
       const normalizedAddress = normalizeAddress(address)
 
-      // Add to local emitters
-      if (!localSubscribers[normalizedAddress]) {
-        localSubscribers[normalizedAddress] = subscriber
+      const connectionIds = connectionsByAddress.get(normalizedAddress)
+      if (!connectionIds || !connectionIds.has(wsConnectionId)) {
+        // Connection isn't tracked (e.g. close fired twice) — nothing to tear down.
+        return false
       }
 
-      // Add to Redis set for global tracking
-      try {
-        await redis.sAdd(SUBSCRIBERS_SET_KEY, normalizedAddress)
-      } catch (error: any) {
-        logger.error('Failed to add subscriber to Redis', {
-          address: normalizedAddress,
-          error: error?.message || error
-        })
+      // Tear down only this connection's streams/dedup state. Each generator's destroy()
+      // calls emitter.off for its own handler, so sibling connections are untouched.
+      destroyGeneratorsForConnection(wsConnectionId)
+      activeSubscriptions.delete(wsConnectionId)
+      connectionIds.delete(wsConnectionId)
+
+      if (connectionIds.size > 0) {
+        // Other connections for this address are still alive — keep the emitter.
+        return false
       }
+
+      // Last connection for this address: clear the shared emitter.
+      connectionsByAddress.delete(normalizedAddress)
+      clearAddressEmitter(normalizedAddress)
+
+      return true
     },
 
-    async removeSubscriber(address: string): Promise<void> {
-      const normalizedAddress = normalizeAddress(address)
-
-      // Remove from local emitters
-      removeLocalSubscriber(normalizedAddress)
-
-      // Remove from Redis set
-      try {
-        await redis.sRem(SUBSCRIBERS_SET_KEY, normalizedAddress)
-      } catch (error: any) {
-        logger.error('Failed to remove subscriber from Redis', {
-          address: normalizedAddress,
-          error: error?.message || error
-        })
-      }
-    },
-
-    registerGenerator(address: string, generator: { destroy(): void }): void {
-      const normalizedAddress = normalizeAddress(address)
-      let generators = subscriberGenerators.get(normalizedAddress)
+    registerGenerator(wsConnectionId: string, generator: { destroy(): void }): void {
+      let generators = subscriberGenerators.get(wsConnectionId)
       if (!generators) {
         generators = new Set()
-        subscriberGenerators.set(normalizedAddress, generators)
+        subscriberGenerators.set(wsConnectionId, generators)
       }
       generators.add(generator)
     },
 
-    unregisterGenerator(address: string, generator: { destroy(): void }): void {
-      const normalizedAddress = normalizeAddress(address)
-      const generators = subscriberGenerators.get(normalizedAddress)
+    unregisterGenerator(wsConnectionId: string, generator: { destroy(): void }): void {
+      const generators = subscriberGenerators.get(wsConnectionId)
       if (generators) {
         generators.delete(generator)
         if (generators.size === 0) {
-          subscriberGenerators.delete(normalizedAddress)
+          subscriberGenerators.delete(wsConnectionId)
         }
       }
     },
 
-    hasActiveSubscription(address: string, eventName: string): boolean {
-      const normalizedAddress = normalizeAddress(address)
-      return activeSubscriptions.get(normalizedAddress)?.has(eventName) ?? false
+    hasActiveSubscription(wsConnectionId: string, eventName: string): boolean {
+      return activeSubscriptions.get(wsConnectionId)?.has(eventName) ?? false
     },
 
-    setActiveSubscription(address: string, eventName: string): void {
-      const normalizedAddress = normalizeAddress(address)
-      let events = activeSubscriptions.get(normalizedAddress)
+    setActiveSubscription(wsConnectionId: string, eventName: string): void {
+      let events = activeSubscriptions.get(wsConnectionId)
       if (!events) {
         events = new Set()
-        activeSubscriptions.set(normalizedAddress, events)
+        activeSubscriptions.set(wsConnectionId, events)
       }
       events.add(eventName)
     },
 
-    clearActiveSubscription(address: string, eventName: string): void {
-      const normalizedAddress = normalizeAddress(address)
-      const events = activeSubscriptions.get(normalizedAddress)
+    clearActiveSubscription(wsConnectionId: string, eventName: string): void {
+      const events = activeSubscriptions.get(wsConnectionId)
       if (events) {
         events.delete(eventName)
         if (events.size === 0) {
-          activeSubscriptions.delete(normalizedAddress)
+          activeSubscriptions.delete(wsConnectionId)
         }
       }
     }
