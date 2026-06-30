@@ -231,7 +231,7 @@ describe('createRpcServerComponent', () => {
 
       rpcServer.detachUser(address, wsConnectionId)
 
-      // Wait for async removeSubscriber to complete
+      // detach tears down synchronously; give any fire-and-forget cleanup a tick to settle
       await new Promise((resolve) => setTimeout(resolve, 10))
       expect(subscribersContext.getLocalSubscribersAddresses()).not.toContain(address)
     })
@@ -257,11 +257,31 @@ describe('createRpcServerComponent', () => {
       expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).toHaveBeenCalledWith(address)
     })
 
+    it('should not end the private voice chat when a non-last connection detaches', () => {
+      // Same address connected from a second place (e.g. website + in-world client).
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId: 'conn-2' })
+      endIncomingOrOutgoingPrivateVoiceChatForUserMock.mockClear()
+
+      rpcServer.detachUser(address, wsConnectionId)
+
+      expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).not.toHaveBeenCalled()
+    })
+
+    it('should end the private voice chat only once the last connection detaches', () => {
+      rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId: 'conn-2' })
+
+      rpcServer.detachUser(address, wsConnectionId)
+      expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).not.toHaveBeenCalled()
+
+      rpcServer.detachUser(address, 'conn-2')
+      expect(endIncomingOrOutgoingPrivateVoiceChatForUserMock).toHaveBeenCalledWith(address)
+    })
+
     it('should handle multiple detach calls for same user', async () => {
       rpcServer.detachUser(address, wsConnectionId)
       rpcServer.detachUser(address, wsConnectionId)
 
-      // Wait for async removeSubscriber to complete
+      // detach tears down synchronously; give any fire-and-forget cleanup a tick to settle
       await new Promise((resolve) => setTimeout(resolve, 10))
       expect(subscribersContext.getLocalSubscribersAddresses()).not.toContain(address)
     })

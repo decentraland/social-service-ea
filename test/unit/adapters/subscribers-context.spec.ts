@@ -298,4 +298,56 @@ describe('SubscribersContext Component', () => {
       }
     })
   })
+
+  describe('when reconciling stale subscribers on the interval', () => {
+    beforeEach(() => {
+      jest.useFakeTimers()
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it('should remove local subscribers with no authenticated connection and keep the live ones', async () => {
+      const wsPool = createWsPoolMockedComponent({
+        // Only 0x123 is still authenticated; 0x456 has no live connection.
+        getAuthenticatedAddresses: jest.fn().mockReturnValue(['0x123'])
+      })
+      const context = createSubscribersContext(
+        { logs: mockLogs, metrics: mockMetrics, config: mockConfig },
+        wsPool
+      )
+      context.addConnection('0x123', 'conn-1')
+      context.addConnection('0x456', 'conn-2')
+
+      await context.start?.({} as any)
+      // Default reconciliation interval is 5 minutes (config returns undefined in tests).
+      jest.advanceTimersByTime(300_000)
+
+      expect(context.getSubscriber('0x123')).toBeDefined()
+      expect(context.getSubscriber('0x456')).toBeUndefined()
+
+      await context.stop?.()
+    })
+
+    it('should destroy the generators of a reconciled stale subscriber', async () => {
+      const wsPool = createWsPoolMockedComponent({
+        getAuthenticatedAddresses: jest.fn().mockReturnValue([])
+      })
+      const context = createSubscribersContext(
+        { logs: mockLogs, metrics: mockMetrics, config: mockConfig },
+        wsPool
+      )
+      context.addConnection('0x456', 'conn-2')
+      const generator = { destroy: jest.fn() }
+      context.registerGenerator('conn-2', generator)
+
+      await context.start?.({} as any)
+      jest.advanceTimersByTime(300_000)
+
+      expect(generator.destroy).toHaveBeenCalledTimes(1)
+
+      await context.stop?.()
+    })
+  })
 })
