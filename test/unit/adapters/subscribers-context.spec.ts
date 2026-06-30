@@ -51,10 +51,6 @@ describe('SubscribersContext Component', () => {
       it('should create the shared emitter for the address', () => {
         expect(context.getSubscriber(address)).toBeDefined()
       })
-
-      it('should mark the address online in Redis', () => {
-        expect(mockRedis.sAdd).toHaveBeenCalledWith('online_subscribers', address)
-      })
     })
 
     describe('and a second connection for the same address is added', () => {
@@ -65,10 +61,6 @@ describe('SubscribersContext Component', () => {
         ;({ context, address } = createTestContext())
         context.addConnection(address, 'conn-1')
         context.addConnection(address, 'conn-2')
-      })
-
-      it('should not mark the address online in Redis a second time', () => {
-        expect(mockRedis.sAdd).toHaveBeenCalledTimes(1)
       })
 
       it('should keep a single shared emitter for the address', () => {
@@ -97,10 +89,6 @@ describe('SubscribersContext Component', () => {
       it('should keep the shared emitter alive', () => {
         expect(context.getSubscriber(address)).toBeDefined()
       })
-
-      it('should not remove the address from Redis', () => {
-        expect(mockRedis.sRem).not.toHaveBeenCalled()
-      })
     })
 
     describe('and it is the last connection for the address', () => {
@@ -120,10 +108,6 @@ describe('SubscribersContext Component', () => {
 
       it('should clear the shared emitter', () => {
         expect(context.getSubscriber(address)).toBeUndefined()
-      })
-
-      it('should remove the address from Redis', () => {
-        expect(mockRedis.sRem).toHaveBeenCalledWith('online_subscribers', address)
       })
     })
 
@@ -169,39 +153,6 @@ describe('SubscribersContext Component', () => {
   })
 
   describe('when querying subscribers', () => {
-    describe('and getting global subscriber addresses', () => {
-      it('should return addresses from Redis using sScanIterator', async () => {
-        const { context } = createTestContext()
-        const expectedAddresses = ['0x123', '0x456', '0x789']
-
-        ;(mockRedis.client as any).sScanIterator = jest.fn().mockReturnValue(
-          (async function* () {
-            for (const addr of expectedAddresses) {
-              yield addr
-            }
-          })()
-        )
-
-        const addresses = await context.getSubscribersAddresses()
-
-        expect(addresses).toEqual(expectedAddresses)
-        expect((mockRedis.client as any).sScanIterator).toHaveBeenCalledWith('online_subscribers', { COUNT: 100 })
-      })
-
-      it('should fallback to local subscribers when Redis fails', async () => {
-        const { context, address } = createTestContext()
-
-        ;(mockRedis.client as any).sScanIterator = jest.fn().mockImplementation(() => {
-          throw new Error('Redis error')
-        })
-
-        context.addConnection(address, 'conn-1')
-        const addresses = await context.getSubscribersAddresses()
-
-        expect(addresses).toEqual([address])
-      })
-    })
-
     describe('and getting local subscriber addresses', () => {
       it('should return only local subscriber addresses', () => {
         const { context } = createTestContext()
@@ -229,14 +180,6 @@ describe('SubscribersContext Component', () => {
 
         expect(newSubscriber).toBeDefined()
         expect(newSubscriber.all).toBeDefined()
-      })
-
-      it('should NOT touch Redis (online tracking is reference-counted by addConnection)', () => {
-        const { context, address } = createTestContext()
-
-        context.getOrAddSubscriber(address)
-
-        expect(mockRedis.sAdd).not.toHaveBeenCalled()
       })
     })
   })
@@ -347,7 +290,7 @@ describe('SubscribersContext Component', () => {
   })
 
   describe('when stopping the component', () => {
-    it('should remove all local subscribers from Redis', async () => {
+    it('should clear all local subscribers', async () => {
       const { context } = createTestContext()
       const addresses = ['0x123', '0x456']
 
@@ -355,7 +298,6 @@ describe('SubscribersContext Component', () => {
 
       await context.stop?.()
 
-      expect(mockRedis.sRem).toHaveBeenCalledWith('online_subscribers', addresses)
       expect(context.getSubscribers()).toEqual({})
     })
 

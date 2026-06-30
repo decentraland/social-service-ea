@@ -3,10 +3,8 @@ import { createTestIdentity, Identity } from './utils/auth'
 import { connectAuthenticatedRpcClient } from './utils/rpc-client'
 import { BLOCK_UPDATES_CHANNEL } from '../../src/adapters/pubsub'
 
-// Mirrors SUBSCRIBERS_SET_KEY in src/adapters/rpc-server/subscribers-context.ts.
-const ONLINE_SUBSCRIBERS_KEY = 'online_subscribers'
 // Generous window for the subscribe RPC round-trip to register the server-side listener
-// before we publish, and for fire-and-forget Redis writes / WS close handling to settle.
+// before we publish, and for WS close handling to settle.
 const SETTLE_MS = 1500
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -98,23 +96,6 @@ test('RPC subscriptions with multiple connections per address', ({ components })
       const updateForB = await secondB
       expect(updateForB.isBlocked).toBe(false)
       expect(updateForB.address.toLowerCase()).toEqual('0x3333333333333333333333333333333333333333')
-    })
-  })
-
-  describe('when tracking the address in the Redis online set', () => {
-    it('should keep the address online until the last connection closes', async () => {
-      await sleep(SETTLE_MS)
-      expect(await components.redis.client.sIsMember(ONLINE_SUBSCRIBERS_KEY, address)).toBe(true)
-
-      // One connection left: still online.
-      clientA.close()
-      await sleep(SETTLE_MS)
-      expect(await components.redis.client.sIsMember(ONLINE_SUBSCRIBERS_KEY, address)).toBe(true)
-
-      // Last connection closed: now offline.
-      clientB.close()
-      await sleep(SETTLE_MS)
-      expect(await components.redis.client.sIsMember(ONLINE_SUBSCRIBERS_KEY, address)).toBe(false)
     })
   })
 })

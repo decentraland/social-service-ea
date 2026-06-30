@@ -343,7 +343,6 @@ export interface ICdnCacheInvalidatorComponent {
 
 export type ISubscribersContext = IBaseComponent & {
   getSubscribers: () => Subscribers
-  getSubscribersAddresses: () => Promise<string[]>
   getLocalSubscribersAddresses: () => string[]
   /**
    * Get an existing subscriber without creating one if it doesn't exist.

@@ -4,17 +4,19 @@ import { normalizeAddress } from '../../utils/address'
 import { AppComponents } from '../../types/system'
 import { IWsPoolComponent } from '../../logic/ws-pool/types'
 
-const SUBSCRIBERS_SET_KEY = 'online_subscribers'
-
 const METRICS_INTERVAL_MS = 30_000
 const DEFAULT_RECONCILIATION_INTERVAL_MS = 300_000 // 5 minutes
-const SUBSCRIBERS_COUNT_WARNING_THRESHOLD = 10_000
 
+// NOTE: this component no longer maintains a global presence set in Redis. Fan-out is derived
+// per-instance from the local subscribers (every update is broadcast to every instance via
+// pub/sub, and delivery is local-only), which is crash-safe and avoids cross-instance presence
+// drift. `redis` is therefore unused here and kept in the signature only to avoid churning the
+// (many) call sites; it can be dropped from the DI in a follow-up.
 export function createSubscribersContext(
   components: Pick<AppComponents, 'redis' | 'logs' | 'metrics' | 'config'>,
   wsPool: IWsPoolComponent
 ): ISubscribersContext {
-  const { redis, logs, metrics, config } = components
+  const { logs, metrics, config } = components
   const logger = logs.getLogger('subscribers-context')
 
   // One shared in-memory emitter per address. The same address can be connected from
@@ -34,8 +36,8 @@ export function createSubscribersContext(
   // Key: wsConnectionId, Value: set of event names with an active subscription.
   const activeSubscriptions = new Map<string, Set<string>>()
 
-  // Live connections per address (reference count). The shared emitter and the Redis
-  // online entry live as long as at least one connection for the address is open.
+  // Live connections per address (reference count). The shared emitter lives as long as at
+  // least one connection for the address is open.
   // Key: normalized address, Value: set of wsConnectionIds.
   const connectionsByAddress = new Map<string, Set<string>>()
 
@@ -74,7 +76,6 @@ export function createSubscribersContext(
   /**
    * Tear down ALL state for an address (every connection it has). Used by the
    * reconciliation sweep and on shutdown — not on a normal single-connection disconnect.
-   * Redis is handled by the callers (reconciliation/stop) so this stays side-effect free.
    */
   function removeLocalSubscriber(address: string): void {
     const normalizedAddress = normalizeAddress(address)
@@ -101,17 +102,10 @@ export function createSubscribersContext(
     return count
   }
 
-  async function reportMetrics(): Promise<void> {
+  function reportMetrics(): void {
     try {
-      const localCount = Object.keys(localSubscribers).length
-      const generatorsCount = getGeneratorsCount()
-
-      metrics.observe('subscribers_local_count', {}, localCount)
-      metrics.observe('subscribers_generators_count', {}, generatorsCount)
-
-      // SCARD is O(1) — safe to call frequently
-      const redisCount = await redis.sCard(SUBSCRIBERS_SET_KEY)
-      metrics.observe('subscribers_redis_set_size', {}, redisCount)
+      metrics.observe('subscribers_local_count', {}, Object.keys(localSubscribers).length)
+      metrics.observe('subscribers_generators_count', {}, getGeneratorsCount())
     } catch (error: any) {
       logger.error('Failed to report subscriber metrics', { error: error?.message || error })
     }
@@ -122,7 +116,7 @@ export function createSubscribersContext(
    * WebSocket connection. This catches edge cases where the cleanup path in ws-handler
    * failed to call removeConnection (e.g. due to a crash or race condition).
    */
-  async function reconcileStaleSubscribers(): Promise<void> {
+  function reconcileStaleSubscribers(): void {
     try {
       const activeAddresses = new Set(wsPool.getAuthenticatedAddresses())
       const localAddresses = Object.keys(localSubscribers).map(normalizeAddress)
@@ -140,14 +134,6 @@ export function createSubscribersContext(
 
       for (const address of staleAddresses) {
         removeLocalSubscriber(address)
-        try {
-          await redis.sRem(SUBSCRIBERS_SET_KEY, address)
-        } catch (error: any) {
-          logger.error('Failed to remove stale subscriber from Redis', {
-            address,
-            error: error?.message || error
-          })
-        }
       }
 
       metrics.increment('subscribers_stale_cleaned', {}, staleAddresses.length)
@@ -161,13 +147,8 @@ export function createSubscribersContext(
       const reconciliationIntervalMs =
         (await config.getNumber('SUBSCRIBER_RECONCILIATION_INTERVAL_MS')) ?? DEFAULT_RECONCILIATION_INTERVAL_MS
 
-      metricsInterval = setInterval(() => {
-        reportMetrics().catch(() => {})
-      }, METRICS_INTERVAL_MS)
-
-      reconciliationInterval = setInterval(() => {
-        reconcileStaleSubscribers().catch(() => {})
-      }, reconciliationIntervalMs)
+      metricsInterval = setInterval(reportMetrics, METRICS_INTERVAL_MS)
+      reconciliationInterval = setInterval(reconcileStaleSubscribers, reconciliationIntervalMs)
 
       logger.info('Subscribers context started', {
         metricsIntervalMs: METRICS_INTERVAL_MS,
@@ -184,17 +165,6 @@ export function createSubscribersContext(
       if (reconciliationInterval) {
         clearInterval(reconciliationInterval)
         reconciliationInterval = null
-      }
-
-      // Clean up all local subscribers from Redis on shutdown
-      const localAddresses = Object.keys(localSubscribers).map(normalizeAddress)
-      if (localAddresses.length > 0) {
-        try {
-          await redis.sRem(SUBSCRIBERS_SET_KEY, localAddresses)
-          logger.info(`Removed ${localAddresses.length} subscribers from Redis on shutdown`)
-        } catch (error: any) {
-          logger.error('Failed to remove subscribers from Redis on shutdown', { error: error?.message || error })
-        }
       }
 
       // Destroy all generators and clear local emitters
@@ -216,44 +186,17 @@ export function createSubscribersContext(
       return localSubscribers[normalizedAddress]
     },
 
-    async getSubscribersAddresses(): Promise<string[]> {
-      try {
-        // Use SSCAN instead of SMEMBERS to avoid loading the entire set at once,
-        // which can spike memory if the set has accumulated stale entries.
-        const addresses: string[] = []
-        for await (const member of redis.client.sScanIterator(SUBSCRIBERS_SET_KEY, { COUNT: 100 })) {
-          addresses.push(member)
-        }
-
-        if (addresses.length > SUBSCRIBERS_COUNT_WARNING_THRESHOLD) {
-          logger.warn('Redis subscribers set is unusually large', {
-            count: addresses.length,
-            threshold: SUBSCRIBERS_COUNT_WARNING_THRESHOLD
-          })
-        }
-
-        return addresses.map(normalizeAddress)
-      } catch (error: any) {
-        logger.error('Failed to get subscribers from Redis, falling back to local', {
-          error: error?.message || error
-        })
-        // Fallback to local subscribers if Redis fails
-        return Object.keys(localSubscribers).map(normalizeAddress)
-      }
-    },
-
     /**
-     * Ensure and return the shared per-address emitter. No Redis side effects — the Redis
-     * online entry is reference-counted by addConnection/removeConnection.
+     * Ensure and return the shared per-address emitter. No side effects beyond creating the
+     * emitter — the connection lifecycle is managed by addConnection/removeConnection.
      */
     getOrAddSubscriber: (address: string): Emitter<SubscriptionEventsEmitter> => {
       return ensureEmitter(normalizeAddress(address))
     },
 
     /**
-     * Register a live connection for an address. Creates the shared emitter if needed and,
-     * on the FIRST connection for the address, marks it online in Redis. Supports multiple
-     * concurrent connections per address.
+     * Register a live connection for an address, creating the shared emitter if needed.
+     * Supports multiple concurrent connections per address.
      */
     addConnection(address: string, wsConnectionId: string): void {
       const normalizedAddress = normalizeAddress(address)
@@ -265,26 +208,14 @@ export function createSubscribersContext(
         connectionIds = new Set()
         connectionsByAddress.set(normalizedAddress, connectionIds)
       }
-
-      const isFirstConnection = connectionIds.size === 0
       connectionIds.add(wsConnectionId)
-
-      if (isFirstConnection) {
-        // Offline -> online transition for this address (fire-and-forget).
-        redis.sAdd(SUBSCRIBERS_SET_KEY, normalizedAddress).catch((error: any) => {
-          logger.error('Failed to add subscriber to Redis', {
-            address: normalizedAddress,
-            error: error?.message || error
-          })
-        })
-      }
     },
 
     /**
      * Remove a connection for an address. Tears down only this connection's generators and
      * active-subscription state — other connections for the same address are untouched.
      * Returns true if this was the LAST connection for the address, in which case the shared
-     * emitter is cleared and the address is removed from the Redis online set.
+     * emitter is cleared.
      */
     removeConnection(address: string, wsConnectionId: string): boolean {
       const normalizedAddress = normalizeAddress(address)
@@ -302,19 +233,13 @@ export function createSubscribersContext(
       connectionIds.delete(wsConnectionId)
 
       if (connectionIds.size > 0) {
-        // Other connections for this address are still alive — keep the emitter & Redis entry.
+        // Other connections for this address are still alive — keep the emitter.
         return false
       }
 
-      // Last connection for this address: clear the shared emitter and mark offline.
+      // Last connection for this address: clear the shared emitter.
       connectionsByAddress.delete(normalizedAddress)
       clearAddressEmitter(normalizedAddress)
-      redis.sRem(SUBSCRIBERS_SET_KEY, normalizedAddress).catch((error: any) => {
-        logger.error('Failed to remove subscriber from Redis', {
-          address: normalizedAddress,
-          error: error?.message || error
-        })
-      })
 
       return true
     },
