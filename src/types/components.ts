@@ -350,11 +350,6 @@ export type ISubscribersContext = IBaseComponent & {
    */
   getSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter> | undefined
   /**
-   * Ensure and return the shared per-address emitter. No Redis side effects — the online
-   * entry is reference-counted by addConnection/removeConnection.
-   */
-  getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
-  /**
    * Register a live connection for an address. Marks the address online in Redis on the
    * first connection. Multiple concurrent connections per address are supported.
    */

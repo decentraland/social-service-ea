@@ -7,8 +7,6 @@ import {
   Action,
   IUpdateHandlerComponent,
   ISubscribersContext,
-  ICacheComponent,
-  IRedisComponent,
   SubscriptionEventsEmitter,
   RpcServerContext
 } from '../../../src/types'
@@ -16,7 +14,6 @@ import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@d
 import { sleep } from '../../../src/utils/timer'
 import { createMockProfile, mockProfile } from '../../mocks/profile'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
-import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
 import { mockMetrics } from '../../mocks/components/metrics'
 import { mockConfig } from '../../mocks/components/config'
@@ -26,10 +23,18 @@ import { ICommunityMembersComponent } from '../../../src/logic/community/types'
 import { createMockCommunityMembersComponent } from '../../mocks/communities'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 
+// Ensure an address has a live connection (so it is a local subscriber) and return its shared
+// emitter. Mirrors how production creates emitters — via a connection, never orphaned.
+function emitterFor(ctx: ISubscribersContext, address: string): Emitter<SubscriptionEventsEmitter> {
+  if (!ctx.getSubscriber(address)) {
+    ctx.addConnection(address, `test-conn-${address}`)
+  }
+  return ctx.getSubscriber(address)!
+}
+
 describe('Updates Handlers', () => {
   let mockLogs: jest.Mocked<ILoggerComponent>
   let logger: ReturnType<ILoggerComponent['getLogger']>
-  let mockRedis: jest.Mocked<IRedisComponent & ICacheComponent>
   let subscribersContext: ISubscribersContext
   let updateHandler: IUpdateHandlerComponent
   let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
@@ -38,30 +43,8 @@ describe('Updates Handlers', () => {
   beforeEach(async () => {
     mockLogs = createLogsMockedComponent()
     logger = mockLogs.getLogger('test')
-    mockRedis = createRedisMock({})
 
-    // Set up Redis mock with state tracking
-    const addressesSet = new Set<string>()
-    mockRedis.sAdd.mockImplementation(async (_key: string, address: string) => {
-      addressesSet.add(address)
-      return 1
-    })
-    mockRedis.sRem.mockImplementation(async (_key: string, addresses: string | string[]) => {
-      const toRemove = Array.isArray(addresses) ? addresses : [addresses]
-      toRemove.forEach((addr) => addressesSet.delete(addr))
-      return toRemove.length
-    })
-    mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
-    ;(mockRedis.client as any).sScanIterator = jest.fn().mockImplementation(() => {
-      const addresses = Array.from(addressesSet)
-      return (async function* () {
-        for (const addr of addresses) {
-          yield addr
-        }
-      })()
-    })
-
-    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext({ logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     subscribersContext.addConnection('0x456', 'conn-456')
     subscribersContext.addConnection('0x789', 'conn-789')
 
@@ -86,7 +69,7 @@ describe('Updates Handlers', () => {
   describe('when handling friendship updates', () => {
     describe('and the target subscriber exists', () => {
       it('should emit friendship update to the target subscriber', () => {
-        const subscriber = subscribersContext.getOrAddSubscriber('0x456')
+        const subscriber = emitterFor(subscribersContext, '0x456')
         const emitSpy = jest.spyOn(subscriber, 'emit')
 
         const update = {
@@ -135,8 +118,8 @@ describe('Updates Handlers', () => {
   describe('when handling friendship accepted updates', () => {
     describe('and the action is accept', () => {
       it('should emit friend connectivity updates to both users with ONLINE status', () => {
-        const subscriber123 = subscribersContext.getOrAddSubscriber('0x123')
-        const subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
+        const subscriber123 = emitterFor(subscribersContext, '0x123')
+        const subscriber456 = emitterFor(subscribersContext, '0x456')
         const emitSpy123 = jest.spyOn(subscriber123, 'emit')
         const emitSpy456 = jest.spyOn(subscriber456, 'emit')
 
@@ -212,8 +195,8 @@ describe('Updates Handlers', () => {
   describe('when handling friend connectivity updates', () => {
     describe('and there are online friends', () => {
       it('should emit connectivity update to all online friends', async () => {
-        const subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
-        const subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
+        const subscriber456 = emitterFor(subscribersContext, '0x456')
+        const subscriber789 = emitterFor(subscribersContext, '0x789')
         const emitSpy456 = jest.spyOn(subscriber456, 'emit')
         const emitSpy789 = jest.spyOn(subscriber789, 'emit')
 
@@ -293,8 +276,8 @@ describe('Updates Handlers', () => {
     let emitSpy789: jest.SpyInstance
 
     beforeEach(() => {
-      subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
-      subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
+      subscriber456 = emitterFor(subscribersContext, '0x456')
+      subscriber789 = emitterFor(subscribersContext, '0x789')
 
       emitSpy456 = jest.spyOn(subscriber456, 'emit')
       emitSpy789 = jest.spyOn(subscriber789, 'emit')
@@ -409,7 +392,7 @@ describe('Updates Handlers', () => {
 
           // Add the third subscriber for the test (online so the handlers consider it)
           subscribersContext.addConnection('0x999', 'conn-999')
-          const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
+          const subscriber999 = emitterFor(subscribersContext, '0x999')
           const emitSpy999 = jest.spyOn(subscriber999, 'emit')
 
           await updateHandler.communityMemberConnectivityUpdateHandler(JSON.stringify(update))
@@ -493,9 +476,9 @@ describe('Updates Handlers', () => {
       // 0x456/0x789 are marked online by the top-level beforeEach; mark 0x123 online too so
       // it is included in the Redis online set the handlers consult.
       subscribersContext.addConnection('0x123', 'conn-123')
-      subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
-      subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
-      subscriber123 = subscribersContext.getOrAddSubscriber('0x123')
+      subscriber456 = emitterFor(subscribersContext, '0x456')
+      subscriber789 = emitterFor(subscribersContext, '0x789')
+      subscriber123 = emitterFor(subscribersContext, '0x123')
 
       emitSpy456 = jest.spyOn(subscriber456, 'emit')
       emitSpy789 = jest.spyOn(subscriber789, 'emit')
@@ -624,7 +607,7 @@ describe('Updates Handlers', () => {
 
             // Add the third subscriber for the test (online so the handlers consider it)
             subscribersContext.addConnection('0x999', 'conn-999')
-            const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
+            const subscriber999 = emitterFor(subscribersContext, '0x999')
             const emitSpy999 = jest.spyOn(subscriber999, 'emit')
 
             await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
@@ -668,7 +651,7 @@ describe('Updates Handlers', () => {
 
             // Add the third subscriber for the test (online so the handlers consider it)
             subscribersContext.addConnection('0x999', 'conn-999')
-            const subscriber999 = subscribersContext.getOrAddSubscriber('0x999')
+            const subscriber999 = emitterFor(subscribersContext, '0x999')
             const emitSpy999 = jest.spyOn(subscriber999, 'emit')
 
             await updateHandler.communityMemberStatusHandler(JSON.stringify(update))
@@ -749,7 +732,7 @@ describe('Updates Handlers', () => {
   describe('when handling block updates', () => {
     describe('and the blocked user is subscribed', () => {
       it('should emit block update to the blocked user', () => {
-        const subscriber = subscribersContext.getOrAddSubscriber('0x456')
+        const subscriber = emitterFor(subscribersContext, '0x456')
         const emitSpy = jest.spyOn(subscriber, 'emit')
 
         const update = {
@@ -805,8 +788,8 @@ describe('Updates Handlers', () => {
       calleeAddress = '0x456'
       callId = 'voice-call-1'
 
-      const caller = subscribersContext.getOrAddSubscriber(callerAddress)
-      const callee = subscribersContext.getOrAddSubscriber(calleeAddress)
+      const caller = emitterFor(subscribersContext, callerAddress)
+      const callee = emitterFor(subscribersContext, calleeAddress)
       callerEmitSpy = jest.spyOn(caller, 'emit')
       calleeEmitSpy = jest.spyOn(callee, 'emit')
 
@@ -993,9 +976,9 @@ describe('Updates Handlers', () => {
       // 0x456/0x789 are marked online by the top-level beforeEach; mark 0x123 online too so
       // it is included in the Redis online set the handlers consult.
       subscribersContext.addConnection('0x123', 'conn-123')
-      subscriber456 = subscribersContext.getOrAddSubscriber('0x456')
-      subscriber789 = subscribersContext.getOrAddSubscriber('0x789')
-      subscriber123 = subscribersContext.getOrAddSubscriber('0x123')
+      subscriber456 = emitterFor(subscribersContext, '0x456')
+      subscriber789 = emitterFor(subscribersContext, '0x789')
+      subscriber123 = emitterFor(subscribersContext, '0x123')
 
       emitSpy456 = jest.spyOn(subscriber456, 'emit')
       emitSpy789 = jest.spyOn(subscriber789, 'emit')
@@ -1198,28 +1181,7 @@ describe('Updates Handlers', () => {
 
       mockRegistry.getProfile.mockResolvedValue(mockProfile)
 
-      // Set up Redis mock with state tracking (reuse the outer scope mockRedis/mockLogs)
-      const addressesSet = new Set<string>()
-      mockRedis.sAdd.mockImplementation(async (_key: string, address: string) => {
-        addressesSet.add(address)
-        return 1
-      })
-      mockRedis.sRem.mockImplementation(async (_key: string, addresses: string | string[]) => {
-        const toRemove = Array.isArray(addresses) ? addresses : [addresses]
-        toRemove.forEach((addr) => addressesSet.delete(addr))
-        return toRemove.length
-      })
-      mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
-      ;(mockRedis.client as any).sScanIterator = jest.fn().mockImplementation(() => {
-        const addresses = Array.from(addressesSet)
-        return (async function* () {
-          for (const addr of addresses) {
-            yield addr
-          }
-        })()
-      })
-
-      subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+      subscribersContext = createSubscribersContext({ logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
       subscribersContext.addConnection('0x123', 'conn-123')
 
       rpcContext = {
@@ -1309,7 +1271,7 @@ describe('Updates Handlers', () => {
       })
 
       it('should deliver an emitted update to both connections', async () => {
-        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        emitterFor(rpcContext.subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
 
         expect((await resultPromiseA).value).toEqual({ parsed: true })
         expect((await resultPromiseB).value).toEqual({ parsed: true })
@@ -1330,7 +1292,7 @@ describe('Updates Handlers', () => {
         })
 
         const resultPromise = generator.next()
-        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        emitterFor(rpcContext.subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
 
         const result = await resultPromise
         expect(result.value).toEqual({ parsed: true })
@@ -1351,7 +1313,7 @@ describe('Updates Handlers', () => {
         })
 
         const resultPromise = generator.next()
-        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        emitterFor(rpcContext.subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
 
         const result = await resultPromise
         expect(result.value).toEqual({ parsed: true })
@@ -1371,7 +1333,7 @@ describe('Updates Handlers', () => {
         for (let i = 0; i < 2; i++) {
           parser.mockResolvedValueOnce({ parsed: i })
           const resultPromise = generator.next()
-          rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+          emitterFor(rpcContext.subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
           const result = await resultPromise
           expect(result.value).toEqual({ parsed: i })
           expect(parser).toHaveBeenCalledWith(friendshipUpdate, mockProfile)
@@ -1392,7 +1354,7 @@ describe('Updates Handlers', () => {
         })
 
         generator.next()
-        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        emitterFor(rpcContext.subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
 
         await sleep(100)
 
@@ -1416,7 +1378,7 @@ describe('Updates Handlers', () => {
         })
 
         const resultPromise = generator.next()
-        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        emitterFor(rpcContext.subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
 
         await sleep(100)
 
@@ -1439,7 +1401,7 @@ describe('Updates Handlers', () => {
         })
 
         const resultPromise = generator.next()
-        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        emitterFor(rpcContext.subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
 
         await expect(resultPromise).rejects.toThrow('Test error')
       })
@@ -1459,7 +1421,7 @@ describe('Updates Handlers', () => {
         })
 
         const resultPromise = generator.next()
-        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('blockUpdate', blockUpdate)
+        emitterFor(rpcContext.subscribersContext, '0x123').emit('blockUpdate', blockUpdate)
 
         const result = await resultPromise
         expect(result.value).toEqual({ parsed: true })
@@ -1502,7 +1464,7 @@ describe('Updates Handlers', () => {
         const resultPromise = generator.next()
 
         // Emit the update twice to test the skip logic
-        const subscriber = rpcContext.subscribersContext.getOrAddSubscriber('0x123')
+        const subscriber = emitterFor(rpcContext.subscribersContext, '0x123')
         subscriber.emit('blockUpdate', blockUpdateWithoutProfile)
         subscriber.emit('blockUpdate', blockUpdateWithProfile)
 
@@ -1532,7 +1494,7 @@ describe('Updates Handlers', () => {
         const resultPromise = generator.next()
         expect(registerSpy).toHaveBeenCalledWith('conn-123', expect.objectContaining({ destroy: expect.any(Function) }))
 
-        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        emitterFor(rpcContext.subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
         await resultPromise
 
         // Return the generator to trigger finally block
@@ -1556,7 +1518,7 @@ describe('Updates Handlers', () => {
         })
 
         const resultPromise = generator.next()
-        rpcContext.subscribersContext.getOrAddSubscriber('0x123').emit('friendshipUpdate', friendshipUpdate)
+        emitterFor(rpcContext.subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
 
         await expect(resultPromise).rejects.toThrow('parser error')
         expect(unregisterSpy).toHaveBeenCalled()
@@ -1589,9 +1551,9 @@ describe('Updates Handlers', () => {
       })
 
       it('should notify all online community members about the deletion', async () => {
-        const member1Emitter = subscribersContext.getOrAddSubscriber('0xmember1')
-        const member2Emitter = subscribersContext.getOrAddSubscriber('0xmember2')
-        const member3Emitter = subscribersContext.getOrAddSubscriber('0xmember3')
+        const member1Emitter = emitterFor(subscribersContext, '0xmember1')
+        const member2Emitter = emitterFor(subscribersContext, '0xmember2')
+        const member3Emitter = emitterFor(subscribersContext, '0xmember3')
 
         const emitSpy1 = jest.spyOn(member1Emitter, 'emit')
         const emitSpy2 = jest.spyOn(member2Emitter, 'emit')

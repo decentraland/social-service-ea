@@ -160,7 +160,7 @@ async function initComponents(): Promise<TestComponents> {
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
   const wsPool = createWsPoolComponent({ logs, metrics })
-  const subscribersContext = createSubscribersContext({ redis, logs, metrics, config }, wsPool)
+  const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })

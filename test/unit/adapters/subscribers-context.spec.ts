@@ -1,6 +1,4 @@
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
-import { ICacheComponent, IRedisComponent } from '../../../src/types'
-import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
 import { mockMetrics } from '../../mocks/components/metrics'
 import { mockConfig } from '../../mocks/components/config'
@@ -8,11 +6,9 @@ import { createWsPoolMockedComponent } from '../../mocks/components/ws-pool'
 import { ILoggerComponent } from '@well-known-components/interfaces'
 
 describe('SubscribersContext Component', () => {
-  let mockRedis: jest.Mocked<IRedisComponent & ICacheComponent>
   let mockLogs: jest.Mocked<ILoggerComponent>
 
   beforeEach(() => {
-    mockRedis = createRedisMock({})
     mockLogs = createLogsMockedComponent()
   })
 
@@ -23,7 +19,7 @@ describe('SubscribersContext Component', () => {
   function createTestContext() {
     return {
       context: createSubscribersContext(
-        { redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig },
+        { logs: mockLogs, metrics: mockMetrics, config: mockConfig },
         createWsPoolMockedComponent()
       ),
       address: '0x123'
@@ -164,24 +160,6 @@ describe('SubscribersContext Component', () => {
       })
     })
 
-    describe('and using getOrAddSubscriber', () => {
-      it('should return the existing emitter on subsequent calls', () => {
-        const { context, address } = createTestContext()
-
-        const emitter = context.getOrAddSubscriber(address)
-
-        expect(context.getOrAddSubscriber(address)).toBe(emitter)
-      })
-
-      it('should create and return a new emitter if none exists', () => {
-        const { context, address } = createTestContext()
-
-        const newSubscriber = context.getOrAddSubscriber(address)
-
-        expect(newSubscriber).toBeDefined()
-        expect(newSubscriber.all).toBeDefined()
-      })
-    })
   })
 
   describe('when managing generators per connection', () => {

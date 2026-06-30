@@ -2,15 +2,12 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import { subscribeToPrivateVoiceChatUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-private-voice-chat-updates'
 import {
-  ICacheComponent,
-  IRedisComponent,
   IUpdateHandlerComponent,
   RpcServerContext,
   SubscriptionEventsEmitter
 } from '../../../../../src/types'
 import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
-import { createRedisMock } from '../../../../mocks/components/redis'
 import { mockMetrics } from '../../../../mocks/components/metrics'
 import { mockConfig } from '../../../../mocks/components/config'
 import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
@@ -22,7 +19,6 @@ import { VoiceChatStatus } from '../../../../../src/logic/voice/types'
 
 describe('when subscribing to private voice chat updates', () => {
   let logs: jest.Mocked<ILoggerComponent>
-  let redis: jest.Mocked<IRedisComponent & ICacheComponent>
   let service: ReturnType<typeof subscribeToPrivateVoiceChatUpdatesService>
   let rpcContext: RpcServerContext
   let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
@@ -35,7 +31,6 @@ describe('when subscribing to private voice chat updates', () => {
     calleeAddress = '0xC001010101010101010101010101010101010101'
     callId = '1'
     logs = createLogsMockedComponent()
-    redis = createRedisMock({})
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     service = subscribeToPrivateVoiceChatUpdatesService({
@@ -44,7 +39,7 @@ describe('when subscribing to private voice chat updates', () => {
 
     rpcContext = {
       address: callerAddress,
-      subscribersContext: createSubscribersContext({ redis, logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+      subscribersContext: createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     }
   })
 

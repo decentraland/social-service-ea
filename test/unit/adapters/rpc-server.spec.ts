@@ -3,13 +3,10 @@ import {
   IRPCServerComponent,
   ISubscribersContext,
   IUpdateHandlerComponent,
-  ICacheComponent,
-  IRedisComponent,
   RpcServerContext
 } from '../../../src/types'
 import { RpcServer, Transport, createRpcServer } from '@dcl/rpc'
 import { mockConfig, mockFriendsDB, mockMetrics, mockPubSub, mockUWs } from '../../mocks/components'
-import { createRedisMock } from '../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
 import { createWsPoolMockedComponent } from '../../mocks/components/ws-pool'
 import {
@@ -42,28 +39,13 @@ describe('createRpcServerComponent', () => {
   let subscribersContext: ISubscribersContext
   let endIncomingOrOutgoingPrivateVoiceChatForUserMock: jest.Mock
   let mockUpdateHandler: jest.Mocked<IUpdateHandlerComponent>
-  let mockRedis: jest.Mocked<IRedisComponent & ICacheComponent>
   let mockLogs: jest.Mocked<ILoggerComponent>
 
   beforeEach(async () => {
     endIncomingOrOutgoingPrivateVoiceChatForUserMock = jest.fn()
-    mockRedis = createRedisMock({})
     mockLogs = createLogsMockedComponent()
 
-    // Set up Redis mock with state tracking
-    const addressesSet = new Set<string>()
-    mockRedis.sAdd.mockImplementation(async (_key: string, address: string) => {
-      addressesSet.add(address)
-      return 1
-    })
-    mockRedis.sRem.mockImplementation(async (_key: string, addresses: string | string[]) => {
-      const toRemove = Array.isArray(addresses) ? addresses : [addresses]
-      toRemove.forEach((addr) => addressesSet.delete(addr))
-      return toRemove.length
-    })
-    mockRedis.sMembers.mockImplementation(async () => Array.from(addressesSet))
-
-    subscribersContext = createSubscribersContext({ redis: mockRedis, logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext({ logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
 
     rpcServerMock = createRpcServer({
       logger: mockLogs.getLogger('rpcServer-test')
@@ -204,7 +186,7 @@ describe('createRpcServerComponent', () => {
     it('should create and store a new emitter for the user', () => {
       rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId })
 
-      const subscriber = subscribersContext.getOrAddSubscriber(address)
+      const subscriber = subscribersContext.getSubscriber(address)!
       expect(subscriber).toBeDefined()
       expect(subscriber.all).toBeDefined()
       expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address)
@@ -212,10 +194,10 @@ describe('createRpcServerComponent', () => {
 
     it('should not override existing subscriber for the same address', () => {
       rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId })
-      const firstSubscriber = subscribersContext.getOrAddSubscriber(address)
+      const firstSubscriber = subscribersContext.getSubscriber(address)!
 
       rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId: 'conn-2' })
-      const secondSubscriber = subscribersContext.getOrAddSubscriber(address)
+      const secondSubscriber = subscribersContext.getSubscriber(address)!
 
       expect(secondSubscriber).toBe(firstSubscriber)
     })
@@ -226,8 +208,8 @@ describe('createRpcServerComponent', () => {
       rpcServer.attachUser({ transport: mockTransport, address, wsConnectionId })
       rpcServer.attachUser({ transport: mockTransport, address: address2, wsConnectionId: 'conn-2' })
 
-      const subscriber1 = subscribersContext.getOrAddSubscriber(address)
-      const subscriber2 = subscribersContext.getOrAddSubscriber(address2)
+      const subscriber1 = subscribersContext.getSubscriber(address)!
+      const subscriber2 = subscribersContext.getSubscriber(address2)!
 
       expect(subscriber1).not.toBe(subscriber2)
       expect(subscribersContext.getLocalSubscribersAddresses()).toContain(address)
@@ -255,7 +237,7 @@ describe('createRpcServerComponent', () => {
     })
 
     it('should clear subscriber events when detaching', () => {
-      const subscriber = subscribersContext.getOrAddSubscriber(address)
+      const subscriber = subscribersContext.getSubscriber(address)!
       const clearSpy = jest.spyOn(subscriber.all, 'clear')
 
       rpcServer.detachUser(address, wsConnectionId)

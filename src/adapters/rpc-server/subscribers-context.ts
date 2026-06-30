@@ -7,13 +7,11 @@ import { IWsPoolComponent } from '../../logic/ws-pool/types'
 const METRICS_INTERVAL_MS = 30_000
 const DEFAULT_RECONCILIATION_INTERVAL_MS = 300_000 // 5 minutes
 
-// NOTE: this component no longer maintains a global presence set in Redis. Fan-out is derived
-// per-instance from the local subscribers (every update is broadcast to every instance via
-// pub/sub, and delivery is local-only), which is crash-safe and avoids cross-instance presence
-// drift. `redis` is therefore unused here and kept in the signature only to avoid churning the
-// (many) call sites; it can be dropped from the DI in a follow-up.
+// Fan-out is derived per-instance from the local subscribers (every update is broadcast to
+// every instance via pub/sub, and delivery is local-only), which is crash-safe and avoids
+// cross-instance presence drift — so this component holds no shared/Redis state.
 export function createSubscribersContext(
-  components: Pick<AppComponents, 'redis' | 'logs' | 'metrics' | 'config'>,
+  components: Pick<AppComponents, 'logs' | 'metrics' | 'config'>,
   wsPool: IWsPoolComponent
 ): ISubscribersContext {
   const { logs, metrics, config } = components
@@ -184,14 +182,6 @@ export function createSubscribersContext(
     getSubscriber: (address: string): Emitter<SubscriptionEventsEmitter> | undefined => {
       const normalizedAddress = normalizeAddress(address)
       return localSubscribers[normalizedAddress]
-    },
-
-    /**
-     * Ensure and return the shared per-address emitter. No side effects beyond creating the
-     * emitter — the connection lifecycle is managed by addConnection/removeConnection.
-     */
-    getOrAddSubscriber: (address: string): Emitter<SubscriptionEventsEmitter> => {
-      return ensureEmitter(normalizeAddress(address))
     },
 
     /**

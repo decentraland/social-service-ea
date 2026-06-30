@@ -1,9 +1,8 @@
 import { subscribeToBlockUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-block-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
-import { ICacheComponent, IRedisComponent, RpcServerContext } from '../../../../../src/types'
+import { RpcServerContext } from '../../../../../src/types'
 import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
-import { createRedisMock } from '../../../../mocks/components/redis'
 import { createLogsMockedComponent } from '../../../../mocks/components/logs'
 import { mockMetrics } from '../../../../mocks/components/metrics'
 import { mockConfig } from '../../../../mocks/components/config'
@@ -15,7 +14,6 @@ describe('when subscribing to block updates', () => {
   let rpcContext: RpcServerContext
   let mockUpdateHandler: jest.Mocked<any>
   let subscribersContext: any
-  let redis: jest.Mocked<IRedisComponent & ICacheComponent>
   let logs: jest.Mocked<ILoggerComponent>
 
   const mockUpdate = {
@@ -25,9 +23,8 @@ describe('when subscribing to block updates', () => {
   }
 
   beforeEach(() => {
-    redis = createRedisMock({})
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ redis, logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
     mockUpdateHandler = createMockUpdateHandlerComponent({})
 
     subscribeToBlockUpdates = subscribeToBlockUpdatesService({
