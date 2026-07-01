@@ -9,3 +9,9 @@ export class BlockedUserError extends Error {
     super('This action is not allowed because either you blocked this user or this user blocked you')
   }
 }
+
+export class InvalidFriendshipActionError extends Error {
+  constructor(message = 'The friendship action is not valid for the current friendship status') {
+    super(message)
+  }
+}
