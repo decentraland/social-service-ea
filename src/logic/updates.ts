@@ -376,9 +376,11 @@ export function createUpdateHandlerComponent(
     // Guard against the SAME connection opening the same stream twice — each extra generator
     // allocates another value queue and doubles that connection's memory.
     if (rpcContext.subscribersContext.hasActiveSubscription(connectionId, eventNameString)) {
-      // Expected, benign outcome — the guard is doing its job. But it can fire at very high
-      // frequency during reconnect/re-subscribe churn, so count it as a metric (for alerting
-      // and graphing) and keep the per-occurrence line at debug so it never floods the logs.
+      // A connection re-subscribing to an event it is already subscribed to is expected and
+      // benign — the guard is the #407 OOM protection (it prevents a second generator/value-queue
+      // for the same connection+event). We both count it (the subscription_duplicates_total metric,
+      // labelled by event) and log it at debug for per-connection visibility; a sustained high
+      // rate/volume for a single connection indicates a client stuck in a re-subscribe loop.
       metrics.increment('subscription_duplicates_total', { event: eventNameString })
       logger.debug('Duplicate subscription detected, ignoring', {
         address: normalizedAddress,
@@ -398,12 +400,18 @@ export function createUpdateHandlerComponent(
         event: eventNameString,
         wsConnectionId: connectionId
       })
-      return
+      // Throw rather than return: a clean completion here invites the client to immediately
+      // re-open the stream and hit this same path again — a hot loop. Erroring out makes a
+      // (well-behaved) client back off instead. Reaching here means the RPC call is live but the
+      // per-address emitter is gone, which is an abnormal/racy state, not a normal stream end.
+      throw new Error('No subscriber emitter for address; connection no longer attached')
     }
 
     rpcContext.subscribersContext.setActiveSubscription(connectionId, eventNameString)
 
-    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
+    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName, () =>
+      metrics.increment('subscription_updates_dropped_total', { event: eventNameString })
+    )
     rpcContext.subscribersContext.registerGenerator(connectionId, updatesGenerator)
 
     try {

@@ -1222,6 +1222,14 @@ describe('Updates Handlers', () => {
         })
       })
 
+      it('should log the duplicate at debug for per-connection visibility', () => {
+        expect(logger.debug).toHaveBeenCalledWith('Duplicate subscription detected, ignoring', {
+          address: '0x123',
+          event: 'friendshipUpdate',
+          wsConnectionId: 'conn-123'
+        })
+      })
+
       it('should not parse any update', () => {
         expect(parser).not.toHaveBeenCalled()
       })
@@ -1301,7 +1309,7 @@ describe('Updates Handlers', () => {
     })
 
     describe('and the address has no emitter (connection no longer attached)', () => {
-      it('should not start the subscription and should log a warning', async () => {
+      it('should throw so the client backs off instead of hot-looping, and should log a warning', async () => {
         const contextWithoutEmitter: RpcServerContext = {
           address: '0xnoemitter',
           wsConnectionId: 'conn-detached',
@@ -1316,9 +1324,9 @@ describe('Updates Handlers', () => {
           parser
         })
 
-        const result = await generator.next()
-
-        expect(result.done).toBe(true)
+        await expect(generator.next()).rejects.toThrow(
+          'No subscriber emitter for address; connection no longer attached'
+        )
         expect(logger.warn).toHaveBeenCalledWith('No subscriber emitter for address; connection no longer attached', {
           address: '0xnoemitter',
           event: 'friendshipUpdate',

@@ -13,7 +13,8 @@ export type DestroyableAsyncGenerator<T> = AsyncGenerator<T> & { destroy(): void
  */
 export default function emitterToAsyncGenerator<Events extends Record<EventType, unknown>, T extends keyof Events>(
   emitter: Emitter<Events>,
-  event: T
+  event: T,
+  onOverflowDrop?: () => void
 ): DestroyableAsyncGenerator<Events[T]> {
   let isDone = false
   const nextQueue: {
@@ -34,9 +35,11 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
     }
 
     if (valueQueue.length >= MAX_VALUE_QUEUE_SIZE) {
-      // Drop oldest event silently to prevent unbounded memory growth.
-      // TODO: Add metrics/logging here once a logger is available in this utility.
+      // Drop the oldest event to prevent unbounded memory growth for a slow consumer. Surface it
+      // via the optional hook so callers can track how often (and for which event) updates are
+      // being lost — a sustained rate means a client isn't keeping up with the stream.
       valueQueue.shift()
+      onOverflowDrop?.()
     }
     valueQueue.push(value)
   }

@@ -238,6 +238,19 @@ describe('emitterToAsyncGenerator', () => {
       expect(result.value).toBe('event-10')
     })
 
+    it('should invoke onOverflowDrop once per dropped event', async () => {
+      const onOverflowDrop = jest.fn()
+      const generator = emitterToAsyncGenerator(emitter, 'testEvent', onOverflowDrop)
+      const overflow = 7
+
+      for (let i = 0; i < MAX_VALUE_QUEUE_SIZE + overflow; i++) {
+        emitter.emit('testEvent', `event-${i}`)
+      }
+
+      expect(onOverflowDrop).toHaveBeenCalledTimes(overflow)
+      generator.destroy()
+    })
+
     it('should keep exactly MAX_VALUE_QUEUE_SIZE items when overflowing', async () => {
       const generator = emitterToAsyncGenerator(emitter, 'testEvent')
       const overflow = 5
