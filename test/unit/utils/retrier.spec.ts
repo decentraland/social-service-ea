@@ -65,4 +65,30 @@ describe('retry', () => {
     expect(mockSleep).toHaveBeenCalledTimes(2)
     expect(mockSleep).toHaveBeenCalledWith(500)
   })
+
+  it('should invoke onRetry with the error and attempt number on each retried failure', async () => {
+    mockAction.mockReset()
+    const firstError = new Error('fail 1')
+    const secondError = new Error('fail 2')
+    mockAction.mockRejectedValueOnce(firstError).mockRejectedValueOnce(secondError).mockResolvedValueOnce('ok')
+    const onRetry = jest.fn()
+
+    const result = await retry(mockAction, 3, 100, onRetry)
+
+    expect(result).toBe('ok')
+    expect(onRetry).toHaveBeenCalledTimes(2)
+    expect(onRetry).toHaveBeenNthCalledWith(1, firstError, 1)
+    expect(onRetry).toHaveBeenNthCalledWith(2, secondError, 2)
+  })
+
+  it('should not invoke onRetry on the final exhausting attempt', async () => {
+    mockAction.mockReset()
+    mockAction.mockRejectedValue(new Error('always fails'))
+    const onRetry = jest.fn()
+
+    await expect(retry(mockAction, 2, 100, onRetry)).rejects.toThrow('Failed after 2 attempts')
+
+    // With 2 attempts only the first failure is a "retry"; the last one throws instead.
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
 })

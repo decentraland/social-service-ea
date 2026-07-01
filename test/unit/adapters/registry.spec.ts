@@ -525,7 +525,7 @@ describe('registry', () => {
       })
 
       it('should throw an error', async () => {
-        await expect(registry.getProfile(profileId)).rejects.toThrow('Failed to fetch profile from registry')
+        await expect(registry.getProfile(profileId)).rejects.toThrow('Failed to fetch profiles from registry')
       })
     })
   })

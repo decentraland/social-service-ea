@@ -1,7 +1,7 @@
 import { createCatalystClient } from '../../../src/adapters/catalyst-client'
 import { ICatalystClientComponent } from '../../../src/types'
 import { createLambdasClient, LambdasClient } from 'dcl-catalyst-client'
-import { mockConfig, mockFetcher } from '../../mocks/components'
+import { mockConfig, mockFetcher, mockLogs } from '../../mocks/components'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 
 jest.mock('dcl-catalyst-client', () => ({
@@ -41,7 +41,8 @@ describe('catalyst-client', () => {
 
     catalystClient = await createCatalystClient({
       fetcher: mockFetcher,
-      config: mockConfig
+      config: mockConfig,
+      logs: mockLogs
     })
     lambdasClientMock = createLambdasClient({
       fetcher: mockFetcher,

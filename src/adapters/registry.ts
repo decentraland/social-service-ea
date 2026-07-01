@@ -33,6 +33,28 @@ export async function createRegistryComponent({
     }
   }
 
+  // Single place that talks to the registry, so a fetch failure (network error or non-ok
+  // response) is always logged with context at the source — not left to whichever caller
+  // happens to catch it. Rethrows so callers keep their existing control flow.
+  async function fetchProfilesFromRegistry(ids: string[]): Promise<Profile[]> {
+    try {
+      return await fetchJson<Profile[]>(
+        () =>
+          fetcher.fetch(`${registryUrl}/profiles`, {
+            method: 'POST',
+            body: JSON.stringify({ ids })
+          }),
+        (r) => new Error(`Failed to fetch profiles from registry: ${r.statusText}`)
+      )
+    } catch (error: any) {
+      logger.error('Failed to fetch profiles from registry', {
+        error: error?.message ?? String(error),
+        count: ids.length
+      })
+      throw error
+    }
+  }
+
   async function getProfiles(ids: string[]): Promise<Profile[]> {
     if (ids.length === 0) return []
 
@@ -56,14 +78,7 @@ export async function createRegistryComponent({
     let validProfiles: Profile[] = []
 
     if (idsToFetch.length > 0) {
-      const registryResults = await fetchJson<Profile[]>(
-        () =>
-          fetcher.fetch(`${registryUrl}/profiles`, {
-            method: 'POST',
-            body: JSON.stringify({ ids: idsToFetch })
-          }),
-        (r) => new Error(`Failed to fetch profiles from registry: ${r.statusText}`)
-      )
+      const registryResults = await fetchProfilesFromRegistry(idsToFetch)
 
       const minimalProfiles = registryResults.map(extractMinimalProfile).filter(Boolean) as Profile[]
       validProfiles = minimalProfiles
@@ -94,14 +109,7 @@ export async function createRegistryComponent({
       return cachedProfile
     }
 
-    const registryResults = await fetchJson<Profile[]>(
-      () =>
-        fetcher.fetch(`${registryUrl}/profiles`, {
-          method: 'POST',
-          body: JSON.stringify({ ids: [id] })
-        }),
-      (r) => new Error(`Failed to fetch profile from registry: ${r.statusText}`)
-    )
+    const registryResults = await fetchProfilesFromRegistry([id])
 
     if (registryResults.length === 0) {
       throw new Error(`Profile not found: ${id}`)
