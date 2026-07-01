@@ -12,6 +12,9 @@ export function subscribeToFriendConnectivityUpdatesService({
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
+    // Initial online-friends snapshot. Best-effort: a DB/registry hiccup here must NOT tear down
+    // the whole subscription — otherwise the client just reconnects and retries, churning (and
+    // re-running these queries every time). Log and fall through to live updates instead.
     try {
       const onlinePeers = await peersStats.getConnectedPeers()
       const onlineFriends = await friendsDb.getOnlineFriends(context.address, onlinePeers)
@@ -23,7 +26,14 @@ export function subscribeToFriendConnectivityUpdatesService({
       }))
 
       yield* parsedProfiles
+    } catch (error: any) {
+      logger.warn('Failed to deliver initial friend connectivity snapshot; continuing with live updates', {
+        address: context.address,
+        error: error?.message ?? String(error)
+      })
+    }
 
+    try {
       yield* updateHandler.handleSubscriptionUpdates<
         FriendConnectivityUpdate,
         SubscriptionEventsEmitter['friendConnectivityUpdate']

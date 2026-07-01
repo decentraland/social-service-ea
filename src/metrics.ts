@@ -116,6 +116,11 @@ export const metricDeclarations = {
     help: 'Number of duplicate stream subscriptions rejected by the per-(address, event) guard',
     labelNames: ['event']
   },
+  subscription_updates_dropped_total: {
+    type: IMetricsComponent.CounterType,
+    help: "Number of subscription updates dropped because a connection's value queue overflowed (slow consumer)",
+    labelNames: ['event']
+  },
   ai_compliance_validation_duration_seconds: {
     type: IMetricsComponent.HistogramType,
     help: 'Duration of AI compliance validation in seconds',

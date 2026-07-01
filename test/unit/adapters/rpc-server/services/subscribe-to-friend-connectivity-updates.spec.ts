@@ -106,17 +106,51 @@ describe('when subscribing to friend connectivity updates', () => {
     })
   })
 
-  describe('when the subscription encounters an error', () => {
+  describe('when the initial snapshot fails', () => {
     let testError: Error
 
     beforeEach(() => {
       testError = new Error('Test error')
       mockFriendsDB.getOnlineFriends.mockRejectedValue(testError)
+      // The subscription must still continue to live updates despite the snapshot failure.
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
     })
 
-    it('should propagate the error', async () => {
+    it('should not tear down the subscription, log a warning, and continue to live updates', async () => {
       const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
-      await expect(generator.next()).rejects.toThrow(testError)
+
+      const result = await generator.next()
+
+      expect(result.done).toBe(true)
+      expect(logs.getLogger('subscribe-to-friend-connectivity-updates-service').warn).toHaveBeenCalledWith(
+        'Failed to deliver initial friend connectivity snapshot; continuing with live updates',
+        expect.objectContaining({ address: '0x123' })
+      )
+      expect(mockUpdateHandler.handleSubscriptionUpdates).toHaveBeenCalled()
+    })
+  })
+
+  describe('when the live update stream errors', () => {
+    let streamError: Error
+
+    beforeEach(() => {
+      streamError = new Error('stream boom')
+      // Snapshot succeeds (empty) so we reach the live-update stream, which then errors.
+      mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
+      mockRegistry.getProfiles.mockResolvedValueOnce([])
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
+        throw streamError
+      })
+    })
+
+    it('should log the error and propagate it', async () => {
+      const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+
+      await expect(generator.next()).rejects.toThrow(streamError)
+      expect(logs.getLogger('subscribe-to-friend-connectivity-updates-service').error).toHaveBeenCalledWith(
+        'Error in friend connectivity updates subscription:',
+        streamError
+      )
     })
   })
 
