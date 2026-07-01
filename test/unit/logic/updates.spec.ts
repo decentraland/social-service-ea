@@ -1222,12 +1222,11 @@ describe('Updates Handlers', () => {
         })
       })
 
-      it('should log the duplicate at debug for per-connection visibility', () => {
-        expect(logger.debug).toHaveBeenCalledWith('Duplicate subscription detected, ignoring', {
-          address: '0x123',
-          event: 'friendshipUpdate',
-          wsConnectionId: 'conn-123'
-        })
+      it('should not log per occurrence (tracked only via the metric to avoid flooding)', () => {
+        expect(logger.debug).not.toHaveBeenCalledWith(
+          'Duplicate subscription detected, ignoring',
+          expect.anything()
+        )
       })
 
       it('should not parse any update', () => {

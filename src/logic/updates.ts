@@ -378,15 +378,12 @@ export function createUpdateHandlerComponent(
     if (rpcContext.subscribersContext.hasActiveSubscription(connectionId, eventNameString)) {
       // A connection re-subscribing to an event it is already subscribed to is expected and
       // benign — the guard is the #407 OOM protection (it prevents a second generator/value-queue
-      // for the same connection+event). We both count it (the subscription_duplicates_total metric,
-      // labelled by event) and log it at debug for per-connection visibility; a sustained high
-      // rate/volume for a single connection indicates a client stuck in a re-subscribe loop.
+      // for the same connection+event). It can fire hundreds of times per minute for a single
+      // connection stuck in a re-subscribe loop, so we track it ONLY via the
+      // subscription_duplicates_total metric (labelled by event) and do not log per occurrence —
+      // at DEBUG level (production) that line floods the logs. A sustained high rate on the metric
+      // indicates a client stuck re-subscribing.
       metrics.increment('subscription_duplicates_total', { event: eventNameString })
-      logger.debug('Duplicate subscription detected, ignoring', {
-        address: normalizedAddress,
-        event: eventNameString,
-        wsConnectionId: connectionId
-      })
       return
     }
 
