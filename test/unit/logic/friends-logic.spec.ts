@@ -11,7 +11,7 @@ import { createLogsMockedComponent, createMockedPubSubComponent } from '../../mo
 import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { Action, Friendship, User, BlockedUserWithDate, FriendshipRequest, FriendshipAction } from '../../../src/types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
-import { BlockedUserError } from '../../../src/logic/friends/errors'
+import { BlockedUserError, InvalidFriendshipActionError } from '../../../src/logic/friends/errors'
 import { sendNotification } from '../../../src/logic/notifications'
 
 jest.mock('../../../src/logic/notifications', () => ({
@@ -1114,28 +1114,57 @@ describe('Friends Component', () => {
       beforeEach(() => {
         friendshipId = 'existing-friendship-id'
         actionId = 'new-action-id'
-        mockLastAction = {
-          id: 'last-action-id',
-          friendship_id: friendshipId,
-          acting_user: userAddress,
-          action: Action.REQUEST,
-          timestamp: new Date().toISOString()
-        }
-
-        mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(mockLastAction)
         mockFriendsDB.updateFriendshipStatus.mockResolvedValue({ id: friendshipId, created_at: mockCreatedAt })
         mockFriendsDB.recordFriendshipAction.mockResolvedValue(actionId)
       })
 
+      // Only legal state-machine transitions are exercised here. `actingUserMarker` is who performed the
+      // previous action ('user' = the caller, 'friend' = the other user); it determines whether the new
+      // action is allowed (e.g. a user may ACCEPT a request they received, but not one they sent).
       describe.each([
-        [Action.REQUEST, false, 'inactive'],
-        [Action.ACCEPT, true, 'active'],
-        [Action.REJECT, false, 'inactive'],
-        [Action.CANCEL, false, 'inactive'],
-        [Action.DELETE, false, 'inactive']
-      ])('and the action is %s', (actionType, expectedActiveStatus, statusDescription) => {
+        {
+          description: 'accepting a request received from the friend',
+          actingUserMarker: 'friend',
+          lastActionType: Action.REQUEST,
+          actionType: Action.ACCEPT,
+          expectedActiveStatus: true,
+          statusDescription: 'active'
+        },
+        {
+          description: 'rejecting a request received from the friend',
+          actingUserMarker: 'friend',
+          lastActionType: Action.REQUEST,
+          actionType: Action.REJECT,
+          expectedActiveStatus: false,
+          statusDescription: 'inactive'
+        },
+        {
+          description: 'cancelling a request the caller sent to the friend',
+          actingUserMarker: 'user',
+          lastActionType: Action.REQUEST,
+          actionType: Action.CANCEL,
+          expectedActiveStatus: false,
+          statusDescription: 'inactive'
+        },
+        {
+          description: 'deleting an already-accepted friendship',
+          actingUserMarker: 'friend',
+          lastActionType: Action.ACCEPT,
+          actionType: Action.DELETE,
+          expectedActiveStatus: false,
+          statusDescription: 'inactive'
+        }
+      ])('and the action is $description', ({ actingUserMarker, lastActionType, actionType, expectedActiveStatus, statusDescription }) => {
         beforeEach(() => {
           action = actionType
+          mockLastAction = {
+            id: 'last-action-id',
+            friendship_id: friendshipId,
+            acting_user: actingUserMarker === 'user' ? userAddress : friendAddress,
+            action: lastActionType,
+            timestamp: new Date().toISOString()
+          }
+          mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(mockLastAction)
         })
 
         it(`should update the existing friendship status to ${statusDescription}`, async () => {
@@ -1222,32 +1251,25 @@ describe('Friends Component', () => {
       beforeEach(() => {
         friendshipId = 'new-friendship-id'
         actionId = 'new-action-id'
+        action = Action.REQUEST
 
         mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(null)
         mockFriendsDB.createFriendship.mockResolvedValue({ id: friendshipId, created_at: mockCreatedAt })
         mockFriendsDB.recordFriendshipAction.mockResolvedValue(actionId)
       })
 
-      describe.each([
-        [Action.REQUEST, false, 'inactive'],
-        [Action.ACCEPT, true, 'active'],
-        [Action.REJECT, false, 'inactive'],
-        [Action.CANCEL, false, 'inactive'],
-        [Action.DELETE, false, 'inactive']
-      ])('and the action is %s', (actionType, expectedActiveStatus, statusDescription) => {
+      // With no prior action the only legal transition is a REQUEST. Every other action (ACCEPT, REJECT,
+      // CANCEL, DELETE) is an illegal transition and is covered by the invalid-transition block below.
+      describe('and the action is a REQUEST', () => {
         beforeEach(() => {
-          action = actionType
+          action = Action.REQUEST
         })
 
-        it(`should create a new friendship with ${statusDescription} status`, async () => {
+        it('should create a new inactive friendship', async () => {
           await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
 
           expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith(userAddress, friendAddress)
-          expect(mockFriendsDB.createFriendship).toHaveBeenCalledWith(
-            [userAddress, friendAddress],
-            expectedActiveStatus,
-            mockClient
-          )
+          expect(mockFriendsDB.createFriendship).toHaveBeenCalledWith([userAddress, friendAddress], false, mockClient)
           expect(mockFriendsDB.updateFriendshipStatus).not.toHaveBeenCalled()
         })
 
@@ -1257,7 +1279,7 @@ describe('Friends Component', () => {
           expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
             friendshipId,
             userAddress,
-            actionType,
+            Action.REQUEST,
             metadata,
             mockClient
           )
@@ -1270,7 +1292,7 @@ describe('Friends Component', () => {
             id: actionId,
             from: userAddress,
             to: friendAddress,
-            action: actionType,
+            action: Action.REQUEST,
             timestamp: expect.any(Number),
             metadata
           })
@@ -1290,28 +1312,92 @@ describe('Friends Component', () => {
           })
         })
 
-        it('should send notification for the friendship action when appropriate', async () => {
+        it('should send a notification for the friendship request', async () => {
           await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
 
           // Execute setImmediate callback
           jest.runOnlyPendingTimers()
 
-          if (actionType === Action.REQUEST || actionType === Action.ACCEPT) {
-            expect(mockSendNotification).toHaveBeenCalledWith(
-              actionType,
-              {
-                requestId: actionId,
-                senderAddress: userAddress,
-                receiverAddress: friendAddress,
-                senderProfile: mockUserProfile,
-                receiverProfile: mockFriendProfile,
-                message: metadata?.message
-              },
-              { sns: mockSNS, logs: expect.any(Object) }
-            )
-          } else {
-            expect(mockSendNotification).not.toHaveBeenCalled()
-          }
+          expect(mockSendNotification).toHaveBeenCalledWith(
+            Action.REQUEST,
+            {
+              requestId: actionId,
+              senderAddress: userAddress,
+              receiverAddress: friendAddress,
+              senderProfile: mockUserProfile,
+              receiverProfile: mockFriendProfile,
+              message: metadata?.message
+            },
+            { sns: mockSNS, logs: expect.any(Object) }
+          )
+        })
+      })
+    })
+
+    // Regression coverage for the friendship state machine: an action that is not a legal transition
+    // from the current state must be rejected before any state is written. The canonical case is
+    // ACCEPT with no pending request, which previously forged an active friendship without consent.
+    describe('and the action is not a valid transition for the current friendship state', () => {
+      beforeEach(() => {
+        mockFriendsDB.createFriendship.mockResolvedValue({ id: 'friendship-id', created_at: mockCreatedAt })
+        mockFriendsDB.updateFriendshipStatus.mockResolvedValue({ id: 'friendship-id', created_at: mockCreatedAt })
+        mockFriendsDB.recordFriendshipAction.mockResolvedValue('action-id')
+      })
+
+      describe.each([
+        { description: 'accepting when no request exists', actionType: Action.ACCEPT, lastActor: null, lastActionType: null },
+        { description: 'rejecting when no request exists', actionType: Action.REJECT, lastActor: null, lastActionType: null },
+        { description: 'cancelling when no request exists', actionType: Action.CANCEL, lastActor: null, lastActionType: null },
+        { description: 'deleting when no friendship exists', actionType: Action.DELETE, lastActor: null, lastActionType: null },
+        {
+          description: 'accepting a request the caller sent themselves',
+          actionType: Action.ACCEPT,
+          lastActor: 'user',
+          lastActionType: Action.REQUEST
+        },
+        {
+          description: 'cancelling a request the friend sent',
+          actionType: Action.CANCEL,
+          lastActor: 'friend',
+          lastActionType: Action.REQUEST
+        },
+        {
+          description: 'accepting when the friendship is already active',
+          actionType: Action.ACCEPT,
+          lastActor: 'friend',
+          lastActionType: Action.ACCEPT
+        }
+      ])('and the action is $description', ({ actionType, lastActor, lastActionType }) => {
+        beforeEach(() => {
+          action = actionType
+          const lastAction =
+            lastActor === null
+              ? null
+              : {
+                  id: 'last-action-id',
+                  friendship_id: 'existing-friendship-id',
+                  acting_user: lastActor === 'user' ? userAddress : friendAddress,
+                  action: lastActionType as Action,
+                  timestamp: new Date().toISOString()
+                }
+          mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(lastAction)
+        })
+
+        it('should throw an InvalidFriendshipActionError', async () => {
+          await expect(
+            friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+          ).rejects.toThrow(InvalidFriendshipActionError)
+        })
+
+        it('should not open a transaction or write any friendship state', async () => {
+          await expect(
+            friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+          ).rejects.toThrow(InvalidFriendshipActionError)
+
+          expect(mockFriendsDB.executeTx).not.toHaveBeenCalled()
+          expect(mockFriendsDB.createFriendship).not.toHaveBeenCalled()
+          expect(mockFriendsDB.updateFriendshipStatus).not.toHaveBeenCalled()
+          expect(mockFriendsDB.recordFriendshipAction).not.toHaveBeenCalled()
         })
       })
     })
@@ -1399,6 +1485,9 @@ describe('Friends Component', () => {
       let mockLastAction: FriendshipAction
 
       beforeEach(() => {
+        // Caller previously sent a request (valid `REQUEST` by the caller), now cancels it — a legal
+        // transition that reaches updateFriendshipStatus, where the database error is triggered.
+        action = Action.CANCEL
         mockLastAction = {
           id: 'last-action-id',
           friendship_id: 'existing-friendship-id',

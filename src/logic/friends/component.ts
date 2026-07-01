@@ -12,8 +12,8 @@ import {
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { getProfileUserId } from '../profiles'
 import { sendNotification, shouldNotify } from '../notifications'
-import { BlockedUserError, ProfileNotFoundError } from './errors'
-import { getNewFriendshipStatus } from './friendships'
+import { BlockedUserError, InvalidFriendshipActionError, ProfileNotFoundError } from './errors'
+import { getNewFriendshipStatus, validateNewFriendshipAction } from './friendships'
 import { BlockedUser, IFriendsComponent } from './types'
 
 export async function createFriendsComponent(
@@ -215,6 +215,14 @@ export async function createFriendsComponent(
       }
 
       const lastAction = await friendsDb.getLastFriendshipActionByUsers(userAddress, friendAddress)
+
+      // Enforce the friendship state machine before mutating any state. Without this guard an action
+      // like ACCEPT with no pending request would be applied blindly, letting a user forge another
+      // user's friendship (setting is_active = true) with no consent and defeat privacy gates that
+      // key on that flag (e.g. the ONLY_FRIENDS private-voice check).
+      if (!validateNewFriendshipAction(userAddress, { action, user: friendAddress }, lastAction)) {
+        throw new InvalidFriendshipActionError()
+      }
 
       const friendshipStatus = getNewFriendshipStatus(action)
       const isActive = friendshipStatus === FriendshipStatus.Friends
