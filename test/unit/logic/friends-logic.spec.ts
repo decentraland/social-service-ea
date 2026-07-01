@@ -1251,7 +1251,6 @@ describe('Friends Component', () => {
       beforeEach(() => {
         friendshipId = 'new-friendship-id'
         actionId = 'new-action-id'
-        action = Action.REQUEST
 
         mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(null)
         mockFriendsDB.createFriendship.mockResolvedValue({ id: friendshipId, created_at: mockCreatedAt })
