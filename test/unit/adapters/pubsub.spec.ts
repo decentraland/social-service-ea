@@ -77,12 +77,12 @@ describe('PubSubComponent', () => {
       expect(mockSubClient.subscribe).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, handler)
     })
 
-    it('should handle subscription errors gracefully', async () => {
+    it('should log and rethrow subscription errors so callers can fail loud', async () => {
       const error = new Error('Redis subscribe error')
       mockSubClient.subscribe.mockRejectedValueOnce(error)
 
       const handler = jest.fn()
-      await pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)
+      await expect(pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)).rejects.toThrow(error)
 
       expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(
         `Error while subscribing to channel ${FRIEND_STATUS_UPDATES_CHANNEL}: ${error.message}`
@@ -94,7 +94,7 @@ describe('PubSubComponent', () => {
       mockSubClient.subscribe.mockRejectedValueOnce(error)
 
       const handler = jest.fn()
-      await pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)
+      await expect(pubsub.subscribeToChannel(FRIEND_STATUS_UPDATES_CHANNEL, handler)).rejects.toThrow(error)
 
       expect(handler).not.toHaveBeenCalled()
     })

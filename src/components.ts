@@ -182,7 +182,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   const storage = await createS3Adapter({ config })
-  const wsPool = createWsPoolComponent({ logs, metrics })
+  const wsPool = await createWsPoolComponent({ logs, metrics, config })
   const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
@@ -298,7 +298,8 @@ export async function initComponents(): Promise<AppComponents> {
     friendsDb,
     communityMembers,
     registry,
-    metrics
+    metrics,
+    peersStats
   })
 
   const rpcServer = await createRpcServerComponent({

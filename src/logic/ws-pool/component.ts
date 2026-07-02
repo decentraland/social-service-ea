@@ -4,18 +4,30 @@ import { AppComponents, WsUserData } from '../../types'
 import { isAuthenticated } from '../../utils/wsUserData'
 import { normalizeAddress } from '../../utils/address'
 import { IWsPoolComponent } from './types'
+import { WsPoolFullError } from './errors'
 
-export function createWsPoolComponent(components: Pick<AppComponents, 'metrics' | 'logs'>): IWsPoolComponent {
-  const { metrics, logs } = components
+export async function createWsPoolComponent(
+  components: Pick<AppComponents, 'metrics' | 'logs' | 'config'>
+): Promise<IWsPoolComponent> {
+  const { metrics, logs, config } = components
   const logger = logs.getLogger('ws-pool')
+
+  // Optional cap on concurrent connections. Undefined means unlimited (previous behavior).
+  const maxConnections = await config.getNumber('WS_MAX_CONCURRENT_CONNECTIONS')
 
   const connections = new Map<string, WebSocket<WsUserData>>()
 
   /**
    * Register a new WebSocket connection by adding it to the connections map.
    * @param ws - The WebSocket instance
+   * @throws {WsPoolFullError} When the configured connection limit is reached.
    */
   function registerConnection(ws: WebSocket<WsUserData>) {
+    if (maxConnections !== undefined && connections.size >= maxConnections) {
+      metrics.increment('ws_connections_rejected')
+      throw new WsPoolFullError(maxConnections)
+    }
+
     const { wsConnectionId } = ws.getUserData()
     connections.set(wsConnectionId, ws)
     logger.debug('Registering connection', { wsConnectionId, totalConnections: connections.size })
@@ -71,10 +83,19 @@ export function createWsPoolComponent(components: Pick<AppComponents, 'metrics' 
     return addresses
   }
 
+  /**
+   * Returns the wsConnectionIds of all currently registered connections. Used by the
+   * reconciliation sweep to identify subscriber state whose socket is gone.
+   */
+  function getConnectionIds(): string[] {
+    return Array.from(connections.keys())
+  }
+
   return {
     registerConnection,
     unregisterConnection,
     getAuthenticatedAddresses,
+    getConnectionIds,
     [STOP_COMPONENT]: stop
   }
 }

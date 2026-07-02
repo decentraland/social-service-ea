@@ -75,6 +75,13 @@ export async function registerWsHandler(
   function cleanupConnection(data: WsUserData, code: number) {
     const { wsConnectionId } = data
 
+    // Mark the socket disconnected BEFORE closing the transport. safeCloseTransport()
+    // synchronously fires the transport 'close' listener, which ends the socket only when
+    // data.isConnected is still true (the RPC-initiated close path, where the socket is
+    // alive). Clearing the flag first makes that guard precise on this socket-initiated
+    // path — otherwise it would rely on ws.end() throwing on the already-closing socket.
+    data.isConnected = false
+
     if (isAuthenticated(data)) {
       // Each step is independent — a failure in one must not prevent the others.
       // Previously these were in a single try/catch, so a throw in transport.close()
@@ -134,6 +141,19 @@ export async function registerWsHandler(
       const eventEmitter = mitt<IUWebSocketEventMap>()
       const transport = await createUWebSocketTransport(ws, eventEmitter, components)
 
+      // Re-check after the await above: if the socket closed while the transport was being
+      // created, attaching now would register a connection for a dead socket that the
+      // (address-level) cleanup paths would never tear down.
+      if (!data.isConnected) {
+        logger.warn('WebSocket closed during transport creation, aborting user attachment', {
+          address,
+          wsConnectionId: data.wsConnectionId
+        })
+        metrics.increment('ws_auth_race_condition_aborted')
+        transport.close()
+        return
+      }
+
       changeStage(data, {
         auth: true,
         address,
@@ -148,6 +168,17 @@ export async function registerWsHandler(
           address
         })
         rpcServer.detachUser(address, data.wsConnectionId)
+
+        // The transport can also be closed by the RPC layer (e.g. on a transport error such
+        // as a queue overflow) while the socket is still open. Without ending the socket the
+        // client would keep a live, ping-alive connection whose messages go nowhere. On the
+        // normal path (socket closed first) end() throws on the already-closed socket and is
+        // swallowed here.
+        if (data.isConnected) {
+          try {
+            ws.end(1011, 'RPC transport closed')
+          } catch (err) {}
+        }
       })
 
       transport.on('error', (error: unknown) => {
@@ -168,7 +199,12 @@ export async function registerWsHandler(
         address: getAddress(data),
         wsConnectionId: data.wsConnectionId
       })
-      ws.end(3003, 'Unauthorized')
+      // The client may have disconnected while verify() was in flight; end() on an
+      // already-closed socket throws and would escape the async message handler as an
+      // unhandled rejection.
+      try {
+        ws.end(3003, 'Unauthorized')
+      } catch (err) {}
     } finally {
       changeStage(data, { authenticating: false })
     }
@@ -185,7 +221,6 @@ export async function registerWsHandler(
       }
 
       data.eventEmitter.emit('message', message)
-      metrics.increment('ws_messages_sent')
     } catch (error: any) {
       logger.error('Error emitting message', {
         error,
@@ -222,6 +257,12 @@ export async function registerWsHandler(
       })
 
       metrics.increment('ws_drain_events')
+
+      // Let the transport retry queued messages now that the socket drained, instead of
+      // waiting for its backoff timer.
+      if (isAuthenticated(data)) {
+        data.eventEmitter.emit('drain')
+      }
     },
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
@@ -308,6 +349,9 @@ export async function registerWsHandler(
       const data = ws.getUserData()
       const { wsConnectionId } = data
       const messageText = textDecoder.decode(message)
+      // Captured before cleanup: cleanupConnection resets the auth flag, so the type guard
+      // never matches afterwards.
+      const address = isAuthenticated(data) ? data.address : undefined
 
       cleanupConnection(data, code)
 
@@ -315,7 +359,7 @@ export async function registerWsHandler(
         code,
         reason: messageText,
         wsConnectionId,
-        ...(isAuthenticated(data) && { address: data.address })
+        ...(address && { address })
       })
     }
   })

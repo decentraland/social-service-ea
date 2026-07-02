@@ -33,7 +33,10 @@ describe('when subscribing to friend connectivity updates', () => {
 
   beforeEach(() => {
     logs = createLogsMockedComponent()
-    subscribersContext = createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext(
+      { logs, metrics: mockMetrics, config: mockConfig },
+      createWsPoolMockedComponent()
+    )
     mockUpdateHandler = createMockUpdateHandlerComponent({})
     mockPeersStats = createMockPeersStatsComponent()
     mockFriendProfile = createMockProfile('0x456')
@@ -54,11 +57,8 @@ describe('when subscribing to friend connectivity updates', () => {
     }
   })
 
-  describe('when there are online friends', () => {
+  describe('when receiving live updates', () => {
     beforeEach(() => {
-      mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
-      mockRegistry.getProfiles.mockResolvedValueOnce([mockFriendProfile])
-      mockPeersStats.getConnectedPeers.mockResolvedValueOnce(['0x456', '0x789', '0x654', '0x987'])
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
         yield {
           friend: parseProfileToFriend(mockFriendProfile),
@@ -67,66 +67,82 @@ describe('when subscribing to friend connectivity updates', () => {
       })
     })
 
-    it('should get initial online friends and then receive updates', async () => {
+    it('should yield the updates produced by the subscription handler and complete with it', async () => {
       const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
-      const result = await generator.next()
 
-      expect(mockPeersStats.getConnectedPeers).toHaveBeenCalled()
+      const result = await generator.next()
       expect(result.value).toEqual({
         friend: parseProfileToFriend(mockFriendProfile),
         status: ConnectivityStatus.ONLINE
       })
 
       const result2 = await generator.next()
-      expect(result2.done).toBe(false)
-    })
-  })
-
-  describe('when there are no online friends', () => {
-    beforeEach(() => {
-      mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
-      mockRegistry.getProfiles.mockResolvedValueOnce([])
-      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
-        yield {
-          friend: parseProfileToFriend(mockFriendProfile),
-          status: ConnectivityStatus.ONLINE
-        }
-      })
-    })
-
-    it('should handle empty online friends list and then receive updates', async () => {
-      const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
-
-      const result = await generator.next()
-      expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
-      expect(result.done).toBe(false)
-
-      const result2 = await generator.next()
       expect(result2.done).toBe(true)
     })
   })
 
-  describe('when the initial snapshot fails', () => {
-    let testError: Error
+  describe('when building the initial snapshot', () => {
+    let getInitialUpdates: () => Promise<unknown[]>
 
-    beforeEach(() => {
-      testError = new Error('Test error')
-      mockFriendsDB.getOnlineFriends.mockRejectedValue(testError)
-      // The subscription must still continue to live updates despite the snapshot failure.
+    beforeEach(async () => {
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
+
+      const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+      await generator.next()
+
+      getInitialUpdates = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].getInitialUpdates
     })
 
-    it('should not tear down the subscription, log a warning, and continue to live updates', async () => {
-      const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+    it('should provide a snapshot provider to the subscription handler so the live listener registers first', () => {
+      expect(getInitialUpdates).toEqual(expect.any(Function))
+    })
 
-      const result = await generator.next()
+    describe('and there are online friends', () => {
+      beforeEach(() => {
+        mockPeersStats.getConnectedPeers.mockResolvedValueOnce(['0x456', '0x789'])
+        mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([friend])
+        mockRegistry.getProfiles.mockResolvedValueOnce([mockFriendProfile])
+      })
 
-      expect(result.done).toBe(true)
-      expect(logs.getLogger('subscribe-to-friend-connectivity-updates-service').warn).toHaveBeenCalledWith(
-        'Failed to deliver initial friend connectivity snapshot; continuing with live updates',
-        expect.objectContaining({ address: '0x123' })
-      )
-      expect(mockUpdateHandler.handleSubscriptionUpdates).toHaveBeenCalled()
+      it('should resolve to the online friends profiles with ONLINE status', async () => {
+        await expect(getInitialUpdates()).resolves.toEqual([
+          {
+            friend: parseProfileToFriend(mockFriendProfile),
+            status: ConnectivityStatus.ONLINE
+          }
+        ])
+      })
+
+      it('should query the online friends of the subscriber against the connected peers', async () => {
+        await getInitialUpdates()
+
+        expect(mockFriendsDB.getOnlineFriends).toHaveBeenCalledWith('0x123', ['0x456', '0x789'])
+      })
+    })
+
+    describe('and there are no online friends', () => {
+      beforeEach(() => {
+        mockPeersStats.getConnectedPeers.mockResolvedValueOnce([])
+        mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
+        mockRegistry.getProfiles.mockResolvedValueOnce([])
+      })
+
+      it('should resolve to an empty snapshot', async () => {
+        await expect(getInitialUpdates()).resolves.toEqual([])
+      })
+    })
+
+    describe('and the snapshot queries fail', () => {
+      let testError: Error
+
+      beforeEach(() => {
+        testError = new Error('Test error')
+        mockPeersStats.getConnectedPeers.mockRejectedValueOnce(testError)
+      })
+
+      it('should reject so the subscription handler can log it and continue with live updates', async () => {
+        await expect(getInitialUpdates()).rejects.toThrow(testError)
+      })
     })
   })
 
@@ -135,9 +151,6 @@ describe('when subscribing to friend connectivity updates', () => {
 
     beforeEach(() => {
       streamError = new Error('stream boom')
-      // Snapshot succeeds (empty) so we reach the live-update stream, which then errors.
-      mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
-      mockRegistry.getProfiles.mockResolvedValueOnce([])
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
         throw streamError
       })
@@ -172,18 +185,11 @@ describe('when subscribing to friend connectivity updates', () => {
   })
 
   describe('when extracting addresses from updates', () => {
-    beforeEach(() => {
-      mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
-      mockRegistry.getProfiles.mockResolvedValueOnce([])
-      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
-        yield {
-          friend: parseProfileToFriend(mockFriendProfile),
-          status: ConnectivityStatus.ONLINE
-        }
-      })
+    beforeEach(async () => {
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
 
       const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
-      generator.next()
+      await generator.next()
     })
 
     it('should get the address from the update', () => {
@@ -197,9 +203,7 @@ describe('when subscribing to friend connectivity updates', () => {
     let mockUpdateFromOther: any
     let mockUpdateFromSelf: any
 
-    beforeEach(() => {
-      mockFriendsDB.getOnlineFriends.mockResolvedValueOnce([])
-      mockRegistry.getProfiles.mockResolvedValueOnce([])
+    beforeEach(async () => {
       mockUpdateFromOther = {
         address: '0x456', // different from context.address
         status: ConnectivityStatus.ONLINE
@@ -210,15 +214,10 @@ describe('when subscribing to friend connectivity updates', () => {
         status: ConnectivityStatus.ONLINE
       }
 
-      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
-        yield {
-          friend: parseProfileToFriend(mockFriendProfile),
-          status: ConnectivityStatus.ONLINE
-        }
-      })
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
 
       const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
-      generator.next()
+      await generator.next()
     })
 
     it('should filter connectivity updates based on address conditions', () => {

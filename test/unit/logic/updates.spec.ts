@@ -1,7 +1,8 @@
 import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createUpdateHandlerComponent } from '../../../src/logic/updates'
-import { mockRegistry, mockFriendsDB } from '../../mocks/components'
+import { mockRegistry, mockFriendsDB, createMockPeersStatsComponent } from '../../mocks/components'
+import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { Emitter } from 'mitt'
 import {
   Action,
@@ -39,6 +40,7 @@ describe('Updates Handlers', () => {
   let updateHandler: IUpdateHandlerComponent
   let mockCommunityMembers: jest.Mocked<ICommunityMembersComponent>
   let mockCommunitiesDb: jest.Mocked<any>
+  let mockPeersStats: jest.Mocked<IPeersStatsComponent>
 
   beforeEach(async () => {
     mockLogs = createLogsMockedComponent()
@@ -56,13 +58,16 @@ describe('Updates Handlers', () => {
       getCommunity: jest.fn()
     }
 
+    mockPeersStats = createMockPeersStatsComponent()
+
     updateHandler = createUpdateHandlerComponent({
       logs: mockLogs,
       subscribersContext,
       friendsDb: mockFriendsDB,
       registry: mockRegistry,
       communityMembers: mockCommunityMembers,
-      metrics: mockMetrics
+      metrics: mockMetrics,
+      peersStats: mockPeersStats
     })
   })
 
@@ -117,13 +122,19 @@ describe('Updates Handlers', () => {
 
   describe('when handling friendship accepted updates', () => {
     describe('and the action is accept', () => {
-      it('should emit friend connectivity updates to both users with ONLINE status', () => {
-        const subscriber123 = emitterFor(subscribersContext, '0x123')
-        const subscriber456 = emitterFor(subscribersContext, '0x456')
-        const emitSpy123 = jest.spyOn(subscriber123, 'emit')
-        const emitSpy456 = jest.spyOn(subscriber456, 'emit')
+      let update: {
+        id: string
+        from: string
+        to: string
+        action: Action
+        timestamp: number
+        metadata: { message: string }
+      }
+      let emitSpy123: jest.SpyInstance
+      let emitSpy456: jest.SpyInstance
 
-        const update = {
+      beforeEach(() => {
+        update = {
           id: 'update-1',
           from: '0x123',
           to: '0x456',
@@ -131,17 +142,60 @@ describe('Updates Handlers', () => {
           timestamp: Date.now(),
           metadata: { message: 'Hello!' }
         }
+        emitSpy123 = jest.spyOn(emitterFor(subscribersContext, '0x123'), 'emit')
+        emitSpy456 = jest.spyOn(emitterFor(subscribersContext, '0x456'), 'emit')
+      })
 
-        updateHandler.friendshipAcceptedUpdateHandler(JSON.stringify(update))
-
-        expect(emitSpy123).toHaveBeenCalledWith('friendConnectivityUpdate', {
-          address: '0x456',
-          status: ConnectivityStatus.ONLINE
+      describe('and both users are connected', () => {
+        beforeEach(() => {
+          mockPeersStats.getConnectedPeers.mockResolvedValueOnce(['0x123', '0x456'])
         })
 
-        expect(emitSpy456).toHaveBeenCalledWith('friendConnectivityUpdate', {
-          address: '0x123',
-          status: ConnectivityStatus.ONLINE
+        it('should emit friend connectivity updates to both users with ONLINE status', async () => {
+          await updateHandler.friendshipAcceptedUpdateHandler(JSON.stringify(update))
+
+          expect(emitSpy123).toHaveBeenCalledWith('friendConnectivityUpdate', {
+            address: '0x456',
+            status: ConnectivityStatus.ONLINE
+          })
+          expect(emitSpy456).toHaveBeenCalledWith('friendConnectivityUpdate', {
+            address: '0x123',
+            status: ConnectivityStatus.ONLINE
+          })
+        })
+      })
+
+      describe('and only the accepter is connected', () => {
+        beforeEach(() => {
+          mockPeersStats.getConnectedPeers.mockResolvedValueOnce(['0x123'])
+        })
+
+        it('should notify the requester that the accepter is online', async () => {
+          await updateHandler.friendshipAcceptedUpdateHandler(JSON.stringify(update))
+
+          expect(emitSpy456).toHaveBeenCalledWith('friendConnectivityUpdate', {
+            address: '0x123',
+            status: ConnectivityStatus.ONLINE
+          })
+        })
+
+        it('should not announce the disconnected requester as online', async () => {
+          await updateHandler.friendshipAcceptedUpdateHandler(JSON.stringify(update))
+
+          expect(emitSpy123).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and neither user is connected', () => {
+        beforeEach(() => {
+          mockPeersStats.getConnectedPeers.mockResolvedValueOnce([])
+        })
+
+        it('should not emit any connectivity updates', async () => {
+          await updateHandler.friendshipAcceptedUpdateHandler(JSON.stringify(update))
+
+          expect(emitSpy123).not.toHaveBeenCalled()
+          expect(emitSpy456).not.toHaveBeenCalled()
         })
       })
     })
@@ -1282,6 +1336,84 @@ describe('Updates Handlers', () => {
 
         expect((await resultPromiseA).value).toEqual({ parsed: true })
         expect((await resultPromiseB).value).toEqual({ parsed: true })
+      })
+    })
+
+    describe('and an initial snapshot provider is given', () => {
+      let generator: AsyncGenerator<unknown>
+      let getInitialUpdates: jest.Mock
+
+      beforeEach(() => {
+        parser.mockResolvedValue({ parsed: true })
+      })
+
+      describe('and the snapshot resolves', () => {
+        let resolveSnapshot: (updates: unknown[]) => void
+
+        beforeEach(() => {
+          getInitialUpdates = jest.fn().mockReturnValueOnce(
+            new Promise((resolve) => {
+              resolveSnapshot = resolve
+            })
+          )
+
+          generator = updateHandler.handleSubscriptionUpdates({
+            rpcContext,
+            eventName: 'friendshipUpdate',
+            getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+            shouldHandleUpdate: () => true,
+            parser,
+            getInitialUpdates
+          })
+        })
+
+        it('should yield the snapshot items before live updates', async () => {
+          const firstResultPromise = generator.next()
+          // Let the generator body run up to the snapshot await before resolving it.
+          await sleep(0)
+          resolveSnapshot([{ snapshot: true }])
+
+          expect((await firstResultPromise).value).toEqual({ snapshot: true })
+        })
+
+        it('should queue live updates emitted while the snapshot is being fetched and deliver them afterwards', async () => {
+          const firstResultPromise = generator.next()
+          // Let the generator body register the live listener and reach the snapshot await,
+          // then emit an update while the snapshot is still pending.
+          await sleep(0)
+          emitterFor(subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
+          resolveSnapshot([{ snapshot: true }])
+
+          expect((await firstResultPromise).value).toEqual({ snapshot: true })
+          expect((await generator.next()).value).toEqual({ parsed: true })
+        })
+      })
+
+      describe('and the snapshot fails', () => {
+        beforeEach(() => {
+          getInitialUpdates = jest.fn().mockRejectedValueOnce(new Error('snapshot failed'))
+
+          generator = updateHandler.handleSubscriptionUpdates({
+            rpcContext,
+            eventName: 'friendshipUpdate',
+            getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+            shouldHandleUpdate: () => true,
+            parser,
+            getInitialUpdates
+          })
+        })
+
+        it('should log a warning and continue with live updates', async () => {
+          const firstResultPromise = generator.next()
+          await sleep(0)
+          emitterFor(subscribersContext, '0x123').emit('friendshipUpdate', friendshipUpdate)
+
+          expect((await firstResultPromise).value).toEqual({ parsed: true })
+          expect(logger.warn).toHaveBeenCalledWith(
+            'Failed to deliver initial friendshipUpdate snapshot; continuing with live updates',
+            expect.objectContaining({ address: '0x123', error: 'snapshot failed' })
+          )
+        })
       })
     })
 

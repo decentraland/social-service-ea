@@ -231,6 +231,74 @@ describe('ws-handler', () => {
         expect(mockWs.end).toHaveBeenCalledWith(3003, 'Unauthorized')
       })
 
+      it('should not propagate the error when ending an already-closed socket after an authentication failure', async () => {
+        ;(verify as jest.Mock).mockRejectedValue(new Error('Invalid auth chain'))
+        mockWs.end.mockImplementationOnce(() => {
+          throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+        })
+
+        await expect(
+          wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        ).resolves.toBeUndefined()
+      })
+
+      describe('and the transport is closed by the RPC layer while the socket is still connected', () => {
+        beforeEach(async () => {
+          ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        })
+
+        it('should detach the user and end the socket so the client reconnects instead of keeping a dead session', () => {
+          const updatedData = mockWs.getUserData()
+
+          updatedData.transport.close()
+
+          expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123', 'test-client-id')
+          expect(mockWs.end).toHaveBeenCalledWith(1011, 'RPC transport closed')
+        })
+      })
+
+      describe('and the socket itself closes (normal client-initiated close)', () => {
+        beforeEach(async () => {
+          ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        })
+
+        it('should not try to end the already-closing socket when the transport close fires during cleanup', async () => {
+          // cleanupConnection clears isConnected before closing the transport, so the
+          // transport 'close' listener must not attempt ws.end on the socket that is already
+          // being torn down by uWS.
+          await wsHandlers.close(mockWs, 1000, Buffer.from('normal closure'))
+
+          expect(mockWs.end).not.toHaveBeenCalled()
+          expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123', 'test-client-id')
+        })
+      })
+
+      describe('and the connection closes during transport creation (race condition)', () => {
+        let userData: WsNotAuthenticatedUserData
+
+        beforeEach(() => {
+          userData = mockWs.getUserData()
+          ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+          // The transport factory reads its config while being created — flipping the flag
+          // there simulates the socket closing in that window.
+          mockConfig.getNumber.mockImplementation(async (key) => {
+            if (key === 'WS_TRANSPORT_MAX_QUEUE_SIZE') {
+              userData.isConnected = false
+            }
+            return { WS_AUTH_TIMEOUT_IN_MS }[key] || null
+          })
+        })
+
+        it('should abort user attachment', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockRpcServer.attachUser).not.toHaveBeenCalled()
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_race_condition_aborted')
+        })
+      })
+
       it('should clear timeout when user authenticates', async () => {
         const mockTimeout = setTimeout(() => {}, 1000)
         const userData = mockWs.getUserData()
@@ -354,6 +422,31 @@ describe('ws-handler', () => {
     it('should increment drain event', () => {
       wsHandlers.drain(mockWs)
       expect(mockMetrics.increment).toHaveBeenCalledWith('ws_drain_events')
+    })
+
+    describe('when the connection is authenticated', () => {
+      let authData: WsAuthenticatedUserData
+
+      beforeEach(() => {
+        authData = {
+          isConnected: true,
+          auth: true,
+          address: '0x123',
+          wsConnectionId: 'test-client-id',
+          eventEmitter: mitt(),
+          transport: { close: jest.fn() } as any,
+          connectionStartTime: Date.now(),
+          authenticating: false
+        }
+        jest.spyOn(authData.eventEmitter, 'emit')
+        mockWs.getUserData.mockReturnValue(authData)
+      })
+
+      it('should forward the drain event to the transport so it retries queued messages', () => {
+        wsHandlers.drain(mockWs)
+
+        expect(authData.eventEmitter.emit).toHaveBeenCalledWith('drain')
+      })
     })
   })
 })

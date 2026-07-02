@@ -81,9 +81,12 @@ export async function createRpcServerComponent({
         logger.info(`[RPC] RPC Server listening on port ${rpcServerPort}`)
       })
 
+      // flatMap so Promise.all awaits the actual subscription promises — with forEach it
+      // awaited an array of undefined and the server reported started before (or whether)
+      // the pub/sub subscriptions were established.
       await Promise.all(
-        Object.entries(subscriptionsMap).map(([channel, handlers]) =>
-          handlers.forEach((handler) => pubsub.subscribeToChannel(channel, handler))
+        Object.entries(subscriptionsMap).flatMap(([channel, handlers]) =>
+          handlers.map((handler) => pubsub.subscribeToChannel(channel, handler))
         )
       )
     },

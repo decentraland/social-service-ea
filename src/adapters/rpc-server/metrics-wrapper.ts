@@ -246,16 +246,23 @@ export function createRpcServerMetricsWrapper({
         async () => serviceFunction(params, context)
       )
 
+      // Streams usually end by the CLIENT closing them, which returns this generator from
+      // the outside — code placed after the loop never runs in that case, so completion is
+      // recorded in the finally block instead.
+      let errored = false
       try {
         for await (const item of generator) {
           metrics.increment('rpc_updates_sent_on_subscription', { event })
           yield item
         }
-
-        recordCallMetrics(procedureName, RpcResponseCode.OK, startTime)
       } catch (error) {
+        errored = true
         recordCallMetrics(procedureName, RpcResponseCode.STREAM_ERROR, startTime)
         throw error
+      } finally {
+        if (!errored) {
+          recordCallMetrics(procedureName, RpcResponseCode.OK, startTime)
+        }
       }
     }
   }

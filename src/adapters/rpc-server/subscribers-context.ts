@@ -121,22 +121,59 @@ export function createSubscribersContext(
 
       const staleAddresses = localAddresses.filter((address) => !activeAddresses.has(address))
 
-      if (staleAddresses.length === 0) {
-        return
+      if (staleAddresses.length > 0) {
+        logger.warn('Reconciliation found stale subscribers, removing', {
+          count: staleAddresses.length,
+          addresses: staleAddresses.slice(0, 5).join(', ') + (staleAddresses.length > 5 ? '...' : '')
+        })
+
+        for (const address of staleAddresses) {
+          removeLocalSubscriber(address)
+        }
+
+        metrics.increment('subscribers_stale_cleaned', {}, staleAddresses.length)
       }
 
-      logger.warn('Reconciliation found stale subscribers, removing', {
-        count: staleAddresses.length,
-        addresses: staleAddresses.slice(0, 5).join(', ') + (staleAddresses.length > 5 ? '...' : '')
-      })
-
-      for (const address of staleAddresses) {
-        removeLocalSubscriber(address)
-      }
-
-      metrics.increment('subscribers_stale_cleaned', {}, staleAddresses.length)
+      reconcileStaleConnections()
     } catch (error: any) {
       logger.error('Failed to reconcile stale subscribers', { error: error?.message || error })
+    }
+  }
+
+  /**
+   * Removes tracked connections whose WebSocket is gone while the address still has other
+   * live connections (the address-level sweep above can't see those). Without this, a leaked
+   * wsConnectionId under a still-active address keeps the address "connected" forever:
+   * removeConnection never reports the last connection, so the user is never marked offline
+   * and the shared emitter never freed once the real connections close.
+   */
+  function reconcileStaleConnections(): void {
+    const liveConnectionIds = new Set(wsPool.getConnectionIds())
+    let staleConnectionsCount = 0
+
+    for (const [address, connectionIds] of connectionsByAddress) {
+      for (const wsConnectionId of Array.from(connectionIds)) {
+        if (liveConnectionIds.has(wsConnectionId)) {
+          continue
+        }
+
+        // Same teardown as removeConnection: generators first so pending next() calls
+        // resolve before any emitter handlers are cleared.
+        destroyGeneratorsForConnection(wsConnectionId)
+        activeSubscriptions.delete(wsConnectionId)
+        connectionIds.delete(wsConnectionId)
+        staleConnectionsCount++
+      }
+
+      if (connectionIds.size === 0) {
+        connectionsByAddress.delete(address)
+        clearAddressEmitter(address)
+      }
+    }
+
+    if (staleConnectionsCount > 0) {
+      logger.warn('Reconciliation found stale connections, removing', { count: staleConnectionsCount })
+      metrics.increment('subscribers_stale_connections_cleaned', {}, staleConnectionsCount)
     }
   }
 

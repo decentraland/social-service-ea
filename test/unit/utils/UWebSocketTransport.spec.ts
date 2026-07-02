@@ -97,14 +97,14 @@ describe('UWebSocketTransport', () => {
       expect(transport.isConnected).toBe(false)
     })
 
-    it('should handle multiple close calls gracefully', () => {
+    it('should be idempotent and not emit close twice', () => {
       transport.close()
       expect(transport.isConnected).toBe(false)
       expect(closeListener).toHaveBeenCalledTimes(1)
 
       transport.close()
       expect(transport.isConnected).toBe(false)
-      expect(closeListener).toHaveBeenCalledTimes(2)
+      expect(closeListener).toHaveBeenCalledTimes(1)
       expect(mockSocket.end).not.toHaveBeenCalled()
     })
   })
@@ -126,6 +126,14 @@ describe('UWebSocketTransport', () => {
           { result: 'success' },
           mockMessage.byteLength
         )
+      })
+
+      it('should increment the sent messages metric', async () => {
+        const sendPromise = transport.sendMessage(mockMessage)
+        await jest.advanceTimersByTimeAsync(0)
+        await sendPromise
+
+        expect(mockMetrics.increment).toHaveBeenCalledWith('ws_messages_sent')
       })
     })
 
@@ -164,9 +172,8 @@ describe('UWebSocketTransport', () => {
         expect(mockMetrics.increment).toHaveBeenCalledWith('ws_backpressure_events', { result: 'dropped' })
       })
 
-      it('should drop message after max retries', async () => {
+      it('should emit an error after max retries so the RPC server tears the transport down instead of silently losing the message', async () => {
         const sendPromise = transport.sendMessage(mockMessage)
-        ;(sendPromise as unknown as Promise<void>)?.catch(() => {})
 
         await jest.advanceTimersByTimeAsync(0)
 
@@ -184,7 +191,44 @@ describe('UWebSocketTransport', () => {
         )
         await jest.advanceTimersByTimeAsync(finalDelay)
 
-        await expect(sendPromise).rejects.toThrow('Message dropped after max retries')
+        expect(errorListener).toHaveBeenCalledWith(new Error('Message not deliverable after max retries'))
+        expect(mockMetrics.increment).toHaveBeenCalledWith('ws_backpressure_events', { result: 'max_retries' })
+
+        // The error listener (the RPC server in production) reacts by closing the transport,
+        // which rejects everything still queued.
+        transport.close()
+        await expect(sendPromise).rejects.toThrow('Connection closed')
+      })
+
+      it('should not retry the backpressured head message before the backoff elapses when new messages are sent', async () => {
+        transport.sendMessage(mockMessage)
+        await jest.advanceTimersByTimeAsync(0)
+        expect(mockSocket.send).toHaveBeenCalledTimes(1)
+
+        transport.sendMessage(mockMessage)
+        await jest.advanceTimersByTimeAsync(0)
+
+        expect(mockSocket.send).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and the socket drains while a backoff retry is pending', () => {
+      beforeEach(() => {
+        mockSocket.send
+          .mockReturnValueOnce(UWebSocketSendResult.DROPPED)
+          .mockReturnValue(UWebSocketSendResult.SUCCESS)
+      })
+
+      it('should retry immediately on drain without waiting for the backoff timer', async () => {
+        const sendPromise = transport.sendMessage(mockMessage)
+        await jest.advanceTimersByTimeAsync(0)
+        expect(mockSocket.send).toHaveBeenCalledTimes(1)
+
+        mockEmitter.emit('drain')
+        await jest.advanceTimersByTimeAsync(0)
+
+        expect(mockSocket.send).toHaveBeenCalledTimes(2)
+        await expect(sendPromise).resolves.not.toThrow()
       })
     })
 

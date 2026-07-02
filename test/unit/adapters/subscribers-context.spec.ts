@@ -311,7 +311,8 @@ describe('SubscribersContext Component', () => {
     it('should remove local subscribers with no authenticated connection and keep the live ones', async () => {
       const wsPool = createWsPoolMockedComponent({
         // Only 0x123 is still authenticated; 0x456 has no live connection.
-        getAuthenticatedAddresses: jest.fn().mockReturnValue(['0x123'])
+        getAuthenticatedAddresses: jest.fn().mockReturnValue(['0x123']),
+        getConnectionIds: jest.fn().mockReturnValue(['conn-1'])
       })
       const context = createSubscribersContext(
         { logs: mockLogs, metrics: mockMetrics, config: mockConfig },
@@ -348,6 +349,46 @@ describe('SubscribersContext Component', () => {
       expect(generator.destroy).toHaveBeenCalledTimes(1)
 
       await context.stop?.()
+    })
+
+    describe('and a stale connection remains under an address that still has a live connection', () => {
+      let context: ReturnType<typeof createSubscribersContext>
+      let staleGenerator: { destroy: jest.Mock }
+
+      beforeEach(async () => {
+        const wsPool = createWsPoolMockedComponent({
+          getAuthenticatedAddresses: jest.fn().mockReturnValue(['0x123']),
+          // conn-live is still open; conn-stale's socket is gone but was never detached
+          // (e.g. the cleanup path failed), so the address-level sweep can't see it.
+          getConnectionIds: jest.fn().mockReturnValue(['conn-live'])
+        })
+        context = createSubscribersContext({ logs: mockLogs, metrics: mockMetrics, config: mockConfig }, wsPool)
+        context.addConnection('0x123', 'conn-live')
+        context.addConnection('0x123', 'conn-stale')
+        staleGenerator = { destroy: jest.fn() }
+        context.registerGenerator('conn-stale', staleGenerator)
+
+        await context.start?.({} as any)
+        jest.advanceTimersByTime(300_000)
+      })
+
+      afterEach(async () => {
+        await context.stop?.()
+      })
+
+      it('should destroy the stale connection generators', () => {
+        expect(staleGenerator.destroy).toHaveBeenCalledTimes(1)
+      })
+
+      it('should keep the address subscribed for the live connection', () => {
+        expect(context.getSubscriber('0x123')).toBeDefined()
+      })
+
+      it('should report the last connection when the live connection is later removed', () => {
+        // With the stale connection swept, removing the real connection correctly reports it
+        // was the address's last one, so the user gets marked offline.
+        expect(context.removeConnection('0x123', 'conn-live')).toBe(true)
+      })
     })
   })
 })
