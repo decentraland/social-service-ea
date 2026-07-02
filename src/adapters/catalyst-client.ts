@@ -11,11 +11,13 @@ const L1_TESTNET = 'sepolia'
 
 export async function createCatalystClient({
   fetcher,
-  config
-}: Pick<AppComponents, 'fetcher' | 'config'>): Promise<ICatalystClientComponent> {
+  config,
+  logs
+}: Pick<AppComponents, 'fetcher' | 'config' | 'logs'>): Promise<ICatalystClientComponent> {
   const loadBalancer = await config.requireString('CATALYST_LAMBDAS_URL_LOADBALANCER')
   const env = await config.getString('ENV')
   const contractNetwork = env === 'prd' ? L1_MAINNET : L1_TESTNET
+  const logger = logs.getLogger('catalyst-client')
 
   function getLambdasClientOrDefault(lambdasServerUrl?: string): LambdasClient {
     return createLambdasClient({
@@ -52,13 +54,27 @@ export async function createCatalystClient({
       lambdasServerUrl
     )
 
-    const result = await retry(executeClientRequest, retries, waitTime)
-    return result.elements.map((name) => ({
-      id: name.tokenId,
-      name: name.name,
-      contractAddress: name.contractAddress,
-      tokenId: name.tokenId
-    }))
+    try {
+      const result = await retry(executeClientRequest, retries, waitTime, (error, attempt) =>
+        logger.warn('Retrying owned names fetch after a failed attempt', {
+          address,
+          attempt,
+          error: error.message
+        })
+      )
+      return result.elements.map((name) => ({
+        id: name.tokenId,
+        name: name.name,
+        contractAddress: name.contractAddress,
+        tokenId: name.tokenId
+      }))
+    } catch (error: any) {
+      logger.error('Failed to fetch owned names from catalyst', {
+        address,
+        error: error?.message ?? String(error)
+      })
+      throw error
+    }
   }
 
   return { getOwnedNames }

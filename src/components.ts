@@ -107,7 +107,23 @@ export async function initComponents(): Promise<AppComponents> {
   const uwsServer = await createUWsComponent({ config: uwsHttpServerConfig, logs })
   const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 
-  const fetcher = createFetchComponent()
+  // Without an explicit timeout, undici falls back to multi-minute header/body defaults, so a
+  // stalled upstream (catalyst / registry / archipelago) pins a keep-alive socket and blocks the
+  // caller for minutes. Give every request a timeout so it fails fast instead; the component
+  // retries only idempotent methods (GET/HEAD/OPTIONS/PUT/DELETE) and cancels discarded bodies.
+  const httpFetchTimeoutMs = (await config.getNumber('HTTP_FETCH_TIMEOUT_MS')) ?? 10000
+  const fetcher = createFetchComponent({
+    defaultFetcherOptions: {
+      timeout: httpFetchTimeoutMs,
+      attempts: (await config.getNumber('HTTP_FETCH_ATTEMPTS')) ?? 3
+    }
+  })
+  // The catalyst client runs its own retry that rotates across catalyst servers on each attempt,
+  // so its fetcher must NOT also retry the same host — otherwise attempts multiply (rotation ×
+  // per-host retries). One attempt per request lets the rotation be the single retry layer.
+  const catalystFetcher = createFetchComponent({
+    defaultFetcherOptions: { timeout: httpFetchTimeoutMs, attempts: 1 }
+  })
   const memoryCache = createInMemoryCacheComponent()
   const schemaValidator = createSchemaValidatorComponent({ ensureJsonContentType: false })
 
@@ -155,7 +171,7 @@ export async function initComponents(): Promise<AppComponents> {
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
   const registry = await createRegistryComponent({ fetcher, config, redis, logs })
-  const catalystClient = await createCatalystClient({ config, fetcher })
+  const catalystClient = await createCatalystClient({ config, fetcher: catalystFetcher, logs })
   const cdnCacheInvalidator = await createCdnCacheInvalidatorComponent({ config, fetcher })
   const settings = await createSettingsComponent({ friendsDb })
   const voiceDb = await createVoiceDBComponent({ pg, config })
