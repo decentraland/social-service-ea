@@ -77,10 +77,9 @@ export async function createRpcServerComponent({
         throw new Error('Service creators must be set before starting the RPC server')
       }
 
-      uwsServer.app.listen(rpcServerPort, () => {
-        logger.info(`[RPC] RPC Server listening on port ${rpcServerPort}`)
-      })
-
+      // Establish the pub/sub subscriptions BEFORE accepting connections, so a client that
+      // connects and subscribes can't miss live fan-out during a window where the socket is
+      // open but the Redis subscriptions aren't up yet.
       // flatMap so Promise.all awaits the actual subscription promises — with forEach it
       // awaited an array of undefined and the server reported started before (or whether)
       // the pub/sub subscriptions were established.
@@ -89,6 +88,10 @@ export async function createRpcServerComponent({
           handlers.map((handler) => pubsub.subscribeToChannel(channel, handler))
         )
       )
+
+      uwsServer.app.listen(rpcServerPort, () => {
+        logger.info(`[RPC] RPC Server listening on port ${rpcServerPort}`)
+      })
     },
     async stop() {
       logger.info(`[RPC] Stopping RPC Server on port ${rpcServerPort}`)

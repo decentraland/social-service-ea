@@ -90,7 +90,7 @@ export const createRedisMock = ({
     mGet:
       mGet ||
       jest.fn(async (keys: string[]) => {
-        return keys.map(() => null) // Default to cache miss for tests
+        return keys.map(() => null) as any[] // Default to cache miss for tests
       }),
     put:
       put ||

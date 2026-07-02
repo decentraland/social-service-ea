@@ -8,6 +8,7 @@ import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { isErrorWithMessage } from '../../../utils/errors'
+import { WsPoolFullError } from '../../../logic/ws-pool'
 
 const textDecoder = new TextDecoder()
 
@@ -315,14 +316,25 @@ export async function registerWsHandler(
         changeStage(data, { isConnected: true, connectionStartTime: Date.now() })
         logger.debug('WebSocket opened', { wsConnectionId: data.wsConnectionId })
       } catch (error: any) {
-        logger.debug('Failed to acquire connection', {
-          wsConnectionId: data.wsConnectionId,
-          error: error.message
-        })
-        tracing.captureException(error as Error, {
-          address: getAddress(data),
-          wsConnectionId: data.wsConnectionId
-        })
+        // Hitting the connection cap is an expected operational condition (it already
+        // increments ws_connections_rejected), so log it rather than reporting it to Sentry
+        // as an exception, which would flood on a busy instance. Any other, genuinely
+        // unexpected acquisition failure is still captured.
+        if (error instanceof WsPoolFullError) {
+          logger.warn('Rejected connection: WebSocket pool is full', {
+            wsConnectionId: data.wsConnectionId,
+            error: error.message
+          })
+        } else {
+          logger.debug('Failed to acquire connection', {
+            wsConnectionId: data.wsConnectionId,
+            error: error.message
+          })
+          tracing.captureException(error as Error, {
+            address: getAddress(data),
+            wsConnectionId: data.wsConnectionId
+          })
+        }
         ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
       }
     },

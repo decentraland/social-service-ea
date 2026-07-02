@@ -159,7 +159,7 @@ async function initComponents(): Promise<TestComponents> {
   const registry = await createRegistryComponent({ fetcher, config, redis, logs })
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
-  const wsPool = createWsPoolComponent({ logs, metrics })
+  const wsPool = await createWsPoolComponent({ logs, metrics, config })
   const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
@@ -258,7 +258,8 @@ async function initComponents(): Promise<TestComponents> {
     friendsDb,
     communityMembers,
     registry,
-    metrics
+    metrics,
+    peersStats
   })
   const communityVoice = await createCommunityVoiceComponent({
     logs,

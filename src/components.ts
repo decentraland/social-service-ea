@@ -346,6 +346,10 @@ export async function initComponents(): Promise<AppComponents> {
   const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
   createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
 
+  // NOTE: components are started sequentially by @well-known-components in this object's key
+  // order (for...in), awaiting each. `rpcServer.start()` subscribes on `pubsub`'s Redis
+  // client and now throws if a subscription fails, so `pubsub` MUST stay ordered before
+  // `rpcServer` here — otherwise the sub client isn't connected yet and startup fails.
   return {
     aiCompliance,
     analytics,

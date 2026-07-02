@@ -6,6 +6,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "type-check": "tsc --noEmit -p tsconfig.test.json",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
     "dev": "nodemon --watch 'src/**' --ext 'ts,json' --ignore 'src/**/*.spec.ts' --ignore 'src/migrations' --exec 'ts-node src/index.ts'",
     "pretest": "yarn test:integration:before",
