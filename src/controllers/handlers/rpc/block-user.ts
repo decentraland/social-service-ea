@@ -17,13 +17,13 @@ export function blockUserService({ components: { logs, friends } }: RPCServiceCo
       const { address: blockerAddress } = context
       const blockedAddress = request.user?.address
 
-      // Compare normalized addresses so a checksummed/mixed-case self-address can't bypass the guard.
-      if (blockedAddress && blockerAddress === normalizeAddress(blockedAddress)) {
-        throw new InvalidRequestError('Cannot block yourself')
-      }
-
       if (!EthAddress.validate(blockedAddress)) {
         throw new InvalidRequestError('Invalid user address in the request payload')
+      }
+
+      // Compare normalized addresses so a checksummed/mixed-case self-address can't bypass the guard.
+      if (blockerAddress === normalizeAddress(blockedAddress)) {
+        throw new InvalidRequestError('Cannot block yourself')
       }
 
       const { profile, blockedAt } = await friends.blockUser(blockerAddress, blockedAddress)

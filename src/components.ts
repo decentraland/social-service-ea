@@ -148,7 +148,7 @@ export async function initComponents(): Promise<AppComponents> {
   const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
 
   const email = await createEmailComponent({ fetcher, config })
-  const rewards = await createRewardComponent({ fetcher, config })
+  const rewards = await createRewardComponent({ fetcher, config, logs })
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })

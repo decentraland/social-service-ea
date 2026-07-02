@@ -206,7 +206,7 @@ export function getFriendshipRequestsBaseQuery(
       baseQuery.append(SQL` LIMIT ${limit}`)
     }
 
-    if (offset) {
+    if (typeof offset === 'number') {
       baseQuery.append(SQL` OFFSET ${offset}`)
     }
   }
@@ -319,7 +319,7 @@ export function withSearchAndPagination(query: SQLStatement, options?: GetCommun
     query.append(SQL` LIMIT ${limit}`)
   }
 
-  if (offset) {
+  if (typeof offset === 'number') {
     query.append(SQL` OFFSET ${offset}`)
   }
 
