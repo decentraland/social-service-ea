@@ -41,6 +41,9 @@ export function createPubSubComponent(components: Pick<AppComponents, 'logs' | '
         await subClient.subscribe(channel, cb)
       } catch (error: any) {
         logger.error(`Error while subscribing to channel ${channel}: ${error.message}`)
+        // An instance without its subscriptions silently delivers no updates — fail loud so
+        // the boot (or the caller) can abort instead.
+        throw error
       }
     },
     async publishInChannel<T>(channel: string, update: T) {

@@ -182,7 +182,7 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   const storage = await createS3Adapter({ config })
-  const wsPool = createWsPoolComponent({ logs, metrics })
+  const wsPool = await createWsPoolComponent({ logs, metrics, config })
   const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
@@ -298,7 +298,8 @@ export async function initComponents(): Promise<AppComponents> {
     friendsDb,
     communityMembers,
     registry,
-    metrics
+    metrics,
+    peersStats
   })
 
   const rpcServer = await createRpcServerComponent({
@@ -345,6 +346,10 @@ export async function initComponents(): Promise<AppComponents> {
   const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
   createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
 
+  // NOTE: components are started sequentially by @well-known-components in this object's key
+  // order (for...in), awaiting each. `rpcServer.start()` subscribes on `pubsub`'s Redis
+  // client and now throws if a subscription fails, so `pubsub` MUST stay ordered before
+  // `rpcServer` here — otherwise the sub client isn't connected yet and startup fails.
   return {
     aiCompliance,
     analytics,

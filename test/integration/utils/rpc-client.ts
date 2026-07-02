@@ -95,8 +95,8 @@ export async function createRpcClientComponent({
           const cleanup = () => {
             clearTimeout(timeoutId)
             // Remove all listeners
-            listeners.forEach(({ event, handler }: { event: keyof TransportEvents; handler: Function }) => {
-              transport?.off(event, handler as any)
+            listeners.forEach(({ event, handler }: { event: string; handler: Function }) => {
+              transport?.off(event as keyof TransportEvents, handler as any)
             })
             listeners = []
           }
@@ -188,7 +188,7 @@ export async function createRpcClientComponent({
       try {
         oldTransport.close()
       } catch (error) {
-        logger.error('Error closing transport:', { error })
+        logger.error('Error closing transport:', { error: error instanceof Error ? error.message : String(error) })
       }
     }
   }

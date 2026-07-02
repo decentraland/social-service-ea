@@ -22,6 +22,10 @@ export type SubscriptionHandlerParams<T, U> = {
   shouldHandleUpdate: (update: U) => boolean
   parser: UpdateParser<T, U>
   parseArgs?: any[]
+  // Optional initial snapshot, fetched AFTER the live listener is registered so updates
+  // emitted while it runs are queued rather than lost. Best-effort: a failure is logged and
+  // the subscription continues with live updates only.
+  getInitialUpdates?: () => Promise<T[]>
 }
 
 /**
@@ -54,10 +58,10 @@ async function processInBatches<T>(
 export function createUpdateHandlerComponent(
   components: Pick<
     AppComponents,
-    'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry' | 'metrics'
+    'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry' | 'metrics' | 'peersStats'
   >
 ): IUpdateHandlerComponent {
-  const { logs, subscribersContext, friendsDb, communityMembers, registry, metrics } = components
+  const { logs, subscribersContext, friendsDb, communityMembers, registry, metrics, peersStats } = components
   const logger = logs.getLogger('update-handler')
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
@@ -81,10 +85,19 @@ export function createUpdateHandlerComponent(
     }
   })
 
-  const friendshipAcceptedUpdateHandler = handleUpdate<'friendshipUpdate'>((update) => {
+  const friendshipAcceptedUpdateHandler = handleUpdate<'friendshipUpdate'>(async (update) => {
     if (update.action !== Action.ACCEPT) {
       return
     }
+
+    // Only announce a new friend as ONLINE if they actually are: the request may have been
+    // sent long ago (requester offline by now) and the accept may come from the website
+    // (accepter not in-world). Announcing without checking pushed false presence.
+    // Degraded mode: peersStats swallows stats-source failures and resolves to an empty
+    // list, so during a stats outage these notifications are skipped entirely (preferable
+    // to fabricating presence); the next real connectivity transition corrects the client.
+    const connectedPeers = await peersStats.getConnectedPeers()
+    const onlinePeers = new Set(connectedPeers.map(normalizeAddress))
 
     const notifications = [
       { subscriber: update.to, friend: update.from },
@@ -92,6 +105,10 @@ export function createUpdateHandlerComponent(
     ]
 
     notifications.forEach(({ subscriber, friend }) => {
+      if (!onlinePeers.has(normalizeAddress(friend))) {
+        return
+      }
+
       const emitter = subscribersContext.getSubscriber(subscriber)
       if (emitter) {
         emitter.emit('friendConnectivityUpdate', {
@@ -355,7 +372,8 @@ export function createUpdateHandlerComponent(
     getAddressFromUpdate,
     shouldHandleUpdate,
     parser,
-    parseArgs = []
+    parseArgs = [],
+    getInitialUpdates
   }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
     const normalizedAddress = normalizeAddress(rpcContext.address)
     const eventNameString = String(eventName)
@@ -412,6 +430,24 @@ export function createUpdateHandlerComponent(
     rpcContext.subscribersContext.registerGenerator(connectionId, updatesGenerator)
 
     try {
+      // The listener above is already registered, so updates emitted while the snapshot
+      // queries run are queued rather than lost. Best-effort: a DB/registry hiccup here must
+      // NOT tear down the subscription — otherwise the client just reconnects and retries,
+      // churning (and re-running these queries every time).
+      if (getInitialUpdates) {
+        try {
+          const initialUpdates = await getInitialUpdates()
+          for (const initialUpdate of initialUpdates) {
+            yield initialUpdate
+          }
+        } catch (error: any) {
+          logger.warn(`Failed to deliver initial ${eventNameString} snapshot; continuing with live updates`, {
+            address: normalizedAddress,
+            error: error?.message ?? String(error)
+          })
+        }
+      }
+
       for await (const update of updatesGenerator) {
         if (!shouldHandleUpdate(update as U)) {
           continue

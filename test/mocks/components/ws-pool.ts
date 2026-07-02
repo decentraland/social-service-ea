@@ -8,6 +8,7 @@ export function createWsPoolMockedComponent(
     registerConnection: jest.fn(),
     unregisterConnection: jest.fn(),
     getAuthenticatedAddresses: jest.fn().mockReturnValue([]),
+    getConnectionIds: jest.fn().mockReturnValue([]),
     [STOP_COMPONENT]: jest.fn(),
     ...overrides
   }
