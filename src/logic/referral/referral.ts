@@ -334,7 +334,8 @@ export async function createReferralComponent(
         return
       }
 
-      await redis.put(cacheKey, [], { EX: 0 })
+      // Clear the login-days cache promptly (Redis rejects a 0 TTL, so use a minimal positive one).
+      await redis.put(cacheKey, [], { EX: 1 })
 
       logger.info('Finalizing referral', {
         invitedUser,
@@ -494,15 +495,13 @@ export async function createReferralComponent(
       }
 
       logger.info('Setting referral email', {
-        referrer,
-        email
+        referrer
       })
 
       const referralEmail = await referralDb.setReferralEmail({ referrer, email })
 
       logger.info('Referral email set successfully', {
-        referrer,
-        email
+        referrer
       })
 
       try {
@@ -512,13 +511,11 @@ export async function createReferralComponent(
           `A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}`
         )
         logger.info('Marketing email sent successfully', {
-          referrer,
-          email
+          referrer
         })
       } catch (error) {
         logger.warn('Failed to send marketing email, but referral email was saved', {
           referrer,
-          email,
           error: error instanceof Error ? error.message : String(error)
         })
       }

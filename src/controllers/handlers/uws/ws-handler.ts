@@ -195,7 +195,8 @@ export async function registerWsHandler(
         hasEventEmitter: String(!!data.eventEmitter)
       })
       metrics.increment('ws_errors')
-      ws.send(JSON.stringify({ error: 'Error processing message', message: error.message }))
+      // Do not leak internal error details to the client.
+      ws.send(JSON.stringify({ error: 'Error processing message' }))
       tracing.captureException(error as Error, {
         address: getAddress(data),
         wsConnectionId: data.wsConnectionId
@@ -206,6 +207,8 @@ export async function registerWsHandler(
   uwsServer.app.ws<WsUserData>('/', {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS,
     sendPingsAutomatically: true,
+    // Bound inbound frame size so a client can't force large per-message buffering (uWS default is 16 MB).
+    maxPayloadLength: (await config.getNumber('WS_MAX_PAYLOAD_LENGTH')) ?? 1024 * 1024,
     maxBackpressure: (await config.getNumber('WS_MAX_BACKPRESSURE')) ?? 128 * 1024, // should be adjusted based on metrics
     drain: (ws) => {
       const data = ws.getUserData()

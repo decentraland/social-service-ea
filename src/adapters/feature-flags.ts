@@ -37,7 +37,7 @@ export async function createFeatureFlagsAdapter(
 
   async function refresh() {
     try {
-      const [isEnabled, isDevEnabled] = await Promise.all([
+      const [isEnabled, isDevEnabled, isGlobalModeratorsEnabled] = await Promise.all([
         features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE),
         features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE),
         features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS)
@@ -45,11 +45,13 @@ export async function createFeatureFlagsAdapter(
 
       logger.debug(`Refreshed feature flags`, {
         [FeatureFlag.COMMUNITIES_AI_COMPLIANCE]: String(isEnabled),
-        [FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE]: String(isDevEnabled)
+        [FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE]: String(isDevEnabled),
+        [FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS]: String(isGlobalModeratorsEnabled)
       })
 
       featuresFlagMap.set(FeatureFlag.COMMUNITIES_AI_COMPLIANCE, isEnabled)
       featuresFlagMap.set(FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE, isDevEnabled)
+      featuresFlagMap.set(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS, isGlobalModeratorsEnabled)
     } catch (error) {
       logger.error('Failed to refresh feature flags', {
         error: error instanceof Error ? error.message : String(error)
@@ -65,7 +67,7 @@ export async function createFeatureFlagsAdapter(
 
     if (variant?.payload?.value) {
       const values = variant.payload.value
-        .replace('\n', '')
+        .replace(/\r?\n/g, '')
         .split(',')
         .map((domain) => domain.toLowerCase().trim())
 
@@ -80,6 +82,12 @@ export async function createFeatureFlagsAdapter(
    */
   async function start() {
     logger.info('Starting feature flags adapter')
+
+    // Guard against a double start orphaning a previous interval.
+    if (refreshInterval) {
+      clearInterval(refreshInterval)
+      refreshInterval = null
+    }
 
     // Do initial refresh
     await refresh()

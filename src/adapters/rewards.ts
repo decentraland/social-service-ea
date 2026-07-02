@@ -20,8 +20,9 @@ export async function createRewardComponent(
     })
 
     if (response.ok) {
-      const { data: rewards } = await response.json()
-      return rewards
+      const body = await response.json()
+      const rewards = body?.data
+      return Array.isArray(rewards) ? rewards : []
     }
 
     throw new Error(`Failed to fetch ${url}: ${response.status} ${await response.text()}`)

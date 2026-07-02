@@ -202,7 +202,7 @@ export function getFriendshipRequestsBaseQuery(
   if (!onlyCount) {
     baseQuery.append(SQL` ORDER BY fa.timestamp DESC`)
 
-    if (limit) {
+    if (typeof limit === 'number') {
       baseQuery.append(SQL` LIMIT ${limit}`)
     }
 
@@ -315,7 +315,7 @@ export function withSearchAndPagination(query: SQLStatement, options?: GetCommun
       query.append(SQL` ORDER BY c.name ASC`)
   }
 
-  if (limit) {
+  if (typeof limit === 'number') {
     query.append(SQL` LIMIT ${limit}`)
   }
 
@@ -326,9 +326,18 @@ export function withSearchAndPagination(query: SQLStatement, options?: GetCommun
   return query
 }
 
+/**
+ * Escapes LIKE/ILIKE wildcards (%, _) and the escape character (\) in user-supplied search input
+ * so they are matched literally instead of acting as wildcards. Must be paired with `ESCAPE '\'`.
+ */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
 export function searchCommunitiesQuery(search: string) {
   // TODO: enhance the search to include the description using the full text search or pg score
-  return SQL` AND (c.name ILIKE ${`%${search}%`} OR c.description ILIKE ${`%${search}%`})`
+  const pattern = `%${escapeLikePattern(search)}%`
+  return SQL` AND (c.name ILIKE ${pattern} ESCAPE '\\' OR c.description ILIKE ${pattern} ESCAPE '\\')`
 }
 
 export function getMembersCTE(subquery: SQLStatement) {

@@ -17,7 +17,8 @@ export function createInMemoryCacheComponent(): ICacheComponent {
   }
 
   async function mGet<T>(keys: string[]): Promise<T[]> {
-    return keys.map((key) => get(key)).filter((value) => value !== null) as T[]
+    const values = await Promise.all(keys.map((key) => get<T>(key)))
+    return values.filter((value) => value !== null) as T[]
   }
 
   return {

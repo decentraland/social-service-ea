@@ -7,6 +7,7 @@ import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { parseProfileToBlockedUser } from '../../../logic/friends'
 import { InvalidRequestError } from '../../errors/rpc.errors'
 import { ProfileNotFoundError } from '../../../logic/friends/errors'
+import { normalizeAddress } from '../../../utils/address'
 
 export function blockUserService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('block-user-service')
@@ -16,7 +17,8 @@ export function blockUserService({ components: { logs, friends } }: RPCServiceCo
       const { address: blockerAddress } = context
       const blockedAddress = request.user?.address
 
-      if (blockerAddress === blockedAddress) {
+      // Compare normalized addresses so a checksummed/mixed-case self-address can't bypass the guard.
+      if (blockedAddress && blockerAddress === normalizeAddress(blockedAddress)) {
         throw new InvalidRequestError('Cannot block yourself')
       }
 

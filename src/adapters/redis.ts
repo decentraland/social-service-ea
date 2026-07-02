@@ -40,10 +40,16 @@ export async function createRedisComponent(
   async function get<T>(key: string): Promise<T | null> {
     try {
       const serializedValue = await client.get(key)
-      if (serializedValue) {
-        return JSON.parse(serializedValue) as T
+      if (!serializedValue) {
+        return null
       }
-      return null
+      try {
+        return JSON.parse(serializedValue) as T
+      } catch (parseErr: any) {
+        // A corrupted/legacy value must not break callers that expect a value-or-null contract.
+        logger.error(`Error parsing value for key "${key}"`, parseErr)
+        return null
+      }
     } catch (err: any) {
       logger.error(`Error getting key "${key}"`, err)
       throw err
@@ -68,8 +74,10 @@ export async function createRedisComponent(
   async function put<T>(key: string, value: T, options?: SetOptions & { noTTL?: boolean }): Promise<void> {
     try {
       const serializedValue = JSON.stringify(value)
+      // Use nullish coalescing so an explicit EX is honored; `|| TWO_HOURS` would silently
+      // override a caller-provided value of 0.
       await client.set(key, serializedValue, {
-        EX: options?.noTTL ? undefined : options?.EX || TWO_HOURS_IN_SECONDS
+        EX: options?.noTTL ? undefined : (options?.EX ?? TWO_HOURS_IN_SECONDS)
       })
     } catch (err: any) {
       logger.error(`Error setting key "${key}"`, err)

@@ -825,7 +825,7 @@ describe('referral-component', () => {
           newStatus: ReferralProgressStatus.TIER_GRANTED
         })
         expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
-        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
+        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 1 })
       })
     })
 
@@ -903,7 +903,7 @@ describe('referral-component', () => {
         await referralComponent.finalizeReferral(validInvitedUser)
 
         expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
-        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
+        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 1 })
         expect(mockReferralDb.updateReferralProgress).toHaveBeenCalledWith(
           validInvitedUser.toLowerCase(),
           ReferralProgressStatus.TIER_GRANTED
@@ -935,7 +935,7 @@ describe('referral-component', () => {
         await referralComponent.finalizeReferral(validInvitedUser)
 
         expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
-        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
+        expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 1 })
         expect(mockReferralDb.updateReferralProgress).toHaveBeenCalledWith(
           validInvitedUser.toLowerCase(),
           ReferralProgressStatus.TIER_GRANTED
@@ -990,7 +990,7 @@ describe('referral-component', () => {
           await referralComponent.finalizeReferral(validInvitedUser)
 
           expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
-          expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
+          expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 1 })
           expect(mockRewards.sendReward).toHaveBeenCalledWith(rewardKey, validReferrer.toLowerCase())
           expect(mockReferralDb.setReferralRewardImage).toHaveBeenCalledWith({
             referrer: validReferrer.toLowerCase(),
@@ -1066,7 +1066,7 @@ describe('referral-component', () => {
           await referralComponent.finalizeReferral(validInvitedUser)
 
           expect(mockRedis.get).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`)
-          expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 0 })
+          expect(mockRedis.put).toHaveBeenCalledWith(`referral:invited-user:${validInvitedUser}`, [], { EX: 1 })
           expect(mockRewards.sendReward).not.toHaveBeenCalled()
           expect(mockReferralDb.setReferralRewardImage).not.toHaveBeenCalled()
           expect(mockSns.publishMessage).toHaveBeenCalledWith(
@@ -1434,16 +1434,13 @@ describe('referral-component', () => {
             `A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${validEmail}`
           )
           expect(mockLogger.info).toHaveBeenCalledWith('Setting referral email', {
-            referrer: validReferrer.toLowerCase(),
-            email: validEmail
+            referrer: validReferrer.toLowerCase()
           })
           expect(mockLogger.info).toHaveBeenCalledWith('Marketing email sent successfully', {
-            referrer: validReferrer.toLowerCase(),
-            email: validEmail
+            referrer: validReferrer.toLowerCase()
           })
           expect(mockLogger.info).toHaveBeenCalledWith('Referral email set successfully', {
-            referrer: validReferrer.toLowerCase(),
-            email: validEmail
+            referrer: validReferrer.toLowerCase()
           })
           expect(result).toEqual({
             id: 'test-id',
@@ -1472,12 +1469,10 @@ describe('referral-component', () => {
           })
           expect(mockLogger.warn).toHaveBeenCalledWith('Failed to send marketing email, but referral email was saved', {
             referrer: validReferrer.toLowerCase(),
-            email: validEmail,
             error: 'Email service unavailable'
           })
           expect(mockLogger.info).toHaveBeenCalledWith('Referral email set successfully', {
-            referrer: validReferrer.toLowerCase(),
-            email: validEmail
+            referrer: validReferrer.toLowerCase()
           })
           expect(result).toEqual({
             id: 'test-id',

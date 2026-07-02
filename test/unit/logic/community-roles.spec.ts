@@ -10,13 +10,13 @@ describe('Community Roles Component', () => {
   let roles: ICommunityRolesComponent
 
   const communityId = 'test-community'
-  const ownerAddress = '0xOwner'
-  const moderatorAddress = '0xModerator'
-  const memberAddress = '0xMember'
-  const anotherOwnerAddress = '0xAnotherOwner'
-  const anotherModeratorAddress = '0xAnotherModerator'
-  const anotherMemberAddress = '0xAnotherMember'
-  const nonMemberAddress = '0xNonMember'
+  const ownerAddress = '0xowner'
+  const moderatorAddress = '0xmoderator'
+  const memberAddress = '0xmember'
+  const anotherOwnerAddress = '0xanotherowner'
+  const anotherModeratorAddress = '0xanothermoderator'
+  const anotherMemberAddress = '0xanothermember'
+  const nonMemberAddress = '0xnonmember'
 
   beforeEach(() => {
     roles = createCommunityRolesComponent({ communitiesDb: mockCommunitiesDB, logs: mockLogs })
@@ -582,9 +582,9 @@ describe('Community Roles Component', () => {
 
   describe('when validating permission to transfer ownership', () => {
     const communityId = 'test-community'
-    const ownerAddress = '0xOwner'
-    const memberAddress = '0xMember'
-    const nonMemberAddress = '0xNonMember'
+    const ownerAddress = '0xowner'
+    const memberAddress = '0xmember'
+    const nonMemberAddress = '0xnonmember'
 
     describe('and the updater is owner and target is member', () => {
       beforeEach(() => {

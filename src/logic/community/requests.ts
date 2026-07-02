@@ -112,6 +112,11 @@ export function createCommunityRequestsComponent(
       throw new CommunityNotFoundError(communityId)
     }
 
+    const isBanned = await communitiesDb.isMemberBanned(communityId, memberAddress)
+    if (isBanned) {
+      throw new NotAuthorizedError(`The user ${memberAddress} is banned from the community ${communityId}`)
+    }
+
     if (community.privacy === CommunityPrivacyEnum.Public && type === CommunityRequestType.RequestToJoin) {
       throw new InvalidCommunityRequestError(`Public communities do not accept requests to join`)
     }
@@ -249,6 +254,13 @@ export function createCommunityRequestsComponent(
 
     // User accepts invite or member with privileges accepts request to join
     if (status === CommunityRequestStatus.Accepted) {
+      const isBanned = await communitiesDb.isMemberBanned(request.communityId, request.memberAddress)
+      if (isBanned) {
+        throw new NotAuthorizedError(
+          `The user ${request.memberAddress} is banned from the community ${request.communityId}`
+        )
+      }
+
       await communitiesDb.joinMemberAndRemoveRequests({
         communityId: request.communityId,
         memberAddress: request.memberAddress,

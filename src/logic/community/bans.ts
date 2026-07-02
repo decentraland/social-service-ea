@@ -91,6 +91,9 @@ export async function createCommunityBansComponent(
 
       await communitiesDb.banMemberFromCommunity(communityId, bannerAddress, targetAddress)
 
+      // Remove any pending join requests/invites so the ban cannot be circumvented by later accepting them.
+      await communitiesDb.removeMemberRequests(communityId, targetAddress)
+
       // For private communities, also kick user from voice chat if they are in one
       if (community.privacy === CommunityPrivacyEnum.Private) {
         // Only for private communities

@@ -32,6 +32,18 @@ export async function createVoiceComponent({
   async function startPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
     logger.info(`Starting private voice chat from ${callerAddress} to ${calleeAddress}`)
 
+    // A user cannot start a private voice chat with themselves.
+    if (callerAddress.toLowerCase() === calleeAddress.toLowerCase()) {
+      throw new VoiceChatNotAllowedError()
+    }
+
+    // A voice chat is not allowed if either user has blocked the other (isFriendshipBlocked
+    // normalizes both addresses internally, so it is case-insensitive).
+    const isBlocked = await friendsDb.isFriendshipBlocked(callerAddress, calleeAddress)
+    if (isBlocked) {
+      throw new VoiceChatNotAllowedError()
+    }
+
     // Check privacy settings of the callee and the caller
     const [calleeSettings, callerSettings] = await settings.getUsersSettings([calleeAddress, callerAddress])
     if (

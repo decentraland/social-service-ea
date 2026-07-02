@@ -33,7 +33,8 @@ export async function createCatalystClient({
 
     return (attempt: number): Promise<T> => {
       if (attempt > 1 && catalystServers.length > 0) {
-        const [catalystServerUrl] = catalystServers.splice(attempt % catalystServers.length, 1)
+        // Index without mutating the shared array so the modulo doesn't skew as the list shrinks.
+        const catalystServerUrl = catalystServers[(attempt - 2) % catalystServers.length]
         lambdasClientToUse = getLambdasClientOrDefault(`${catalystServerUrl}/lambdas`)
       }
 

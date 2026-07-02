@@ -36,7 +36,7 @@ describe('retry', () => {
   it('should throw an error after exhausting all retries', async () => {
     mockAction.mockRejectedValue(new Error('Fail on every attempt'))
 
-    await expect(retry(mockAction, 3, 100)).rejects.toThrowError('Failed after 3 attempts')
+    await expect(retry(mockAction, 3, 100)).rejects.toThrowError('Fail on every attempt')
 
     expect(mockAction).toHaveBeenCalledTimes(3)
     expect(mockSleep).toHaveBeenCalledTimes(2)
