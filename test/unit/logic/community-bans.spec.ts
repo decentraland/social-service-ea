@@ -125,6 +125,7 @@ describe('Community Bans Component', () => {
               bannerAddress,
               targetAddress
             )
+            expect(mockCommunitiesDB.removeMemberRequests).toHaveBeenCalledWith(communityId, targetAddress)
           })
 
           it('should publish member status update to pubsub', async () => {
@@ -181,6 +182,9 @@ describe('Community Bans Component', () => {
               bannerAddress,
               targetAddress
             )
+            // Even a non-member's pending requests/invites must be cleared so the ban can't be
+            // circumvented by later accepting them.
+            expect(mockCommunitiesDB.removeMemberRequests).toHaveBeenCalledWith(communityId, targetAddress)
           })
 
           it('should publish member status update to pubsub', async () => {

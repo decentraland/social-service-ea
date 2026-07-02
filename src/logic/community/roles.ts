@@ -2,6 +2,7 @@ import { NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityRole, CommunityPermission } from '../../types/entities'
 import { AppComponents } from '../../types/system'
 import { ICommunityRolesComponent, CommunityPost } from './types'
+import { normalizeAddress } from '../../utils/address'
 
 export const OWNER_PERMISSIONS: CommunityPermission[] = [
   'edit_info',
@@ -90,8 +91,8 @@ export function createCommunityRolesComponent(
       targetAddress: string
     ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [ownerAddress, targetAddress])
-      const updaterRole = roles[ownerAddress]
-      const targetRole = roles[targetAddress]
+      const updaterRole = roles[normalizeAddress(ownerAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
       // Only current owners can transfer; target must be an existing member (not None)
       if (updaterRole !== CommunityRole.Owner) {
@@ -110,8 +111,8 @@ export function createCommunityRolesComponent(
       targetAddress: string
     ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [kickerAddress, targetAddress])
-      const kickerRole = roles[kickerAddress]
-      const targetRole = roles[targetAddress]
+      const kickerRole = roles[normalizeAddress(kickerAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
       if (!canActOnMember(kickerRole, targetRole)) {
         throw new NotAuthorizedError(
@@ -128,8 +129,8 @@ export function createCommunityRolesComponent(
       targetAddress: string
     ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [bannerAddress, targetAddress])
-      const bannerRole = roles[bannerAddress]
-      const targetRole = roles[targetAddress]
+      const bannerRole = roles[normalizeAddress(bannerAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
       if (
         !hasPermission(bannerRole, 'ban_players') ||
@@ -147,8 +148,8 @@ export function createCommunityRolesComponent(
       targetAddress: string
     ): Promise<void> {
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [unbannerAddress, targetAddress])
-      const unbannerRole = roles[unbannerAddress]
-      const targetRole = roles[targetAddress]
+      const unbannerRole = roles[normalizeAddress(unbannerAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
       if (
         !hasPermission(unbannerRole, 'ban_players') ||
@@ -173,8 +174,8 @@ export function createCommunityRolesComponent(
       }
 
       const roles = await communitiesDb.getCommunityMemberRoles(communityId, [updaterAddress, targetAddress])
-      const updaterRole = roles[updaterAddress]
-      const targetRole = roles[targetAddress]
+      const updaterRole = roles[normalizeAddress(updaterAddress)]
+      const targetRole = roles[normalizeAddress(targetAddress)]
 
       if (
         !hasPermission(updaterRole, 'assign_roles') ||

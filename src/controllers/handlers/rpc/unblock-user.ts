@@ -7,6 +7,7 @@ import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { parseProfileToBlockedUser } from '../../../logic/friends'
 import { InvalidRequestError } from '../../errors/rpc.errors'
 import { ProfileNotFoundError } from '../../../logic/friends/errors'
+import { normalizeAddress } from '../../../utils/address'
 
 export function unblockUserService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('unblock-user-service')
@@ -16,12 +17,13 @@ export function unblockUserService({ components: { logs, friends } }: RPCService
       const { address: blockerAddress } = context
       const blockedAddress = request.user?.address
 
-      if (blockerAddress === blockedAddress) {
-        throw new InvalidRequestError('Cannot unblock yourself')
-      }
-
       if (!EthAddress.validate(blockedAddress)) {
         throw new InvalidRequestError('Invalid user address in the request payload')
+      }
+
+      // Compare normalized addresses so a checksummed/mixed-case self-address can't bypass the guard.
+      if (blockerAddress === normalizeAddress(blockedAddress)) {
+        throw new InvalidRequestError('Cannot unblock yourself')
       }
 
       const unblockedUserProfile = await friends.unblockUser(blockerAddress, blockedAddress)

@@ -179,8 +179,7 @@ describe('ws-handler', () => {
 
         expect(mockWs.send).toHaveBeenCalledWith(
           JSON.stringify({
-            error: 'Error processing message',
-            message: error.message
+            error: 'Error processing message'
           })
         )
       })

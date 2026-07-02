@@ -775,85 +775,114 @@ describe('Community Members Component', () => {
     const memberAddress = '0x1234567890123456789012345678901234567890'
     let isMember: boolean
     let isBanned: boolean
+    let publicCommunity: any
 
     beforeEach(() => {
       isMember = false
       isBanned = false
-      mockCommunitiesDB.communityExists.mockResolvedValue(false)
+      publicCommunity = {
+        id: communityId,
+        name: 'Test Community',
+        description: 'Test Description',
+        privacy: CommunityPrivacyEnum.Public,
+        active: true,
+        ownerAddress: '0xowner',
+        role: CommunityRole.None
+      }
+      mockCommunitiesDB.getCommunity.mockResolvedValue(undefined as any)
       mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(isMember)
       mockCommunitiesDB.isMemberBanned.mockResolvedValue(isBanned)
       mockCommunitiesDB.addCommunityMember.mockResolvedValue()
     })
 
     describe('and the community exists', () => {
-      beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(true)
-      })
-
-      describe('and the user is not already a member', () => {
+      describe('and the community is public', () => {
         beforeEach(() => {
-          isMember = false
-          mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(isMember)
+          mockCommunitiesDB.getCommunity.mockResolvedValue(publicCommunity)
         })
 
-        describe('and the user is not banned', () => {
+        describe('and the user is not already a member', () => {
           beforeEach(() => {
-            isBanned = false
-            mockCommunitiesDB.isMemberBanned.mockResolvedValue(isBanned)
+            isMember = false
+            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(isMember)
           })
 
-          it('should add the member to the community', async () => {
+          describe('and the user is not banned', () => {
+            beforeEach(() => {
+              isBanned = false
+              mockCommunitiesDB.isMemberBanned.mockResolvedValue(isBanned)
+            })
+
+            it('should add the member to the community', async () => {
+              await communityMembersComponent.joinCommunity(communityId, memberAddress)
+
+              expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+              expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
+              expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, memberAddress)
+              expect(mockCommunitiesDB.joinMemberAndRemoveRequests).toHaveBeenCalledWith({
+                communityId,
+                memberAddress,
+                role: CommunityRole.Member
+              })
+              expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
+                communityId,
+                memberAddress,
+                status: ConnectivityStatus.ONLINE
+              })
+            })
+          })
+
+          describe('and the user is banned', () => {
+            beforeEach(() => {
+              isBanned = true
+              mockCommunitiesDB.isMemberBanned.mockResolvedValue(isBanned)
+            })
+
+            it('should throw NotAuthorizedError', async () => {
+              await expect(communityMembersComponent.joinCommunity(communityId, memberAddress)).rejects.toThrow(
+                new NotAuthorizedError(`The user ${memberAddress} is banned from community ${communityId}`)
+              )
+
+              expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+              expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
+              expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, memberAddress)
+              expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+              expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
+            })
+          })
+        })
+
+        describe('and the user is already a member', () => {
+          beforeEach(() => {
+            isMember = true
+            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(isMember)
+          })
+
+          it('should return without adding', async () => {
             await communityMembersComponent.joinCommunity(communityId, memberAddress)
 
-            expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
             expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
-            expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, memberAddress)
-            expect(mockCommunitiesDB.joinMemberAndRemoveRequests).toHaveBeenCalledWith({
-              communityId,
-              memberAddress,
-              role: CommunityRole.Member
-            })
-            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
-              communityId,
-              memberAddress,
-              status: ConnectivityStatus.ONLINE
-            })
-          })
-        })
-
-        describe('and the user is banned', () => {
-          beforeEach(() => {
-            isBanned = true
-            mockCommunitiesDB.isMemberBanned.mockResolvedValue(isBanned)
-          })
-
-          it('should throw NotAuthorizedError', async () => {
-            await expect(communityMembersComponent.joinCommunity(communityId, memberAddress)).rejects.toThrow(
-              new NotAuthorizedError(`The user ${memberAddress} is banned from community ${communityId}`)
-            )
-
-            expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
-            expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, memberAddress)
+            expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
             expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
           })
         })
       })
 
-      describe('and the user is already a member', () => {
+      describe('and the community is private', () => {
         beforeEach(() => {
-          isMember = true
-          mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(isMember)
+          mockCommunitiesDB.getCommunity.mockResolvedValue({ ...publicCommunity, privacy: CommunityPrivacyEnum.Private })
         })
 
-        it('should return without adding', async () => {
-          await communityMembersComponent.joinCommunity(communityId, memberAddress)
+        it('should throw NotAuthorizedError without joining, since private communities require a request', async () => {
+          await expect(communityMembersComponent.joinCommunity(communityId, memberAddress)).rejects.toThrow(
+            NotAuthorizedError
+          )
 
-          expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-          expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, memberAddress)
-          expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
-          expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
+          expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
           expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
         })
       })
@@ -861,7 +890,7 @@ describe('Community Members Component', () => {
 
     describe('and the community does not exist', () => {
       beforeEach(() => {
-        mockCommunitiesDB.communityExists.mockResolvedValue(false)
+        mockCommunitiesDB.getCommunity.mockResolvedValue(undefined as any)
       })
 
       it('should throw CommunityNotFoundError', async () => {
@@ -869,7 +898,7 @@ describe('Community Members Component', () => {
           new CommunityNotFoundError(communityId)
         )
 
-        expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
         expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
         expect(mockCommunitiesDB.addCommunityMember).not.toHaveBeenCalled()

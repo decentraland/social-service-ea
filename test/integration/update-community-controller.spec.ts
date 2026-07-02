@@ -1,4 +1,4 @@
-import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../src/logic/community'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum, CommunityRequestType } from '../../src/logic/community'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import {
@@ -483,6 +483,52 @@ test('Update Community Controller', async function ({ components, stubComponents
                 )
 
                 expect(response.status).toBe(401)
+              })
+            })
+
+            describe('and flipping a private community with pending join requests to public', () => {
+              const bannedRequester = '0x1111111111111111111111111111111111111111'
+              const allowedRequester = '0x2222222222222222222222222222222222222222'
+
+              beforeEach(async () => {
+                await components.communitiesDb.updateCommunity(communityId, { private: true })
+                await components.communitiesDb.createCommunityRequest(
+                  communityId,
+                  bannedRequester,
+                  CommunityRequestType.RequestToJoin
+                )
+                await components.communitiesDb.createCommunityRequest(
+                  communityId,
+                  allowedRequester,
+                  CommunityRequestType.RequestToJoin
+                )
+                await components.communitiesDb.banMemberFromCommunity(
+                  communityId,
+                  identity.realAccount.address,
+                  bannedRequester
+                )
+              })
+
+              afterEach(async () => {
+                await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
+                  bannedRequester,
+                  allowedRequester
+                ])
+              })
+
+              it('should admit the non-banned requester as a member but not the banned one', async () => {
+                const response = await makeMultipartRequest(
+                  identity,
+                  `/v1/communities/${communityId}`,
+                  {
+                    privacy: CommunityPrivacyEnum.Public
+                  },
+                  'PUT'
+                )
+
+                expect(response.status).toBe(200)
+                expect(await components.communitiesDb.isMemberOfCommunity(communityId, allowedRequester)).toBe(true)
+                expect(await components.communitiesDb.isMemberOfCommunity(communityId, bannedRequester)).toBe(false)
               })
             })
           })

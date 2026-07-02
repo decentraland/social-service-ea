@@ -26,7 +26,7 @@ describe('when unblocking a user', () => {
   let userAddress: EthAddress
 
   beforeEach(async () => {
-    userAddress = '0x123'
+    userAddress = '0x1111111111111111111111111111111111111111'
     rpcContext = {
       address: userAddress,
       subscribersContext: undefined

@@ -107,7 +107,10 @@ export async function initComponents(): Promise<AppComponents> {
   const uwsServer = await createUWsComponent({ config: uwsHttpServerConfig, logs })
   const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 
-  const fetcher = createFetchComponent()
+  // Bound every outbound HTTP request so a stalled upstream can't pin handlers indefinitely.
+  // Per-call options passed by adapters still override this default.
+  const httpFetchTimeoutMs = (await config.getNumber('HTTP_FETCH_TIMEOUT_MS')) ?? 30000
+  const fetcher = createFetchComponent({ defaultFetcherOptions: { timeout: httpFetchTimeoutMs } })
   const memoryCache = createInMemoryCacheComponent()
   const schemaValidator = createSchemaValidatorComponent({ ensureJsonContentType: false })
 
@@ -145,7 +148,7 @@ export async function initComponents(): Promise<AppComponents> {
   const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
 
   const email = await createEmailComponent({ fetcher, config })
-  const rewards = await createRewardComponent({ fetcher, config })
+  const rewards = await createRewardComponent({ fetcher, config, logs })
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })

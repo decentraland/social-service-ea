@@ -286,10 +286,17 @@ export async function createCommunityMembersComponent(
     },
 
     joinCommunity: async (communityId: string, memberAddress: EthAddress): Promise<void> => {
-      const communityExists = await communitiesDb.communityExists(communityId)
+      const community = await communitiesDb.getCommunity(communityId)
 
-      if (!communityExists) {
+      if (!community) {
         throw new CommunityNotFoundError(communityId)
+      }
+
+      // Private communities can only be joined through the request/invite approval flow.
+      if (community.privacy === CommunityPrivacyEnum.Private) {
+        throw new NotAuthorizedError(
+          `Cannot join private community ${communityId} directly; a join request or invite is required`
+        )
       }
 
       const isAlreadyMember = await communitiesDb.isMemberOfCommunity(communityId, memberAddress)

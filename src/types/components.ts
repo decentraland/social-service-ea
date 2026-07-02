@@ -230,6 +230,7 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<number>
   getCommunityRequest(requestId: string): Promise<MemberRequest | undefined>
   removeCommunityRequest(requestId: string): Promise<void>
+  removeMemberRequests(communityId: string, memberAddress: EthAddress): Promise<void>
   joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<string | undefined>
   getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
   acceptAllRequestsToJoin(communityId: string): Promise<string[]>
