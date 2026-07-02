@@ -335,7 +335,12 @@ export async function registerWsHandler(
             wsConnectionId: data.wsConnectionId
           })
         }
-        ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
+        // No await precedes this today (the socket can't have closed mid-callback), but
+        // guard like every other ws.end() site so a future await in the try block can't
+        // turn this into an unhandled rejection.
+        try {
+          ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
+        } catch (err) {}
       }
     },
     message: async (ws, message) => {

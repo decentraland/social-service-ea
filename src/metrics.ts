@@ -20,7 +20,10 @@ export const metricDeclarations = {
   },
   ws_messages_sent: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket messages sent'
+    // Counted at the transport when the socket accepts an outbound frame (SUCCESS or
+    // buffered under BACKPRESSURE). Includes RPC control frames, not just application
+    // messages — previously this counted inbound messages forwarded to the RPC layer.
+    help: 'Number of outbound WebSocket messages accepted by the socket (sent or buffered)'
   },
   ws_errors: {
     type: IMetricsComponent.CounterType,

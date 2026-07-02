@@ -163,7 +163,17 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
             queueLength: messageQueue.length
           })
           metrics.increment('ws_backpressure_events', { result: 'max_retries' })
+          // Contract: the RPC server listens for 'error' and closes this transport
+          // (handleTransportError), which rejects everything queued and lets the ws-handler
+          // end the socket — that teardown runs synchronously inside this emit.
           events.emit('error', new Error('Message not deliverable after max retries'))
+          // Defensive fallback: if no listener closed the transport (e.g. a future refactor
+          // swaps in a log-only listener), drop the poisoned head message so the queue can
+          // never spin on it — silent loss is the least-bad outcome at that point.
+          if (isTransportActive && messageQueue[0] === currentMessage) {
+            currentMessage.future.reject(new Error('Message not deliverable after max retries'))
+            messageQueue.shift()
+          }
           return
         }
 

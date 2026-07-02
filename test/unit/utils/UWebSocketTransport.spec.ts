@@ -174,6 +174,10 @@ describe('UWebSocketTransport', () => {
 
       it('should emit an error after max retries so the RPC server tears the transport down instead of silently losing the message', async () => {
         const sendPromise = transport.sendMessage(mockMessage)
+        // Register the rejection expectation before advancing timers so the handler exists
+        // the moment the rejection fires (jest flags transiently-unhandled rejections that
+        // occur inside fake-timer callbacks).
+        const rejection = expect(sendPromise).rejects.toThrow('Message not deliverable after max retries')
 
         await jest.advanceTimersByTimeAsync(0)
 
@@ -194,10 +198,32 @@ describe('UWebSocketTransport', () => {
         expect(errorListener).toHaveBeenCalledWith(new Error('Message not deliverable after max retries'))
         expect(mockMetrics.increment).toHaveBeenCalledWith('ws_backpressure_events', { result: 'max_retries' })
 
-        // The error listener (the RPC server in production) reacts by closing the transport,
-        // which rejects everything still queued.
-        transport.close()
-        await expect(sendPromise).rejects.toThrow('Connection closed')
+        // The error listener here is log-only (in production the RPC server closes the
+        // transport), so the defensive fallback rejects and drops the head message instead
+        // of letting the queue spin on it.
+        await rejection
+      })
+
+      it('should not poison the queue after max retries: a subsequent message still sends', async () => {
+        const failedPromise = transport.sendMessage(mockMessage)
+        const rejection = expect(failedPromise).rejects.toThrow('Message not deliverable after max retries')
+
+        await jest.advanceTimersByTimeAsync(0)
+        // Exhaust all retry attempts (backoff delays are capped by the max backoff delay).
+        for (let attempt = 1; attempt <= DEFAULT_CONFIG.WS_TRANSPORT_MAX_RETRY_ATTEMPTS; attempt++) {
+          const delay = Math.min(
+            DEFAULT_CONFIG.WS_TRANSPORT_RETRY_DELAY_MS * Math.pow(2, attempt),
+            DEFAULT_CONFIG.WS_TRANSPORT_MAX_BACKOFF_DELAY_MS
+          )
+          await jest.advanceTimersByTimeAsync(delay)
+        }
+        await rejection
+
+        mockSocket.send.mockReturnValue(UWebSocketSendResult.SUCCESS)
+        const nextPromise = transport.sendMessage(mockMessage)
+        await jest.advanceTimersByTimeAsync(0)
+
+        await expect(nextPromise).resolves.not.toThrow()
       })
 
       it('should not retry the backpressured head message before the backoff elapses when new messages are sent', async () => {
