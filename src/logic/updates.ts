@@ -93,6 +93,9 @@ export function createUpdateHandlerComponent(
     // Only announce a new friend as ONLINE if they actually are: the request may have been
     // sent long ago (requester offline by now) and the accept may come from the website
     // (accepter not in-world). Announcing without checking pushed false presence.
+    // Degraded mode: peersStats swallows stats-source failures and resolves to an empty
+    // list, so during a stats outage these notifications are skipped entirely (preferable
+    // to fabricating presence); the next real connectivity transition corrects the client.
     const connectedPeers = await peersStats.getConnectedPeers()
     const onlinePeers = new Set(connectedPeers.map(normalizeAddress))
 
