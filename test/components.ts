@@ -309,7 +309,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const referralDb = await createReferralDBComponent({ pg, logs, config })
 
-  const rewards = await createRewardComponent({ fetcher, config })
+  const rewards = await createRewardComponent({ fetcher, config, logs })
 
   const email = await createEmailComponent({ fetcher, config })
 
