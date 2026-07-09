@@ -5,8 +5,8 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "type-check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json",
+    "build": "node node_modules/typescript-go/bin/tsc -p tsconfig.json",
+    "type-check": "node node_modules/typescript-go/bin/tsc --noEmit -p tsconfig.json && node node_modules/typescript-go/bin/tsc --noEmit -p test/tsconfig.json",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
     "dev": "nodemon --watch 'src/**' --ext 'ts,json' --ignore 'src/**/*.spec.ts' --ignore 'src/migrations' --exec 'ts-node src/index.ts'",
     "pretest": "yarn test:integration:before",
@@ -36,7 +36,8 @@
     "nodemon": "^3.1.0",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
+    "typescript": "^5.9.3",
+    "typescript-go": "npm:typescript@^7.0.2",
     "uuid": "^9.0.1"
   },
   "prettier": {
