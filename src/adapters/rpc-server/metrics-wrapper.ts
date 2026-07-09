@@ -140,7 +140,8 @@ export async function createRpcServerMetricsWrapper({
 
   // Tracing is enabled by default; set RPC_TRACING_ENABLED=false to turn off the
   // per-call/stream Sentry transactions (and suppress their child DB/Redis spans).
-  const tracingEnabled = (await config.getString('RPC_TRACING_ENABLED')) !== 'false'
+  // Compared case-insensitively so FALSE/False also disable it.
+  const tracingEnabled = (await config.getString('RPC_TRACING_ENABLED'))?.toLowerCase() !== 'false'
 
   function getMessageSize(msg: unknown): number {
     if (!msg) return 0

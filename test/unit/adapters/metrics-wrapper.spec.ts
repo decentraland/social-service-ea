@@ -23,18 +23,21 @@ import { mockMetrics } from '../../mocks/components'
 import { createMockConfigComponent } from '../../mocks/components/config'
 
 describe('RPC Server Metrics Component', () => {
-  async function createTestContext(tracingEnabled: boolean = true) {
+  // `flagValue` is the raw RPC_TRACING_ENABLED config value; `undefined` mimics an unset var.
+  async function createTestContext(flagValue: string | undefined = 'true') {
+    const config = createMockConfigComponent({
+      getString: jest.fn().mockResolvedValue(flagValue)
+    })
     return {
       wrapper: await createRpcServerMetricsWrapper({
         components: {
           metrics: mockMetrics,
           logs: mockLogs,
-          config: createMockConfigComponent({
-            getString: jest.fn().mockResolvedValue(tracingEnabled ? 'true' : 'false')
-          })
+          config
         }
       }),
-      mockContext: { address: '0x123' } as RpcServerContext
+      mockContext: { address: '0x123' } as RpcServerContext,
+      config
     }
   }
 
@@ -478,9 +481,15 @@ describe('RPC Server Metrics Component', () => {
       suppressTracingMock.mockClear()
     })
 
+    it('should read the flag from the RPC_TRACING_ENABLED config key', async () => {
+      const { config } = await createTestContext('true')
+
+      expect(config.getString).toHaveBeenCalledWith('RPC_TRACING_ENABLED')
+    })
+
     describe('and the flag is enabled (the default)', () => {
       it('should wrap a call in a Sentry span and not suppress tracing', async () => {
-        const { wrapper, mockContext } = await createTestContext(true)
+        const { wrapper, mockContext } = await createTestContext('true')
 
         const wrappedService = wrapper.withMetrics({
           testCall: { creator: jest.fn().mockResolvedValue({}), type: ServiceType.CALL }
@@ -496,7 +505,7 @@ describe('RPC Server Metrics Component', () => {
       })
 
       it('should wrap a stream set-up in a Sentry span and not suppress tracing', async () => {
-        const { wrapper, mockContext } = await createTestContext(true)
+        const { wrapper, mockContext } = await createTestContext('true')
 
         async function* testGenerator() {
           yield 1
@@ -514,11 +523,27 @@ describe('RPC Server Metrics Component', () => {
         )
         expect(suppressTracingMock).not.toHaveBeenCalled()
       })
+
+      it('should default to enabled when the config value is unset', async () => {
+        const { wrapper, mockContext } = await createTestContext(undefined)
+
+        const wrappedService = wrapper.withMetrics({
+          testCall: { creator: jest.fn().mockResolvedValue({}), type: ServiceType.CALL }
+        })
+
+        await wrappedService.testCall({}, mockContext)
+
+        expect(startSpanMock).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'RPC testCall', op: 'rpc.call' }),
+          expect.any(Function)
+        )
+        expect(suppressTracingMock).not.toHaveBeenCalled()
+      })
     })
 
     describe('and the flag is disabled', () => {
       it('should suppress tracing for a call and not open a Sentry span', async () => {
-        const { wrapper, mockContext } = await createTestContext(false)
+        const { wrapper, mockContext } = await createTestContext('false')
 
         const callService = jest.fn().mockResolvedValue({ paginationData: { total: 1 } })
         const wrappedService = wrapper.withMetrics({
@@ -538,7 +563,7 @@ describe('RPC Server Metrics Component', () => {
       })
 
       it('should suppress tracing for a stream set-up and not open a Sentry span', async () => {
-        const { wrapper, mockContext } = await createTestContext(false)
+        const { wrapper, mockContext } = await createTestContext('false')
 
         async function* testGenerator() {
           yield 1
@@ -559,6 +584,64 @@ describe('RPC Server Metrics Component', () => {
         expect(mockMetrics.increment).toHaveBeenCalledWith('rpc_procedure_call_total', {
           code: 'OK',
           procedure: 'testStream'
+        })
+      })
+
+      it('should disable tracing case-insensitively (e.g. FALSE)', async () => {
+        const { wrapper, mockContext } = await createTestContext('FALSE')
+
+        const wrappedService = wrapper.withMetrics({
+          testCall: { creator: jest.fn().mockResolvedValue({}), type: ServiceType.CALL }
+        })
+
+        await wrappedService.testCall({}, mockContext)
+
+        expect(startSpanMock).not.toHaveBeenCalled()
+        expect(suppressTracingMock).toHaveBeenCalled()
+      })
+
+      it('should propagate errors from a call and record ERROR metrics', async () => {
+        const { wrapper, mockContext } = await createTestContext('false')
+
+        const testError = new Error('Test error')
+        const callService = jest.fn().mockRejectedValue(testError)
+        const wrappedService = wrapper.withMetrics({
+          errorCall: { creator: callService, type: ServiceType.CALL }
+        })
+
+        await expect(wrappedService.errorCall({}, mockContext)).rejects.toThrow(testError)
+
+        expect(startSpanMock).not.toHaveBeenCalled()
+        expect(suppressTracingMock).toHaveBeenCalled()
+        expect(mockMetrics.increment).toHaveBeenCalledWith('rpc_procedure_call_total', {
+          code: 'ERROR',
+          procedure: 'errorCall'
+        })
+      })
+
+      it('should propagate errors from a stream and record STREAM_ERROR metrics', async () => {
+        const { wrapper, mockContext } = await createTestContext('false')
+
+        const testError = new Error('Stream error')
+        async function* errorGenerator() {
+          yield 1
+          throw testError
+        }
+        const wrappedService = wrapper.withMetrics({
+          errorStream: { creator: jest.fn().mockImplementation(errorGenerator), type: ServiceType.STREAM, event: 'errorStream' }
+        })
+
+        const iterator = wrappedService.errorStream({}, mockContext)
+        await expect(async () => {
+          for await (const _ of iterator) {
+          }
+        }).rejects.toThrow(testError)
+
+        expect(startSpanMock).not.toHaveBeenCalled()
+        expect(suppressTracingMock).toHaveBeenCalled()
+        expect(mockMetrics.increment).toHaveBeenCalledWith('rpc_procedure_call_total', {
+          code: 'STREAM_ERROR',
+          procedure: 'errorStream'
         })
       })
     })
