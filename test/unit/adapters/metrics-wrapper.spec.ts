@@ -1,19 +1,37 @@
+import * as Sentry from '@sentry/node'
 import {
   createRpcServerMetricsWrapper,
   RpcResponseCode,
   ServiceType
 } from '../../../src/adapters/rpc-server/metrics-wrapper'
+
+// Sentry's exports are non-configurable, so they can't be spied on directly. Mock the
+// module with call-through implementations: startSpan/suppressTracing still run their
+// callback (so metrics are recorded), while remaining assertable as jest mocks.
+jest.mock('@sentry/node', () => {
+  const actual = jest.requireActual('@sentry/node')
+  return {
+    __esModule: true,
+    ...actual,
+    startSpan: jest.fn((_options: unknown, callback: (...args: unknown[]) => unknown) => callback()),
+    suppressTracing: jest.fn((callback: (...args: unknown[]) => unknown) => callback())
+  }
+})
 import { RpcServerContext } from '../../../src/types'
 import { mockLogs } from '../../mocks/components/logs'
 import { mockMetrics } from '../../mocks/components'
+import { createMockConfigComponent } from '../../mocks/components/config'
 
 describe('RPC Server Metrics Component', () => {
-  function createTestContext() {
+  async function createTestContext(tracingEnabled: boolean = true) {
     return {
-      wrapper: createRpcServerMetricsWrapper({
+      wrapper: await createRpcServerMetricsWrapper({
         components: {
           metrics: mockMetrics,
-          logs: mockLogs
+          logs: mockLogs,
+          config: createMockConfigComponent({
+            getString: jest.fn().mockResolvedValue(tracingEnabled ? 'true' : 'false')
+          })
         }
       }),
       mockContext: { address: '0x123' } as RpcServerContext
@@ -21,8 +39,8 @@ describe('RPC Server Metrics Component', () => {
   }
 
   describe('initialization', () => {
-    it('should return an object with withMetrics method', () => {
-      const { wrapper } = createTestContext()
+    it('should return an object with withMetrics method', async () => {
+      const { wrapper } = await createTestContext()
       expect(wrapper).toHaveProperty('withMetrics')
       expect(typeof wrapper.withMetrics).toBe('function')
     })
@@ -30,7 +48,7 @@ describe('RPC Server Metrics Component', () => {
 
   describe('message size calculation', () => {
     it('should handle empty/null messages', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const callService = jest.fn().mockResolvedValue({})
       const wrappedService = wrapper.withMetrics({
@@ -50,7 +68,7 @@ describe('RPC Server Metrics Component', () => {
     })
 
     it('should handle falsy values correctly', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const nullService = jest.fn().mockResolvedValue(null)
       const wrappedService = wrapper.withMetrics({
@@ -72,7 +90,7 @@ describe('RPC Server Metrics Component', () => {
     })
 
     it('should return 0 for all falsy values', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       let returnValue: any = undefined
 
@@ -103,7 +121,7 @@ describe('RPC Server Metrics Component', () => {
     })
 
     it('should handle complex objects', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const callService = jest.fn().mockResolvedValue({ result: 'success' })
       const wrappedService = wrapper.withMetrics({
@@ -124,7 +142,7 @@ describe('RPC Server Metrics Component', () => {
     })
 
     it('should handle JSON stringify errors', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const callService = jest.fn().mockResolvedValue({})
       const wrappedService = wrapper.withMetrics({
@@ -149,7 +167,7 @@ describe('RPC Server Metrics Component', () => {
 
   describe('measureRpcCall', () => {
     it('should wrap a call method and record metrics', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const callResult = { paginationData: { total: 100, page: 1 } }
       const callService = jest.fn().mockResolvedValue(callResult)
@@ -189,7 +207,7 @@ describe('RPC Server Metrics Component', () => {
     })
 
     it('should handle errors in call methods', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const testError = new Error('Test error')
       const callService = jest.fn().mockRejectedValue(testError)
@@ -216,7 +234,7 @@ describe('RPC Server Metrics Component', () => {
 
   describe('measureRpcStream', () => {
     it('should wrap a stream method and record metrics', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       async function* testGenerator() {
         yield 1
@@ -265,7 +283,7 @@ describe('RPC Server Metrics Component', () => {
     })
 
     it('should handle errors in stream methods', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const testError = new Error('Stream error')
 
@@ -300,8 +318,8 @@ describe('RPC Server Metrics Component', () => {
       )
     })
 
-    it('should throw an error if a stream method does not have an event property', () => {
-      const { wrapper } = createTestContext()
+    it('should throw an error if a stream method does not have an event property', async () => {
+      const { wrapper } = await createTestContext()
 
       const streamFn = jest.fn()
 
@@ -314,8 +332,8 @@ describe('RPC Server Metrics Component', () => {
   })
 
   describe('withMetrics', () => {
-    it('should wrap multiple methods of different types', () => {
-      const { wrapper } = createTestContext()
+    it('should wrap multiple methods of different types', async () => {
+      const { wrapper } = await createTestContext()
 
       const callFn = jest.fn()
       const streamFn = jest.fn()
@@ -331,8 +349,8 @@ describe('RPC Server Metrics Component', () => {
       expect(typeof wrappedServices.method2).toBe('function')
     })
 
-    it('should skip non-function properties', () => {
-      const { wrapper } = createTestContext()
+    it('should skip non-function properties', async () => {
+      const { wrapper } = await createTestContext()
 
       const services = {
         getFriends: { creator: jest.fn(), type: ServiceType.CALL },
@@ -354,7 +372,7 @@ describe('RPC Server Metrics Component', () => {
       { $case: 'profileNotFound', code: RpcResponseCode.PROFILE_NOT_FOUND },
       { $case: 'invalidFriendshipAction', code: RpcResponseCode.INVALID_FRIENDSHIP_ACTION }
     ])('should map response with case $case to $code', async ({ $case, code }) => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const errorResponse = {
         response: { $case }
@@ -378,7 +396,7 @@ describe('RPC Server Metrics Component', () => {
     })
 
     it('should map paginated response to OK code', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const paginatedResponse = {
         paginationData: { nextCursor: 'next' }
@@ -402,7 +420,7 @@ describe('RPC Server Metrics Component', () => {
     })
 
     it('should map blocking status response to OK code', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const blockingResponse = {
         blockedUsers: [],
@@ -427,7 +445,7 @@ describe('RPC Server Metrics Component', () => {
     })
 
     it('should map unknown response to UNKNOWN code', async () => {
-      const { wrapper, mockContext } = createTestContext()
+      const { wrapper, mockContext } = await createTestContext()
 
       const unknownResponse = {
         someField: 'value'
@@ -448,6 +466,101 @@ describe('RPC Server Metrics Component', () => {
         { code: 'UNKNOWN', procedure: 'testMethod' },
         expect.any(Number)
       )
+    })
+  })
+
+  describe('when the RPC_TRACING_ENABLED flag is toggled', () => {
+    const startSpanMock = Sentry.startSpan as jest.Mock
+    const suppressTracingMock = Sentry.suppressTracing as jest.Mock
+
+    beforeEach(() => {
+      startSpanMock.mockClear()
+      suppressTracingMock.mockClear()
+    })
+
+    describe('and the flag is enabled (the default)', () => {
+      it('should wrap a call in a Sentry span and not suppress tracing', async () => {
+        const { wrapper, mockContext } = await createTestContext(true)
+
+        const wrappedService = wrapper.withMetrics({
+          testCall: { creator: jest.fn().mockResolvedValue({}), type: ServiceType.CALL }
+        })
+
+        await wrappedService.testCall({}, mockContext)
+
+        expect(startSpanMock).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'RPC testCall', op: 'rpc.call' }),
+          expect.any(Function)
+        )
+        expect(suppressTracingMock).not.toHaveBeenCalled()
+      })
+
+      it('should wrap a stream set-up in a Sentry span and not suppress tracing', async () => {
+        const { wrapper, mockContext } = await createTestContext(true)
+
+        async function* testGenerator() {
+          yield 1
+        }
+        const wrappedService = wrapper.withMetrics({
+          testStream: { creator: jest.fn().mockImplementation(testGenerator), type: ServiceType.STREAM, event: 'testStream' }
+        })
+
+        for await (const _ of wrappedService.testStream({}, mockContext)) {
+        }
+
+        expect(startSpanMock).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'RPC Stream testStream', op: 'rpc.stream.init' }),
+          expect.any(Function)
+        )
+        expect(suppressTracingMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the flag is disabled', () => {
+      it('should suppress tracing for a call and not open a Sentry span', async () => {
+        const { wrapper, mockContext } = await createTestContext(false)
+
+        const callService = jest.fn().mockResolvedValue({ paginationData: { total: 1 } })
+        const wrappedService = wrapper.withMetrics({
+          testCall: { creator: callService, type: ServiceType.CALL }
+        })
+
+        await wrappedService.testCall({}, mockContext)
+
+        expect(startSpanMock).not.toHaveBeenCalled()
+        expect(suppressTracingMock).toHaveBeenCalled()
+        // Metrics are still recorded even with tracing off.
+        expect(callService).toHaveBeenCalled()
+        expect(mockMetrics.increment).toHaveBeenCalledWith('rpc_procedure_call_total', {
+          code: 'OK',
+          procedure: 'testCall'
+        })
+      })
+
+      it('should suppress tracing for a stream set-up and not open a Sentry span', async () => {
+        const { wrapper, mockContext } = await createTestContext(false)
+
+        async function* testGenerator() {
+          yield 1
+        }
+        const wrappedService = wrapper.withMetrics({
+          testStream: { creator: jest.fn().mockImplementation(testGenerator), type: ServiceType.STREAM, event: 'testStream' }
+        })
+
+        const results = []
+        for await (const item of wrappedService.testStream({}, mockContext)) {
+          results.push(item)
+        }
+
+        expect(startSpanMock).not.toHaveBeenCalled()
+        expect(suppressTracingMock).toHaveBeenCalled()
+        // The stream still yields and records metrics with tracing off.
+        expect(results).toEqual([1])
+        expect(mockMetrics.increment).toHaveBeenCalledWith('rpc_procedure_call_total', {
+          code: 'OK',
+          procedure: 'testStream'
+        })
+      })
     })
   })
 })
