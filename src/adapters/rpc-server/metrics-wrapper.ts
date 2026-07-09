@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/node'
 import { BaseComponents, RpcServerContext, RPCServiceContext } from '../../types'
+import { withoutTracing } from '../../utils/tracing'
 import {
   BlockUserResponse,
   GetBlockedUsersResponse,
@@ -132,10 +133,15 @@ const responsePatterns: ResponsePatterns = [
   }
 ]
 
-export function createRpcServerMetricsWrapper({
-  components: { metrics, logs }
-}: RPCServiceContext<'metrics' | 'logs'>): RpcServerMetrics {
+export async function createRpcServerMetricsWrapper({
+  components: { metrics, logs, config }
+}: RPCServiceContext<'metrics' | 'logs' | 'config'>): Promise<RpcServerMetrics> {
   const logger = logs.getLogger('rpc-server-metrics')
+
+  // Tracing is enabled by default; set RPC_TRACING_ENABLED=false to turn off the
+  // per-call/stream Sentry transactions (and suppress their child DB/Redis spans).
+  // Compared case-insensitively so FALSE/False also disable it.
+  const tracingEnabled = (await config.getString('RPC_TRACING_ENABLED'))?.toLowerCase() !== 'false'
 
   function getMessageSize(msg: unknown): number {
     if (!msg) return 0
@@ -189,6 +195,30 @@ export function createRpcServerMetricsWrapper({
     return async (params: TParams, context: RpcServerContext) => {
       const startTime = Date.now()
 
+      const runCall = async () => {
+        try {
+          recordRequestSize(procedureName, params)
+          const result = await serviceFunction(params, context)
+
+          // Determine the response code from the result structure
+          const responseCode = getResponseCode(result)
+
+          recordResponseSize(procedureName, responseCode, result)
+          recordCallMetrics(procedureName, responseCode, startTime)
+
+          return result
+        } catch (error) {
+          recordCallMetrics(procedureName, RpcResponseCode.ERROR, startTime)
+          throw error
+        }
+      }
+
+      // When tracing is disabled, suppress spans entirely so Redis/DB calls don't
+      // leak as standalone transactions.
+      if (!tracingEnabled) {
+        return withoutTracing(runCall)
+      }
+
       // Wrap in Sentry transaction so Redis/DB calls become child spans
       return Sentry.startSpan(
         {
@@ -200,23 +230,7 @@ export function createRpcServerMetricsWrapper({
             'user.address': context.address
           }
         },
-        async () => {
-          try {
-            recordRequestSize(procedureName, params)
-            const result = await serviceFunction(params, context)
-
-            // Determine the response code from the result structure
-            const responseCode = getResponseCode(result)
-
-            recordResponseSize(procedureName, responseCode, result)
-            recordCallMetrics(procedureName, responseCode, startTime)
-
-            return result
-          } catch (error) {
-            recordCallMetrics(procedureName, RpcResponseCode.ERROR, startTime)
-            throw error
-          }
-        }
+        runCall
       )
     }
   }
@@ -231,20 +245,24 @@ export function createRpcServerMetricsWrapper({
 
       recordRequestSize(procedureName, params)
 
+      const initStream = async () => serviceFunction(params, context)
+
       // We only trace set-up face since stream are long-lived
-      const generator = await Sentry.startSpan(
-        {
-          name: `RPC Stream ${procedureName}`,
-          op: 'rpc.stream.init',
-          attributes: {
-            'rpc.method': procedureName,
-            'rpc.service': 'Social-Service-EA',
-            'rpc.stream.event': event,
-            'user.address': context.address
-          }
-        },
-        async () => serviceFunction(params, context)
-      )
+      const generator = tracingEnabled
+        ? await Sentry.startSpan(
+            {
+              name: `RPC Stream ${procedureName}`,
+              op: 'rpc.stream.init',
+              attributes: {
+                'rpc.method': procedureName,
+                'rpc.service': 'Social-Service-EA',
+                'rpc.stream.event': event,
+                'user.address': context.address
+              }
+            },
+            initStream
+          )
+        : await withoutTracing(initStream)
 
       // Streams usually end by the CLIENT closing them, which returns this generator from
       // the outside — code placed after the loop never runs in that case, so completion is

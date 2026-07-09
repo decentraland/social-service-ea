@@ -34,8 +34,8 @@ export async function createRpcServerComponent({
     logger: logs.getLogger('rpc-server')
   })
 
-  const { withMetrics } = createRpcServerMetricsWrapper({
-    components: { metrics, logs }
+  const { withMetrics } = await createRpcServerMetricsWrapper({
+    components: { metrics, logs, config }
   })
 
   const rpcServerPort = (await config.getNumber('RPC_SERVER_PORT')) || 8085
