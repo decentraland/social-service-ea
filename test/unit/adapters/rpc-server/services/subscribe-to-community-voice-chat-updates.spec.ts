@@ -2,7 +2,9 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
 import {
   CommunityVoiceChatStatus,
-  CommunityVoiceChatUpdate
+  CommunityVoiceChatUpdate,
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { subscribeToCommunityVoiceChatUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-voice-chat-updates'
 import {
@@ -241,6 +243,36 @@ describe('when subscribing to community voice chat updates', () => {
     it('should handle proper service initialization', () => {
       expect(service).toBeDefined()
       expect(typeof service).toBe('function')
+    })
+  })
+
+  describe('when building the final stream-closed message', () => {
+    let streamClosed: SubscriptionStreamClosed
+
+    beforeEach(async () => {
+      streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION }
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
+
+      const generator = service({} as Empty, rpcContext)
+      await generator.next()
+    })
+
+    it('should build an update with protobuf defaults carrying the stream-closed notice', () => {
+      const buildStreamClosedUpdate = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0]
+        .buildStreamClosedUpdate!
+
+      // All other fields are the protobuf zero-value defaults; clients must ignore them
+      // when streamClosed is present.
+      expect(buildStreamClosedUpdate(streamClosed)).toEqual({
+        communityId: '',
+        createdAt: 0,
+        status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+        positions: [],
+        isMember: false,
+        communityName: '',
+        worlds: [],
+        streamClosed
+      })
     })
   })
 })

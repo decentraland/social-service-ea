@@ -64,7 +64,10 @@ export function subscribeToPrivateVoiceChatUpdatesService({
         getAddressFromUpdate: () => 'not-needed',
         parser: parseEmittedUpdateToPrivateVoiceChatUpdate,
         // Only handle updates that are known by the this subscription call
-        shouldHandleUpdate: (update) => Object.values(VoiceChatStatus).includes(update.status)
+        shouldHandleUpdate: (update) => Object.values(VoiceChatStatus).includes(update.status),
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => PrivateVoiceChatUpdate.fromPartial({ streamClosed })
       })
     } catch (error) {
       logger.error(

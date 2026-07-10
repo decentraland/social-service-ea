@@ -1,4 +1,7 @@
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  ConnectivityStatus,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createUpdateHandlerComponent } from '../../../src/logic/updates'
 import { mockRegistry, mockFriendsDB, createMockPeersStatsComponent } from '../../mocks/components'
@@ -1289,6 +1292,39 @@ describe('Updates Handlers', () => {
 
       it('should not clear the existing active subscription', () => {
         expect(clearActiveSubscriptionSpy).not.toHaveBeenCalled()
+      })
+
+      describe('and a stream-closed update builder is provided', () => {
+        let duplicateGenerator: AsyncGenerator<unknown>
+        let buildStreamClosedUpdate: jest.Mock
+
+        beforeEach(() => {
+          buildStreamClosedUpdate = jest.fn().mockImplementation((streamClosed) => ({ streamClosed }))
+
+          duplicateGenerator = updateHandler.handleSubscriptionUpdates({
+            rpcContext,
+            eventName: 'friendshipUpdate',
+            shouldRetrieveProfile: true,
+            getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+            shouldHandleUpdate: () => true,
+            parser,
+            buildStreamClosedUpdate
+          })
+        })
+
+        it('should yield a final stream-closed message with the duplicate-subscription reason and then complete', async () => {
+          const first = await duplicateGenerator.next()
+          const second = await duplicateGenerator.next()
+
+          expect(first.done).toBe(false)
+          expect(first.value).toEqual({
+            streamClosed: {
+              reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION,
+              message: 'This connection already has an active friendshipUpdate subscription'
+            }
+          })
+          expect(second.done).toBe(true)
+        })
       })
     })
 

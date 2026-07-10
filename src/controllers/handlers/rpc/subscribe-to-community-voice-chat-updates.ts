@@ -39,7 +39,10 @@ export function subscribeToCommunityVoiceChatUpdatesService({
         shouldRetrieveProfile: false,
         getAddressFromUpdate: () => 'not-needed',
         parser: parseEmittedUpdateToCommunityVoiceChatUpdate,
-        shouldHandleUpdate: () => true // Handle all community voice chat updates for now
+        shouldHandleUpdate: () => true, // Handle all community voice chat updates for now
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => CommunityVoiceChatUpdate.fromPartial({ streamClosed })
       })
     } catch (error) {
       const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown error'

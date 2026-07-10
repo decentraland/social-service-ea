@@ -13,7 +13,9 @@ import { mockConfig } from '../../../../mocks/components/config'
 import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
 import {
   PrivateVoiceChatStatus,
-  PrivateVoiceChatUpdate
+  PrivateVoiceChatUpdate,
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { VoiceChatStatus } from '../../../../../src/logic/voice/types'
 
@@ -237,6 +239,31 @@ describe('when subscribing to private voice chat updates', () => {
         expect(() => mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)).toThrow(
           'Unknown voice chat status: unknown'
         )
+      })
+    })
+  })
+
+  describe('when building the final stream-closed message', () => {
+    let streamClosed: SubscriptionStreamClosed
+
+    beforeEach(async () => {
+      streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION }
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
+
+      const generator = service({} as Empty, rpcContext)
+      await generator.next()
+    })
+
+    it('should build an update with protobuf defaults carrying the stream-closed notice', () => {
+      const buildStreamClosedUpdate = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0]
+        .buildStreamClosedUpdate!
+
+      // callId/status are the protobuf zero-value defaults; clients must ignore them when
+      // streamClosed is present.
+      expect(buildStreamClosedUpdate(streamClosed)).toEqual({
+        callId: '',
+        status: PrivateVoiceChatStatus.VOICE_CHAT_REQUESTED,
+        streamClosed
       })
     })
   })

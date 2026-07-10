@@ -17,7 +17,10 @@ export function subscribeToFriendshipUpdatesService({
         parser: parseEmittedUpdateToFriendshipUpdate,
         shouldRetrieveProfile: true,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) =>
-          update.from !== context.address && update.to === context.address
+          update.from !== context.address && update.to === context.address,
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => FriendshipUpdate.fromPartial({ streamClosed })
       })
     } catch (error: any) {
       logger.error('Error in friendship updates subscription:', error)

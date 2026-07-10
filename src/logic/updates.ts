@@ -1,4 +1,8 @@
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  ConnectivityStatus,
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
@@ -26,6 +30,11 @@ export type SubscriptionHandlerParams<T, U> = {
   // emitted while it runs are queued rather than lost. Best-effort: a failure is logged and
   // the subscription continues with live updates only.
   getInitialUpdates?: () => Promise<T[]>
+  // Builds the FINAL message of the stream from a close notice, so the client learns why
+  // the server is closing it (per the protocol contract, such a message carries no update
+  // data). Used when a duplicate subscription is rejected — the connection is alive there,
+  // so the notice is deliverable. When omitted, the stream ends silently, as before.
+  buildStreamClosedUpdate?: (streamClosed: SubscriptionStreamClosed) => T
 }
 
 /**
@@ -373,7 +382,8 @@ export function createUpdateHandlerComponent(
     shouldHandleUpdate,
     parser,
     parseArgs = [],
-    getInitialUpdates
+    getInitialUpdates,
+    buildStreamClosedUpdate
   }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
     const normalizedAddress = normalizeAddress(rpcContext.address)
     const eventNameString = String(eventName)
@@ -402,6 +412,15 @@ export function createUpdateHandlerComponent(
       // at DEBUG level (production) that line floods the logs. A sustained high rate on the metric
       // indicates a client stuck re-subscribing.
       metrics.increment('subscription_duplicates_total', { event: eventNameString })
+      // Tell the client why before ending the stream — this connection is alive by
+      // definition, so the final message is deliverable. Without it the client only sees a
+      // clean close, indistinguishable from any other stream end.
+      if (buildStreamClosedUpdate) {
+        yield buildStreamClosedUpdate({
+          reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION,
+          message: `This connection already has an active ${eventNameString} subscription`
+        })
+      }
       return
     }
 
