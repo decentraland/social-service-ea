@@ -1,18 +1,9 @@
 import { EventType, Emitter } from 'mitt'
-import { SubscriptionStreamClosed } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 
 // TODO: Choose a proper value based on real metrics from peak queue sizes in production.
 export const MAX_VALUE_QUEUE_SIZE = 1000
 
-export type DestroyableAsyncGenerator<T> = AsyncGenerator<T> & {
-  destroy(closeReason?: SubscriptionStreamClosed): void
-  /**
-   * Why destroy() ended the generator, when the caller provided a reason. Consumers read it
-   * after their iteration loop completes to send the client a final "stream closed" message.
-   * Undefined for consumer-initiated ends (return()) and reasonless destroys.
-   */
-  getCloseReason(): SubscriptionStreamClosed | undefined
-}
+export type DestroyableAsyncGenerator<T> = AsyncGenerator<T> & { destroy(): void }
 
 /**
  * Turns an `EventEmitter` into an `AsyncGenerator`
@@ -26,7 +17,6 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
   onOverflowDrop?: () => void
 ): DestroyableAsyncGenerator<Events[T]> {
   let isDone = false
-  let closeReason: SubscriptionStreamClosed | undefined
   const nextQueue: {
     resolve: (value: IteratorResult<Events[T], any> | PromiseLike<IteratorResult<Events[T], any>>) => void
     reject: (reason?: any) => void
@@ -59,13 +49,10 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
   /**
    * Synchronously terminates the generator from outside the consumer loop.
    * Resolves any pending next() calls with { done: true } and removes the handler.
-   * The optional reason is recorded (first call wins) so the consumer can inform
-   * the client why the stream ended.
    */
-  function destroy(reason?: SubscriptionStreamClosed): void {
+  function destroy(): void {
     if (isDone) return
     isDone = true
-    closeReason = reason
     emitter.off(event, eventHandler)
     while (nextQueue.length > 0) {
       const { resolve } = nextQueue.shift()!
@@ -113,7 +100,6 @@ export default function emitterToAsyncGenerator<Events extends Record<EventType,
       }
       throw e
     },
-    destroy,
-    getCloseReason: () => closeReason
+    destroy
   }
 }

@@ -1,8 +1,4 @@
 import mitt, { Emitter } from 'mitt'
-import {
-  SubscriptionStreamClosed,
-  SubscriptionStreamClosedReason
-} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import emitterToAsyncGenerator, { MAX_VALUE_QUEUE_SIZE } from '../../../src/utils/emitterToGenerator'
 
 type TestEvents = {
@@ -225,57 +221,6 @@ describe('emitterToAsyncGenerator', () => {
       emitter.emit('testEvent', 'after-destroy')
       const result = await generator.next()
       expect(result.done).toBe(true)
-    })
-  })
-
-  describe('when destroying the generator with a close reason', () => {
-    let generator: ReturnType<typeof emitterToAsyncGenerator<TestEvents, 'testEvent'>>
-    let closeReason: SubscriptionStreamClosed
-
-    beforeEach(() => {
-      closeReason = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN }
-      generator = emitterToAsyncGenerator(emitter, 'testEvent')
-      generator.destroy(closeReason)
-    })
-
-    it('should expose the reason through getCloseReason', () => {
-      expect(generator.getCloseReason()).toEqual(closeReason)
-    })
-
-    describe('and destroy is called again with a different reason', () => {
-      beforeEach(() => {
-        generator.destroy({ reason: SubscriptionStreamClosedReason.STREAM_CLOSED_STALE_SUBSCRIPTION })
-      })
-
-      it('should keep the reason of the first destroy call', () => {
-        expect(generator.getCloseReason()).toEqual(closeReason)
-      })
-    })
-  })
-
-  describe('when destroying the generator without a close reason', () => {
-    let generator: ReturnType<typeof emitterToAsyncGenerator<TestEvents, 'testEvent'>>
-
-    beforeEach(() => {
-      generator = emitterToAsyncGenerator(emitter, 'testEvent')
-      generator.destroy()
-    })
-
-    it('should report no close reason through getCloseReason', () => {
-      expect(generator.getCloseReason()).toBeUndefined()
-    })
-  })
-
-  describe('when ending the generator through return()', () => {
-    let generator: ReturnType<typeof emitterToAsyncGenerator<TestEvents, 'testEvent'>>
-
-    beforeEach(async () => {
-      generator = emitterToAsyncGenerator(emitter, 'testEvent')
-      await generator.return(undefined)
-    })
-
-    it('should report no close reason through getCloseReason', () => {
-      expect(generator.getCloseReason()).toBeUndefined()
     })
   })
 

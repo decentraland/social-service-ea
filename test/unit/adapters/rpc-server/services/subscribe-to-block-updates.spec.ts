@@ -149,7 +149,7 @@ describe('when subscribing to block updates', () => {
     let streamClosed: SubscriptionStreamClosed
 
     beforeEach(async () => {
-      streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN }
+      streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION }
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
 
       const generator = subscribeToBlockUpdates({} as Empty, rpcContext)

@@ -32,9 +32,8 @@ export type SubscriptionHandlerParams<T, U> = {
   getInitialUpdates?: () => Promise<T[]>
   // Builds the FINAL message of the stream from a close notice, so the client learns why
   // the server is closing it (per the protocol contract, such a message carries no update
-  // data). Delivery is best-effort: it only reaches clients whose connection is still alive
-  // (e.g. duplicate-subscription rejection, shutdown drain). When omitted, server-initiated
-  // closes end the stream silently, as before.
+  // data). Used when a duplicate subscription is rejected — the connection is alive there,
+  // so the notice is deliverable. When omitted, the stream ends silently, as before.
   buildStreamClosedUpdate?: (streamClosed: SubscriptionStreamClosed) => T
 }
 
@@ -489,15 +488,6 @@ export function createUpdateHandlerComponent(
         } else {
           logger.error(`Unable to parse ${eventNameString}`, { update: JSON.stringify(update) })
         }
-      }
-
-      // The loop above ends when the generator is destroyed. If the destroyer provided a
-      // close reason (shutdown drain, stale cleanup, ...), forward it to the client as the
-      // stream's final message. Best-effort: when the destroy was triggered by the socket
-      // already being gone, the RPC layer simply fails to deliver it.
-      const closeReason = updatesGenerator.getCloseReason()
-      if (closeReason && buildStreamClosedUpdate) {
-        yield buildStreamClosedUpdate(closeReason)
       }
       // Intentionally no catch here: errors propagate to the per-service subscribe handler,
       // which logs them with service-specific context and re-throws. A central catch would

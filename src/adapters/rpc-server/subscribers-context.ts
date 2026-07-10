@@ -1,8 +1,4 @@
 import mitt, { Emitter } from 'mitt'
-import {
-  SubscriptionStreamClosed,
-  SubscriptionStreamClosedReason
-} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { ISubscribersContext, Subscribers, SubscriptionEventsEmitter } from '../../types'
 import { normalizeAddress } from '../../utils/address'
 import { AppComponents } from '../../types/system'
@@ -30,7 +26,7 @@ export function createSubscribersContext(
   // Active emitterToAsyncGenerator instances per connection, so we can synchronously
   // terminate exactly one connection's streams on disconnect without touching another
   // connection for the same address. Key: wsConnectionId.
-  const subscriberGenerators = new Map<string, Set<{ destroy(closeReason?: SubscriptionStreamClosed): void }>>()
+  const subscriberGenerators = new Map<string, Set<{ destroy(): void }>>()
 
   // Active subscriptions per connection, to prevent a single connection from opening the
   // same stream twice (each would allocate another generator + value queue). Scoped per
@@ -53,15 +49,11 @@ export function createSubscribersContext(
     return localSubscribers[normalizedAddress]
   }
 
-  // The optional closeReason is recorded by each generator so its consumer can send the
-  // client a final "stream closed" message. Best-effort: it is only deliverable while the
-  // connection is still alive (e.g. shutdown drain); teardowns triggered by the socket
-  // already being gone can't inform anyone.
-  function destroyGeneratorsForConnection(wsConnectionId: string, closeReason?: SubscriptionStreamClosed): void {
+  function destroyGeneratorsForConnection(wsConnectionId: string): void {
     const generators = subscriberGenerators.get(wsConnectionId)
     if (generators) {
       for (const gen of generators) {
-        gen.destroy(closeReason)
+        gen.destroy()
       }
       generators.clear()
       subscriberGenerators.delete(wsConnectionId)
@@ -83,7 +75,7 @@ export function createSubscribersContext(
    * Tear down ALL state for an address (every connection it has). Used by the
    * reconciliation sweep and on shutdown — not on a normal single-connection disconnect.
    */
-  function removeLocalSubscriber(address: string, closeReason?: SubscriptionStreamClosed): void {
+  function removeLocalSubscriber(address: string): void {
     const normalizedAddress = normalizeAddress(address)
 
     const connectionIds = connectionsByAddress.get(normalizedAddress)
@@ -91,7 +83,7 @@ export function createSubscribersContext(
       for (const wsConnectionId of connectionIds) {
         // Destroy generators first so pending next() calls resolve before we clear the
         // emitter handlers (prevents the deadlock).
-        destroyGeneratorsForConnection(wsConnectionId, closeReason)
+        destroyGeneratorsForConnection(wsConnectionId)
         activeSubscriptions.delete(wsConnectionId)
       }
       connectionsByAddress.delete(normalizedAddress)
@@ -136,7 +128,7 @@ export function createSubscribersContext(
         })
 
         for (const address of staleAddresses) {
-          removeLocalSubscriber(address, { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_STALE_SUBSCRIPTION })
+          removeLocalSubscriber(address)
         }
 
         metrics.increment('subscribers_stale_cleaned', {}, staleAddresses.length)
@@ -167,9 +159,7 @@ export function createSubscribersContext(
 
         // Same teardown as removeConnection: generators first so pending next() calls
         // resolve before any emitter handlers are cleared.
-        destroyGeneratorsForConnection(wsConnectionId, {
-          reason: SubscriptionStreamClosedReason.STREAM_CLOSED_STALE_SUBSCRIPTION
-        })
+        destroyGeneratorsForConnection(wsConnectionId)
         activeSubscriptions.delete(wsConnectionId)
         connectionIds.delete(wsConnectionId)
         staleConnectionsCount++
@@ -212,12 +202,9 @@ export function createSubscribersContext(
         reconciliationInterval = null
       }
 
-      // Destroy all generators and clear local emitters. The reason lets streams whose
-      // connection is still draining tell the client the server is going away.
+      // Destroy all generators and clear local emitters
       for (const address of Object.keys(localSubscribers)) {
-        removeLocalSubscriber(address, {
-          reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN
-        })
+        removeLocalSubscriber(address)
       }
     },
 
@@ -257,7 +244,7 @@ export function createSubscribersContext(
      * Returns true if this was the LAST connection for the address, in which case the shared
      * emitter is cleared.
      */
-    removeConnection(address: string, wsConnectionId: string, closeReason?: SubscriptionStreamClosed): boolean {
+    removeConnection(address: string, wsConnectionId: string): boolean {
       const normalizedAddress = normalizeAddress(address)
 
       const connectionIds = connectionsByAddress.get(normalizedAddress)
@@ -268,7 +255,7 @@ export function createSubscribersContext(
 
       // Tear down only this connection's streams/dedup state. Each generator's destroy()
       // calls emitter.off for its own handler, so sibling connections are untouched.
-      destroyGeneratorsForConnection(wsConnectionId, closeReason)
+      destroyGeneratorsForConnection(wsConnectionId)
       activeSubscriptions.delete(wsConnectionId)
       connectionIds.delete(wsConnectionId)
 
@@ -284,7 +271,7 @@ export function createSubscribersContext(
       return true
     },
 
-    registerGenerator(wsConnectionId: string, generator: { destroy(closeReason?: SubscriptionStreamClosed): void }): void {
+    registerGenerator(wsConnectionId: string, generator: { destroy(): void }): void {
       let generators = subscriberGenerators.get(wsConnectionId)
       if (!generators) {
         generators = new Set()
@@ -293,10 +280,7 @@ export function createSubscribersContext(
       generators.add(generator)
     },
 
-    unregisterGenerator(
-      wsConnectionId: string,
-      generator: { destroy(closeReason?: SubscriptionStreamClosed): void }
-    ): void {
+    unregisterGenerator(wsConnectionId: string, generator: { destroy(): void }): void {
       const generators = subscriberGenerators.get(wsConnectionId)
       if (generators) {
         generators.delete(generator)
