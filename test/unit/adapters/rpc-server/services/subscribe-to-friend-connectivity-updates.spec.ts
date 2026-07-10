@@ -7,7 +7,11 @@ import {
   mockRegistry
 } from '../../../../mocks/components'
 import { subscribeToFriendConnectivityUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-friend-connectivity-updates'
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  ConnectivityStatus,
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createMockProfile } from '../../../../mocks/profile'
 import { parseProfileToFriend } from '../../../../../src/logic/friends'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
@@ -227,6 +231,31 @@ describe('when subscribing to friend connectivity updates', () => {
       // Verify filtering logic
       expect(shouldHandleUpdate(mockUpdateFromOther)).toBe(true) // Should handle: from different address
       expect(shouldHandleUpdate(mockUpdateFromSelf)).toBe(false) // Should not handle: from self
+    })
+  })
+
+  describe('when building the final stream-closed message', () => {
+    let streamClosed: SubscriptionStreamClosed
+
+    beforeEach(async () => {
+      streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN }
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
+
+      const generator = subscribeToFriendConnectivityUpdates({} as Empty, rpcContext)
+      await generator.next()
+    })
+
+    it('should build an update with protobuf defaults carrying the stream-closed notice', () => {
+      const buildStreamClosedUpdate =
+        mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].buildStreamClosedUpdate
+
+      // friend/status are the protobuf zero-value defaults; clients must ignore them when
+      // streamClosed is present.
+      expect(buildStreamClosedUpdate(streamClosed)).toEqual({
+        friend: undefined,
+        status: ConnectivityStatus.ONLINE,
+        streamClosed
+      })
     })
   })
 })

@@ -24,6 +24,9 @@ export function subscribeToFriendConnectivityUpdatesService({
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) =>
           update.address !== context.address,
         parser: parseEmittedUpdateToFriendConnectivityUpdate,
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => FriendConnectivityUpdate.fromPartial({ streamClosed }),
         // Initial online-friends snapshot. Delivered by handleSubscriptionUpdates AFTER the
         // live listener is registered, so connectivity changes emitted while these queries
         // run are queued rather than lost. Best-effort: a DB/registry hiccup is logged there

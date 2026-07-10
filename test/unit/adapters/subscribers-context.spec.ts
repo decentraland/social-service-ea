@@ -1,3 +1,4 @@
+import { SubscriptionStreamClosedReason } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { createSubscribersContext } from '../../../src/adapters/rpc-server/subscribers-context'
 import { createLogsMockedComponent } from '../../mocks/components/logs'
 import { mockMetrics } from '../../mocks/components/metrics'
@@ -232,6 +233,31 @@ describe('SubscribersContext Component', () => {
 
       expect(() => context.unregisterGenerator('conn-unknown', generator)).not.toThrow()
     })
+
+    it('should pass the close reason to the destroyed generators when the connection is removed with one', () => {
+      const { context, address } = createTestContext()
+      context.addConnection(address, 'conn-1')
+
+      const generator = { destroy: jest.fn() }
+      context.registerGenerator('conn-1', generator)
+
+      const closeReason = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_UNAUTHORIZED }
+      context.removeConnection(address, 'conn-1', closeReason)
+
+      expect(generator.destroy).toHaveBeenCalledWith(closeReason)
+    })
+
+    it('should destroy the generators without a close reason when the connection is removed without one', () => {
+      const { context, address } = createTestContext()
+      context.addConnection(address, 'conn-1')
+
+      const generator = { destroy: jest.fn() }
+      context.registerGenerator('conn-1', generator)
+
+      context.removeConnection(address, 'conn-1')
+
+      expect(generator.destroy).toHaveBeenCalledWith(undefined)
+    })
   })
 
   describe('when tracking active subscriptions per connection', () => {
@@ -297,6 +323,19 @@ describe('SubscribersContext Component', () => {
         expect(generator.destroy).toHaveBeenCalledTimes(1)
       }
     })
+
+    it('should destroy the generators with the server-shutting-down close reason', async () => {
+      const { context, address } = createTestContext()
+      context.addConnection(address, 'conn-1')
+      const generator = { destroy: jest.fn() }
+      context.registerGenerator('conn-1', generator)
+
+      await context.stop?.()
+
+      expect(generator.destroy).toHaveBeenCalledWith({
+        reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN
+      })
+    })
   })
 
   describe('when reconciling stale subscribers on the interval', () => {
@@ -351,6 +390,28 @@ describe('SubscribersContext Component', () => {
       await context.stop?.()
     })
 
+    it('should destroy the generators of a reconciled stale subscriber with the stale-subscription close reason', async () => {
+      const wsPool = createWsPoolMockedComponent({
+        getAuthenticatedAddresses: jest.fn().mockReturnValue([])
+      })
+      const context = createSubscribersContext(
+        { logs: mockLogs, metrics: mockMetrics, config: mockConfig },
+        wsPool
+      )
+      context.addConnection('0x456', 'conn-2')
+      const generator = { destroy: jest.fn() }
+      context.registerGenerator('conn-2', generator)
+
+      await context.start?.({} as any)
+      jest.advanceTimersByTime(300_000)
+
+      expect(generator.destroy).toHaveBeenCalledWith({
+        reason: SubscriptionStreamClosedReason.STREAM_CLOSED_STALE_SUBSCRIPTION
+      })
+
+      await context.stop?.()
+    })
+
     describe('and a stale connection remains under an address that still has a live connection', () => {
       let context: ReturnType<typeof createSubscribersContext>
       let staleGenerator: { destroy: jest.Mock }
@@ -378,6 +439,12 @@ describe('SubscribersContext Component', () => {
 
       it('should destroy the stale connection generators', () => {
         expect(staleGenerator.destroy).toHaveBeenCalledTimes(1)
+      })
+
+      it('should destroy the stale connection generators with the stale-subscription close reason', () => {
+        expect(staleGenerator.destroy).toHaveBeenCalledWith({
+          reason: SubscriptionStreamClosedReason.STREAM_CLOSED_STALE_SUBSCRIPTION
+        })
       })
 
       it('should keep the address subscribed for the live connection', () => {

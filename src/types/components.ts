@@ -6,7 +6,10 @@ import { Transport } from '@dcl/rpc'
 import { PoolClient } from 'pg'
 import { createClient, SetOptions } from 'redis'
 import { Subscription } from '@well-known-components/nats-component/dist/types'
-import { SocialServiceDefinition } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  SocialServiceDefinition,
+  SubscriptionStreamClosed
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { EthAddress, PaginatedParameters } from '@dcl/schemas'
 import { GetNamesParams, Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { FromTsProtoServiceDefinition, RawClient } from '@dcl/rpc/dist/codegen-types'
@@ -358,11 +361,19 @@ export type ISubscribersContext = IBaseComponent & {
   /**
    * Remove a connection for an address. Tears down only that connection's generators and
    * active-subscription state. Returns true if it was the last connection for the address
-   * (the shared emitter is cleared).
+   * (the shared emitter is cleared). When a closeReason is given, each destroyed generator
+   * records it so its consumer can send the client a final "stream closed" message
+   * (best-effort: only deliverable while the connection is still alive).
    */
-  removeConnection: (address: string, wsConnectionId: string) => boolean
-  registerGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
-  unregisterGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
+  removeConnection: (address: string, wsConnectionId: string, closeReason?: SubscriptionStreamClosed) => boolean
+  registerGenerator: (
+    wsConnectionId: string,
+    generator: { destroy(closeReason?: SubscriptionStreamClosed): void }
+  ) => void
+  unregisterGenerator: (
+    wsConnectionId: string,
+    generator: { destroy(closeReason?: SubscriptionStreamClosed): void }
+  ) => void
   hasActiveSubscription: (wsConnectionId: string, eventName: string) => boolean
   setActiveSubscription: (wsConnectionId: string, eventName: string) => void
   clearActiveSubscription: (wsConnectionId: string, eventName: string) => void

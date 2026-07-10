@@ -1,4 +1,7 @@
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  ConnectivityStatus,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createUpdateHandlerComponent } from '../../../src/logic/updates'
 import { mockRegistry, mockFriendsDB, createMockPeersStatsComponent } from '../../mocks/components'
@@ -1289,6 +1292,133 @@ describe('Updates Handlers', () => {
 
       it('should not clear the existing active subscription', () => {
         expect(clearActiveSubscriptionSpy).not.toHaveBeenCalled()
+      })
+
+      describe('and a stream-closed update builder is provided', () => {
+        let duplicateGenerator: AsyncGenerator<unknown>
+        let buildStreamClosedUpdate: jest.Mock
+
+        beforeEach(() => {
+          buildStreamClosedUpdate = jest.fn().mockImplementation((streamClosed) => ({ streamClosed }))
+
+          duplicateGenerator = updateHandler.handleSubscriptionUpdates({
+            rpcContext,
+            eventName: 'friendshipUpdate',
+            shouldRetrieveProfile: true,
+            getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+            shouldHandleUpdate: () => true,
+            parser,
+            buildStreamClosedUpdate
+          })
+        })
+
+        it('should yield a final stream-closed message with the duplicate-subscription reason and then complete', async () => {
+          const first = await duplicateGenerator.next()
+          const second = await duplicateGenerator.next()
+
+          expect(first.done).toBe(false)
+          expect(first.value).toEqual({
+            streamClosed: {
+              reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION,
+              message: 'This connection already has an active friendshipUpdate subscription'
+            }
+          })
+          expect(second.done).toBe(true)
+        })
+      })
+    })
+
+    describe('and the subscription is destroyed with a close reason', () => {
+      let generator: AsyncGenerator<unknown>
+      let buildStreamClosedUpdate: jest.Mock
+      let firstResultPromise: Promise<IteratorResult<unknown, unknown>>
+
+      beforeEach(async () => {
+        buildStreamClosedUpdate = jest.fn().mockImplementation((streamClosed) => ({ streamClosed }))
+
+        generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext,
+          eventName: 'friendshipUpdate',
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser,
+          buildStreamClosedUpdate
+        })
+
+        firstResultPromise = generator.next()
+        // Let the generator body run up to the pending live-updates await before destroying.
+        await sleep(0)
+        subscribersContext.removeConnection('0x123', 'conn-123', {
+          reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN
+        })
+      })
+
+      it('should yield a final stream-closed message with the destroy reason and then complete', async () => {
+        const first = await firstResultPromise
+        const second = await generator.next()
+
+        expect(first.done).toBe(false)
+        expect(first.value).toEqual({
+          streamClosed: { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN }
+        })
+        expect(second.done).toBe(true)
+      })
+    })
+
+    describe('and the subscription is destroyed with a close reason but no builder is provided', () => {
+      let generator: AsyncGenerator<unknown>
+      let firstResultPromise: Promise<IteratorResult<unknown, unknown>>
+
+      beforeEach(async () => {
+        generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext,
+          eventName: 'friendshipUpdate',
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser
+        })
+
+        firstResultPromise = generator.next()
+        await sleep(0)
+        subscribersContext.removeConnection('0x123', 'conn-123', {
+          reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN
+        })
+      })
+
+      it('should complete the stream silently without yielding a final message', async () => {
+        const first = await firstResultPromise
+
+        expect(first.done).toBe(true)
+      })
+    })
+
+    describe('and the subscription is destroyed without a close reason', () => {
+      let generator: AsyncGenerator<unknown>
+      let buildStreamClosedUpdate: jest.Mock
+      let firstResultPromise: Promise<IteratorResult<unknown, unknown>>
+
+      beforeEach(async () => {
+        buildStreamClosedUpdate = jest.fn().mockImplementation((streamClosed) => ({ streamClosed }))
+
+        generator = updateHandler.handleSubscriptionUpdates({
+          rpcContext,
+          eventName: 'friendshipUpdate',
+          getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendshipUpdate']) => update.from,
+          shouldHandleUpdate: () => true,
+          parser,
+          buildStreamClosedUpdate
+        })
+
+        firstResultPromise = generator.next()
+        await sleep(0)
+        subscribersContext.removeConnection('0x123', 'conn-123')
+      })
+
+      it('should complete the stream without building a final message', async () => {
+        const first = await firstResultPromise
+
+        expect(first.done).toBe(true)
+        expect(buildStreamClosedUpdate).not.toHaveBeenCalled()
       })
     })
 

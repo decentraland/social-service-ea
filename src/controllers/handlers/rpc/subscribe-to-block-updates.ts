@@ -18,7 +18,10 @@ export function subscribeToBlockUpdatesService({
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) => update.blockerAddress,
         parser: parseEmittedUpdateToBlockUpdate,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['blockUpdate']) =>
-          update.blockedAddress === context.address
+          update.blockedAddress === context.address,
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => BlockUpdate.fromPartial({ streamClosed })
       })
     } catch (error: any) {
       logger.error('Error in block updates subscription:', error)

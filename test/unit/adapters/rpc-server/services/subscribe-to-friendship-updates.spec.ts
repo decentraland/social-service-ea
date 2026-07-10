@@ -1,5 +1,9 @@
 import { subscribeToFriendshipUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-friendship-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
+import {
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, RpcServerContext } from '../../../../../src/types'
 import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createMockProfile } from '../../../../mocks/profile'
@@ -173,6 +177,25 @@ describe('when subscribing to friendship updates', () => {
       expect(shouldHandleUpdate(mockUpdateFromOther)).toBe(true) // Should handle: from different, to self
       expect(shouldHandleUpdate(mockUpdateFromSelf)).toBe(false) // Should not handle: from self
       expect(shouldHandleUpdate(mockUpdateToOther)).toBe(false) // Should not handle: to different
+    })
+  })
+
+  describe('when building the final stream-closed message', () => {
+    let streamClosed: SubscriptionStreamClosed
+
+    beforeEach(async () => {
+      streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN }
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
+
+      const generator = subscribeToFriendshipUpdates({} as Empty, rpcContext)
+      await generator.next()
+    })
+
+    it('should build an update carrying only the stream-closed notice', () => {
+      const buildStreamClosedUpdate =
+        mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].buildStreamClosedUpdate
+
+      expect(buildStreamClosedUpdate(streamClosed)).toEqual({ streamClosed })
     })
   })
 })

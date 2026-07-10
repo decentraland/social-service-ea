@@ -1,5 +1,9 @@
 import { subscribeToBlockUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-block-updates'
 import { Empty } from '@dcl/protocol/out-js/google/protobuf/empty.gen'
+import {
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext } from '../../../../../src/types'
 import { createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
@@ -138,6 +142,25 @@ describe('when subscribing to block updates', () => {
 
       expect(shouldHandleUpdate(mockUpdateBlockingNonLoggedUser)).toBe(false)
       expect(shouldHandleUpdate(mockUpdateBlockingLoggedUser)).toBe(true)
+    })
+  })
+
+  describe('when building the final stream-closed message', () => {
+    let streamClosed: SubscriptionStreamClosed
+
+    beforeEach(async () => {
+      streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_SERVER_SHUTTING_DOWN }
+      mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
+
+      const generator = subscribeToBlockUpdates({} as Empty, rpcContext)
+      await generator.next()
+    })
+
+    it('should build an update with protobuf defaults carrying the stream-closed notice', () => {
+      const buildStreamClosedUpdate =
+        mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].buildStreamClosedUpdate
+
+      expect(buildStreamClosedUpdate(streamClosed)).toEqual({ address: '', isBlocked: false, streamClosed })
     })
   })
 })

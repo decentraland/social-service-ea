@@ -1136,9 +1136,9 @@
     pg-query-stream "4.11.2"
     sql-template-strings "2.2.2"
 
-"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-22759287695.commit-d2351e7.tgz":
-  version "1.0.0-22759287695.commit-d2351e7"
-  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-22759287695.commit-d2351e7.tgz#a6cadea01d5e6f66a45435b7fb80b382ca855ff9"
+"@dcl/protocol@https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-29096097303.commit-e4b0c4c.tgz":
+  version "1.0.0-29096097303.commit-e4b0c4c"
+  resolved "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-29096097303.commit-e4b0c4c.tgz#1f909a9d44d38ced876989e83670c561156bbbbc"
   dependencies:
     "@dcl/ts-proto" "1.154.0"
     protobufjs "7.2.4"
