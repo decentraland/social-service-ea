@@ -675,7 +675,14 @@ export function createCommunityComponent(
           '-' +
           existingCommunity.name.trim().toLowerCase().replace(/ /g, '-')
 
-        void broadcastCommunityRenamed(communityId, eventKeySuffix, existingCommunity.name, updates.name!)
+        void broadcastCommunityRenamed(communityId, eventKeySuffix, existingCommunity.name, updates.name!).catch(
+          (error: any) => {
+            logger.error('Unhandled error in broadcastCommunityRenamed', {
+              error: error.message,
+              communityId
+            })
+          }
+        )
       }
 
       if (thumbnailBuffer) {

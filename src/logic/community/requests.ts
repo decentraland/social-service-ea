@@ -184,7 +184,9 @@ export function createCommunityRequestsComponent(
       )
     }
 
-    void notifyAboutNewRequest(createdRequest, communityId, community.name, memberAddress)
+    void notifyAboutNewRequest(createdRequest, communityId, community.name, memberAddress).catch((error: any) => {
+      logger.error('Unhandled error in notifyAboutNewRequest', { error: error.message, communityId })
+    })
 
     return createdRequest
   }
@@ -314,7 +316,12 @@ export function createCommunityRequestsComponent(
         communityName: community.name,
         memberAddress: request.memberAddress
       }
-    )
+    ).catch((error: any) => {
+      logger.error('Unhandled error in notifyStakeholdersAboutRequest', {
+        error: error.message,
+        communityId: community.id
+      })
+    })
   }
 
   /**
