@@ -544,6 +544,37 @@ describe('UWebSocketTransport', () => {
       await expect(sendPromise).rejects.toThrow('Connection closed')
     })
 
+    it('should not emit unhandled rejections when fire-and-forget queued sends are rejected during cleanup', async () => {
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
+      const unhandledRejectionListener = jest.fn()
+      process.on('unhandledRejection', unhandledRejectionListener)
+
+      try {
+        transport.sendMessage(mockMessage)
+        transport.sendMessage(mockMessage)
+
+        await jest.advanceTimersByTimeAsync(0)
+        transport.close()
+        await jest.advanceTimersByTimeAsync(0)
+
+        expect(unhandledRejectionListener).not.toHaveBeenCalled()
+      } finally {
+        process.off('unhandledRejection', unhandledRejectionListener)
+      }
+    })
+
+    it('should preserve the connection closed rejection for callers awaiting queued sends during cleanup', async () => {
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
+
+      const sendPromise = transport.sendMessage(mockMessage)
+      const rejection = expect(sendPromise).rejects.toThrow('Connection closed')
+
+      await jest.advanceTimersByTimeAsync(0)
+      transport.close()
+
+      await rejection
+    })
+
     it('should handle cleanup with null timeouts', () => {
       // Test that cleanup works when no timeouts are set
       transport.close()

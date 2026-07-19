@@ -270,7 +270,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
   }
 
-  async function send(msg: Uint8Array) {
+  function send(msg: Uint8Array) {
     if (!isInitialized) {
       const error = new Error('Transport is not ready')
       logger.error('Transport is not ready', {
@@ -279,7 +279,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         isInitialized: String(isInitialized),
         isConnected: String(isSocketConnected())
       })
-      return events.emit('error', error)
+      events.emit('error', error)
+      return Promise.resolve()
     }
 
     if (!isSocketConnected()) {
@@ -289,7 +290,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         isTransportActive: String(isTransportActive),
         isConnected: String(isSocketConnected())
       })
-      return
+      return Promise.resolve()
     }
 
     if (messageQueue.length >= maxQueueSize) {
@@ -299,7 +300,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         queueSize: messageQueue.length,
         maxQueueSize
       })
-      return events.emit('error', error)
+      events.emit('error', error)
+      return Promise.resolve()
     }
 
     const messageFuture = future<void>()
