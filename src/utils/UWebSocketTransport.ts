@@ -189,7 +189,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         // Schedule retry with exponential backoff
         processingTimeout = setTimeout(() => {
           processingTimeout = null
-          void processQueue()
+          runQueueProcessing()
         }, backoffDelay)
 
         // Exit the loop after scheduling retry
@@ -270,7 +270,22 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
   }
 
-  async function send(msg: Uint8Array) {
+  // processQueue is always kicked fire-and-forget (from send(), the retry timer and
+  // handleDrain). It has no internal catch and, although it has no awaits today, its
+  // synchronous body emits 'error' events whose listeners tear the transport down across
+  // modules — if any link in that chain throws, the promise it returns rejects. Route every
+  // call through here so such a throw is logged instead of surfacing as an unhandled rejection
+  // that crashes the process (issue #435).
+  function runQueueProcessing() {
+    processQueue().catch((error: unknown) => {
+      logger.error('Unhandled error while processing the message queue', {
+        transportId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    })
+  }
+
+  function send(msg: Uint8Array) {
     if (!isInitialized) {
       const error = new Error('Transport is not ready')
       logger.error('Transport is not ready', {
@@ -279,7 +294,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         isInitialized: String(isInitialized),
         isConnected: String(isSocketConnected())
       })
-      return events.emit('error', error)
+      events.emit('error', error)
+      return Promise.resolve()
     }
 
     if (!isSocketConnected()) {
@@ -289,7 +305,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         isTransportActive: String(isTransportActive),
         isConnected: String(isSocketConnected())
       })
-      return
+      return Promise.resolve()
     }
 
     if (messageQueue.length >= maxQueueSize) {
@@ -299,7 +315,8 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
         queueSize: messageQueue.length,
         maxQueueSize
       })
-      return events.emit('error', error)
+      events.emit('error', error)
+      return Promise.resolve()
     }
 
     const messageFuture = future<void>()
@@ -319,7 +336,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     // timer and re-sends the backpressured head message immediately, which burns its retry
     // attempts within a burst instead of giving the socket time to drain.
     if (!isProcessing && !processingTimeout) {
-      void processQueue()
+      runQueueProcessing()
     }
 
     return messageFuture
@@ -377,7 +394,7 @@ export async function createUWebSocketTransport<T extends { isConnected: boolean
     }
 
     if (!isProcessing) {
-      void processQueue()
+      runQueueProcessing()
     }
   }
 

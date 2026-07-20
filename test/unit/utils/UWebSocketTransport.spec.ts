@@ -544,6 +544,37 @@ describe('UWebSocketTransport', () => {
       await expect(sendPromise).rejects.toThrow('Connection closed')
     })
 
+    it('should not emit unhandled rejections when fire-and-forget queued sends are rejected during cleanup', async () => {
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
+      const unhandledRejectionListener = jest.fn()
+      process.on('unhandledRejection', unhandledRejectionListener)
+
+      try {
+        transport.sendMessage(mockMessage)
+        transport.sendMessage(mockMessage)
+
+        await jest.advanceTimersByTimeAsync(0)
+        transport.close()
+        await jest.advanceTimersByTimeAsync(0)
+
+        expect(unhandledRejectionListener).not.toHaveBeenCalled()
+      } finally {
+        process.off('unhandledRejection', unhandledRejectionListener)
+      }
+    })
+
+    it('should preserve the connection closed rejection for callers awaiting queued sends during cleanup', async () => {
+      mockSocket.send.mockReturnValue(UWebSocketSendResult.DROPPED)
+
+      const sendPromise = transport.sendMessage(mockMessage)
+      const rejection = expect(sendPromise).rejects.toThrow('Connection closed')
+
+      await jest.advanceTimersByTimeAsync(0)
+      transport.close()
+
+      await rejection
+    })
+
     it('should handle cleanup with null timeouts', () => {
       // Test that cleanup works when no timeouts are set
       transport.close()
@@ -570,6 +601,36 @@ describe('UWebSocketTransport', () => {
 
       // No more events should be processed after error
       expect(mockSocket.send).not.toHaveBeenCalled()
+    })
+
+    describe('and an error event listener throws while the queue is being processed', () => {
+      let unhandledRejectionListener: jest.Mock
+
+      beforeEach(() => {
+        mockSocket.send.mockImplementation(() => {
+          throw new Error('Socket error')
+        })
+        // processQueue runs fire-and-forget and emits 'error' when a send throws. A listener
+        // throwing here models the RPC layer's transport teardown chain throwing synchronously
+        // inside that fire-and-forget call — it must not become an unhandled rejection.
+        transport.on('error', () => {
+          throw new Error('Error listener threw')
+        })
+        unhandledRejectionListener = jest.fn()
+        process.on('unhandledRejection', unhandledRejectionListener)
+      })
+
+      afterEach(() => {
+        process.off('unhandledRejection', unhandledRejectionListener)
+      })
+
+      it('should not surface the failure as an unhandled promise rejection', async () => {
+        transport.sendMessage(mockMessage)
+
+        await jest.advanceTimersByTimeAsync(0)
+
+        expect(unhandledRejectionListener).not.toHaveBeenCalled()
+      })
     })
   })
 })
