@@ -59,8 +59,15 @@ export async function createWsPoolComponent(
   async function stop() {
     logger.info('Shutting down WebSocket pool')
     for (const connection of connections.values()) {
-      logger.info('Shutting down connection', { wsConnectionId: connection.getUserData().wsConnectionId })
-      connection.end(1001, 'Server shutting down') // 1001 = Going away
+      // Close each connection independently: getUserData()/end() throw when accessing a socket
+      // that is already closing, and one throw must not abort the graceful shutdown of the
+      // remaining sockets.
+      try {
+        logger.info('Shutting down connection', { wsConnectionId: connection.getUserData().wsConnectionId })
+        connection.end(1001, 'Server shutting down') // 1001 = Going away
+      } catch (error: any) {
+        logger.warn('Failed to close connection during shutdown', { error: error?.message ?? String(error) })
+      }
     }
   }
 

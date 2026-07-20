@@ -168,7 +168,10 @@ export async function registerWsHandler(
           wsConnectionId: data.wsConnectionId,
           address
         })
-        rpcServer.detachUser(address, data.wsConnectionId)
+        // Guarded like the cleanupConnection path: this listener also runs synchronously inside
+        // the RPC layer's transport 'error' → close teardown, so a throw here would escape into
+        // the transport's fire-and-forget queue processing as an unhandled rejection.
+        safeDetachUser(address, data.wsConnectionId)
 
         // The transport can also be closed by the RPC layer (e.g. on a transport error such
         // as a queue overflow) while the socket is still open. Without ending the socket the
@@ -231,8 +234,12 @@ export async function registerWsHandler(
         hasEventEmitter: String(!!data.eventEmitter)
       })
       metrics.increment('ws_errors')
-      // Do not leak internal error details to the client.
-      ws.send(JSON.stringify({ error: 'Error processing message' }))
+      // Do not leak internal error details to the client. Guarded like every ws I/O site:
+      // ws.send() throws on an already-closed socket, which inside this handler would surface
+      // as an unhandled rejection.
+      try {
+        ws.send(JSON.stringify({ error: 'Error processing message' }))
+      } catch (err) {}
       tracing.captureException(error as Error, {
         address: getAddress(data),
         wsConnectionId: data.wsConnectionId
@@ -350,7 +357,11 @@ export async function registerWsHandler(
         logger.warn('Authentication already in progress', {
           wsConnectionId: data.wsConnectionId
         })
-        ws.send(JSON.stringify({ error: 'Authentication already in progress, please try again later' }))
+        // Guarded like every ws I/O site: ws.send() throws on an already-closed socket, which
+        // inside this async handler would surface as an unhandled rejection.
+        try {
+          ws.send(JSON.stringify({ error: 'Authentication already in progress, please try again later' }))
+        } catch (err) {}
         return
       }
 

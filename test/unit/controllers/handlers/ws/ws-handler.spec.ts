@@ -137,6 +137,22 @@ describe('ws-handler', () => {
       expect(verify).not.toHaveBeenCalled()
     })
 
+    describe('and notifying the client that authentication is already in progress fails', () => {
+      beforeEach(() => {
+        const userData = mockWs.getUserData()
+        userData.authenticating = true
+        mockWs.send.mockImplementationOnce(() => {
+          throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+        })
+      })
+
+      it('should not propagate the error', async () => {
+        await expect(
+          wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+        ).resolves.toBeUndefined()
+      })
+    })
+
     describe('for authenticated users', () => {
       let authData: WsAuthenticatedUserData
 
@@ -182,6 +198,21 @@ describe('ws-handler', () => {
             error: 'Error processing message'
           })
         )
+      })
+
+      describe('and notifying the client of the processing failure also fails', () => {
+        beforeEach(() => {
+          jest.spyOn(authData.eventEmitter, 'emit').mockImplementationOnce(() => {
+            throw new Error('Emission failed')
+          })
+          mockWs.send.mockImplementationOnce(() => {
+            throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+          })
+        })
+
+        it('should not propagate the error', async () => {
+          await expect(wsHandlers.message(mockWs, Buffer.from('test message'))).resolves.toBeUndefined()
+        })
       })
 
       it('should ignore messages when connection is marked as disconnected', async () => {
@@ -255,6 +286,22 @@ describe('ws-handler', () => {
 
           expect(mockRpcServer.detachUser).toHaveBeenCalledWith('0x123', 'test-client-id')
           expect(mockWs.end).toHaveBeenCalledWith(1011, 'RPC transport closed')
+        })
+
+        describe('and detaching the user throws', () => {
+          beforeEach(() => {
+            mockRpcServer.detachUser.mockImplementationOnce(() => {
+              throw new Error('detach failed')
+            })
+          })
+
+          it('should swallow the error and still end the socket', () => {
+            const updatedData = mockWs.getUserData()
+
+            updatedData.transport.close()
+
+            expect(mockWs.end).toHaveBeenCalledWith(1011, 'RPC transport closed')
+          })
         })
       })
 

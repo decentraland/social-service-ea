@@ -13,6 +13,7 @@ let mockConfigComponent: jest.Mocked<IConfigComponent>
 let mockLogger: ReturnType<typeof createLogsMockedComponent>
 let mockInfo: jest.MockedFunction<ReturnType<(typeof mockLogger)['getLogger']>['info']>
 let mockDebug: jest.MockedFunction<ReturnType<(typeof mockLogger)['getLogger']>['debug']>
+let mockWarn: jest.MockedFunction<ReturnType<(typeof mockLogger)['getLogger']>['warn']>
 
 beforeEach(async () => {
   mockMetricsComponent = { ...mockMetrics }
@@ -22,9 +23,11 @@ beforeEach(async () => {
   mockLogger = createLogsMockedComponent({})
   mockInfo = jest.fn()
   mockDebug = jest.fn()
+  mockWarn = jest.fn()
   mockLogger.getLogger = jest.fn().mockReturnValue({
     info: mockInfo,
-    debug: mockDebug
+    debug: mockDebug,
+    warn: mockWarn
   })
 
   wsPool = await createWsPoolComponent({
@@ -275,6 +278,57 @@ describe('when shutting down the component', () => {
       expect(mockInfo).toHaveBeenCalledWith('Shutting down connection', { wsConnectionId: 'connection-1' })
       expect(mockInfo).toHaveBeenCalledWith('Shutting down connection', { wsConnectionId: 'connection-2' })
       expect(firstWebSocket.end).toHaveBeenCalledWith(1001, 'Server shutting down')
+      expect(secondWebSocket.end).toHaveBeenCalledWith(1001, 'Server shutting down')
+    })
+  })
+
+  describe('and closing one connection throws', () => {
+    beforeEach(() => {
+      firstWebSocket = {
+        getUserData: jest.fn(),
+        end: jest.fn()
+      } as unknown as jest.Mocked<WebSocket<WsUserData>>
+
+      secondWebSocket = {
+        getUserData: jest.fn(),
+        end: jest.fn()
+      } as unknown as jest.Mocked<WebSocket<WsUserData>>
+
+      firstWsUserData = {
+        isConnected: true,
+        auth: true,
+        authenticating: false,
+        wsConnectionId: 'connection-1',
+        connectionStartTime: Date.now(),
+        address: '0x111111111',
+        eventEmitter: {} as any,
+        transport: {} as any
+      }
+
+      secondWsUserData = {
+        isConnected: true,
+        auth: true,
+        authenticating: false,
+        wsConnectionId: 'connection-2',
+        connectionStartTime: Date.now(),
+        address: '0x222222222',
+        eventEmitter: {} as any,
+        transport: {} as any
+      }
+
+      firstWebSocket.getUserData.mockReturnValue(firstWsUserData)
+      secondWebSocket.getUserData.mockReturnValue(secondWsUserData)
+      firstWebSocket.end.mockImplementation(() => {
+        throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+      })
+
+      wsPool.registerConnection(firstWebSocket)
+      wsPool.registerConnection(secondWebSocket)
+    })
+
+    it('should still close the remaining connections', async () => {
+      await wsPool[STOP_COMPONENT]()
+
       expect(secondWebSocket.end).toHaveBeenCalledWith(1001, 'Server shutting down')
     })
   })
