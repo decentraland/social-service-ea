@@ -160,6 +160,19 @@ export async function createReferralComponent(
 
       const referralExists = await referralDb.hasReferralProgress(invitedUser)
       if (referralExists) {
+        // Idempotency: a create for an invited user that already has a referral with the SAME
+        // referrer is a safe no-op (returns the existing record → 204). This makes the client
+        // retry-safe: a dropped response, a re-registration during onboarding, or the web setup
+        // flow having already recorded it all converge without error. A DIFFERENT referrer is a
+        // genuine conflict (first-wins attribution) and is still rejected.
+        const existing = await referralDb.findReferralProgress({ invitedUser })
+        if (existing.length > 0 && existing[0].referrer.toLowerCase() === referrer) {
+          logger.info('Referral already exists with the same referrer; treating create as idempotent', {
+            referrer,
+            invitedUser
+          })
+          return existing[0]
+        }
         throw new ReferralAlreadyExistsError(invitedUser)
       }
 
