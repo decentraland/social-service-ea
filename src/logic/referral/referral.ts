@@ -1,4 +1,4 @@
-import { ReferralEmail, ReferralProgressStatus } from '../../types/referral-db.type'
+import { ReferralEmail, ReferralProgress, ReferralProgressStatus } from '../../types/referral-db.type'
 import { EthAddress, Events, ReferralInvitedUsersAcceptedEvent, ReferralNewTierReachedEvent, Email } from '@dcl/schemas'
 import { CreateReferralWithInvitedUser } from '../../types/create-referral-handler.type'
 import {
@@ -158,13 +158,12 @@ export async function createReferralComponent(
         throw new SelfReferralError(invitedUser)
       }
 
-      const referralExists = await referralDb.hasReferralProgress(invitedUser)
-      if (referralExists) {
-        // Idempotency: a create for an invited user that already has a referral with the SAME
-        // referrer is a safe no-op (returns the existing record → 204). This makes the client
-        // retry-safe: a dropped response, a re-registration during onboarding, or the web setup
-        // flow having already recorded it all converge without error. A DIFFERENT referrer is a
-        // genuine conflict (first-wins attribution) and is still rejected.
+      // Decides what an already-existing referral for this invited user means. A create with
+      // the SAME referrer is a safe no-op (returns the existing record → 204), which makes the
+      // client retry-safe: a dropped response, a re-registration during onboarding, or the web
+      // setup flow having already recorded it all converge without error. A DIFFERENT referrer
+      // is a genuine conflict (first-wins attribution) and is rejected.
+      const resolveExistingReferral = async (): Promise<ReferralProgress> => {
         const existing = await referralDb.findReferralProgress({ invitedUser })
         if (existing.length > 0 && existing[0].referrer.toLowerCase() === referrer) {
           logger.info('Referral already exists with the same referrer; treating create as idempotent', {
@@ -174,6 +173,11 @@ export async function createReferralComponent(
           return existing[0]
         }
         throw new ReferralAlreadyExistsError(invitedUser)
+      }
+
+      const referralExists = await referralDb.hasReferralProgress(invitedUser)
+      if (referralExists) {
+        return resolveExistingReferral()
       }
 
       logger.info('Creating referral', {
@@ -189,6 +193,18 @@ export async function createReferralComponent(
       }
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
+
+      // The check above and this insert are not a single transaction, so two concurrent creates
+      // can both reach here. The unique index on invited_user rejects the loser's insert, which
+      // comes back as null — resolve it the same way as a pre-detected existing referral instead
+      // of writing a second, contradictory attribution.
+      if (!referral) {
+        logger.info('Concurrent create lost the insert race; resolving against the stored referral', {
+          referrer,
+          invitedUser
+        })
+        return resolveExistingReferral()
+      }
 
       const recentInvitations = await referralDb.findReferralProgress({
         referrer,
