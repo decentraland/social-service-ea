@@ -349,7 +349,7 @@ describe('referral-component', () => {
             status: ReferralProgressStatus.PENDING,
             created_at: Date.now()
           }
-          mockReferralDb.findReferralProgress.mockResolvedValueOnce([stored])
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([]).mockResolvedValueOnce([stored])
         })
 
         it('should resolve to the stored referral instead of writing a second attribution', async () => {
@@ -361,14 +361,16 @@ describe('referral-component', () => {
 
       describe('and the stored referral has a different referrer', () => {
         beforeEach(() => {
-          mockReferralDb.findReferralProgress.mockResolvedValueOnce([
-            {
-              referrer: '0x1111111111111111111111111111111111111111',
-              invited_user: validInvitedUser.toLowerCase(),
-              status: ReferralProgressStatus.PENDING,
-              created_at: Date.now()
-            }
-          ])
+          mockReferralDb.findReferralProgress
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([
+              {
+                referrer: '0x1111111111111111111111111111111111111111',
+                invited_user: validInvitedUser.toLowerCase(),
+                status: ReferralProgressStatus.PENDING,
+                created_at: Date.now()
+              }
+            ])
         })
 
         it('should throw ReferralAlreadyExistsError', async () => {

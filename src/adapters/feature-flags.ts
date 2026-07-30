@@ -45,13 +45,12 @@ export async function createFeatureFlagsAdapter(
 
   async function refresh() {
     try {
-      const [isEnabled, isDevEnabled, isGlobalModeratorsEnabled, isReferralRegistrationDisabled] =
-        await Promise.all([
-          features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE),
-          features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE),
-          features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS),
-          features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.REFERRAL_REGISTRATION_DISABLED)
-        ])
+      const [isEnabled, isDevEnabled, isGlobalModeratorsEnabled, isReferralRegistrationDisabled] = await Promise.all([
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE),
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE),
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS),
+        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.REFERRAL_REGISTRATION_DISABLED)
+      ])
 
       logger.debug(`Refreshed feature flags`, {
         [FeatureFlag.COMMUNITIES_AI_COMPLIANCE]: String(isEnabled),
