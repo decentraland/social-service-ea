@@ -21,6 +21,9 @@ test('POST /v1/referral-email', function ({ components }) {
 
     afterEach(async () => {
       await cleanup.cleanup()
+      // These tests seed referrals directly with fixed invited-user ids and don't track them for
+      // cleanup; clear the table so reused ids don't collide with the unique(invited_user) constraint.
+      await components.pg.query('DELETE FROM referral_progress')
     })
 
     describe('and the request is not signed', () => {

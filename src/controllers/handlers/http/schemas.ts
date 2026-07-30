@@ -68,9 +68,11 @@ export const AddCommunityPlacesSchema: Schema = {
     placeIds: {
       type: 'array',
       items: {
-        type: 'string'
+        type: 'string',
+        maxLength: 256
       },
-      minItems: 1
+      minItems: 1,
+      maxItems: 100
     }
   }
 }

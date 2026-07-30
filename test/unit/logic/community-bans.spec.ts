@@ -1,4 +1,4 @@
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockLogs, mockRegistry, mockPubSub } from '../../mocks/components'
@@ -125,6 +125,7 @@ describe('Community Bans Component', () => {
               bannerAddress,
               targetAddress
             )
+            expect(mockCommunitiesDB.removeMemberRequests).toHaveBeenCalledWith(communityId, targetAddress)
           })
 
           it('should publish member status update to pubsub', async () => {
@@ -181,6 +182,9 @@ describe('Community Bans Component', () => {
               bannerAddress,
               targetAddress
             )
+            // Even a non-member's pending requests/invites must be cleared so the ban can't be
+            // circumvented by later accepting them.
+            expect(mockCommunitiesDB.removeMemberRequests).toHaveBeenCalledWith(communityId, targetAddress)
           })
 
           it('should publish member status update to pubsub', async () => {

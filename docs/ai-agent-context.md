@@ -12,6 +12,7 @@
 - **Friendship Management**: Manage friend relationships and social connections (via RPC/gRPC)
 - **Privacy Controls**: Blocking and privacy settings for user interactions
 - **Referral System**: Track user referrals, invitations, and referral progress
+- **User Mutes**: Mute/unmute users with paginated retrieval and address filtering
 - **User Profiles**: Integration with user profiles including claimed names and avatars
 - **Online Status**: Track online status for community members
 
@@ -66,7 +67,7 @@
 
 **Database Schema:**
 
-- **Main Tables**: `communities`, `community_members`, `community_posts`, `community_post_likes`, `community_bans`, `community_requests`, `community_places`, `friendships`, `friendships_history`, `social_settings`, `blocks`, `private_voice_chats`, `referral_progress`, `referral_progress_viewed`, `referral_emails`, `referral_reward_images`, `community_ranking_metrics`
+- **Main Tables**: `communities`, `community_members`, `community_posts`, `community_post_likes`, `community_bans`, `community_requests`, `community_places`, `friendships`, `friendships_history`, `social_settings`, `blocks`, `private_voice_chats`, `referral_progress`, `referral_progress_viewed`, `referral_emails`, `referral_reward_images`, `community_ranking_metrics`, `user_mutes`
 - **Key Relationships**: Communities have members, posts, bans, and places. Members have roles. Posts have likes. Referrals track progress and rewards.
 - **Full Documentation**: See [docs/database-schemas.md](docs/database-schemas.md) for detailed schema, column definitions, and relationships
 

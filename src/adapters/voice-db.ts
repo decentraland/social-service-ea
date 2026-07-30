@@ -16,7 +16,7 @@ export async function createVoiceDBComponent(
 
       const query = SQL`
         SELECT EXISTS (
-          SELECT 1 FROM private_voice_chats WHERE caller_address IN (${normalizedUserAddresses}) OR callee_address IN (${normalizedUserAddresses})
+          SELECT 1 FROM private_voice_chats WHERE caller_address = ANY(${normalizedUserAddresses}) OR callee_address = ANY(${normalizedUserAddresses})
         )
       `
       return pg.exists(query, 'exists')

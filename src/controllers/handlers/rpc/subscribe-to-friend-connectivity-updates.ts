@@ -12,21 +12,8 @@ export function subscribeToFriendConnectivityUpdatesService({
   const logger = logs.getLogger('subscribe-to-friend-connectivity-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<FriendConnectivityUpdate> {
-    let cleanup: (() => void) | undefined
-
     try {
-      const onlinePeers = await peersStats.getConnectedPeers()
-      const onlineFriends = await friendsDb.getOnlineFriends(context.address, onlinePeers)
-
-      const profiles = await registry.getProfiles(onlineFriends.map((friend) => friend.address))
-      const parsedProfiles = parseProfilesToFriends(profiles).map((friend) => ({
-        friend,
-        status: ConnectivityStatus.ONLINE
-      }))
-
-      yield* parsedProfiles
-
-      cleanup = yield* updateHandler.handleSubscriptionUpdates<
+      yield* updateHandler.handleSubscriptionUpdates<
         FriendConnectivityUpdate,
         SubscriptionEventsEmitter['friendConnectivityUpdate']
       >({
@@ -36,14 +23,28 @@ export function subscribeToFriendConnectivityUpdatesService({
         getAddressFromUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) => update.address,
         shouldHandleUpdate: (update: SubscriptionEventsEmitter['friendConnectivityUpdate']) =>
           update.address !== context.address,
-        parser: parseEmittedUpdateToFriendConnectivityUpdate
+        parser: parseEmittedUpdateToFriendConnectivityUpdate,
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => FriendConnectivityUpdate.fromPartial({ streamClosed }),
+        // Initial online-friends snapshot. Delivered by handleSubscriptionUpdates AFTER the
+        // live listener is registered, so connectivity changes emitted while these queries
+        // run are queued rather than lost. Best-effort: a DB/registry hiccup is logged there
+        // and the subscription continues with live updates only.
+        getInitialUpdates: async () => {
+          const onlinePeers = await peersStats.getConnectedPeers()
+          const onlineFriends = await friendsDb.getOnlineFriends(context.address, onlinePeers)
+
+          const profiles = await registry.getProfiles(onlineFriends.map((friend) => friend.address))
+          return parseProfilesToFriends(profiles).map((friend) => ({
+            friend,
+            status: ConnectivityStatus.ONLINE
+          }))
+        }
       })
     } catch (error: any) {
       logger.error('Error in friend connectivity updates subscription:', error)
       throw error
-    } finally {
-      logger.info('Cleaning up friend connectivity updates subscription')
-      cleanup?.()
     }
   }
 }

@@ -6,7 +6,8 @@ describe('Community Voice Chat Cache Component', () => {
   let mockComponents: Pick<AppComponents, 'logs' | 'redis'>
   let mockRedisGet: jest.MockedFunction<any>
   let mockRedisPut: jest.MockedFunction<any>
-  let mockRedisKeys: jest.MockedFunction<any>
+  let mockRedisMGet: jest.MockedFunction<any>
+  let mockRedisScanIterator: jest.MockedFunction<any>
   let mockRedisDel: jest.MockedFunction<any>
 
   // Fixed timestamps to avoid test flakiness
@@ -19,11 +20,12 @@ describe('Community Voice Chat Cache Component', () => {
     
     mockRedisGet = jest.fn()
     mockRedisPut = jest.fn()
-    mockRedisKeys = jest.fn()
+    mockRedisMGet = jest.fn()
+    mockRedisScanIterator = jest.fn()
     mockRedisDel = jest.fn()
 
     const mockRedisClient = {
-      keys: mockRedisKeys,
+      scanIterator: mockRedisScanIterator,
       del: mockRedisDel
     }
 
@@ -39,6 +41,7 @@ describe('Community Voice Chat Cache Component', () => {
       redis: {
         put: mockRedisPut,
         get: mockRedisGet,
+        mGet: mockRedisMGet,
         client: mockRedisClient
       }
     } as any
@@ -214,17 +217,18 @@ describe('Community Voice Chat Cache Component', () => {
 
   describe('when retrieving active community voice chats', () => {
     describe('when there are active and inactive chats', () => {
-      
+      const activeChat1 = { communityId: 'active-1', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
+      const inactiveChat = { communityId: 'inactive-1', isActive: false, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
+      const activeChat2 = { communityId: 'active-2', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
+
       beforeEach(() => {
-        const activeChat1 = { communityId: 'active-1', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
-        const inactiveChat = { communityId: 'inactive-1', isActive: false, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
-        const activeChat2 = { communityId: 'active-2', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
         const keys = ['community-voice-chat:active-1', 'community-voice-chat:inactive-1', 'community-voice-chat:active-2']
-        mockRedisKeys.mockResolvedValue(keys)
-        mockRedisGet
-          .mockResolvedValueOnce(activeChat1)
-          .mockResolvedValueOnce(inactiveChat)
-          .mockResolvedValueOnce(activeChat2)
+        mockRedisScanIterator.mockReturnValue(
+          (async function* () {
+            for (const key of keys) yield key
+          })()
+        )
+        mockRedisMGet.mockResolvedValue([activeChat1, inactiveChat, activeChat2])
       })
 
       it('should return only active voice chats', async () => {
@@ -233,17 +237,31 @@ describe('Community Voice Chat Cache Component', () => {
         expect(active).toHaveLength(2)
         expect(active.map((c) => c.communityId)).toEqual(expect.arrayContaining(['active-1', 'active-2']))
       })
+
+      it('should call mGet with all scanned keys', async () => {
+        await cache.getActiveCommunityVoiceChats()
+
+        expect(mockRedisMGet).toHaveBeenCalledWith([
+          'community-voice-chat:active-1',
+          'community-voice-chat:inactive-1',
+          'community-voice-chat:active-2'
+        ])
+      })
     })
 
     describe('when there are no active voice chats', () => {
       beforeEach(() => {
-        mockRedisKeys.mockResolvedValue(['community-voice-chat:inactive-1'])
-        mockRedisGet.mockResolvedValue({
+        mockRedisScanIterator.mockReturnValue(
+          (async function* () {
+            yield 'community-voice-chat:inactive-1'
+          })()
+        )
+        mockRedisMGet.mockResolvedValue([{
           communityId: 'inactive-1',
           isActive: false,
           lastChecked: FIXED_LAST_CHECKED,
           createdAt: FIXED_CREATED_AT
-        })
+        }])
       })
 
       it('should return empty array when no active voice chats exist', async () => {
@@ -255,7 +273,9 @@ describe('Community Voice Chat Cache Component', () => {
 
     describe('when Redis throws an error', () => {
       beforeEach(() => {
-        mockRedisKeys.mockRejectedValue(new Error('Redis error'))
+        mockRedisScanIterator.mockImplementation(() => {
+          throw new Error('Redis error')
+        })
       })
 
       it('should handle Redis errors gracefully', async () => {

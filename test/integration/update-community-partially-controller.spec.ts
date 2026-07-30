@@ -2,7 +2,6 @@ import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest, createAuthHeaders } from './utils/auth'
 import { randomUUID } from 'crypto'
-import FormData from 'form-data'
 
 test('Update Community Partially Controller', async function ({ components, stubComponents, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -40,7 +39,7 @@ test('Update Community Partially Controller', async function ({ components, stub
       const createResponse = await components.localHttpFetch.fetch('/v1/communities', {
         method: 'POST',
         headers: createHeaders,
-        body: createForm as any
+        body: createForm
       })
 
       const createBody = await createResponse.json()

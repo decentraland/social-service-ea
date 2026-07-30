@@ -1,4 +1,4 @@
-import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityNotFoundError, CommunityRequestNotFoundError } from '../../../logic/community'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'

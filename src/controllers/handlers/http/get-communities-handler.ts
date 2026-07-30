@@ -1,4 +1,4 @@
-import { getPaginationParams, InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { getPaginationParams, InvalidRequestError, NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityRole, HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'

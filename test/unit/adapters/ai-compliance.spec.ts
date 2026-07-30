@@ -4,7 +4,7 @@ import { IAIComplianceComponent } from '../../../src/adapters/ai-compliance'
 import { AIComplianceError } from '../../../src/logic/community/errors'
 import { IFeatureFlagsAdapter } from '../../../src/adapters/feature-flags'
 import { IMetricsComponent } from '@well-known-components/interfaces'
-import { createTestMetricsComponent } from '@well-known-components/metrics'
+import { createTestMetricsComponent } from '@dcl/metrics'
 import { metricDeclarations } from '../../../src/metrics'
 import { IRedisComponent, ICacheComponent } from '../../../src/types'
 

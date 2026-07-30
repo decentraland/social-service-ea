@@ -1,7 +1,7 @@
-import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
+import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityPostNotFoundError } from '../../../logic/community'
 
 export async function deleteCommunityPostHandler(

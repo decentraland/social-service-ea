@@ -29,10 +29,8 @@ export function subscribeToCommunityVoiceChatUpdatesService({
   const logger = logs.getLogger('subscribe-to-community-voice-chat-updates-service')
 
   return async function* (_request: Empty, context: RpcServerContext): AsyncGenerator<CommunityVoiceChatUpdate> {
-    let cleanup: (() => void) | undefined
-
     try {
-      cleanup = yield* updateHandler.handleSubscriptionUpdates<
+      yield* updateHandler.handleSubscriptionUpdates<
         CommunityVoiceChatUpdate,
         SubscriptionEventsEmitter['communityVoiceChatUpdate']
       >({
@@ -41,15 +39,15 @@ export function subscribeToCommunityVoiceChatUpdatesService({
         shouldRetrieveProfile: false,
         getAddressFromUpdate: () => 'not-needed',
         parser: parseEmittedUpdateToCommunityVoiceChatUpdate,
-        shouldHandleUpdate: () => true // Handle all community voice chat updates for now
+        shouldHandleUpdate: () => true, // Handle all community voice chat updates for now
+        // fromPartial fills the remaining fields with protobuf defaults so the final
+        // "stream closed" message is safe to encode.
+        buildStreamClosedUpdate: (streamClosed) => CommunityVoiceChatUpdate.fromPartial({ streamClosed })
       })
     } catch (error) {
       const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown error'
       logger.error(`Error in community voice chat updates subscription: ${errorMessage}`)
       throw error
-    } finally {
-      logger.info('Closing community voice chat updates subscription')
-      cleanup?.()
     }
   }
 }

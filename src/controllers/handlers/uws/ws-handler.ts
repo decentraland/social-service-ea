@@ -1,13 +1,14 @@
 import mitt from 'mitt'
 import { randomUUID } from 'crypto'
 import { WebSocket } from 'uWebSockets.js'
-import { onRequestEnd, onRequestStart } from '@well-known-components/uws-http-server'
-import { verify } from '@dcl/platform-crypto-middleware'
+import { onRequestEnd, onRequestStart } from '@dcl/uws-http-server'
+import { verify } from '@dcl/crypto-middleware'
 import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsUserData } from '../../../types'
 import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { isErrorWithMessage } from '../../../utils/errors'
+import { WsPoolFullError } from '../../../logic/ws-pool'
 
 const textDecoder = new TextDecoder()
 
@@ -27,32 +28,68 @@ export async function registerWsHandler(
   const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool } = components
   const logger = logs.getLogger('ws-handler')
 
-  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_MS')) ?? 300000 // 3 minutes in ms
-  const authSignatureExpirationInMs = (await config.getNumber('WS_AUTH_SIGNATURE_EXPIRATION_IN_MS')) ?? 300000 // 3 minutes in ms
+  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_MS')) ?? 300000 // 5 minutes in ms
+  const authSignatureExpirationInMs = (await config.getNumber('WS_AUTH_SIGNATURE_EXPIRATION_IN_MS')) ?? 300000 // 5 minutes in ms
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
     Object.assign(data, { ...data, ...newData })
   }
 
+  function safeCloseTransport(data: WsAuthenticatedUserData, wsConnectionId: string) {
+    try {
+      data.transport.close()
+    } catch (error: any) {
+      logger.error('Error closing transport during cleanup', {
+        error: error.message,
+        address: data.address,
+        wsConnectionId
+      })
+      tracing.captureException(error as Error, { address: data.address, wsConnectionId })
+    }
+  }
+
+  function safeDetachUser(address: string, wsConnectionId: string) {
+    try {
+      rpcServer.detachUser(address, wsConnectionId)
+    } catch (error: any) {
+      logger.error('Error detaching user during cleanup', {
+        error: error.message,
+        address,
+        wsConnectionId
+      })
+      tracing.captureException(error as Error, { address, wsConnectionId })
+    }
+  }
+
+  function safeClearEmitter(data: WsAuthenticatedUserData, wsConnectionId: string) {
+    try {
+      data.eventEmitter.all.clear()
+    } catch (error: any) {
+      logger.error('Error clearing event emitter during cleanup', {
+        error: error.message,
+        address: data.address,
+        wsConnectionId
+      })
+    }
+  }
+
   function cleanupConnection(data: WsUserData, code: number) {
     const { wsConnectionId } = data
 
+    // Mark the socket disconnected BEFORE closing the transport. safeCloseTransport()
+    // synchronously fires the transport 'close' listener, which ends the socket only when
+    // data.isConnected is still true (the RPC-initiated close path, where the socket is
+    // alive). Clearing the flag first makes that guard precise on this socket-initiated
+    // path — otherwise it would rely on ws.end() throwing on the already-closing socket.
+    data.isConnected = false
+
     if (isAuthenticated(data)) {
-      try {
-        data.transport.close()
-        rpcServer.detachUser(data.address)
-        data.eventEmitter.all.clear()
-      } catch (error: any) {
-        tracing.captureException(error as Error, {
-          address: getAddress(data),
-          wsConnectionId
-        })
-        logger.error('Error during connection cleanup', {
-          error: error.message,
-          address: getAddress(data),
-          wsConnectionId
-        })
-      }
+      // Each step is independent — a failure in one must not prevent the others.
+      // Previously these were in a single try/catch, so a throw in transport.close()
+      // would skip detachUser() and emitter.clear(), permanently leaking the subscriber.
+      safeCloseTransport(data, wsConnectionId)
+      safeDetachUser(data.address, wsConnectionId)
+      safeClearEmitter(data, wsConnectionId)
     }
 
     if (isNotAuthenticated(data) && data.timeout) {
@@ -105,6 +142,19 @@ export async function registerWsHandler(
       const eventEmitter = mitt<IUWebSocketEventMap>()
       const transport = await createUWebSocketTransport(ws, eventEmitter, components)
 
+      // Re-check after the await above: if the socket closed while the transport was being
+      // created, attaching now would register a connection for a dead socket that the
+      // (address-level) cleanup paths would never tear down.
+      if (!data.isConnected) {
+        logger.warn('WebSocket closed during transport creation, aborting user attachment', {
+          address,
+          wsConnectionId: data.wsConnectionId
+        })
+        metrics.increment('ws_auth_race_condition_aborted')
+        transport.close()
+        return
+      }
+
       changeStage(data, {
         auth: true,
         address,
@@ -118,7 +168,21 @@ export async function registerWsHandler(
           wsConnectionId: data.wsConnectionId,
           address
         })
-        rpcServer.detachUser(address)
+        // Guarded like the cleanupConnection path: this listener also runs synchronously inside
+        // the RPC layer's transport 'error' → close teardown, so a throw here would escape into
+        // the transport's fire-and-forget queue processing as an unhandled rejection.
+        safeDetachUser(address, data.wsConnectionId)
+
+        // The transport can also be closed by the RPC layer (e.g. on a transport error such
+        // as a queue overflow) while the socket is still open. Without ending the socket the
+        // client would keep a live, ping-alive connection whose messages go nowhere. On the
+        // normal path (socket closed first) end() throws on the already-closed socket and is
+        // swallowed here.
+        if (data.isConnected) {
+          try {
+            ws.end(1011, 'RPC transport closed')
+          } catch (err) {}
+        }
       })
 
       transport.on('error', (error: unknown) => {
@@ -129,7 +193,7 @@ export async function registerWsHandler(
         })
       })
 
-      rpcServer.attachUser({ transport, address })
+      rpcServer.attachUser({ transport, address, wsConnectionId: data.wsConnectionId })
     } catch (error: any) {
       logger.error(`Error verifying auth chain: ${error.message}`, {
         wsConnectionId: data.wsConnectionId
@@ -139,7 +203,12 @@ export async function registerWsHandler(
         address: getAddress(data),
         wsConnectionId: data.wsConnectionId
       })
-      ws.end(3003, 'Unauthorized')
+      // The client may have disconnected while verify() was in flight; end() on an
+      // already-closed socket throws and would escape the async message handler as an
+      // unhandled rejection.
+      try {
+        ws.end(3003, 'Unauthorized')
+      } catch (err) {}
     } finally {
       changeStage(data, { authenticating: false })
     }
@@ -156,7 +225,6 @@ export async function registerWsHandler(
       }
 
       data.eventEmitter.emit('message', message)
-      metrics.increment('ws_messages_sent')
     } catch (error: any) {
       logger.error('Error emitting message', {
         error,
@@ -166,7 +234,12 @@ export async function registerWsHandler(
         hasEventEmitter: String(!!data.eventEmitter)
       })
       metrics.increment('ws_errors')
-      ws.send(JSON.stringify({ error: 'Error processing message', message: error.message }))
+      // Do not leak internal error details to the client. Guarded like every ws I/O site:
+      // ws.send() throws on an already-closed socket, which inside this handler would surface
+      // as an unhandled rejection.
+      try {
+        ws.send(JSON.stringify({ error: 'Error processing message' }))
+      } catch (err) {}
       tracing.captureException(error as Error, {
         address: getAddress(data),
         wsConnectionId: data.wsConnectionId
@@ -177,6 +250,8 @@ export async function registerWsHandler(
   uwsServer.app.ws<WsUserData>('/', {
     idleTimeout: (await config.getNumber('WS_IDLE_TIMEOUT_IN_SECONDS')) ?? FIVE_MINUTES_IN_SECONDS,
     sendPingsAutomatically: true,
+    // Bound inbound frame size so a client can't force large per-message buffering (uWS default is 16 MB).
+    maxPayloadLength: (await config.getNumber('WS_MAX_PAYLOAD_LENGTH')) ?? 1024 * 1024,
     maxBackpressure: (await config.getNumber('WS_MAX_BACKPRESSURE')) ?? 128 * 1024, // should be adjusted based on metrics
     drain: (ws) => {
       const data = ws.getUserData()
@@ -190,6 +265,12 @@ export async function registerWsHandler(
       })
 
       metrics.increment('ws_drain_events')
+
+      // Let the transport retry queued messages now that the socket drained, instead of
+      // waiting for its backoff timer.
+      if (isAuthenticated(data)) {
+        data.eventEmitter.emit('drain')
+      }
     },
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
@@ -242,15 +323,31 @@ export async function registerWsHandler(
         changeStage(data, { isConnected: true, connectionStartTime: Date.now() })
         logger.debug('WebSocket opened', { wsConnectionId: data.wsConnectionId })
       } catch (error: any) {
-        logger.debug('Failed to acquire connection', {
-          wsConnectionId: data.wsConnectionId,
-          error: error.message
-        })
-        tracing.captureException(error as Error, {
-          address: getAddress(data),
-          wsConnectionId: data.wsConnectionId
-        })
-        ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
+        // Hitting the connection cap is an expected operational condition (it already
+        // increments ws_connections_rejected), so log it rather than reporting it to Sentry
+        // as an exception, which would flood on a busy instance. Any other, genuinely
+        // unexpected acquisition failure is still captured.
+        if (error instanceof WsPoolFullError) {
+          logger.warn('Rejected connection: WebSocket pool is full', {
+            wsConnectionId: data.wsConnectionId,
+            error: error.message
+          })
+        } else {
+          logger.debug('Failed to acquire connection', {
+            wsConnectionId: data.wsConnectionId,
+            error: error.message
+          })
+          tracing.captureException(error as Error, {
+            address: getAddress(data),
+            wsConnectionId: data.wsConnectionId
+          })
+        }
+        // No await precedes this today (the socket can't have closed mid-callback), but
+        // guard like every other ws.end() site so a future await in the try block can't
+        // turn this into an unhandled rejection.
+        try {
+          ws.end(1013, 'Unable to acquire connection') // 1013 = Try again later
+        } catch (err) {}
       }
     },
     message: async (ws, message) => {
@@ -260,7 +357,11 @@ export async function registerWsHandler(
         logger.warn('Authentication already in progress', {
           wsConnectionId: data.wsConnectionId
         })
-        ws.send(JSON.stringify({ error: 'Authentication already in progress, please try again later' }))
+        // Guarded like every ws I/O site: ws.send() throws on an already-closed socket, which
+        // inside this async handler would surface as an unhandled rejection.
+        try {
+          ws.send(JSON.stringify({ error: 'Authentication already in progress, please try again later' }))
+        } catch (err) {}
         return
       }
 
@@ -276,6 +377,9 @@ export async function registerWsHandler(
       const data = ws.getUserData()
       const { wsConnectionId } = data
       const messageText = textDecoder.decode(message)
+      // Captured before cleanup: cleanupConnection resets the auth flag, so the type guard
+      // never matches afterwards.
+      const address = isAuthenticated(data) ? data.address : undefined
 
       cleanupConnection(data, code)
 
@@ -283,7 +387,7 @@ export async function registerWsHandler(
         code,
         reason: messageText,
         wsConnectionId,
-        ...(isAuthenticated(data) && { address: data.address })
+        ...(address && { address })
       })
     }
   })

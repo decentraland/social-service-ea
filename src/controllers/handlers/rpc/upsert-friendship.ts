@@ -1,14 +1,13 @@
 import { EthAddress } from '@dcl/schemas/dist/misc'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 import {
   UpsertFriendshipPayload,
   UpsertFriendshipResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
 import { parseUpsertFriendshipRequest, parseFriendshipRequestToFriendshipRequestResponse } from '../../../logic/friends'
-import { InvalidFriendshipActionError } from '../../errors/rpc.errors'
 import { isErrorWithMessage } from '../../../utils/errors'
-import { BlockedUserError } from '../../../logic/friends/errors'
+import { BlockedUserError, InvalidFriendshipActionError } from '../../../logic/friends/errors'
 
 export function upsertFriendshipService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('upsert-friendship-service')

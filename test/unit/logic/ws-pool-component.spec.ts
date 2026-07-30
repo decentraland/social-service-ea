@@ -1,30 +1,39 @@
 import { WebSocket } from 'uWebSockets.js'
-import { STOP_COMPONENT } from '@well-known-components/interfaces'
+import { IConfigComponent, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { createWsPoolComponent } from '../../../src/logic/ws-pool/component'
 import { IWsPoolComponent } from '../../../src/logic/ws-pool/types'
-import { createLogsMockedComponent, mockMetrics } from '../../mocks/components'
+import { WsPoolFullError } from '../../../src/logic/ws-pool/errors'
+import { createLogsMockedComponent, createMockConfigComponent, mockMetrics } from '../../mocks/components'
 import { WsUserData } from '../../../src/types'
 
 let wsPool: IWsPoolComponent
 let mockWebSocket: jest.Mocked<WebSocket<WsUserData>>
 let mockMetricsComponent: typeof mockMetrics
+let mockConfigComponent: jest.Mocked<IConfigComponent>
 let mockLogger: ReturnType<typeof createLogsMockedComponent>
 let mockInfo: jest.MockedFunction<ReturnType<(typeof mockLogger)['getLogger']>['info']>
 let mockDebug: jest.MockedFunction<ReturnType<(typeof mockLogger)['getLogger']>['debug']>
+let mockWarn: jest.MockedFunction<ReturnType<(typeof mockLogger)['getLogger']>['warn']>
 
-beforeEach(() => {
+beforeEach(async () => {
   mockMetricsComponent = { ...mockMetrics }
+  mockConfigComponent = createMockConfigComponent({
+    getNumber: jest.fn().mockResolvedValue(undefined)
+  })
   mockLogger = createLogsMockedComponent({})
   mockInfo = jest.fn()
   mockDebug = jest.fn()
+  mockWarn = jest.fn()
   mockLogger.getLogger = jest.fn().mockReturnValue({
     info: mockInfo,
-    debug: mockDebug
+    debug: mockDebug,
+    warn: mockWarn
   })
 
-  wsPool = createWsPoolComponent({
+  wsPool = await createWsPoolComponent({
     metrics: mockMetricsComponent,
-    logs: mockLogger
+    logs: mockLogger,
+    config: mockConfigComponent
   })
 
   // Create a mock WebSocket with user data
@@ -273,6 +282,57 @@ describe('when shutting down the component', () => {
     })
   })
 
+  describe('and closing one connection throws', () => {
+    beforeEach(() => {
+      firstWebSocket = {
+        getUserData: jest.fn(),
+        end: jest.fn()
+      } as unknown as jest.Mocked<WebSocket<WsUserData>>
+
+      secondWebSocket = {
+        getUserData: jest.fn(),
+        end: jest.fn()
+      } as unknown as jest.Mocked<WebSocket<WsUserData>>
+
+      firstWsUserData = {
+        isConnected: true,
+        auth: true,
+        authenticating: false,
+        wsConnectionId: 'connection-1',
+        connectionStartTime: Date.now(),
+        address: '0x111111111',
+        eventEmitter: {} as any,
+        transport: {} as any
+      }
+
+      secondWsUserData = {
+        isConnected: true,
+        auth: true,
+        authenticating: false,
+        wsConnectionId: 'connection-2',
+        connectionStartTime: Date.now(),
+        address: '0x222222222',
+        eventEmitter: {} as any,
+        transport: {} as any
+      }
+
+      firstWebSocket.getUserData.mockReturnValue(firstWsUserData)
+      secondWebSocket.getUserData.mockReturnValue(secondWsUserData)
+      firstWebSocket.end.mockImplementation(() => {
+        throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
+      })
+
+      wsPool.registerConnection(firstWebSocket)
+      wsPool.registerConnection(secondWebSocket)
+    })
+
+    it('should still close the remaining connections', async () => {
+      await wsPool[STOP_COMPONENT]()
+
+      expect(secondWebSocket.end).toHaveBeenCalledWith(1001, 'Server shutting down')
+    })
+  })
+
   describe('and there are no active connections', () => {
     beforeEach(() => {
       firstWebSocket = {
@@ -328,5 +388,97 @@ describe('when handling connection with non-authenticated user data', () => {
 
     wsPool.unregisterConnection(wsUserData)
     expect(mockMetrics.observe).toHaveBeenCalledWith('ws_active_connections', {}, 0)
+  })
+})
+
+describe('when a maximum amount of concurrent connections is configured', () => {
+  let firstWebSocket: jest.Mocked<WebSocket<WsUserData>>
+  let secondWebSocket: jest.Mocked<WebSocket<WsUserData>>
+
+  beforeEach(async () => {
+    mockConfigComponent.getNumber.mockResolvedValueOnce(1)
+    wsPool = await createWsPoolComponent({
+      metrics: mockMetricsComponent,
+      logs: mockLogger,
+      config: mockConfigComponent
+    })
+
+    firstWebSocket = {
+      getUserData: jest.fn().mockReturnValue({
+        isConnected: true,
+        auth: false,
+        authenticating: false,
+        wsConnectionId: 'connection-1',
+        connectionStartTime: Date.now()
+      }),
+      end: jest.fn()
+    } as unknown as jest.Mocked<WebSocket<WsUserData>>
+
+    secondWebSocket = {
+      getUserData: jest.fn().mockReturnValue({
+        isConnected: true,
+        auth: false,
+        authenticating: false,
+        wsConnectionId: 'connection-2',
+        connectionStartTime: Date.now()
+      }),
+      end: jest.fn()
+    } as unknown as jest.Mocked<WebSocket<WsUserData>>
+  })
+
+  describe('and the pool is not full', () => {
+    it('should register the connection without throwing', () => {
+      expect(() => wsPool.registerConnection(firstWebSocket)).not.toThrow()
+    })
+  })
+
+  describe('and the pool is full', () => {
+    beforeEach(() => {
+      wsPool.registerConnection(firstWebSocket)
+    })
+
+    it('should reject the connection with a WsPoolFullError', () => {
+      expect(() => wsPool.registerConnection(secondWebSocket)).toThrow(WsPoolFullError)
+    })
+
+    it('should increment the rejected connections metric', () => {
+      expect(() => wsPool.registerConnection(secondWebSocket)).toThrow(WsPoolFullError)
+      expect(mockMetricsComponent.increment).toHaveBeenCalledWith('ws_connections_rejected')
+    })
+
+    describe('and a connection is unregistered afterwards', () => {
+      beforeEach(() => {
+        wsPool.unregisterConnection(firstWebSocket.getUserData())
+      })
+
+      it('should accept new connections again', () => {
+        expect(() => wsPool.registerConnection(secondWebSocket)).not.toThrow()
+      })
+    })
+  })
+})
+
+describe('when getting the connection ids', () => {
+  describe('and there are registered connections', () => {
+    beforeEach(() => {
+      mockWebSocket.getUserData.mockReturnValue({
+        isConnected: true,
+        auth: false,
+        authenticating: false,
+        wsConnectionId: 'connection-123',
+        connectionStartTime: Date.now()
+      })
+      wsPool.registerConnection(mockWebSocket)
+    })
+
+    it('should return the ids of all registered connections', () => {
+      expect(wsPool.getConnectionIds()).toEqual(['connection-123'])
+    })
+  })
+
+  describe('and there are no registered connections', () => {
+    it('should return an empty array', () => {
+      expect(wsPool.getConnectionIds()).toEqual([])
+    })
   })
 })

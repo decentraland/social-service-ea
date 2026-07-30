@@ -16,6 +16,7 @@ import {
   referralIpMatchRejectionMessage,
   referralSuspiciousTimingMessage
 } from '../../utils/slackMessages'
+import { fetchJson } from '../../utils/fetch'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
@@ -131,11 +132,10 @@ export async function createReferralComponent(
 
   async function fetchDenyList(): Promise<Set<string>> {
     try {
-      const response = await fetch('https://config.decentraland.org/denylist.json')
-      if (!response.ok) {
-        throw new Error(`Failed to fetch deny list, status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await fetchJson<{ users?: { wallet: string }[] }>(
+        () => fetch('https://config.decentraland.org/denylist.json'),
+        (r) => new Error(`Failed to fetch deny list, status: ${r.status}`)
+      )
       if (data.users && Array.isArray(data.users)) {
         return new Set(data.users.map((user: { wallet: string }) => user.wallet.toLocaleLowerCase()))
       } else {
@@ -145,6 +145,23 @@ export async function createReferralComponent(
     } catch (error) {
       logger.error(`Error fetching deny list: ${(error as Error).message}`)
       return new Set()
+    }
+  }
+
+  async function assertReferrerNotBanned(referrer: string, ip: string | null | undefined): Promise<void> {
+    const denyList = await fetchDenyList()
+    const context = ip !== null && ip !== undefined ? `${referrer}, ${ip}` : referrer
+
+    if (denyList.has(referrer.toLowerCase())) {
+      throw new ReferralInvalidInputError(`Referrer is on the deny list ${context}`)
+    }
+
+    const referrerAsInvitedRecords = await referralDb.findReferralProgress({ invitedUser: referrer, limit: 1 })
+    if (referrerAsInvitedRecords.length > 0) {
+      const originalReferrer = referrerAsInvitedRecords[0].referrer
+      if (denyList.has(originalReferrer.toLowerCase())) {
+        throw new ReferralInvalidInputError(`Referrer is part of a banned referral chain ${context}`)
+      }
     }
   }
 
@@ -186,11 +203,7 @@ export async function createReferralComponent(
         invitedUserIP
       })
 
-      const denyList = await fetchDenyList()
-
-      if (denyList.has(referrer.toLowerCase())) {
-        throw new ReferralInvalidInputError(`Referrer is on the deny list ${referrer}, ${invitedUserIP}`)
-      }
+      await assertReferrerNotBanned(referrer, invitedUserIP)
 
       const referral = await referralDb.createReferral({ referrer, invitedUser, invitedUserIP })
 
@@ -285,17 +298,11 @@ export async function createReferralComponent(
 
       const progress = await referralDb.findReferralProgress({ invitedUser })
 
-      const denyList = await fetchDenyList()
-
       if (!progress.length) {
         throw new ReferralNotFoundError(invitedUser)
       }
 
-      if (denyList.has(progress[0].referrer.toLowerCase())) {
-        throw new ReferralInvalidInputError(
-          `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
-        )
-      }
+      await assertReferrerNotBanned(progress[0].referrer, progress[0].invited_user_ip)
 
       const currentStatus = progress[0].status
       if (currentStatus !== ReferralProgressStatus.PENDING) {
@@ -324,13 +331,8 @@ export async function createReferralComponent(
         return
       }
 
-      const denyList = await fetchDenyList()
+      await assertReferrerNotBanned(progress[0].referrer, progress[0].invited_user_ip)
 
-      if (denyList.has(progress[0].referrer.toLowerCase())) {
-        throw new ReferralInvalidInputError(
-          `Referrer is on the deny list ${progress[0].referrer.toLowerCase()}, ${progress[0].invited_user_ip}`
-        )
-      }
       if (
         progress[0].status === ReferralProgressStatus.TIER_GRANTED ||
         progress[0].status === ReferralProgressStatus.REJECTED_IP_MATCH
@@ -361,7 +363,8 @@ export async function createReferralComponent(
         return
       }
 
-      await redis.put(cacheKey, [], { EX: 0 })
+      // Clear the login-days cache promptly (Redis rejects a 0 TTL, so use a minimal positive one).
+      await redis.put(cacheKey, [], { EX: 1 })
 
       logger.info('Finalizing referral', {
         invitedUser,
@@ -369,7 +372,17 @@ export async function createReferralComponent(
         newStatus: ReferralProgressStatus.TIER_GRANTED
       })
 
-      await referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+      const granted = await referralDb.updateReferralProgress(invitedUser, ReferralProgressStatus.TIER_GRANTED)
+
+      // If no row transitioned, another concurrent finalize already granted this
+      // referral. Stop here to avoid sending the referrer a duplicate reward.
+      if (!granted) {
+        logger.info('Referral already finalized by a concurrent request, skipping reward', {
+          invitedUser,
+          referrer
+        })
+        return
+      }
 
       const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
 
@@ -511,15 +524,13 @@ export async function createReferralComponent(
       }
 
       logger.info('Setting referral email', {
-        referrer,
-        email
+        referrer
       })
 
       const referralEmail = await referralDb.setReferralEmail({ referrer, email })
 
       logger.info('Referral email set successfully', {
-        referrer,
-        email
+        referrer
       })
 
       try {
@@ -529,13 +540,11 @@ export async function createReferralComponent(
           `A user has unlocked the IRL Swag Referral Tier and provided the following email for contact: ${email}`
         )
         logger.info('Marketing email sent successfully', {
-          referrer,
-          email
+          referrer
         })
       } catch (error) {
         logger.warn('Failed to send marketing email, but referral email was saved', {
           referrer,
-          email,
           error: error instanceof Error ? error.message : String(error)
         })
       }

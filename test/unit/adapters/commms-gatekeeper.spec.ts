@@ -1,4 +1,5 @@
-import { ILoggerComponent, IFetchComponent, IConfigComponent } from '@well-known-components/interfaces'
+import { ILoggerComponent, IConfigComponent } from '@well-known-components/interfaces'
+import { IFetchComponent } from '@dcl/core-commons'
 import { createCommsGatekeeperComponent } from '../../../src/adapters/comms-gatekeeper'
 import { ICommsGatekeeperComponent, PrivateMessagesPrivacy } from '../../../src/types'
 import { createLogsMockedComponent, createMockConfigComponent } from '../../mocks/components'

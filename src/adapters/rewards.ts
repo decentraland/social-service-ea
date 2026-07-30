@@ -2,9 +2,10 @@ import { AppComponents, IRewardComponent } from '../types'
 import { RewardAttributes } from '../logic/referral/types'
 
 export async function createRewardComponent(
-  components: Pick<AppComponents, 'fetcher' | 'config'>
+  components: Pick<AppComponents, 'fetcher' | 'config' | 'logs'>
 ): Promise<IRewardComponent> {
-  const { fetcher, config } = components
+  const { fetcher, config, logs } = components
+  const logger = logs.getLogger('rewards-component')
 
   const rewardUrl = new URL(await config.requireString('REWARD_SERVER_URL'))
 
@@ -20,7 +21,15 @@ export async function createRewardComponent(
     })
 
     if (response.ok) {
-      const { data: rewards } = await response.json()
+      const body = await response.json()
+      const rewards = body?.data
+      if (!Array.isArray(rewards)) {
+        logger.warn('Reward server response did not contain a data array; returning no rewards', {
+          campaignKey,
+          beneficiary
+        })
+        return []
+      }
       return rewards
     }
 

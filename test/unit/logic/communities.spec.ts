@@ -1,5 +1,5 @@
 import { CommunityRole } from '../../../src/types'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import {
@@ -861,6 +861,25 @@ describe('Community Component', () => {
 
       expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(memberAddress, options)
       expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(memberAddress, { onlyMemberOf: true })
+    })
+
+    describe('and only publicly visible communities are requested', () => {
+      it('should forward the restriction to both the listing and the count queries', async () => {
+        const restrictedOptions = { ...options, onlyPublicVisible: true }
+
+        const result = await communityComponent.getMemberCommunities(memberAddress, restrictedOptions)
+
+        expect(result).toEqual({
+          communities: mockMemberCommunities,
+          total: 1
+        })
+
+        expect(mockCommunitiesDB.getMemberCommunities).toHaveBeenCalledWith(memberAddress, restrictedOptions)
+        expect(mockCommunitiesDB.getCommunitiesCount).toHaveBeenCalledWith(memberAddress, {
+          onlyMemberOf: true,
+          onlyPublicVisible: true
+        })
+      })
     })
   })
 
@@ -1786,6 +1805,12 @@ describe('Community Component', () => {
               placeIds: ['place-1'],
               thumbnailBuffer: Buffer.from('complete-thumbnail')
             }
+
+            mockCommunityPlaces.validateOwnership.mockResolvedValueOnce({
+              isValid: true,
+              ownedPlaces: completeUpdate.placeIds,
+              notOwnedPlaces: []
+            })
 
             mockCommunitiesDB.updateCommunity.mockResolvedValueOnce({
               ...mockCommunity,

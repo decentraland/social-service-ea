@@ -18,7 +18,7 @@ import {
   CommunityDB,
   CommunityVisibilityEnum
 } from '../../../src/logic/community'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { createCommunityRequestsComponent } from '../../../src/logic/community/requests'
 import { createMockedPubSubComponent, mockLogs } from '../../mocks/components'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
@@ -105,6 +105,38 @@ describe('Community Requests Component', () => {
         await expect(
           communityRequestsComponent.createCommunityRequest(communityId, userAddress, type, callerAddress)
         ).rejects.toThrow(CommunityNotFoundError)
+      })
+    })
+
+    describe('when the target user is banned from the community', () => {
+      let community: Community & { role: CommunityRole }
+      let userAddress: string
+      let callerAddress: string
+      let type: CommunityRequestType
+
+      beforeEach(() => {
+        userAddress = '0x1234567890123456789012345678901234567890'
+        callerAddress = userAddress
+        type = CommunityRequestType.RequestToJoin
+        community = {
+          id: randomUUID(),
+          name: 'Mock Community',
+          description: 'Mock Description',
+          ownerAddress: '0x1234567890123456789012345678901234567891',
+          privacy: CommunityPrivacyEnum.Private,
+          active: true,
+          role: CommunityRole.None,
+          visibility: CommunityVisibilityEnum.All
+        }
+        mockCommunitiesDB.getCommunity.mockResolvedValueOnce(community)
+        mockCommunitiesDB.isMemberBanned.mockResolvedValueOnce(true)
+      })
+
+      it('should throw a NotAuthorizedError and not create the request', async () => {
+        await expect(
+          communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+        ).rejects.toThrow(NotAuthorizedError)
+        expect(mockCommunitiesDB.createCommunityRequest).not.toHaveBeenCalled()
       })
     })
 
@@ -995,6 +1027,32 @@ describe('Community Requests Component', () => {
           await expect(
             communityRequestsComponent.updateRequestStatus(requestId, status, { callerAddress })
           ).rejects.toThrow(CommunityRequestNotFoundError)
+        })
+      })
+
+      describe('and the invited user is banned from the community', () => {
+        let bannedUserAddress: string
+        let pendingInvite: MemberRequest
+
+        beforeEach(() => {
+          bannedUserAddress = '0x1111111111111111111111111111111111111111'
+          callerAddress = bannedUserAddress
+          pendingInvite = {
+            id: requestId,
+            communityId: community.id,
+            memberAddress: bannedUserAddress,
+            type: CommunityRequestType.Invite,
+            status: CommunityRequestStatus.Pending
+          }
+          mockCommunitiesDB.getCommunityRequest.mockResolvedValueOnce(pendingInvite)
+          mockCommunitiesDB.isMemberBanned.mockResolvedValueOnce(true)
+        })
+
+        it('should throw NotAuthorizedError and not add the banned user as a member when accepting', async () => {
+          await expect(
+            communityRequestsComponent.updateRequestStatus(requestId, CommunityRequestStatus.Accepted, { callerAddress })
+          ).rejects.toThrow(NotAuthorizedError)
+          expect(mockCommunitiesDB.joinMemberAndRemoveRequests).not.toHaveBeenCalled()
         })
       })
 

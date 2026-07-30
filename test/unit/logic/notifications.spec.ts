@@ -183,7 +183,7 @@ describe('Notifications', () => {
         expect(logger.error).toHaveBeenCalledWith(
           'Error sending notification for action request',
           expect.objectContaining({
-            error: expect.stringContaining('Failed after 3 attempts'),
+            error: expect.stringContaining('Persistent failure'),
             action: Action.REQUEST
           })
         )

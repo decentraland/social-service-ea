@@ -1,14 +1,9 @@
-import type {
-  IConfigComponent,
-  ILoggerComponent,
-  IMetricsComponent,
-  IFetchComponent,
-  IHttpServerComponent
-} from '@well-known-components/interfaces'
+import type { IConfigComponent, ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
+import type { IFetchComponent, IHttpServerComponent } from '@dcl/core-commons'
 import { metricDeclarations } from '../metrics'
-import { IUWsComponent } from '@well-known-components/uws-http-server'
+import { IUWsComponent } from '@dcl/uws-http-server'
 import { INatsComponent } from '@well-known-components/nats-component/dist/types'
-import { IFeaturesComponent } from '@well-known-components/features-component'
+import { IFeaturesComponent } from '@dcl/features-component'
 import { IAnalyticsComponent } from '@dcl/analytics-component'
 import {
   IFriendsDatabaseComponent,
@@ -68,6 +63,8 @@ import { IJobComponent } from '@dcl/job-component'
 import { IWsPoolComponent } from '../logic/ws-pool'
 import { AnalyticsEventPayload } from './analytics'
 import { IFriendsComponent } from '../logic/friends'
+import { IUserMutesComponent } from '../logic/user-mutes'
+import { IUserMutesDatabaseComponent } from './components'
 import { ISlackComponent } from '@dcl/slack-component'
 import { IAIComplianceComponent } from '../adapters/ai-compliance'
 import { IFeatureFlagsAdapter } from '../adapters/feature-flags'
@@ -150,6 +147,8 @@ export type BaseComponents = {
   slack: ISlackComponent
   schemaValidator: ISchemaValidatorComponent<GlobalContext>
   queueProcessor: IQueueConsumerComponent
+  userMutesDb: IUserMutesDatabaseComponent
+  userMutes: IUserMutesComponent
 }
 
 // components used in runtime

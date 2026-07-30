@@ -1,6 +1,7 @@
+import { IHttpServerComponent } from '@dcl/core-commons'
 import { Router } from '@dcl/http-server'
 import { GlobalContext } from '../../types'
-import { bearerTokenMiddleware, errorHandler } from '@dcl/platform-server-commons'
+import { bearerTokenMiddleware, errorHandler } from '@dcl/http-commons'
 import {
   getCommunityHandler,
   getCommunitiesHandler,
@@ -36,10 +37,20 @@ import {
   deleteCommunityPostHandler,
   likeCommunityPostHandler,
   unlikeCommunityPostHandler,
-  getMemberCommunitiesByIdsHandler
+  getMemberCommunitiesByIdsHandler,
+  addUserMuteHandler,
+  removeUserMuteHandler,
+  getUserMutesHandler,
+  getCommunityV2Handler,
+  getCommunitiesV2Handler,
+  getCommunityMembersV2Handler,
+  getBannedMembersV2Handler,
+  getCommunityRequestsV2Handler,
+  getMemberRequestsV2Handler,
+  getCommunityPostsV2Handler
 } from '../handlers/http'
-import { wellKnownComponents } from '@dcl/platform-crypto-middleware'
-import { multipartParserWrapper } from '@well-known-components/multipart-wrapper'
+import { wellKnownComponents } from '@dcl/crypto-middleware'
+import { multipartParserWrapper } from '../../utils/multipart'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
 import {
   UpdateMemberRoleSchema,
@@ -96,7 +107,7 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
   router.post('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), banMemberHandler)
   router.delete('/v1/communities/:id/members/:memberAddress/bans', signedFetchMiddleware(), unbanMemberHandler)
 
-  router.get('/v1/members/:address/communities', signedFetchMiddleware(), getMemberCommunitiesHandler)
+  router.get('/v1/members/:address/communities', signedFetchMiddleware({ optional: true }), getMemberCommunitiesHandler)
 
   if (API_ADMIN_TOKEN) {
     router.post(
@@ -111,8 +122,18 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
 
   router.get('/v1/members/:address/invites', signedFetchMiddleware(), getCommunityInvitesHandler)
 
-  router.post('/v1/communities', signedFetchMiddleware(), multipartParserWrapper(createCommunityHandler))
-  router.put('/v1/communities/:id', signedFetchMiddleware(), multipartParserWrapper(updateCommunityHandler))
+  // The multipart wrapper enriches the context with the parsed form data but is otherwise
+  // path/verification-agnostic, so cast to the route handler type expected by the router.
+  router.post(
+    '/v1/communities',
+    signedFetchMiddleware(),
+    multipartParserWrapper(createCommunityHandler) as unknown as IHttpServerComponent.IRequestHandler<GlobalContext>
+  )
+  router.put(
+    '/v1/communities/:id',
+    signedFetchMiddleware(),
+    multipartParserWrapper(updateCommunityHandler) as unknown as IHttpServerComponent.IRequestHandler<GlobalContext>
+  )
   router.patch(
     '/v1/communities/:id',
     signedFetchMiddleware(),
@@ -170,11 +191,26 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
     updateCommunityRequestStatusHandler
   )
 
+  // User mute routes
+  router.get('/v1/mutes', signedFetchMiddleware(), getUserMutesHandler)
+  router.post('/v1/mutes', signedFetchMiddleware(), addUserMuteHandler)
+  router.delete('/v1/mutes', signedFetchMiddleware(), removeUserMuteHandler)
+
   // Community voice chats
   router.get('/v1/community-voice-chats/active', signedFetchMiddleware(), getActiveCommunityVoiceChatsHandler)
 
   // Moderation endpoints
   router.get('/v1/moderation/communities', signedFetchMiddleware(), getAllCommunitiesForModerationHandler)
+
+  // v2 endpoints: same behavior as their v1 counterparts but the responses contain only
+  // addresses (no Catalyst profile information). Same middleware as the v1 routes.
+  router.get('/v2/communities/:id', signedFetchMiddleware({ optional: true }), getCommunityV2Handler)
+  router.get('/v2/communities', signedFetchMiddleware({ optional: true }), getCommunitiesV2Handler)
+  router.get('/v2/communities/:id/members', signedFetchMiddleware({ optional: true }), getCommunityMembersV2Handler)
+  router.get('/v2/communities/:id/bans', signedFetchMiddleware(), getBannedMembersV2Handler)
+  router.get('/v2/members/:address/requests', signedFetchMiddleware(), getMemberRequestsV2Handler)
+  router.get('/v2/communities/:id/requests', signedFetchMiddleware(), getCommunityRequestsV2Handler)
+  router.get('/v2/communities/:id/posts', signedFetchMiddleware({ optional: true }), getCommunityPostsV2Handler)
 
   return router
 }

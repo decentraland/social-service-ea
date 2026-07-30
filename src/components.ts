@@ -6,8 +6,8 @@ import {
 } from '@dcl/http-server'
 import { createConfigComponent, createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
-import { createMetricsComponent } from '@well-known-components/metrics'
-import { createFetchComponent } from '@well-known-components/fetch-component'
+import { createMetricsComponent } from '@dcl/metrics'
+import { createFetchComponent } from '@dcl/fetch-component'
 import { createAnalyticsComponent } from '@dcl/analytics-component'
 import { createPgComponent } from './adapters/pg'
 import { AppComponents, GlobalContext } from './types'
@@ -16,7 +16,7 @@ import { createFriendsDBComponent } from './adapters/friends-db'
 import { createSubscribersContext, createRpcServerComponent } from './adapters/rpc-server'
 import { createRedisComponent } from './adapters/redis'
 import { createPubSubComponent } from './adapters/pubsub'
-import { createUWsComponent } from '@well-known-components/uws-http-server'
+import { createUWsComponent } from '@dcl/uws-http-server'
 import { createArchipelagoStatsComponent } from './adapters/archipelago-stats'
 import { createPeersSynchronizerComponent } from './adapters/peers-synchronizer'
 import { createNatsComponent } from '@well-known-components/nats-component'
@@ -64,7 +64,7 @@ import { createCommunityVoiceChatCacheComponent } from './logic/community-voice/
 import { createCommunityVoiceChatPollingComponent } from './logic/community-voice/community-voice-polling'
 import { createSlackComponent } from '@dcl/slack-component'
 import { createAIComplianceComponent } from './adapters/ai-compliance'
-import { createFeaturesComponent } from '@well-known-components/features-component'
+import { createFeaturesComponent } from '@dcl/features-component'
 import { createFeatureFlagsAdapter } from './adapters/feature-flags'
 import { createInMemoryCacheComponent } from './adapters/memory-cache'
 import { createQueueConsumerComponent } from '@dcl/queue-consumer-component'
@@ -72,6 +72,8 @@ import { createSqsComponent } from '@dcl/sqs-component'
 import { createSnsComponent } from '@dcl/sns-component'
 import { createSchemaValidatorComponent } from '@dcl/schema-validator-component'
 import { createRegistryComponent } from './adapters/registry'
+import { createUserMutesDBComponent } from './adapters/user-mutes-db'
+import { createUserMutesComponent } from './logic/user-mutes'
 import { createSqsHandlers } from './controllers/handlers/sqs/handler'
 import { withSuppressedTracing, withoutTracing } from './utils/tracing'
 
@@ -105,21 +107,20 @@ export async function initComponents(): Promise<AppComponents> {
   const uwsServer = await createUWsComponent({ config: uwsHttpServerConfig, logs })
   const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 
-  const fetcher = createFetchComponent()
+  // Bound every outbound HTTP request so a stalled upstream can't pin handlers indefinitely.
+  // Per-call options passed by adapters still override this default.
+  const httpFetchTimeoutMs = (await config.getNumber('HTTP_FETCH_TIMEOUT_MS')) ?? 30000
+  const fetcher = createFetchComponent({ defaultFetcherOptions: { timeout: httpFetchTimeoutMs } })
   const memoryCache = createInMemoryCacheComponent()
   const schemaValidator = createSchemaValidatorComponent({ ensureJsonContentType: false })
 
-  await instrumentHttpServerWithPromClientRegistry({ server: httpServer, metrics, config, registry: metrics.registry! })
+  await instrumentHttpServerWithPromClientRegistry({
+    server: httpServer,
+    metrics,
+    config,
+    registry: metrics.registry as NonNullable<typeof metrics.registry>
+  })
 
-  let databaseUrl: string | undefined = await config.getString('PG_COMPONENT_PSQL_CONNECTION_STRING')
-  if (!databaseUrl) {
-    const dbUser = await config.requireString('PG_COMPONENT_PSQL_USER')
-    const dbDatabaseName = await config.requireString('PG_COMPONENT_PSQL_DATABASE')
-    const dbPort = await config.requireString('PG_COMPONENT_PSQL_PORT')
-    const dbHost = await config.requireString('PG_COMPONENT_PSQL_HOST')
-    const dbPassword = await config.requireString('PG_COMPONENT_PSQL_PASSWORD')
-    databaseUrl = `postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbDatabaseName}`
-  }
   const privateVoiceChatJobInterval = await config.requireNumber('PRIVATE_VOICE_CHAT_JOB_INTERVAL')
   const communityVoiceChatPollingJobInterval = await config.requireNumber('COMMUNITY_VOICE_CHAT_POLLING_JOB_INTERVAL')
 
@@ -127,7 +128,6 @@ export async function initComponents(): Promise<AppComponents> {
     { logs, config, metrics },
     {
       migration: {
-        databaseUrl,
         dir: resolve(__dirname, 'migrations'),
         migrationsTable: 'pgmigrations',
         ignorePattern: '.*\\.map',
@@ -137,6 +137,7 @@ export async function initComponents(): Promise<AppComponents> {
   )
 
   const friendsDb = createFriendsDBComponent({ pg, logs })
+  const userMutesDb = createUserMutesDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const referralDb = await createReferralDBComponent({ pg, logs, config })
   const analytics = await createAnalyticsComponent<AnalyticsEventPayload>({ logs, fetcher, config })
@@ -147,7 +148,7 @@ export async function initComponents(): Promise<AppComponents> {
   const featureFlags = await createFeatureFlagsAdapter({ config, logs, features })
 
   const email = await createEmailComponent({ fetcher, config })
-  const rewards = await createRewardComponent({ fetcher, config })
+  const rewards = await createRewardComponent({ fetcher, config, logs })
 
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
@@ -181,11 +182,12 @@ export async function initComponents(): Promise<AppComponents> {
   })
 
   const storage = await createS3Adapter({ config })
-  const subscribersContext = createSubscribersContext({ redis, logs })
+  const wsPool = await createWsPoolComponent({ logs, metrics, config })
+  const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
 
-  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb, peersStats })
+  const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb, peersStats, logs })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
 
   const communityPlaces = await createCommunityPlacesComponent({
@@ -288,13 +290,16 @@ export async function initComponents(): Promise<AppComponents> {
     { repeat: true, startupDelay: 30 * 60 * 1000 } // Start after 30 minutes delay
   )
 
+  const userMutes = await createUserMutesComponent({ userMutesDb, logs })
   const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
   const updateHandler = createUpdateHandlerComponent({
     logs,
     subscribersContext,
     friendsDb,
     communityMembers,
-    registry
+    registry,
+    metrics,
+    peersStats
   })
 
   const rpcServer = await createRpcServerComponent({
@@ -314,8 +319,6 @@ export async function initComponents(): Promise<AppComponents> {
   const peerTracking = withSuppressedTracing(
     await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   )
-  const wsPool = createWsPoolComponent({ logs, metrics })
-
   const expirePrivateVoiceChatJob = createJobComponent(
     { logs },
     // wrap function itself since it is executed in different context (setImmediate)
@@ -343,6 +346,10 @@ export async function initComponents(): Promise<AppComponents> {
   const queueProcessor = createQueueConsumerComponent({ sqs: queue, logs })
   createSqsHandlers({ logs, referral, communitiesDb, queueProcessor })
 
+  // NOTE: components are started sequentially by @well-known-components in this object's key
+  // order (for...in), awaiting each. `rpcServer.start()` subscribes on `pubsub`'s Redis
+  // client and now throws if a subscription fails, so `pubsub` MUST stay ordered before
+  // `rpcServer` here — otherwise the sub client isn't connected yet and startup fails.
   return {
     aiCompliance,
     analytics,
@@ -410,6 +417,8 @@ export async function initComponents(): Promise<AppComponents> {
     voiceDb,
     worldsStats,
     wsPool,
-    schemaValidator
+    schemaValidator,
+    userMutesDb,
+    userMutes
   }
 }

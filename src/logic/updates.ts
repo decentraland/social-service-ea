@@ -1,4 +1,8 @@
-import { ConnectivityStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import {
+  ConnectivityStatus,
+  SubscriptionStreamClosed,
+  SubscriptionStreamClosedReason
+} from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
@@ -22,6 +26,15 @@ export type SubscriptionHandlerParams<T, U> = {
   shouldHandleUpdate: (update: U) => boolean
   parser: UpdateParser<T, U>
   parseArgs?: any[]
+  // Optional initial snapshot, fetched AFTER the live listener is registered so updates
+  // emitted while it runs are queued rather than lost. Best-effort: a failure is logged and
+  // the subscription continues with live updates only.
+  getInitialUpdates?: () => Promise<T[]>
+  // Builds the FINAL message of the stream from a close notice, so the client learns why
+  // the server is closing it (per the protocol contract, such a message carries no update
+  // data). Used when a duplicate subscription is rejected — the connection is alive there,
+  // so the notice is deliverable. When omitted, the stream ends silently, as before.
+  buildStreamClosedUpdate?: (streamClosed: SubscriptionStreamClosed) => T
 }
 
 /**
@@ -52,9 +65,12 @@ async function processInBatches<T>(
 }
 
 export function createUpdateHandlerComponent(
-  components: Pick<AppComponents, 'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry'>
+  components: Pick<
+    AppComponents,
+    'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry' | 'metrics' | 'peersStats'
+  >
 ): IUpdateHandlerComponent {
-  const { logs, subscribersContext, friendsDb, communityMembers, registry } = components
+  const { logs, subscribersContext, friendsDb, communityMembers, registry, metrics, peersStats } = components
   const logger = logs.getLogger('update-handler')
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
@@ -78,10 +94,19 @@ export function createUpdateHandlerComponent(
     }
   })
 
-  const friendshipAcceptedUpdateHandler = handleUpdate<'friendshipUpdate'>((update) => {
+  const friendshipAcceptedUpdateHandler = handleUpdate<'friendshipUpdate'>(async (update) => {
     if (update.action !== Action.ACCEPT) {
       return
     }
+
+    // Only announce a new friend as ONLINE if they actually are: the request may have been
+    // sent long ago (requester offline by now) and the accept may come from the website
+    // (accepter not in-world). Announcing without checking pushed false presence.
+    // Degraded mode: peersStats swallows stats-source failures and resolves to an empty
+    // list, so during a stats outage these notifications are skipped entirely (preferable
+    // to fabricating presence); the next real connectivity transition corrects the client.
+    const connectedPeers = await peersStats.getConnectedPeers()
+    const onlinePeers = new Set(connectedPeers.map(normalizeAddress))
 
     const notifications = [
       { subscriber: update.to, friend: update.from },
@@ -89,6 +114,10 @@ export function createUpdateHandlerComponent(
     ]
 
     notifications.forEach(({ subscriber, friend }) => {
+      if (!onlinePeers.has(normalizeAddress(friend))) {
+        return
+      }
+
       const emitter = subscribersContext.getSubscriber(subscriber)
       if (emitter) {
         emitter.emit('friendConnectivityUpdate', {
@@ -100,7 +129,10 @@ export function createUpdateHandlerComponent(
   })
 
   const friendConnectivityUpdateHandler = handleUpdate<'friendConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const friends = await friendsDb.getOnlineFriends(update.address, onlineSubscribers)
 
     // Notify friends about connectivity change, yielding event loop for large friend lists
@@ -117,7 +149,10 @@ export function createUpdateHandlerComponent(
   })
 
   const communityMemberConnectivityUpdateHandler = handleUpdate<'communityMemberConnectivityUpdate'>(async (update) => {
-    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromUserCommunities(update.memberAddress, onlineSubscribers)
 
     for await (const batch of batches) {
@@ -210,7 +245,10 @@ export function createUpdateHandlerComponent(
 
     logger.info('Community member status update', { update: JSON.stringify(update) })
 
-    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromCommunity(
       communityId,
       onlineSubscribers.filter((address) => address !== normalizedMemberAddress)
@@ -252,7 +290,10 @@ export function createUpdateHandlerComponent(
   const communityDeletedUpdateHandler = handleUpdate<'communityDeletedUpdate'>(async (update) => {
     const { communityId } = update
 
-    const onlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    // Derive recipients from THIS instance's local subscribers: every update is broadcast to
+    // every instance via pub/sub and delivery is local-only, so each instance fans out to its
+    // own connected subscribers (crash-safe, no global presence set needed).
+    const onlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const batches = communityMembers.getOnlineMembersFromCommunity(communityId, onlineSubscribers)
 
     for await (const batch of batches) {
@@ -279,7 +320,7 @@ export function createUpdateHandlerComponent(
 
     // Get all online subscribers, excluding the creator if present (creator already knows about their action)
     const creatorAddress = update.creatorAddress?.toLowerCase()
-    const allOnlineSubscribers = await subscribersContext.getSubscribersAddresses()
+    const allOnlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
     try {
@@ -340,15 +381,92 @@ export function createUpdateHandlerComponent(
     getAddressFromUpdate,
     shouldHandleUpdate,
     parser,
-    parseArgs = []
+    parseArgs = [],
+    getInitialUpdates,
+    buildStreamClosedUpdate
   }: SubscriptionHandlerParams<T, U>): AsyncGenerator<T> {
     const normalizedAddress = normalizeAddress(rpcContext.address)
-    const eventEmitter = rpcContext.subscribersContext.getOrAddSubscriber(normalizedAddress)
     const eventNameString = String(eventName)
 
-    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName)
+    // Subscriptions are scoped per CONNECTION: the same address can be connected from
+    // multiple places at once (website + client) and each connection gets its own stream.
+    // wsConnectionId is always set in production (assigned at WS upgrade and threaded through
+    // attachUser/attachTransport); fail loud rather than silently mis-key if it is missing.
+    const connectionId = rpcContext.wsConnectionId
+    if (!connectionId) {
+      logger.error('Cannot handle subscription without a wsConnectionId', {
+        address: normalizedAddress,
+        event: eventNameString
+      })
+      return
+    }
+
+    // Guard against the SAME connection opening the same stream twice — each extra generator
+    // allocates another value queue and doubles that connection's memory.
+    if (rpcContext.subscribersContext.hasActiveSubscription(connectionId, eventNameString)) {
+      // A connection re-subscribing to an event it is already subscribed to is expected and
+      // benign — the guard is the #407 OOM protection (it prevents a second generator/value-queue
+      // for the same connection+event). It can fire hundreds of times per minute for a single
+      // connection stuck in a re-subscribe loop, so we track it ONLY via the
+      // subscription_duplicates_total metric (labelled by event) and do not log per occurrence —
+      // at DEBUG level (production) that line floods the logs. A sustained high rate on the metric
+      // indicates a client stuck re-subscribing.
+      metrics.increment('subscription_duplicates_total', { event: eventNameString })
+      // Tell the client why before ending the stream — this connection is alive by
+      // definition, so the final message is deliverable. Without it the client only sees a
+      // clean close, indistinguishable from any other stream end.
+      if (buildStreamClosedUpdate) {
+        yield buildStreamClosedUpdate({
+          reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION,
+          message: `This connection already has an active ${eventNameString} subscription`
+        })
+      }
+      return
+    }
+
+    // The shared per-address emitter is created when the connection attaches (addConnection).
+    // If it's gone, the connection is no longer attached — don't resurrect an orphan emitter
+    // that wouldn't be tracked as a live connection and would be invisible to the local fan-out.
+    const eventEmitter = rpcContext.subscribersContext.getSubscriber(normalizedAddress)
+    if (!eventEmitter) {
+      logger.warn('No subscriber emitter for address; connection no longer attached', {
+        address: normalizedAddress,
+        event: eventNameString,
+        wsConnectionId: connectionId
+      })
+      // Throw rather than return: a clean completion here invites the client to immediately
+      // re-open the stream and hit this same path again — a hot loop. Erroring out makes a
+      // (well-behaved) client back off instead. Reaching here means the RPC call is live but the
+      // per-address emitter is gone, which is an abnormal/racy state, not a normal stream end.
+      throw new Error('No subscriber emitter for address; connection no longer attached')
+    }
+
+    rpcContext.subscribersContext.setActiveSubscription(connectionId, eventNameString)
+
+    const updatesGenerator = emitterToAsyncGenerator(eventEmitter, eventName, () =>
+      metrics.increment('subscription_updates_dropped_total', { event: eventNameString })
+    )
+    rpcContext.subscribersContext.registerGenerator(connectionId, updatesGenerator)
 
     try {
+      // The listener above is already registered, so updates emitted while the snapshot
+      // queries run are queued rather than lost. Best-effort: a DB/registry hiccup here must
+      // NOT tear down the subscription — otherwise the client just reconnects and retries,
+      // churning (and re-running these queries every time).
+      if (getInitialUpdates) {
+        try {
+          const initialUpdates = await getInitialUpdates()
+          for (const initialUpdate of initialUpdates) {
+            yield initialUpdate
+          }
+        } catch (error: any) {
+          logger.warn(`Failed to deliver initial ${eventNameString} snapshot; continuing with live updates`, {
+            address: normalizedAddress,
+            error: error?.message ?? String(error)
+          })
+        }
+      }
+
       for await (const update of updatesGenerator) {
         if (!shouldHandleUpdate(update as U)) {
           continue
@@ -371,21 +489,21 @@ export function createUpdateHandlerComponent(
           logger.error(`Unable to parse ${eventNameString}`, { update: JSON.stringify(update) })
         }
       }
-    } catch (error) {
-      logger.error('Error in generator loop', {
-        error: JSON.stringify(error),
-        address: rpcContext.address,
-        event: eventNameString
-      })
-      throw error
+      // Intentionally no catch here: errors propagate to the per-service subscribe handler,
+      // which logs them with service-specific context and re-throws. A central catch would
+      // double-log every subscription error (and only as JSON.stringify(error) === "{}").
     } finally {
+      // Logged here (not in the per-service handler) so it only fires for subscriptions
+      // that were actually established — the duplicate guard above returns before this
+      // try/finally, so rejected duplicates no longer emit a misleading "cleaning up" line.
+      logger.info('Cleaning up subscription', {
+        address: normalizedAddress,
+        event: eventNameString,
+        wsConnectionId: connectionId
+      })
       await updatesGenerator.return(undefined)
-    }
-
-    // Return a cleanup function
-    return () => {
-      logger.debug(`Cleaning up subscription for ${eventNameString}`, { address: rpcContext.address })
-      void updatesGenerator.return(undefined)
+      rpcContext.subscribersContext.unregisterGenerator(connectionId, updatesGenerator)
+      rpcContext.subscribersContext.clearActiveSubscription(connectionId, eventNameString)
     }
   }
 

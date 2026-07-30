@@ -1,5 +1,5 @@
-import { validateMetricsDeclaration } from '@well-known-components/metrics'
-import { getDefaultHttpMetrics } from '@well-known-components/uws-http-server'
+import { validateMetricsDeclaration } from '@dcl/metrics'
+import { getDefaultHttpMetrics } from '@dcl/http-server'
 import { metricDeclarations as logsMetricsDeclarations } from '@well-known-components/logger'
 import { IMetricsComponent } from '@well-known-components/interfaces'
 
@@ -10,13 +10,20 @@ export const metricDeclarations = {
     type: IMetricsComponent.GaugeType,
     help: 'Number of WebSocket active connections'
   },
+  ws_connections_rejected: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of WebSocket connections rejected because the pool reached WS_MAX_CONCURRENT_CONNECTIONS'
+  },
   ws_messages_received: {
     type: IMetricsComponent.CounterType,
     help: 'Number of WebSocket messages received'
   },
   ws_messages_sent: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket messages sent'
+    // Counted at the transport when the socket accepts an outbound frame (SUCCESS or
+    // buffered under BACKPRESSURE). Includes RPC control frames, not just application
+    // messages — previously this counted inbound messages forwarded to the RPC layer.
+    help: 'Number of outbound WebSocket messages accepted by the socket (sent or buffered)'
   },
   ws_errors: {
     type: IMetricsComponent.CounterType,
@@ -83,7 +90,7 @@ export const metricDeclarations = {
   ws_backpressure_events: {
     type: IMetricsComponent.CounterType,
     help: 'Number of WebSocket messages that encountered backpressure or were dropped',
-    labelNames: ['result'] // 'backpressure', 'dropped', or 'error'
+    labelNames: ['result'] // 'backpressure', 'dropped', or 'max_retries'
   },
   ws_drain_events: {
     type: IMetricsComponent.CounterType,
@@ -98,6 +105,32 @@ export const metricDeclarations = {
   ws_queue_vs_backpressure_ratio: {
     type: IMetricsComponent.GaugeType,
     help: 'Ratio of message queue size to uWebSocket buffered amount'
+  },
+  subscribers_local_count: {
+    type: IMetricsComponent.GaugeType,
+    help: 'Number of local in-memory subscriber emitters'
+  },
+  subscribers_generators_count: {
+    type: IMetricsComponent.GaugeType,
+    help: 'Number of active async generators across all subscribers'
+  },
+  subscribers_stale_cleaned: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of stale subscribers removed by reconciliation'
+  },
+  subscribers_stale_connections_cleaned: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of stale connections (socket gone, address still active) removed by reconciliation'
+  },
+  subscription_duplicates_total: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of duplicate stream subscriptions rejected by the per-(address, event) guard',
+    labelNames: ['event']
+  },
+  subscription_updates_dropped_total: {
+    type: IMetricsComponent.CounterType,
+    help: "Number of subscription updates dropped because a connection's value queue overflowed (slow consumer)",
+    labelNames: ['event']
   },
   ai_compliance_validation_duration_seconds: {
     type: IMetricsComponent.HistogramType,

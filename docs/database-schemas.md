@@ -76,6 +76,12 @@ erDiagram
         BIGINT updated_at "Update timestamp"
     }
     
+    user_mutes {
+        VARCHAR muter_address PK "Muter address"
+        VARCHAR muted_address PK "Muted address"
+        TIMESTAMP muted_at "Mute timestamp"
+    }
+
     communities ||--o{ community_members : "has"
     communities ||--o{ community_posts : "has"
     communities ||--o{ community_bans : "has"
@@ -105,6 +111,7 @@ The database contains the following main tables:
 15. **`referral_emails`** - Email associations for referrals
 16. **`referral_reward_images`** - Referral reward images
 17. **`community_ranking_metrics`** - Community ranking and metrics
+18. **`user_mutes`** - User mute relationships
 
 ## Table: `communities`
 
@@ -335,6 +342,31 @@ Tracks user referrals and invitation progress.
 1. One referral record per referrer-invited user pair
 2. Status tracks the referral progress
 3. Timestamps stored in milliseconds (BIGINT)
+
+---
+
+## Table: `user_mutes`
+
+Stores mute relationships between users. Records who muted whom and when.
+
+### Columns
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `muter_address` | VARCHAR | NOT NULL | **Primary Key (part 1)**. Ethereum address of the user who muted. |
+| `muted_address` | VARCHAR | NOT NULL | **Primary Key (part 2)**. Ethereum address of the muted user. |
+| `muted_at` | TIMESTAMP | NOT NULL | Timestamp when the mute was created. Defaults to `now()`. |
+
+### Indexes
+
+- **Composite Primary Key**: `(muter_address, muted_address)` - One mute per user pair. The leading column (`muter_address`) supports efficient lookups of all users muted by a given user.
+
+### Business Rules
+
+1. One mute record per muter-muted pair
+2. Muting is unidirectional (A muting B does not mean B muted A)
+3. Users cannot mute themselves (enforced at the application level)
+4. Inserting a duplicate mute is idempotent (ON CONFLICT DO UPDATE)
 
 ---
 

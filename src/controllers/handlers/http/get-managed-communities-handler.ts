@@ -1,4 +1,4 @@
-import { getPaginationParams } from '@dcl/platform-server-commons'
+import { getPaginationParams } from '@dcl/http-commons'
 import { CommunityRole, HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { MemberCommunity } from '../../../logic/community'
 import { PaginatedResponse } from '@dcl/schemas'

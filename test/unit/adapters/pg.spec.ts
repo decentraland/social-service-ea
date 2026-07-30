@@ -1,9 +1,16 @@
 import { IDatabase } from '@well-known-components/interfaces'
-import * as BasePgComponent from '@well-known-components/pg-component'
+import * as BasePgComponent from '@dcl/pg-component'
 import { IPgComponent } from '../../../src/types'
 import { createPgComponent } from '../../../src/adapters/pg'
 import { mockConfig, mockLogs, mockMetrics, mockPg } from '../../mocks/components'
 import { SQLStatement } from 'sql-template-strings'
+
+// @dcl/pg-component exposes createPgComponent as a non-configurable getter (it is re-exported via
+// `export *`), so it cannot be replaced with jest.spyOn. Mock the module instead.
+jest.mock('@dcl/pg-component', () => ({
+  ...jest.requireActual('@dcl/pg-component'),
+  createPgComponent: jest.fn()
+}))
 
 let dbClientQueryMock: jest.Mock
 let dbClientReleaseMock: jest.Mock
@@ -28,9 +35,13 @@ beforeEach(async () => {
     })
   }
 
-  jest.spyOn(BasePgComponent, 'createPgComponent').mockImplementation(async () => mockPgWithPool)
+  ;(BasePgComponent.createPgComponent as jest.Mock).mockResolvedValue(mockPgWithPool)
 
   pg = await createPgComponent({ config: mockConfig, logs: mockLogs, metrics: mockMetrics })
+})
+
+afterEach(() => {
+  jest.clearAllMocks()
 })
 
 describe('when executing db queries inside a transaction', () => {

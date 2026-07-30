@@ -1,4 +1,4 @@
-import { InvalidRequestError } from '@dcl/platform-server-commons/dist/errors'
+import { InvalidRequestError } from '@dcl/http-commons'
 import { EthAddress } from '@dcl/schemas'
 import { Community } from '../../../logic/community'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
@@ -25,16 +25,17 @@ export async function getCommunityInvitesHandler(
 
   try {
     const inviterAddress = verification!.auth.toLowerCase()
+    const normalizedInviteeAddress = inviteeAddress.toLowerCase()
 
-    if (inviterAddress === inviteeAddress) {
-      throw new InvalidRequestError('Users cannot invite themselves')
-    }
-
-    if (!EthAddress.validate(inviterAddress) || !EthAddress.validate(inviteeAddress)) {
+    if (!EthAddress.validate(inviterAddress) || !EthAddress.validate(normalizedInviteeAddress)) {
       throw new InvalidRequestError('Invalid addresses')
     }
 
-    const invites = await communities.getCommunityInvites(inviterAddress, inviteeAddress)
+    if (inviterAddress === normalizedInviteeAddress) {
+      throw new InvalidRequestError('Users cannot invite themselves')
+    }
+
+    const invites = await communities.getCommunityInvites(inviterAddress, normalizedInviteeAddress)
 
     return {
       status: 200,

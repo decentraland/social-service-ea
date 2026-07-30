@@ -38,6 +38,10 @@ export function createMockCommunitiesComponent({
   getAllCommunitiesForModeration = jest.fn(),
   updateEditorChoice = jest.fn(),
   searchCommunities = jest.fn(),
+  getCommunityWithoutProfile = jest.fn(),
+  getCommunityPublicInformationWithoutProfile = jest.fn(),
+  getCommunitiesWithoutProfiles = jest.fn(),
+  getCommunitiesPublicInformationWithoutProfiles = jest.fn()
 }: Partial<jest.Mocked<ICommunitiesComponent>>): jest.Mocked<ICommunitiesComponent> {
   return {
     getCommunity,
@@ -52,6 +56,10 @@ export function createMockCommunitiesComponent({
     getAllCommunitiesForModeration,
     updateEditorChoice,
     searchCommunities,
+    getCommunityWithoutProfile,
+    getCommunityPublicInformationWithoutProfile,
+    getCommunitiesWithoutProfiles,
+    getCommunitiesPublicInformationWithoutProfiles
   }
 }
 
@@ -145,7 +153,9 @@ export function createMockCommunityMembersComponent({
   updateMemberRole = jest.fn(),
   getOnlineMembersFromUserCommunities = jest.fn(),
   getOnlineMembersFromCommunity = jest.fn(),
-  aggregateWithProfiles = jest.fn()
+  aggregateWithProfiles = jest.fn(),
+  getCommunityMembersWithoutProfiles = jest.fn(),
+  aggregateWithFriendshipStatus = jest.fn()
 }: Partial<jest.Mocked<ICommunityMembersComponent>>): jest.Mocked<ICommunityMembersComponent> {
   return {
     getCommunityMembers,
@@ -155,19 +165,23 @@ export function createMockCommunityMembersComponent({
     updateMemberRole,
     getOnlineMembersFromUserCommunities,
     getOnlineMembersFromCommunity,
-    aggregateWithProfiles
+    aggregateWithProfiles,
+    getCommunityMembersWithoutProfiles,
+    aggregateWithFriendshipStatus
   }
 }
 
 export function createMockCommunityBansComponent({
   getBannedMembers = jest.fn(),
   banMember = jest.fn(),
-  unbanMember = jest.fn()
+  unbanMember = jest.fn(),
+  getBannedMembersWithoutProfiles = jest.fn()
 }: Partial<jest.Mocked<ICommunityBansComponent>>): jest.Mocked<ICommunityBansComponent> {
   return {
     getBannedMembers,
     banMember,
-    unbanMember
+    unbanMember,
+    getBannedMembersWithoutProfiles
   }
 }
 
@@ -206,13 +220,15 @@ export function createMockCommunityPostsComponent({
   getPosts = jest.fn(),
   deletePost = jest.fn(),
   likePost = jest.fn(),
-  unlikePost = jest.fn()
+  unlikePost = jest.fn(),
+  getPostsWithoutProfiles = jest.fn()
 }: Partial<jest.Mocked<ICommunityPostsComponent>>): jest.Mocked<ICommunityPostsComponent> {
   return {
     createPost,
     getPosts,
     deletePost,
     likePost,
-    unlikePost
+    unlikePost,
+    getPostsWithoutProfiles
   }
 }

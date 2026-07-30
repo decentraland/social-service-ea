@@ -1,5 +1,5 @@
 import type { IBaseComponent, ICacheComponent as IBaseCacheComponent } from '@well-known-components/interfaces'
-import { IPgComponent as IBasePgComponent } from '@well-known-components/pg-component'
+import { IPgComponent as IBasePgComponent } from '@dcl/pg-component'
 import { WebSocketServer } from 'ws'
 import { Emitter } from 'mitt'
 import { Transport } from '@dcl/rpc'
@@ -61,10 +61,20 @@ export interface IRpcClient extends IBaseComponent {
 }
 
 export type IRPCServerComponent = IBaseComponent & {
-  attachUser(user: { transport: Transport; address: string }): void
-  detachUser(address: string): void
+  attachUser(user: { transport: Transport; address: string; wsConnectionId: string }): void
+  detachUser(address: string, wsConnectionId: string): void
   setServiceCreators(creators: RpcServiceCreators): void
 }
+
+export interface IUserMutesDatabaseComponent {
+  addMute(muterAddress: string, mutedAddress: string): Promise<{ muted_at: Date }>
+  removeMute(muterAddress: string, mutedAddress: string): Promise<void>
+  getMutedUsers(
+    muterAddress: string,
+    options?: { pagination?: Pagination; address?: string; addresses?: string[] }
+  ): Promise<{ mutes: { address: string; muted_at: Date }[]; total: number }>
+}
+
 export interface IFriendsDatabaseComponent {
   createFriendship(
     users: [string, string],
@@ -150,7 +160,7 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<Omit<AggregatedCommunityWithMemberAndFriendsData, 'ownerName'>[]>
   getCommunitiesCount(
     memberAddress: EthAddress,
-    options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds'>
+    options: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'onlyPublicVisible'>
   ): Promise<number>
   getCommunitiesPublicInformation(
     options: GetCommunitiesOptions
@@ -178,7 +188,7 @@ export interface ICommunitiesDatabaseComponent {
   getCommunityMembersCount(communityId: string, options?: { filterByMembers?: string[] }): Promise<number>
   getMemberCommunities(
     memberAddress: EthAddress,
-    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+    options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
   ): Promise<MemberCommunity[]>
   getOnlineMembersFromUserCommunities(
     userAddress: EthAddress,
@@ -220,6 +230,7 @@ export interface ICommunitiesDatabaseComponent {
   ): Promise<number>
   getCommunityRequest(requestId: string): Promise<MemberRequest | undefined>
   removeCommunityRequest(requestId: string): Promise<void>
+  removeMemberRequests(communityId: string, memberAddress: EthAddress): Promise<void>
   joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<string | undefined>
   getCommunityInvites(inviter: EthAddress, invitee: EthAddress): Promise<Community[]>
   acceptAllRequestsToJoin(communityId: string): Promise<string[]>
@@ -272,6 +283,7 @@ export interface IRedisComponent extends IBaseComponent {
   sAdd: (key: string, member: string) => Promise<number>
   sRem: (key: string, members: string | string[]) => Promise<number>
   sMembers: (key: string) => Promise<string[]>
+  sCard: (key: string) => Promise<number>
 }
 
 export interface ICacheComponent extends IBaseCacheComponent {
@@ -332,16 +344,28 @@ export interface ICdnCacheInvalidatorComponent {
 
 export type ISubscribersContext = IBaseComponent & {
   getSubscribers: () => Subscribers
-  getSubscribersAddresses: () => Promise<string[]>
   getLocalSubscribersAddresses: () => string[]
   /**
    * Get an existing subscriber without creating one if it doesn't exist.
    * Use this in update handlers to avoid creating orphaned emitters.
    */
   getSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter> | undefined
-  getOrAddSubscriber: (address: string) => Emitter<SubscriptionEventsEmitter>
-  addSubscriber: (address: string, subscriber: Emitter<SubscriptionEventsEmitter>) => Promise<void>
-  removeSubscriber: (address: string) => Promise<void>
+  /**
+   * Register a live connection for an address, creating the shared emitter on the
+   * first connection. Multiple concurrent connections per address are supported.
+   */
+  addConnection: (address: string, wsConnectionId: string) => void
+  /**
+   * Remove a connection for an address. Tears down only that connection's generators and
+   * active-subscription state. Returns true if it was the last connection for the address
+   * (the shared emitter is cleared).
+   */
+  removeConnection: (address: string, wsConnectionId: string) => boolean
+  registerGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
+  unregisterGenerator: (wsConnectionId: string, generator: { destroy(): void }) => void
+  hasActiveSubscription: (wsConnectionId: string, eventName: string) => boolean
+  setActiveSubscription: (wsConnectionId: string, eventName: string) => void
+  clearActiveSubscription: (wsConnectionId: string, eventName: string) => void
 }
 
 export type ITracingComponent = IBaseComponent & {
@@ -429,7 +453,7 @@ export interface IStorageHelperComponent {
 }
 
 export interface IPlacesApiComponent {
-  getPlaces: (placesIds: string[]) => Promise<PlacesApiResponse['data']>
+  getDestinations: (placeIds: string[], worldNames: string[]) => Promise<PlacesApiResponse['data']>
 }
 
 export interface IUpdateHandlerComponent {

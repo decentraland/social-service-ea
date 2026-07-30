@@ -20,13 +20,13 @@ test('Delete Community Post Controller', async function ({ components, stubCompo
       memberIdentity = await createTestIdentity()
 
       // Stub Catalyst client responses
-      stubComponents.catalystClient.getOwnedNames.resolves([
+      stubComponents.catalystClient.getOwnedNames.mockResolvedValue([
         { id: '1', name: 'OwnerName', contractAddress: '0x123', tokenId: '1' },
         { id: '2', name: 'ModeratorName', contractAddress: '0x123', tokenId: '2' },
         { id: '3', name: 'MemberName', contractAddress: '0x123', tokenId: '3' }
       ])
 
-      stubComponents.registry.getProfiles.resolves([
+      stubComponents.registry.getProfiles.mockResolvedValue([
         createMockProfile(ownerIdentity.realAccount.address.toLowerCase()),
         createMockProfile(moderatorIdentity.realAccount.address.toLowerCase()),
         createMockProfile(memberIdentity.realAccount.address.toLowerCase())

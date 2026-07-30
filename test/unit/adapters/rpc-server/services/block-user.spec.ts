@@ -17,7 +17,7 @@ describe('when blocking a user', () => {
   let rpcContext: RpcServerContext
 
   beforeEach(async () => {
-    userAddress = '0x123'
+    userAddress = '0x1111111111111111111111111111111111111111'
     blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
     rpcContext = {
       address: userAddress,

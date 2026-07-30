@@ -1,6 +1,6 @@
 import { IBaseComponent, START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { AppComponents } from '../types'
-import { ApplicationName } from '@well-known-components/features-component'
+import { ApplicationName } from '@dcl/features-component'
 
 export enum FeatureFlag {
   // Feature flag to enable/disable AI compliance for communities.
@@ -45,24 +45,24 @@ export async function createFeatureFlagsAdapter(
 
   async function refresh() {
     try {
-      // The third fetch (COMMUNITIES_GLOBAL_MODERATORS) is intentionally not stored:
-      // that flag is consumed live through getVariants. The hole in the destructuring
-      // keeps the positions aligned with the Promise.all array.
-      const [isEnabled, isDevEnabled, , isReferralRegistrationDisabled] = await Promise.all([
-        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE),
-        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE),
-        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS),
-        features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.REFERRAL_REGISTRATION_DISABLED)
-      ])
+      const [isEnabled, isDevEnabled, isGlobalModeratorsEnabled, isReferralRegistrationDisabled] =
+        await Promise.all([
+          features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_AI_COMPLIANCE),
+          features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE),
+          features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS),
+          features.getIsFeatureEnabled(ApplicationName.DAPPS, FeatureFlag.REFERRAL_REGISTRATION_DISABLED)
+        ])
 
       logger.debug(`Refreshed feature flags`, {
         [FeatureFlag.COMMUNITIES_AI_COMPLIANCE]: String(isEnabled),
         [FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE]: String(isDevEnabled),
+        [FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS]: String(isGlobalModeratorsEnabled),
         [FeatureFlag.REFERRAL_REGISTRATION_DISABLED]: String(isReferralRegistrationDisabled)
       })
 
       featuresFlagMap.set(FeatureFlag.COMMUNITIES_AI_COMPLIANCE, isEnabled)
       featuresFlagMap.set(FeatureFlag.DEV_COMMUNITIES_AI_COMPLIANCE, isDevEnabled)
+      featuresFlagMap.set(FeatureFlag.COMMUNITIES_GLOBAL_MODERATORS, isGlobalModeratorsEnabled)
       featuresFlagMap.set(FeatureFlag.REFERRAL_REGISTRATION_DISABLED, isReferralRegistrationDisabled)
     } catch (error) {
       logger.error('Failed to refresh feature flags', {
@@ -79,7 +79,7 @@ export async function createFeatureFlagsAdapter(
 
     if (variant?.payload?.value) {
       const values = variant.payload.value
-        .replace('\n', '')
+        .replace(/\r?\n/g, '')
         .split(',')
         .map((domain) => domain.toLowerCase().trim())
 
@@ -94,6 +94,12 @@ export async function createFeatureFlagsAdapter(
    */
   async function start() {
     logger.info('Starting feature flags adapter')
+
+    // Guard against a double start orphaning a previous interval.
+    if (refreshInterval) {
+      clearInterval(refreshInterval)
+      refreshInterval = null
+    }
 
     // Do initial refresh
     await refresh()

@@ -22,7 +22,7 @@ import { EthAddress } from '@dcl/schemas'
 test('RPC Server Controller', function ({ components, stubComponents }) {
   beforeAll(async () => {
     await components.rpcClient.connect()
-    stubComponents.peersSynchronizer.syncPeers.resolves()
+    stubComponents.peersSynchronizer.syncPeers.mockResolvedValue(undefined)
   })
 
   describe('when getting friends', function () {
@@ -35,7 +35,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
         const mockFriendProfile = createMockProfile(friendAddress)
         friendshipId = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
-        stubComponents.registry.getProfiles.resolves([mockFriendProfile])
+        stubComponents.registry.getProfiles.mockResolvedValue([mockFriendProfile])
       })
 
       afterEach(async () => {
@@ -60,7 +60,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
     describe('and the user has no friends', () => {
       beforeEach(() => {
-        stubComponents.registry.getProfiles.resolves([])
+        stubComponents.registry.getProfiles.mockResolvedValue([])
       })
 
       it('should return empty list', async () => {
@@ -90,7 +90,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         mutualFriendAddress = '0x77c4c17331436d3b8798596e3d7c0d8e1b786aa4'
         const mockMutualFriendProfile = createMockProfile(mutualFriendAddress)
 
-        stubComponents.registry.getProfiles.resolves([mockMutualFriendProfile])
+        stubComponents.registry.getProfiles.mockResolvedValue([mockMutualFriendProfile])
 
         const id1 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
         const id2 = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, mutualFriendAddress])
@@ -131,7 +131,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         const { friendsDb, rpcClient } = components
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
         friendshipId = await createOrUpsertActiveFriendship(friendsDb, [rpcClient.authAddress, friendAddress])
-        stubComponents.registry.getProfiles.resolves([])
+        stubComponents.registry.getProfiles.mockResolvedValue([])
       })
 
       afterEach(async () => {
@@ -167,7 +167,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd1'
         const mockFriendProfile = createMockProfile(friendAddress)
         friendshipId = await createPendingFriendshipRequest(friendsDb, [friendAddress, rpcClient.authAddress])
-        stubComponents.registry.getProfiles.resolves([mockFriendProfile])
+        stubComponents.registry.getProfiles.mockResolvedValue([mockFriendProfile])
       })
 
       afterEach(async () => {
@@ -194,7 +194,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
     describe('and the user has no pending friendship requests', () => {
       beforeEach(() => {
-        stubComponents.registry.getProfiles.resolves([])
+        stubComponents.registry.getProfiles.mockResolvedValue([])
       })
 
       it('should return empty list', async () => {
@@ -233,7 +233,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           requestIds.push(id)
         }
 
-        stubComponents.registry.getProfiles.resolves(mockProfiles)
+        stubComponents.registry.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       afterEach(async () => {
@@ -282,7 +282,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd2'
         const mockFriendProfile = createMockProfile(friendAddress)
         friendshipId = await createPendingFriendshipRequest(friendsDb, [rpcClient.authAddress, friendAddress])
-        stubComponents.registry.getProfiles.resolves([mockFriendProfile])
+        stubComponents.registry.getProfiles.mockResolvedValue([mockFriendProfile])
       })
 
       afterEach(async () => {
@@ -309,7 +309,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
     describe('and the user has no sent friendship requests', () => {
       beforeEach(() => {
-        stubComponents.registry.getProfiles.resolves([])
+        stubComponents.registry.getProfiles.mockResolvedValue([])
       })
 
       it('should return empty list', async () => {
@@ -348,7 +348,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           requestIds.push(id)
         }
 
-        stubComponents.registry.getProfiles.resolves(mockProfiles)
+        stubComponents.registry.getProfiles.mockResolvedValue(mockProfiles)
       })
 
       afterEach(async () => {
@@ -398,7 +398,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     describe('and the user is not blocked', () => {
       beforeEach(() => {
         mockBlockedProfile = createMockProfile(blockedAddress)
-        stubComponents.registry.getProfile.resolves(mockBlockedProfile)
+        stubComponents.registry.getProfile.mockResolvedValue(mockBlockedProfile)
       })
 
       afterEach(async () => {
@@ -422,7 +422,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
     describe('and the user is already blocked', () => {
       beforeEach(() => {
         mockBlockedProfile = createMockProfile(blockedAddress)
-        stubComponents.registry.getProfile.resolves(mockBlockedProfile)
+        stubComponents.registry.getProfile.mockResolvedValue(mockBlockedProfile)
       })
 
       afterEach(async () => {
@@ -454,7 +454,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
       beforeEach(async () => {
         mockBlockedProfile = createMockProfile(blockedAddress)
-        stubComponents.registry.getProfile.resolves(mockBlockedProfile)
+        stubComponents.registry.getProfile.mockResolvedValue(mockBlockedProfile)
 
         // Setup: block the user first
         await components.friendsDb.blockUser(components.rpcClient.authAddress, blockedAddress)
@@ -1266,7 +1266,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
         friendAddress = '0x06b7c9e6aef7f6b6c259831953309f63c59bcfd4'
         const mockUserProfile = createMockProfile(rpcClient.authAddress)
         const mockFriendProfile = createMockProfile(friendAddress)
-        stubComponents.registry.getProfiles.resolves([mockUserProfile, mockFriendProfile])
+        stubComponents.registry.getProfiles.mockResolvedValue([mockUserProfile, mockFriendProfile])
       })
 
       afterEach(async () => {
@@ -1355,7 +1355,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
         const mockUserProfile = createMockProfile(rpcClient.authAddress)
         const mockFriendProfile = createMockProfile(friendAddress)
-        stubComponents.registry.getProfiles.resolves([mockUserProfile, mockFriendProfile])
+        stubComponents.registry.getProfiles.mockResolvedValue([mockUserProfile, mockFriendProfile])
       })
 
       afterEach(async () => {

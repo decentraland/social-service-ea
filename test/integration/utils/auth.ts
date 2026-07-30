@@ -3,7 +3,6 @@ import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
 import { signedHeaderFactory } from 'decentraland-crypto-fetch'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../../src/logic/community'
 import { TestComponents } from '../../../src/types'
-import FormData from 'form-data'
 import fs from 'fs'
 
 export type Identity = {
@@ -88,6 +87,9 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
     method: string = 'POST'
   ) => {
     const { localHttpFetch } = components
+    // Use the web-standard FormData/Blob: the local fetch component is backed by the native
+    // (undici) fetch, which only serializes a global FormData into a proper multipart body with
+    // the right Content-Type boundary. A node `form-data` instance would be stringified instead.
     const form = new FormData()
 
     if (name !== undefined) {
@@ -99,11 +101,12 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
     }
 
     if (thumbnailPath) {
-      form.append('thumbnail', fs.createReadStream(thumbnailPath), 'thumbnail.png')
+      const fileBuffer = fs.readFileSync(thumbnailPath)
+      form.append('thumbnail', new Blob([new Uint8Array(fileBuffer)], { type: 'image/png' }), 'thumbnail.png')
     }
 
     if (thumbnailBuffer) {
-      form.append('thumbnail', thumbnailBuffer, 'thumbnail.png')
+      form.append('thumbnail', new Blob([new Uint8Array(thumbnailBuffer)], { type: 'image/png' }), 'thumbnail.png')
     }
 
     if (placeIds !== undefined) {
@@ -128,7 +131,7 @@ export function makeAuthenticatedMultipartRequest(components: Pick<TestComponent
     return localHttpFetch.fetch(path, {
       method,
       headers,
-      body: form as any
+      body: form
     })
   }
 }

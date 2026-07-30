@@ -1,5 +1,6 @@
 import { getCommunityThumbnailPath } from '../logic/community'
 import { AppComponents, ICdnCacheInvalidatorComponent } from '../types'
+import { discardResponseBody } from '../utils/fetch'
 
 export async function createCdnCacheInvalidatorComponent(
   components: Pick<AppComponents, 'config' | 'fetcher'>
@@ -12,7 +13,7 @@ export async function createCdnCacheInvalidatorComponent(
 
   async function invalidateThumbnail(communityId: string): Promise<void> {
     const url = `${CDN_CACHE_INVALIDATOR_API_URL}/invalidate`
-    await fetcher.fetch(url, {
+    const response = await fetcher.fetch(url, {
       method: 'POST',
       body: JSON.stringify({
         files: [getCommunityThumbnailPath(communityId)],
@@ -22,6 +23,8 @@ export async function createCdnCacheInvalidatorComponent(
         Authorization: `Bearer ${CDN_CACHE_INVALIDATOR_API_TOKEN}`
       }
     })
+
+    await discardResponseBody(response)
   }
 
   return { invalidateThumbnail }

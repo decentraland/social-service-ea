@@ -1,4 +1,4 @@
-import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../src/logic/community'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum, CommunityRequestType } from '../../src/logic/community'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import {
@@ -9,7 +9,6 @@ import {
   makeAuthenticatedMultipartRequest
 } from './utils/auth'
 import { randomUUID } from 'crypto'
-import FormData from 'form-data'
 import { AIComplianceError, CommunityNotCompliantError } from '../../src/logic/community/errors'
 
 test('Update Community Controller', async function ({ components, stubComponents, spyComponents }) {
@@ -24,7 +23,7 @@ test('Update Community Controller', async function ({ components, stubComponents
       identity = await createTestIdentity()
 
       // Mock AI compliance to return compliant by default for community creation
-      stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+      stubComponents.communityComplianceValidator.validateCommunityContent.mockResolvedValue(undefined)
 
       // Mock catalyst client for community creation
       spyComponents.catalystClient.getOwnedNames.mockResolvedValue([
@@ -51,7 +50,7 @@ test('Update Community Controller', async function ({ components, stubComponents
       const createResponse = await components.localHttpFetch.fetch('/v1/communities', {
         method: 'POST',
         headers: createHeaders,
-        body: createForm as any
+        body: createForm
       })
 
       const createBody = await createResponse.json()
@@ -92,7 +91,7 @@ test('Update Community Controller', async function ({ components, stubComponents
         describe('when AI compliance validation passes', () => {
           beforeEach(async () => {
             // Mock AI compliance to return compliant by default
-            stubComponents.communityComplianceValidator.validateCommunityContent.resolves()
+            stubComponents.communityComplianceValidator.validateCommunityContent.mockResolvedValue(undefined)
 
             // Mock owner name - needed for the update flow when querying current community
             spyComponents.communityOwners.getOwnerName.mockResolvedValue('Test Owner')
@@ -260,7 +259,7 @@ test('Update Community Controller', async function ({ components, stubComponents
             beforeEach(async () => {
               newPlaceIds = [randomUUID(), randomUUID()]
 
-              stubComponents.fetcher.fetch.onFirstCall().resolves({
+              stubComponents.fetcher.fetch.mockResolvedValueOnce({
                 ok: true,
                 status: 200,
                 json: () =>
@@ -329,7 +328,7 @@ test('Update Community Controller', async function ({ components, stubComponents
             beforeEach(() => {
               initialPlaceIds = [randomUUID(), randomUUID()]
 
-              stubComponents.fetcher.fetch.onFirstCall().resolves({
+              stubComponents.fetcher.fetch.mockResolvedValueOnce({
                 ok: true,
                 status: 200,
                 json: () =>
@@ -486,6 +485,52 @@ test('Update Community Controller', async function ({ components, stubComponents
                 expect(response.status).toBe(401)
               })
             })
+
+            describe('and flipping a private community with pending join requests to public', () => {
+              const bannedRequester = '0x1111111111111111111111111111111111111111'
+              const allowedRequester = '0x2222222222222222222222222222222222222222'
+
+              beforeEach(async () => {
+                await components.communitiesDb.updateCommunity(communityId, { private: true })
+                await components.communitiesDb.createCommunityRequest(
+                  communityId,
+                  bannedRequester,
+                  CommunityRequestType.RequestToJoin
+                )
+                await components.communitiesDb.createCommunityRequest(
+                  communityId,
+                  allowedRequester,
+                  CommunityRequestType.RequestToJoin
+                )
+                await components.communitiesDb.banMemberFromCommunity(
+                  communityId,
+                  identity.realAccount.address,
+                  bannedRequester
+                )
+              })
+
+              afterEach(async () => {
+                await components.communitiesDbHelper.forceCommunityMemberRemoval(communityId, [
+                  bannedRequester,
+                  allowedRequester
+                ])
+              })
+
+              it('should admit the non-banned requester as a member but not the banned one', async () => {
+                const response = await makeMultipartRequest(
+                  identity,
+                  `/v1/communities/${communityId}`,
+                  {
+                    privacy: CommunityPrivacyEnum.Public
+                  },
+                  'PUT'
+                )
+
+                expect(response.status).toBe(200)
+                expect(await components.communitiesDb.isMemberOfCommunity(communityId, allowedRequester)).toBe(true)
+                expect(await components.communitiesDb.isMemberOfCommunity(communityId, bannedRequester)).toBe(false)
+              })
+            })
           })
 
           describe('when updating visibility', () => {
@@ -564,7 +609,7 @@ test('Update Community Controller', async function ({ components, stubComponents
         describe('and AI compliance validation fails', () => {
           beforeEach(async () => {
             // Mock AI compliance to return non-compliant
-            stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
+            stubComponents.communityComplianceValidator.validateCommunityContent.mockRejectedValue(
               new CommunityNotCompliantError(
                 "Community content violates Decentraland's Code of Ethics",
                 { name: ['Contains inappropriate language', 'Promotes violence'] },
@@ -613,7 +658,7 @@ test('Update Community Controller', async function ({ components, stubComponents
 
         describe('and AI compliance validation fails with AIComplianceError', () => {
           beforeEach(async () => {
-            stubComponents.communityComplianceValidator.validateCommunityContent.rejects(
+            stubComponents.communityComplianceValidator.validateCommunityContent.mockRejectedValue(
               new AIComplianceError('AI compliance validation failed')
             )
           })
@@ -785,7 +830,7 @@ test('Update Community Controller', async function ({ components, stubComponents
           const response = await components.localHttpFetch.fetch(`/v1/communities/${communityId}`, {
             method: 'PUT',
             headers,
-            body: form as any
+            body: form
           })
 
           expect(response.status).toBe(400)
@@ -802,7 +847,7 @@ test('Update Community Controller', async function ({ components, stubComponents
           const response = await components.localHttpFetch.fetch(`/v1/communities/${communityId}`, {
             method: 'PUT',
             headers,
-            body: form as any
+            body: form
           })
 
           expect(response.status).toBe(400)

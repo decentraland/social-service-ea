@@ -2,15 +2,12 @@
 // Here we define the test components to be used in the testing environment
 
 import { resolve } from 'path'
-import {
-  createRunner,
-  createLocalFetchCompoment as createLocalFetchComponent
-} from '@well-known-components/test-helpers'
+import { createRunner, createLocalFetchComponent } from '@dcl/test-helpers'
 import { createConfigComponent, createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
-import { createTestMetricsComponent } from '@well-known-components/metrics'
+import { createTestMetricsComponent } from '@dcl/metrics'
 import { createLogComponent } from '@well-known-components/logger'
-import { createUWsComponent } from '@well-known-components/uws-http-server'
-import { createFetchComponent } from '@well-known-components/fetch-component'
+import { createUWsComponent } from '@dcl/uws-http-server'
+import { createFetchComponent } from '@dcl/fetch-component'
 import { createAnalyticsComponent } from '@dcl/analytics-component'
 import { createPgComponent } from '../src/adapters/pg'
 import { createSqsHandlers } from '../src/controllers/handlers/sqs/handler'
@@ -34,6 +31,8 @@ import { ARCHIPELAGO_STATS_URL } from './mocks/components/archipelago-stats'
 import { createWorldsStatsComponent } from '../src/adapters/worlds-stats'
 import { createPlacesApiAdapter } from '../src/adapters/places-api'
 import { metricDeclarations } from '../src/metrics'
+import { createUserMutesDBComponent } from '../src/adapters/user-mutes-db'
+import { createUserMutesComponent } from '../src/logic/user-mutes'
 import { createRpcClientComponent } from './integration/utils/rpc-client'
 import {
   mockPeersSynchronizer,
@@ -76,7 +75,7 @@ import { createWsPoolComponent } from '../src/logic/ws-pool'
 import { createEmailComponent } from '../src/adapters/email'
 import { createFriendsComponent } from '../src/logic/friends'
 import { createSlackComponent } from '@dcl/slack-component'
-import { createFeaturesComponent } from '@well-known-components/features-component'
+import { createFeaturesComponent } from '@dcl/features-component'
 import { createFeatureFlagsAdapter } from '../src/adapters/feature-flags'
 import { createInMemoryCacheComponent } from '../src/adapters/memory-cache'
 import { createMockCommunityBroadcasterComponent } from './mocks/communities'
@@ -135,12 +134,10 @@ async function initComponents(): Promise<TestComponents> {
 
   const statusChecks = await createStatusCheckComponent({ server: httpServer, config })
 
-  let databaseUrl: string = await config.requireString('PG_COMPONENT_PSQL_CONNECTION_STRING')
   const pg = await createPgComponent(
     { logs, config, metrics },
     {
       migration: {
-        databaseUrl,
         dir: resolve(__dirname, '../src/migrations'),
         migrationsTable: 'pgmigrations',
         ignorePattern: '.*\\.map',
@@ -150,6 +147,7 @@ async function initComponents(): Promise<TestComponents> {
       }
     }
   )
+  const userMutesDb = createUserMutesDBComponent({ pg, logs })
   const friendsDb = createFriendsDBComponent({ pg, logs })
   const communitiesDb = createCommunitiesDBComponent({ pg, logs })
   const voiceDb = await createVoiceDBComponent({ pg, config })
@@ -161,7 +159,8 @@ async function initComponents(): Promise<TestComponents> {
   const registry = await createRegistryComponent({ fetcher, config, redis, logs })
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
-  const subscribersContext = createSubscribersContext({ redis, logs })
+  const wsPool = await createWsPoolComponent({ logs, metrics, config })
+  const subscribersContext = createSubscribersContext({ logs, metrics, config }, wsPool)
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
@@ -258,7 +257,9 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     friendsDb,
     communityMembers,
-    registry
+    registry,
+    metrics,
+    peersStats
   })
   const communityVoice = await createCommunityVoiceComponent({
     logs,
@@ -309,7 +310,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const referralDb = await createReferralDBComponent({ pg, logs, config })
 
-  const rewards = await createRewardComponent({ fetcher, config })
+  const rewards = await createRewardComponent({ fetcher, config, logs })
 
   const email = await createEmailComponent({ fetcher, config })
 
@@ -328,8 +329,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const storageHelper = await createStorageHelper({ config })
 
-  const wsPool = createWsPoolComponent({ logs, metrics })
-
+  const userMutes = await createUserMutesComponent({ userMutesDb, logs })
   const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
 
   return {
@@ -396,6 +396,8 @@ async function initComponents(): Promise<TestComponents> {
     subscribersContext,
     tracing: mockTracing,
     updateHandler,
+    userMutes,
+    userMutesDb,
     uwsServer,
     voice,
     voiceDb,

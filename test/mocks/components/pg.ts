@@ -2,7 +2,9 @@ import { SQLStatement } from 'sql-template-strings'
 import { IPgComponent } from '../../../src/types'
 import { PoolClient } from 'pg'
 
-export const mockPg: jest.Mocked<IPgComponent> = {
+// `query` is typed as a loose jest.Mock so tests can resolve query results without specifying the
+// `notices` field that @dcl/pg-component's QueryResult now requires.
+export const mockPg: Omit<jest.Mocked<IPgComponent>, 'query'> & { query: jest.Mock } = {
   streamQuery: jest.fn(),
   start: jest.fn(),
   query: jest.fn(),
@@ -10,6 +12,7 @@ export const mockPg: jest.Mocked<IPgComponent> = {
     connect: jest.fn().mockResolvedValue({ query: jest.fn(), release: jest.fn() })
   }),
   stop: jest.fn(),
+  withAsyncContextTransaction: jest.fn(),
   getCount: jest.fn().mockImplementation(async (query: SQLStatement) => {
     const result = await mockPg.query(query)
     return result.rows[0].count

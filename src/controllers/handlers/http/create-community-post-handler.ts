@@ -1,5 +1,5 @@
-import { DecentralandSignatureContext } from '@dcl/platform-crypto-middleware'
-import { InvalidRequestError, NotAuthorizedError } from '@dcl/platform-server-commons'
+import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
+import { InvalidRequestError, NotAuthorizedError } from '@dcl/http-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { CommunityPost } from '../../../logic/community/types'
 import { errorMessageOrDefault } from '../../../utils/errors'

@@ -8,8 +8,8 @@ import { upsertFriendshipService } from '../../../../../src/controllers/handlers
 import { FriendshipRequest, RpcServerContext } from '../../../../../src/types'
 import { IFriendsComponent, parseFriendshipRequestToFriendshipRequestResponse } from '../../../../../src/logic/friends'
 import { createMockProfile } from '../../../../mocks/profile'
-import { InvalidFriendshipActionError, InvalidRequestError } from '../../../../../src/controllers/errors/rpc.errors'
-import { BlockedUserError } from '../../../../../src/logic/friends/errors'
+import { InvalidRequestError } from '../../../../../src/controllers/errors/rpc.errors'
+import { BlockedUserError, InvalidFriendshipActionError } from '../../../../../src/logic/friends/errors'
 
 describe('when upserting a friendship', () => {
   let upsertFriendship: ReturnType<typeof upsertFriendshipService>

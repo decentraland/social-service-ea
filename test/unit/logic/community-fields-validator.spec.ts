@@ -1,7 +1,7 @@
 import { createCommunityFieldsValidatorComponent } from '../../../src/logic/community/fields-validator'
 import { ICommunityFieldsValidatorComponent } from '../../../src/logic/community/types'
 import { createMockConfigComponent } from '../../mocks/components/config'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 import { CommunityPrivacyEnum } from '../../../src/logic/community'
 import { IConfigComponent } from '@well-known-components/interfaces'
 

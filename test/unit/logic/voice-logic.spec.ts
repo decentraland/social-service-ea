@@ -22,7 +22,8 @@ import {
   IPubSubComponent,
   IVoiceDatabaseComponent,
   PrivateMessagesPrivacy,
-  PrivateVoiceChat
+  PrivateVoiceChat,
+  SituationReactionsVisibility
 } from '../../../src/types'
 import { createSettingsMockedComponent } from '../../mocks/components/settings'
 import { ISettingsComponent } from '../../../src/logic/settings'
@@ -39,6 +40,7 @@ let areUsersBeingCalledOrCallingSomeoneMock: jest.MockedFn<
 let createPrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['createPrivateVoiceChat']>
 let getUsersSettingsMock: jest.MockedFn<ISettingsComponent['getUsersSettings']>
 let getFriendshipMock: jest.MockedFn<IFriendsDatabaseComponent['getFriendship']>
+let isFriendshipBlockedMock: jest.MockedFn<IFriendsDatabaseComponent['isFriendshipBlocked']>
 let isUserInAVoiceChatMock: jest.MockedFn<ICommsGatekeeperComponent['isUserInAVoiceChat']>
 let getPrivateVoiceChatCredentialsMock: jest.MockedFn<ICommsGatekeeperComponent['getPrivateVoiceChatCredentials']>
 let getPrivateVoiceChatMock: jest.MockedFn<IVoiceDatabaseComponent['getPrivateVoiceChat']>
@@ -55,6 +57,7 @@ beforeEach(async () => {
   getPrivateVoiceChatMock = jest.fn()
   getUsersSettingsMock = jest.fn()
   getFriendshipMock = jest.fn()
+  isFriendshipBlockedMock = jest.fn()
   isUserInAVoiceChatMock = jest.fn()
   publishInChannelMock = jest.fn()
   areUsersBeingCalledOrCallingSomeoneMock = jest.fn()
@@ -83,7 +86,8 @@ beforeEach(async () => {
     getUsersSettings: getUsersSettingsMock
   })
   const friendsDb = createFriendsDBMockedComponent({
-    getFriendship: getFriendshipMock
+    getFriendship: getFriendshipMock,
+    isFriendshipBlocked: isFriendshipBlockedMock
   })
   const commsGatekeeper = createCommsGatekeeperMockedComponent({
     isUserInAVoiceChat: isUserInAVoiceChatMock,
@@ -115,18 +119,47 @@ describe('when starting a private voice chat', () => {
     calleeAddress = '0x2B72b8d597c553b3173bca922B9ad871da751dA5'
   })
 
+  describe('and the caller and callee are the same user', () => {
+    it('should reject with a voice chat not allowed error without hitting any downstream calls', async () => {
+      await expect(voice.startPrivateVoiceChat(callerAddress, callerAddress)).rejects.toThrow(VoiceChatNotAllowedError)
+      expect(isFriendshipBlockedMock).not.toHaveBeenCalled()
+      expect(getUsersSettingsMock).not.toHaveBeenCalled()
+      expect(createPrivateVoiceChatMock).not.toHaveBeenCalled()
+    })
+
+    it('should treat differently-cased addresses of the same user as self', async () => {
+      await expect(voice.startPrivateVoiceChat(callerAddress, callerAddress.toLowerCase())).rejects.toThrow(
+        VoiceChatNotAllowedError
+      )
+      expect(createPrivateVoiceChatMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('and one of the users has blocked the other', () => {
+    beforeEach(() => {
+      isFriendshipBlockedMock.mockResolvedValueOnce(true)
+    })
+
+    it('should reject with a voice chat not allowed error and not create the chat', async () => {
+      await expect(voice.startPrivateVoiceChat(callerAddress, calleeAddress)).rejects.toThrow(VoiceChatNotAllowedError)
+      expect(createPrivateVoiceChatMock).not.toHaveBeenCalled()
+    })
+  })
+
   describe('and the caller is not accepting voice calls from users that are not friends', () => {
     beforeEach(() => {
       getUsersSettingsMock.mockResolvedValueOnce([
         {
           address: callerAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ONLY_FRIENDS,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         },
         {
           address: calleeAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         }
       ])
     })
@@ -177,12 +210,14 @@ describe('when starting a private voice chat', () => {
         {
           address: callerAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         },
         {
           address: calleeAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ONLY_FRIENDS,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         }
       ])
     })
@@ -233,12 +268,14 @@ describe('when starting a private voice chat', () => {
         {
           address: callerAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         },
         {
           address: calleeAddress,
           private_messages_privacy: PrivateMessagesPrivacy.ALL,
-          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+          blocked_users_messages_visibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+          show_situation_reactions: SituationReactionsVisibility.SHOW
         }
       ])
     })

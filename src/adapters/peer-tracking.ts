@@ -46,6 +46,11 @@ export async function createPeerTrackingComponent({
   const PEER_STATUS_KEY_PREFIX = 'peer-status:'
 
   async function notifyPeerStatusChange(peerId: string, status: ConnectivityStatus) {
+    if (!peerId) {
+      logger.warn('Ignoring peer status change with empty peerId')
+      return
+    }
+
     const key = PEER_STATUS_KEY_PREFIX + peerId
     const currentStatus = await redis.get<ConnectivityStatus>(key)
 

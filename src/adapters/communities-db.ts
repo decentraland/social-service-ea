@@ -21,7 +21,8 @@ import {
   GetCommunityPostsOptions,
   CommunityVisibilityEnum,
   CommunityRankingMetrics,
-  CommunityRankingMetricsDB
+  CommunityRankingMetricsDB,
+  CommunityNotFoundError
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -30,6 +31,7 @@ import {
   useCTEs,
   getUserFriendsCTE,
   searchCommunitiesQuery,
+  escapeLikePattern,
   getCommunitiesWithMembersCountCTE,
   withSearchAndPagination,
   getLatestFriendshipActionCTE,
@@ -385,9 +387,12 @@ export function createCommunitiesDBComponent(
 
     async getCommunitiesCount(
       memberAddress: EthAddress,
-      options?: Pick<GetCommunitiesOptions, 'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'includeUnlisted'>
+      options?: Pick<
+        GetCommunitiesOptions,
+        'search' | 'onlyMemberOf' | 'roles' | 'communityIds' | 'includeUnlisted' | 'onlyPublicVisible'
+      >
     ): Promise<number> {
-      const { search, onlyMemberOf, roles, communityIds, includeUnlisted } = options ?? {}
+      const { search, onlyMemberOf, roles, communityIds, includeUnlisted, onlyPublicVisible } = options ?? {}
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const membersJoin = getCommunityMembersJoin(normalizedMemberAddress, { onlyMemberOf, roles })
@@ -406,6 +411,7 @@ export function createCommunitiesDBComponent(
           // Otherwise, exclude unlisted communities from public listings
           onlyMemberOf || includeUnlisted ? SQL`` : SQL` AND c.unlisted = false`
         )
+        .append(onlyPublicVisible ? SQL` AND c.private = false AND c.unlisted = false` : SQL``)
         .append(SQL` AND cb.banned_address IS NULL`)
 
       if (search) {
@@ -470,12 +476,12 @@ export function createCommunitiesDBComponent(
 
     async getMemberCommunities(
       memberAddress: EthAddress,
-      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles'>
+      options: Pick<GetCommunitiesOptions, 'pagination' | 'roles' | 'onlyPublicVisible'>
     ): Promise<MemberCommunity[]> {
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       const baseQuery = SQL`
-        SELECT 
+        SELECT
           c.id,
           c.name,
           c.owner_address as "ownerAddress",
@@ -485,6 +491,7 @@ export function createCommunitiesDBComponent(
       `
         .append(options.roles ? SQL` AND cm.role = ANY(${options.roles})` : SQL``)
         .append(SQL` WHERE c.active = true`)
+        .append(options.onlyPublicVisible ? SQL` AND c.private = false AND c.unlisted = false` : SQL``)
 
       const query = withSearchAndPagination(baseQuery, {
         sortBy: 'role',
@@ -699,10 +706,14 @@ export function createCommunitiesDBComponent(
           FOR UPDATE
         `)
 
+        if (!lockResult.rows[0]) {
+          throw new CommunityNotFoundError(communityId)
+        }
+
         const oldOwner = lockResult.rows[0].owner_address
 
         await client.query(SQL`
-          UPDATE communities 
+          UPDATE communities
           SET owner_address = ${normalizedNewOwner}, updated_at = now() 
           WHERE id = ${communityId}
         `)
@@ -928,18 +939,43 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
+    async removeMemberRequests(communityId: string, memberAddress: EthAddress): Promise<void> {
+      const query = SQL`
+        DELETE FROM community_requests
+        WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
+      `
+      await pg.query(query)
+    },
+
     async acceptAllRequestsToJoin(communityId: string): Promise<string[]> {
       return pg.withTransaction(async (client) => {
         const addMembersQuery = SQL`
           INSERT INTO community_members (community_id, member_address, role)
-          SELECT community_id, member_address, ${CommunityRole.Member}
-          FROM community_requests
-          WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
+          SELECT cr.community_id, cr.member_address, ${CommunityRole.Member}
+          FROM community_requests cr
+          WHERE cr.community_id = ${communityId} AND cr.type = ${CommunityRequestType.RequestToJoin}
+            AND NOT EXISTS (
+              SELECT 1 FROM community_bans cb
+              WHERE cb.community_id = cr.community_id
+                AND cb.banned_address = cr.member_address
+                AND cb.active = true
+            )
+          ON CONFLICT (community_id, member_address) DO NOTHING
         `
         await client.query(addMembersQuery.text, addMembersQuery.values)
 
+        // Only remove (and report as accepted) the requests that were actually accepted above, i.e.
+        // from non-banned users. A banned user's pending request is left untouched; it cannot be
+        // accepted while the ban is active (see updateRequestStatus).
         const removeRequestsToJoinQuery = SQL`
-          DELETE FROM community_requests WHERE community_id = ${communityId} AND type = ${CommunityRequestType.RequestToJoin}
+          DELETE FROM community_requests cr
+          WHERE cr.community_id = ${communityId} AND cr.type = ${CommunityRequestType.RequestToJoin}
+            AND NOT EXISTS (
+              SELECT 1 FROM community_bans cb
+              WHERE cb.community_id = cr.community_id
+                AND cb.banned_address = cr.member_address
+                AND cb.active = true
+            )
           RETURNING id
         `
 
@@ -993,7 +1029,7 @@ export function createCommunitiesDBComponent(
         WHERE c.active = true`
 
       if (search) {
-        query = query.append(SQL` AND (c.name ILIKE ${`%${search}%`} OR c.description ILIKE ${`%${search}%`})`)
+        query = query.append(searchCommunitiesQuery(search))
       }
 
       query = query.append(
@@ -1353,7 +1389,8 @@ export function createCommunitiesDBComponent(
       countQuery.append(countBaseCondition)
 
       if (search) {
-        const searchCondition = SQL` AND (c.name ILIKE ${search + '%'} OR c.name ILIKE ${'% ' + search + '%'})`
+        const escapedSearch = escapeLikePattern(search)
+        const searchCondition = SQL` AND (c.name ILIKE ${escapedSearch + '%'} ESCAPE '\\' OR c.name ILIKE ${'% ' + escapedSearch + '%'} ESCAPE '\\')`
         mainQuery.append(searchCondition)
         countQuery.append(searchCondition)
       }

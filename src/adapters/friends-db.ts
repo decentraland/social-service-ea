@@ -192,13 +192,13 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
     },
     async getSocialSettings(userAddresses: string[]): Promise<SocialSettings[]> {
       const query = SQL`
-        SELECT * FROM social_settings WHERE address = ANY(${userAddresses})
+        SELECT * FROM social_settings WHERE address = ANY(${userAddresses.map(normalizeAddress)})
       `
       const results = await pg.query<{ private_messages_privacy: string }>(query)
       return results.rows as SocialSettings[]
     },
     async deleteSocialSettings(userAddress: string): Promise<void> {
-      const query = SQL`DELETE FROM social_settings WHERE address = ${userAddress}`
+      const query = SQL`DELETE FROM social_settings WHERE address = ${normalizeAddress(userAddress)}`
       await pg.query(query)
     },
     async upsertSocialSettings(
@@ -225,7 +225,7 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
         .append(values)
         .append(`) ON CONFLICT (address) DO UPDATE SET `)
         .append(update)
-        .append(SQL` WHERE social_settings.address = ${userAddress} RETURNING *`)
+        .append(SQL` WHERE social_settings.address = ${normalizeAddress(userAddress)} RETURNING *`)
       const results = await pg.query<SocialSettings>(query)
       return results.rows[0]
     },
@@ -260,6 +260,10 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       }
     },
     async blockUsers(blockerAddress, blockedAddresses) {
+      if (blockedAddresses.length === 0) {
+        return
+      }
+
       const query = SQL`INSERT INTO blocks (id, blocker_address, blocked_address) VALUES `
 
       blockedAddresses.forEach((blockedAddress, index) => {

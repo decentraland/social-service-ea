@@ -6,7 +6,7 @@ import {
   AggregatedCommunityWithMemberAndVoiceChatData,
   CommunityPublicInformationWithVoiceChat
 } from '../../../logic/community'
-import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { InvalidRequestError } from '@dcl/http-commons'
 
 export async function getCommunityHandler(
   context: Pick<

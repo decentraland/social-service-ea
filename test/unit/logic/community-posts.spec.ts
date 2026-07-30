@@ -1,5 +1,5 @@
 import { EthAddress, Events } from '@dcl/schemas'
-import { NotAuthorizedError } from '@dcl/platform-server-commons'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { CommunityNotFoundError, CommunityPostNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
 import { mockRegistry, createLogsMockedComponent } from '../../mocks/components'
