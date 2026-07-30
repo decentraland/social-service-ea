@@ -332,15 +332,98 @@ describe('referral-component', () => {
       })
     })
 
+    describe('when a concurrent create wins the insert race', () => {
+      beforeEach(() => {
+        // Passes the existence pre-check, then the unique index rejects the insert.
+        mockReferralDb.hasReferralProgress.mockResolvedValueOnce(false)
+        mockReferralDb.createReferral.mockResolvedValueOnce(null)
+      })
+
+      describe('and the stored referral has the same referrer', () => {
+        let stored: { referrer: string; invited_user: string; status: ReferralProgressStatus; created_at: number }
+
+        beforeEach(() => {
+          stored = {
+            referrer: validReferrer.toLowerCase(),
+            invited_user: validInvitedUser.toLowerCase(),
+            status: ReferralProgressStatus.PENDING,
+            created_at: Date.now()
+          }
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([]).mockResolvedValueOnce([stored])
+        })
+
+        it('should resolve to the stored referral instead of writing a second attribution', async () => {
+          const result = await referralComponent.create(validInput)
+
+          expect(result).toEqual(stored)
+        })
+      })
+
+      describe('and the stored referral has a different referrer', () => {
+        beforeEach(() => {
+          mockReferralDb.findReferralProgress
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([
+              {
+                referrer: '0x1111111111111111111111111111111111111111',
+                invited_user: validInvitedUser.toLowerCase(),
+                status: ReferralProgressStatus.PENDING,
+                created_at: Date.now()
+              }
+            ])
+        })
+
+        it('should throw ReferralAlreadyExistsError', async () => {
+          await expect(referralComponent.create(validInput)).rejects.toThrow(
+            new ReferralAlreadyExistsError(validInvitedUser.toLowerCase())
+          )
+        })
+      })
+    })
+
     describe('when referral already exists', () => {
       beforeEach(() => {
         mockReferralDb.hasReferralProgress.mockResolvedValueOnce(true)
       })
 
-      it('should throw ReferralAlreadyExistsError', async () => {
-        await expect(referralComponent.create(validInput)).rejects.toThrow(
-          new ReferralAlreadyExistsError(validInvitedUser.toLowerCase())
-        )
+      describe('and it belongs to a different referrer', () => {
+        beforeEach(() => {
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([
+            {
+              referrer: '0x1111111111111111111111111111111111111111',
+              invited_user: validInvitedUser.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
+        })
+
+        it('should throw ReferralAlreadyExistsError', async () => {
+          await expect(referralComponent.create(validInput)).rejects.toThrow(
+            new ReferralAlreadyExistsError(validInvitedUser.toLowerCase())
+          )
+        })
+      })
+
+      describe('and it belongs to the same referrer', () => {
+        let existing: { referrer: string; invited_user: string; status: ReferralProgressStatus; created_at: number }
+
+        beforeEach(() => {
+          existing = {
+            referrer: validReferrer.toLowerCase(),
+            invited_user: validInvitedUser.toLowerCase(),
+            status: ReferralProgressStatus.PENDING,
+            created_at: Date.now()
+          }
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([existing])
+        })
+
+        it('should return the existing referral without creating a new one (idempotent)', async () => {
+          const result = await referralComponent.create(validInput)
+
+          expect(result).toEqual(existing)
+          expect(mockReferralDb.createReferral).not.toHaveBeenCalled()
+        })
       })
     })
 

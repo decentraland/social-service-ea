@@ -4,7 +4,7 @@ import { createTestIdentity, Identity, createAuthHeaders } from './utils/auth'
 import { TestCleanup } from '../db-cleanup'
 import { makeAuthenticatedRequest } from './utils/auth'
 
-test('POST /v1/referral-progress', ({ components }) => {
+test('POST /v1/referral-progress', ({ components, spyComponents }) => {
   const makeRequest = makeAuthenticatedRequest(components)
   let cleanup: TestCleanup
   const endpoint = '/v1/referral-progress'
@@ -27,6 +27,26 @@ test('POST /v1/referral-progress', ({ components }) => {
     jest.restoreAllMocks()
   })
 
+  describe('when referral registration is disabled by the kill switch', () => {
+    beforeEach(() => {
+      body = {
+        referrer: referrer.realAccount.address.toLowerCase()
+      }
+      spyComponents.featureFlags.isEnabled.mockReturnValue(true)
+    })
+
+    it('should reject the create with 503 and register nothing', async () => {
+      const response = await makeRequest(invited_user, endpoint, 'POST', body)
+
+      expect(response.status).toBe(503)
+      const json = await response.json()
+      expect(json).toEqual({
+        error: 'Service Unavailable',
+        message: 'Referral registration is temporarily disabled'
+      })
+    })
+  })
+
   describe('when creating a new referral progress entry', () => {
     describe('with valid referral data', () => {
       beforeEach(() => {
@@ -47,27 +67,50 @@ test('POST /v1/referral-progress', ({ components }) => {
     })
 
     describe('when referral progress already exists for the invited user', () => {
-      beforeEach(() => {
-        body = {
-          referrer: referrer.realAccount.address.toLowerCase()
-        }
-      })
-
       afterEach(async () => {
-        await cleanup.trackInsert('referral_progress', body)
+        await cleanup.trackInsert('referral_progress', { referrer: referrer.realAccount.address.toLowerCase() })
       })
 
-      it('should return 400 with referral progress already exists error', async () => {
-        await makeRequest(invited_user, endpoint, 'POST', body)
+      describe('and the second create uses the same referrer', () => {
+        beforeEach(() => {
+          body = {
+            referrer: referrer.realAccount.address.toLowerCase()
+          }
+        })
 
-        const response = await makeRequest(invited_user, endpoint, 'POST', body)
+        it('should be idempotent and return 204', async () => {
+          await makeRequest(invited_user, endpoint, 'POST', body)
 
-        expect(response.status).toBe(400)
-        const json = await response.json()
-        expect(json).toEqual({
-          error: 'Bad request',
-          message:
-            'Referral progress already exists for the invited user: ' + invited_user.realAccount.address.toLowerCase()
+          const response = await makeRequest(invited_user, endpoint, 'POST', body)
+
+          expect(response.status).toBe(204)
+        })
+      })
+
+      describe('and the second create uses a different referrer', () => {
+        let otherReferrer: Identity
+
+        beforeEach(async () => {
+          otherReferrer = await createTestIdentity()
+          body = {
+            referrer: referrer.realAccount.address.toLowerCase()
+          }
+        })
+
+        it('should return 400 with referral progress already exists error', async () => {
+          await makeRequest(invited_user, endpoint, 'POST', body)
+
+          const response = await makeRequest(invited_user, endpoint, 'POST', {
+            referrer: otherReferrer.realAccount.address.toLowerCase()
+          })
+
+          expect(response.status).toBe(400)
+          const json = await response.json()
+          expect(json).toEqual({
+            error: 'Bad request',
+            message:
+              'Referral progress already exists for the invited user: ' + invited_user.realAccount.address.toLowerCase()
+          })
         })
       })
     })
