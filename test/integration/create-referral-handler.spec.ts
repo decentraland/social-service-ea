@@ -4,7 +4,7 @@ import { createTestIdentity, Identity, createAuthHeaders } from './utils/auth'
 import { TestCleanup } from '../db-cleanup'
 import { makeAuthenticatedRequest } from './utils/auth'
 
-test('POST /v1/referral-progress', ({ components }) => {
+test('POST /v1/referral-progress', ({ components, spyComponents }) => {
   const makeRequest = makeAuthenticatedRequest(components)
   let cleanup: TestCleanup
   const endpoint = '/v1/referral-progress'
@@ -25,6 +25,26 @@ test('POST /v1/referral-progress', ({ components }) => {
   afterEach(async () => {
     await cleanup.cleanup()
     jest.restoreAllMocks()
+  })
+
+  describe('when referral registration is disabled by the kill switch', () => {
+    beforeEach(() => {
+      body = {
+        referrer: referrer.realAccount.address.toLowerCase()
+      }
+      spyComponents.featureFlags.isEnabled.mockReturnValue(true)
+    })
+
+    it('should reject the create with 503 and register nothing', async () => {
+      const response = await makeRequest(invited_user, endpoint, 'POST', body)
+
+      expect(response.status).toBe(503)
+      const json = await response.json()
+      expect(json).toEqual({
+        error: 'Service Unavailable',
+        message: 'Referral registration is temporarily disabled'
+      })
+    })
   })
 
   describe('when creating a new referral progress entry', () => {
