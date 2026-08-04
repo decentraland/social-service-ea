@@ -19,10 +19,10 @@ export function createPubSubComponent(components: Pick<AppComponents, 'logs' | '
   // duplicate() copies options but not listeners, so these clients do not inherit the main
   // client's 'error' handler. Without one, an emitted 'error' is unhandled and aborts the process.
   subClient.on('error', (error: Error) => {
-    logger.error(`Redis sub client error: ${error.message}`)
+    logger.error(error, { client: 'sub' })
   })
   pubClient.on('error', (error: Error) => {
-    logger.error(`Redis pub client error: ${error.message}`)
+    logger.error(error, { client: 'pub' })
   })
 
   return {

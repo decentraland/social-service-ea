@@ -156,12 +156,8 @@ describe('PubSubComponent', () => {
 
       handlers.forEach((handler) => expect(() => handler(error)).not.toThrow())
 
-      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(
-        `Redis sub client error: ${error.message}`
-      )
-      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(
-        `Redis pub client error: ${error.message}`
-      )
+      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(error, { client: 'sub' })
+      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(error, { client: 'pub' })
     })
   })
 })
