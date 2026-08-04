@@ -141,4 +141,23 @@ describe('PubSubComponent', () => {
       expect(mockPubClient.disconnect).not.toHaveBeenCalled()
     })
   })
+
+  describe('client error handling', () => {
+    const errorRegistrations = () =>
+      (mockSubClient.on as unknown as jest.Mock).mock.calls.filter(([event]: [string]) => event === 'error')
+
+    it('should register an error listener on both duplicated clients', () => {
+      expect(errorRegistrations()).toHaveLength(2)
+    })
+
+    it('should log client errors instead of leaving them unhandled', () => {
+      const error = new Error('Socket closed unexpectedly')
+      const handlers = errorRegistrations().map(([, handler]: [string, (error: Error) => void]) => handler)
+
+      handlers.forEach((handler) => expect(() => handler(error)).not.toThrow())
+
+      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(error, { client: 'sub' })
+      expect(mockLogs.getLogger('pubsub-component').error).toHaveBeenCalledWith(error, { client: 'pub' })
+    })
+  })
 })
