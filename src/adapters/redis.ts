@@ -121,6 +121,14 @@ export async function createRedisComponent(
     }
   }
 
+  async function consumeRateLimit(key: string, limit: number, windowSeconds: number): Promise<boolean> {
+    const count = await client.eval(
+      "local current = redis.call('INCR', KEYS[1]); if current == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return current",
+      { keys: [key], arguments: [windowSeconds.toString()] }
+    )
+    return Number(count) <= limit
+  }
+
   return {
     client,
     start,
@@ -131,6 +139,7 @@ export async function createRedisComponent(
     sAdd,
     sRem,
     sMembers,
-    sCard
+    sCard,
+    consumeRateLimit
   }
 }

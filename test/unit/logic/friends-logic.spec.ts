@@ -5,14 +5,18 @@ import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/
 import { createFriendsComponent } from '../../../src/logic/friends/component'
 import { IFriendsComponent } from '../../../src/logic/friends/types'
 import { createFriendsDBMockedComponent } from '../../mocks/components/friends-db'
-import { mockConfig, mockRedis, mockRegistry } from '../../mocks/components'
+import { mockConfig, mockMetrics, mockRedis, mockRegistry } from '../../mocks/components'
 import { createMockProfile } from '../../mocks/profile'
 import { createLogsMockedComponent, createMockedPubSubComponent } from '../../mocks/components'
 import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { BLOCKED_USERS_DEFAULT_LIMIT, FRIENDS_DEFAULT_LIMIT } from '../../../src/utils/friendship-pagination'
 import { Action, Friendship, User, BlockedUserWithDate, FriendshipRequest, FriendshipAction } from '../../../src/types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
-import { BlockedUserError, InvalidFriendshipActionError } from '../../../src/logic/friends/errors'
+import {
+  BlockedUserError,
+  FriendshipRateLimitError,
+  InvalidFriendshipActionError
+} from '../../../src/logic/friends/errors'
 import { sendNotification } from '../../../src/logic/notifications'
 
 jest.mock('../../../src/logic/notifications', () => ({
@@ -47,7 +51,10 @@ describe('Friends Component', () => {
       registry: mockRegistry,
       pubsub: mockPubSub,
       sns: mockSNS,
-      logs
+      logs,
+      redis: mockRedis,
+      config: mockConfig,
+      metrics: mockMetrics
     })
   })
 
@@ -323,6 +330,60 @@ describe('Friends Component', () => {
 
         expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xfriend1'])
       })
+    })
+  })
+
+  describe('when the friendship mutation rate limit is exhausted', () => {
+    let error: Error | undefined
+    let targetAddress: string
+
+    beforeEach(async () => {
+      targetAddress = '0x2234567890123456789012345678901234567890'
+      mockRedis.consumeRateLimit.mockResolvedValueOnce(false)
+      error = await friendsComponent.blockUser(mockUserAddress, targetAddress).catch((caught) => caught)
+    })
+
+    it('should reject the mutation with a rate limit error', () => {
+      expect(error).toBeInstanceOf(FriendshipRateLimitError)
+    })
+
+    it('should reject before reading the target profile', () => {
+      expect(mockRegistry.getProfile).not.toHaveBeenCalled()
+    })
+
+    it('should reject before writing friendship state', () => {
+      expect(mockFriendsDB.executeTx).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the rate limiter backend is unreachable', () => {
+    let targetAddress: string
+    let result: Awaited<ReturnType<typeof friendsComponent.blockUser>> | undefined
+    let error: Error | undefined
+
+    beforeEach(async () => {
+      targetAddress = '0x2234567890123456789012345678901234567890'
+      mockRedis.consumeRateLimit.mockRejectedValue(new Error('The client is closed'))
+      mockRegistry.getProfile.mockResolvedValueOnce(createMockProfile(targetAddress))
+      mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb({} as jest.Mocked<PoolClient>))
+      mockFriendsDB.getFriendship.mockResolvedValueOnce(undefined)
+      mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: new Date() })
+      result = await friendsComponent.blockUser(mockUserAddress, targetAddress).catch((caught) => {
+        error = caught
+        return undefined
+      })
+    })
+
+    it('should allow the mutation instead of failing the request', () => {
+      expect(error).toBeUndefined()
+    })
+
+    it('should complete the block', () => {
+      expect(result).toBeDefined()
+    })
+
+    it('should record that the limiter was bypassed', () => {
+      expect(mockMetrics.increment).toHaveBeenCalledWith('friendship_rate_limiter_unavailable')
     })
   })
 
