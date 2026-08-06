@@ -1,8 +1,17 @@
 import { CommunityRole } from '../../../../src/types'
 import {
   toCommunityWithUserInformationAndVoiceChat,
+  toCommunityWithMembersCount,
+  toCommunityWithMembersCountV2,
+  toPublicCommunityWithVoiceChat,
+  toPublicCommunityWithVoiceChatV2,
+  AggregatedCommunityWithMemberAndVoiceChatData,
+  AggregatedCommunityWithMemberAndVoiceChatDataV2,
+  CommunityPublicInformationWithVoiceChat,
+  CommunityPublicInformationWithVoiceChatV2,
   CommunityPrivacyEnum,
   AggregatedCommunityWithMemberAndFriendsData,
+  Community,
   CommunityVoiceChatStatus,
   CommunityVisibilityEnum
 } from '../../../../src/logic/community'
@@ -202,6 +211,234 @@ describe('Community Utils', () => {
           })
         )
         expect(result.friends).toHaveLength(2)
+      })
+    })
+  })
+
+  describe('when mapping a single community that has a live voice chat', () => {
+    let baseCommunity: Community
+    let activeVoiceChatStatus: CommunityVoiceChatStatus
+    let membersCount: number
+
+    beforeEach(() => {
+      baseCommunity = {
+        id: 'test-community-id',
+        name: 'Test Community',
+        description: 'Test Description',
+        ownerAddress: '0xowner',
+        privacy: CommunityPrivacyEnum.Public,
+        visibility: CommunityVisibilityEnum.All,
+        active: true
+      }
+      activeVoiceChatStatus = { isActive: true, participantCount: 5, moderatorCount: 2 }
+      membersCount = 10
+    })
+
+    describe('and the community is private', () => {
+      let privateCommunity: Community
+
+      beforeEach(() => {
+        privateCommunity = { ...baseCommunity, privacy: CommunityPrivacyEnum.Private }
+      })
+
+      describe('and the caller is authenticated but not a member', () => {
+        let result: AggregatedCommunityWithMemberAndVoiceChatData
+        let resultV2: AggregatedCommunityWithMemberAndVoiceChatDataV2
+
+        beforeEach(() => {
+          result = toCommunityWithMembersCount(
+            { ...privateCommunity, ownerName: 'Test Owner', isHostingLiveEvent: false, role: CommunityRole.None },
+            membersCount,
+            activeVoiceChatStatus
+          )
+          resultV2 = toCommunityWithMembersCountV2(
+            { ...privateCommunity, isHostingLiveEvent: false, role: CommunityRole.None },
+            membersCount,
+            activeVoiceChatStatus
+          )
+        })
+
+        it('should hide the voice chat status from the v1 response', () => {
+          expect(result.voiceChatStatus).toBeNull()
+        })
+
+        it('should hide the voice chat status from the v2 response', () => {
+          expect(resultV2.voiceChatStatus).toBeNull()
+        })
+
+        it('should still expose the community name, description and owner address', () => {
+          expect(result).toEqual(
+            expect.objectContaining({
+              name: 'Test Community',
+              description: 'Test Description',
+              ownerAddress: '0xowner'
+            })
+          )
+        })
+
+        describe('and a caller who may see the status is served a community with no live voice chat', () => {
+          let visibleCallerWithoutVoiceChat: AggregatedCommunityWithMemberAndVoiceChatData
+
+          beforeEach(() => {
+            visibleCallerWithoutVoiceChat = toCommunityWithMembersCount(
+              { ...privateCommunity, ownerName: 'Test Owner', isHostingLiveEvent: false, role: CommunityRole.Member },
+              membersCount,
+              null
+            )
+          })
+
+          it('should be indistinguishable from the hidden live voice chat', () => {
+            expect(result.voiceChatStatus).toEqual(visibleCallerWithoutVoiceChat.voiceChatStatus)
+          })
+        })
+      })
+
+      describe('and the caller is a member', () => {
+        let result: AggregatedCommunityWithMemberAndVoiceChatData
+        let resultV2: AggregatedCommunityWithMemberAndVoiceChatDataV2
+
+        beforeEach(() => {
+          result = toCommunityWithMembersCount(
+            { ...privateCommunity, ownerName: 'Test Owner', isHostingLiveEvent: false, role: CommunityRole.Member },
+            membersCount,
+            activeVoiceChatStatus
+          )
+          resultV2 = toCommunityWithMembersCountV2(
+            { ...privateCommunity, isHostingLiveEvent: false, role: CommunityRole.Member },
+            membersCount,
+            activeVoiceChatStatus
+          )
+        })
+
+        it('should expose the real voice chat status in the v1 response', () => {
+          expect(result.voiceChatStatus).toEqual(activeVoiceChatStatus)
+        })
+
+        it('should expose the real voice chat status in the v2 response', () => {
+          expect(resultV2.voiceChatStatus).toEqual(activeVoiceChatStatus)
+        })
+      })
+
+      describe('and the caller is a moderator', () => {
+        let result: AggregatedCommunityWithMemberAndVoiceChatData
+
+        beforeEach(() => {
+          result = toCommunityWithMembersCount(
+            { ...privateCommunity, ownerName: 'Test Owner', isHostingLiveEvent: false, role: CommunityRole.Moderator },
+            membersCount,
+            activeVoiceChatStatus
+          )
+        })
+
+        it('should expose the real voice chat status', () => {
+          expect(result.voiceChatStatus).toEqual(activeVoiceChatStatus)
+        })
+      })
+
+      describe('and the caller is the owner', () => {
+        let result: AggregatedCommunityWithMemberAndVoiceChatData
+
+        beforeEach(() => {
+          result = toCommunityWithMembersCount(
+            { ...privateCommunity, ownerName: 'Test Owner', isHostingLiveEvent: false, role: CommunityRole.Owner },
+            membersCount,
+            activeVoiceChatStatus
+          )
+        })
+
+        it('should expose the real voice chat status', () => {
+          expect(result.voiceChatStatus).toEqual(activeVoiceChatStatus)
+        })
+      })
+
+      describe('and the caller is not authenticated', () => {
+        let publicResult: CommunityPublicInformationWithVoiceChat
+        let publicResultV2: CommunityPublicInformationWithVoiceChatV2
+
+        beforeEach(() => {
+          publicResult = toPublicCommunityWithVoiceChat(
+            { ...privateCommunity, ownerName: 'Test Owner', isHostingLiveEvent: false, membersCount },
+            activeVoiceChatStatus
+          )
+          publicResultV2 = toPublicCommunityWithVoiceChatV2(
+            { ...privateCommunity, isHostingLiveEvent: false, membersCount },
+            activeVoiceChatStatus
+          )
+        })
+
+        it('should hide the voice chat status from the v1 response', () => {
+          expect(publicResult.voiceChatStatus).toBeNull()
+        })
+
+        it('should hide the voice chat status from the v2 response', () => {
+          expect(publicResultV2.voiceChatStatus).toBeNull()
+        })
+
+        it('should still expose the community name, description and owner address', () => {
+          expect(publicResult).toEqual(
+            expect.objectContaining({
+              name: 'Test Community',
+              description: 'Test Description',
+              ownerAddress: '0xowner'
+            })
+          )
+        })
+      })
+    })
+
+    describe('and the community is public', () => {
+      describe('and the caller is authenticated but not a member', () => {
+        let result: AggregatedCommunityWithMemberAndVoiceChatData
+        let resultV2: AggregatedCommunityWithMemberAndVoiceChatDataV2
+
+        beforeEach(() => {
+          result = toCommunityWithMembersCount(
+            { ...baseCommunity, ownerName: 'Test Owner', isHostingLiveEvent: false, role: CommunityRole.None },
+            membersCount,
+            activeVoiceChatStatus
+          )
+          resultV2 = toCommunityWithMembersCountV2(
+            { ...baseCommunity, isHostingLiveEvent: false, role: CommunityRole.None },
+            membersCount,
+            activeVoiceChatStatus
+          )
+        })
+
+        it('should expose the real voice chat status in the v1 response', () => {
+          expect(result.voiceChatStatus).toEqual(activeVoiceChatStatus)
+        })
+
+        it('should expose the real voice chat status in the v2 response', () => {
+          expect(resultV2.voiceChatStatus).toEqual(activeVoiceChatStatus)
+        })
+      })
+
+      describe('and the caller is not authenticated', () => {
+        let publicResult: CommunityPublicInformationWithVoiceChat
+        let publicResultV2: CommunityPublicInformationWithVoiceChatV2
+
+        beforeEach(() => {
+          publicResult = toPublicCommunityWithVoiceChat(
+            { ...baseCommunity, ownerName: 'Test Owner', isHostingLiveEvent: false, membersCount },
+            activeVoiceChatStatus
+          )
+          publicResultV2 = toPublicCommunityWithVoiceChatV2(
+            { ...baseCommunity, isHostingLiveEvent: false, membersCount },
+            activeVoiceChatStatus
+          )
+        })
+
+        it('should expose the real voice chat status in the v1 response', () => {
+          expect(publicResult.voiceChatStatus).toEqual(activeVoiceChatStatus)
+        })
+
+        it('should expose the real voice chat status in the v2 response', () => {
+          expect(publicResultV2.voiceChatStatus).toEqual(activeVoiceChatStatus)
+        })
+
+        it('should return the members count as a number', () => {
+          expect(publicResult.membersCount).toBe(10)
+        })
       })
     })
   })
