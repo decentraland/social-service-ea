@@ -14,6 +14,11 @@ import { getProfileUserId } from '../profiles'
 import { sendNotification, shouldNotify } from '../notifications'
 import { BlockedUserError, InvalidFriendshipActionError, ProfileNotFoundError } from './errors'
 import { getNewFriendshipStatus, validateNewFriendshipAction } from './friendships'
+import {
+  normalizeBlockedUsersPagination,
+  normalizeFriendsPagination,
+  normalizeFriendshipRequestsPagination
+} from '../../utils/friendship-pagination'
 import { BlockedUser, IFriendsComponent } from './types'
 
 export async function createFriendsComponent(
@@ -21,14 +26,13 @@ export async function createFriendsComponent(
 ): Promise<IFriendsComponent> {
   const { friendsDb, registry, pubsub, sns, logs } = components
   const logger = logs.getLogger('friends-component')
-
   return {
     getFriendsProfiles: async (
       userAddress: EthAddress,
       pagination?: Pagination
     ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
       const [friends, total] = await Promise.all([
-        friendsDb.getFriends(userAddress, { pagination, onlyActive: true }),
+        friendsDb.getFriends(userAddress, { pagination: normalizeFriendsPagination(pagination), onlyActive: true }),
         friendsDb.getFriendsCount(userAddress, { onlyActive: true })
       ])
 
@@ -80,16 +84,20 @@ export async function createFriendsComponent(
       return { profile, blockedAt }
     },
     getBlockedUsers: async (
-      userAddress: string
+      userAddress: string,
+      pagination?: Pagination
     ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }> => {
-      const blockedUsers = await friendsDb.getBlockedUsers(userAddress)
-      const blockedAddresses = blockedUsers.map((user) => user.address)
-      const profiles = await registry.getProfiles(blockedAddresses)
+      // total must be the row count, not the page length: clients page until they reach it.
+      const [blockedUsers, total] = await Promise.all([
+        friendsDb.getBlockedUsers(userAddress, normalizeBlockedUsersPagination(pagination)),
+        friendsDb.getBlockedUsersCount(userAddress)
+      ])
+      const profiles = await registry.getProfiles(blockedUsers.map((user) => user.address))
 
       return {
         blockedUsers,
         blockedProfiles: profiles,
-        total: blockedAddresses.length
+        total
       }
     },
     getBlockingStatus: async (userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }> => {
@@ -119,7 +127,7 @@ export async function createFriendsComponent(
       pagination?: Pagination
     ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
       const [mutualFriends, total] = await Promise.all([
-        friendsDb.getMutualFriends(requesterAddress, requestedAddress, pagination),
+        friendsDb.getMutualFriends(requesterAddress, requestedAddress, normalizeFriendsPagination(pagination)),
         friendsDb.getMutualFriendsCount(requesterAddress, requestedAddress)
       ])
 
@@ -134,8 +142,9 @@ export async function createFriendsComponent(
       userAddress: string,
       pagination?: Pagination
     ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }> => {
+      const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
       const [pendingRequests, pendingRequestsCount] = await Promise.all([
-        friendsDb.getReceivedFriendshipRequests(userAddress, pagination),
+        friendsDb.getReceivedFriendshipRequests(userAddress, boundedPagination),
         friendsDb.getReceivedFriendshipRequestsCount(userAddress)
       ])
 
@@ -152,8 +161,9 @@ export async function createFriendsComponent(
       userAddress: string,
       pagination?: Pagination
     ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }> => {
+      const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
       const [sentRequests, sentRequestsCount] = await Promise.all([
-        friendsDb.getSentFriendshipRequests(userAddress, pagination),
+        friendsDb.getSentFriendshipRequests(userAddress, boundedPagination),
         friendsDb.getSentFriendshipRequestsCount(userAddress)
       ])
 

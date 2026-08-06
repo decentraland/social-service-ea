@@ -15,6 +15,7 @@ import {
 } from '../types'
 import { FRIENDSHIPS_PER_PAGE } from './rpc-server/constants'
 import { normalizeAddress } from '../utils/address'
+import { normalizeFriendshipRequestsPagination } from '../utils/friendship-pagination'
 import {
   getFriendsBaseQuery,
   getFriendsFromListBaseQuery,
@@ -29,7 +30,8 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
 
   function getFriendshipRequests(type: FriendshipRequestType) {
     return async (userAddress: string, pagination?: Pagination) => {
-      const query = getFriendshipRequestsBaseQuery(userAddress, type, { pagination })
+      const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
+      const query = getFriendshipRequestsBaseQuery(userAddress, type, { pagination: boundedPagination })
       const result = await pg.query<FriendshipRequest>(query)
       return result.rows
     }
@@ -284,12 +286,26 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       `
       await pg.query(query)
     },
-    async getBlockedUsers(blockerAddress) {
+    // Unpaginated by default on purpose: getBlockingStatus needs the complete set to build the
+    // client's blocking cache, and a silently truncated list makes blocked avatars reappear.
+    // Callers that render a page pass pagination explicitly.
+    async getBlockedUsers(blockerAddress, pagination) {
       const query = SQL`
         SELECT blocked_address as address, blocked_at FROM blocks WHERE blocker_address = ${normalizeAddress(blockerAddress)}
       `
+
+      if (pagination) {
+        query.append(SQL` ORDER BY blocked_at DESC, blocked_address ASC`)
+        query.append(SQL` LIMIT ${pagination.limit} OFFSET ${pagination.offset}`)
+      }
+
       const result = await pg.query<BlockedUserWithDate>(query)
       return result.rows
+    },
+    async getBlockedUsersCount(blockerAddress) {
+      return pg.getCount(SQL`
+        SELECT COUNT(*) as count FROM blocks WHERE blocker_address = ${normalizeAddress(blockerAddress)}
+      `)
     },
     async getBlockedByUsers(blockedAddress) {
       const query = SQL`

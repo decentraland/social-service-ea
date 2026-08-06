@@ -7,6 +7,7 @@ import { createMockExpectedFriendshipRequest } from '../../../../mocks/friendshi
 import { createMockProfile } from '../../../../mocks/profile'
 import { IFriendsComponent } from '../../../../../src/logic/friends'
 import { FriendshipRequest } from '../../../../../src/types'
+import { FRIENDSHIP_REQUESTS_MAX_LIMIT } from '../../../../../src/utils/friendship-pagination'
 
 describe('when getting pending friendship requests', () => {
   let getPendingRequests: ReturnType<typeof getPendingFriendshipRequestsService>
@@ -71,7 +72,7 @@ describe('when getting pending friendship requests', () => {
       it('should return empty requests array', async () => {
         const response = await getPendingRequests(emptyRequest, rpcContext)
 
-        expect(getPendingFriendshipRequestsMethod).toHaveBeenCalledWith(rpcContext.address, undefined)
+        expect(getPendingFriendshipRequestsMethod).toHaveBeenCalledWith(rpcContext.address, { limit: 100, offset: 0 })
         expect(response).toEqual({
           response: {
             $case: 'requests',
@@ -114,7 +115,7 @@ describe('when getting pending friendship requests', () => {
       it('should return the list of pending requests with the pagination data for the page', async () => {
         const response = await getPendingRequests(emptyRequest, rpcContext)
 
-        expect(getPendingFriendshipRequestsMethod).toHaveBeenCalledWith(rpcContext.address, undefined)
+        expect(getPendingFriendshipRequestsMethod).toHaveBeenCalledWith(rpcContext.address, { limit: 100, offset: 0 })
         expect(response).toEqual({
           response: {
             $case: 'requests',
@@ -189,6 +190,23 @@ describe('when getting pending friendship requests', () => {
             total: pendingRequestsData.total,
             page: 3
           }
+        })
+      })
+    })
+
+    describe('and the requested page size exceeds the supported maximum', () => {
+      beforeEach(() => {
+        pendingRequestsData.requests = []
+        pendingRequestsData.profiles = []
+        pendingRequestsData.total = 0
+      })
+
+      it('should cap the page before calling the friends component', async () => {
+        await getPendingRequests({ pagination: { limit: FRIENDSHIP_REQUESTS_MAX_LIMIT + 1, offset: 200 } }, rpcContext)
+
+        expect(getPendingFriendshipRequestsMethod).toHaveBeenCalledWith(rpcContext.address, {
+          limit: FRIENDSHIP_REQUESTS_MAX_LIMIT,
+          offset: 200
         })
       })
     })
