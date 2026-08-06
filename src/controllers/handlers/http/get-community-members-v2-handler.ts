@@ -1,7 +1,7 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityMemberV2, CommunityNotFoundError, GetCommunityMembersOptions } from '../../../logic/community'
-import { getPaginationParams, NotAuthorizedError } from '@dcl/http-commons'
+import { getPaginationParams, NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { getPaginationResultProperties } from '../../../utils/pagination'
 import { PaginatedResponse } from '@dcl/schemas'
 
@@ -55,7 +55,11 @@ export async function getCommunityMembersV2Handler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting community members (v2): ${communityId}, error: ${message}`)
 
-    if (error instanceof CommunityNotFoundError || error instanceof NotAuthorizedError) {
+    if (
+      error instanceof CommunityNotFoundError ||
+      error instanceof NotAuthorizedError ||
+      error instanceof InvalidRequestError
+    ) {
       throw error
     }
 

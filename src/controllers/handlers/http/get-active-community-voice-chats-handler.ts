@@ -2,6 +2,7 @@ import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { ActiveCommunityVoiceChat } from '../../../logic/community/types'
+import { InvalidRequestError } from '@dcl/http-commons'
 
 export interface ActiveCommunityVoiceChatsResponse {
   activeChats: ActiveCommunityVoiceChat[]
@@ -43,6 +44,10 @@ export async function getActiveCommunityVoiceChatsHandler(
   } catch (error) {
     const errorMessage = errorMessageOrDefault(error)
     logger.error(`Failed to get active community voice chats: ${errorMessage}`)
+
+    if (error instanceof InvalidRequestError) {
+      throw error
+    }
 
     return {
       status: 500,
