@@ -1,6 +1,7 @@
 import { InvalidRequestError } from '@dcl/http-commons'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '.'
 import { AppComponents } from '../../types/system'
+import { detectImageMimeType } from './image-signature'
 import {
   ICommunityFieldsValidatorComponent,
   CommunityFieldsValidationOptions,
@@ -9,29 +10,6 @@ import {
 
 const MIN_THUMBNAIL_BYTES = 1024
 const MAX_THUMBNAIL_BYTES = 500 * 1024
-
-/**
- * Checks only fixed signature bytes for the supported thumbnail formats.
- *
- * Variable-depth container parsing is intentionally kept off the main Node.js thread. Full
- * decoding must run in a resource-bounded worker if it is added in the future.
- *
- * @param buffer - Uploaded thumbnail bytes
- * @returns Whether the bytes start with a supported PNG, JPEG, GIF or WebP signature
- */
-function hasSupportedImageSignature(buffer: Buffer): boolean {
-  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  const isPng = buffer.length >= pngSignature.length && buffer.subarray(0, pngSignature.length).equals(pngSignature)
-  const isJpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
-  const gifSignature = buffer.subarray(0, 6).toString('ascii')
-  const isGif = gifSignature === 'GIF87a' || gifSignature === 'GIF89a'
-  const isWebp =
-    buffer.length >= 12 &&
-    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
-    buffer.subarray(8, 12).toString('ascii') === 'WEBP'
-
-  return isPng || isJpeg || isGif || isWebp
-}
 
 export async function createCommunityFieldsValidatorComponent(
   components: Pick<AppComponents, 'config'>
@@ -108,8 +86,8 @@ export async function createCommunityFieldsValidatorComponent(
           throw new InvalidRequestError('Thumbnail size must be between 1KB and 500KB')
         }
 
-        if (!hasSupportedImageSignature(thumbnailBuffer)) {
-          throw new InvalidRequestError('Thumbnail must be a valid PNG, JPEG, GIF or WebP image')
+        if (!detectImageMimeType(thumbnailBuffer)) {
+          throw new InvalidRequestError('Thumbnail must start with a supported PNG, JPEG, GIF or WebP signature')
         }
       }
 

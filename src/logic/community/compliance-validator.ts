@@ -1,4 +1,5 @@
 import { FeatureFlag } from '../../adapters/feature-flags'
+import { detectImageMimeType } from './image-signature'
 import { AppComponents } from '../../types'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { CommunityNotCompliantError } from './errors'
@@ -41,7 +42,10 @@ export function createCommunityComplianceValidatorComponent(
         const validationResult = await aiCompliance.validateCommunityContent({
           name,
           description,
-          thumbnailBuffer
+          thumbnailBuffer,
+          // Label the bytes as what they are: the validator accepts JPEG, GIF and
+          // WebP, and the provider is told the media type it is being given.
+          thumbnailMime: thumbnailBuffer ? (detectImageMimeType(thumbnailBuffer) ?? undefined) : undefined
         })
 
         if (!validationResult.isCompliant) {

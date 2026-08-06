@@ -443,7 +443,7 @@ export interface ICommunitiesDbHelperComponent {
 }
 
 export interface IStorageComponent {
-  storeFile: (file: Buffer, key: string) => Promise<string>
+  storeFile: (file: Buffer, key: string, contentType?: string) => Promise<string>
   exists: (key: string) => Promise<boolean>
   existsMultiple: (keys: string[]) => Promise<Record<string, boolean>>
 }

@@ -250,23 +250,37 @@ describe('CommunityFieldsValidator', () => {
 
     describe('and thumbnail validation', () => {
       describe('and thumbnail is valid', () => {
-        let validImageBuffer: Buffer
-        let formData: { fields: { name: { value: string } } }
+        // One case per advertised format, so dropping a signature cannot pass
+        // unnoticed. Each buffer carries the format's leading bytes, which is
+        // what the validator inspects, padded past the 1KB minimum.
+        describe.each([
+          ['PNG', [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
+          ['JPEG', [0xff, 0xd8, 0xff, 0xe0]],
+          ['GIF87a', [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]],
+          ['GIF89a', [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]],
+          [
+            'WebP',
+            [0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]
+          ]
+        ])('and the thumbnail is a %s', (_format: string, signature: number[]) => {
+          let validImageBuffer: Buffer
+          let formData: { fields: { name: { value: string } } }
 
-        beforeEach(() => {
-          validImageBuffer = Buffer.alloc(2048)
-          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(validImageBuffer)
-          formData = {
-            fields: {
-              name: { value: 'Test Community' }
+          beforeEach(() => {
+            validImageBuffer = Buffer.alloc(2048)
+            Buffer.from(signature).copy(validImageBuffer)
+            formData = {
+              fields: {
+                name: { value: 'Test Community' }
+              }
             }
-          }
-        })
+          })
 
-        it('should pass validation for valid image buffer', async () => {
-          const result = await fieldsValidator.validate(formData, validImageBuffer)
+          it('should pass validation and keep the buffer', async () => {
+            const result = await fieldsValidator.validate(formData, validImageBuffer)
 
-          expect(result.thumbnailBuffer).toBe(validImageBuffer)
+            expect(result.thumbnailBuffer).toBe(validImageBuffer)
+          })
         })
       })
 

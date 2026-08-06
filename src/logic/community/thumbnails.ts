@@ -1,4 +1,5 @@
 import { AppComponents } from '../../types'
+import { detectImageMimeType } from './image-signature'
 import { ICommunityThumbnailComponent } from './types'
 import { getCommunityThumbnailPath } from './utils'
 
@@ -40,7 +41,12 @@ export async function createCommunityThumbnailComponent(
   }
 
   async function uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string> {
-    await storage.storeFile(thumbnail, `communities/${communityId}/raw-thumbnail.png`)
+    // The key keeps its .png name because it is a published URL, but the object
+    // is served as what it is: the validator accepts JPEG, GIF and WebP too, and
+    // a browser goes by the Content-Type rather than the extension.
+    const contentType = detectImageMimeType(thumbnail) ?? 'image/png'
+
+    await storage.storeFile(thumbnail, `communities/${communityId}/raw-thumbnail.png`, contentType)
     return buildThumbnailUrl(communityId)
   }
 
