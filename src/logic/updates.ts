@@ -186,7 +186,8 @@ export function createUpdateHandlerComponent(
   })
 
   const privateVoiceChatUpdateHandler = handleUpdate<'privateVoiceChatUpdate'>((update) => {
-    logger.info('Private voice chat update', { update: JSON.stringify(update) })
+    // Allowlist the loggable fields: this update also carries the LiveKit join credentials.
+    logger.info('Private voice chat update', { callId: update.callId, status: update.status })
 
     const addressesToNotify: string[] = []
 
