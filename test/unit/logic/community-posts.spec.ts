@@ -531,6 +531,7 @@ describe('Community Posts Component', () => {
         expect(mockCommunitiesDB.deletePost).not.toHaveBeenCalled()
       })
     })
+
   })
 
   describe('when liking a post', () => {
@@ -674,6 +675,29 @@ describe('Community Posts Component', () => {
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, likerAddress)
         expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+        expect(mockCommunitiesDB.likePost).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the post belongs to another community', () => {
+      let error: Error | undefined
+
+      beforeEach(async () => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          ...mockCommunity,
+          privacy: CommunityPrivacyEnum.Public,
+          role: CommunityRole.Member
+        })
+        mockCommunitiesDB.isMemberBanned.mockResolvedValue(false)
+        mockCommunitiesDB.getPost.mockResolvedValue({ ...mockPost, communityId: 'different-community' })
+        error = await postsComponent.likePost(mockPost.communityId, mockPostId, likerAddress).catch((caught) => caught)
+      })
+
+      it('should hide the post as not found', () => {
+        expect(error).toBeInstanceOf(CommunityPostNotFoundError)
+      })
+
+      it('should not mutate the foreign post', () => {
         expect(mockCommunitiesDB.likePost).not.toHaveBeenCalled()
       })
     })
@@ -847,6 +871,31 @@ describe('Community Posts Component', () => {
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(mockPost.communityId, unlikerAddress)
         expect(mockCommunitiesDB.getPost).toHaveBeenCalledWith(mockPostId)
+        expect(mockCommunitiesDB.unlikePost).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the post belongs to another community', () => {
+      let error: Error | undefined
+
+      beforeEach(async () => {
+        mockCommunitiesDB.getCommunity.mockResolvedValue({
+          ...mockCommunity,
+          privacy: CommunityPrivacyEnum.Public,
+          role: CommunityRole.Member
+        })
+        mockCommunitiesDB.isMemberBanned.mockResolvedValue(false)
+        mockCommunitiesDB.getPost.mockResolvedValue({ ...mockPost, communityId: 'different-community' })
+        error = await postsComponent
+          .unlikePost(mockPost.communityId, mockPostId, unlikerAddress)
+          .catch((caught) => caught)
+      })
+
+      it('should hide the post as not found', () => {
+        expect(error).toBeInstanceOf(CommunityPostNotFoundError)
+      })
+
+      it('should not mutate the foreign post', () => {
         expect(mockCommunitiesDB.unlikePost).not.toHaveBeenCalled()
       })
     })
