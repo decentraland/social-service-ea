@@ -27,6 +27,17 @@ import {
 } from '../../utils/friendship-pagination'
 import { BlockedUser, IFriendsComponent } from './types'
 
+// Pair rate-limit buckets. The two scopes MUST keep separate keys: a friendship is symmetric, a block is not.
+const PAIR_RATE_LIMIT_KEY = {
+  // Friendship: one bucket per unordered pair, both directions share it.
+  symmetric: (actor: string, target: string): string => `friends:rate:pair:sym:${[actor, target].sort().join(':')}`,
+  // Block/unblock: one bucket per ordered pair, so one account cannot spend the budget the other
+  // needs to block back.
+  directional: (actor: string, target: string): string => `friends:rate:pair:dir:${actor}:${target}`
+} as const
+
+type PairRateLimitScope = keyof typeof PAIR_RATE_LIMIT_KEY
+
 export async function createFriendsComponent(
   components: Pick<AppComponents, 'friendsDb' | 'registry' | 'pubsub' | 'sns' | 'logs' | 'redis' | 'config' | 'metrics'>
 ): Promise<IFriendsComponent> {
@@ -55,15 +66,18 @@ export async function createFriendsComponent(
     }
   }
 
-  async function enforceMutationRateLimit(actorAddress: string, targetAddress: string): Promise<void> {
+  async function enforceMutationRateLimit(
+    actorAddress: string,
+    targetAddress: string,
+    scope: PairRateLimitScope
+  ): Promise<void> {
     const actor = actorAddress.toLowerCase()
     const target = targetAddress.toLowerCase()
-    const pair = [actor, target].sort().join(':')
 
     const actorAllowed = await consumeOrFailOpen(`friends:rate:actor:${actor}`, actorRateLimit)
     if (!actorAllowed) throw new FriendshipRateLimitError()
 
-    const pairAllowed = await consumeOrFailOpen(`friends:rate:pair:${pair}`, pairRateLimit)
+    const pairAllowed = await consumeOrFailOpen(PAIR_RATE_LIMIT_KEY[scope](actor, target), pairRateLimit)
     if (!pairAllowed) throw new FriendshipRateLimitError()
   }
 
@@ -85,7 +99,7 @@ export async function createFriendsComponent(
       }
     },
     blockUser: async (blockerAddress: string, blockedAddress: string): Promise<BlockedUser> => {
-      await enforceMutationRateLimit(blockerAddress, blockedAddress)
+      await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
       const profile = await registry.getProfile(blockedAddress)
 
       if (!profile) {
@@ -219,7 +233,7 @@ export async function createFriendsComponent(
       }
     },
     unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile> => {
-      await enforceMutationRateLimit(blockerAddress, blockedAddress)
+      await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
       const profile = await registry.getProfile(blockedAddress)
 
       if (!profile) {
@@ -261,7 +275,7 @@ export async function createFriendsComponent(
       action: Action,
       metadata: Record<string, string> | null
     ) => {
-      await enforceMutationRateLimit(userAddress, friendAddress)
+      await enforceMutationRateLimit(userAddress, friendAddress, 'symmetric')
       const isBlocked = await friendsDb.isFriendshipBlocked(userAddress, friendAddress)
 
       if (isBlocked) {

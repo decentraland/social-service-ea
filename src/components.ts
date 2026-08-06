@@ -94,7 +94,6 @@ export async function initComponents(): Promise<AppComponents> {
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ metrics, config })
   const tracing = await createTracingComponent({ config, logs })
-  const httpMaxRequestBodyBytes = (await config.getNumber('HTTP_MAX_REQUEST_BODY_BYTES')) ?? 1024 * 1024
 
   const httpServer = await createServerComponent<GlobalContext>(
     { config: apiSeverConfig, logs },
@@ -102,8 +101,7 @@ export async function initComponents(): Promise<AppComponents> {
       cors: {
         methods: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'POST', 'PUT', 'PATCH'],
         maxAge: 86400
-      },
-      maxBodySize: httpMaxRequestBodyBytes
+      }
     }
   )
   const uwsServer = await createUWsComponent({ config: uwsHttpServerConfig, logs })
