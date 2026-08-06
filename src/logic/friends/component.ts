@@ -10,9 +10,15 @@ import {
   FriendshipStatus
 } from '../../types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapters/pubsub'
+import { isErrorWithMessage } from '../../utils/errors'
 import { getProfileUserId } from '../profiles'
 import { sendNotification, shouldNotify } from '../notifications'
-import { BlockedUserError, InvalidFriendshipActionError, ProfileNotFoundError } from './errors'
+import {
+  BlockedUserError,
+  FriendshipRateLimitError,
+  InvalidFriendshipActionError,
+  ProfileNotFoundError
+} from './errors'
 import { getNewFriendshipStatus, validateNewFriendshipAction } from './friendships'
 import {
   normalizeBlockedUsersPagination,
@@ -21,11 +27,59 @@ import {
 } from '../../utils/friendship-pagination'
 import { BlockedUser, IFriendsComponent } from './types'
 
+// Pair rate-limit buckets. The two scopes MUST keep separate keys: a friendship is symmetric, a block is not.
+const PAIR_RATE_LIMIT_KEY = {
+  // Friendship: one bucket per unordered pair, both directions share it.
+  symmetric: (actor: string, target: string): string => `friends:rate:pair:sym:${[actor, target].sort().join(':')}`,
+  // Block/unblock: one bucket per ordered pair, so a spammer cannot spend the budget their victim needs to block back.
+  directional: (actor: string, target: string): string => `friends:rate:pair:dir:${actor}:${target}`
+} as const
+
+type PairRateLimitScope = keyof typeof PAIR_RATE_LIMIT_KEY
+
 export async function createFriendsComponent(
-  components: Pick<AppComponents, 'friendsDb' | 'registry' | 'pubsub' | 'sns' | 'logs'>
+  components: Pick<AppComponents, 'friendsDb' | 'registry' | 'pubsub' | 'sns' | 'logs' | 'redis' | 'config' | 'metrics'>
 ): Promise<IFriendsComponent> {
-  const { friendsDb, registry, pubsub, sns, logs } = components
+  const { friendsDb, registry, pubsub, sns, logs, redis, config, metrics } = components
   const logger = logs.getLogger('friends-component')
+  const rateLimitWindowSeconds = (await config.getNumber('FRIENDSHIP_RATE_LIMIT_WINDOW_SECONDS')) ?? 60
+  const actorRateLimit = (await config.getNumber('FRIENDSHIP_RATE_LIMIT_PER_ACTOR')) ?? 30
+  const pairRateLimit = (await config.getNumber('FRIENDSHIP_RATE_LIMIT_PER_PAIR')) ?? 10
+
+  /**
+   * Consumes one rate-limit token, failing open if Redis is unreachable.
+   *
+   * The limiter is an abuse control, not an authorization control: a Redis outage must not
+   * take friendship and block mutations down with it. Exhaustion still rejects.
+   */
+  async function consumeOrFailOpen(key: string, limit: number): Promise<boolean> {
+    try {
+      return await redis.consumeRateLimit(key, limit, rateLimitWindowSeconds)
+    } catch (error) {
+      logger.error('Friendship rate limiter unavailable, allowing the action', {
+        key,
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      metrics.increment('friendship_rate_limiter_unavailable')
+      return true
+    }
+  }
+
+  async function enforceMutationRateLimit(
+    actorAddress: string,
+    targetAddress: string,
+    scope: PairRateLimitScope
+  ): Promise<void> {
+    const actor = actorAddress.toLowerCase()
+    const target = targetAddress.toLowerCase()
+
+    const actorAllowed = await consumeOrFailOpen(`friends:rate:actor:${actor}`, actorRateLimit)
+    if (!actorAllowed) throw new FriendshipRateLimitError()
+
+    const pairAllowed = await consumeOrFailOpen(PAIR_RATE_LIMIT_KEY[scope](actor, target), pairRateLimit)
+    if (!pairAllowed) throw new FriendshipRateLimitError()
+  }
+
   return {
     getFriendsProfiles: async (
       userAddress: EthAddress,
@@ -44,6 +98,7 @@ export async function createFriendsComponent(
       }
     },
     blockUser: async (blockerAddress: string, blockedAddress: string): Promise<BlockedUser> => {
+      await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
       const profile = await registry.getProfile(blockedAddress)
 
       if (!profile) {
@@ -177,6 +232,7 @@ export async function createFriendsComponent(
       }
     },
     unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile> => {
+      await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
       const profile = await registry.getProfile(blockedAddress)
 
       if (!profile) {
@@ -218,6 +274,7 @@ export async function createFriendsComponent(
       action: Action,
       metadata: Record<string, string> | null
     ) => {
+      await enforceMutationRateLimit(userAddress, friendAddress, 'symmetric')
       const isBlocked = await friendsDb.isFriendshipBlocked(userAddress, friendAddress)
 
       if (isBlocked) {

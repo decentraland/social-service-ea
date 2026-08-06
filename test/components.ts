@@ -330,7 +330,7 @@ async function initComponents(): Promise<TestComponents> {
   const storageHelper = await createStorageHelper({ config })
 
   const userMutes = await createUserMutesComponent({ userMutesDb, logs })
-  const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
+  const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs, redis, config, metrics })
 
   return {
     aiCompliance,
