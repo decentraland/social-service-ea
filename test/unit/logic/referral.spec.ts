@@ -18,6 +18,8 @@ import { IPublisherComponent } from '@dcl/sns-component'
 import { createSNSMockedComponent } from '../../mocks/components'
 
 const MAX_IP_MATCHES = 2
+const REWARD_MAX_ATTEMPTS = 5
+const REWARD_CLAIM_LEASE_MS = 5 * 60 * 1000
 
 describe('referral-component', () => {
   let mockReferralDb: any
@@ -42,7 +44,12 @@ describe('referral-component', () => {
       setReferralEmail: jest.fn(),
       getLastReferralEmailByReferrer: jest.fn(),
       setReferralRewardImage: jest.fn(),
-      getReferralRewardImage: jest.fn()
+      getReferralRewardImage: jest.fn(),
+      // Default: every reached tier is already granted, so nothing new is issued. Tests that
+      // expect an issuance claim their specific tier explicitly.
+      claimTierReward: jest.fn().mockResolvedValue(null),
+      markTierRewardGranted: jest.fn().mockResolvedValue(1),
+      recordTierRewardFailure: jest.fn().mockResolvedValue(undefined)
     }
 
     mockLogger = {
@@ -78,6 +85,13 @@ describe('referral-component', () => {
           REFERRAL_MAX_IP_MATCHES: MAX_IP_MATCHES,
           REFERRAL_MIN_LOGIN_DAYS: 3,
           REFERRAL_FIVE_MINUTES_IN_MS: 5 * 60 * 1000
+        }
+        return Promise.resolve(configValues[key])
+      }),
+      getNumber: jest.fn().mockImplementation((key: string) => {
+        const configValues: Record<string, number> = {
+          REFERRAL_REWARD_MAX_ATTEMPTS: REWARD_MAX_ATTEMPTS,
+          REFERRAL_REWARD_CLAIM_LEASE_MS: REWARD_CLAIM_LEASE_MS
         }
         return Promise.resolve(configValues[key])
       })
@@ -361,16 +375,14 @@ describe('referral-component', () => {
 
       describe('and the stored referral has a different referrer', () => {
         beforeEach(() => {
-          mockReferralDb.findReferralProgress
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce([
-              {
-                referrer: '0x1111111111111111111111111111111111111111',
-                invited_user: validInvitedUser.toLowerCase(),
-                status: ReferralProgressStatus.PENDING,
-                created_at: Date.now()
-              }
-            ])
+          mockReferralDb.findReferralProgress.mockResolvedValueOnce([]).mockResolvedValueOnce([
+            {
+              referrer: '0x1111111111111111111111111111111111111111',
+              invited_user: validInvitedUser.toLowerCase(),
+              status: ReferralProgressStatus.PENDING,
+              created_at: Date.now()
+            }
+          ])
         })
 
         it('should throw ReferralAlreadyExistsError', async () => {
@@ -850,7 +862,6 @@ describe('referral-component', () => {
         expect(mockReferralDb.updateReferralProgress).not.toHaveBeenCalled()
       })
     })
-
   })
 
   describe('when finalizing referral', () => {
@@ -1054,6 +1065,10 @@ describe('referral-component', () => {
           mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(invitedUsers)
           mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+          // Only this tier is outstanding; every lower tier was granted by an earlier event.
+          mockReferralDb.claimTierReward.mockImplementation(async (_referrer: string, claimedTier: number) =>
+            claimedTier === invitedUsers ? { id: 'grant-id', attempts: 1 } : null
+          )
           mockRewards.sendReward.mockResolvedValueOnce([
             {
               id: '550e8400-e29b-41d4-a716-446655440000',
@@ -1210,6 +1225,340 @@ describe('referral-component', () => {
       })
     })
 
+    describe('when the reward server issues nothing usable', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+
+      beforeEach(async () => {
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockResolvedValueOnce({ id: 'grant-id', attempts: 1 })
+        mockRewards.sendReward.mockRejectedValueOnce(
+          new Error('Reward server issued no usable reward: response contained an empty reward list')
+        )
+
+        await referralComponent.finalizeReferral(validInvitedUser)
+      })
+
+      it('should not crash the finalize flow on the missing reward payload', () => {
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          'Failed to issue tier reward; it stays claimable for a later event',
+          expect.objectContaining({
+            tier: 5,
+            error: 'Reward server issued no usable reward: response contained an empty reward list'
+          })
+        )
+      })
+
+      it('should not mark the tier as granted', () => {
+        expect(mockReferralDb.markTierRewardGranted).not.toHaveBeenCalled()
+      })
+
+      it('should not record a reward image for a reward that was never issued', () => {
+        expect(mockReferralDb.setReferralRewardImage).not.toHaveBeenCalled()
+      })
+
+      it('should record the failure so the tier is retried by a later event', () => {
+        expect(mockReferralDb.recordTierRewardFailure).toHaveBeenCalledWith(
+          validReferrer.toLowerCase(),
+          5,
+          'Reward server issued no usable reward: response contained an empty reward list'
+        )
+      })
+    })
+
+    describe('when the reward server fails and a later event retries the tier', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+      let grantedTiers: number[]
+
+      beforeEach(async () => {
+        grantedTiers = []
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+
+        // Models the durable grant row: claimable while pending, closed for good once granted.
+        mockReferralDb.claimTierReward.mockImplementation(async (_referrer: string, tier: number) =>
+          grantedTiers.includes(tier) ? null : { id: `grant-${tier}`, attempts: 1 }
+        )
+        mockReferralDb.markTierRewardGranted.mockImplementation(async (_referrer: string, tier: number) => {
+          grantedTiers.push(tier)
+          return 1
+        })
+
+        mockReferralDb.findReferralProgress.mockResolvedValue([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValue(1)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValue(5)
+        mockRedis.get.mockResolvedValue(['2024-01-01', '2024-01-02', '2024-01-03'])
+
+        mockRewards.sendReward.mockRejectedValueOnce(new Error('Failed to fetch rewards: 503'))
+        mockRewards.sendReward.mockResolvedValueOnce([{ image: 'reward5.png', rarity: null }])
+
+        await referralComponent.finalizeReferral(validInvitedUser)
+        await referralComponent.finalizeReferral(validInvitedUser)
+        await referralComponent.finalizeReferral(validInvitedUser)
+      })
+
+      it('should stop contacting the reward server once the reward has been issued', () => {
+        expect(mockRewards.sendReward).toHaveBeenCalledTimes(2)
+      })
+
+      it('should ultimately issue the reward exactly once', () => {
+        expect(mockReferralDb.markTierRewardGranted).toHaveBeenCalledTimes(1)
+      })
+
+      it('should close only the tier that was recovered', () => {
+        expect(grantedTiers).toEqual([5])
+      })
+
+      it('should record the reward image exactly once', () => {
+        expect(mockReferralDb.setReferralRewardImage).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('when the reward was issued but the grant could not be closed', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+
+      beforeEach(async () => {
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockResolvedValueOnce({ id: 'grant-id', attempts: 1 })
+        mockRewards.sendReward.mockResolvedValueOnce([{ image: 'reward5.png', rarity: null }])
+        mockReferralDb.markTierRewardGranted.mockRejectedValueOnce(new Error('connection terminated'))
+
+        await referralComponent.finalizeReferral(validInvitedUser)
+      })
+
+      it('should raise an alertable error naming the re-issue risk', () => {
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          'Tier reward was issued but the grant could not be closed; a later event may re-issue it',
+          expect.objectContaining({ tier: 5, error: 'connection terminated' })
+        )
+      })
+
+      it('should not record it as a retryable issuance failure', () => {
+        expect(mockReferralDb.recordTierRewardFailure).not.toHaveBeenCalled()
+      })
+
+      it('should still publish the tier-reached event for the reward that was issued', () => {
+        expect(mockSns.publishMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ subType: Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED })
+        )
+      })
+    })
+
+    describe('when another worker closed the grant before this one could', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+
+      beforeEach(async () => {
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockResolvedValueOnce({ id: 'grant-id', attempts: 1 })
+        mockRewards.sendReward.mockResolvedValueOnce([{ image: 'reward5.png', rarity: null }])
+        mockReferralDb.markTierRewardGranted.mockResolvedValueOnce(0)
+
+        await referralComponent.finalizeReferral(validInvitedUser)
+      })
+
+      it('should not publish a second tier-reached event for the same tier', () => {
+        expect(mockSns.publishMessage).not.toHaveBeenCalledWith(
+          expect.objectContaining({ subType: Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED })
+        )
+      })
+
+      it('should not write a second reward image row', () => {
+        expect(mockReferralDb.setReferralRewardImage).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when recording an issuance failure itself fails', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+      let thrown: Error | undefined
+
+      beforeEach(async () => {
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockResolvedValueOnce({ id: 'grant-id', attempts: 1 })
+        mockRewards.sendReward.mockRejectedValueOnce(new Error('reward server unavailable'))
+        mockReferralDb.recordTierRewardFailure.mockRejectedValueOnce(new Error('connection terminated'))
+
+        thrown = await referralComponent.finalizeReferral(validInvitedUser).catch((error) => error)
+      })
+
+      it('should not propagate the bookkeeping error out of the finalize', () => {
+        expect(thrown).toBeUndefined()
+      })
+
+      it('should raise an alertable error for the failed bookkeeping', () => {
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          'Failed to record a tier reward failure',
+          expect.objectContaining({ tier: 5, error: 'connection terminated' })
+        )
+      })
+    })
+
+    describe('when a concurrent finalize pushed the count past a tier boundary', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+      let claimedTiers: number[]
+
+      beforeEach(async () => {
+        claimedTiers = []
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
+        // Both concurrent finalizes committed before either counted, so the tier-5 boundary
+        // is never observed as an exact count.
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(6)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockImplementation(async (_referrer: string, tier: number) => {
+          claimedTiers.push(tier)
+          return { id: `grant-${tier}`, attempts: 1 }
+        })
+        mockRewards.sendReward.mockResolvedValue([{ image: 'reward5.png', rarity: null }])
+
+        await referralComponent.finalizeReferral(validInvitedUser)
+      })
+
+      it('should still grant the skipped tier instead of dropping it', () => {
+        expect(mockRewards.sendReward).toHaveBeenCalledWith(
+          'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5',
+          validReferrer.toLowerCase()
+        )
+      })
+
+      it('should only consider tiers at or below the accepted invite count', () => {
+        expect(claimedTiers).toEqual([5])
+      })
+
+      it('should announce the tier that was unlocked rather than the live invite count', () => {
+        expect(mockSns.publishMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            subType: Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED,
+            metadata: expect.objectContaining({ tier: 1, invitedUsers: 5 })
+          })
+        )
+      })
+    })
+
+    describe('when several tiers were crossed while issuance was failing', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+
+      beforeEach(async () => {
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(20)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockResolvedValue({ id: 'grant-id', attempts: 1 })
+        mockRewards.sendReward.mockResolvedValue([{ image: 'reward.png', rarity: null }])
+
+        await referralComponent.finalizeReferral(validInvitedUser)
+      })
+
+      it('should back-fill every outstanding tier in ascending order', () => {
+        expect(mockRewards.sendReward.mock.calls.map((call: string[]) => call[0])).toEqual([
+          'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5',
+          'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10',
+          'REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_20'
+        ])
+      })
+    })
+
+    describe('when a tier reward fails but a later tier can still be issued', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+
+      beforeEach(async () => {
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(10)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockResolvedValue({ id: 'grant-id', attempts: 1 })
+        mockRewards.sendReward.mockRejectedValueOnce(new Error('Failed to fetch rewards: 503'))
+        mockRewards.sendReward.mockResolvedValueOnce([{ image: 'reward10.png', rarity: null }])
+
+        await referralComponent.finalizeReferral(validInvitedUser)
+      })
+
+      it('should not let one failing tier block the tiers after it', () => {
+        expect(mockReferralDb.markTierRewardGranted).toHaveBeenCalledWith(validReferrer.toLowerCase(), 10)
+      })
+
+      it('should leave the failed tier unclosed so it is retried later', () => {
+        expect(mockReferralDb.markTierRewardGranted).not.toHaveBeenCalledWith(validReferrer.toLowerCase(), 5)
+      })
+    })
+
+    describe('when the tier was already granted by a previous event', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+
+      beforeEach(async () => {
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockResolvedValue(null)
+
+        await referralComponent.finalizeReferral(validInvitedUser)
+      })
+
+      it('should not contact the reward server again', () => {
+        expect(mockRewards.sendReward).not.toHaveBeenCalled()
+      })
+
+      it('should not publish a duplicate tier-reached event', () => {
+        expect(mockSns.publishMessage).not.toHaveBeenCalledWith(
+          expect.objectContaining({ subType: Events.SubType.Referral.REFERRAL_NEW_TIER_REACHED })
+        )
+      })
+    })
+
     describe('when referral is already finalized', () => {
       beforeEach(() => {
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
@@ -1241,7 +1590,7 @@ describe('referral-component', () => {
     })
 
     describe('when SNS publish fails', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         mockReferralDb.findReferralProgress.mockResolvedValueOnce([
           {
             referrer: validReferrer,
@@ -1252,16 +1601,29 @@ describe('referral-component', () => {
         mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
         mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockResolvedValueOnce({ id: 'grant-id', attempts: 1 })
+        mockRewards.sendReward.mockResolvedValueOnce([{ image: 'reward.png', rarity: null }])
         mockSns.publishMessage.mockRejectedValueOnce(new Error('SNS publish failed'))
+
+        await referralComponent.finalizeReferral(validInvitedUser)
       })
 
-      it('should still update referral progress even if SNS fails', async () => {
-        await expect(referralComponent.finalizeReferral(validInvitedUser)).rejects.toThrow('SNS publish failed')
+      it('should not propagate the notification failure to the caller', () => {
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          'Failed to publish referral event',
+          expect.objectContaining({ error: 'SNS publish failed' })
+        )
+      })
 
+      it('should still update referral progress to tier granted', () => {
         expect(mockReferralDb.updateReferralProgress).toHaveBeenCalledWith(
           validInvitedUser.toLowerCase(),
           ReferralProgressStatus.TIER_GRANTED
         )
+      })
+
+      it('should still issue the tier reward the notification was announcing', () => {
+        expect(mockRewards.sendReward).toHaveBeenCalledTimes(1)
       })
     })
 
@@ -1278,6 +1640,10 @@ describe('referral-component', () => {
         mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
         mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
         mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        // Only the IRL swag milestone is outstanding; the reward tiers were granted earlier.
+        mockReferralDb.claimTierReward.mockImplementation(async (_referrer: string, claimedTier: number) =>
+          claimedTier === 100 ? { id: 'grant-id', attempts: 1 } : null
+        )
       })
 
       it('should send Slack notification', async () => {
@@ -1288,8 +1654,14 @@ describe('referral-component', () => {
         )
       })
 
+      it('should close the milestone so a later event does not notify again', async () => {
+        await referralComponent.finalizeReferral(validInvitedUser)
+
+        expect(mockReferralDb.markTierRewardGranted).toHaveBeenCalledWith(validReferrer.toLowerCase(), 100)
+      })
+
       describe('and Slack notification fails', () => {
-        beforeEach(() => {
+        beforeEach(async () => {
           mockSlack.sendMessage.mockReset()
           mockSlack.sendMessage.mockRejectedValueOnce(new Error('Slack service unavailable'))
           mockReferralDb.findReferralProgress.mockResolvedValueOnce([
@@ -1302,29 +1674,35 @@ describe('referral-component', () => {
           mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
           mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(100)
           mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+
+          await referralComponent.finalizeReferral(validInvitedUser)
         })
 
-        it('should still finalize referral even if Slack fails', async () => {
-          await referralComponent.finalizeReferral(validInvitedUser)
-
+        it('should still finalize the referral to tier granted', () => {
           expect(mockReferralDb.updateReferralProgress).toHaveBeenCalledWith(
             validInvitedUser.toLowerCase(),
             ReferralProgressStatus.TIER_GRANTED
           )
+        })
+
+        it('should still publish the invited-users-accepted event', () => {
           expect(mockSns.publishMessage).toHaveBeenCalledWith(
             expect.objectContaining({
               type: Events.Type.REFERRAL,
               subType: Events.SubType.Referral.REFERRAL_INVITED_USERS_ACCEPTED
             })
           )
-          expect(mockLogger.warn).toHaveBeenCalledWith(
-            'Failed to send Slack notification, but referral was finalized successfully',
-            expect.objectContaining({
-              referrer: validReferrer.toLowerCase(),
-              invitedUser: validInvitedUser.toLowerCase(),
-              acceptedInvites: 100,
-              error: 'Slack service unavailable'
-            })
+        })
+
+        it('should leave the milestone unclosed so a later event can notify', () => {
+          expect(mockReferralDb.markTierRewardGranted).not.toHaveBeenCalledWith(validReferrer.toLowerCase(), 100)
+        })
+
+        it('should record the Slack failure against the pending milestone', () => {
+          expect(mockReferralDb.recordTierRewardFailure).toHaveBeenCalledWith(
+            validReferrer.toLowerCase(),
+            100,
+            'Slack service unavailable'
           )
         })
       })
@@ -1705,9 +2083,7 @@ describe('referral-component', () => {
           }
         ])
 
-        await expect(
-          referralComponent.updateProgress(invitedUser, ReferralProgressStatus.SIGNED_UP)
-        ).rejects.toThrow(
+        await expect(referralComponent.updateProgress(invitedUser, ReferralProgressStatus.SIGNED_UP)).rejects.toThrow(
           new ReferralInvalidInputError(
             `Referrer is part of a banned referral chain ${referrerPreviouslyInvited.toLowerCase()}, 192.168.1.1`
           )

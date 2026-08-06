@@ -7,10 +7,20 @@ import {
   ReferralProgressStatus,
   ReferralTierSeen,
   ReferralEmail,
+  ReferralRewardGrant,
+  ReferralRewardGrantStatus,
   ReferralRewardImage
 } from '../types/referral-db.type'
 import { AppComponents } from '../types/system'
 
+/**
+ * Creates the referral persistence component.
+ *
+ * Referral insertion serializes each referrer/IP anti-fraud bucket before counting and writing.
+ *
+ * @param components Required PostgreSQL, logging, and configuration components.
+ * @returns The referral database component.
+ */
 export async function createReferralDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs' | 'config'>
 ): Promise<IReferralDatabaseComponent> {
@@ -34,37 +44,43 @@ export async function createReferralDBComponent(
     logger.debug(`Creating referral_progress for ${referralInput.referrer} and ${referralInput.invitedUser}`)
     const now = Date.now()
 
-    const query = SQL`
-      WITH other_users_invited as (
-        SELECT COUNT(*) as count 
-        FROM referral_progress 
-        WHERE invited_user_ip = ${referralInput.invitedUserIP} 
-        AND referrer = ${referralInput.referrer.toLowerCase()}
-      )
-      INSERT INTO referral_progress 
-        (
-          id,
-          referrer,
-          invited_user,
-          invited_user_ip,
-          status,
-          created_at,
-          updated_at
+    const normalizedReferrer = referralInput.referrer.toLowerCase()
+
+    return pg.withTransaction(async (client) => {
+      // Serialize the count-and-insert decision per referrer/IP bucket, so concurrent inserts
+      // cannot all read the same below-limit snapshot.
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [
+        normalizedReferrer,
+        referralInput.invitedUserIP
+      ])
+
+      const query = SQL`
+        WITH other_users_invited as (
+          SELECT COUNT(*) as count
+          FROM referral_progress
+          WHERE invited_user_ip = ${referralInput.invitedUserIP}
+          AND referrer = ${normalizedReferrer}
         )
-          SELECT
+        INSERT INTO referral_progress
+          (id, referrer, invited_user, invited_user_ip, status, created_at, updated_at)
+        SELECT
           ${randomUUID()},
-          ${referralInput.referrer.toLowerCase()},
+          ${normalizedReferrer},
           ${referralInput.invitedUser.toLowerCase()},
           ${referralInput.invitedUserIP},
-          CASE WHEN other_users_invited.count < ${MAX_IP_MATCHES} THEN ${ReferralProgressStatus.PENDING} ELSE ${ReferralProgressStatus.REJECTED_IP_MATCH} END,
+          CASE WHEN other_users_invited.count < ${MAX_IP_MATCHES}
+            THEN ${ReferralProgressStatus.PENDING}
+            ELSE ${ReferralProgressStatus.REJECTED_IP_MATCH}
+          END,
           ${now},
           ${now}
-          FROM other_users_invited
+        FROM other_users_invited
         ON CONFLICT (invited_user) DO NOTHING
         RETURNING *
-    `
-    const result = await pg.query<ReferralProgress>(query)
-    return result.rows[0] ?? null
+      `
+      const result = await client.query<ReferralProgress>(query.text, query.values)
+      return result.rows[0] ?? null
+    })
   }
 
   const findReferralProgress = async (filter: ReferralProgressFilter): Promise<ReferralProgress[]> => {
@@ -219,7 +235,68 @@ export async function createReferralDBComponent(
     return result.rows || null
   }
 
+  async function claimTierReward(
+    referrer: string,
+    tier: number,
+    options: { maxAttempts: number; leaseMs: number }
+  ): Promise<ReferralRewardGrant | null> {
+    const now = Date.now()
+    const leaseCutoff = now - options.leaseMs
+    const normalizedReferrer = referrer.toLowerCase()
+
+    // Single-statement claim. The unique (referrer, tier) index serializes competing
+    // workers; the DO UPDATE predicate then yields no row unless this caller may issue.
+    const result = await pg.query<ReferralRewardGrant>(SQL`
+      INSERT INTO referral_reward_grants (id, referrer, tier, status, attempts, created_at, updated_at)
+      VALUES (
+        ${randomUUID()},
+        ${normalizedReferrer},
+        ${tier},
+        ${ReferralRewardGrantStatus.PENDING},
+        1,
+        ${now},
+        ${now}
+      )
+      ON CONFLICT (referrer, tier) DO UPDATE
+        SET attempts = referral_reward_grants.attempts + 1,
+            updated_at = ${now}
+        WHERE referral_reward_grants.status = ${ReferralRewardGrantStatus.PENDING}
+          AND referral_reward_grants.attempts < ${options.maxAttempts}
+          AND referral_reward_grants.updated_at <= ${leaseCutoff}
+      RETURNING *
+    `)
+
+    return result.rows[0] ?? null
+  }
+
+  async function markTierRewardGranted(referrer: string, tier: number): Promise<number> {
+    const now = Date.now()
+    // Terminal transition: once granted the claim predicate can never match again.
+    const result = await pg.query(SQL`
+      UPDATE referral_reward_grants
+      SET status = ${ReferralRewardGrantStatus.GRANTED}, last_error = NULL, updated_at = ${now}
+      WHERE referrer = ${referrer.toLowerCase()}
+        AND tier = ${tier}
+        AND status = ${ReferralRewardGrantStatus.PENDING}
+    `)
+    return result.rowCount
+  }
+
+  async function recordTierRewardFailure(referrer: string, tier: number, error: string): Promise<void> {
+    // Deliberately leaves updated_at untouched so the lease expires on schedule and a later event retries.
+    await pg.query(SQL`
+      UPDATE referral_reward_grants
+      SET last_error = ${error}
+      WHERE referrer = ${referrer.toLowerCase()}
+        AND tier = ${tier}
+        AND status = ${ReferralRewardGrantStatus.PENDING}
+    `)
+  }
+
   return {
+    claimTierReward,
+    markTierRewardGranted,
+    recordTierRewardFailure,
     createReferral,
     findReferralProgress,
     updateReferralProgress,

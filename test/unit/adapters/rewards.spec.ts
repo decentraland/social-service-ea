@@ -109,14 +109,25 @@ describe('RewardComponent', () => {
       })
     })
 
-    describe('with valid data but no stock available', () => {
-      beforeEach(() => {
+    describe('and the response is ok but no stock is available', () => {
+      let caughtError: unknown
+
+      beforeEach(async () => {
+        caughtError = undefined
         mockFetcher.fetch.mockResolvedValue(createMockRewardEmptyResponse())
+
+        try {
+          await rewardComponent.sendReward(campaignKey, beneficiary)
+        } catch (error) {
+          caughtError = error
+        }
       })
 
-      it('should send reward successfully but return empty data array', async () => {
-        const result = await rewardComponent.sendReward(campaignKey, beneficiary)
+      afterEach(() => {
+        caughtError = undefined
+      })
 
+      it('should still have posted the campaign key and beneficiary to the reward server', () => {
         expect(mockFetcher.fetch).toHaveBeenCalledWith(
           `${mockRewardUrl}/rewards`,
           expect.objectContaining({
@@ -124,28 +135,83 @@ describe('RewardComponent', () => {
             body: JSON.stringify(requestBody)
           })
         )
-        expect(result).toEqual([])
+      })
+
+      it('should throw a RewardIssuanceError naming the empty reward list rather than returning an empty array', () => {
+        expect(caughtError).toMatchObject({
+          name: 'RewardIssuanceError',
+          message: 'Reward server issued no usable reward: response contained an empty reward list'
+        })
+      })
+
+      it('should log a warning identifying the beneficiary that received nothing', () => {
+        expect(mockWarn).toHaveBeenCalledWith('Reward server returned an empty reward list', { beneficiary })
       })
     })
 
-    describe('when the response is ok but the data field is missing or not an array', () => {
-      beforeEach(() => {
+    describe('and the response is ok but the data field is missing', () => {
+      let caughtError: unknown
+
+      beforeEach(async () => {
+        caughtError = undefined
         mockFetcher.fetch.mockResolvedValue({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({ ok: true }),
           text: jest.fn().mockResolvedValue('')
         } as any)
+
+        try {
+          await rewardComponent.sendReward(campaignKey, beneficiary)
+        } catch (error) {
+          caughtError = error
+        }
       })
 
-      it('should return an empty array and log a warning', async () => {
-        const result = await rewardComponent.sendReward(campaignKey, beneficiary)
+      afterEach(() => {
+        caughtError = undefined
+      })
 
-        expect(result).toEqual([])
-        expect(mockWarn).toHaveBeenCalledWith(
-          'Reward server response did not contain a data array; returning no rewards',
-          { campaignKey, beneficiary }
-        )
+      it('should throw a RewardIssuanceError naming the missing data array', () => {
+        expect(caughtError).toMatchObject({
+          name: 'RewardIssuanceError',
+          message: 'Reward server issued no usable reward: response contained no data array'
+        })
+      })
+
+      it('should log a warning identifying the beneficiary that received nothing', () => {
+        expect(mockWarn).toHaveBeenCalledWith('Reward server response did not contain a data array', { beneficiary })
+      })
+    })
+
+    describe('and the response is ok but a returned reward has no image', () => {
+      let caughtError: unknown
+
+      beforeEach(async () => {
+        caughtError = undefined
+        mockFetcher.fetch.mockResolvedValue({
+          ok: true,
+          status: 201,
+          json: jest.fn().mockResolvedValue({ ok: true, data: [{ ...mockRewardData, image: undefined }] }),
+          text: jest.fn().mockResolvedValue('')
+        } as any)
+
+        try {
+          await rewardComponent.sendReward(campaignKey, beneficiary)
+        } catch (error) {
+          caughtError = error
+        }
+      })
+
+      afterEach(() => {
+        caughtError = undefined
+      })
+
+      it('should throw a RewardIssuanceError rather than hand the caller a reward it will dereference', () => {
+        expect(caughtError).toMatchObject({
+          name: 'RewardIssuanceError',
+          message: 'Reward server issued no usable reward: a returned reward is missing its image'
+        })
       })
     })
 
@@ -165,9 +231,9 @@ describe('RewardComponent', () => {
         } as any)
       })
 
-      it('should throw an error with response details', async () => {
+      it('should throw an error without propagating the upstream response body', async () => {
         await expect(rewardComponent.sendReward(campaignKey, beneficiary)).rejects.toThrow(
-          'Failed to fetch https://rewards.decentraland.org/api/rewards: 400 {"ok":false,"code":"bad_request","error":"Invalid data was sent to the server"}'
+          'Failed to fetch https://rewards.decentraland.org/api/rewards: 400'
         )
       })
     })
@@ -183,17 +249,38 @@ describe('RewardComponent', () => {
     })
 
     describe('when the response text cannot be read', () => {
-      beforeEach(() => {
+      let responseTextMock: jest.Mock
+      let caughtError: unknown
+
+      beforeEach(async () => {
+        responseTextMock = jest.fn().mockRejectedValue(new Error('Cannot read response'))
+        caughtError = undefined
         mockFetcher.fetch.mockResolvedValue({
           ok: false,
           status: 500,
           statusText: 'Internal Server Error',
-          text: jest.fn().mockRejectedValue(new Error('Cannot read response'))
+          text: responseTextMock
         } as any)
+
+        try {
+          await rewardComponent.sendReward(campaignKey, beneficiary)
+        } catch (error) {
+          caughtError = error
+        }
       })
 
-      it('should throw the text reading error', async () => {
-        await expect(rewardComponent.sendReward(campaignKey, beneficiary)).rejects.toThrow('Cannot read response')
+      afterEach(() => {
+        caughtError = undefined
+      })
+
+      it('should throw a stable error that does not depend on the response body', () => {
+        expect(caughtError).toMatchObject({
+          message: 'Failed to fetch https://rewards.decentraland.org/api/rewards: 500'
+        })
+      })
+
+      it('should not read a potentially secret-bearing response body', () => {
+        expect(responseTextMock).not.toHaveBeenCalled()
       })
     })
   })

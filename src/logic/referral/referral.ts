@@ -70,6 +70,11 @@ export async function createReferralComponent(
 
   const isDev = ENV === 'dev'
 
+  // Bounds retries of a tier whose issuance keeps failing, and how long one worker's claim
+  // blocks a competing worker from issuing the same tier.
+  const rewardMaxAttempts = (await config.getNumber('REFERRAL_REWARD_MAX_ATTEMPTS')) ?? 5
+  const rewardClaimLeaseMs = (await config.getNumber('REFERRAL_REWARD_CLAIM_LEASE_MS')) ?? 5 * 60 * 1000
+
   const rewardKeys = {
     5: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5,
     10: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_10,
@@ -105,10 +110,12 @@ export async function createReferralComponent(
     }
   }
 
+  // `tierInvites` is the tier boundary being granted, not the live invite count: a count that
+  // skipped past the boundary must still announce the tier it actually unlocked.
   function createReferralNewTierReachedEvent(
     referrer: string,
     invitedUser: string,
-    totalInvitedUsers: number,
+    tierInvites: number,
     reward: RewardAttributes
   ): ReferralNewTierReachedEvent {
     return {
@@ -120,11 +127,11 @@ export async function createReferralComponent(
         address: referrer,
         title: 'Referral Reward Unlocked!',
         description: `Check the 'Referral Rewards' tab in your web profile to see your prize!`,
-        tier: TIERS.findIndex((tier) => totalInvitedUsers <= tier) + 1,
+        tier: TIERS.findIndex((tier) => tierInvites <= tier) + 1,
         url: `${PROFILE_URL}/accounts/${referrer}/referral`,
         image: reward.image,
         invitedUserAddress: invitedUser,
-        invitedUsers: totalInvitedUsers,
+        invitedUsers: tierInvites,
         rarity: reward.rarity!
       }
     }
@@ -162,6 +169,151 @@ export async function createReferralComponent(
       if (denyList.has(originalReferrer.toLowerCase())) {
         throw new ReferralInvalidInputError(`Referrer is part of a banned referral chain ${context}`)
       }
+    }
+  }
+
+  /**
+   * Issues the reward for one crossed tier, at most once ever.
+   *
+   * The claim is taken before the reward server is called and is only closed after a confirmed
+   * success, so a failure leaves the tier claimable by a later event instead of losing it.
+   */
+  async function grantTierReward(referrer: string, invitedUser: string, tier: number): Promise<void> {
+    const claim = await referralDb.claimTierReward(referrer, tier, {
+      maxAttempts: rewardMaxAttempts,
+      leaseMs: rewardClaimLeaseMs
+    })
+
+    if (!claim) return
+
+    let rewardsSent: RewardAttributes[]
+    try {
+      rewardsSent = await rewards.sendReward(rewardKeys[tier as keyof typeof rewardKeys], referrer)
+    } catch (error) {
+      // Nothing was issued, so the tier must stay claimable for a later event.
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Failed to issue tier reward; it stays claimable for a later event', {
+        referrer,
+        tier,
+        attempts: claim.attempts,
+        error: message
+      })
+      await recordFailureBestEffort(referrer, tier, message)
+      return
+    }
+
+    // Only a successful call returning zero rows proves someone else closed the grant. A throw
+    // leaves it unknown, and the reward is already issued, so that path still announces.
+    let closedByAnotherWorker = false
+    try {
+      // The reward exists now. Closing the grant is mandatory: a row left pending is re-claimed
+      // once the lease expires, and the tier would be issued again.
+      closedByAnotherWorker = (await referralDb.markTierRewardGranted(referrer, tier)) === 0
+    } catch (error) {
+      logger.error('Tier reward was issued but the grant could not be closed; a later event may re-issue it', {
+        referrer,
+        tier,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+
+    if (closedByAnotherWorker) {
+      logger.error('Tier reward grant was already closed by another worker; skipping notifications', {
+        referrer,
+        tier
+      })
+      return
+    }
+
+    // Everything below is best-effort and can never make the tier retryable.
+    const reward = rewardsSent[0]
+    if (!reward) return
+
+    await Promise.all([
+      publishBestEffort(createReferralNewTierReachedEvent(referrer, invitedUser, tier, reward)),
+      setRewardImageBestEffort(referrer, reward.image, tier)
+    ])
+  }
+
+  /** Recording why an attempt failed must never abort the remaining tiers. */
+  async function recordFailureBestEffort(referrer: string, tier: number, reason: string) {
+    try {
+      await referralDb.recordTierRewardFailure(referrer, tier, reason)
+    } catch (error) {
+      logger.error('Failed to record a tier reward failure', {
+        referrer,
+        tier,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+  }
+
+  /** Notifies the IRL-swag milestone once, using the same claim guard as the reward tiers. */
+  async function grantIrlSwagTier(referrer: string): Promise<void> {
+    const claim = await referralDb.claimTierReward(referrer, TIERS_IRL_SWAG, {
+      maxAttempts: rewardMaxAttempts,
+      leaseMs: rewardClaimLeaseMs
+    })
+
+    if (!claim) return
+
+    try {
+      await slack.sendMessage(referral100InvitesReachedMessage(referrer, isDev, REFERRAL_METABASE_DASHBOARD))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.warn('Failed to send the IRL swag Slack notification; it stays claimable', { referrer, error: message })
+      await recordFailureBestEffort(referrer, TIERS_IRL_SWAG, message)
+      return
+    }
+
+    // Closed in its own block: leaving the row pending after a sent notification re-sends it.
+    try {
+      await referralDb.markTierRewardGranted(referrer, TIERS_IRL_SWAG)
+    } catch (error) {
+      logger.error('IRL swag notification was sent but the grant could not be closed', {
+        referrer,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+  }
+
+  /**
+   * Grants every tier the referrer has reached but not yet been granted.
+   *
+   * Uses `<=` against the accepted-invite count rather than exact equality, so a count that
+   * jumps past a boundary under concurrency still grants the skipped tier on this or a later event.
+   */
+  async function grantReachedTiers(referrer: string, invitedUser: string, acceptedInvites: number): Promise<void> {
+    for (const tier of TIERS.filter((tier) => tier <= acceptedInvites)) {
+      await grantTierReward(referrer, invitedUser, tier)
+    }
+
+    if (acceptedInvites >= TIERS_IRL_SWAG) {
+      await grantIrlSwagTier(referrer)
+    }
+  }
+
+  /** Notifications are best-effort: a failure must not abort or re-run the money path. */
+  async function publishBestEffort(event: ReferralInvitedUsersAcceptedEvent | ReferralNewTierReachedEvent) {
+    try {
+      await sns.publishMessage(event)
+    } catch (error) {
+      logger.warn('Failed to publish referral event', {
+        subType: event.subType,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+  }
+
+  async function setRewardImageBestEffort(referrer: string, rewardImageUrl: string, tier: number) {
+    try {
+      await referralDb.setReferralRewardImage({ referrer, rewardImageUrl, tier })
+    } catch (error) {
+      logger.warn('Failed to store referral reward image', {
+        referrer,
+        tier,
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
   }
 
@@ -386,56 +538,9 @@ export async function createReferralComponent(
 
       const acceptedInvites = await referralDb.countAcceptedInvitesByReferrer(referrer)
 
-      const event = createReferralInvitedUsersAcceptedEvent(referrer, invitedUser, acceptedInvites)
-      logger.debug('Publishing event createReferralInvitedUsersAcceptedEvent', {
-        referrer,
-        invitedUser,
-        acceptedInvites,
-        event: JSON.stringify(event)
-      })
-      await sns.publishMessage(event)
+      await publishBestEffort(createReferralInvitedUsersAcceptedEvent(referrer, invitedUser, acceptedInvites))
 
-      if (TIERS.includes(acceptedInvites)) {
-        const rewardKey = rewardKeys[acceptedInvites as keyof typeof rewardKeys]
-        const rewardsSent = await rewards.sendReward(rewardKey, referrer)
-
-        const eventNewTierReached = createReferralNewTierReachedEvent(
-          referrer,
-          invitedUser,
-          acceptedInvites,
-          rewardsSent[0]
-        )
-        logger.debug('Publishing event createReferralNewTierReachedEvent', {
-          referrer,
-          invitedUser,
-          acceptedInvites,
-          event: JSON.stringify(eventNewTierReached)
-        })
-
-        await Promise.all([
-          sns.publishMessage(eventNewTierReached),
-          referralDb.setReferralRewardImage({
-            referrer,
-            rewardImageUrl: rewardsSent[0].image,
-            tier: acceptedInvites
-          })
-        ])
-
-        return
-      }
-
-      if (acceptedInvites === TIERS_IRL_SWAG) {
-        try {
-          await slack.sendMessage(referral100InvitesReachedMessage(referrer, isDev, REFERRAL_METABASE_DASHBOARD))
-        } catch (error) {
-          logger.warn('Failed to send Slack notification, but referral was finalized successfully', {
-            referrer,
-            invitedUser,
-            acceptedInvites,
-            error: error instanceof Error ? error.message : String(error)
-          })
-        }
-      }
+      await grantReachedTiers(referrer, invitedUser, acceptedInvites)
 
       logger.info('Referral finalized successfully', {
         invitedUser,

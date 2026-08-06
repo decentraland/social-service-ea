@@ -5,10 +5,13 @@ describe('referral-db-component', () => {
   let mockPg: any
   let mockLogger: any
   let referralDb: any
+  let transactionQuery: jest.Mock
 
   beforeEach(async () => {
+    transactionQuery = jest.fn()
     mockPg = {
-      query: jest.fn()
+      query: jest.fn(),
+      withTransaction: jest.fn(async (callback) => callback({ query: transactionQuery }))
     }
 
     mockLogger = {
@@ -32,6 +35,31 @@ describe('referral-db-component', () => {
 
   afterEach(() => {
     jest.resetAllMocks()
+  })
+
+  describe('when creating a referral in an IP anti-fraud bucket', () => {
+    let referralInput: { referrer: string; invitedUser: string; invitedUserIP: string }
+
+    beforeEach(() => {
+      referralInput = {
+        referrer: '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        invitedUser: '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
+        invitedUserIP: '203.0.113.20'
+      }
+      transactionQuery
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ id: 'referral-id' }], rowCount: 1 })
+    })
+
+    it('should serialize the count and insert using the normalized referrer and IP', async () => {
+      await referralDb.createReferral(referralInput)
+
+      expect(transactionQuery).toHaveBeenNthCalledWith(
+        1,
+        'SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
+        [referralInput.referrer.toLowerCase(), referralInput.invitedUserIP]
+      )
+    })
   })
 
   describe('findReferralProgress', () => {
@@ -242,6 +270,109 @@ describe('referral-db-component', () => {
           })
         )
       })
+    })
+  })
+
+  describe('when claiming a tier reward', () => {
+    let referrer: string
+    let tier: number
+    let options: { maxAttempts: number; leaseMs: number }
+
+    beforeEach(() => {
+      referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      tier = 5
+      options = { maxAttempts: 5, leaseMs: 300000 }
+    })
+
+    describe('and no grant row exists yet', () => {
+      let result: unknown
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [{ id: 'grant-id', tier: 5, attempts: 1 }], rowCount: 1 })
+        result = await referralDb.claimTierReward(referrer, tier, options)
+      })
+
+      it('should return the claimed grant so the caller may issue the reward', () => {
+        expect(result).toEqual({ id: 'grant-id', tier: 5, attempts: 1 })
+      })
+
+      it('should upsert on the referrer/tier conflict target with the normalized referrer', () => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('ON CONFLICT (referrer, tier) DO UPDATE'),
+            values: expect.arrayContaining([referrer.toLowerCase(), tier])
+          })
+        )
+      })
+
+      it('should restrict the conflict update to pending grants that are within budget and unleased', () => {
+        expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(
+          /WHERE referral_reward_grants\.status = \$\d+ AND referral_reward_grants\.attempts < \$\d+ AND referral_reward_grants\.updated_at <= \$\d+/
+        )
+      })
+
+      it('should bound the claim by the configured attempt budget', () => {
+        expect(mockPg.query.mock.calls[0][0].values).toContain(options.maxAttempts)
+      })
+    })
+
+    describe('and the grant is already granted or still leased by another worker', () => {
+      let result: unknown
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        result = await referralDb.claimTierReward(referrer, tier, options)
+      })
+
+      it('should return null so the caller issues nothing', () => {
+        expect(result).toBeNull()
+      })
+    })
+  })
+
+  describe('when marking a tier reward as granted', () => {
+    let referrer: string
+    let result: number
+
+    beforeEach(async () => {
+      referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      result = await referralDb.markTierRewardGranted(referrer, 5)
+    })
+
+    it('should report the single row it transitioned', () => {
+      expect(result).toBe(1)
+    })
+
+    it('should only transition a grant that is still pending, using the normalized referrer', () => {
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('AND status ='),
+          values: expect.arrayContaining(['granted', referrer.toLowerCase(), 5, 'pending'])
+        })
+      )
+    })
+  })
+
+  describe('when recording a tier reward failure', () => {
+    let referrer: string
+
+    beforeEach(async () => {
+      referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      await referralDb.recordTierRewardFailure(referrer, 5, 'upstream 503')
+    })
+
+    it('should store the failure reason against the pending grant', () => {
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: expect.arrayContaining(['upstream 503', referrer.toLowerCase(), 5, 'pending'])
+        })
+      )
+    })
+
+    it('should not extend the lease, so the tier becomes retryable on schedule', () => {
+      expect(mockPg.query.mock.calls[0][0].text).not.toContain('updated_at =')
     })
   })
 })

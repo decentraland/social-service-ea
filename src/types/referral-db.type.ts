@@ -26,6 +26,32 @@ export interface IReferralDatabaseComponent {
   }): Promise<ReferralRewardImage>
   getLastReferralEmailByReferrer(referrer: string): Promise<ReferralEmail | null>
   getReferralRewardImage(referrer: string): Promise<ReferralRewardImage[] | null>
+  /**
+   * Atomically takes the exclusive right to issue the reward for a (referrer, tier) pair.
+   *
+   * Resolves to null — meaning the caller must NOT issue anything — when the tier is already
+   * granted, when another worker holds an unexpired claim, or when the attempt budget is spent.
+   *
+   * @param referrer The referrer wallet address.
+   * @param tier The tier being granted.
+   * @param options Attempt budget and how long a claim blocks a competing worker.
+   * @returns The claimed grant row, or null when the caller did not win the claim.
+   */
+  claimTierReward(
+    referrer: string,
+    tier: number,
+    options: { maxAttempts: number; leaseMs: number }
+  ): Promise<ReferralRewardGrant | null>
+  /**
+   * Marks a claimed tier as granted, closing it to any further issuance.
+   *
+   * @returns The number of rows transitioned (0 when it was not in the pending state).
+   */
+  markTierRewardGranted(referrer: string, tier: number): Promise<number>
+  /**
+   * Records why an issuance attempt failed, leaving the tier claimable again once the lease expires.
+   */
+  recordTierRewardFailure(referrer: string, tier: number, error: string): Promise<void>
 }
 
 export enum ReferralProgressStatus {
@@ -77,4 +103,20 @@ export type ReferralRewardImage = {
   reward_image_url: string
   tier: number
   created_at: number
+}
+
+export enum ReferralRewardGrantStatus {
+  PENDING = 'pending',
+  GRANTED = 'granted'
+}
+
+export type ReferralRewardGrant = {
+  id: string
+  referrer: string
+  tier: number
+  status: ReferralRewardGrantStatus
+  attempts: number
+  last_error: string | null
+  created_at: number
+  updated_at: number
 }
