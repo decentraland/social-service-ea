@@ -177,11 +177,19 @@ export function createCommunitiesDBComponent(
     async getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>> {
       const normalizedUserAddresses = userAddresses.map(normalizeAddress)
 
+      // Membership rows survive a soft delete, so the active check keeps a deleted community's
+      // former staff from still resolving as owners and moderators. Mirrors getCommunityMembersCount.
       const query = SQL`
         SELECT cm.member_address AS "memberAddress", cm.role AS "role"
         FROM community_members cm
         WHERE cm.community_id = ${id}
           AND cm.member_address = ANY(${normalizedUserAddresses})
+          AND EXISTS (
+            SELECT 1
+            FROM communities c
+            WHERE c.id = cm.community_id
+              AND c.active = true
+          )
       `
       const result = await pg.query<{ memberAddress: string; role: CommunityRole }>(query)
       return result.rows.reduce(
