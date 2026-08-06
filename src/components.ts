@@ -23,6 +23,7 @@ import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
 import { createCatalystClient } from './adapters/catalyst-client'
 import { createWorldsStatsComponent } from './adapters/worlds-stats'
+import { resolveMaxRequestBodyBytes } from './utils/requestBodyLimit'
 import { createTracingComponent } from './adapters/tracing'
 import { createCommsGatekeeperComponent } from './adapters/comms-gatekeeper'
 import { createVoiceComponent } from './logic/voice'
@@ -94,7 +95,7 @@ export async function initComponents(): Promise<AppComponents> {
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ metrics, config })
   const tracing = await createTracingComponent({ config, logs })
-  const httpMaxRequestBodyBytes = (await config.getNumber('HTTP_MAX_REQUEST_BODY_BYTES')) ?? 1024 * 1024
+  const httpMaxRequestBodyBytes = resolveMaxRequestBodyBytes(await config.getNumber('HTTP_MAX_REQUEST_BODY_BYTES'))
 
   const httpServer = await createServerComponent<GlobalContext>(
     { config: apiSeverConfig, logs },
