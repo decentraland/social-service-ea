@@ -1,10 +1,12 @@
 import { createHash, timingSafeEqual } from 'crypto'
 
+const BEARER_PREFIX = 'Bearer '
+
 /**
- * Whether an Authorization header carries the expected bearer token.
+ * Whether an Authorization header is exactly `Bearer <expectedToken>`.
  *
- * Both sides are hashed to a fixed length before comparison, so the check neither throws on a
- * length mismatch nor reveals the token's length through timing.
+ * Both sides are hashed to a fixed length and compared in constant time, so the check neither
+ * throws on a length mismatch nor reveals the token's length or contents through timing.
  *
  * @param authorizationHeader - Raw Authorization header value, if any
  * @param expectedToken - The configured token; an unset value never matches
@@ -12,18 +14,14 @@ import { createHash, timingSafeEqual } from 'crypto'
  */
 export function matchesBearerToken(authorizationHeader: string | null | undefined, expectedToken?: string): boolean {
   if (!authorizationHeader || !expectedToken) return false
+  if (!authorizationHeader.startsWith(BEARER_PREFIX)) return false
 
-  const [scheme, value] = authorizationHeader.split(' ')
-  if (scheme !== 'Bearer' || !value) return false
+  // Everything after the scheme is the token, so trailing segments can't be ignored.
+  const value = authorizationHeader.slice(BEARER_PREFIX.length)
 
-  return digest(value).equals(digest(expectedToken))
+  return timingSafeEqual(digest(value), digest(expectedToken))
 }
 
 function digest(value: string): Buffer {
   return createHash('sha256').update(value).digest()
-}
-
-/** Exposed so the comparison itself stays testable without reaching into crypto. */
-export function tokensMatch(candidate: string, expected: string): boolean {
-  return timingSafeEqual(digest(candidate), digest(expected))
 }
