@@ -496,4 +496,41 @@ describe('ws-handler', () => {
       })
     })
   })
+
+  describe('when verifying the auth chain of a connecting socket', () => {
+    let metadataValidator: (metadata: Record<string, any> | undefined) => boolean
+
+    beforeEach(async () => {
+      mockWs.getUserData.mockReturnValue({
+        isConnected: true,
+        auth: false,
+        wsConnectionId: 'test-client-id'
+      } as WsNotAuthenticatedUserData)
+      ;(verify as jest.Mock).mockResolvedValue({ auth: '0x123' })
+
+      await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+      metadataValidator = (verify as jest.Mock).mock.calls[0][3].metadataValidator
+    })
+
+    it('should install a metadata validator, matching the HTTP routes', () => {
+      expect(metadataValidator).toEqual(expect.any(Function))
+    })
+
+    it('should reject a chain whose metadata declares the scene signer', () => {
+      expect(metadataValidator({ signer: 'decentraland-kernel-scene' })).toBe(false)
+    })
+
+    it('should accept the empty metadata the explorer client sends on this socket', () => {
+      expect(metadataValidator({})).toBe(true)
+    })
+
+    it('should accept a chain signed by any other signer', () => {
+      expect(metadataValidator({ signer: 'dcl:explorer' })).toBe(true)
+    })
+
+    it('should accept absent metadata without throwing', () => {
+      expect(metadataValidator(undefined)).toBe(true)
+    })
+  })
 })

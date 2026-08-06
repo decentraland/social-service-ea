@@ -116,7 +116,9 @@ export async function registerWsHandler(
 
       const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
         fetcher,
-        expiration: authSignatureExpirationInMs
+        expiration: authSignatureExpirationInMs,
+        // Scene signers are not accepted on this surface, matching the HTTP routes.
+        metadataValidator: (metadata) => metadata?.signer !== 'decentraland-kernel-scene'
       })
 
       if (data.timeout) {
