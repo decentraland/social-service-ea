@@ -12,6 +12,7 @@ import {
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { CommunityRole } from '../../../types/entities'
+import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function kickPlayerFromCommunityVoiceChatService({
   components: { logs, commsGatekeeper, communitiesDb }
@@ -107,7 +108,11 @@ export function kickPlayerFromCommunityVoiceChatService({
         }
       }
 
-      if (error instanceof InvalidCommunityIdError || error instanceof InvalidUserAddressError) {
+      if (
+        error instanceof InvalidCommunityIdError ||
+        error instanceof InvalidUserAddressError ||
+        error instanceof InvalidGatekeeperIdentifierError
+      ) {
         return {
           response: {
             $case: 'invalidRequest',

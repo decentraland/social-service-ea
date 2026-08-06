@@ -9,6 +9,7 @@ import {
   MuteSpeakerFromCommunityVoiceChatPayload,
   MuteSpeakerFromCommunityVoiceChatResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
+import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function muteSpeakerFromCommunityVoiceChatService({
   components: { logs, communityVoice }
@@ -70,7 +71,11 @@ export function muteSpeakerFromCommunityVoiceChatService({
         }
       }
 
-      if (error instanceof InvalidCommunityIdError || error instanceof InvalidUserAddressError) {
+      if (
+        error instanceof InvalidCommunityIdError ||
+        error instanceof InvalidUserAddressError ||
+        error instanceof InvalidGatekeeperIdentifierError
+      ) {
         return {
           response: {
             $case: 'invalidRequest',

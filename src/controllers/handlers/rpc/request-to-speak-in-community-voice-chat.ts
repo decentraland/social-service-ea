@@ -9,6 +9,7 @@ import {
   InvalidCommunityIdError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
+import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function requestToSpeakInCommunityVoiceChatService({
   components: { logs, commsGatekeeper }
@@ -84,7 +85,7 @@ export function requestToSpeakInCommunityVoiceChatService({
         }
       }
 
-      if (error instanceof InvalidCommunityIdError) {
+      if (error instanceof InvalidCommunityIdError || error instanceof InvalidGatekeeperIdentifierError) {
         return {
           response: {
             $case: 'invalidRequest',
