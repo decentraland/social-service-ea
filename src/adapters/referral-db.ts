@@ -243,22 +243,27 @@ export async function createReferralDBComponent(
     const now = Date.now()
     const leaseCutoff = now - options.leaseMs
     const normalizedReferrer = referrer.toLowerCase()
+    // Fresh fencing token per claim. Rotating it on the conflict path is what invalidates the
+    // previous holder: once a lease expires and someone else claims, the old token matches nothing.
+    const claimToken = randomUUID()
 
     // Single-statement claim. The unique (referrer, tier) index serializes competing
     // workers; the DO UPDATE predicate then yields no row unless this caller may issue.
     const result = await pg.query<ReferralRewardGrant>(SQL`
-      INSERT INTO referral_reward_grants (id, referrer, tier, status, attempts, created_at, updated_at)
+      INSERT INTO referral_reward_grants (id, referrer, tier, status, attempts, claim_token, created_at, updated_at)
       VALUES (
         ${randomUUID()},
         ${normalizedReferrer},
         ${tier},
         ${ReferralRewardGrantStatus.PENDING},
         1,
+        ${claimToken},
         ${now},
         ${now}
       )
       ON CONFLICT (referrer, tier) DO UPDATE
         SET attempts = referral_reward_grants.attempts + 1,
+            claim_token = ${claimToken},
             updated_at = ${now}
         WHERE referral_reward_grants.status = ${ReferralRewardGrantStatus.PENDING}
           AND referral_reward_grants.attempts < ${options.maxAttempts}
@@ -269,20 +274,28 @@ export async function createReferralDBComponent(
     return result.rows[0] ?? null
   }
 
-  async function markTierRewardGranted(referrer: string, tier: number): Promise<number> {
+  async function markTierRewardGranted(referrer: string, tier: number, claimToken: string): Promise<number> {
     const now = Date.now()
-    // Terminal transition: once granted the claim predicate can never match again.
+    // Terminal transition: once granted the claim predicate can never match again. Fenced on
+    // claim_token so a worker whose lease expired mid-issuance cannot close the claim that
+    // replaced it — that worker would otherwise close a claim whose reward is still in flight.
     const result = await pg.query(SQL`
       UPDATE referral_reward_grants
       SET status = ${ReferralRewardGrantStatus.GRANTED}, last_error = NULL, updated_at = ${now}
       WHERE referrer = ${referrer.toLowerCase()}
         AND tier = ${tier}
         AND status = ${ReferralRewardGrantStatus.PENDING}
+        AND claim_token = ${claimToken}
     `)
     return result.rowCount
   }
 
-  async function recordTierRewardFailure(referrer: string, tier: number, error: string): Promise<void> {
+  async function recordTierRewardFailure(
+    referrer: string,
+    tier: number,
+    claimToken: string,
+    error: string
+  ): Promise<void> {
     // Deliberately leaves updated_at untouched so the lease expires on schedule and a later event retries.
     await pg.query(SQL`
       UPDATE referral_reward_grants
@@ -290,13 +303,35 @@ export async function createReferralDBComponent(
       WHERE referrer = ${referrer.toLowerCase()}
         AND tier = ${tier}
         AND status = ${ReferralRewardGrantStatus.PENDING}
+        AND claim_token = ${claimToken}
     `)
+  }
+
+  async function markTierRewardNeedsManualReview(
+    referrer: string,
+    tier: number,
+    claimToken: string,
+    error: string
+  ): Promise<number> {
+    const now = Date.now()
+    // Parks the grant outside the retry loop: the claim predicate only matches 'pending', so no
+    // later event can re-issue a tier whose reward may already exist upstream.
+    const result = await pg.query(SQL`
+      UPDATE referral_reward_grants
+      SET status = ${ReferralRewardGrantStatus.NEEDS_MANUAL_REVIEW}, last_error = ${error}, updated_at = ${now}
+      WHERE referrer = ${referrer.toLowerCase()}
+        AND tier = ${tier}
+        AND status = ${ReferralRewardGrantStatus.PENDING}
+        AND claim_token = ${claimToken}
+    `)
+    return result.rowCount
   }
 
   return {
     claimTierReward,
     markTierRewardGranted,
     recordTierRewardFailure,
+    markTierRewardNeedsManualReview,
     createReferral,
     findReferralProgress,
     updateReferralProgress,

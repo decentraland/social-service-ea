@@ -286,10 +286,16 @@ describe('referral-db-component', () => {
 
     describe('and no grant row exists yet', () => {
       let result: unknown
+      let queryText: string
+      let insertedToken: string
+      let takeoverToken: string
 
       beforeEach(async () => {
         mockPg.query.mockResolvedValueOnce({ rows: [{ id: 'grant-id', tier: 5, attempts: 1 }], rowCount: 1 })
         result = await referralDb.claimTierReward(referrer, tier, options)
+        queryText = mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')
+        insertedToken = mockPg.query.mock.calls[0][0].values[4]
+        takeoverToken = mockPg.query.mock.calls[0][0].values[7]
       })
 
       it('should return the claimed grant so the caller may issue the reward', () => {
@@ -306,13 +312,44 @@ describe('referral-db-component', () => {
       })
 
       it('should restrict the conflict update to pending grants that are within budget and unleased', () => {
-        expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(
+        expect(queryText).toMatch(
           /WHERE referral_reward_grants\.status = \$\d+ AND referral_reward_grants\.attempts < \$\d+ AND referral_reward_grants\.updated_at <= \$\d+/
         )
       })
 
       it('should bound the claim by the configured attempt budget', () => {
         expect(mockPg.query.mock.calls[0][0].values).toContain(options.maxAttempts)
+      })
+
+      it('should stamp a uuid fencing token on the row it inserts', () => {
+        expect(insertedToken).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+      })
+
+      it('should rotate the fencing token when it takes an expired claim over from another worker', () => {
+        expect(queryText).toMatch(
+          /DO UPDATE SET attempts = referral_reward_grants\.attempts \+ 1, claim_token = \$\d+, updated_at = \$\d+/
+        )
+      })
+
+      it('should use the same freshly minted token whether it inserts or takes over', () => {
+        expect(takeoverToken).toBe(insertedToken)
+      })
+    })
+
+    describe('and the same tier is claimed again after the lease expired', () => {
+      let firstToken: string
+      let secondToken: string
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValue({ rows: [{ id: 'grant-id' }], rowCount: 1 })
+        await referralDb.claimTierReward(referrer, tier, options)
+        await referralDb.claimTierReward(referrer, tier, options)
+        firstToken = mockPg.query.mock.calls[0][0].values[4]
+        secondToken = mockPg.query.mock.calls[1][0].values[4]
+      })
+
+      it('should mint a different token for the new claim so the previous holder is fenced out', () => {
+        expect(secondToken).not.toBe(firstToken)
       })
     })
 
@@ -332,47 +369,125 @@ describe('referral-db-component', () => {
 
   describe('when marking a tier reward as granted', () => {
     let referrer: string
-    let result: number
+    let claimToken: string
 
-    beforeEach(async () => {
+    beforeEach(() => {
       referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
-      mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      result = await referralDb.markTierRewardGranted(referrer, 5)
+      claimToken = 'a2f1c0de-0000-4000-8000-000000000001'
     })
 
-    it('should report the single row it transitioned', () => {
-      expect(result).toBe(1)
+    describe('and the caller still holds the claim', () => {
+      let result: number
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        result = await referralDb.markTierRewardGranted(referrer, 5, claimToken)
+      })
+
+      it('should report the single row it transitioned', () => {
+        expect(result).toBe(1)
+      })
+
+      it('should only transition a grant that is still pending, using the normalized referrer', () => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('AND status ='),
+            values: expect.arrayContaining(['granted', referrer.toLowerCase(), 5, 'pending'])
+          })
+        )
+      })
+
+      it('should fence the transition on the claim token so it cannot close another claim', () => {
+        expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(/AND claim_token = \$\d+/)
+      })
+
+      it('should pass the caller-held token as the fence value', () => {
+        expect(mockPg.query.mock.calls[0][0].values).toContain(claimToken)
+      })
     })
 
-    it('should only transition a grant that is still pending, using the normalized referrer', () => {
-      expect(mockPg.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining('AND status ='),
-          values: expect.arrayContaining(['granted', referrer.toLowerCase(), 5, 'pending'])
-        })
-      )
+    describe('and the claim was superseded while the caller was issuing the reward', () => {
+      let result: number
+
+      beforeEach(async () => {
+        // The row now carries the newer worker's token, so the fenced UPDATE matches nothing.
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        result = await referralDb.markTierRewardGranted(referrer, 5, claimToken)
+      })
+
+      it('should report zero rows so the stale worker knows it did not close the grant', () => {
+        expect(result).toBe(0)
+      })
     })
   })
 
   describe('when recording a tier reward failure', () => {
     let referrer: string
+    let claimToken: string
 
     beforeEach(async () => {
       referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      claimToken = 'a2f1c0de-0000-4000-8000-000000000002'
       mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      await referralDb.recordTierRewardFailure(referrer, 5, 'upstream 503')
+      await referralDb.recordTierRewardFailure(referrer, 5, claimToken, 'upstream rejected the request')
     })
 
     it('should store the failure reason against the pending grant', () => {
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          values: expect.arrayContaining(['upstream 503', referrer.toLowerCase(), 5, 'pending'])
+          values: expect.arrayContaining([
+            'upstream rejected the request',
+            referrer.toLowerCase(),
+            5,
+            'pending',
+            claimToken
+          ])
         })
       )
     })
 
+    it('should fence the write on the claim token so a stale worker cannot stamp another claim', () => {
+      expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(/AND claim_token = \$\d+/)
+    })
+
     it('should not extend the lease, so the tier becomes retryable on schedule', () => {
       expect(mockPg.query.mock.calls[0][0].text).not.toContain('updated_at =')
+    })
+  })
+
+  describe('when parking a tier reward for manual review', () => {
+    let referrer: string
+    let claimToken: string
+    let result: number
+
+    beforeEach(async () => {
+      referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      claimToken = 'a2f1c0de-0000-4000-8000-000000000003'
+      mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      result = await referralDb.markTierRewardNeedsManualReview(referrer, 5, claimToken, 'Request aborted (timed out)')
+    })
+
+    it('should report the single row it parked', () => {
+      expect(result).toBe(1)
+    })
+
+    it('should move the grant out of pending into the manual review state with the reason attached', () => {
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: expect.arrayContaining([
+            'needs_manual_review',
+            'Request aborted (timed out)',
+            referrer.toLowerCase(),
+            5,
+            'pending',
+            claimToken
+          ])
+        })
+      )
+    })
+
+    it('should fence the write on the claim token so it cannot park another claim', () => {
+      expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(/AND claim_token = \$\d+/)
     })
   })
 })

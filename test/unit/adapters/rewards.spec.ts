@@ -1,4 +1,4 @@
-import { createRewardComponent } from '../../../src/adapters/rewards'
+import { createRewardComponent, isDefinitiveNonIssuance, RewardIssuanceError } from '../../../src/adapters/rewards'
 import { ChainId, Rarity } from '@dcl/schemas'
 import { RewardAttributes, RewardStatus } from '../../../src/logic/referral/types'
 import { IRewardComponent } from '../../../src/types'
@@ -147,6 +147,10 @@ describe('RewardComponent', () => {
       it('should log a warning identifying the beneficiary that received nothing', () => {
         expect(mockWarn).toHaveBeenCalledWith('Reward server returned an empty reward list', { beneficiary })
       })
+
+      it('should classify it as a definitive non-issuance so the tier stays retryable', () => {
+        expect(isDefinitiveNonIssuance(caughtError)).toBe(true)
+      })
     })
 
     describe('and the response is ok but the data field is missing', () => {
@@ -215,8 +219,10 @@ describe('RewardComponent', () => {
       })
     })
 
-    describe('when the API returns a bad request error', () => {
-      beforeEach(() => {
+    describe('and the reward server refuses the request with a 4xx', () => {
+      let caughtError: unknown
+
+      beforeEach(async () => {
         mockFetcher.fetch.mockResolvedValue({
           ok: false,
           status: 400,
@@ -229,32 +235,33 @@ describe('RewardComponent', () => {
             })
           )
         } as any)
+
+        caughtError = await rewardComponent.sendReward(campaignKey, beneficiary).catch((error) => error)
       })
 
-      it('should throw an error without propagating the upstream response body', async () => {
-        await expect(rewardComponent.sendReward(campaignKey, beneficiary)).rejects.toThrow(
-          'Failed to fetch https://rewards.decentraland.org/api/rewards: 400'
-        )
+      afterEach(() => {
+        caughtError = undefined
+      })
+
+      it('should throw a RewardRequestFailedError carrying the status and not the upstream response body', () => {
+        expect(caughtError).toMatchObject({
+          name: 'RewardRequestFailedError',
+          status: 400,
+          message: 'Failed to fetch https://rewards.decentraland.org/api/rewards: 400'
+        })
+      })
+
+      it('should classify it as a definitive non-issuance, since the server refused before creating anything', () => {
+        expect(isDefinitiveNonIssuance(caughtError)).toBe(true)
       })
     })
 
-    describe('when the fetch fails with network error', () => {
-      beforeEach(() => {
-        mockFetcher.fetch.mockRejectedValue(new Error('Network error'))
-      })
-
-      it('should throw the network error', async () => {
-        await expect(rewardComponent.sendReward(campaignKey, beneficiary)).rejects.toThrow('Network error')
-      })
-    })
-
-    describe('when the response text cannot be read', () => {
+    describe('and the reward server answers with a 5xx', () => {
       let responseTextMock: jest.Mock
       let caughtError: unknown
 
       beforeEach(async () => {
         responseTextMock = jest.fn().mockRejectedValue(new Error('Cannot read response'))
-        caughtError = undefined
         mockFetcher.fetch.mockResolvedValue({
           ok: false,
           status: 500,
@@ -262,11 +269,7 @@ describe('RewardComponent', () => {
           text: responseTextMock
         } as any)
 
-        try {
-          await rewardComponent.sendReward(campaignKey, beneficiary)
-        } catch (error) {
-          caughtError = error
-        }
+        caughtError = await rewardComponent.sendReward(campaignKey, beneficiary).catch((error) => error)
       })
 
       afterEach(() => {
@@ -275,12 +278,90 @@ describe('RewardComponent', () => {
 
       it('should throw a stable error that does not depend on the response body', () => {
         expect(caughtError).toMatchObject({
+          name: 'RewardRequestFailedError',
+          status: 500,
           message: 'Failed to fetch https://rewards.decentraland.org/api/rewards: 500'
         })
       })
 
       it('should not read a potentially secret-bearing response body', () => {
         expect(responseTextMock).not.toHaveBeenCalled()
+      })
+
+      it('should not classify it as a definitive non-issuance, since the reward can be created before the handler fails', () => {
+        expect(isDefinitiveNonIssuance(caughtError)).toBe(false)
+      })
+    })
+
+    describe('and the request never completed', () => {
+      let caughtError: unknown
+
+      beforeEach(async () => {
+        mockFetcher.fetch.mockRejectedValue(new Error('Network error'))
+        caughtError = await rewardComponent.sendReward(campaignKey, beneficiary).catch((error) => error)
+      })
+
+      afterEach(() => {
+        caughtError = undefined
+      })
+
+      it('should propagate the transport error untouched', () => {
+        expect(caughtError).toMatchObject({ message: 'Network error' })
+      })
+
+      it('should not classify it as a definitive non-issuance, since the request may have reached the server', () => {
+        expect(isDefinitiveNonIssuance(caughtError)).toBe(false)
+      })
+    })
+  })
+
+  describe('when classifying a failure the reward server produced', () => {
+    describe('and the fetcher timed the request out', () => {
+      let timeoutError: Error
+
+      beforeEach(() => {
+        // The exact error @dcl/fetch-component throws once its timeout aborts the request.
+        timeoutError = new Error('Request aborted (timed out)')
+      })
+
+      it('should not treat it as a definitive non-issuance', () => {
+        expect(isDefinitiveNonIssuance(timeoutError)).toBe(false)
+      })
+    })
+
+    describe('and undici rejected the request at the network level', () => {
+      let networkError: Error
+
+      beforeEach(() => {
+        networkError = new TypeError('fetch failed')
+      })
+
+      it('should not treat it as a definitive non-issuance', () => {
+        expect(isDefinitiveNonIssuance(networkError)).toBe(false)
+      })
+    })
+
+    describe('and the response arrived but carried no usable reward', () => {
+      let issuanceError: RewardIssuanceError
+
+      beforeEach(() => {
+        issuanceError = new RewardIssuanceError('response contained an empty reward list')
+      })
+
+      it('should treat it as a definitive non-issuance', () => {
+        expect(isDefinitiveNonIssuance(issuanceError)).toBe(true)
+      })
+    })
+
+    describe('and the failure is of an unforeseen kind', () => {
+      let unexpectedError: Error
+
+      beforeEach(() => {
+        unexpectedError = new Error('something nobody anticipated')
+      })
+
+      it('should default to not definitive, so an unknown outcome is never blindly retried', () => {
+        expect(isDefinitiveNonIssuance(unexpectedError)).toBe(false)
       })
     })
   })

@@ -17,6 +17,7 @@ import {
   referralSuspiciousTimingMessage
 } from '../../utils/slackMessages'
 import { fetchJson } from '../../utils/fetch'
+import { isDefinitiveNonIssuance } from '../../adapters/rewards'
 
 const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
@@ -176,7 +177,10 @@ export async function createReferralComponent(
    * Issues the reward for one crossed tier, at most once ever.
    *
    * The claim is taken before the reward server is called and is only closed after a confirmed
-   * success, so a failure leaves the tier claimable by a later event instead of losing it.
+   * success, fenced on the claim's token. A failure that proves nothing was issued leaves the
+   * tier claimable by a later event; a failure whose outcome is unknown parks the grant for a
+   * human instead, because the reward API has no idempotency key and a blind retry would be
+   * how a second reward gets issued.
    */
   async function grantTierReward(referrer: string, invitedUser: string, tier: number): Promise<void> {
     const claim = await referralDb.claimTierReward(referrer, tier, {
@@ -190,38 +194,54 @@ export async function createReferralComponent(
     try {
       rewardsSent = await rewards.sendReward(rewardKeys[tier as keyof typeof rewardKeys], referrer)
     } catch (error) {
-      // Nothing was issued, so the tier must stay claimable for a later event.
       const message = error instanceof Error ? error.message : String(error)
-      logger.error('Failed to issue tier reward; it stays claimable for a later event', {
+
+      if (!isDefinitiveNonIssuance(error)) {
+        logger.error(
+          'MANUAL REVIEW REQUIRED: tier reward issuance ended with an unknown outcome, so the reward may already exist upstream. The grant is parked and will not be retried until a human reconciles it with the reward provider',
+          { referrer, tier, attempts: claim.attempts, error: message }
+        )
+        await parkForManualReviewBestEffort(referrer, tier, claim.claim_token, message)
+        return
+      }
+
+      // Proven not issued, so the tier must stay claimable for a later event.
+      logger.error('Failed to issue tier reward; nothing was issued, so it stays claimable for a later event', {
         referrer,
         tier,
         attempts: claim.attempts,
         error: message
       })
-      await recordFailureBestEffort(referrer, tier, message)
+      await recordFailureBestEffort(referrer, tier, claim.claim_token, message)
       return
     }
 
-    // Only a successful call returning zero rows proves someone else closed the grant. A throw
+    // Only a successful call returning zero rows proves the claim is no longer ours. A throw
     // leaves it unknown, and the reward is already issued, so that path still announces.
     let closedByAnotherWorker = false
     try {
       // The reward exists now. Closing the grant is mandatory: a row left pending is re-claimed
       // once the lease expires, and the tier would be issued again.
-      closedByAnotherWorker = (await referralDb.markTierRewardGranted(referrer, tier)) === 0
+      closedByAnotherWorker = (await referralDb.markTierRewardGranted(referrer, tier, claim.claim_token)) === 0
     } catch (error) {
-      logger.error('Tier reward was issued but the grant could not be closed; a later event may re-issue it', {
-        referrer,
-        tier,
-        error: error instanceof Error ? error.message : String(error)
-      })
+      // The reward exists but the row may still be pending, which the next lease expiry would
+      // turn into a second issuance. Park it instead. The park is fenced on the same token, so
+      // it matches nothing if the close actually landed.
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error(
+        'MANUAL REVIEW REQUIRED: tier reward was issued but the grant could not be closed; parking it so a later event cannot re-issue it',
+        { referrer, tier, error: message }
+      )
+      await parkForManualReviewBestEffort(referrer, tier, claim.claim_token, `issued but not closed: ${message}`)
     }
 
     if (closedByAnotherWorker) {
-      logger.error('Tier reward grant was already closed by another worker; skipping notifications', {
-        referrer,
-        tier
-      })
+      // Either the grant was already closed, or this worker's lease expired and another worker
+      // re-claimed the tier — in which case both workers called the reward server.
+      logger.error(
+        'MANUAL REVIEW REQUIRED: tier reward was issued but the claim is no longer ours, so a duplicate reward may exist. Skipping notifications',
+        { referrer, tier, attempts: claim.attempts }
+      )
       return
     }
 
@@ -236,15 +256,42 @@ export async function createReferralComponent(
   }
 
   /** Recording why an attempt failed must never abort the remaining tiers. */
-  async function recordFailureBestEffort(referrer: string, tier: number, reason: string) {
+  async function recordFailureBestEffort(referrer: string, tier: number, claimToken: string, reason: string) {
     try {
-      await referralDb.recordTierRewardFailure(referrer, tier, reason)
+      await referralDb.recordTierRewardFailure(referrer, tier, claimToken, reason)
     } catch (error) {
       logger.error('Failed to record a tier reward failure', {
         referrer,
         tier,
         error: error instanceof Error ? error.message : String(error)
       })
+    }
+  }
+
+  /**
+   * Parks a grant whose issuance outcome is unknown, so no later event can retry it.
+   *
+   * Best-effort like the rest of the bookkeeping, but a failure here is the worst case: the
+   * grant stays pending and becomes claimable again, so it is logged for alerting.
+   */
+  async function parkForManualReviewBestEffort(referrer: string, tier: number, claimToken: string, reason: string) {
+    try {
+      const parked = await referralDb.markTierRewardNeedsManualReview(referrer, tier, claimToken, reason)
+      if (parked === 0) {
+        logger.error('MANUAL REVIEW REQUIRED: could not park a tier reward grant because the claim is no longer ours', {
+          referrer,
+          tier
+        })
+      }
+    } catch (error) {
+      logger.error(
+        'MANUAL REVIEW REQUIRED: failed to park a tier reward grant with an unknown outcome; it stays claimable and may be issued twice',
+        {
+          referrer,
+          tier,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      )
     }
   }
 
@@ -260,15 +307,17 @@ export async function createReferralComponent(
     try {
       await slack.sendMessage(referral100InvitesReachedMessage(referrer, isDev, REFERRAL_METABASE_DASHBOARD))
     } catch (error) {
+      // Deliberately stays retryable even though a Slack failure is as ambiguous as a reward
+      // one: a duplicate ping costs nothing, so here the trade runs the other way.
       const message = error instanceof Error ? error.message : String(error)
       logger.warn('Failed to send the IRL swag Slack notification; it stays claimable', { referrer, error: message })
-      await recordFailureBestEffort(referrer, TIERS_IRL_SWAG, message)
+      await recordFailureBestEffort(referrer, TIERS_IRL_SWAG, claim.claim_token, message)
       return
     }
 
     // Closed in its own block: leaving the row pending after a sent notification re-sends it.
     try {
-      await referralDb.markTierRewardGranted(referrer, TIERS_IRL_SWAG)
+      await referralDb.markTierRewardGranted(referrer, TIERS_IRL_SWAG, claim.claim_token)
     } catch (error) {
       logger.error('IRL swag notification was sent but the grant could not be closed', {
         referrer,
