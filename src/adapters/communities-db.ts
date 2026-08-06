@@ -1022,9 +1022,8 @@ export function createCommunitiesDBComponent(
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
       return pg.withTransaction(async (client) => {
-        // Same bucket the ban takes, so a request cannot be created for a member a concurrent
-        // ban is in the middle of removing. The ban deletes requests, so without this the
-        // insert could land just after that cleanup and leave a pending request for a banned user.
+        // Same bucket the ban takes, so a request cannot be inserted for a member a concurrent
+        // ban is in the middle of removing along with their existing requests.
         await lockCommunityMemberBuckets(client, communityId, [normalizedMemberAddress])
 
         const activeBan = await client.query(
@@ -1038,16 +1037,23 @@ export function createCommunitiesDBComponent(
         const query = SQL`
           INSERT INTO community_requests (id, community_id, member_address, type, status)
           VALUES (${id}, ${communityId}, ${normalizedMemberAddress}, ${type}, ${CommunityRequestStatus.Pending})
-          RETURNING id
+          ON CONFLICT (community_id, member_address, type) WHERE status = 'pending'
+          DO UPDATE SET updated_at = community_requests.updated_at
+          RETURNING id, community_id, member_address, type, status
         `
-        const result = await client.query(query)
+        const result = await client.query<
+          Pick<MemberRequest, 'id' | 'type' | 'status'> & { community_id: string; member_address: string }
+        >(query)
+        const row = result.rows[0]
 
+        // The resolved row, not the caller's input: on conflict this is the pre-existing
+        // request, whose stored address is normalized and whose status may differ.
         return {
-          id: result.rows[0].id,
-          communityId,
-          memberAddress,
-          type,
-          status: CommunityRequestStatus.Pending
+          id: row.id,
+          communityId: row.community_id,
+          memberAddress: row.member_address,
+          type: row.type,
+          status: row.status
         }
       })
     },
