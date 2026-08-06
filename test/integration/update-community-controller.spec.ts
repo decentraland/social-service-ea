@@ -9,6 +9,7 @@ import {
   makeAuthenticatedMultipartRequest
 } from './utils/auth'
 import { randomUUID } from 'crypto'
+import SQL from 'sql-template-strings'
 import { AIComplianceError, CommunityNotCompliantError } from '../../src/logic/community/errors'
 
 test('Update Community Controller', async function ({ components, stubComponents, spyComponents }) {
@@ -457,18 +458,19 @@ test('Update Community Controller', async function ({ components, stubComponents
 
             describe('and the user is not the owner', () => {
               beforeEach(async () => {
-                await components.communitiesDb.updateMemberRole(
-                  communityId,
-                  identity.realAccount.address,
-                  CommunityRole.Moderator
+                // Seeded directly: the component method refuses to change the owner's role.
+                await components.pg.query(
+                  SQL`UPDATE community_members SET role = ${CommunityRole.Moderator}
+                      WHERE community_id = ${communityId}
+                        AND member_address = ${identity.realAccount.address.toLowerCase()}`
                 )
               })
 
               afterEach(async () => {
-                await components.communitiesDb.updateMemberRole(
-                  communityId,
-                  identity.realAccount.address,
-                  CommunityRole.Owner
+                await components.pg.query(
+                  SQL`UPDATE community_members SET role = ${CommunityRole.Owner}
+                      WHERE community_id = ${communityId}
+                        AND member_address = ${identity.realAccount.address.toLowerCase()}`
                 )
               })
 
@@ -575,18 +577,19 @@ test('Update Community Controller', async function ({ components, stubComponents
 
             describe('and the user is not the owner', () => {
               beforeEach(async () => {
-                await components.communitiesDb.updateMemberRole(
-                  communityId,
-                  identity.realAccount.address,
-                  CommunityRole.Moderator
+                // Seeded directly: the component method refuses to change the owner's role.
+                await components.pg.query(
+                  SQL`UPDATE community_members SET role = ${CommunityRole.Moderator}
+                      WHERE community_id = ${communityId}
+                        AND member_address = ${identity.realAccount.address.toLowerCase()}`
                 )
               })
 
               afterEach(async () => {
-                await components.communitiesDb.updateMemberRole(
-                  communityId,
-                  identity.realAccount.address,
-                  CommunityRole.Owner
+                await components.pg.query(
+                  SQL`UPDATE community_members SET role = ${CommunityRole.Owner}
+                      WHERE community_id = ${communityId}
+                        AND member_address = ${identity.realAccount.address.toLowerCase()}`
                 )
               })
 

@@ -1,5 +1,5 @@
 import { NotAuthorizedError } from '@dcl/http-commons'
-import { CommunityRole, CommunityPermission } from '../../types/entities'
+import { CommunityRole, CommunityPermission, canActOnMember } from '../../types/entities'
 import { AppComponents } from '../../types/system'
 import { ICommunityRolesComponent, CommunityPost } from './types'
 import { normalizeAddress } from '../../utils/address'
@@ -43,13 +43,7 @@ export const COMMUNITY_ROLES: Record<CommunityRole, CommunityPermission[]> = {
   [CommunityRole.None]: []
 }
 
-// [targetRole]: [roles that can act on targetRole]
-export const ROLE_ACTION_TRANSITIONS: Record<CommunityRole, CommunityRole[]> = {
-  [CommunityRole.Owner]: [], // No one can act on owners
-  [CommunityRole.Moderator]: [CommunityRole.Owner], // Only owners can act on moderators
-  [CommunityRole.Member]: [CommunityRole.Owner, CommunityRole.Moderator], // Owners and moderators can act on members
-  [CommunityRole.None]: [] // N/A
-}
+export { ROLE_ACTION_TRANSITIONS, canActOnMember } from '../../types/entities'
 
 export function createCommunityRolesComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'logs'>
@@ -66,10 +60,6 @@ export function createCommunityRolesComponent(
 
   const isMember = (role: CommunityRole): boolean => {
     return !!role && role !== CommunityRole.None
-  }
-
-  const canActOnMember = (actorRole: CommunityRole, targetRole: CommunityRole): boolean => {
-    return ROLE_ACTION_TRANSITIONS[targetRole]?.includes(actorRole) ?? false
   }
 
   const validatePermission = (permission: CommunityPermission, action: string) =>

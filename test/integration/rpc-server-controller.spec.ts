@@ -1067,7 +1067,11 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           }
 
           // Cleanup
-          await components.communitiesDb.kickMemberFromCommunity(communityId, targetMemberAddress.toLowerCase())
+          await components.communitiesDb.kickMemberFromCommunity(
+            communityId,
+            targetMemberAddress.toLowerCase(),
+            targetMemberAddress.toLowerCase()
+          )
         })
       })
     })
@@ -1121,7 +1125,11 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
           }
 
           // Cleanup
-          await components.communitiesDb.kickMemberFromCommunity(communityId, targetMemberAddress.toLowerCase())
+          await components.communitiesDb.kickMemberFromCommunity(
+            communityId,
+            targetMemberAddress.toLowerCase(),
+            targetMemberAddress.toLowerCase()
+          )
         })
       })
     })

@@ -171,7 +171,12 @@ export interface ICommunitiesDatabaseComponent {
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
   getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
-  updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void>
+  updateMemberRole(
+    communityId: string,
+    memberAddress: EthAddress,
+    newRole: CommunityRole,
+    actingAddress: EthAddress
+  ): Promise<void>
   /**
    * Atomically transfers ownership after revalidating the acting owner and target membership.
    *
@@ -192,7 +197,7 @@ export interface ICommunitiesDatabaseComponent {
     bannedMemberAddress: EthAddress
   ): Promise<{ wasMember: boolean }>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
-  kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
+  kickMemberFromCommunity(communityId: string, memberAddress: EthAddress, actingAddress: EthAddress): Promise<void>
   getCommunityMembers(
     id: string,
     options: {

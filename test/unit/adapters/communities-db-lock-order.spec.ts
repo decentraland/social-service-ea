@@ -11,6 +11,24 @@ function isCommunitiesRowLock(text: string): boolean {
   return text.includes('FROM communities') && text.includes('FOR UPDATE')
 }
 
+/**
+ * Answers each statement by what it is rather than by call order, so adding a statement to a
+ * transaction does not silently shift every mocked result.
+ */
+function createTransactionQueryMock(options: { ownerAddress: string; roles?: Record<string, CommunityRole> }) {
+  return jest.fn(async (statement: unknown) => {
+    const text = queryTextOf(statement)
+    if (isCommunitiesRowLock(text) || text.includes('FOR NO KEY UPDATE')) {
+      return { rows: [{ owner_address: options.ownerAddress }], rowCount: 1 }
+    }
+    if (text.includes('SELECT member_address, role FROM community_members')) {
+      const rows = Object.entries(options.roles ?? {}).map(([member_address, role]) => ({ member_address, role }))
+      return { rows, rowCount: rows.length }
+    }
+    return { rows: [], rowCount: 1 }
+  })
+}
+
 describe('when banning a member and removing their requests', () => {
   let communitiesDb: ICommunitiesDatabaseComponent
   let transactionQuery: jest.Mock
@@ -26,13 +44,10 @@ describe('when banning a member and removing their requests', () => {
     communityId = '11111111-1111-4111-8111-111111111111'
     bannerAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     bannedAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-    transactionQuery = jest
-      .fn()
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [{ owner_address: bannerAddress }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [{ member_address: bannedAddress }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    transactionQuery = createTransactionQueryMock({
+      ownerAddress: bannerAddress,
+      roles: { [bannerAddress]: CommunityRole.Owner, [bannedAddress]: CommunityRole.Member }
+    })
     withTransaction = jest.fn(async (callback) => callback({ query: transactionQuery }))
     communitiesDb = createCommunitiesDBComponent({ pg: { withTransaction } as any, logs: {} as any })
 
@@ -55,8 +70,12 @@ describe('when banning a member and removing their requests', () => {
     expect(advisoryLockIndex).toBeLessThan(communitiesRowLockIndex)
   })
 
-  it('should key the advisory lock on the community and the banned address', () => {
-    expect(transactionQuery.mock.calls[0][1]).toEqual([communityId, bannedAddress])
+  it('should key the advisory locks on the community and both the actor and the banned address', () => {
+    const lockedAddresses = transactionQuery.mock.calls
+      .filter((call) => queryTextOf(call[0]).includes(ADVISORY_LOCK_SQL))
+      .map((call) => call[1][1])
+
+    expect(lockedAddresses).toEqual([bannerAddress, bannedAddress].sort())
   })
 })
 
@@ -75,15 +94,14 @@ describe('when kicking a member from a community', () => {
     communityId = '11111111-1111-4111-8111-111111111111'
     ownerAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     memberAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-    transactionQuery = jest
-      .fn()
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [{ owner_address: ownerAddress }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    transactionQuery = createTransactionQueryMock({
+      ownerAddress,
+      roles: { [ownerAddress]: CommunityRole.Owner, [memberAddress]: CommunityRole.Member }
+    })
     withTransaction = jest.fn(async (callback) => callback({ query: transactionQuery }))
     communitiesDb = createCommunitiesDBComponent({ pg: { withTransaction } as any, logs: {} as any })
 
-    await communitiesDb.kickMemberFromCommunity(communityId, memberAddress)
+    await communitiesDb.kickMemberFromCommunity(communityId, memberAddress, ownerAddress)
 
     queryTexts = transactionQuery.mock.calls.map((call) => queryTextOf(call[0]))
     advisoryLockIndex = queryTexts.findIndex((text) => text.includes(ADVISORY_LOCK_SQL))
@@ -118,15 +136,14 @@ describe('when updating a community member role', () => {
     communityId = '11111111-1111-4111-8111-111111111111'
     ownerAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     memberAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-    transactionQuery = jest
-      .fn()
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [{ owner_address: ownerAddress }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    transactionQuery = createTransactionQueryMock({
+      ownerAddress,
+      roles: { [ownerAddress]: CommunityRole.Owner, [memberAddress]: CommunityRole.Member }
+    })
     withTransaction = jest.fn(async (callback) => callback({ query: transactionQuery }))
     communitiesDb = createCommunitiesDBComponent({ pg: { withTransaction } as any, logs: {} as any })
 
-    await communitiesDb.updateMemberRole(communityId, memberAddress, CommunityRole.Moderator)
+    await communitiesDb.updateMemberRole(communityId, memberAddress, CommunityRole.Moderator, ownerAddress)
 
     queryTexts = transactionQuery.mock.calls.map((call) => queryTextOf(call[0]))
     advisoryLockIndex = queryTexts.findIndex((text) => text.includes(ADVISORY_LOCK_SQL))

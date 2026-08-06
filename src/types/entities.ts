@@ -105,6 +105,19 @@ export enum CommunityRole {
   None = 'none'
 }
 
+// [targetRole]: [roles that can act on targetRole]
+export const ROLE_ACTION_TRANSITIONS: Record<CommunityRole, CommunityRole[]> = {
+  [CommunityRole.Owner]: [], // No one can act on owners
+  [CommunityRole.Moderator]: [CommunityRole.Owner], // Only owners can act on moderators
+  [CommunityRole.Member]: [CommunityRole.Owner, CommunityRole.Moderator], // Owners and moderators can act on members
+  [CommunityRole.None]: [] // N/A
+}
+
+/** Whether `actorRole` outranks `targetRole` enough to act on it. */
+export function canActOnMember(actorRole: CommunityRole, targetRole: CommunityRole): boolean {
+  return ROLE_ACTION_TRANSITIONS[targetRole]?.includes(actorRole) ?? false
+}
+
 export type OwnedName = {
   id: string
   name: string

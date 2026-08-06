@@ -2,7 +2,13 @@ import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, mockCatalystClient, mockRegistry, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
+import {
+  mockLogs,
+  mockCatalystClient,
+  mockRegistry,
+  createMockPeersStatsComponent,
+  mockPubSub
+} from '../../mocks/components'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { createCommunityMembersComponent } from '../../../src/logic/community/members'
 import {
@@ -672,7 +678,11 @@ describe('Community Members Component', () => {
               kickerAddress,
               targetAddress
             )
-            expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
+            expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(
+              communityId,
+              targetAddress,
+              kickerAddress
+            )
             expect(mockCommunitiesDB.unlikePostsFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
               communityId,
@@ -872,7 +882,10 @@ describe('Community Members Component', () => {
 
       describe('and the community is private', () => {
         beforeEach(() => {
-          mockCommunitiesDB.getCommunity.mockResolvedValue({ ...publicCommunity, privacy: CommunityPrivacyEnum.Private })
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...publicCommunity,
+            privacy: CommunityPrivacyEnum.Private
+          })
         })
 
         it('should throw NotAuthorizedError without joining, since private communities require a request', async () => {
@@ -944,7 +957,12 @@ describe('Community Members Component', () => {
               communityId,
               memberAddress
             )
-            expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, memberAddress)
+            // Leaving is self-service: the member is their own actor.
+            expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(
+              communityId,
+              memberAddress,
+              memberAddress
+            )
             expect(mockCommunitiesDB.unlikePostsFromCommunity).toHaveBeenCalledWith(communityId, memberAddress)
             expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_MEMBER_STATUS_UPDATES_CHANNEL, {
               communityId,
@@ -1066,7 +1084,12 @@ describe('Community Members Component', () => {
             targetAddress,
             newRole
           )
-          expect(mockCommunitiesDB.updateMemberRole).toHaveBeenCalledWith(communityId, targetAddress, newRole)
+          expect(mockCommunitiesDB.updateMemberRole).toHaveBeenCalledWith(
+            communityId,
+            targetAddress,
+            newRole,
+            updaterAddress
+          )
         })
       })
 

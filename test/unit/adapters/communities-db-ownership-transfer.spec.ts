@@ -134,6 +134,25 @@ describe('when transferring community ownership atomically', () => {
   })
 })
 
+function queryTextOf(statement: unknown): string {
+  return typeof statement === 'string' ? statement : String((statement as { text?: string })?.text ?? '')
+}
+
+/** Answers by statement kind, so adding a statement does not shift every mocked result. */
+function respondByStatement(ownerAddress: string, roles: Record<string, CommunityRole> = {}) {
+  return async (statement: unknown) => {
+    const text = queryTextOf(statement)
+    if (text.includes('FROM communities')) {
+      return { rows: [{ owner_address: ownerAddress }], rowCount: 1 }
+    }
+    if (text.includes('SELECT member_address, role FROM community_members')) {
+      const rows = Object.entries(roles).map(([member_address, role]) => ({ member_address, role }))
+      return { rows, rowCount: rows.length }
+    }
+    return { rows: [], rowCount: 1 }
+  }
+}
+
 describe('when deleting a community membership atomically', () => {
   let communitiesDb: ICommunitiesDatabaseComponent
   let transactionQuery: jest.Mock
@@ -159,36 +178,48 @@ describe('when deleting a community membership atomically', () => {
 
   describe('and the target became the owner before a kick acquired its lock', () => {
     beforeEach(() => {
-      transactionQuery
-        .mockResolvedValueOnce(advisoryLockResult)
-        .mockResolvedValueOnce({ rows: [{ owner_address: memberAddress }], rowCount: 1 })
+      transactionQuery.mockImplementation(
+        respondByStatement(memberAddress, {
+          [ownerAddress]: CommunityRole.Owner,
+          [memberAddress]: CommunityRole.Owner
+        })
+      )
     })
 
     it('should reject removal of the new owner', async () => {
-      await expect(communitiesDb.kickMemberFromCommunity(communityId, memberAddress)).rejects.toBeInstanceOf(
-        NotAuthorizedError
-      )
+      await expect(
+        communitiesDb.kickMemberFromCommunity(communityId, memberAddress, ownerAddress)
+      ).rejects.toBeInstanceOf(NotAuthorizedError)
     })
   })
 
   describe('and the target is not the owner', () => {
     beforeEach(() => {
       transactionQuery
-        .mockResolvedValueOnce(advisoryLockResult)
-        .mockResolvedValueOnce({ rows: [{ owner_address: ownerAddress }], rowCount: 1 })
+        .mockImplementation(
+          respondByStatement(ownerAddress, {
+            [ownerAddress]: CommunityRole.Owner,
+            [memberAddress]: CommunityRole.Member
+          })
+        )
         .mockResolvedValueOnce({ rows: [], rowCount: 1 })
     })
 
     it('should remove the member', async () => {
-      await expect(communitiesDb.kickMemberFromCommunity(communityId, memberAddress)).resolves.toBeUndefined()
+      await expect(
+        communitiesDb.kickMemberFromCommunity(communityId, memberAddress, ownerAddress)
+      ).resolves.toBeUndefined()
     })
   })
 
   describe('and the target became the owner before a ban acquired its lock', () => {
     beforeEach(() => {
-      transactionQuery
-        .mockResolvedValueOnce(advisoryLockResult)
-        .mockResolvedValueOnce({ rows: [{ owner_address: memberAddress }], rowCount: 1 })
+      transactionQuery.mockImplementation(
+        respondByStatement(memberAddress, {
+          [ownerAddress]: CommunityRole.Owner,
+          [memberAddress]: CommunityRole.Owner
+        })
+      )
     })
 
     it('should reject banning and removing the new owner', async () => {
@@ -224,14 +255,17 @@ describe('when changing a community member role atomically', () => {
 
   describe('and the target became the owner before the role update acquired its lock', () => {
     beforeEach(() => {
-      transactionQuery
-        .mockResolvedValueOnce(advisoryLockResult)
-        .mockResolvedValueOnce({ rows: [{ owner_address: memberAddress }], rowCount: 1 })
+      transactionQuery.mockImplementation(
+        respondByStatement(memberAddress, {
+          [ownerAddress]: CommunityRole.Owner,
+          [memberAddress]: CommunityRole.Owner
+        })
+      )
     })
 
     it('should reject changing the new owner role', async () => {
       await expect(
-        communitiesDb.updateMemberRole(communityId, memberAddress, CommunityRole.Member)
+        communitiesDb.updateMemberRole(communityId, memberAddress, CommunityRole.Member, ownerAddress)
       ).rejects.toBeInstanceOf(NotAuthorizedError)
     })
   })
@@ -239,14 +273,18 @@ describe('when changing a community member role atomically', () => {
   describe('and the target is not the owner', () => {
     beforeEach(() => {
       transactionQuery
-        .mockResolvedValueOnce(advisoryLockResult)
-        .mockResolvedValueOnce({ rows: [{ owner_address: ownerAddress }], rowCount: 1 })
+        .mockImplementation(
+          respondByStatement(ownerAddress, {
+            [ownerAddress]: CommunityRole.Owner,
+            [memberAddress]: CommunityRole.Member
+          })
+        )
         .mockResolvedValueOnce({ rows: [], rowCount: 1 })
     })
 
     it('should update the member role', async () => {
       await expect(
-        communitiesDb.updateMemberRole(communityId, memberAddress, CommunityRole.Moderator)
+        communitiesDb.updateMemberRole(communityId, memberAddress, CommunityRole.Moderator, ownerAddress)
       ).resolves.toBeUndefined()
     })
   })
