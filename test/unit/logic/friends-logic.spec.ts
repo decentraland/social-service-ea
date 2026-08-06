@@ -44,6 +44,8 @@ describe('Friends Component', () => {
     mockSNS = createSNSMockedComponent({})
     mockSendNotification = sendNotification as jest.MockedFunction<typeof sendNotification>
     mockSendNotification.mockResolvedValue()
+    // mockRedis is shared across the file and jest.clearAllMocks() keeps implementations: reset to permissive.
+    mockRedis.consumeRateLimit.mockReset().mockResolvedValue(true)
     const logs = createLogsMockedComponent()
 
     friendsComponent = await createFriendsComponent({
@@ -363,6 +365,7 @@ describe('Friends Component', () => {
 
     beforeEach(async () => {
       targetAddress = '0x2234567890123456789012345678901234567890'
+      // Scoped to this context only: the top-level beforeEach resets this mock back to permissive.
       mockRedis.consumeRateLimit.mockRejectedValue(new Error('The client is closed'))
       mockRegistry.getProfile.mockResolvedValueOnce(createMockProfile(targetAddress))
       mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb({} as jest.Mocked<PoolClient>))
@@ -384,6 +387,97 @@ describe('Friends Component', () => {
 
     it('should record that the limiter was bypassed', () => {
       expect(mockMetrics.increment).toHaveBeenCalledWith('friendship_rate_limiter_unavailable')
+    })
+  })
+
+  describe('when the rate limiter counts consumption per bucket', () => {
+    let attackerAddress: string
+    let victimAddress: string
+    let pairRateLimit: number
+    let consumedByKey: Map<string, number>
+
+    beforeEach(() => {
+      attackerAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      victimAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+      pairRateLimit = 10 // FRIENDSHIP_RATE_LIMIT_PER_PAIR default
+      consumedByKey = new Map<string, number>()
+
+      // Mirrors the INCR-and-compare limiter in the Redis adapter, so buckets are told apart by key.
+      mockRedis.consumeRateLimit.mockImplementation(async (key: string, limit: number) => {
+        const consumed = (consumedByKey.get(key) ?? 0) + 1
+        consumedByKey.set(key, consumed)
+        return consumed <= limit
+      })
+
+      mockFriendsDB.executeTx.mockImplementation(async (cb) => cb({} as jest.Mocked<PoolClient>))
+      mockFriendsDB.getFriendship.mockResolvedValue(undefined)
+      mockFriendsDB.blockUser.mockResolvedValue({ id: 'block-id', blocked_at: new Date() })
+      mockFriendsDB.recordFriendshipAction.mockResolvedValue('action-id')
+    })
+
+    describe('and an attacker exhausts the pair budget with friendship mutations against a victim', () => {
+      let attackerError: Error | undefined
+      let victimError: Error | undefined
+
+      beforeEach(async () => {
+        attackerError = undefined
+        victimError = undefined
+
+        mockFriendsDB.isFriendshipBlocked.mockResolvedValue(false)
+        mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(undefined)
+        mockFriendsDB.createFriendship.mockResolvedValue({ id: 'friendship-id', created_at: new Date() })
+        mockRegistry.getProfiles.mockResolvedValue([
+          createMockProfile(attackerAddress),
+          createMockProfile(victimAddress)
+        ])
+        mockRegistry.getProfile.mockResolvedValue(createMockProfile(attackerAddress))
+
+        for (let attempt = 0; attempt < pairRateLimit; attempt++) {
+          await friendsComponent.upsertFriendship(attackerAddress, victimAddress, Action.REQUEST, null)
+        }
+
+        attackerError = await friendsComponent
+          .upsertFriendship(attackerAddress, victimAddress, Action.REQUEST, null)
+          .then(() => undefined)
+          .catch((caught) => caught)
+        victimError = await friendsComponent
+          .blockUser(victimAddress, attackerAddress)
+          .then(() => undefined)
+          .catch((caught) => caught)
+      })
+
+      it('should reject further friendship mutations from the attacker', () => {
+        expect(attackerError).toBeInstanceOf(FriendshipRateLimitError)
+      })
+
+      it('should still let the victim block the attacker', () => {
+        expect(victimError).toBeUndefined()
+      })
+    })
+
+    describe('and the same actor loops block and unblock at the same target', () => {
+      let loopError: Error | undefined
+
+      beforeEach(async () => {
+        loopError = undefined
+
+        mockFriendsDB.unblockUser.mockResolvedValue(undefined)
+        mockRegistry.getProfile.mockResolvedValue(createMockProfile(victimAddress))
+
+        for (let attempt = 0; attempt < pairRateLimit / 2; attempt++) {
+          await friendsComponent.blockUser(attackerAddress, victimAddress)
+          await friendsComponent.unblockUser(attackerAddress, victimAddress)
+        }
+
+        loopError = await friendsComponent
+          .blockUser(attackerAddress, victimAddress)
+          .then(() => undefined)
+          .catch((caught) => caught)
+      })
+
+      it('should reject the block once the directional pair budget is spent', () => {
+        expect(loopError).toBeInstanceOf(FriendshipRateLimitError)
+      })
     })
   })
 
