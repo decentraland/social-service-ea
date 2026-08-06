@@ -136,7 +136,7 @@ export async function createCommunityMembersComponent(
       throw new InvalidRequestError(`The user ${targetAddress} doesn't have any names`)
     }
 
-    await communitiesDb.transferCommunityOwnership(communityId, targetAddress)
+    await communitiesDb.transferCommunityOwnership(communityId, updaterAddress, targetAddress)
 
     void broadcastOwnershipTransferred(communityId, updaterAddress, targetAddress).catch((error: any) => {
       logger.error('Unhandled error in broadcastOwnershipTransferred', { error: error.message, communityId })

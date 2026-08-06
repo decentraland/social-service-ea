@@ -1188,7 +1188,11 @@ describe('Community Members Component', () => {
           CommunityRole.Owner
         )
 
-        expect(mockCommunitiesDB.transferCommunityOwnership).toHaveBeenCalledWith('test-community', targetAddress)
+        expect(mockCommunitiesDB.transferCommunityOwnership).toHaveBeenCalledWith(
+          'test-community',
+          updaterAddress,
+          targetAddress
+        )
         expect(mockCommunitiesDB.updateMemberRole).not.toHaveBeenCalled()
       })
 

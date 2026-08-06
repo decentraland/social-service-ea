@@ -172,7 +172,25 @@ export interface ICommunitiesDatabaseComponent {
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
   getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
   updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void>
-  transferCommunityOwnership(communityId: string, newOwnerAddress: EthAddress): Promise<void>
+  /**
+   * Atomically transfers ownership after revalidating the acting owner and target membership.
+   *
+   * @param communityId - Community whose ownership is being transferred.
+   * @param currentOwnerAddress - Authenticated owner authorizing the transfer.
+   * @param newOwnerAddress - Existing member who will become the owner.
+   * @throws {CommunityNotFoundError} If the active community no longer exists.
+   * @throws {NotAuthorizedError} If ownership or membership changed before the transaction acquired its locks.
+   */
+  transferCommunityOwnership(
+    communityId: string,
+    currentOwnerAddress: EthAddress,
+    newOwnerAddress: EthAddress
+  ): Promise<void>
+  banMemberAndRemoveRequests(
+    communityId: string,
+    bannedBy: EthAddress,
+    bannedMemberAddress: EthAddress
+  ): Promise<{ wasMember: boolean }>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
   kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
   getCommunityMembers(
