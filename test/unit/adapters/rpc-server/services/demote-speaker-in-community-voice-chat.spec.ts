@@ -16,12 +16,12 @@ describe('when demoting a speaker in a community voice chat', () => {
   let demoteSpeakerMock: jest.MockedFn<ICommsGatekeeperComponent['demoteSpeakerInCommunityVoiceChat']>
   let getCommunityMemberRolesMock: jest.MockedFn<ICommunitiesDatabaseComponent['getCommunityMemberRoles']>
   let getCommunityMock: jest.MockedFn<ICommunitiesDatabaseComponent['getCommunity']>
-  let isMemberBannedMock: jest.MockedFn<ICommunitiesDatabaseComponent['isMemberBanned']>
+  let getBannedMemberAddressesMock: jest.MockedFn<ICommunitiesDatabaseComponent['getBannedMemberAddresses']>
   let logs: jest.Mocked<ILoggerComponent>
   let commsGatekeeper: jest.Mocked<ICommsGatekeeperComponent>
   let communitiesDb: Pick<
     ICommunitiesDatabaseComponent,
-    'getCommunityMemberRoles' | 'getCommunityMemberRole' | 'getCommunity' | 'isMemberBanned'
+    'getCommunityMemberRoles' | 'getCommunityMemberRole' | 'getCommunity' | 'getBannedMemberAddresses'
   >
   let communityId: string
   let actingUserAddress: string
@@ -38,7 +38,7 @@ describe('when demoting a speaker in a community voice chat', () => {
     demoteSpeakerMock = jest.fn().mockResolvedValue(undefined)
     getCommunityMemberRolesMock = jest.fn()
     getCommunityMock = jest.fn()
-    isMemberBannedMock = jest.fn().mockResolvedValue(false)
+    getBannedMemberAddressesMock = jest.fn().mockResolvedValue([])
     logs = createLogsMockedComponent()
     commsGatekeeper = createCommsGatekeeperMockedComponent({
       demoteSpeakerInCommunityVoiceChat: demoteSpeakerMock
@@ -47,7 +47,7 @@ describe('when demoting a speaker in a community voice chat', () => {
       getCommunityMemberRoles: getCommunityMemberRolesMock,
       getCommunityMemberRole: jest.fn(),
       getCommunity: getCommunityMock,
-      isMemberBanned: isMemberBannedMock
+      getBannedMemberAddresses: getBannedMemberAddressesMock
     }
     payload = DemoteSpeakerInCommunityVoiceChatPayload.create({
       communityId,
@@ -210,6 +210,93 @@ describe('when demoting a speaker in a community voice chat', () => {
 
       it('should not run the moderation hierarchy check', () => {
         expect(getCommunityMemberRolesMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a banned guest demotes themselves', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.None
+        })
+        getBannedMemberAddressesMock.mockResolvedValue([actingUserAddress])
+        payload = DemoteSpeakerInCommunityVoiceChatPayload.create({
+          communityId,
+          userAddress: actingUserAddress
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response, since giving up the mic is never gated', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should demote the banned guest to listener', () => {
+        expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, actingUserAddress)
+      })
+    })
+
+    describe('and the acting user is a banned moderator', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Moderator
+        })
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        getBannedMemberAddressesMock.mockResolvedValue([actingUserAddress])
+        result = await service(payload, context)
+      })
+
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not demote the target user', () => {
+        expect(demoteSpeakerMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a moderator demotes a banned member still in the room', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Moderator
+        })
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        getBannedMemberAddressesMock.mockResolvedValue([targetUserAddress])
+        result = await service(payload, context)
+      })
+
+      it('should resolve with a forbidden error response, since a banned user belongs out of the room', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not demote the banned member', () => {
+        expect(demoteSpeakerMock).not.toHaveBeenCalled()
       })
     })
   })

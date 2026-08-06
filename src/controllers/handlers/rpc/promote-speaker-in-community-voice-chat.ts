@@ -41,8 +41,9 @@ export function promoteSpeakerInCommunityVoiceChatService({
         throw new InvalidUserAddressError()
       }
 
-      // Owner/moderator gate, owner protection and community lookup issued together.
-      const [community, { actingUserRole, targetUserRole }] = await Promise.all([
+      // Owner/moderator gate, owner protection and community lookup issued together. Authorization
+      // is reported first on purpose: a caller with no role learns nothing about the community.
+      const [community, { actingUserRole, targetUserRole, isTargetUserBanned }] = await Promise.all([
         communitiesDb.getCommunity(request.communityId, context.address),
         validateCommunityVoiceChatModerator(
           communitiesDb,
@@ -58,12 +59,12 @@ export function promoteSpeakerInCommunityVoiceChatService({
       }
 
       // Validate target user can be promoted based on community privacy and membership
-      await validateCommunityVoiceChatTargetUser(
-        communitiesDb,
+      validateCommunityVoiceChatTargetUser(
         community,
         request.communityId,
         request.userAddress,
-        targetUserRole
+        targetUserRole,
+        isTargetUserBanned
       )
 
       logger.info('Permission check passed: moderator/owner promoting speaker', {

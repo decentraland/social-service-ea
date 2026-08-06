@@ -63,6 +63,7 @@ describe('Community Voice Logic', () => {
       getCommunityMemberRoles: jest.fn(),
       getCommunity: jest.fn(),
       isMemberBanned: jest.fn(),
+      getBannedMemberAddresses: jest.fn().mockResolvedValue([]),
       getCommunityPlaces: jest.fn()
     }
 
@@ -1047,6 +1048,99 @@ describe('Community Voice Logic', () => {
         await expect(
           communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
         ).rejects.toThrow(CommunityVoiceChatPermissionError)
+      })
+    })
+
+    describe('and the acting user is a banned moderator muting someone else', () => {
+      let thrownError: Error | undefined
+
+      beforeEach(async () => {
+        thrownError = undefined
+        mockCommunitiesDb.getCommunityMemberRoles!.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        mockCommunitiesDb.getBannedMemberAddresses!.mockResolvedValue([actingUserAddress])
+
+        try {
+          await communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
+        } catch (error) {
+          thrownError = error as Error
+        }
+      })
+
+      it('should throw a permission error', () => {
+        expect(thrownError).toBeInstanceOf(CommunityVoiceChatPermissionError)
+      })
+
+      it('should not reach the comms gatekeeper', () => {
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the acting user is a banned owner muting someone else', () => {
+      let thrownError: Error | undefined
+
+      beforeEach(async () => {
+        thrownError = undefined
+        mockCommunitiesDb.getCommunityMemberRoles!.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Owner,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        mockCommunitiesDb.getBannedMemberAddresses!.mockResolvedValue([actingUserAddress])
+
+        try {
+          await communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
+        } catch (error) {
+          thrownError = error as Error
+        }
+      })
+
+      it('should throw a permission error', () => {
+        expect(thrownError).toBeInstanceOf(CommunityVoiceChatPermissionError)
+      })
+
+      it('should not reach the comms gatekeeper', () => {
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a moderator mutes a banned member still in the room', () => {
+      beforeEach(async () => {
+        mockCommunitiesDb.getCommunityMemberRoles!.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        mockCommunitiesDb.getBannedMemberAddresses!.mockResolvedValue([targetUserAddress])
+
+        await communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
+      })
+
+      it('should mute them, since silencing a banned speaker must not be blocked', () => {
+        expect(mockCommsGatekeeper.muteSpeakerInCommunityVoiceChat).toHaveBeenCalledWith(
+          communityId,
+          targetUserAddress.toLowerCase(),
+          true
+        )
+      })
+    })
+
+    describe('and the acting user is a moderator who is not banned', () => {
+      beforeEach(async () => {
+        mockCommunitiesDb.getCommunityMemberRoles!.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+
+        await communityVoice.muteSpeakerInCommunityVoiceChat(communityId, targetUserAddress, actingUserAddress, true)
+      })
+
+      it('should resolve both ban statuses with a single batched query', () => {
+        expect(mockCommunitiesDb.getBannedMemberAddresses).toHaveBeenCalledTimes(1)
+        expect(mockCommunitiesDb.getBannedMemberAddresses).toHaveBeenCalledWith(communityId, [
+          actingUserAddress.toLowerCase(),
+          targetUserAddress.toLowerCase()
+        ])
       })
     })
 

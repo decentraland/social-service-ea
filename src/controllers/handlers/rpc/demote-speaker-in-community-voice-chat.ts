@@ -62,7 +62,7 @@ export function demoteSpeakerInCommunityVoiceChatService({
       // If user is trying to demote someone else, check permissions
       if (!isSelfDemote) {
         // Owner/moderator gate; the owner cannot be demoted by anyone else.
-        const { targetUserRole } = await validateCommunityVoiceChatModerator(
+        const { targetUserRole, isTargetUserBanned } = await validateCommunityVoiceChatModerator(
           communitiesDb,
           request.communityId,
           context.address,
@@ -71,12 +71,12 @@ export function demoteSpeakerInCommunityVoiceChatService({
         )
 
         // Validate target user can be demoted based on community privacy and membership
-        await validateCommunityVoiceChatTargetUser(
-          communitiesDb,
+        validateCommunityVoiceChatTargetUser(
           community,
           request.communityId,
           request.userAddress,
-          targetUserRole
+          targetUserRole,
+          isTargetUserBanned
         )
 
         logger.info('Permission check passed: moderator/owner demoting another user', {

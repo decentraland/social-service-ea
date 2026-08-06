@@ -16,12 +16,12 @@ describe('when promoting a speaker in a community voice chat', () => {
   let promoteSpeakerMock: jest.MockedFn<ICommsGatekeeperComponent['promoteSpeakerInCommunityVoiceChat']>
   let getCommunityMemberRolesMock: jest.MockedFn<ICommunitiesDatabaseComponent['getCommunityMemberRoles']>
   let getCommunityMock: jest.MockedFn<ICommunitiesDatabaseComponent['getCommunity']>
-  let isMemberBannedMock: jest.MockedFn<ICommunitiesDatabaseComponent['isMemberBanned']>
+  let getBannedMemberAddressesMock: jest.MockedFn<ICommunitiesDatabaseComponent['getBannedMemberAddresses']>
   let logs: jest.Mocked<ILoggerComponent>
   let commsGatekeeper: jest.Mocked<ICommsGatekeeperComponent>
   let communitiesDb: Pick<
     ICommunitiesDatabaseComponent,
-    'getCommunityMemberRoles' | 'getCommunityMemberRole' | 'getCommunity' | 'isMemberBanned'
+    'getCommunityMemberRoles' | 'getCommunityMemberRole' | 'getCommunity' | 'getBannedMemberAddresses'
   >
   let communityId: string
   let actingUserAddress: string
@@ -47,7 +47,7 @@ describe('when promoting a speaker in a community voice chat', () => {
       active: true,
       role: CommunityRole.Moderator
     })
-    isMemberBannedMock = jest.fn().mockResolvedValue(false)
+    getBannedMemberAddressesMock = jest.fn().mockResolvedValue([])
     logs = createLogsMockedComponent()
     commsGatekeeper = createCommsGatekeeperMockedComponent({
       promoteSpeakerInCommunityVoiceChat: promoteSpeakerMock
@@ -56,7 +56,7 @@ describe('when promoting a speaker in a community voice chat', () => {
       getCommunityMemberRoles: getCommunityMemberRolesMock,
       getCommunityMemberRole: jest.fn(),
       getCommunity: getCommunityMock,
-      isMemberBanned: isMemberBannedMock
+      getBannedMemberAddresses: getBannedMemberAddressesMock
     }
     payload = PromoteSpeakerInCommunityVoiceChatPayload.create({
       communityId,
@@ -95,8 +95,9 @@ describe('when promoting a speaker in a community voice chat', () => {
         expect(getCommunityMemberRolesMock).toHaveBeenCalledWith(communityId, [actingUserAddress, targetUserAddress])
       })
 
-      it('should not check the ban list for a public community', () => {
-        expect(isMemberBannedMock).not.toHaveBeenCalled()
+      it('should resolve both ban statuses with a single batched query', () => {
+        expect(getBannedMemberAddressesMock).toHaveBeenCalledTimes(1)
+        expect(getBannedMemberAddressesMock).toHaveBeenCalledWith(communityId, [actingUserAddress, targetUserAddress])
       })
     })
 
@@ -114,6 +115,81 @@ describe('when promoting a speaker in a community voice chat', () => {
 
       it('should promote the guest to speaker', () => {
         expect(promoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+    })
+
+    describe('and a moderator promotes a banned guest holding no role', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator
+        })
+        getBannedMemberAddressesMock.mockResolvedValue([targetUserAddress])
+        result = await service(payload, context)
+      })
+
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not promote the banned guest', () => {
+        expect(promoteSpeakerMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a moderator promotes a banned member still in the room', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        getBannedMemberAddressesMock.mockResolvedValue([targetUserAddress])
+        result = await service(payload, context)
+      })
+
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not promote the banned member', () => {
+        expect(promoteSpeakerMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the acting user is a banned moderator', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        getBannedMemberAddressesMock.mockResolvedValue([actingUserAddress])
+        result = await service(payload, context)
+      })
+
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not promote the target user', () => {
+        expect(promoteSpeakerMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the acting user is a banned owner', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Owner,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        getBannedMemberAddressesMock.mockResolvedValue([actingUserAddress])
+        result = await service(payload, context)
+      })
+
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not promote the target user', () => {
+        expect(promoteSpeakerMock).not.toHaveBeenCalled()
       })
     })
 
@@ -190,7 +266,7 @@ describe('when promoting a speaker in a community voice chat', () => {
       })
 
       it('should check the target user ban status', () => {
-        expect(isMemberBannedMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+        expect(getBannedMemberAddressesMock).toHaveBeenCalledWith(communityId, [actingUserAddress, targetUserAddress])
       })
     })
 
@@ -217,7 +293,7 @@ describe('when promoting a speaker in a community voice chat', () => {
           [actingUserAddress]: CommunityRole.Moderator,
           [targetUserAddress]: CommunityRole.Member
         })
-        isMemberBannedMock.mockResolvedValue(true)
+        getBannedMemberAddressesMock.mockResolvedValue([targetUserAddress])
         result = await service(payload, context)
       })
 

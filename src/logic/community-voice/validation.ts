@@ -58,16 +58,17 @@ export async function validateCommunityVoiceChatParticipation(
 /**
  * Validates that the acting user may moderate the target user in a community's voice chat.
  *
- * Requires the actor to be an owner or moderator, and protects the owner from everyone but
- * themselves. Peer moderators may act on each other. Both roles are resolved in one batched query.
+ * Requires the actor to be an owner or moderator who is not banned, and protects the owner from
+ * everyone but themselves. Peer moderators may act on each other. Roles and bans for both users
+ * are resolved in two queries issued together, so this stays a single round trip.
  *
  * @param communitiesDb - Communities database adapter
  * @param communityId - Community ID
  * @param actingUserAddress - Address of the moderator or owner performing the action
  * @param targetUserAddress - Address of the user being acted on
  * @param action - Human readable action used to build the error messages
- * @returns The acting and target user roles
- * @throws {CommunityVoiceChatPermissionError} When the actor is not privileged or is outranked
+ * @returns The acting and target user roles, plus whether the target is banned
+ * @throws {CommunityVoiceChatPermissionError} When the actor is not privileged, banned, or outranked
  */
 export async function validateCommunityVoiceChatModerator(
   communitiesDb: ICommunitiesDatabaseComponent,
@@ -75,19 +76,29 @@ export async function validateCommunityVoiceChatModerator(
   actingUserAddress: string,
   targetUserAddress: string,
   action: string
-): Promise<{ actingUserRole: CommunityRole; targetUserRole: CommunityRole }> {
+): Promise<{ actingUserRole: CommunityRole; targetUserRole: CommunityRole; isTargetUserBanned: boolean }> {
   const normalizedActingUserAddress = normalizeAddress(actingUserAddress)
   const normalizedTargetUserAddress = normalizeAddress(targetUserAddress)
+  const addresses = [normalizedActingUserAddress, normalizedTargetUserAddress]
 
-  const roles = await communitiesDb.getCommunityMemberRoles(communityId, [
-    normalizedActingUserAddress,
-    normalizedTargetUserAddress
+  // Independent lookups, issued together so the ban check costs no extra round trip.
+  const [roles, bannedAddresses] = await Promise.all([
+    communitiesDb.getCommunityMemberRoles(communityId, addresses),
+    communitiesDb.getBannedMemberAddresses(communityId, addresses)
   ])
+
   const actingUserRole = roles[normalizedActingUserAddress] ?? CommunityRole.None
   const targetUserRole = roles[normalizedTargetUserAddress] ?? CommunityRole.None
+  const isActingUserBanned = bannedAddresses.includes(normalizedActingUserAddress)
+  const isTargetUserBanned = bannedAddresses.includes(normalizedTargetUserAddress)
 
   if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
     throw new CommunityVoiceChatPermissionError(`Only community owners and moderators can ${action}`)
+  }
+
+  // A ban is not guaranteed to clear the role row, so the role alone cannot be trusted.
+  if (isActingUserBanned) {
+    throw new CommunityVoiceChatPermissionError(`Banned users cannot ${action}`)
   }
 
   // Only the owner may be acted on by nobody but themselves. Peer moderators can still moderate
@@ -98,43 +109,41 @@ export async function validateCommunityVoiceChatModerator(
     throw new CommunityVoiceChatPermissionError(`Not enough permissions to ${action} this user`)
   }
 
-  return { actingUserRole, targetUserRole }
+  return { actingUserRole, targetUserRole, isTargetUserBanned }
 }
 
 /**
- * Helper function to validate target user permissions for voice chat operations (promote/demote) based on community privacy
- * @param communitiesDb - Communities database adapter
+ * Validates that the target user may be promoted or demoted, based on community privacy.
+ *
+ * Both facts are resolved by {@link validateCommunityVoiceChatModerator}, so this performs no
+ * lookups of its own.
+ *
  * @param community - Community object with privacy information
  * @param communityId - Community ID
  * @param targetUserAddress - Target user address
- * @param knownTargetUserRole - Already resolved target role, when the caller has one
- * @returns Promise<void> - Throws error if validation fails
+ * @param targetUserRole - Already resolved target role
+ * @param isTargetUserBanned - Whether the target is banned from the community
+ * @throws {UserNotCommunityMemberError} When the target is banned, or is not a member of a private community
  */
-export async function validateCommunityVoiceChatTargetUser(
-  communitiesDb: ICommunitiesDatabaseComponent,
+export function validateCommunityVoiceChatTargetUser(
   community: Community,
   communityId: string,
   targetUserAddress: string,
-  knownTargetUserRole?: CommunityRole
-): Promise<void> {
-  // For public communities: no restrictions, anyone in voice chat can be promoted/demoted.
-  // Let comms-gatekeeper validate if user is actually in voice chat
+  targetUserRole: CommunityRole,
+  isTargetUserBanned: boolean
+): void {
+  // A ban survives leaving the room, and a public community does not kick the banned user out of
+  // an ongoing call, so it has to be enforced whatever the privacy setting is.
+  if (isTargetUserBanned) {
+    throw new UserNotCommunityMemberError(targetUserAddress, communityId)
+  }
+
+  // Public communities take anyone the room already holds; comms-gatekeeper owns presence.
   if (community.privacy !== CommunityPrivacyEnum.Private) {
     return
   }
 
-  // For private communities: user must be member AND NOT banned
-  const targetUserRole =
-    knownTargetUserRole ?? (await communitiesDb.getCommunityMemberRole(communityId, targetUserAddress))
-
-  // User must be a member first
   if (targetUserRole === CommunityRole.None) {
-    throw new UserNotCommunityMemberError(targetUserAddress, communityId)
-  }
-
-  // If user is a member, check they are not banned
-  const isTargetBanned = await communitiesDb.isMemberBanned(communityId, targetUserAddress)
-  if (isTargetBanned) {
     throw new UserNotCommunityMemberError(targetUserAddress, communityId)
   }
 }
