@@ -44,7 +44,9 @@ export const UpdateMemberRoleSchema: Schema = {
   properties: {
     role: {
       type: 'string',
-      enum: Object.values(CommunityRole)
+      // Not Object.values(CommunityRole): 'none' is the absence of membership, not a role that
+      // can be assigned. Owner stays valid — it routes to an ownership transfer.
+      enum: [CommunityRole.Owner, CommunityRole.Moderator, CommunityRole.Member]
     }
   }
 }
