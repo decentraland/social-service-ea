@@ -11,7 +11,7 @@ import {
   CommunityVoiceChatPermissionError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
-import { CommunityRole } from '../../../types/entities'
+import { validateCommunityVoiceChatModerator } from '../../../logic/community-voice/validation'
 import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function kickPlayerFromCommunityVoiceChatService({
@@ -40,14 +40,16 @@ export function kickPlayerFromCommunityVoiceChatService({
         throw new InvalidUserAddressError()
       }
 
-      // Check permissions: only owners and moderators can kick players
-      const actingUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, context.address)
-      if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
-        throw new CommunityVoiceChatPermissionError('Only community owners and moderators can kick players')
-      }
+      // Owner/moderator gate; the owner cannot be kicked by anyone else.
+      const { actingUserRole } = await validateCommunityVoiceChatModerator(
+        communitiesDb,
+        request.communityId,
+        context.address,
+        request.userAddress,
+        'kick players'
+      )
 
-      // For kicking: no restrictions, moderators/owners can kick anyone in voice chat
-      // Let comms-gatekeeper validate if user is actually in voice chat
+      // No further target restrictions; comms-gatekeeper validates presence in the room.
       logger.info('Permission check passed: moderator/owner kicking player', {
         communityId: request.communityId,
         actingUserRole,

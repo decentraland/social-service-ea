@@ -1,15 +1,18 @@
 import { RPCServiceContext, RpcServerContext } from '../../../types/rpc'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import {
+  CommunityVoiceChatNotFoundError,
   CommunityVoiceChatPermissionError,
   InvalidCommunityIdError,
-  InvalidUserAddressError
+  InvalidUserAddressError,
+  UserNotCommunityMemberError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
+import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 import {
   MuteSpeakerFromCommunityVoiceChatPayload,
   MuteSpeakerFromCommunityVoiceChatResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function muteSpeakerFromCommunityVoiceChatService({
   components: { logs, communityVoice }
@@ -62,11 +65,24 @@ export function muteSpeakerFromCommunityVoiceChatService({
       })
 
       // Handle specific error types
-      if (error instanceof CommunityVoiceChatPermissionError) {
+      if (
+        error instanceof CommunityVoiceChatPermissionError ||
+        error instanceof UserNotCommunityMemberError ||
+        error instanceof NotAuthorizedError
+      ) {
         return {
           response: {
             $case: 'forbiddenError',
             forbiddenError: { message: error.message }
+          }
+        }
+      }
+
+      if (error instanceof CommunityVoiceChatNotFoundError) {
+        return {
+          response: {
+            $case: 'notFoundError',
+            notFoundError: { message: error.message }
           }
         }
       }

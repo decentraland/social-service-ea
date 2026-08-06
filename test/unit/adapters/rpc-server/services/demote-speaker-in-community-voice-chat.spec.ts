@@ -1,545 +1,462 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
-import { DemoteSpeakerInCommunityVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { demoteSpeakerInCommunityVoiceChatService } from '../../../../../src/controllers/handlers/rpc/demote-speaker-in-community-voice-chat'
-import { ICommsGatekeeperComponent } from '../../../../../src/types/components'
-import { createLogsMockedComponent } from '../../../../mocks/components'
 import {
-  UserNotCommunityMemberError,
-  CommunityVoiceChatNotFoundError
-} from '../../../../../src/logic/community-voice/errors'
+  DemoteSpeakerInCommunityVoiceChatPayload,
+  DemoteSpeakerInCommunityVoiceChatResponse
+} from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
+import { demoteSpeakerInCommunityVoiceChatService } from '../../../../../src/controllers/handlers/rpc/demote-speaker-in-community-voice-chat'
+import { ICommsGatekeeperComponent, ICommunitiesDatabaseComponent } from '../../../../../src/types/components'
+import { createLogsMockedComponent } from '../../../../mocks/components'
+import { CommunityVoiceChatNotFoundError } from '../../../../../src/logic/community-voice/errors'
 import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 import { CommunityRole } from '../../../../../src/types/entities'
-import { CommunityPrivacyEnum } from '../../../../../src/logic/community/types'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../../../../src/logic/community/types'
+import { RpcServerContext } from '../../../../../src/types'
 
-describe('when demoting speaker in community voice chat', () => {
+describe('when demoting a speaker in a community voice chat', () => {
   let demoteSpeakerMock: jest.MockedFn<ICommsGatekeeperComponent['demoteSpeakerInCommunityVoiceChat']>
+  let getCommunityMemberRolesMock: jest.MockedFn<ICommunitiesDatabaseComponent['getCommunityMemberRoles']>
+  let getCommunityMock: jest.MockedFn<ICommunitiesDatabaseComponent['getCommunity']>
+  let isMemberBannedMock: jest.MockedFn<ICommunitiesDatabaseComponent['isMemberBanned']>
   let logs: jest.Mocked<ILoggerComponent>
   let commsGatekeeper: jest.Mocked<ICommsGatekeeperComponent>
-  let mockCommunitiesDB: {
-    getCommunityMemberRole: jest.MockedFunction<any>
-    getCommunity: jest.MockedFunction<any>
-    isMemberBanned: jest.MockedFunction<any>
-  }
+  let communitiesDb: Pick<
+    ICommunitiesDatabaseComponent,
+    'getCommunityMemberRoles' | 'getCommunityMemberRole' | 'getCommunity' | 'isMemberBanned'
+  >
   let communityId: string
-  let userAddress: string
+  let actingUserAddress: string
   let targetUserAddress: string
+  let payload: DemoteSpeakerInCommunityVoiceChatPayload
+  let context: RpcServerContext
   let service: ReturnType<typeof demoteSpeakerInCommunityVoiceChatService>
+  let result: DemoteSpeakerInCommunityVoiceChatResponse
 
-  beforeEach(async () => {
-    demoteSpeakerMock = jest.fn()
+  beforeEach(() => {
     communityId = 'test-community-id'
-    userAddress = '0x123456789abcdef'
+    actingUserAddress = '0x123456789abcdef'
     targetUserAddress = '0x987654321fedcba'
+    demoteSpeakerMock = jest.fn().mockResolvedValue(undefined)
+    getCommunityMemberRolesMock = jest.fn()
+    getCommunityMock = jest.fn()
+    isMemberBannedMock = jest.fn().mockResolvedValue(false)
     logs = createLogsMockedComponent()
     commsGatekeeper = createCommsGatekeeperMockedComponent({
       demoteSpeakerInCommunityVoiceChat: demoteSpeakerMock
     })
-
-    mockCommunitiesDB = {
+    communitiesDb = {
+      getCommunityMemberRoles: getCommunityMemberRolesMock,
       getCommunityMemberRole: jest.fn(),
-      getCommunity: jest.fn(),
-      isMemberBanned: jest.fn()
+      getCommunity: getCommunityMock,
+      isMemberBanned: isMemberBannedMock
     }
-
-    // Setup default mocks
-    mockCommunitiesDB.getCommunity.mockResolvedValue({
-      id: communityId,
-      privacy: CommunityPrivacyEnum.Public // Default to public community
+    payload = DemoteSpeakerInCommunityVoiceChatPayload.create({
+      communityId,
+      userAddress: targetUserAddress
     })
-    mockCommunitiesDB.isMemberBanned.mockResolvedValue(false) // Default to not banned
-
-    // Reset mocks
-    jest.clearAllMocks()
-
+    context = { address: actingUserAddress, subscribersContext: undefined }
     service = demoteSpeakerInCommunityVoiceChatService({
-      components: { commsGatekeeper, logs, communitiesDb: mockCommunitiesDB as any }
+      components: { commsGatekeeper, logs, communitiesDb: communitiesDb as ICommunitiesDatabaseComponent }
     })
   })
 
-  describe('when user is demoting themselves (self-demote)', () => {
-    beforeEach(() => {
-      demoteSpeakerMock.mockResolvedValue(undefined)
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  describe('and the community is public', () => {
+    describe('and a moderator demotes a plain member', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Moderator
+        })
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should demote the target user to listener', () => {
+        expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+
+      it('should resolve both roles with a single batched query', () => {
+        expect(getCommunityMemberRolesMock).toHaveBeenCalledTimes(1)
+        expect(getCommunityMemberRolesMock).toHaveBeenCalledWith(communityId, [actingUserAddress, targetUserAddress])
+      })
     })
 
-    it('should allow regular member to demote themselves', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: userAddress // Same as context.address = self-demote
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+    describe('and a moderator demotes the community owner', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: targetUserAddress,
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Moderator
+        })
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Owner
+        })
+        result = await service(payload, context)
+      })
 
-      expect(result.response?.$case).toBe('ok')
-      if (result.response?.$case === 'ok') {
-        expect(result.response.ok.message).toBe('You have been demoted to listener successfully')
-      }
-      expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, userAddress)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not demote the owner', () => {
+        expect(demoteSpeakerMock).not.toHaveBeenCalled()
+      })
     })
 
-    it('should allow moderator to demote themselves', async () => {
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Moderator)
+    describe('and a moderator demotes another moderator', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Moderator
+        })
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Moderator
+        })
+        result = await service(payload, context)
+      })
 
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: userAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+      it('should resolve with an ok response, since revoking a mic is reversible', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
 
-      expect(result.response?.$case).toBe('ok')
-      if (result.response?.$case === 'ok') {
-        expect(result.response.ok.message).toBe('You have been demoted to listener successfully')
-      }
-      expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, userAddress)
+      it('should demote the other moderator', () => {
+        expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
     })
 
-    it('should allow owner to demote themselves', async () => {
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Owner)
+    describe('and the owner demotes a moderator', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: actingUserAddress,
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Owner
+        })
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Owner,
+          [targetUserAddress]: CommunityRole.Moderator
+        })
+        result = await service(payload, context)
+      })
 
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: userAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
 
-      expect(result.response?.$case).toBe('ok')
-      if (result.response?.$case === 'ok') {
-        expect(result.response.ok.message).toBe('You have been demoted to listener successfully')
-      }
-      expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, userAddress)
+      it('should demote the moderator to listener', () => {
+        expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
     })
 
-    it('should allow self-demote even if user is not a community member (public community)', async () => {
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
-
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
+    describe('and a guest holding no role demotes themselves', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Public,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.None
+        })
+        payload = DemoteSpeakerInCommunityVoiceChatPayload.create({
           communityId,
-          userAddress: userAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+          userAddress: actingUserAddress
+        })
+        result = await service(payload, context)
+      })
 
-      expect(result.response?.$case).toBe('ok')
-      if (result.response?.$case === 'ok') {
-        expect(result.response.ok.message).toBe('You have been demoted to listener successfully')
-      }
-      expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, userAddress)
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should demote the guest to listener', () => {
+        expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, actingUserAddress)
+      })
+
+      it('should not run the moderation hierarchy check', () => {
+        expect(getCommunityMemberRolesMock).not.toHaveBeenCalled()
+      })
     })
   })
 
-  describe('when moderator is demoting another user in public community', () => {
-    beforeEach(() => {
-      demoteSpeakerMock.mockResolvedValue(undefined)
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
+  describe('and the community is private', () => {
+    describe('and a member demotes themselves', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Private Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Private,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Member
+        })
+        payload = DemoteSpeakerInCommunityVoiceChatPayload.create({
+          communityId,
+          userAddress: actingUserAddress
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should demote the member to listener', () => {
+        expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, actingUserAddress)
+      })
     })
 
-    it('should allow moderator to demote other members (no membership restrictions for public communities)', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
+    describe('and a non-member demotes themselves', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Private Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Private,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.None
+        })
+        payload = DemoteSpeakerInCommunityVoiceChatPayload.create({
           communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+          userAddress: actingUserAddress
+        })
+        result = await service(payload, context)
+      })
 
-      expect(result.response?.$case).toBe('ok')
-      if (result.response?.$case === 'ok') {
-        expect(result.response.ok.message).toBe('User demoted to listener successfully')
-      }
-      expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-      // For public communities, only acting user role is checked
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(1)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress) // acting user
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not demote the non-member', () => {
+        expect(demoteSpeakerMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a moderator demotes a member who is not banned', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Private Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Private,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Moderator
+        })
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should demote the member to listener', () => {
+        expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+
+      it('should reuse the batched target role instead of querying it again', () => {
+        expect(communitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a moderator demotes a user who is not a member', () => {
+      beforeEach(async () => {
+        getCommunityMock.mockResolvedValue({
+          id: communityId,
+          name: 'Private Test Community',
+          description: 'Test Description',
+          ownerAddress: '0xowner',
+          privacy: CommunityPrivacyEnum.Private,
+          visibility: CommunityVisibilityEnum.All,
+          active: true,
+          role: CommunityRole.Moderator
+        })
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not demote the non-member', () => {
+        expect(demoteSpeakerMock).not.toHaveBeenCalled()
+      })
     })
   })
 
-  describe('when owner is demoting another user', () => {
-    beforeEach(() => {
-      demoteSpeakerMock.mockResolvedValue(undefined)
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Owner) // acting user role
-        .mockResolvedValueOnce(CommunityRole.Member) // target user role
+  describe('and the acting user is a plain member demoting someone else', () => {
+    beforeEach(async () => {
+      getCommunityMock.mockResolvedValue({
+        id: communityId,
+        name: 'Test Community',
+        description: 'Test Description',
+        ownerAddress: '0xowner',
+        privacy: CommunityPrivacyEnum.Public,
+        visibility: CommunityVisibilityEnum.All,
+        active: true,
+        role: CommunityRole.Member
+      })
+      getCommunityMemberRolesMock.mockResolvedValue({
+        [actingUserAddress]: CommunityRole.Member,
+        [targetUserAddress]: CommunityRole.Member
+      })
+      result = await service(payload, context)
     })
 
-    it('should allow owner to demote other members', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
-      expect(result.response?.$case).toBe('ok')
-      if (result.response?.$case === 'ok') {
-        expect(result.response.ok.message).toBe('User demoted to listener successfully')
-      }
-      expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-    })
-  })
-
-  describe('when regular member tries to demote another user', () => {
-    beforeEach(() => {
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
-    })
-
-    it('should reject with permission error', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
+    it('should resolve with a forbidden error response', () => {
       expect(result.response?.$case).toBe('forbiddenError')
-      if (result.response?.$case === 'forbiddenError') {
-        expect(result.response.forbiddenError.message).toBe(
-          'Only community owners and moderators can demote other speakers'
-        )
-      }
+    })
+
+    it('should not demote the target user', () => {
       expect(demoteSpeakerMock).not.toHaveBeenCalled()
     })
   })
 
-  describe('when acting user is not a community member', () => {
-    beforeEach(() => {
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+  describe('and the community does not exist', () => {
+    beforeEach(async () => {
+      getCommunityMock.mockResolvedValue(null as never)
+      result = await service(payload, context)
     })
 
-    it('should reject with not member error', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+    it('should resolve with an invalid request response', () => {
+      expect(result.response?.$case).toBe('invalidRequest')
+    })
 
-      expect(result.response?.$case).toBe('forbiddenError')
+    it('should not demote the target user', () => {
       expect(demoteSpeakerMock).not.toHaveBeenCalled()
     })
   })
 
-  describe('when target user is not a community member in public community', () => {
-    beforeEach(() => {
-      demoteSpeakerMock.mockResolvedValue(undefined)
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
+  describe('and the community id is missing', () => {
+    beforeEach(async () => {
+      payload = DemoteSpeakerInCommunityVoiceChatPayload.create({
+        communityId: '',
+        userAddress: targetUserAddress
+      })
+      result = await service(payload, context)
     })
 
-    it('should allow demoting non-member user (public community)', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
-      expect(result.response?.$case).toBe('ok')
-      if (result.response?.$case === 'ok') {
-        expect(result.response.ok.message).toBe('User demoted to listener successfully')
-      }
-      expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-      // For public communities, only acting user role is checked
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('and demoting speaker is successful (legacy test)', () => {
-    beforeEach(() => {
-      demoteSpeakerMock.mockResolvedValue(undefined)
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-        .mockResolvedValueOnce(CommunityRole.Member) // target user role
-    })
-
-    it('should resolve with an ok response', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
-      expect(result.response?.$case).toBe('ok')
-      expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-    })
-  })
-
-  describe('and community ID is missing', () => {
-    it('should resolve with an invalid request response', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId: '',
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
+    it('should resolve with an invalid request response', () => {
       expect(result.response?.$case).toBe('invalidRequest')
     })
+
+    it('should not look up the community', () => {
+      expect(getCommunityMock).not.toHaveBeenCalled()
+    })
   })
 
-  describe('and user address is missing', () => {
-    it('should resolve with an invalid request response', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: ''
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+  describe('and the target user address is missing', () => {
+    beforeEach(async () => {
+      payload = DemoteSpeakerInCommunityVoiceChatPayload.create({
+        communityId,
+        userAddress: ''
+      })
+      result = await service(payload, context)
+    })
 
+    it('should resolve with an invalid request response', () => {
       expect(result.response?.$case).toBe('invalidRequest')
     })
-  })
 
-  describe('and demoting speaker fails with a user not member error', () => {
-    beforeEach(() => {
-      demoteSpeakerMock.mockRejectedValue(new UserNotCommunityMemberError(targetUserAddress, communityId))
-    })
-
-    it('should resolve with a forbidden error response', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
-      expect(result.response?.$case).toBe('forbiddenError')
+    it('should not look up the community', () => {
+      expect(getCommunityMock).not.toHaveBeenCalled()
     })
   })
 
-  describe('and demoting speaker fails with a voice chat not found error', () => {
-    beforeEach(() => {
+  describe('and the gatekeeper reports the voice chat is not found', () => {
+    beforeEach(async () => {
+      getCommunityMock.mockResolvedValue({
+        id: communityId,
+        name: 'Test Community',
+        description: 'Test Description',
+        ownerAddress: actingUserAddress,
+        privacy: CommunityPrivacyEnum.Public,
+        visibility: CommunityVisibilityEnum.All,
+        active: true,
+        role: CommunityRole.Owner
+      })
+      getCommunityMemberRolesMock.mockResolvedValue({
+        [actingUserAddress]: CommunityRole.Owner,
+        [targetUserAddress]: CommunityRole.Member
+      })
       demoteSpeakerMock.mockRejectedValue(new CommunityVoiceChatNotFoundError(communityId))
-      // Setup permission validation to pass by making the acting user a moderator
-      // and the target user a member
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-        .mockResolvedValueOnce(CommunityRole.Member) // target user role
+      result = await service(payload, context)
     })
 
-    it('should resolve with a not found error response', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
+    it('should resolve with a not found error response', () => {
       expect(result.response?.$case).toBe('notFoundError')
     })
   })
 
-  describe('and demoting speaker fails with an unknown error', () => {
-    beforeEach(() => {
+  describe('and demoting the speaker fails with an unknown error', () => {
+    beforeEach(async () => {
+      getCommunityMock.mockResolvedValue({
+        id: communityId,
+        name: 'Test Community',
+        description: 'Test Description',
+        ownerAddress: actingUserAddress,
+        privacy: CommunityPrivacyEnum.Public,
+        visibility: CommunityVisibilityEnum.All,
+        active: true,
+        role: CommunityRole.Owner
+      })
+      getCommunityMemberRolesMock.mockResolvedValue({
+        [actingUserAddress]: CommunityRole.Owner,
+        [targetUserAddress]: CommunityRole.Member
+      })
       demoteSpeakerMock.mockRejectedValue(new Error('Unknown error'))
-      // Setup permission validation to pass by making the acting user a moderator
-      // and the target user a member
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-        .mockResolvedValueOnce(CommunityRole.Member) // target user role
+      result = await service(payload, context)
     })
 
-    it('should resolve with an internal server error response', async () => {
-      const result = await service(
-        DemoteSpeakerInCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
+    it('should resolve with an internal server error response', () => {
       expect(result.response?.$case).toBe('internalServerError')
-    })
-  })
-
-  describe('validation for community privacy and banned users', () => {
-    describe('when community is public', () => {
-      beforeEach(() => {
-        // Setup public community
-        mockCommunitiesDB.getCommunity.mockResolvedValue({
-          id: communityId,
-          privacy: CommunityPrivacyEnum.Public
-        })
-      })
-
-      describe('and acting user is a moderator demoting another user', () => {
-        beforeEach(() => {
-          mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-          demoteSpeakerMock.mockResolvedValue(undefined)
-        })
-
-        it('should allow demoting any user (no membership restrictions for public communities)', async () => {
-          const result = await service(
-            DemoteSpeakerInCommunityVoiceChatPayload.create({
-              communityId,
-              userAddress: targetUserAddress
-            }),
-            {
-              address: userAddress,
-              subscribersContext: undefined
-            }
-          )
-
-          expect(result.response?.$case).toBe('ok')
-          expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-          // Should not check target user membership or ban status for public communities
-          expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(1)
-          expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
-        })
-      })
-    })
-
-    describe('when community is private', () => {
-      beforeEach(() => {
-        // Setup private community
-        mockCommunitiesDB.getCommunity.mockResolvedValue({
-          id: communityId,
-          privacy: CommunityPrivacyEnum.Private
-        })
-      })
-
-      describe('and target user is a member and not banned', () => {
-        beforeEach(() => {
-          mockCommunitiesDB.getCommunityMemberRole
-            .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-            .mockResolvedValueOnce(CommunityRole.Member) // target user is member
-          mockCommunitiesDB.isMemberBanned.mockResolvedValue(false) // not banned
-          demoteSpeakerMock.mockResolvedValue(undefined)
-        })
-
-        it('should allow demoting member users who are not banned', async () => {
-          const result = await service(
-            DemoteSpeakerInCommunityVoiceChatPayload.create({
-              communityId,
-              userAddress: targetUserAddress
-            }),
-            {
-              address: userAddress,
-              subscribersContext: undefined
-            }
-          )
-
-          expect(result.response?.$case).toBe('ok')
-          expect(demoteSpeakerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-          expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetUserAddress)
-        })
-      })
-
-      describe('and target user is not a member', () => {
-        beforeEach(() => {
-          mockCommunitiesDB.getCommunityMemberRole
-            .mockResolvedValueOnce(CommunityRole.Owner) // acting user role
-            .mockResolvedValueOnce(CommunityRole.None) // target user is not a member
-        })
-
-        it('should resolve with a forbidden error response', async () => {
-          const result = await service(
-            DemoteSpeakerInCommunityVoiceChatPayload.create({
-              communityId,
-              userAddress: targetUserAddress
-            }),
-            {
-              address: userAddress,
-              subscribersContext: undefined
-            }
-          )
-
-          expect(result.response?.$case).toBe('forbiddenError')
-          if (result.response?.$case === 'forbiddenError') {
-            expect(result.response.forbiddenError?.message).toContain('not a member of community')
-          }
-          expect(demoteSpeakerMock).not.toHaveBeenCalled()
-        })
-      })
-
-      describe('and target user is a member but is banned', () => {
-        beforeEach(() => {
-          mockCommunitiesDB.getCommunityMemberRole
-            .mockResolvedValueOnce(CommunityRole.Owner) // acting user role
-            .mockResolvedValueOnce(CommunityRole.Member) // target user is member
-          mockCommunitiesDB.isMemberBanned.mockResolvedValue(true) // but is banned
-        })
-
-        it('should resolve with a forbidden error response (banned users cannot be demoted)', async () => {
-          const result = await service(
-            DemoteSpeakerInCommunityVoiceChatPayload.create({
-              communityId,
-              userAddress: targetUserAddress
-            }),
-            {
-              address: userAddress,
-              subscribersContext: undefined
-            }
-          )
-
-          expect(result.response?.$case).toBe('forbiddenError')
-          if (result.response?.$case === 'forbiddenError') {
-            expect(result.response.forbiddenError?.message).toContain('not a member of community')
-          }
-          expect(demoteSpeakerMock).not.toHaveBeenCalled()
-          expect(mockCommunitiesDB.isMemberBanned).toHaveBeenCalledWith(communityId, targetUserAddress)
-        })
-      })
     })
   })
 })

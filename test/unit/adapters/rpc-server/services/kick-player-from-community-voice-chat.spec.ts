@@ -1,267 +1,248 @@
 import { ILoggerComponent } from '@well-known-components/interfaces'
-import { KickPlayerFromCommunityVoiceChatPayload } from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
-import { kickPlayerFromCommunityVoiceChatService } from '../../../../../src/controllers/handlers/rpc/kick-player-from-community-voice-chat'
-import { ICommsGatekeeperComponent } from '../../../../../src/types/components'
-import { createLogsMockedComponent } from '../../../../mocks/components'
 import {
-  UserNotCommunityMemberError,
-  CommunityVoiceChatNotFoundError
-} from '../../../../../src/logic/community-voice/errors'
+  KickPlayerFromCommunityVoiceChatPayload,
+  KickPlayerFromCommunityVoiceChatResponse
+} from '@dcl/protocol/out-ts/decentraland/social_service/v2/social_service_v2.gen'
+import { kickPlayerFromCommunityVoiceChatService } from '../../../../../src/controllers/handlers/rpc/kick-player-from-community-voice-chat'
+import { ICommsGatekeeperComponent, ICommunitiesDatabaseComponent } from '../../../../../src/types/components'
+import { createLogsMockedComponent } from '../../../../mocks/components'
+import { CommunityVoiceChatNotFoundError } from '../../../../../src/logic/community-voice/errors'
 import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 import { CommunityRole } from '../../../../../src/types/entities'
+import { RpcServerContext } from '../../../../../src/types'
 
-describe('when kicking player from community voice chat', () => {
+describe('when kicking a player from a community voice chat', () => {
   let kickPlayerMock: jest.MockedFn<ICommsGatekeeperComponent['kickUserFromCommunityVoiceChat']>
+  let getCommunityMemberRolesMock: jest.MockedFn<ICommunitiesDatabaseComponent['getCommunityMemberRoles']>
   let logs: jest.Mocked<ILoggerComponent>
   let commsGatekeeper: jest.Mocked<ICommsGatekeeperComponent>
-    let mockCommunitiesDB: {
-    getCommunityMemberRole: jest.MockedFunction<any>
-  }
+  let communitiesDb: Pick<ICommunitiesDatabaseComponent, 'getCommunityMemberRoles'>
   let communityId: string
-  let userAddress: string
+  let actingUserAddress: string
   let targetUserAddress: string
+  let payload: KickPlayerFromCommunityVoiceChatPayload
+  let context: RpcServerContext
   let service: ReturnType<typeof kickPlayerFromCommunityVoiceChatService>
+  let result: KickPlayerFromCommunityVoiceChatResponse
 
-  beforeEach(async () => {
-    kickPlayerMock = jest.fn()
+  beforeEach(() => {
     communityId = 'test-community-id'
-    userAddress = '0x123456789abcdef'
+    actingUserAddress = '0x123456789abcdef'
     targetUserAddress = '0x987654321fedcba'
+    kickPlayerMock = jest.fn().mockResolvedValue(undefined)
+    getCommunityMemberRolesMock = jest.fn()
     logs = createLogsMockedComponent()
     commsGatekeeper = createCommsGatekeeperMockedComponent({
       kickUserFromCommunityVoiceChat: kickPlayerMock
     })
-
-    mockCommunitiesDB = {
-      getCommunityMemberRole: jest.fn()
-    }
-
+    communitiesDb = { getCommunityMemberRoles: getCommunityMemberRolesMock }
+    payload = KickPlayerFromCommunityVoiceChatPayload.create({
+      communityId,
+      userAddress: targetUserAddress
+    })
+    context = { address: actingUserAddress, subscribersContext: undefined }
     service = kickPlayerFromCommunityVoiceChatService({
-      components: {
-        commsGatekeeper,
-        logs,
-        communitiesDb: mockCommunitiesDB as any
-      }
+      components: { commsGatekeeper, logs, communitiesDb: communitiesDb as ICommunitiesDatabaseComponent }
     })
   })
 
-  describe('and kicking player is successful', () => {
-    beforeEach(() => {
-      kickPlayerMock.mockResolvedValue(undefined)
-      // Setup permission validation to pass - for public community (default), only acting user role is checked
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  describe('and the acting user is a moderator', () => {
+    describe('and the target user is a plain member', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should kick the target user from the voice chat room', () => {
+        expect(kickPlayerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+
+      it('should resolve both roles with a single batched query', () => {
+        expect(getCommunityMemberRolesMock).toHaveBeenCalledTimes(1)
+        expect(getCommunityMemberRolesMock).toHaveBeenCalledWith(communityId, [actingUserAddress, targetUserAddress])
+      })
     })
 
-    it('should resolve with an ok response', async () => {
-      const result = await service(
-        KickPlayerFromCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+    describe('and the target user is the community owner', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Owner
+        })
+        result = await service(payload, context)
+      })
 
-      expect(result.response?.$case).toBe('ok')
-      expect(kickPlayerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-      // For public communities, only acting user role is checked (no target user validation)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(1)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not kick the owner from the voice chat room', () => {
+        expect(kickPlayerMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the target user is another moderator', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Moderator
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response, since a room ejection is reversible', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should kick the other moderator from the voice chat room', () => {
+        expect(kickPlayerMock).toHaveBeenCalledWith(payload.communityId, targetUserAddress)
+      })
+    })
+
+    describe('and the target user is a public community guest holding no role', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should kick the guest from the voice chat room', () => {
+        expect(kickPlayerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
     })
   })
 
-  describe('and user is not a moderator or owner', () => {
-    beforeEach(() => {
-      // Acting user is just a member (no permission to kick)
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
+  describe('and the acting user is the community owner', () => {
+    describe('and the target user is a moderator', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Owner,
+          [targetUserAddress]: CommunityRole.Moderator
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should kick the moderator from the voice chat room', () => {
+        expect(kickPlayerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+    })
+  })
+
+  describe('and the acting user is a plain member', () => {
+    beforeEach(async () => {
+      getCommunityMemberRolesMock.mockResolvedValue({
+        [actingUserAddress]: CommunityRole.Member,
+        [targetUserAddress]: CommunityRole.Member
+      })
+      result = await service(payload, context)
     })
 
-    it('should resolve with a forbidden error response', async () => {
-      const result = await service(
-        KickPlayerFromCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
+    it('should resolve with a forbidden error response', () => {
       expect(result.response?.$case).toBe('forbiddenError')
-      if (result.response?.$case === 'forbiddenError') {
-        expect(result.response.forbiddenError?.message).toContain(
-          'Only community owners and moderators can kick players'
-        )
-      }
+    })
+
+    it('should not kick the target user from the voice chat room', () => {
       expect(kickPlayerMock).not.toHaveBeenCalled()
     })
   })
 
-  describe('and moderator/owner kicking any user', () => {
-    beforeEach(() => {
-      // Setup acting user as moderator
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-      kickPlayerMock.mockResolvedValue(undefined)
+  describe('and the acting user is not a community member', () => {
+    beforeEach(async () => {
+      getCommunityMemberRolesMock.mockResolvedValue({})
+      result = await service(payload, context)
     })
 
-    it('should allow kicking any user (no restrictions on target user)', async () => {
-      const result = await service(
-        KickPlayerFromCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
-      expect(result.response?.$case).toBe('ok')
-      expect(kickPlayerMock).toHaveBeenCalledWith(communityId, targetUserAddress)
-      // Should only check acting user role, no restrictions on target user
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledTimes(1)
-      expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, userAddress)
-      // Should not check community privacy, target membership, or ban status
-    })
-  })
-
-  describe('and acting user is not a community member', () => {
-    beforeEach(() => {
-      // Acting user is not a member (should fail permission check)
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.None)
-    })
-
-    it('should resolve with a forbidden error response', async () => {
-      const result = await service(
-        KickPlayerFromCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
+    it('should resolve with a forbidden error response', () => {
       expect(result.response?.$case).toBe('forbiddenError')
-      if (result.response?.$case === 'forbiddenError') {
-        expect(result.response.forbiddenError?.message).toContain(
-          'Only community owners and moderators can kick players'
-        )
-      }
+    })
+
+    it('should not kick the target user from the voice chat room', () => {
       expect(kickPlayerMock).not.toHaveBeenCalled()
     })
   })
 
-  describe('and community ID is missing', () => {
-    it('should resolve with an invalid request response', async () => {
-      const result = await service(
-        KickPlayerFromCommunityVoiceChatPayload.create({
-          communityId: '',
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+  describe('and the community id is missing', () => {
+    beforeEach(async () => {
+      payload = KickPlayerFromCommunityVoiceChatPayload.create({
+        communityId: '',
+        userAddress: targetUserAddress
+      })
+      result = await service(payload, context)
+    })
 
+    it('should resolve with an invalid request response', () => {
       expect(result.response?.$case).toBe('invalidRequest')
     })
+
+    it('should not look up any community roles', () => {
+      expect(getCommunityMemberRolesMock).not.toHaveBeenCalled()
+    })
   })
 
-  describe('and user address is missing', () => {
-    it('should resolve with an invalid request response', async () => {
-      const result = await service(
-        KickPlayerFromCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: ''
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
+  describe('and the target user address is missing', () => {
+    beforeEach(async () => {
+      payload = KickPlayerFromCommunityVoiceChatPayload.create({
+        communityId,
+        userAddress: ''
+      })
+      result = await service(payload, context)
+    })
 
+    it('should resolve with an invalid request response', () => {
       expect(result.response?.$case).toBe('invalidRequest')
     })
-  })
 
-  describe('and kicking player fails with a user not member error', () => {
-    beforeEach(() => {
-      kickPlayerMock.mockRejectedValue(new UserNotCommunityMemberError(targetUserAddress, communityId))
-      // Setup permission validation to pass by making the acting user a moderator
-      // and the target user a member
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-        .mockResolvedValueOnce(CommunityRole.Member) // target user role
-    })
-
-    it('should resolve with a forbidden error response', async () => {
-      const result = await service(
-        KickPlayerFromCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
-      expect(result.response?.$case).toBe('forbiddenError')
+    it('should not look up any community roles', () => {
+      expect(getCommunityMemberRolesMock).not.toHaveBeenCalled()
     })
   })
 
-  describe('and kicking player fails with a voice chat not found error', () => {
-    beforeEach(() => {
+  describe('and the gatekeeper reports the voice chat is not found', () => {
+    beforeEach(async () => {
+      getCommunityMemberRolesMock.mockResolvedValue({
+        [actingUserAddress]: CommunityRole.Owner,
+        [targetUserAddress]: CommunityRole.Member
+      })
       kickPlayerMock.mockRejectedValue(new CommunityVoiceChatNotFoundError(communityId))
-      // Setup permission validation to pass
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-        .mockResolvedValueOnce(CommunityRole.Member) // target user role
+      result = await service(payload, context)
     })
 
-    it('should resolve with a not found error response', async () => {
-      const result = await service(
-        KickPlayerFromCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
+    it('should resolve with a not found error response', () => {
       expect(result.response?.$case).toBe('notFoundError')
     })
   })
 
-  describe('and kicking player fails with an unknown error', () => {
-    beforeEach(() => {
+  describe('and kicking the player fails with an unknown error', () => {
+    beforeEach(async () => {
+      getCommunityMemberRolesMock.mockResolvedValue({
+        [actingUserAddress]: CommunityRole.Owner,
+        [targetUserAddress]: CommunityRole.Member
+      })
       kickPlayerMock.mockRejectedValue(new Error('Unknown error'))
-      // Setup permission validation to pass
-      mockCommunitiesDB.getCommunityMemberRole
-        .mockResolvedValueOnce(CommunityRole.Moderator) // acting user role
-        .mockResolvedValueOnce(CommunityRole.Member) // target user role
+      result = await service(payload, context)
     })
 
-    it('should resolve with an internal server error response', async () => {
-      const result = await service(
-        KickPlayerFromCommunityVoiceChatPayload.create({
-          communityId,
-          userAddress: targetUserAddress
-        }),
-        {
-          address: userAddress,
-          subscribersContext: undefined
-        }
-      )
-
+    it('should resolve with an internal server error response', () => {
       expect(result.response?.$case).toBe('internalServerError')
     })
   })
