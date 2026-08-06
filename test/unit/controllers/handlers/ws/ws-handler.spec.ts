@@ -44,7 +44,7 @@ describe('ws-handler', () => {
       unregisterConnection
     })
 
-    mockRes = { upgrade: jest.fn() }
+    mockRes = { upgrade: jest.fn(), getRemoteAddressAsText: jest.fn().mockReturnValue(Buffer.from('203.0.113.10')) }
     mockReq = {
       getMethod: jest.fn().mockReturnValue('GET'),
       getHeader: jest.fn().mockImplementation(
@@ -131,9 +131,7 @@ describe('ws-handler', () => {
 
       await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
 
-      expect(mockWs.send).toHaveBeenCalledWith(
-        JSON.stringify({ error: 'Authentication already in progress, please try again later' })
-      )
+      expect(mockWs.end).toHaveBeenCalledWith(3003, 'Authentication already in progress')
       expect(verify).not.toHaveBeenCalled()
     })
 
@@ -141,7 +139,7 @@ describe('ws-handler', () => {
       beforeEach(() => {
         const userData = mockWs.getUserData()
         userData.authenticating = true
-        mockWs.send.mockImplementationOnce(() => {
+        mockWs.end.mockImplementationOnce(() => {
           throw new Error('Invalid access of closed uWS.WebSocket/SSLWebSocket.')
         })
       })
@@ -535,6 +533,19 @@ describe('ws-handler', () => {
 
     it('should accept absent metadata without throwing', () => {
       expect(metadataValidator(undefined)).toBe(true)
+    })
+  })
+
+  describe('when upgrading a connection', () => {
+    let upgradedData: WsUserData
+
+    beforeEach(() => {
+      wsHandlers.upgrade(mockRes, mockReq, mockContext)
+      upgradedData = mockRes.upgrade.mock.calls[0][0]
+    })
+
+    it('should record the TCP peer address, which per-IP admission keys on', () => {
+      expect(upgradedData.clientIp).toBe('203.0.113.10')
     })
   })
 })

@@ -6,6 +6,7 @@ export function createWsPoolMockedComponent(
 ): jest.Mocked<IWsPoolComponent> {
   return {
     registerConnection: jest.fn(),
+    markAuthenticated: jest.fn(),
     unregisterConnection: jest.fn(),
     getAuthenticatedAddresses: jest.fn().mockReturnValue([]),
     getConnectionIds: jest.fn().mockReturnValue([]),

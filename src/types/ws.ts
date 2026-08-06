@@ -9,6 +9,8 @@ type WsBaseUserData = {
   authenticating: boolean
   wsConnectionId: string
   connectionStartTime: number
+  /** TCP peer address. Behind an L7 proxy this is the edge, not the client. */
+  clientIp?: string
 }
 
 export type WsAuthenticatedUserData = WsBaseUserData & {
