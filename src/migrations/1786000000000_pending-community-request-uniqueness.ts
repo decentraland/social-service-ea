@@ -3,7 +3,7 @@ import { ColumnDefinitions, MigrationBuilder } from 'node-pg-migrate'
 export const shorthands: ColumnDefinitions | undefined = undefined
 
 const INDEX_NAME = 'unique_pending_community_request'
-const INDEX_COLUMNS = ['community_id', 'member_address', 'type']
+const INDEX_COLUMNS = ['community_id', 'member_address']
 
 /**
  * Adds the pending-request uniqueness invariant.
@@ -21,14 +21,17 @@ const INDEX_COLUMNS = ['community_id', 'member_address', 'type']
 export async function up(pgm: MigrationBuilder): Promise<void> {
   pgm.noTransaction()
 
-  // Keep the oldest logical request; the invariant cannot be added while duplicates exist.
+  // One pending request per (community, member), whatever its type: an invite and a
+  // request-to-join must never coexist — they auto-accept instead. Keep the oldest row;
+  // the migration must not grant memberships, so coexisting pairs collapse to a request
+  // the counterpart can still accept.
   pgm.sql(`
     DELETE FROM community_requests
     WHERE id IN (
       SELECT id
       FROM (
         SELECT id, ROW_NUMBER() OVER (
-          PARTITION BY community_id, member_address, type
+          PARTITION BY community_id, member_address
           ORDER BY created_at ASC, id ASC
         ) AS duplicate_number
         FROM community_requests

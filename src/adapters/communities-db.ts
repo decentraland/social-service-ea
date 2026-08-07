@@ -1017,7 +1017,7 @@ export function createCommunitiesDBComponent(
       communityId: string,
       memberAddress: EthAddress,
       type: CommunityRequestType
-    ): Promise<MemberRequest> {
+    ): Promise<MemberRequest & { created: boolean }> {
       const id = randomUUID()
       const normalizedMemberAddress = normalizeAddress(memberAddress)
 
@@ -1034,10 +1034,12 @@ export function createCommunitiesDBComponent(
           throw new CommunityMemberBannedError(communityId, normalizedMemberAddress)
         }
 
+        // One pending request per (community, member), any type: on conflict this resolves
+        // to the pre-existing row so callers can detect an opposite-type pending request.
         const query = SQL`
           INSERT INTO community_requests (id, community_id, member_address, type, status)
           VALUES (${id}, ${communityId}, ${normalizedMemberAddress}, ${type}, ${CommunityRequestStatus.Pending})
-          ON CONFLICT (community_id, member_address, type) WHERE status = 'pending'
+          ON CONFLICT (community_id, member_address) WHERE status = 'pending'
           DO UPDATE SET updated_at = community_requests.updated_at
           RETURNING id, community_id, member_address, type, status
         `
@@ -1047,13 +1049,14 @@ export function createCommunitiesDBComponent(
         const row = result.rows[0]
 
         // The resolved row, not the caller's input: on conflict this is the pre-existing
-        // request, whose stored address is normalized and whose status may differ.
+        // request, whose stored address is normalized and whose type may differ.
         return {
           id: row.id,
           communityId: row.community_id,
           memberAddress: row.member_address,
           type: row.type,
-          status: row.status
+          status: row.status,
+          created: row.id === id
         }
       })
     },

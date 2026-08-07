@@ -237,7 +237,7 @@ export interface ICommunitiesDatabaseComponent {
     communityId: string,
     memberAddress: EthAddress,
     type: CommunityRequestType
-  ): Promise<MemberRequest>
+  ): Promise<MemberRequest & { created: boolean }>
   getCommunityRequests(communityId: string, filters: GetCommunityRequestsOptions): Promise<MemberRequest[]>
   getCommunityRequestsCount(
     communityId: string,

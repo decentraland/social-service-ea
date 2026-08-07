@@ -8,7 +8,60 @@ function queryTextOf(statement: unknown): string {
   return typeof statement === 'string' ? statement : String((statement as { text?: string })?.text ?? '')
 }
 
-describe('when creating a community request that already exists as pending', () => {
+function queryValuesOf(statement: unknown): unknown[] {
+  return (statement as { values?: unknown[] })?.values ?? []
+}
+
+describe('when creating a community request with no pending request for the member', () => {
+  let communitiesDb: ICommunitiesDatabaseComponent
+  let transactionQuery: jest.Mock
+  let withTransaction: jest.Mock
+  let result: Awaited<ReturnType<ICommunitiesDatabaseComponent['createCommunityRequest']>>
+  let communityId: string
+  let checksummedAddress: string
+  let storedAddress: string
+
+  beforeEach(async () => {
+    communityId = '11111111-1111-4111-8111-111111111111'
+    checksummedAddress = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+    storedAddress = checksummedAddress.toLowerCase()
+    transactionQuery = jest.fn(async (statement: unknown) => {
+      const text = queryTextOf(statement)
+      if (text.includes('FROM community_bans')) {
+        return { rows: [], rowCount: 0 }
+      }
+      if (text.includes('INSERT INTO community_requests')) {
+        const [id, community_id, member_address, type, status] = queryValuesOf(statement)
+        return { rows: [{ id, community_id, member_address, type, status }], rowCount: 1 }
+      }
+      return { rows: [], rowCount: 1 }
+    })
+    withTransaction = jest.fn(async (callback) => callback({ query: transactionQuery }))
+    communitiesDb = createCommunitiesDBComponent({ pg: { withTransaction } as any, logs: {} as any })
+
+    result = await communitiesDb.createCommunityRequest(communityId, checksummedAddress, CommunityRequestType.Invite)
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  it('should report the request as created', () => {
+    expect(result.created).toBe(true)
+  })
+
+  it('should return the request as pending with the requested type', () => {
+    expect(result).toEqual(
+      expect.objectContaining({ type: CommunityRequestType.Invite, status: CommunityRequestStatus.Pending })
+    )
+  })
+
+  it('should insert the normalized member address', () => {
+    expect(result.memberAddress).toBe(storedAddress)
+  })
+})
+
+describe('when creating a community request that already exists as pending with the same type', () => {
   let communitiesDb: ICommunitiesDatabaseComponent
   let transactionQuery: jest.Mock
   let withTransaction: jest.Mock
@@ -66,9 +119,9 @@ describe('when creating a community request that already exists as pending', () 
     expect(queryTexts.filter((text) => text.includes('community_requests'))).toHaveLength(1)
   })
 
-  it('should use the pending-request uniqueness invariant as the conflict target', () => {
+  it('should target the one-pending-request-per-member invariant regardless of type', () => {
     expect(queryTexts.find((text) => text.includes('INSERT INTO community_requests'))).toContain(
-      "ON CONFLICT (community_id, member_address, type) WHERE status = 'pending'"
+      "ON CONFLICT (community_id, member_address) WHERE status = 'pending'"
     )
   })
 
@@ -82,6 +135,67 @@ describe('when creating a community request that already exists as pending', () 
 
   it('should report the resolved status so callers can tell it was already pending', () => {
     expect(result.status).toBe(CommunityRequestStatus.Pending)
+  })
+
+  it('should report the request as not created so callers do not repeat new-request side effects', () => {
+    expect(result.created).toBe(false)
+  })
+})
+
+describe('when creating a community request while the member has a pending request of the opposite type', () => {
+  let communitiesDb: ICommunitiesDatabaseComponent
+  let transactionQuery: jest.Mock
+  let withTransaction: jest.Mock
+  let result: Awaited<ReturnType<ICommunitiesDatabaseComponent['createCommunityRequest']>>
+  let communityId: string
+  let memberAddress: string
+
+  beforeEach(async () => {
+    communityId = '11111111-1111-4111-8111-111111111111'
+    memberAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    transactionQuery = jest.fn(async (statement: unknown) => {
+      const text = queryTextOf(statement)
+      if (text.includes('FROM community_bans')) {
+        return { rows: [], rowCount: 0 }
+      }
+      if (text.includes('INSERT INTO community_requests')) {
+        return {
+          rows: [
+            {
+              id: 'existing-invite-id',
+              community_id: communityId,
+              member_address: memberAddress,
+              type: CommunityRequestType.Invite,
+              status: CommunityRequestStatus.Pending
+            }
+          ],
+          rowCount: 1
+        }
+      }
+      return { rows: [], rowCount: 1 }
+    })
+    withTransaction = jest.fn(async (callback) => callback({ query: transactionQuery }))
+    communitiesDb = createCommunitiesDBComponent({ pg: { withTransaction } as any, logs: {} as any })
+
+    result = await communitiesDb.createCommunityRequest(communityId, memberAddress, CommunityRequestType.RequestToJoin)
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  it('should resolve to the pending request of the opposite type so callers can auto-accept it', () => {
+    expect(result).toEqual(
+      expect.objectContaining({ id: 'existing-invite-id', type: CommunityRequestType.Invite, created: false })
+    )
+  })
+
+  it('should not insert a second pending request for the member', () => {
+    const inserts = transactionQuery.mock.calls.filter((call) =>
+      queryTextOf(call[0]).includes('INSERT INTO community_requests')
+    )
+
+    expect(inserts).toHaveLength(1)
   })
 })
 
