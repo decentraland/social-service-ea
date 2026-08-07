@@ -133,23 +133,13 @@ export function createCommunityRequestsComponent(
       throw new InvalidCommunityRequestError(`User trying to impersonate another user`)
     }
 
-    const existingMemberRequests = await communitiesDb.getCommunityRequests(communityId, {
-      pagination: { limit: 2, offset: 0 }, // An user can have maximum 2 requests at the same time for a given community
-      targetAddress: memberAddress,
-      status: CommunityRequestStatus.Pending
-    })
+    // The insert is the existing-request lookup: it resolves atomically against the
+    // one-pending-request-per-member invariant, so a concurrent opposite-type request
+    // can never leave two pending rows.
+    const { created, ...resolvedRequest } = await communitiesDb.createCommunityRequest(communityId, memberAddress, type)
 
-    const duplicatedRequest = existingMemberRequests.find((request) => request.type === type)
-
-    // Do not fail if the request is duplicated, just return it
-    if (duplicatedRequest) {
-      return duplicatedRequest
-    }
-
-    // Check for automatic join scenarios - if there's a request of the opposite type, auto-accept it
-    const oppositeTypeRequest = existingMemberRequests.find((request) => request.type !== type)
-
-    if (oppositeTypeRequest) {
+    if (resolvedRequest.type !== type) {
+      // A pending request of the opposite type already existed: both sides agreed, auto-accept it
       await communitiesDb.joinMemberAndRemoveRequests({
         communityId,
         memberAddress,
@@ -159,11 +149,11 @@ export function createCommunityRequestsComponent(
       analytics.fireEvent(AnalyticsEvent.JOIN_COMMUNITY, {
         community_id: communityId,
         user_id: memberAddress,
-        request_id: oppositeTypeRequest?.id
+        request_id: resolvedRequest.id
       })
 
       createdRequest = {
-        ...oppositeTypeRequest,
+        ...resolvedRequest,
         type,
         status: CommunityRequestStatus.Accepted
       }
@@ -175,10 +165,13 @@ export function createCommunityRequestsComponent(
       })
 
       logger.info(
-        `Automatically joined user ${memberAddress} to community ${community.name} (${communityId}) by accepting ${oppositeTypeRequest.type}`
+        `Automatically joined user ${memberAddress} to community ${community.name} (${communityId}) by accepting ${resolvedRequest.type}`
       )
+    } else if (!created) {
+      // Do not fail if the request is duplicated, just return it without re-notifying
+      return resolvedRequest
     } else {
-      createdRequest = await communitiesDb.createCommunityRequest(communityId, memberAddress, type)
+      createdRequest = resolvedRequest
       logger.info(
         `Created community request: ${type} (${createdRequest.id}) for community ${community.name} (${communityId}) for member ${memberAddress}`
       )

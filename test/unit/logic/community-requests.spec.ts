@@ -195,9 +195,6 @@ describe('Community Requests Component', () => {
             type,
             status: CommunityRequestStatus.Pending
           }
-          mockCommunitiesDB.createCommunityRequest.mockImplementationOnce(() => {
-            return Promise.resolve(expectedCreatedRequest)
-          })
         })
 
         describe('and inviter does not have permission to invite users', () => {
@@ -237,7 +234,10 @@ describe('Community Requests Component', () => {
 
             describe('and there are no pending requests for the user', () => {
               beforeEach(() => {
-                mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+                mockCommunitiesDB.createCommunityRequest.mockResolvedValueOnce({
+                  ...expectedCreatedRequest,
+                  created: true
+                })
               })
 
               it('should create and return the request as pending', async () => {
@@ -281,7 +281,10 @@ describe('Community Requests Component', () => {
 
               beforeEach(() => {
                 requestToJoinRequest = { ...expectedCreatedRequest, type: CommunityRequestType.RequestToJoin }
-                mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([requestToJoinRequest])
+                mockCommunitiesDB.createCommunityRequest.mockResolvedValueOnce({
+                  ...requestToJoinRequest,
+                  created: false
+                })
                 callerAddress = userAddress
                 mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
               })
@@ -318,9 +321,9 @@ describe('Community Requests Component', () => {
                 })
               })
 
-              it('should not create the invite request', async () => {
+              it('should resolve the existing request atomically instead of inserting a second pending one', async () => {
                 await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-                expect(mockCommunitiesDB.createCommunityRequest).not.toHaveBeenCalled()
+                expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledTimes(1)
               })
             })
           })
@@ -381,9 +384,6 @@ describe('Community Requests Component', () => {
             type,
             status: CommunityRequestStatus.Pending
           }
-          mockCommunitiesDB.createCommunityRequest.mockImplementationOnce(() => {
-            return Promise.resolve(expectedCreatedRequest)
-          })
         })
 
         describe('and user does not belong to community', () => {
@@ -395,7 +395,10 @@ describe('Community Requests Component', () => {
             let mockProfile: any
 
             beforeEach(() => {
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+              mockCommunitiesDB.createCommunityRequest.mockResolvedValueOnce({
+                ...expectedCreatedRequest,
+                created: true
+              })
               mockProfile = {
                 avatars: [
                   {
@@ -460,7 +463,10 @@ describe('Community Requests Component', () => {
 
           describe('and profile fetch fails', () => {
             beforeEach(() => {
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+              mockCommunitiesDB.createCommunityRequest.mockResolvedValueOnce({
+                ...expectedCreatedRequest,
+                created: true
+              })
               mockRegistry.getProfile.mockRejectedValueOnce(new Error('Profile not found'))
             })
 
@@ -487,7 +493,6 @@ describe('Community Requests Component', () => {
           describe('and the caller is different from the user', () => {
             beforeEach(() => {
               callerAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabce'
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
             })
 
             it('should throw an InvalidCommunityRequestError with correct message', async () => {
@@ -508,7 +513,10 @@ describe('Community Requests Component', () => {
 
             beforeEach(() => {
               duplicatedRequest = { ...expectedCreatedRequest, type: CommunityRequestType.RequestToJoin }
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([duplicatedRequest])
+              mockCommunitiesDB.createCommunityRequest.mockResolvedValueOnce({
+                ...duplicatedRequest,
+                created: false
+              })
               callerAddress = userAddress
             })
 
@@ -522,9 +530,9 @@ describe('Community Requests Component', () => {
               expect(result).toEqual(duplicatedRequest)
             })
 
-            it('should not create a new request', async () => {
+            it('should not insert a second pending request', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.createCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledTimes(1)
             })
 
             it('should not accept any request', async () => {
@@ -540,12 +548,11 @@ describe('Community Requests Component', () => {
 
           describe('and there is a pending invite for the user', () => {
             beforeEach(() => {
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([
-                {
-                  ...expectedCreatedRequest,
-                  type: CommunityRequestType.Invite
-                }
-              ])
+              mockCommunitiesDB.createCommunityRequest.mockResolvedValueOnce({
+                ...expectedCreatedRequest,
+                type: CommunityRequestType.Invite,
+                created: false
+              })
               callerAddress = userAddress
             })
 
@@ -583,9 +590,9 @@ describe('Community Requests Component', () => {
               })
             })
 
-            it('should not create the request to join', async () => {
+            it('should resolve the pending invite atomically instead of inserting a second pending request', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.createCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledTimes(1)
             })
           })
         })
@@ -622,9 +629,6 @@ describe('Community Requests Component', () => {
             type,
             status: CommunityRequestStatus.Pending
           }
-          mockCommunitiesDB.createCommunityRequest.mockImplementationOnce(() => {
-            return Promise.resolve(expectedCreatedRequest)
-          })
         })
 
         describe('and inviter does not have permission to invite users', () => {
@@ -648,7 +652,10 @@ describe('Community Requests Component', () => {
 
           describe('and there are no pending requests for the user', () => {
             beforeEach(() => {
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([])
+              mockCommunitiesDB.createCommunityRequest.mockResolvedValueOnce({
+                ...expectedCreatedRequest,
+                created: true
+              })
               mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
             })
 
@@ -708,7 +715,10 @@ describe('Community Requests Component', () => {
 
             beforeEach(() => {
               duplicatedRequest = { ...expectedCreatedRequest, type: CommunityRequestType.Invite }
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([duplicatedRequest])
+              mockCommunitiesDB.createCommunityRequest.mockResolvedValueOnce({
+                ...duplicatedRequest,
+                created: false
+              })
               mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
             })
 
@@ -722,9 +732,9 @@ describe('Community Requests Component', () => {
               expect(result).toEqual(duplicatedRequest)
             })
 
-            it('should not create a new request', async () => {
+            it('should not insert a second pending request', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.createCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledTimes(1)
             })
 
             it('should not accept any request', async () => {
@@ -748,7 +758,10 @@ describe('Community Requests Component', () => {
 
             beforeEach(() => {
               requestToJoinRequest = { ...expectedCreatedRequest, type: CommunityRequestType.RequestToJoin }
-              mockCommunitiesDB.getCommunityRequests.mockResolvedValueOnce([requestToJoinRequest])
+              mockCommunitiesDB.createCommunityRequest.mockResolvedValueOnce({
+                ...requestToJoinRequest,
+                created: false
+              })
               mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
             })
 
@@ -784,9 +797,9 @@ describe('Community Requests Component', () => {
               })
             })
 
-            it('should not create the invite request', async () => {
+            it('should resolve the pending request atomically instead of inserting a second pending one', async () => {
               await communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
-              expect(mockCommunitiesDB.createCommunityRequest).not.toHaveBeenCalled()
+              expect(mockCommunitiesDB.createCommunityRequest).toHaveBeenCalledTimes(1)
             })
           })
         })
