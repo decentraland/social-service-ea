@@ -310,14 +310,28 @@ test('Create Community Controller', async function ({ components, stubComponents
             })
 
             describe('and an invalid thumbnail is provided', () => {
-              it('should respond with a 400 status code when trying to upload a file that is not an image', async () => {
-                const response = await makeMultipartRequest(identity, '/v1/communities', {
-                  ...validBody,
-                  thumbnailPath: require('path').join(__dirname, 'fixtures/example.txt')
+              describe('and the file carries no image signature', () => {
+                let response: Response
+                let body: Record<string, unknown>
+
+                beforeEach(async () => {
+                  // Over the 1KB floor on purpose, so the size bound passes and the signature
+                  // check is the one that rejects it.
+                  response = await makeMultipartRequest(identity, '/v1/communities', {
+                    ...validBody,
+                    thumbnailBuffer: Buffer.alloc(2 * 1024, 0x61)
+                  })
+                  body = await response.json()
                 })
-                expect(response.status).toBe(400)
-                expect(await response.json()).toMatchObject({
-                  message: 'Thumbnail must be a valid image file'
+
+                it('should respond with a 400 status code', () => {
+                  expect(response.status).toBe(400)
+                })
+
+                it('should say which signatures are accepted', () => {
+                  expect(body).toMatchObject({
+                    message: 'Thumbnail must start with a supported PNG, JPEG, GIF or WebP signature'
+                  })
                 })
               })
 
