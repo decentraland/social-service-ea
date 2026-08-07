@@ -3,6 +3,15 @@ import { randomUUID } from 'node:crypto'
 import { AppComponents, IVoiceDatabaseComponent, PrivateVoiceChat } from '../types'
 import { normalizeAddress } from '../utils/address'
 
+/**
+ * Creates the private-voice persistence component.
+ *
+ * Pending-call creation serializes both participants before checking and inserting so an address
+ * cannot concurrently occupy either side of multiple calls.
+ *
+ * @param components Required PostgreSQL and configuration components.
+ * @returns The private-voice database component.
+ */
 export async function createVoiceDBComponent(
   components: Pick<AppComponents, 'pg' | 'config'>
 ): Promise<IVoiceDatabaseComponent> {
@@ -21,14 +30,34 @@ export async function createVoiceDBComponent(
       `
       return pg.exists(query, 'exists')
     },
-    async createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string> {
-      const query = SQL`
-        INSERT INTO private_voice_chats (id, caller_address, callee_address)
-        VALUES (${randomUUID()}, ${normalizeAddress(callerAddress)}, ${normalizeAddress(calleeAddress)})
-        RETURNING id
-      `
-      const results = await pg.query<{ id: string }>(query)
-      return results.rows[0].id
+    async createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string | null> {
+      const normalizedCaller = normalizeAddress(callerAddress)
+      const normalizedCallee = normalizeAddress(calleeAddress)
+      const participants = [normalizedCaller, normalizedCallee].sort()
+
+      return pg.withTransaction(async (client) => {
+        // Every call involving either participant takes these locks in the same order. This enforces
+        // uniqueness across both caller/callee columns, which independent unique indexes cannot do.
+        for (const participant of participants) {
+          await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`private-voice:${participant}`])
+        }
+
+        const busyParticipant = await client.query(
+          `SELECT 1 FROM private_voice_chats
+           WHERE caller_address = ANY($1::varchar[]) OR callee_address = ANY($1::varchar[])
+           LIMIT 1`,
+          [participants]
+        )
+        if ((busyParticipant.rowCount ?? 0) > 0) return null
+
+        const query = SQL`
+          INSERT INTO private_voice_chats (id, caller_address, callee_address)
+          VALUES (${randomUUID()}, ${normalizedCaller}, ${normalizedCallee})
+          RETURNING id
+        `
+        const results = await client.query<{ id: string }>(query.text, query.values)
+        return results.rows[0].id
+      })
     },
     async getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null> {
       const query = SQL`
