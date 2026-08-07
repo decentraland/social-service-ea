@@ -44,6 +44,14 @@ const toBaseCommunity = <T extends { membersCount: number | string }>(community:
 }
 
 /**
+ * Whether the caller may see whether a community currently has a live voice chat: always
+ * for non-private communities, and only for members of a private one. Sole authority for
+ * this decision; every mapper that exposes a voice chat status must go through it.
+ */
+const isVoiceChatVisible = (community: { privacy: CommunityPrivacyEnum; role: CommunityRole }): boolean =>
+  community.privacy !== CommunityPrivacyEnum.Private || community.role !== CommunityRole.None
+
+/**
  * Resolves the voice chat status to expose for a community: the real status when voice
  * chat is visible to the caller (a public community, or any member of a private one) and
  * is actually active, otherwise a zeroed/inactive default. Shared by the v1 and v2 mappers.
@@ -52,16 +60,25 @@ const resolveVoiceChatStatus = (
   community: { privacy: CommunityPrivacyEnum; role: CommunityRole },
   voiceChatStatus: CommunityVoiceChatStatus | null
 ): CommunityVoiceChatStatus => {
-  const shouldIncludeVoiceChat =
-    community.privacy !== CommunityPrivacyEnum.Private || community.role !== CommunityRole.None
-
-  return shouldIncludeVoiceChat && !!voiceChatStatus
+  return isVoiceChatVisible(community) && !!voiceChatStatus
     ? voiceChatStatus
     : {
         isActive: false,
         participantCount: 0,
         moderatorCount: 0
       }
+}
+
+/**
+ * Same decision as {@link resolveVoiceChatStatus} for the single-community responses, whose
+ * contract already uses `null` for "no active voice chat". A hidden status reuses that same
+ * `null`, so the response is identical either way.
+ */
+const resolveNullableVoiceChatStatus = (
+  community: { privacy: CommunityPrivacyEnum; role: CommunityRole },
+  voiceChatStatus: CommunityVoiceChatStatus | null
+): CommunityVoiceChatStatus | null => {
+  return isVoiceChatVisible(community) ? voiceChatStatus : null
 }
 
 export const toCommunityWithMembersCount = (
@@ -77,7 +94,7 @@ export const toCommunityWithMembersCount = (
     ...community,
     ownerAddress: community.ownerAddress,
     membersCount,
-    voiceChatStatus
+    voiceChatStatus: resolveNullableVoiceChatStatus(community, voiceChatStatus)
   })
 }
 
@@ -137,7 +154,11 @@ export const toPublicCommunityWithVoiceChat = (
 ): CommunityPublicInformationWithVoiceChat => {
   return {
     ...toBaseCommunity(community),
-    voiceChatStatus
+    // Unauthenticated caller: no role, so a private community always hides its voice chat.
+    voiceChatStatus: resolveNullableVoiceChatStatus(
+      { privacy: community.privacy, role: CommunityRole.None },
+      voiceChatStatus
+    )
   }
 }
 
@@ -155,7 +176,7 @@ export const toCommunityWithMembersCountV2 = (
     ...community,
     ownerAddress: community.ownerAddress,
     membersCount,
-    voiceChatStatus
+    voiceChatStatus: resolveNullableVoiceChatStatus(community, voiceChatStatus)
   })
 }
 
@@ -196,7 +217,11 @@ export const toPublicCommunityWithVoiceChatV2 = (
 ): CommunityPublicInformationWithVoiceChatV2 => {
   return {
     ...toBaseCommunity(community),
-    voiceChatStatus
+    // Unauthenticated caller: no role, so a private community always hides its voice chat.
+    voiceChatStatus: resolveNullableVoiceChatStatus(
+      { privacy: community.privacy, role: CommunityRole.None },
+      voiceChatStatus
+    )
   }
 }
 
