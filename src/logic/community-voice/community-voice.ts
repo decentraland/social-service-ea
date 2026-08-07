@@ -6,12 +6,9 @@ import { isErrorWithMessage, errorMessageOrDefault } from '../../utils/errors'
 import { separatePositionsAndWorlds } from '../../utils/places'
 import { ActiveCommunityVoiceChat, CommunityPrivacyEnum } from '../community/types'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
-import { NotAuthorizedError } from '@dcl/http-commons'
 import {
   CommunityVoiceChatNotFoundError,
   CommunityVoiceChatAlreadyActiveError,
-  CommunityVoiceChatPermissionError,
-  UserNotCommunityMemberError,
   CommunityVoiceChatCreationError,
   InvalidCommunityIdError,
   InvalidUserAddressError
@@ -19,6 +16,11 @@ import {
 import { CommunityVoiceChatProfileData, ICommunityVoiceComponent } from './types'
 import { getProfileInfo } from '../profiles'
 import { ICommunityVoiceChatCacheComponent } from './community-voice-cache'
+import {
+  validateCommunityVoiceChatHost,
+  validateCommunityVoiceChatModerator,
+  validateCommunityVoiceChatParticipation
+} from './validation'
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
@@ -95,17 +97,13 @@ export async function createCommunityVoiceComponent({
   ): Promise<{ connectionUrl: string }> {
     logger.info(`Starting community voice chat for community ${communityId} by ${creatorAddress}`)
 
-    // Check if user is member of the community
-    const userRole = await communitiesDb.getCommunityMemberRole(communityId, creatorAddress)
-
-    if (userRole === CommunityRole.None) {
-      throw new UserNotCommunityMemberError(creatorAddress, communityId)
-    }
-
-    // Check if user has permission to start voice chats (only owners and moderators)
-    if (userRole !== CommunityRole.Owner && userRole !== CommunityRole.Moderator) {
-      throw new CommunityVoiceChatPermissionError('Only community owners and moderators can start voice chats')
-    }
+    // Only owners and moderators who are not banned may open the room.
+    const userRole = await validateCommunityVoiceChatHost(
+      communitiesDb,
+      communityId,
+      creatorAddress,
+      'start voice chats'
+    )
 
     // Check if community already has an active voice chat
     const existingVoiceChat = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
@@ -235,33 +233,13 @@ export async function createCommunityVoiceComponent({
   async function joinCommunityVoiceChat(communityId: string, userAddress: string): Promise<{ connectionUrl: string }> {
     logger.info(`User ${userAddress} joining community voice chat for community ${communityId}`)
 
-    // Get the active voice chat for the community
-    const voiceChatStatus = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
-    if (!voiceChatStatus?.isActive) {
-      throw new CommunityVoiceChatNotFoundError(communityId)
-    }
-
-    // Get community information to check privacy setting
-    const community = await communitiesDb.getCommunity(communityId, userAddress)
-    if (!community) {
-      throw new CommunityVoiceChatNotFoundError(communityId)
-    }
-
-    // Check if user is banned from the community (applies to both public and private communities)
-    const isBanned = await communitiesDb.isMemberBanned(communityId, userAddress)
-    if (isBanned) {
-      throw new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
-    }
-
-    // Get the user's role in the community for both public and private communities
-    const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-
-    // For private communities, check if user is a member
-    if (community.privacy === CommunityPrivacyEnum.Private) {
-      if (userRole === CommunityRole.None) {
-        throw new UserNotCommunityMemberError(userAddress, communityId)
-      }
-    }
+    // Active room, active community, not banned, and membership when private.
+    const userRole = await validateCommunityVoiceChatParticipation(
+      communitiesDb,
+      commsGatekeeper,
+      communityId,
+      userAddress
+    )
 
     // Fetch user profile data using helper function
     const profileData = await getUserProfileData(userAddress)
@@ -286,17 +264,8 @@ export async function createCommunityVoiceComponent({
   async function endCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
     logger.info(`Ending community voice chat for community ${communityId} by ${userAddress}`)
 
-    // Check if user is member of the community
-    const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-
-    if (userRole === CommunityRole.None) {
-      throw new UserNotCommunityMemberError(userAddress, communityId)
-    }
-
-    // Check if user has permission to end voice chats (only owners and moderators)
-    if (userRole !== CommunityRole.Owner && userRole !== CommunityRole.Moderator) {
-      throw new CommunityVoiceChatPermissionError('Only community owners and moderators can end voice chats')
-    }
+    // Only owners and moderators who are not banned may close the room.
+    await validateCommunityVoiceChatHost(communitiesDb, communityId, userAddress, 'end voice chats')
 
     // Check if community has an active voice chat
     const existingVoiceChat = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
@@ -533,13 +502,14 @@ export async function createCommunityVoiceComponent({
       const isSelfMute = targetUserAddressLower === actingUserAddressLower
 
       if (!isSelfMute) {
-        // Check permissions: only owners and moderators can mute/unmute other players
-        const actingUserRole = await communitiesDb.getCommunityMemberRole(communityId, actingUserAddressLower)
-        if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
-          throw new CommunityVoiceChatPermissionError(
-            'Only community owners, moderators, or the user themselves can mute/unmute speakers'
-          )
-        }
+        // Only owners and moderators can mute/unmute other players, and never the owner.
+        const { actingUserRole } = await validateCommunityVoiceChatModerator(
+          communitiesDb,
+          communityId,
+          actingUserAddressLower,
+          targetUserAddressLower,
+          'mute/unmute speakers'
+        )
 
         logger.info('Permission check passed: moderator/owner muting player', {
           communityId,
@@ -548,6 +518,17 @@ export async function createCommunityVoiceComponent({
           actingUserAddress: actingUserAddressLower
         })
       } else {
+        // Only unmuting gains a capability. Muting yourself must always work, including for
+        // someone still connected to the room after being banned or leaving the community.
+        if (!muted) {
+          await validateCommunityVoiceChatParticipation(
+            communitiesDb,
+            commsGatekeeper,
+            communityId,
+            actingUserAddressLower
+          )
+        }
+
         logger.info('Self-mute operation', {
           communityId,
           userAddress: targetUserAddressLower
@@ -584,10 +565,33 @@ export async function createCommunityVoiceComponent({
     }
   }
 
+  async function requestToSpeakInCommunityVoiceChat(
+    communityId: string,
+    userAddress: string,
+    isRaisingHand: boolean
+  ): Promise<void> {
+    if (!communityId || communityId.trim() === '') {
+      throw new InvalidCommunityIdError()
+    }
+
+    if (!userAddress || userAddress.trim() === '') {
+      throw new InvalidUserAddressError()
+    }
+
+    // Entitlement gates gaining a capability, never giving one up: lowering a hand must keep
+    // working for someone who has since been banned or has left, or their hand stays raised.
+    if (isRaisingHand) {
+      await validateCommunityVoiceChatParticipation(communitiesDb, commsGatekeeper, communityId, userAddress)
+    }
+
+    await commsGatekeeper.requestToSpeakInCommunityVoiceChat(communityId, userAddress, isRaisingHand)
+  }
+
   return {
     startCommunityVoiceChat,
     endCommunityVoiceChat,
     joinCommunityVoiceChat,
+    requestToSpeakInCommunityVoiceChat,
     muteSpeakerInCommunityVoiceChat,
     getCommunityVoiceChat,
     getActiveCommunityVoiceChats,
