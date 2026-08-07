@@ -5,10 +5,11 @@ import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/
 import { createFriendsComponent } from '../../../src/logic/friends/component'
 import { IFriendsComponent } from '../../../src/logic/friends/types'
 import { createFriendsDBMockedComponent } from '../../mocks/components/friends-db'
-import { mockRegistry } from '../../mocks/components'
+import { mockConfig, mockRedis, mockRegistry } from '../../mocks/components'
 import { createMockProfile } from '../../mocks/profile'
 import { createLogsMockedComponent, createMockedPubSubComponent } from '../../mocks/components'
 import { createSNSMockedComponent } from '../../mocks/components/sns'
+import { BLOCKED_USERS_DEFAULT_LIMIT, FRIENDS_DEFAULT_LIMIT } from '../../../src/utils/friendship-pagination'
 import { Action, Friendship, User, BlockedUserWithDate, FriendshipRequest, FriendshipAction } from '../../../src/types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
 import { BlockedUserError, InvalidFriendshipActionError } from '../../../src/logic/friends/errors'
@@ -160,7 +161,7 @@ describe('Friends Component', () => {
         })
 
         expect(mockFriendsDB.getFriends).toHaveBeenCalledWith(mockUserAddress, {
-          pagination: undefined,
+          pagination: { limit: FRIENDS_DEFAULT_LIMIT, offset: 0 },
           onlyActive: true
         })
         expect(mockFriendsDB.getFriendsCount).toHaveBeenCalledWith(mockUserAddress, {
@@ -344,6 +345,7 @@ describe('Friends Component', () => {
 
         mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
         mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
+        mockFriendsDB.getBlockedUsersCount.mockResolvedValue(3)
       })
 
       it('should return blocked users with profiles and total count', async () => {
@@ -355,7 +357,10 @@ describe('Friends Component', () => {
           total: 3
         })
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
+          limit: BLOCKED_USERS_DEFAULT_LIMIT,
+          offset: 0
+        })
         expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
       })
     })
@@ -364,6 +369,7 @@ describe('Friends Component', () => {
       beforeEach(() => {
         mockFriendsDB.getBlockedUsers.mockResolvedValue([])
         mockRegistry.getProfiles.mockResolvedValue([])
+        mockFriendsDB.getBlockedUsersCount.mockResolvedValue(0)
       })
 
       it('should return empty arrays with zero total', async () => {
@@ -375,7 +381,10 @@ describe('Friends Component', () => {
           total: 0
         })
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
+          limit: BLOCKED_USERS_DEFAULT_LIMIT,
+          offset: 0
+        })
         expect(mockRegistry.getProfiles).toHaveBeenCalledWith([])
       })
     })
@@ -388,7 +397,10 @@ describe('Friends Component', () => {
       it('should propagate the error', async () => {
         await expect(friendsComponent.getBlockedUsers(mockUserAddress)).rejects.toThrow('Database connection failed')
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
+          limit: BLOCKED_USERS_DEFAULT_LIMIT,
+          offset: 0
+        })
         expect(mockRegistry.getProfiles).not.toHaveBeenCalled()
       })
     })
@@ -409,7 +421,10 @@ describe('Friends Component', () => {
       it('should propagate the error', async () => {
         await expect(friendsComponent.getBlockedUsers(mockUserAddress)).rejects.toThrow('Catalyst service unavailable')
 
-        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress)
+        expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
+          limit: BLOCKED_USERS_DEFAULT_LIMIT,
+          offset: 0
+        })
         expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2'])
       })
     })
@@ -425,6 +440,7 @@ describe('Friends Component', () => {
         ]
 
         mockFriendsDB.getBlockedUsers.mockResolvedValue(mockBlockedUsers)
+        mockFriendsDB.getBlockedUsersCount.mockResolvedValue(3)
         // Catalyst returns only 2 profiles instead of 3
         mockRegistry.getProfiles.mockResolvedValue([createMockProfile('0xblocked1'), createMockProfile('0xblocked2')])
       })
@@ -439,6 +455,34 @@ describe('Friends Component', () => {
         })
 
         expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xblocked1', '0xblocked2', '0xblocked3'])
+      })
+    })
+
+    describe('and there are more blocked users than fit in one page', () => {
+      let firstPage: BlockedUserWithDate[]
+      let result: { blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }
+
+      beforeEach(async () => {
+        firstPage = [
+          { address: '0xblocked1', blocked_at: new Date('2023-01-01') },
+          { address: '0xblocked2', blocked_at: new Date('2023-01-02') }
+        ]
+        mockFriendsDB.getBlockedUsers.mockResolvedValue(firstPage)
+        mockFriendsDB.getBlockedUsersCount.mockResolvedValue(57)
+        mockRegistry.getProfiles.mockResolvedValue([createMockProfile('0xblocked1'), createMockProfile('0xblocked2')])
+        result = await friendsComponent.getBlockedUsers(mockUserAddress, { limit: 2, offset: 0 })
+      })
+
+      it('should report the full row count, not the size of the returned page', () => {
+        expect(result.total).toBe(57)
+      })
+
+      it('should return only the requested page', () => {
+        expect(result.blockedUsers).toEqual(firstPage)
+      })
+
+      it('should count without applying the pagination', () => {
+        expect(mockFriendsDB.getBlockedUsersCount).toHaveBeenCalledWith(mockUserAddress)
       })
     })
   })
@@ -575,7 +619,10 @@ describe('Friends Component', () => {
           total: 1
         })
 
-        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, undefined)
+        expect(mockFriendsDB.getMutualFriends).toHaveBeenCalledWith(requesterAddress, requestedAddress, {
+          limit: FRIENDS_DEFAULT_LIMIT,
+          offset: 0
+        })
         expect(mockFriendsDB.getMutualFriendsCount).toHaveBeenCalledWith(requesterAddress, requestedAddress)
         expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xmutual1'])
       })
@@ -1154,94 +1201,97 @@ describe('Friends Component', () => {
           expectedActiveStatus: false,
           statusDescription: 'inactive'
         }
-      ])('and the action is $description', ({ actingUserMarker, lastActionType, actionType, expectedActiveStatus, statusDescription }) => {
-        beforeEach(() => {
-          action = actionType
-          mockLastAction = {
-            id: 'last-action-id',
-            friendship_id: friendshipId,
-            acting_user: actingUserMarker === 'user' ? userAddress : friendAddress,
-            action: lastActionType,
-            timestamp: new Date().toISOString()
-          }
-          mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(mockLastAction)
-        })
-
-        it(`should update the existing friendship status to ${statusDescription}`, async () => {
-          await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-
-          expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith(userAddress, friendAddress)
-          expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(
-            friendshipId,
-            expectedActiveStatus,
-            mockClient
-          )
-          expect(mockFriendsDB.createFriendship).not.toHaveBeenCalled()
-        })
-
-        it('should record the friendship action', async () => {
-          await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-
-          expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
-            friendshipId,
-            userAddress,
-            actionType,
-            metadata,
-            mockClient
-          )
-        })
-
-        it('should publish friendship update event', async () => {
-          await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-
-          expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
-            id: actionId,
-            from: userAddress,
-            to: friendAddress,
-            action: actionType,
-            timestamp: expect.any(Number),
-            metadata
+      ])(
+        'and the action is $description',
+        ({ actingUserMarker, lastActionType, actionType, expectedActiveStatus, statusDescription }) => {
+          beforeEach(() => {
+            action = actionType
+            mockLastAction = {
+              id: 'last-action-id',
+              friendship_id: friendshipId,
+              acting_user: actingUserMarker === 'user' ? userAddress : friendAddress,
+              action: lastActionType,
+              timestamp: new Date().toISOString()
+            }
+            mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(mockLastAction)
           })
-        })
 
-        it('should return the correct friendship request and receiver profile', async () => {
-          const result = await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+          it(`should update the existing friendship status to ${statusDescription}`, async () => {
+            await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
 
-          expect(result).toEqual({
-            friendshipRequest: {
-              id: friendshipId,
-              address: friendAddress,
-              timestamp: mockCreatedAt.toString(),
-              metadata
-            },
-            receiverProfile: mockFriendProfile
-          })
-        })
-
-        it('should send notification for the friendship action when appropriate', async () => {
-          await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-
-          // Execute setImmediate callback
-          jest.runOnlyPendingTimers()
-
-          if (actionType === Action.REQUEST || actionType === Action.ACCEPT) {
-            expect(mockSendNotification).toHaveBeenCalledWith(
-              actionType,
-              {
-                requestId: actionId,
-                senderAddress: userAddress,
-                receiverAddress: friendAddress,
-                senderProfile: mockUserProfile,
-                receiverProfile: mockFriendProfile,
-                message: metadata?.message
-              },
-              { sns: mockSNS, logs: expect.any(Object) }
+            expect(mockFriendsDB.getLastFriendshipActionByUsers).toHaveBeenCalledWith(userAddress, friendAddress)
+            expect(mockFriendsDB.updateFriendshipStatus).toHaveBeenCalledWith(
+              friendshipId,
+              expectedActiveStatus,
+              mockClient
             )
-          } else {
-            expect(mockSendNotification).not.toHaveBeenCalled()
-          }
-        })
-      })
+            expect(mockFriendsDB.createFriendship).not.toHaveBeenCalled()
+          })
+
+          it('should record the friendship action', async () => {
+            await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+
+            expect(mockFriendsDB.recordFriendshipAction).toHaveBeenCalledWith(
+              friendshipId,
+              userAddress,
+              actionType,
+              metadata,
+              mockClient
+            )
+          })
+
+          it('should publish friendship update event', async () => {
+            await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+
+            expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIENDSHIP_UPDATES_CHANNEL, {
+              id: actionId,
+              from: userAddress,
+              to: friendAddress,
+              action: actionType,
+              timestamp: expect.any(Number),
+              metadata
+            })
+          })
+
+          it('should return the correct friendship request and receiver profile', async () => {
+            const result = await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+
+            expect(result).toEqual({
+              friendshipRequest: {
+                id: friendshipId,
+                address: friendAddress,
+                timestamp: mockCreatedAt.toString(),
+                metadata
+              },
+              receiverProfile: mockFriendProfile
+            })
+          })
+
+          it('should send notification for the friendship action when appropriate', async () => {
+            await friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
+
+            // Execute setImmediate callback
+            jest.runOnlyPendingTimers()
+
+            if (actionType === Action.REQUEST || actionType === Action.ACCEPT) {
+              expect(mockSendNotification).toHaveBeenCalledWith(
+                actionType,
+                {
+                  requestId: actionId,
+                  senderAddress: userAddress,
+                  receiverAddress: friendAddress,
+                  senderProfile: mockUserProfile,
+                  receiverProfile: mockFriendProfile,
+                  message: metadata?.message
+                },
+                { sns: mockSNS, logs: expect.any(Object) }
+              )
+            } else {
+              expect(mockSendNotification).not.toHaveBeenCalled()
+            }
+          })
+        }
+      )
     })
 
     describe('and there is no existing friendship action', () => {
@@ -1344,10 +1394,30 @@ describe('Friends Component', () => {
       })
 
       describe.each([
-        { description: 'accepting when no request exists', actionType: Action.ACCEPT, lastActor: null, lastActionType: null },
-        { description: 'rejecting when no request exists', actionType: Action.REJECT, lastActor: null, lastActionType: null },
-        { description: 'cancelling when no request exists', actionType: Action.CANCEL, lastActor: null, lastActionType: null },
-        { description: 'deleting when no friendship exists', actionType: Action.DELETE, lastActor: null, lastActionType: null },
+        {
+          description: 'accepting when no request exists',
+          actionType: Action.ACCEPT,
+          lastActor: null,
+          lastActionType: null
+        },
+        {
+          description: 'rejecting when no request exists',
+          actionType: Action.REJECT,
+          lastActor: null,
+          lastActionType: null
+        },
+        {
+          description: 'cancelling when no request exists',
+          actionType: Action.CANCEL,
+          lastActor: null,
+          lastActionType: null
+        },
+        {
+          description: 'deleting when no friendship exists',
+          actionType: Action.DELETE,
+          lastActor: null,
+          lastActionType: null
+        },
         {
           description: 'accepting a request the caller sent themselves',
           actionType: Action.ACCEPT,
@@ -1383,15 +1453,15 @@ describe('Friends Component', () => {
         })
 
         it('should throw an InvalidFriendshipActionError', async () => {
-          await expect(
-            friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-          ).rejects.toThrow(InvalidFriendshipActionError)
+          await expect(friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)).rejects.toThrow(
+            InvalidFriendshipActionError
+          )
         })
 
         it('should not open a transaction or write any friendship state', async () => {
-          await expect(
-            friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)
-          ).rejects.toThrow(InvalidFriendshipActionError)
+          await expect(friendsComponent.upsertFriendship(userAddress, friendAddress, action, metadata)).rejects.toThrow(
+            InvalidFriendshipActionError
+          )
 
           expect(mockFriendsDB.executeTx).not.toHaveBeenCalled()
           expect(mockFriendsDB.createFriendship).not.toHaveBeenCalled()

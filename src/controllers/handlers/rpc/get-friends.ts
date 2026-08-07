@@ -1,7 +1,7 @@
 import { parseProfilesToFriends } from '../../../logic/friends'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { getPage } from '../../../utils/pagination'
-import { FRIENDSHIPS_PER_PAGE } from '../../../adapters/rpc-server/constants'
+import { normalizeFriendsPagination } from '../../../utils/friendship-pagination'
 import {
   GetFriendsPayload,
   PaginatedFriendsProfilesResponse
@@ -14,7 +14,7 @@ export function getFriendsService({ components: { logs, friends } }: RPCServiceC
     request: GetFriendsPayload,
     context: RpcServerContext
   ): Promise<PaginatedFriendsProfilesResponse> {
-    const { pagination } = request
+    const pagination = normalizeFriendsPagination(request.pagination)
     const { address: loggedUserAddress } = context
 
     try {
@@ -24,7 +24,7 @@ export function getFriendsService({ components: { logs, friends } }: RPCServiceC
         friends: parseProfilesToFriends(friendsProfiles),
         paginationData: {
           total,
-          page: getPage(pagination?.limit || FRIENDSHIPS_PER_PAGE, pagination?.offset)
+          page: getPage(pagination.limit, pagination.offset)
         }
       }
     } catch (error: any) {
