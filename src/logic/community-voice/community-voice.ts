@@ -9,8 +9,6 @@ import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@d
 import {
   CommunityVoiceChatNotFoundError,
   CommunityVoiceChatAlreadyActiveError,
-  CommunityVoiceChatPermissionError,
-  UserNotCommunityMemberError,
   CommunityVoiceChatCreationError,
   InvalidCommunityIdError,
   InvalidUserAddressError
@@ -18,7 +16,11 @@ import {
 import { CommunityVoiceChatProfileData, ICommunityVoiceComponent } from './types'
 import { getProfileInfo } from '../profiles'
 import { ICommunityVoiceChatCacheComponent } from './community-voice-cache'
-import { validateCommunityVoiceChatModerator, validateCommunityVoiceChatParticipation } from './validation'
+import {
+  validateCommunityVoiceChatHost,
+  validateCommunityVoiceChatModerator,
+  validateCommunityVoiceChatParticipation
+} from './validation'
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
@@ -95,17 +97,13 @@ export async function createCommunityVoiceComponent({
   ): Promise<{ connectionUrl: string }> {
     logger.info(`Starting community voice chat for community ${communityId} by ${creatorAddress}`)
 
-    // Check if user is member of the community
-    const userRole = await communitiesDb.getCommunityMemberRole(communityId, creatorAddress)
-
-    if (userRole === CommunityRole.None) {
-      throw new UserNotCommunityMemberError(creatorAddress, communityId)
-    }
-
-    // Check if user has permission to start voice chats (only owners and moderators)
-    if (userRole !== CommunityRole.Owner && userRole !== CommunityRole.Moderator) {
-      throw new CommunityVoiceChatPermissionError('Only community owners and moderators can start voice chats')
-    }
+    // Only owners and moderators who are not banned may open the room.
+    const userRole = await validateCommunityVoiceChatHost(
+      communitiesDb,
+      communityId,
+      creatorAddress,
+      'start voice chats'
+    )
 
     // Check if community already has an active voice chat
     const existingVoiceChat = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)
@@ -266,17 +264,8 @@ export async function createCommunityVoiceComponent({
   async function endCommunityVoiceChat(communityId: string, userAddress: string): Promise<void> {
     logger.info(`Ending community voice chat for community ${communityId} by ${userAddress}`)
 
-    // Check if user is member of the community
-    const userRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-
-    if (userRole === CommunityRole.None) {
-      throw new UserNotCommunityMemberError(userAddress, communityId)
-    }
-
-    // Check if user has permission to end voice chats (only owners and moderators)
-    if (userRole !== CommunityRole.Owner && userRole !== CommunityRole.Moderator) {
-      throw new CommunityVoiceChatPermissionError('Only community owners and moderators can end voice chats')
-    }
+    // Only owners and moderators who are not banned may close the room.
+    await validateCommunityVoiceChatHost(communitiesDb, communityId, userAddress, 'end voice chats')
 
     // Check if community has an active voice chat
     const existingVoiceChat = await commsGatekeeper.getCommunityVoiceChatStatus(communityId)

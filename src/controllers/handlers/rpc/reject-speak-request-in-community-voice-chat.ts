@@ -11,8 +11,10 @@ import {
   CommunityVoiceChatPermissionError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
-import { CommunityRole } from '../../../types/entities'
-import { validateCommunityVoiceChatModerator } from '../../../logic/community-voice/validation'
+import {
+  validateCommunityVoiceChatModerator,
+  validateCommunityVoiceChatTargetMembership
+} from '../../../logic/community-voice/validation'
 import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function rejectSpeakRequestInCommunityVoiceChatService({
@@ -41,19 +43,25 @@ export function rejectSpeakRequestInCommunityVoiceChatService({
         throw new InvalidUserAddressError()
       }
 
-      // Owner/moderator gate plus owner protection, resolved in one batched query.
-      const { actingUserRole, targetUserRole } = await validateCommunityVoiceChatModerator(
-        communitiesDb,
-        request.communityId,
-        context.address,
-        request.userAddress,
-        'reject speak requests'
-      )
+      // Owner/moderator gate, owner protection and community lookup issued together. Authorization
+      // is reported first on purpose: a caller with no role learns nothing about the community.
+      const [community, { actingUserRole, targetUserRole }] = await Promise.all([
+        communitiesDb.getCommunity(request.communityId, context.address),
+        validateCommunityVoiceChatModerator(
+          communitiesDb,
+          request.communityId,
+          context.address,
+          request.userAddress,
+          'reject speak requests'
+        )
+      ])
 
-      // Verify the target user is a member of the community
-      if (targetUserRole === CommunityRole.None) {
-        throw new UserNotCommunityMemberError(request.userAddress, request.communityId)
+      if (!community) {
+        throw new InvalidCommunityIdError()
       }
+
+      // Public guests can raise a hand; a banned target stays rejectable since denying grants nothing.
+      validateCommunityVoiceChatTargetMembership(community, request.communityId, request.userAddress, targetUserRole)
 
       logger.info('Permission check passed: moderator/owner rejecting speak request', {
         communityId: request.communityId,

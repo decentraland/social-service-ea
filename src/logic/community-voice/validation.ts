@@ -56,6 +56,48 @@ export async function validateCommunityVoiceChatParticipation(
 }
 
 /**
+ * Validates that the acting user may open or close a community's voice chat room.
+ *
+ * Requires an owner or moderator who is not banned. Both facts are resolved in two queries issued
+ * together, so this stays a single round trip.
+ *
+ * @param communitiesDb - Communities database adapter
+ * @param communityId - Community ID
+ * @param actingUserAddress - Address of the moderator or owner performing the action
+ * @param action - Human readable action used to build the error messages
+ * @returns The acting user's role in the community
+ * @throws {UserNotCommunityMemberError} When the actor holds no role in the community
+ * @throws {CommunityVoiceChatPermissionError} When the actor is not privileged or is banned
+ */
+export async function validateCommunityVoiceChatHost(
+  communitiesDb: ICommunitiesDatabaseComponent,
+  communityId: string,
+  actingUserAddress: string,
+  action: string
+): Promise<CommunityRole> {
+  // Independent lookups, issued together so the ban check costs no extra round trip.
+  const [actingUserRole, isActingUserBanned] = await Promise.all([
+    communitiesDb.getCommunityMemberRole(communityId, actingUserAddress),
+    communitiesDb.isMemberBanned(communityId, actingUserAddress)
+  ])
+
+  if (actingUserRole === CommunityRole.None) {
+    throw new UserNotCommunityMemberError(actingUserAddress, communityId)
+  }
+
+  if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
+    throw new CommunityVoiceChatPermissionError(`Only community owners and moderators can ${action}`)
+  }
+
+  // A ban is not guaranteed to clear the role row, so the role alone cannot be trusted.
+  if (isActingUserBanned) {
+    throw new CommunityVoiceChatPermissionError(`Banned users cannot ${action}`)
+  }
+
+  return actingUserRole
+}
+
+/**
  * Validates that the acting user may moderate the target user in a community's voice chat.
  *
  * Requires the actor to be an owner or moderator who is not banned, and protects the owner from
@@ -113,6 +155,34 @@ export async function validateCommunityVoiceChatModerator(
 }
 
 /**
+ * Validates that the target user is reachable by a moderation action, based on community privacy.
+ *
+ * The role is resolved by {@link validateCommunityVoiceChatModerator}, so this performs no lookups
+ * of its own.
+ *
+ * @param community - Community object with privacy information
+ * @param communityId - Community ID
+ * @param targetUserAddress - Target user address
+ * @param targetUserRole - Already resolved target role
+ * @throws {UserNotCommunityMemberError} When the target is not a member of a private community
+ */
+export function validateCommunityVoiceChatTargetMembership(
+  community: Community,
+  communityId: string,
+  targetUserAddress: string,
+  targetUserRole: CommunityRole
+): void {
+  // Public communities take anyone the room already holds; comms-gatekeeper owns presence.
+  if (community.privacy !== CommunityPrivacyEnum.Private) {
+    return
+  }
+
+  if (targetUserRole === CommunityRole.None) {
+    throw new UserNotCommunityMemberError(targetUserAddress, communityId)
+  }
+}
+
+/**
  * Validates that the target user may be promoted or demoted, based on community privacy.
  *
  * Both facts are resolved by {@link validateCommunityVoiceChatModerator}, so this performs no
@@ -138,12 +208,5 @@ export function validateCommunityVoiceChatTargetUser(
     throw new UserNotCommunityMemberError(targetUserAddress, communityId)
   }
 
-  // Public communities take anyone the room already holds; comms-gatekeeper owns presence.
-  if (community.privacy !== CommunityPrivacyEnum.Private) {
-    return
-  }
-
-  if (targetUserRole === CommunityRole.None) {
-    throw new UserNotCommunityMemberError(targetUserAddress, communityId)
-  }
+  validateCommunityVoiceChatTargetMembership(community, communityId, targetUserAddress, targetUserRole)
 }

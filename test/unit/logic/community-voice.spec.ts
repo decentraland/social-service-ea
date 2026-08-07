@@ -418,6 +418,42 @@ describe('Community Voice Logic', () => {
           )
         })
       })
+
+      describe('when user is a banned owner', () => {
+        let startError: unknown
+
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
+          mockCommunitiesDb.isMemberBanned!.mockResolvedValue(true)
+          startError = await communityVoice.startCommunityVoiceChat(communityId, creatorAddress).catch((error) => error)
+        })
+
+        it('should reject with a CommunityVoiceChatPermissionError', () => {
+          expect(startError).toBeInstanceOf(CommunityVoiceChatPermissionError)
+        })
+
+        it('should not create the voice chat room', () => {
+          expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('when user is a banned moderator', () => {
+        let startError: unknown
+
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Moderator)
+          mockCommunitiesDb.isMemberBanned!.mockResolvedValue(true)
+          startError = await communityVoice.startCommunityVoiceChat(communityId, creatorAddress).catch((error) => error)
+        })
+
+        it('should reject with a CommunityVoiceChatPermissionError', () => {
+          expect(startError).toBeInstanceOf(CommunityVoiceChatPermissionError)
+        })
+
+        it('should not create the voice chat room', () => {
+          expect(mockCommsGatekeeper.createCommunityVoiceChatRoom).not.toHaveBeenCalled()
+        })
+      })
     })
 
     describe('when voice chat is already active', () => {
@@ -538,6 +574,42 @@ describe('Community Voice Logic', () => {
         await expect(communityVoice.endCommunityVoiceChat(communityId, userAddress)).rejects.toThrow(
           CommunityVoiceChatPermissionError
         )
+      })
+    })
+
+    describe('when user is a banned owner', () => {
+      let endError: unknown
+
+      beforeEach(async () => {
+        mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Owner)
+        mockCommunitiesDb.isMemberBanned!.mockResolvedValue(true)
+        endError = await communityVoice.endCommunityVoiceChat(communityId, userAddress).catch((error) => error)
+      })
+
+      it('should reject with a CommunityVoiceChatPermissionError', () => {
+        expect(endError).toBeInstanceOf(CommunityVoiceChatPermissionError)
+      })
+
+      it('should not end the voice chat room', () => {
+        expect(mockCommsGatekeeper.endCommunityVoiceChatRoom).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when user is a banned moderator', () => {
+      let endError: unknown
+
+      beforeEach(async () => {
+        mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Moderator)
+        mockCommunitiesDb.isMemberBanned!.mockResolvedValue(true)
+        endError = await communityVoice.endCommunityVoiceChat(communityId, userAddress).catch((error) => error)
+      })
+
+      it('should reject with a CommunityVoiceChatPermissionError', () => {
+        expect(endError).toBeInstanceOf(CommunityVoiceChatPermissionError)
+      })
+
+      it('should not end the voice chat room', () => {
+        expect(mockCommsGatekeeper.endCommunityVoiceChatRoom).not.toHaveBeenCalled()
       })
     })
 

@@ -9,15 +9,20 @@ import { createLogsMockedComponent } from '../../../../mocks/components'
 import { CommunityVoiceChatNotFoundError } from '../../../../../src/logic/community-voice/errors'
 import { createCommsGatekeeperMockedComponent } from '../../../../mocks/components/comms-gatekeeper'
 import { CommunityRole } from '../../../../../src/types/entities'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../../../../src/logic/community/types'
 import { RpcServerContext } from '../../../../../src/types'
 
 describe('when rejecting a speak request in a community voice chat', () => {
   let rejectSpeakRequestMock: jest.MockedFn<ICommsGatekeeperComponent['rejectSpeakRequestInCommunityVoiceChat']>
   let getCommunityMemberRolesMock: jest.MockedFn<ICommunitiesDatabaseComponent['getCommunityMemberRoles']>
+  let getCommunityMock: jest.MockedFn<ICommunitiesDatabaseComponent['getCommunity']>
   let getBannedMemberAddressesMock: jest.MockedFn<ICommunitiesDatabaseComponent['getBannedMemberAddresses']>
   let logs: jest.Mocked<ILoggerComponent>
   let commsGatekeeper: jest.Mocked<ICommsGatekeeperComponent>
-  let communitiesDb: Pick<ICommunitiesDatabaseComponent, 'getCommunityMemberRoles' | 'getBannedMemberAddresses'>
+  let communitiesDb: Pick<
+    ICommunitiesDatabaseComponent,
+    'getCommunityMemberRoles' | 'getCommunityMemberRole' | 'getCommunity' | 'getBannedMemberAddresses'
+  >
   let communityId: string
   let actingUserAddress: string
   let targetUserAddress: string
@@ -32,6 +37,16 @@ describe('when rejecting a speak request in a community voice chat', () => {
     targetUserAddress = '0x987654321fedcba'
     rejectSpeakRequestMock = jest.fn().mockResolvedValue(undefined)
     getCommunityMemberRolesMock = jest.fn()
+    getCommunityMock = jest.fn().mockResolvedValue({
+      id: communityId,
+      name: 'Test Community',
+      description: 'Test Description',
+      ownerAddress: '0xowner',
+      privacy: CommunityPrivacyEnum.Public,
+      visibility: CommunityVisibilityEnum.All,
+      active: true,
+      role: CommunityRole.Moderator
+    })
     getBannedMemberAddressesMock = jest.fn().mockResolvedValue([])
     logs = createLogsMockedComponent()
     commsGatekeeper = createCommsGatekeeperMockedComponent({
@@ -39,6 +54,8 @@ describe('when rejecting a speak request in a community voice chat', () => {
     })
     communitiesDb = {
       getCommunityMemberRoles: getCommunityMemberRolesMock,
+      getCommunityMemberRole: jest.fn(),
+      getCommunity: getCommunityMock,
       getBannedMemberAddresses: getBannedMemberAddressesMock
     }
     payload = RejectSpeakRequestInCommunityVoiceChatPayload.create({
@@ -55,8 +72,8 @@ describe('when rejecting a speak request in a community voice chat', () => {
     jest.resetAllMocks()
   })
 
-  describe('and the acting user is a moderator', () => {
-    describe('and the target user is a plain member', () => {
+  describe('and the community is public', () => {
+    describe('and a moderator rejects the request of a plain member', () => {
       beforeEach(async () => {
         getCommunityMemberRolesMock.mockResolvedValue({
           [actingUserAddress]: CommunityRole.Moderator,
@@ -82,9 +99,48 @@ describe('when rejecting a speak request in a community voice chat', () => {
         expect(getBannedMemberAddressesMock).toHaveBeenCalledTimes(1)
         expect(getBannedMemberAddressesMock).toHaveBeenCalledWith(communityId, [actingUserAddress, targetUserAddress])
       })
+
+      it('should reuse the batched target role instead of querying it again', () => {
+        expect(communitiesDb.getCommunityMemberRole).not.toHaveBeenCalled()
+      })
     })
 
-    describe('and the target user is the community owner', () => {
+    describe('and a moderator rejects the request of a guest holding no role', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should reject the guest speak request', () => {
+        expect(rejectSpeakRequestMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+    })
+
+    describe('and a moderator rejects the request of a banned guest still in the room', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator
+        })
+        getBannedMemberAddressesMock.mockResolvedValue([targetUserAddress])
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should reject the banned guest speak request', () => {
+        expect(rejectSpeakRequestMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+    })
+
+    describe('and a moderator rejects the request of the community owner', () => {
       beforeEach(async () => {
         getCommunityMemberRolesMock.mockResolvedValue({
           [actingUserAddress]: CommunityRole.Moderator,
@@ -102,26 +158,7 @@ describe('when rejecting a speak request in a community voice chat', () => {
       })
     })
 
-    describe('and the target user is not a community member', () => {
-      beforeEach(async () => {
-        getCommunityMemberRolesMock.mockResolvedValue({
-          [actingUserAddress]: CommunityRole.Moderator
-        })
-        result = await service(payload, context)
-      })
-
-      it('should resolve with a forbidden error response', () => {
-        expect(result.response?.$case).toBe('forbiddenError')
-      })
-
-      it('should not reject the speak request', () => {
-        expect(rejectSpeakRequestMock).not.toHaveBeenCalled()
-      })
-    })
-  })
-
-  describe('and the acting user is the community owner', () => {
-    describe('and the target user is a moderator', () => {
+    describe('and the owner rejects the request of a moderator', () => {
       beforeEach(async () => {
         getCommunityMemberRolesMock.mockResolvedValue({
           [actingUserAddress]: CommunityRole.Owner,
@@ -136,6 +173,56 @@ describe('when rejecting a speak request in a community voice chat', () => {
 
       it('should reject the moderator speak request', () => {
         expect(rejectSpeakRequestMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+    })
+  })
+
+  describe('and the community is private', () => {
+    beforeEach(() => {
+      getCommunityMock.mockResolvedValue({
+        id: communityId,
+        name: 'Private Test Community',
+        description: 'Test Description',
+        ownerAddress: '0xowner',
+        privacy: CommunityPrivacyEnum.Private,
+        visibility: CommunityVisibilityEnum.All,
+        active: true,
+        role: CommunityRole.Moderator
+      })
+    })
+
+    describe('and a moderator rejects the request of a plain member', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator,
+          [targetUserAddress]: CommunityRole.Member
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with an ok response', () => {
+        expect(result.response?.$case).toBe('ok')
+      })
+
+      it('should reject the speak request in the voice chat room', () => {
+        expect(rejectSpeakRequestMock).toHaveBeenCalledWith(communityId, targetUserAddress)
+      })
+    })
+
+    describe('and a moderator rejects the request of someone holding no role', () => {
+      beforeEach(async () => {
+        getCommunityMemberRolesMock.mockResolvedValue({
+          [actingUserAddress]: CommunityRole.Moderator
+        })
+        result = await service(payload, context)
+      })
+
+      it('should resolve with a forbidden error response', () => {
+        expect(result.response?.$case).toBe('forbiddenError')
+      })
+
+      it('should not reject the speak request', () => {
+        expect(rejectSpeakRequestMock).not.toHaveBeenCalled()
       })
     })
   })
@@ -204,6 +291,25 @@ describe('when rejecting a speak request in a community voice chat', () => {
 
     it('should resolve with a forbidden error response', () => {
       expect(result.response?.$case).toBe('forbiddenError')
+    })
+
+    it('should not reject the speak request', () => {
+      expect(rejectSpeakRequestMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('and the community does not exist', () => {
+    beforeEach(async () => {
+      getCommunityMemberRolesMock.mockResolvedValue({
+        [actingUserAddress]: CommunityRole.Owner,
+        [targetUserAddress]: CommunityRole.Member
+      })
+      getCommunityMock.mockResolvedValue(null as never)
+      result = await service(payload, context)
+    })
+
+    it('should resolve with an invalid request response', () => {
+      expect(result.response?.$case).toBe('invalidRequest')
     })
 
     it('should not reject the speak request', () => {
