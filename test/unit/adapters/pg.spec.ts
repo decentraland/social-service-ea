@@ -130,4 +130,44 @@ describe('when checking if a record exists in the database', () => {
     expect(exists).toBe(mockExists)
     expect(mockPg.query).toHaveBeenCalledWith(mockQuery)
   })
+
+  describe('and the rollback itself fails', () => {
+    let callbackError: Error
+    let rollbackError: Error
+    let thrown: unknown
+
+    beforeEach(async () => {
+      callbackError = new Error('Unexpected error')
+      rollbackError = new Error('Connection terminated unexpectedly')
+      dbClientQueryMock.mockImplementation(async (statement: unknown) => {
+        if (statement === 'ROLLBACK') throw rollbackError
+        return undefined
+      })
+
+      thrown = await pg
+        .withTransaction(() => {
+          throw callbackError
+        })
+        .catch((error) => error)
+    })
+
+    it('should throw the original error rather than the rollback failure', () => {
+      expect(thrown).toBe(callbackError)
+    })
+
+    it('should destroy the connection instead of returning it to the pool', () => {
+      expect(dbClientReleaseMock).toHaveBeenCalledWith(rollbackError)
+    })
+  })
+
+  describe('and the transaction succeeds', () => {
+    beforeEach(async () => {
+      dbClientQueryMock.mockResolvedValue(undefined)
+      await pg.withTransaction(jest.fn())
+    })
+
+    it('should return the connection to the pool undamaged', () => {
+      expect(dbClientReleaseMock).toHaveBeenCalledWith(undefined)
+    })
+  })
 })

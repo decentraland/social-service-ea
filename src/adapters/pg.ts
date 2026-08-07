@@ -31,6 +31,9 @@ export async function createPgComponent(
   ): Promise<T> {
     const client = await pg.getPool().connect()
 
+    // Set when the connection cannot be trusted again, so it is destroyed rather than pooled.
+    let releaseError: unknown
+
     try {
       await client.query('BEGIN')
       const result = await callback(client)
@@ -38,13 +41,18 @@ export async function createPgComponent(
 
       return result
     } catch (error) {
-      await client.query('ROLLBACK')
+      try {
+        await client.query('ROLLBACK')
+      } catch (rollbackError) {
+        // A failed ROLLBACK leaves the connection inside an aborted transaction, so the next
+        // borrower would get 25P02 on every statement. Keep the original error as the thrown
+        // one: it is the cause, and the rollback failure is a consequence.
+        releaseError = rollbackError
+      }
       if (onError) await onError(error)
       throw error
     } finally {
-      // TODO: handle the following eslint-disable statement
-      // eslint-disable-next-line @typescript-eslint/await-thenable
-      await client.release()
+      client.release(releaseError as Error | undefined)
     }
   }
 
