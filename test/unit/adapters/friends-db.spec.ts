@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings'
 import { createFriendsDBComponent } from '../../../src/adapters/friends-db'
-import { Action } from '../../../src/types'
+import { Action, User } from '../../../src/types'
 import { mockLogs, mockPg } from '../../mocks/components'
 import { normalizeAddress } from '../../../src/utils/address'
 
@@ -543,44 +543,91 @@ describe('friendsDb', () => {
     })
   })
 
-  describe('areFriendsOf', () => {
-    it('should return empty array for empty potential friends', async () => {
-      const result = await dbComponent.getOnlineFriends('0x123', [])
-      expect(result).toEqual([])
-      expect(mockPg.query).not.toHaveBeenCalled()
+  describe('getFriendsFromList', () => {
+    let userAddress: string
+    let otherUserAddresses: string[]
+    let queryText: string
+
+    beforeEach(async () => {
+      userAddress = '0x123'
+      otherUserAddresses = ['0x456abc', '0x789def']
+      mockPg.query.mockResolvedValueOnce({ rows: [{ address: '0x456abc' }], rowCount: 1 })
+      await dbComponent.getFriendsFromList(userAddress, otherUserAddresses)
+      queryText = (mockPg.query as jest.Mock).mock.calls[0][0].text
     })
 
-    it('should query friendships for potential friends', async () => {
-      const mockResult = {
-        rows: [{ address: '0x456' }, { address: '0x789' }],
-        rowCount: 2
-      }
-      const userAddress = '0x123'
-      mockPg.query.mockResolvedValueOnce(mockResult)
+    it('should restrict the friends to the requested addresses', () => {
+      expect(queryText).toMatch(/WHERE uf\.address = ANY\(\$\d+\)/)
+    })
 
-      const potentialFriends = ['0x456ABC', '0x789DEF', '0x999GHI']
-      const normalizedPotentialFriends = potentialFriends.map((address) => normalizeAddress(address))
-      await dbComponent.getOnlineFriends('0x123', normalizedPotentialFriends)
+    it('should exclude a requested address the caller has a block with, matching that address alone', () => {
+      expect(queryText).toContain('WHERE b.address = uf.address')
+    })
 
-      const queryExpectations = [
-        SQL`WHEN address_requester = ${userAddress} THEN address_requested`,
-        SQL`ELSE address_requester`,
-        SQL`(address_requester = ${userAddress} AND address_requested = ANY(${normalizedPotentialFriends}))`,
-        SQL`(address_requested = ${userAddress} AND address_requester = ANY(${normalizedPotentialFriends}))`,
-        SQL`AND NOT EXISTS (
-          SELECT 1 FROM blocks
-          WHERE (blocker_address = ${userAddress} AND blocked_address = ANY(${normalizedPotentialFriends}))
-          OR
-          (blocker_address = ANY(${normalizedPotentialFriends}) AND blocked_address = ${userAddress})
-        )`
-      ]
+    it('should never compare the block list against the whole requested batch', () => {
+      expect(queryText).not.toMatch(/b\.address\s*=\s*ANY/)
+    })
+  })
 
-      queryExpectations.forEach((query) => {
-        expect(mockPg.query).toHaveBeenCalledWith(
-          expect.objectContaining({
-            text: expect.stringContaining((query as any).strings[0]),
-            values: expect.arrayContaining(query.values)
-          })
+  describe('getOnlineFriends', () => {
+    let userAddress: string
+    let normalizedPotentialFriends: string[]
+
+    beforeEach(() => {
+      userAddress = '0x123'
+      normalizedPotentialFriends = ['0x456abc', '0x789def', '0x999ghi']
+    })
+
+    describe('when the candidate list is empty', () => {
+      let result: User[]
+
+      beforeEach(async () => {
+        result = await dbComponent.getOnlineFriends(userAddress, [])
+      })
+
+      it('should resolve to an empty list without querying the database', () => {
+        expect(result).toEqual([])
+        expect(mockPg.query).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when the candidate list has addresses', () => {
+      let queryText: string
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [{ address: '0x456abc' }], rowCount: 1 })
+        await dbComponent.getOnlineFriends(userAddress, normalizedPotentialFriends)
+        queryText = (mockPg.query as jest.Mock).mock.calls[0][0].text
+      })
+
+      it('should resolve each friendship row to the other participant', () => {
+        expect(queryText).toContain('WHEN address_requester = $1 THEN address_requested')
+      })
+
+      it('should restrict the friendships to the candidate addresses in both directions', () => {
+        expect(queryText).toContain('address_requester = $2 AND address_requested = ANY($3)')
+        expect(queryText).toContain('address_requested = $4 AND address_requester = ANY($5)')
+      })
+
+      it('should consider only active friendships', () => {
+        expect(queryText).toContain('is_active = true')
+      })
+
+      it('should exclude a friend the caller has blocked, matching that friend alone', () => {
+        expect(queryText).toContain('blocker_address = $6 AND blocked_address = online_friends.address')
+      })
+
+      it('should exclude a friend who has blocked the caller, matching that friend alone', () => {
+        expect(queryText).toContain('blocker_address = online_friends.address AND blocked_address = $7')
+      })
+
+      it('should never compare the block columns against the whole candidate list', () => {
+        expect(queryText).not.toMatch(/(?:blocked_address|blocker_address)\s*=\s*ANY/)
+      })
+
+      it('should pass the caller address and the normalized candidates as bound values', () => {
+        expect((mockPg.query as jest.Mock).mock.calls[0][0].values).toEqual(
+          expect.arrayContaining([userAddress, normalizedPotentialFriends])
         )
       })
     })

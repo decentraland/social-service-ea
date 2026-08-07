@@ -13,6 +13,7 @@ import {
 } from '../../../logic/community-voice'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { CommunityRole } from '../../../types/entities'
+import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function promoteSpeakerInCommunityVoiceChatService({
   components: { logs, commsGatekeeper, communitiesDb }
@@ -116,7 +117,11 @@ export function promoteSpeakerInCommunityVoiceChatService({
         }
       }
 
-      if (error instanceof InvalidCommunityIdError || error instanceof InvalidUserAddressError) {
+      if (
+        error instanceof InvalidCommunityIdError ||
+        error instanceof InvalidUserAddressError ||
+        error instanceof InvalidGatekeeperIdentifierError
+      ) {
         return {
           response: {
             $case: 'invalidRequest',

@@ -75,7 +75,7 @@ export function createCommunityPostsComponent(
     }
 
     const post = await communitiesDb.getPost(postId)
-    if (!post) {
+    if (!post || post.communityId !== communityId) {
       throw new CommunityPostNotFoundError(postId)
     }
   }

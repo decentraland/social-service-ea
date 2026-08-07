@@ -10,9 +10,12 @@ WORKDIR /app
 # some packages require a build step
 RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/*
 
-# build the app
-COPY . /app
+# Install from the lockfile before copying source so local secrets, Git metadata and
+# unrelated workspace files can never enter an image layer.
+COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
+COPY tsconfig.json .env.default ./
+COPY src ./src
 RUN yarn build
 
 # remove devDependencies, keep only used dependencies
@@ -37,9 +40,13 @@ ARG CURRENT_VERSION=Unknown
 ENV CURRENT_VERSION=${CURRENT_VERSION:-Unknown}
 
 WORKDIR /app
-COPY --from=builderenv /app /app
+COPY --from=builderenv --chown=node:node /app/package.json /app/yarn.lock /app/.env.default ./
+COPY --from=builderenv --chown=node:node /app/node_modules ./node_modules
+COPY --from=builderenv --chown=node:node /app/dist ./dist
 
-RUN echo "" > /app/.env
+RUN touch /app/.env && chown node:node /app/.env
+
+USER node
 
 # Please _DO NOT_ use a custom ENTRYPOINT because it may prevent signals
 # (i.e. SIGTERM) to reach the service
@@ -48,4 +55,4 @@ RUN echo "" > /app/.env
 ENTRYPOINT ["tini", "--"]
 # Run the program under Tini
 # V8 heap limit set to 75% of prod container memory (1024MB → 768MB).
-CMD [ "/usr/local/bin/node", "--max-old-space-size=768", "--inspect=0.0.0.0:9229", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
+CMD [ "/usr/local/bin/node", "--max-old-space-size=768", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]

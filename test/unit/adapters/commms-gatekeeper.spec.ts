@@ -9,12 +9,14 @@ let errorLogMock: jest.Mock
 let warnLogMock: jest.Mock
 let infoLogMock: jest.Mock
 let commsGatekeeper: ICommsGatekeeperComponent
+let testUserAddress: string
 
 beforeEach(async () => {
   fetchMock = jest.fn()
   errorLogMock = jest.fn()
   warnLogMock = jest.fn()
   infoLogMock = jest.fn()
+  testUserAddress = '0x1234567890123456789012345678901234567890'
   const fetcher: IFetchComponent = {
     fetch: fetchMock
   }
@@ -46,10 +48,10 @@ describe('when updating the user privacy message metadata', () => {
 
     it('should log the error and reject with it', async () => {
       await expect(
-        commsGatekeeper.updateUserPrivateMessagePrivacyMetadata('0x123', PrivateMessagesPrivacy.ALL)
+        commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(testUserAddress, PrivateMessagesPrivacy.ALL)
       ).rejects.toThrow('Network error')
       expect(errorLogMock).toHaveBeenCalledWith(
-        'Failed to update user private message privacy metadata for user 0x123: Network error'
+        `Failed to update user private message privacy metadata for user ${testUserAddress}: Network error`
       )
     })
   })
@@ -65,10 +67,10 @@ describe('when updating the user privacy message metadata', () => {
 
     it('should log the error and reject with it', async () => {
       await expect(
-        commsGatekeeper.updateUserPrivateMessagePrivacyMetadata('0x123', PrivateMessagesPrivacy.ALL)
+        commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(testUserAddress, PrivateMessagesPrivacy.ALL)
       ).rejects.toThrow('Server responded with status 400')
       expect(errorLogMock).toHaveBeenCalledWith(
-        'Failed to update user private message privacy metadata for user 0x123: Server responded with status 400'
+        `Failed to update user private message privacy metadata for user ${testUserAddress}: Server responded with status 400`
       )
     })
   })
@@ -82,8 +84,10 @@ describe('when updating the user privacy message metadata', () => {
     })
 
     it('should log the success message and resolve', async () => {
-      await commsGatekeeper.updateUserPrivateMessagePrivacyMetadata('0x123', PrivateMessagesPrivacy.ALL)
-      expect(infoLogMock).toHaveBeenCalledWith('Updated user private message privacy metadata for user 0x123 to all')
+      await commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(testUserAddress, PrivateMessagesPrivacy.ALL)
+      expect(infoLogMock).toHaveBeenCalledWith(
+        `Updated user private message privacy metadata for user ${testUserAddress} to all`
+      )
     })
   })
 })
@@ -99,7 +103,7 @@ describe('when checking if a user is in a voice chat', () => {
     })
 
     it('should resolve as true', () => {
-      return expect(commsGatekeeper.isUserInAVoiceChat('0x123')).resolves.toBe(true)
+      return expect(commsGatekeeper.isUserInAVoiceChat(testUserAddress)).resolves.toBe(true)
     })
   })
 
@@ -113,7 +117,7 @@ describe('when checking if a user is in a voice chat', () => {
     })
 
     it('should resolve as false', () => {
-      return expect(commsGatekeeper.isUserInAVoiceChat('0x123')).resolves.toBe(false)
+      return expect(commsGatekeeper.isUserInAVoiceChat(testUserAddress)).resolves.toBe(false)
     })
   })
 
@@ -127,9 +131,11 @@ describe('when checking if a user is in a voice chat', () => {
     })
 
     it('should log the error and reject with it', async () => {
-      await expect(commsGatekeeper.isUserInAVoiceChat('0x123')).rejects.toThrow('Server responded with status 400')
+      await expect(commsGatekeeper.isUserInAVoiceChat(testUserAddress)).rejects.toThrow(
+        'Server responded with status 400'
+      )
       expect(errorLogMock).toHaveBeenCalledWith(
-        'Failed to check if user 0x123 is in a voice chat: Server responded with status 400'
+        `Failed to check if user ${testUserAddress} is in a voice chat: Server responded with status 400`
       )
     })
   })
@@ -140,8 +146,10 @@ describe('when checking if a user is in a voice chat', () => {
     })
 
     it('should log the error and reject with it', async () => {
-      await expect(commsGatekeeper.isUserInAVoiceChat('0x123')).rejects.toThrow('Network error')
-      expect(errorLogMock).toHaveBeenCalledWith('Failed to check if user 0x123 is in a voice chat: Network error')
+      await expect(commsGatekeeper.isUserInAVoiceChat(testUserAddress)).rejects.toThrow('Network error')
+      expect(errorLogMock).toHaveBeenCalledWith(
+        `Failed to check if user ${testUserAddress} is in a voice chat: Network error`
+      )
     })
   })
 })
@@ -152,7 +160,7 @@ describe('when getting the private voice chat credentials', () => {
   let callerAddress: string
 
   beforeEach(() => {
-    roomId = '1'
+    roomId = '550e8400-e29b-41d4-a716-446655440000'
     calleeAddress = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
     callerAddress = '0x2B72b8d597c553b3173bca922B9ad871da751dA5'
   })
@@ -184,7 +192,10 @@ describe('when getting the private voice chat credentials', () => {
           'Content-Type': 'application/json',
           Authorization: 'Bearer comms-gatekeeper-token'
         },
-        body: JSON.stringify({ room_id: roomId, user_addresses: [calleeAddress, callerAddress] })
+        body: JSON.stringify({
+          room_id: roomId,
+          user_addresses: [calleeAddress.toLowerCase(), callerAddress.toLowerCase()]
+        })
       })
       expect(credentials).toEqual({
         [calleeAddress]: { connectionUrl: response[calleeAddress].connection_url },
@@ -233,7 +244,7 @@ describe('when ending a private voice chat', () => {
   let address: string
 
   beforeEach(() => {
-    callId = 'test-call-id-123'
+    callId = '550e8400-e29b-41d4-a716-446655440001'
     address = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
   })
 
@@ -256,14 +267,14 @@ describe('when ending a private voice chat', () => {
 
     it('should make the correct the API call to the configured URL in the config parameters using the configured auth token and the given address', async () => {
       await commsGatekeeper.endPrivateVoiceChat(callId, address)
-      expect(fetchMock).toHaveBeenCalledWith('https://comms-gatekeeper.org/private-voice-chat/test-call-id-123', {
+      expect(fetchMock).toHaveBeenCalledWith(`https://comms-gatekeeper.org/private-voice-chat/${callId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer comms-gatekeeper-token'
         },
         body: JSON.stringify({
-          address: '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
+          address: address.toLowerCase()
         })
       })
     })

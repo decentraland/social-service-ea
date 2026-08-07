@@ -22,7 +22,8 @@ export async function createEmailComponent(
           },
           body: JSON.stringify({ subject, content, email })
         }),
-      async (r) => new Error(`Failed to fetch ${url}: ${r.status} ${await r.text()}`)
+      // Status only: errors are logged, so the upstream body is deliberately not read.
+      (r) => new Error(`Failed to fetch ${url}: ${r.status}`)
     )
   }
 

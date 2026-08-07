@@ -4,6 +4,7 @@ import { CommunityMemberV2, CommunityNotFoundError, GetCommunityMembersOptions }
 import { getPaginationParams, NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { getPaginationResultProperties } from '../../../utils/pagination'
 import { PaginatedResponse } from '@dcl/schemas'
+import { matchesBearerToken } from '../../../utils/bearer-token'
 
 /**
  * v2 of {@link getCommunityMembersHandler}: returns the member addresses (and friendship
@@ -38,7 +39,7 @@ export async function getCommunityMembersV2Handler(
     const { members, totalMembers } = await communityMembers.getCommunityMembersWithoutProfiles(communityId, {
       ...options,
       as: userAddress,
-      byPassPrivacy: !!(API_ADMIN_TOKEN && optionalAuthHeader === `Bearer ${API_ADMIN_TOKEN}`)
+      byPassPrivacy: matchesBearerToken(optionalAuthHeader, API_ADMIN_TOKEN)
     })
 
     return {

@@ -1,2 +1,16 @@
+.env
+.env.*
+!.env.default
+.git
+.github
+.cursor
+.vscode
+coverage
+dist
+docs
+localstack
 node_modules
+test
+*.md
+*.log
 npm-debug.log
