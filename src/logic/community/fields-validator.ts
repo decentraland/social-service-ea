@@ -1,12 +1,15 @@
 import { InvalidRequestError } from '@dcl/http-commons'
-import fileType from 'file-type'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '.'
 import { AppComponents } from '../../types/system'
+import { detectImageMimeType } from './image-signature'
 import {
   ICommunityFieldsValidatorComponent,
   CommunityFieldsValidationOptions,
   CommunityFieldsValidationFields
 } from './types'
+
+const MIN_THUMBNAIL_BYTES = 1024
+const MAX_THUMBNAIL_BYTES = 500 * 1024
 
 export async function createCommunityFieldsValidatorComponent(
   components: Pick<AppComponents, 'config'>
@@ -78,14 +81,13 @@ export async function createCommunityFieldsValidatorComponent(
 
       // Validate thumbnail if provided
       if (thumbnailBuffer) {
-        const type = await fileType.fromBuffer(thumbnailBuffer)
-        if (!type || !type.mime.startsWith('image/')) {
-          throw new InvalidRequestError('Thumbnail must be a valid image file')
+        const size = thumbnailBuffer.length
+        if (size < MIN_THUMBNAIL_BYTES || size > MAX_THUMBNAIL_BYTES) {
+          throw new InvalidRequestError('Thumbnail size must be between 1KB and 500KB')
         }
 
-        const size = thumbnailBuffer.length
-        if (size < 1024 || size > 500 * 1024) {
-          throw new InvalidRequestError('Thumbnail size must be between 1KB and 500KB')
+        if (!detectImageMimeType(thumbnailBuffer)) {
+          throw new InvalidRequestError('Thumbnail must start with a supported PNG, JPEG, GIF or WebP signature')
         }
       }
 

@@ -140,6 +140,25 @@ describe('CommunityComplianceValidator', () => {
 
           expect(result).toBeUndefined()
         })
+
+        describe('and the thumbnail is not a PNG', () => {
+          let thumbnail: Buffer
+
+          beforeEach(() => {
+            // JPEG signature. The provider used to be told image/png for every
+            // upload, whatever the bytes were.
+            thumbnail = Buffer.alloc(2048)
+            Buffer.from([0xff, 0xd8, 0xff, 0xe0]).copy(thumbnail)
+          })
+
+          it('should tell the provider the media type the bytes announce', async () => {
+            await complianceValidator.validateCommunityContent({ thumbnailBuffer: thumbnail })
+
+            expect(aiComplianceMock.validateCommunityContent).toHaveBeenCalledWith(
+              expect.objectContaining({ thumbnailMime: 'image/jpeg' })
+            )
+          })
+        })
       })
 
       describe('and content is compliant', () => {

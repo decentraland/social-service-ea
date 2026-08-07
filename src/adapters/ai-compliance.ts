@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import crypto from 'crypto'
 import { generateLazyValidator, JSONSchema, ValidateFunction } from '@dcl/schemas'
+import { SupportedImageMimeType } from '../logic/community/image-signature'
 import { AppComponents } from '../types'
 import { AIComplianceError } from '../logic/community/errors'
 import { errorMessageOrDefault } from '../utils/errors'
@@ -20,7 +21,7 @@ export type ComplianceValidationRequest = {
   name?: string
   description?: string
   thumbnailBuffer?: Buffer
-  thumbnailMime?: 'image/png' | 'image/jpeg' | 'image/gif'
+  thumbnailMime?: SupportedImageMimeType
 }
 
 export interface IAIComplianceComponent {
