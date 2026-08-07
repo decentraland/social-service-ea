@@ -543,6 +543,32 @@ describe('friendsDb', () => {
     })
   })
 
+  describe('getFriendsFromList', () => {
+    let userAddress: string
+    let otherUserAddresses: string[]
+    let queryText: string
+
+    beforeEach(async () => {
+      userAddress = '0x123'
+      otherUserAddresses = ['0x456abc', '0x789def']
+      mockPg.query.mockResolvedValueOnce({ rows: [{ address: '0x456abc' }], rowCount: 1 })
+      await dbComponent.getFriendsFromList(userAddress, otherUserAddresses)
+      queryText = (mockPg.query as jest.Mock).mock.calls[0][0].text
+    })
+
+    it('should restrict the friends to the requested addresses', () => {
+      expect(queryText).toMatch(/WHERE uf\.address = ANY\(\$\d+\)/)
+    })
+
+    it('should exclude a requested address the caller has a block with, matching that address alone', () => {
+      expect(queryText).toContain('WHERE b.address = uf.address')
+    })
+
+    it('should never compare the block list against the whole requested batch', () => {
+      expect(queryText).not.toMatch(/b\.address\s*=\s*ANY/)
+    })
+  })
+
   describe('getOnlineFriends', () => {
     let userAddress: string
     let normalizedPotentialFriends: string[]
