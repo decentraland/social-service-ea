@@ -10,6 +10,7 @@ import {
 import type { HandlerContextWithPath } from '../../../types/http'
 import type { CreateReferralWithInvitedUser } from '../../../types/create-referral-handler.type'
 import type { CreateReferralRequestBody } from './schemas'
+import { resolveClientIp } from '../../../utils/client-ip'
 
 export async function createReferralHandler(
   ctx: Pick<HandlerContextWithPath<'logs' | 'referral' | 'featureFlags'>, 'components' | 'request' | 'verification'>
@@ -43,15 +44,11 @@ export async function createReferralHandler(
 
   const rawBody: CreateReferralRequestBody = await request.json()
 
-  const cfConnectingIp = request.headers.get('cf-connecting-ip')
-  const forwardedFor = request.headers.get('x-forwarded-for')
-  const realIp = request.headers.get('x-real-ip')
-
-  const invitedUserIP = cfConnectingIp || forwardedFor?.split(',')[0]?.trim() || realIp
+  const invitedUserIP = resolveClientIp(request.headers)
 
   if (!invitedUserIP) {
-    logger.error('Unable to determine client IP address from connection headers')
-    throw new InvalidRequestError('Unable to determine client IP address from connection headers')
+    logger.error('Unable to determine client IP address')
+    throw new InvalidRequestError('Unable to determine client IP address')
   }
 
   const body: CreateReferralWithInvitedUser = {
