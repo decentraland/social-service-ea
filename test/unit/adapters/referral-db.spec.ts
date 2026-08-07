@@ -5,10 +5,13 @@ describe('referral-db-component', () => {
   let mockPg: any
   let mockLogger: any
   let referralDb: any
+  let transactionQuery: jest.Mock
 
   beforeEach(async () => {
+    transactionQuery = jest.fn()
     mockPg = {
-      query: jest.fn()
+      query: jest.fn(),
+      withTransaction: jest.fn(async (callback) => callback({ query: transactionQuery }))
     }
 
     mockLogger = {
@@ -32,6 +35,31 @@ describe('referral-db-component', () => {
 
   afterEach(() => {
     jest.resetAllMocks()
+  })
+
+  describe('when creating a referral in an IP anti-fraud bucket', () => {
+    let referralInput: { referrer: string; invitedUser: string; invitedUserIP: string }
+
+    beforeEach(() => {
+      referralInput = {
+        referrer: '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        invitedUser: '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
+        invitedUserIP: '203.0.113.20'
+      }
+      transactionQuery
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ id: 'referral-id' }], rowCount: 1 })
+    })
+
+    it('should serialize the count and insert using the normalized referrer and IP', async () => {
+      await referralDb.createReferral(referralInput)
+
+      expect(transactionQuery).toHaveBeenNthCalledWith(
+        1,
+        'SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
+        [referralInput.referrer.toLowerCase(), referralInput.invitedUserIP]
+      )
+    })
   })
 
   describe('findReferralProgress', () => {
@@ -241,6 +269,258 @@ describe('referral-db-component', () => {
             values: expect.arrayContaining(['0x0987654321098765432109876543210987654321']) // lowercase
           })
         )
+      })
+    })
+  })
+
+  describe('when claiming a tier reward', () => {
+    let referrer: string
+    let tier: number
+    let options: { maxAttempts: number; leaseMs: number }
+
+    beforeEach(() => {
+      referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      tier = 5
+      options = { maxAttempts: 5, leaseMs: 300000 }
+    })
+
+    describe('and no grant row exists yet', () => {
+      let result: unknown
+      let queryText: string
+      let insertedToken: string
+      let takeoverToken: string
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [{ id: 'grant-id', tier: 5, attempts: 1 }], rowCount: 1 })
+        result = await referralDb.claimTierReward(referrer, tier, options)
+        queryText = mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')
+        insertedToken = mockPg.query.mock.calls[0][0].values[4]
+        takeoverToken = mockPg.query.mock.calls[0][0].values[7]
+      })
+
+      it('should return the claimed grant so the caller may issue the reward', () => {
+        expect(result).toEqual({ id: 'grant-id', tier: 5, attempts: 1 })
+      })
+
+      it('should upsert on the referrer/tier conflict target with the normalized referrer', () => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('ON CONFLICT (referrer, tier) DO UPDATE'),
+            values: expect.arrayContaining([referrer.toLowerCase(), tier])
+          })
+        )
+      })
+
+      it('should restrict the conflict update to pending grants that are within budget and unleased', () => {
+        expect(queryText).toMatch(
+          /WHERE referral_reward_grants\.status = \$\d+ AND referral_reward_grants\.attempts < \$\d+ AND referral_reward_grants\.updated_at <= \$\d+/
+        )
+      })
+
+      it('should bound the claim by the configured attempt budget', () => {
+        expect(mockPg.query.mock.calls[0][0].values).toContain(options.maxAttempts)
+      })
+
+      it('should stamp a uuid fencing token on the row it inserts', () => {
+        expect(insertedToken).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+      })
+
+      it('should rotate the fencing token when it takes an expired claim over from another worker', () => {
+        expect(queryText).toMatch(
+          /DO UPDATE SET attempts = referral_reward_grants\.attempts \+ 1, claim_token = \$\d+, updated_at = \$\d+/
+        )
+      })
+
+      it('should use the same freshly minted token whether it inserts or takes over', () => {
+        expect(takeoverToken).toBe(insertedToken)
+      })
+    })
+
+    describe('and the same tier is claimed again after the lease expired', () => {
+      let firstToken: string
+      let secondToken: string
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValue({ rows: [{ id: 'grant-id' }], rowCount: 1 })
+        await referralDb.claimTierReward(referrer, tier, options)
+        await referralDb.claimTierReward(referrer, tier, options)
+        firstToken = mockPg.query.mock.calls[0][0].values[4]
+        secondToken = mockPg.query.mock.calls[1][0].values[4]
+      })
+
+      it('should mint a different token for the new claim so the previous holder is fenced out', () => {
+        expect(secondToken).not.toBe(firstToken)
+      })
+    })
+
+    describe('and the grant is already granted or still leased by another worker', () => {
+      let result: unknown
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        result = await referralDb.claimTierReward(referrer, tier, options)
+      })
+
+      it('should return null so the caller issues nothing', () => {
+        expect(result).toBeNull()
+      })
+    })
+  })
+
+  describe('when marking a tier reward as granted', () => {
+    let referrer: string
+    let claimToken: string
+
+    beforeEach(() => {
+      referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      claimToken = 'a2f1c0de-0000-4000-8000-000000000001'
+    })
+
+    describe('and the caller still holds the claim', () => {
+      let result: number
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        result = await referralDb.markTierRewardGranted(referrer, 5, claimToken)
+      })
+
+      it('should report the single row it transitioned', () => {
+        expect(result).toBe(1)
+      })
+
+      it('should only transition a grant that is still pending, using the normalized referrer', () => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('AND status ='),
+            values: expect.arrayContaining(['granted', referrer.toLowerCase(), 5, 'pending'])
+          })
+        )
+      })
+
+      it('should fence the transition on the claim token so it cannot close another claim', () => {
+        expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(/AND claim_token = \$\d+/)
+      })
+
+      it('should pass the caller-held token as the fence value', () => {
+        expect(mockPg.query.mock.calls[0][0].values).toContain(claimToken)
+      })
+    })
+
+    describe('and the claim was superseded while the caller was issuing the reward', () => {
+      let result: number
+
+      beforeEach(async () => {
+        // The row now carries the newer worker's token, so the fenced UPDATE matches nothing.
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        result = await referralDb.markTierRewardGranted(referrer, 5, claimToken)
+      })
+
+      it('should report zero rows so the stale worker knows it did not close the grant', () => {
+        expect(result).toBe(0)
+      })
+    })
+  })
+
+  describe('when recording a tier reward failure', () => {
+    let referrer: string
+    let claimToken: string
+
+    beforeEach(async () => {
+      referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      claimToken = 'a2f1c0de-0000-4000-8000-000000000002'
+      mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      await referralDb.recordTierRewardFailure(referrer, 5, claimToken, 'upstream rejected the request')
+    })
+
+    it('should store the failure reason against the pending grant', () => {
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: expect.arrayContaining([
+            'upstream rejected the request',
+            referrer.toLowerCase(),
+            5,
+            'pending',
+            claimToken
+          ])
+        })
+      )
+    })
+
+    it('should fence the write on the claim token so a stale worker cannot stamp another claim', () => {
+      expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(/AND claim_token = \$\d+/)
+    })
+
+    it('should not extend the lease, so the tier becomes retryable on schedule', () => {
+      expect(mockPg.query.mock.calls[0][0].text).not.toContain('updated_at =')
+    })
+  })
+
+  describe('when parking a tier reward for manual review', () => {
+    let referrer: string
+    let claimToken: string
+
+    beforeEach(() => {
+      referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      claimToken = 'a2f1c0de-0000-4000-8000-000000000003'
+    })
+
+    describe('and the caller still holds the claim', () => {
+      let result: number
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        result = await referralDb.markTierRewardNeedsManualReview(
+          referrer,
+          5,
+          claimToken,
+          'Request aborted (timed out)'
+        )
+      })
+
+      it('should report the single row it parked', () => {
+        expect(result).toBe(1)
+      })
+
+      it('should move the grant out of pending into the manual review state with the reason attached', () => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            values: expect.arrayContaining([
+              'needs_manual_review',
+              'Request aborted (timed out)',
+              referrer.toLowerCase(),
+              5,
+              'pending',
+              claimToken
+            ])
+          })
+        )
+      })
+
+      it('should fence the write on the claim token so it cannot park another claim', () => {
+        expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(
+          /AND claim_token = COALESCE\(\$\d+::uuid, claim_token\)/
+        )
+      })
+    })
+
+    describe('and the caller passes no claim token because its own was superseded', () => {
+      let result: number
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        result = await referralDb.markTierRewardNeedsManualReview(referrer, 5, null, 'issued by a stale worker')
+      })
+
+      it('should park whichever claim currently holds the row', () => {
+        expect(result).toBe(1)
+      })
+
+      it('should collapse the fence to a no-op rather than match on a token', () => {
+        expect(mockPg.query.mock.calls[0][0].values).toContain(null)
+      })
+
+      it('should still refuse to park a grant that already left pending', () => {
+        expect(mockPg.query.mock.calls[0][0].values).toContain('pending')
       })
     })
   })
