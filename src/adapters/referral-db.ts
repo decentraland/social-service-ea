@@ -310,19 +310,20 @@ export async function createReferralDBComponent(
   async function markTierRewardNeedsManualReview(
     referrer: string,
     tier: number,
-    claimToken: string,
+    claimToken: string | null,
     error: string
   ): Promise<number> {
     const now = Date.now()
     // Parks the grant outside the retry loop: the claim predicate only matches 'pending', so no
-    // later event can re-issue a tier whose reward may already exist upstream.
+    // later event can re-issue a tier whose reward may already exist upstream. A null token
+    // collapses the fence to a no-op, parking whichever claim currently holds the row.
     const result = await pg.query(SQL`
       UPDATE referral_reward_grants
       SET status = ${ReferralRewardGrantStatus.NEEDS_MANUAL_REVIEW}, last_error = ${error}, updated_at = ${now}
       WHERE referrer = ${referrer.toLowerCase()}
         AND tier = ${tier}
         AND status = ${ReferralRewardGrantStatus.PENDING}
-        AND claim_token = ${claimToken}
+        AND claim_token = COALESCE(${claimToken}::uuid, claim_token)
     `)
     return result.rowCount
   }

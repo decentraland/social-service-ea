@@ -471,6 +471,13 @@ export interface IUpdateHandlerComponent {
 
 export type IRewardComponent = IBaseComponent & {
   sendReward(campaignKey: string, beneficiary: string): Promise<RewardAttributes[]>
+  /**
+   * Hard upper bound, in milliseconds, on a single `sendReward` call — body read included.
+   *
+   * Callers that serialize issuance behind a time-bounded claim must keep that claim longer
+   * than this, or the claim can expire while the call is still in flight.
+   */
+  requestTimeoutMs: number
 }
 
 export type IEmailComponent = IBaseComponent & {

@@ -458,36 +458,70 @@ describe('referral-db-component', () => {
   describe('when parking a tier reward for manual review', () => {
     let referrer: string
     let claimToken: string
-    let result: number
 
-    beforeEach(async () => {
+    beforeEach(() => {
       referrer = '0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
       claimToken = 'a2f1c0de-0000-4000-8000-000000000003'
-      mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      result = await referralDb.markTierRewardNeedsManualReview(referrer, 5, claimToken, 'Request aborted (timed out)')
     })
 
-    it('should report the single row it parked', () => {
-      expect(result).toBe(1)
+    describe('and the caller still holds the claim', () => {
+      let result: number
+
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        result = await referralDb.markTierRewardNeedsManualReview(
+          referrer,
+          5,
+          claimToken,
+          'Request aborted (timed out)'
+        )
+      })
+
+      it('should report the single row it parked', () => {
+        expect(result).toBe(1)
+      })
+
+      it('should move the grant out of pending into the manual review state with the reason attached', () => {
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            values: expect.arrayContaining([
+              'needs_manual_review',
+              'Request aborted (timed out)',
+              referrer.toLowerCase(),
+              5,
+              'pending',
+              claimToken
+            ])
+          })
+        )
+      })
+
+      it('should fence the write on the claim token so it cannot park another claim', () => {
+        expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(
+          /AND claim_token = COALESCE\(\$\d+::uuid, claim_token\)/
+        )
+      })
     })
 
-    it('should move the grant out of pending into the manual review state with the reason attached', () => {
-      expect(mockPg.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          values: expect.arrayContaining([
-            'needs_manual_review',
-            'Request aborted (timed out)',
-            referrer.toLowerCase(),
-            5,
-            'pending',
-            claimToken
-          ])
-        })
-      )
-    })
+    describe('and the caller passes no claim token because its own was superseded', () => {
+      let result: number
 
-    it('should fence the write on the claim token so it cannot park another claim', () => {
-      expect(mockPg.query.mock.calls[0][0].text.replace(/\s+/g, ' ')).toMatch(/AND claim_token = \$\d+/)
+      beforeEach(async () => {
+        mockPg.query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        result = await referralDb.markTierRewardNeedsManualReview(referrer, 5, null, 'issued by a stale worker')
+      })
+
+      it('should park whichever claim currently holds the row', () => {
+        expect(result).toBe(1)
+      })
+
+      it('should collapse the fence to a no-op rather than match on a token', () => {
+        expect(mockPg.query.mock.calls[0][0].values).toContain(null)
+      })
+
+      it('should still refuse to park a grant that already left pending', () => {
+        expect(mockPg.query.mock.calls[0][0].values).toContain('pending')
+      })
     })
   })
 })

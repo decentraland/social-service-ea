@@ -46,6 +46,8 @@ function isUsableReward(reward: unknown): reward is RewardAttributes {
   return !!reward && typeof (reward as RewardAttributes).image === 'string' && !!(reward as RewardAttributes).image
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
+
 export async function createRewardComponent(
   components: Pick<AppComponents, 'fetcher' | 'config' | 'logs'>
 ): Promise<IRewardComponent> {
@@ -54,8 +56,13 @@ export async function createRewardComponent(
 
   const rewardUrl = new URL(await config.requireString('REWARD_SERVER_URL'))
 
+  const requestTimeoutMs = (await config.getNumber('REWARD_REQUEST_TIMEOUT_MS')) ?? DEFAULT_REQUEST_TIMEOUT_MS
+
   /**
    * Requests a reward for a beneficiary.
+   *
+   * Never runs longer than {@link IRewardComponent.requestTimeoutMs}, so a caller holding a
+   * time-bounded claim can guarantee the call finishes while the claim is still its own.
    *
    * @throws {RewardIssuanceError} When the response carries no reward we can act on. Callers must
    * treat this as "nothing was issued" — every caller dereferences the first element.
@@ -66,45 +73,58 @@ export async function createRewardComponent(
    */
   async function sendReward(campaignKey: string, beneficiary: string): Promise<RewardAttributes[]> {
     const url = new URL('/api/rewards', rewardUrl).toString()
-    const response = await fetcher.fetch(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ campaign_key: campaignKey, beneficiary })
-    })
 
-    if (response.ok) {
-      const body = await response.json()
-      const rewards = body?.data
+    // The fetcher's own timeout stops applying once the headers land, so a trickled body would
+    // leave the call unbounded. This controller spans the body read too, which is what makes
+    // the total duration something a caller can hold a claim against.
+    const abortController = new AbortController()
+    const timer = setTimeout(() => abortController.abort(), requestTimeoutMs)
 
-      // Callers dereference the first element, so an unusable response must throw, not return empty.
-      if (!Array.isArray(rewards)) {
-        logger.warn('Reward server response did not contain a data array', { beneficiary })
-        throw new RewardIssuanceError('response contained no data array')
+    try {
+      const response = await fetcher.fetch(url, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ campaign_key: campaignKey, beneficiary }),
+        abortController
+      })
+
+      if (response.ok) {
+        const body = await response.json()
+        const rewards = body?.data
+
+        // Callers dereference the first element, so an unusable response must throw, not return empty.
+        if (!Array.isArray(rewards)) {
+          logger.warn('Reward server response did not contain a data array', { beneficiary })
+          throw new RewardIssuanceError('response contained no data array')
+        }
+
+        if (rewards.length === 0) {
+          logger.warn('Reward server returned an empty reward list', { beneficiary })
+          throw new RewardIssuanceError('response contained an empty reward list')
+        }
+
+        if (!rewards.every(isUsableReward)) {
+          logger.warn('Reward server returned a reward without an image', { beneficiary })
+          throw new RewardIssuanceError('a returned reward is missing its image')
+        }
+
+        return rewards
       }
 
-      if (rewards.length === 0) {
-        logger.warn('Reward server returned an empty reward list', { beneficiary })
-        throw new RewardIssuanceError('response contained an empty reward list')
-      }
-
-      if (!rewards.every(isUsableReward)) {
-        logger.warn('Reward server returned a reward without an image', { beneficiary })
-        throw new RewardIssuanceError('a returned reward is missing its image')
-      }
-
-      return rewards
+      // Status only: the upstream body is deliberately not read into errors or logs, but it still
+      // has to be released or the keep-alive socket stays pinned.
+      await discardResponseBody(response)
+      throw new RewardRequestFailedError(response.status, url)
+    } finally {
+      clearTimeout(timer)
     }
-
-    // Status only: the upstream body is deliberately not read into errors or logs, but it still
-    // has to be released or the keep-alive socket stays pinned.
-    await discardResponseBody(response)
-    throw new RewardRequestFailedError(response.status, url)
   }
 
   return {
-    sendReward
+    sendReward,
+    requestTimeoutMs
   }
 }

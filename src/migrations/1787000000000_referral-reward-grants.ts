@@ -88,10 +88,8 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
   `)
 }
 
-export async function down(pgm: MigrationBuilder): Promise<void> {
-  pgm.dropIndex('referral_reward_grants', ['referrer', 'tier'], {
-    name: 'unique_referral_reward_grants_referrer_tier',
-    ifExists: true
-  })
-  pgm.dropTable('referral_reward_grants')
-}
+// Deliberately irreversible. This table is the only record that a tier reward was issued: the
+// runtime closes a grant before the best-effort image insert, so rows here have no counterpart
+// anywhere else and the `up` backfill above could not rebuild them. Dropping it and re-running
+// `up` would pay those tiers a second time. Removing the table is a manual, reviewed operation.
+export const down = false

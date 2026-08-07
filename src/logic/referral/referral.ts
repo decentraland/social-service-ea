@@ -23,6 +23,10 @@ const TIERS = [5, 10, 20, 25, 30, 50, 60, 75]
 const TIERS_IRL_SWAG = 100
 const MARKETING_EMAIL = 'marketing@decentraland.org'
 
+// One issuance has to finish comfortably inside the claim lease. If it can outlive the lease,
+// another worker re-claims the tier while the first call is still in flight and both issue.
+const MIN_LEASE_TO_REQUEST_TIMEOUT_RATIO = 2
+
 function validateAddress(value: string, field: string): string {
   if (!EthAddress.validate(value)) {
     throw new ReferralInvalidInputError(`Invalid ${field} address`)
@@ -75,6 +79,14 @@ export async function createReferralComponent(
   // blocks a competing worker from issuing the same tier.
   const rewardMaxAttempts = (await config.getNumber('REFERRAL_REWARD_MAX_ATTEMPTS')) ?? 5
   const rewardClaimLeaseMs = (await config.getNumber('REFERRAL_REWARD_CLAIM_LEASE_MS')) ?? 5 * 60 * 1000
+
+  // Refuse to start rather than run a configuration where the lease can expire mid-issuance.
+  const minClaimLeaseMs = rewards.requestTimeoutMs * MIN_LEASE_TO_REQUEST_TIMEOUT_RATIO
+  if (rewardClaimLeaseMs < minClaimLeaseMs) {
+    throw new Error(
+      `REFERRAL_REWARD_CLAIM_LEASE_MS (${rewardClaimLeaseMs}ms) must be at least ${minClaimLeaseMs}ms, ${MIN_LEASE_TO_REQUEST_TIMEOUT_RATIO}x the reward request timeout of ${rewards.requestTimeoutMs}ms`
+    )
+  }
 
   const rewardKeys = {
     5: REWARDS_API_KEY_BY_REFERRAL_INVITED_USERS_5,
@@ -242,6 +254,9 @@ export async function createReferralComponent(
         'MANUAL REVIEW REQUIRED: tier reward was issued but the claim is no longer ours, so a duplicate reward may exist. Skipping notifications',
         { referrer, tier, attempts: claim.attempts }
       )
+      // A reward is known to exist, so the row must leave the retry loop whatever the newer
+      // claim does next. Unfenced on purpose: our token is the superseded one.
+      await parkForManualReviewBestEffort(referrer, tier, null, 'issued by a worker whose claim was superseded')
       return
     }
 
@@ -273,11 +288,20 @@ export async function createReferralComponent(
    *
    * Best-effort like the rest of the bookkeeping, but a failure here is the worst case: the
    * grant stays pending and becomes claimable again, so it is logged for alerting.
+   *
+   * A null `claimToken` parks whichever claim currently holds the row. Only for the case where
+   * this worker's own token is already superseded but a reward is known to have been issued.
    */
-  async function parkForManualReviewBestEffort(referrer: string, tier: number, claimToken: string, reason: string) {
+  async function parkForManualReviewBestEffort(
+    referrer: string,
+    tier: number,
+    claimToken: string | null,
+    reason: string
+  ) {
     try {
       const parked = await referralDb.markTierRewardNeedsManualReview(referrer, tier, claimToken, reason)
-      if (parked === 0) {
+      // An unfenced park matching nothing just means the row already reached a terminal state.
+      if (parked === 0 && claimToken) {
         logger.error('MANUAL REVIEW REQUIRED: could not park a tier reward grant because the claim is no longer ours', {
           referrer,
           tier

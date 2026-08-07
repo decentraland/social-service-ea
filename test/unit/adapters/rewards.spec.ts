@@ -88,7 +88,8 @@ describe('RewardComponent', () => {
             Accept: 'application/json',
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(requestBody),
+          abortController: expect.any(AbortController)
         })
 
         expect(result).toHaveLength(1)
@@ -312,6 +313,83 @@ describe('RewardComponent', () => {
       it('should not classify it as a definitive non-issuance, since the request may have reached the server', () => {
         expect(isDefinitiveNonIssuance(caughtError)).toBe(false)
       })
+    })
+  })
+
+  describe('when the reward server answers but then stalls the response body', () => {
+    let campaignKey: string
+    let beneficiary: string
+    let caughtError: unknown
+    let stallingComponent: IRewardComponent
+
+    beforeEach(async () => {
+      campaignKey = mockRewardTestData.campaignKey
+      beneficiary = mockRewardTestData.beneficiary
+      mockConfig.requireString.mockResolvedValue(mockRewardTestData.rewardUrl)
+      mockConfig.getNumber.mockResolvedValue(10)
+
+      // The fetcher's timeout stops at the headers, so only the component's own controller can
+      // end a body that never arrives.
+      mockFetcher.fetch.mockImplementation(
+        async (_url, init) =>
+          ({
+            ok: true,
+            status: 201,
+            json: () =>
+              new Promise((_resolve, reject) => {
+                init?.abortController?.signal.addEventListener('abort', () =>
+                  reject(new Error('The operation was aborted'))
+                )
+              })
+          }) as any
+      )
+
+      stallingComponent = await createRewardComponent({
+        fetcher: mockFetcher,
+        config: mockConfig,
+        logs: createLogsMockedComponent({ warn: jest.fn() })
+      })
+
+      caughtError = await stallingComponent.sendReward(campaignKey, beneficiary).catch((error) => error)
+    })
+
+    afterEach(() => {
+      caughtError = undefined
+    })
+
+    it('should read the request timeout from configuration', () => {
+      expect(mockConfig.getNumber).toHaveBeenCalledWith('REWARD_REQUEST_TIMEOUT_MS')
+    })
+
+    it('should abort the stalled body read instead of hanging past the timeout', () => {
+      expect(caughtError).toMatchObject({ message: 'The operation was aborted' })
+    })
+
+    it('should not classify the abort as a definitive non-issuance, since the reward may exist', () => {
+      expect(isDefinitiveNonIssuance(caughtError)).toBe(false)
+    })
+
+    it('should expose the configured bound so a caller can size its claim lease against it', () => {
+      expect(stallingComponent.requestTimeoutMs).toBe(10)
+    })
+  })
+
+  describe('when no reward request timeout is configured', () => {
+    let defaultComponent: IRewardComponent
+
+    beforeEach(async () => {
+      mockConfig.requireString.mockResolvedValue(mockRewardTestData.rewardUrl)
+      mockConfig.getNumber.mockResolvedValue(undefined)
+
+      defaultComponent = await createRewardComponent({
+        fetcher: mockFetcher,
+        config: mockConfig,
+        logs: createLogsMockedComponent({ warn: jest.fn() })
+      })
+    })
+
+    it('should still expose a bound, so a caller can never size a claim lease against an unbounded call', () => {
+      expect(defaultComponent.requestTimeoutMs).toBe(30_000)
     })
   })
 

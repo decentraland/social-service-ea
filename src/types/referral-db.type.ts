@@ -72,10 +72,18 @@ export interface IReferralDatabaseComponent {
    * grant is neither closed as granted nor left claimable. A human or reconciliation job must
    * check with the reward provider and then either close it as granted or return it to pending.
    *
-   * @param claimToken The token returned by the claim that ended ambiguously; fences out a stale worker.
-   * @returns The number of rows parked (0 when the claim is no longer this caller's).
+   * @param claimToken The token returned by the claim that ended ambiguously; fences out a stale
+   * worker. Pass null to park whichever claim currently holds the row — only valid when this
+   * caller's own token is already superseded but a reward is known to have been issued.
+   * @returns The number of rows parked (0 when the claim is no longer this caller's, or, for an
+   * unfenced park, when the row is no longer pending).
    */
-  markTierRewardNeedsManualReview(referrer: string, tier: number, claimToken: string, error: string): Promise<number>
+  markTierRewardNeedsManualReview(
+    referrer: string,
+    tier: number,
+    claimToken: string | null,
+    error: string
+  ): Promise<number>
 }
 
 export enum ReferralProgressStatus {

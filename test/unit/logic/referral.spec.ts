@@ -21,6 +21,7 @@ import { RewardIssuanceError, RewardRequestFailedError } from '../../../src/adap
 const MAX_IP_MATCHES = 2
 const REWARD_MAX_ATTEMPTS = 5
 const REWARD_CLAIM_LEASE_MS = 5 * 60 * 1000
+const REWARD_REQUEST_TIMEOUT_MS = 30 * 1000
 // The fencing token a winning claim hands back; every call that closes or parks that claim
 // must carry it, or the database matches no row.
 const CLAIM_TOKEN = '11111111-1111-4111-8111-111111111111'
@@ -103,7 +104,8 @@ describe('referral-component', () => {
     }
 
     mockRewards = {
-      sendReward: jest.fn().mockResolvedValue([{ image: 'test-image.png', rarity: 'common' }])
+      sendReward: jest.fn().mockResolvedValue([{ image: 'test-image.png', rarity: 'common' }]),
+      requestTimeoutMs: REWARD_REQUEST_TIMEOUT_MS
     }
 
     mockEmail = {
@@ -133,6 +135,31 @@ describe('referral-component', () => {
 
   afterEach(() => {
     jest.resetAllMocks()
+  })
+
+  describe('when starting up with a claim lease no longer than the reward request timeout', () => {
+    let thrown: unknown
+
+    beforeEach(async () => {
+      mockRewards.requestTimeoutMs = REWARD_CLAIM_LEASE_MS
+
+      thrown = await createReferralComponent({
+        referralDb: mockReferralDb,
+        logs: { getLogger: () => mockLogger },
+        sns: mockSns,
+        config: mockConfig,
+        rewards: mockRewards,
+        email: mockEmail,
+        slack: mockSlack,
+        redis: mockRedis
+      }).catch((error) => error)
+    })
+
+    it('should refuse to start rather than let a lease expire while an issuance is in flight', () => {
+      expect(thrown).toMatchObject({
+        message: `REFERRAL_REWARD_CLAIM_LEASE_MS (${REWARD_CLAIM_LEASE_MS}ms) must be at least ${REWARD_CLAIM_LEASE_MS * 2}ms, 2x the reward request timeout of ${REWARD_CLAIM_LEASE_MS}ms`
+      })
+    })
   })
 
   describe('when creating a referral', () => {
@@ -1427,8 +1454,52 @@ describe('referral-component', () => {
         )
       })
 
-      it('should leave the newer claim untouched rather than park it', () => {
-        expect(mockReferralDb.markTierRewardNeedsManualReview).not.toHaveBeenCalled()
+      it('should park the row so a reward known to exist cannot stay retryable behind the newer claim', () => {
+        expect(mockReferralDb.markTierRewardNeedsManualReview).toHaveBeenCalledWith(
+          validReferrer.toLowerCase(),
+          5,
+          null,
+          'issued by a worker whose claim was superseded'
+        )
+      })
+
+      it('should not fence that park on its own superseded token, or it would match nothing', () => {
+        expect(mockReferralDb.markTierRewardNeedsManualReview).not.toHaveBeenCalledWith(
+          validReferrer.toLowerCase(),
+          5,
+          CLAIM_TOKEN,
+          expect.anything()
+        )
+      })
+    })
+
+    describe('when a superseded worker parks a row another worker already closed', () => {
+      let signedUpProgress: { referrer: string; invited_user: string; status: ReferralProgressStatus }
+
+      beforeEach(async () => {
+        signedUpProgress = {
+          referrer: validReferrer,
+          invited_user: validInvitedUser,
+          status: ReferralProgressStatus.SIGNED_UP
+        }
+        mockReferralDb.findReferralProgress.mockResolvedValueOnce([signedUpProgress])
+        mockReferralDb.updateReferralProgress.mockResolvedValueOnce(1)
+        mockReferralDb.countAcceptedInvitesByReferrer.mockResolvedValueOnce(5)
+        mockRedis.get.mockResolvedValueOnce(['2024-01-01', '2024-01-02', '2024-01-03'])
+        mockReferralDb.claimTierReward.mockResolvedValueOnce({ id: 'grant-id', attempts: 1, claim_token: CLAIM_TOKEN })
+        mockRewards.sendReward.mockResolvedValueOnce([{ image: 'reward5.png', rarity: null }])
+        mockReferralDb.markTierRewardGranted.mockResolvedValueOnce(0)
+        // The newer worker already reached a terminal state, so the unfenced park matches nothing.
+        mockReferralDb.markTierRewardNeedsManualReview.mockResolvedValueOnce(0)
+
+        await referralComponent.finalizeReferral(validInvitedUser)
+      })
+
+      it('should not raise a lost-claim alert, since an unfenced park matching nothing is expected', () => {
+        expect(mockLogger.error).not.toHaveBeenCalledWith(
+          'MANUAL REVIEW REQUIRED: could not park a tier reward grant because the claim is no longer ours',
+          expect.anything()
+        )
       })
     })
 
