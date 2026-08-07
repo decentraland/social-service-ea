@@ -168,24 +168,30 @@ export function createFriendsDBComponent(components: Pick<AppComponents, 'pg' | 
       const normalizedUserAddress = normalizeAddress(userAddress)
       const normalizedOnlinePotentialFriends = onlinePotentialFriends.map(normalizeAddress)
 
+      // The block check has to be correlated with each resolved friend address. Comparing it
+      // against the whole candidate array makes the subquery a constant for the entire query,
+      // so a single block anywhere in the list empties the result.
       const query: SQLStatement = SQL`
-        SELECT DISTINCT
-          CASE
-            WHEN address_requester = ${normalizedUserAddress} THEN address_requested
-            ELSE address_requester
-          END as address
-        FROM friendships
-        WHERE (
-          (address_requester = ${normalizedUserAddress} AND address_requested = ANY(${normalizedOnlinePotentialFriends}))
-          OR
-          (address_requested = ${normalizedUserAddress} AND address_requester = ANY(${normalizedOnlinePotentialFriends}))
+        WITH online_friends AS (
+          SELECT DISTINCT
+            CASE
+              WHEN address_requester = ${normalizedUserAddress} THEN address_requested
+              ELSE address_requester
+            END as address
+          FROM friendships
+          WHERE (
+            (address_requester = ${normalizedUserAddress} AND address_requested = ANY(${normalizedOnlinePotentialFriends}))
+            OR
+            (address_requested = ${normalizedUserAddress} AND address_requester = ANY(${normalizedOnlinePotentialFriends}))
+          )
+          AND is_active = true
         )
-        AND NOT EXISTS (
+        SELECT address FROM online_friends
+        WHERE NOT EXISTS (
           SELECT 1 FROM blocks
-          WHERE (blocker_address = ${normalizedUserAddress} AND blocked_address = ANY(${normalizedOnlinePotentialFriends}))
-          OR (blocker_address = ANY(${normalizedOnlinePotentialFriends}) AND blocked_address = ${normalizedUserAddress})
-        )
-        AND is_active = true`
+          WHERE (blocker_address = ${normalizedUserAddress} AND blocked_address = online_friends.address)
+          OR (blocker_address = online_friends.address AND blocked_address = ${normalizedUserAddress})
+        )`
 
       const results = await pg.query<User>(query)
       return results.rows
