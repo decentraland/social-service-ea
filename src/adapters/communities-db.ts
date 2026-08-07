@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings'
 import { AppComponents, ICommunitiesDatabaseComponent, CommunityRole, Pagination } from '../types'
-import { canActOnMember } from '../types/entities'
+import { canActOnMember, canBanMember, canUpdateMemberRole } from '../types/entities'
 import {
   Community,
   CommunityDB,
@@ -79,25 +79,26 @@ export function createCommunitiesDBComponent(
   }
 
   /**
-   * Revalidates, under the locks this transaction already holds, that the actor may still act
-   * on the target. The service layer checks this before the transaction starts; by the time the
-   * locks are acquired the actor may have been demoted or the target promoted.
+   * Revalidates, under the locks this transaction already holds, that the actor may still act on
+   * the target. The service layer checks this before the transaction starts; by the time the locks
+   * are acquired the actor may have been demoted or the target's role may have changed.
+   *
+   * `isAllowed` is the same predicate the service layer used, so the two cannot drift apart.
    */
-  async function assertActorCanActOnMember(
+  async function assertActorStillAllowed(
     client: PoolClient,
     communityId: string,
     actingAddress: string,
-    targetAddress: string
+    targetAddress: string,
+    isAllowed: (actorRole: CommunityRole, targetRole: CommunityRole) => boolean
   ): Promise<void> {
     const result = await client.query<{ member_address: string; role: CommunityRole }>(
       SQL`SELECT member_address, role FROM community_members
           WHERE community_id = ${communityId} AND member_address = ANY(${[actingAddress, targetAddress]})`
     )
-    const roles = new Map(result.rows.map((row) => [row.member_address, row.role]))
+    const roles = new Map(result.rows.map((row) => [normalizeAddress(row.member_address), row.role]))
 
-    if (
-      !canActOnMember(roles.get(actingAddress) ?? CommunityRole.None, roles.get(targetAddress) ?? CommunityRole.None)
-    ) {
+    if (!isAllowed(roles.get(actingAddress) ?? CommunityRole.None, roles.get(targetAddress) ?? CommunityRole.None)) {
       throw new NotAuthorizedError(
         `The user ${actingAddress} can no longer act on ${targetAddress} in community ${communityId}`
       )
@@ -681,7 +682,13 @@ export function createCommunitiesDBComponent(
         const currentOwnerAddress = await lockActiveCommunityOwner(client, communityId)
         // Leaving is self-service; only acting on someone else needs the hierarchy revalidated.
         if (normalizedActingAddress !== normalizedMemberAddress) {
-          await assertActorCanActOnMember(client, communityId, normalizedActingAddress, normalizedMemberAddress)
+          await assertActorStillAllowed(
+            client,
+            communityId,
+            normalizedActingAddress,
+            normalizedMemberAddress,
+            canActOnMember
+          )
         }
         if (currentOwnerAddress === normalizedMemberAddress) {
           throw new NotAuthorizedError(`The owner cannot leave the community ${communityId}`)
@@ -721,9 +728,11 @@ export function createCommunitiesDBComponent(
         // Bucket before the communities row: see lockCommunityMemberBuckets.
         await lockCommunityMemberBuckets(client, communityId, [normalizedBannedBy, normalizedAddressToBan])
         const currentOwnerAddress = await lockActiveCommunityOwner(client, communityId)
-        await assertActorCanActOnMember(client, communityId, normalizedBannedBy, normalizedAddressToBan)
+        // canBanMember, not canActOnMember: banning a non-member is allowed, so a target who is
+        // not (or is no longer) a member must not escape the ban.
+        await assertActorStillAllowed(client, communityId, normalizedBannedBy, normalizedAddressToBan, canBanMember)
         if (currentOwnerAddress === normalizedAddressToBan) {
-          throw new NotAuthorizedError(`The owner cannot leave the community ${communityId}`)
+          throw new NotAuthorizedError(`The owner of community ${communityId} cannot be banned`)
         }
 
         const banQuery = SQL`INSERT INTO community_bans (community_id, banned_address, banned_by, active)
@@ -747,14 +756,23 @@ export function createCommunitiesDBComponent(
       unbannedBy: EthAddress,
       unbannedMemberAddress: EthAddress
     ): Promise<void> {
-      const query = SQL`
-        UPDATE community_bans 
-        SET active = false, unbanned_by = ${normalizeAddress(unbannedBy)}, unbanned_at = now()
-        WHERE community_id = ${communityId} 
-          AND banned_address = ${normalizeAddress(unbannedMemberAddress)}
-          AND active = true
-      `
-      await pg.query(query)
+      const normalizedUnbannedBy = normalizeAddress(unbannedBy)
+      const normalizedMemberAddress = normalizeAddress(unbannedMemberAddress)
+
+      await pg.withTransaction(async (client) => {
+        // Same buckets the ban takes, so the two cannot interleave and undo each other. No
+        // communities row lock: the unban neither reads nor changes the owner.
+        await lockCommunityMemberBuckets(client, communityId, [normalizedUnbannedBy, normalizedMemberAddress])
+        await assertActorStillAllowed(client, communityId, normalizedUnbannedBy, normalizedMemberAddress, canBanMember)
+
+        await client.query(SQL`
+          UPDATE community_bans
+          SET active = false, unbanned_by = ${normalizedUnbannedBy}, unbanned_at = now()
+          WHERE community_id = ${communityId}
+            AND banned_address = ${normalizedMemberAddress}
+            AND active = true
+        `)
+      })
     },
 
     async isMemberBanned(communityId: string, memberAddress: EthAddress): Promise<boolean> {
@@ -826,7 +844,15 @@ export function createCommunitiesDBComponent(
         // Bucket before the communities row: see lockCommunityMemberBuckets.
         await lockCommunityMemberBuckets(client, communityId, [normalizedActingAddress, normalizedMemberAddress])
         const currentOwnerAddress = await lockActiveCommunityOwner(client, communityId)
-        await assertActorCanActOnMember(client, communityId, normalizedActingAddress, normalizedMemberAddress)
+        // The full rule, not just the hierarchy: a demoted owner keeps canActOnMember over members
+        // but loses assign_roles.
+        await assertActorStillAllowed(
+          client,
+          communityId,
+          normalizedActingAddress,
+          normalizedMemberAddress,
+          (actorRole, targetRole) => canUpdateMemberRole(actorRole, targetRole, newRole)
+        )
         if (currentOwnerAddress === normalizedMemberAddress) {
           throw new NotAuthorizedError(`The owner role cannot be changed in community ${communityId}`)
         }

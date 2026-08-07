@@ -1,66 +1,31 @@
 import { NotAuthorizedError } from '@dcl/http-commons'
-import { CommunityRole, CommunityPermission, canActOnMember } from '../../types/entities'
+import {
+  CommunityRole,
+  CommunityPermission,
+  canActOnMember,
+  canBanMember,
+  canUpdateMemberRole,
+  hasPermission,
+  isMember
+} from '../../types/entities'
 import { AppComponents } from '../../types/system'
 import { ICommunityRolesComponent, CommunityPost } from './types'
 import { normalizeAddress } from '../../utils/address'
 
-export const OWNER_PERMISSIONS: CommunityPermission[] = [
-  'edit_info',
-  'edit_name',
-  'add_places',
-  'remove_places',
-  'accept_requests',
-  'reject_requests',
-  'view_requests',
-  'ban_players',
-  'send_invitations',
-  'edit_settings',
-  'delete_community',
-  'assign_roles',
-  'invite_users',
-  'create_posts',
-  'delete_posts'
-]
-
-export const MODERATOR_PERMISSIONS: CommunityPermission[] = [
-  'edit_info',
-  'add_places',
-  'remove_places',
-  'accept_requests',
-  'reject_requests',
-  'view_requests',
-  'ban_players',
-  'send_invitations',
-  'invite_users',
-  'create_posts',
-  'delete_posts'
-]
-
-export const COMMUNITY_ROLES: Record<CommunityRole, CommunityPermission[]> = {
-  [CommunityRole.Owner]: OWNER_PERMISSIONS,
-  [CommunityRole.Moderator]: MODERATOR_PERMISSIONS,
-  [CommunityRole.Member]: [],
-  [CommunityRole.None]: []
-}
-
-export { ROLE_ACTION_TRANSITIONS, canActOnMember } from '../../types/entities'
+export {
+  ROLE_ACTION_TRANSITIONS,
+  OWNER_PERMISSIONS,
+  MODERATOR_PERMISSIONS,
+  COMMUNITY_ROLES,
+  canActOnMember,
+  canBanMember,
+  canUpdateMemberRole
+} from '../../types/entities'
 
 export function createCommunityRolesComponent(
   components: Pick<AppComponents, 'communitiesDb' | 'logs'>
 ): ICommunityRolesComponent {
   const { communitiesDb } = components
-
-  const getRolePermissions = (role: CommunityRole): CommunityPermission[] => {
-    return COMMUNITY_ROLES[role] ?? []
-  }
-
-  const hasPermission = (role: CommunityRole, permission: CommunityPermission): boolean => {
-    return getRolePermissions(role)?.includes(permission) ?? false
-  }
-
-  const isMember = (role: CommunityRole): boolean => {
-    return !!role && role !== CommunityRole.None
-  }
 
   const validatePermission = (permission: CommunityPermission, action: string) =>
     validatePermissions([permission], action)
@@ -122,10 +87,7 @@ export function createCommunityRolesComponent(
       const bannerRole = roles[normalizeAddress(bannerAddress)]
       const targetRole = roles[normalizeAddress(targetAddress)]
 
-      if (
-        !hasPermission(bannerRole, 'ban_players') ||
-        (!canActOnMember(bannerRole, targetRole) && isMember(targetRole))
-      ) {
+      if (!canBanMember(bannerRole, targetRole)) {
         throw new NotAuthorizedError(
           `The user ${bannerAddress} doesn't have permission to ban ${targetAddress} from community ${communityId}`
         )
@@ -141,10 +103,8 @@ export function createCommunityRolesComponent(
       const unbannerRole = roles[normalizeAddress(unbannerAddress)]
       const targetRole = roles[normalizeAddress(targetAddress)]
 
-      if (
-        !hasPermission(unbannerRole, 'ban_players') ||
-        (!canActOnMember(unbannerRole, targetRole) && isMember(targetRole))
-      ) {
+      // Unban shares the ban rule: see canBanMember.
+      if (!canBanMember(unbannerRole, targetRole)) {
         throw new NotAuthorizedError(
           `The user ${unbannerAddress} doesn't have permission to unban ${targetAddress} from community ${communityId}`
         )
@@ -167,11 +127,7 @@ export function createCommunityRolesComponent(
       const updaterRole = roles[normalizeAddress(updaterAddress)]
       const targetRole = roles[normalizeAddress(targetAddress)]
 
-      if (
-        !hasPermission(updaterRole, 'assign_roles') ||
-        !canActOnMember(updaterRole, targetRole) ||
-        newRole === CommunityRole.Owner
-      ) {
+      if (!canUpdateMemberRole(updaterRole, targetRole, newRole)) {
         throw new NotAuthorizedError(
           `The user ${updaterAddress} doesn't have permission to assign roles in community ${communityId}`
         )

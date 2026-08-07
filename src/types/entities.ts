@@ -113,9 +113,89 @@ export const ROLE_ACTION_TRANSITIONS: Record<CommunityRole, CommunityRole[]> = {
   [CommunityRole.None]: [] // N/A
 }
 
+export const OWNER_PERMISSIONS: CommunityPermission[] = [
+  'edit_info',
+  'edit_name',
+  'add_places',
+  'remove_places',
+  'accept_requests',
+  'reject_requests',
+  'view_requests',
+  'ban_players',
+  'send_invitations',
+  'edit_settings',
+  'delete_community',
+  'assign_roles',
+  'invite_users',
+  'create_posts',
+  'delete_posts'
+]
+
+export const MODERATOR_PERMISSIONS: CommunityPermission[] = [
+  'edit_info',
+  'add_places',
+  'remove_places',
+  'accept_requests',
+  'reject_requests',
+  'view_requests',
+  'ban_players',
+  'send_invitations',
+  'invite_users',
+  'create_posts',
+  'delete_posts'
+]
+
+export const COMMUNITY_ROLES: Record<CommunityRole, CommunityPermission[]> = {
+  [CommunityRole.Owner]: OWNER_PERMISSIONS,
+  [CommunityRole.Moderator]: MODERATOR_PERMISSIONS,
+  [CommunityRole.Member]: [],
+  [CommunityRole.None]: []
+}
+
+export function getRolePermissions(role: CommunityRole): CommunityPermission[] {
+  return COMMUNITY_ROLES[role] ?? []
+}
+
+export function hasPermission(role: CommunityRole, permission: CommunityPermission): boolean {
+  return getRolePermissions(role).includes(permission)
+}
+
+export function isMember(role: CommunityRole): boolean {
+  return !!role && role !== CommunityRole.None
+}
+
 /** Whether `actorRole` outranks `targetRole` enough to act on it. */
 export function canActOnMember(actorRole: CommunityRole, targetRole: CommunityRole): boolean {
   return ROLE_ACTION_TRANSITIONS[targetRole]?.includes(actorRole) ?? false
+}
+
+/**
+ * Whether `actorRole` may ban or unban `targetRole`. Both share one rule: the actor always needs
+ * `ban_players`, while the hierarchy only applies while the target is still a member, so
+ * non-members and users who left mid-flight remain bannable.
+ *
+ * Shared by the service-layer validation and the revalidation the database component runs under
+ * its locks, so the two cannot drift apart.
+ */
+export function canBanMember(actorRole: CommunityRole, targetRole: CommunityRole): boolean {
+  return hasPermission(actorRole, 'ban_players') && (canActOnMember(actorRole, targetRole) || !isMember(targetRole))
+}
+
+/**
+ * Whether `actorRole` may move `targetRole` to `newRole`. Ownership is tracked on the community
+ * row, so it is never assignable through a role update.
+ *
+ * Shared by the service-layer validation and the revalidation the database component runs under
+ * its locks, so the two cannot drift apart.
+ */
+export function canUpdateMemberRole(
+  actorRole: CommunityRole,
+  targetRole: CommunityRole,
+  newRole: CommunityRole
+): boolean {
+  return (
+    hasPermission(actorRole, 'assign_roles') && canActOnMember(actorRole, targetRole) && newRole !== CommunityRole.Owner
+  )
 }
 
 export type OwnedName = {
