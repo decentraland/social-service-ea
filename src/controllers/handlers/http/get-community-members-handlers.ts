@@ -4,6 +4,7 @@ import { CommunityMemberProfile, CommunityNotFoundError, GetCommunityMembersOpti
 import { getPaginationParams, NotAuthorizedError } from '@dcl/http-commons'
 import { getPaginationResultProperties } from '../../../utils/pagination'
 import { PaginatedResponse } from '@dcl/schemas'
+import { matchesBearerToken } from '../../../utils/bearer-token'
 
 export async function getCommunityMembersHandler(
   context: Pick<
@@ -34,7 +35,7 @@ export async function getCommunityMembersHandler(
     const { members, totalMembers } = await communityMembers.getCommunityMembers(communityId, {
       ...options,
       as: userAddress,
-      byPassPrivacy: !!(API_ADMIN_TOKEN && optionalAuthHeader === `Bearer ${API_ADMIN_TOKEN}`)
+      byPassPrivacy: matchesBearerToken(optionalAuthHeader, API_ADMIN_TOKEN)
     })
 
     return {
