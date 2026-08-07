@@ -521,6 +521,10 @@ describe('ws-handler', () => {
       expect(metadataValidator({ signer: 'decentraland-kernel-scene' })).toBe(false)
     })
 
+    it('should reject the scene signer whatever casing it arrives in', () => {
+      expect(metadataValidator({ signer: 'Decentraland-Kernel-Scene' })).toBe(false)
+    })
+
     it('should accept the empty metadata the explorer client sends on this socket', () => {
       expect(metadataValidator({})).toBe(true)
     })
