@@ -247,6 +247,9 @@ test('Update Member Role Controller', function ({ components, spyComponents }) {
               memberAddress: updaterAddress,
               role: CommunityRole.Owner
             })
+            // The community row is the authority on ownership, so it has to name the updater too;
+            // an Owner membership row on its own is a state that cannot occur.
+            await components.communitiesDbHelper.forceCommunityOwner(communityId, updaterAddress)
             // Ensure target has NAME by mocking catalyst owned names
             spyComponents.catalystClient.getOwnedNames.mockResolvedValue([
               { id: '1', name: 'test-name', contractAddress: '0x123', tokenId: '1' }

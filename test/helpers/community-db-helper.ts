@@ -29,6 +29,15 @@ export function createDbHelper(pg: IPgComponent): ICommunitiesDbHelperComponent 
       await pg.query(query)
     },
 
+    async forceCommunityOwner(communityId: string, ownerAddress: string): Promise<void> {
+      const query = SQL`
+            UPDATE communities
+            SET owner_address = ${normalizeAddress(ownerAddress)}
+            WHERE id = ${communityId}
+        `
+      await pg.query(query)
+    },
+
     async forceCommunityRequestRemoval(requestId: string): Promise<void> {
       const query = SQL`
             DELETE FROM community_requests
