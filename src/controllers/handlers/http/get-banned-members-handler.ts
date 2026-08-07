@@ -1,4 +1,4 @@
-import { getPaginationParams, NotAuthorizedError } from '@dcl/http-commons'
+import { getPaginationParams, NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
@@ -40,7 +40,11 @@ export async function getBannedMembersHandler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting banned members: ${communityId}, error: ${message}`)
 
-    if (error instanceof CommunityNotFoundError || error instanceof NotAuthorizedError) {
+    if (
+      error instanceof CommunityNotFoundError ||
+      error instanceof NotAuthorizedError ||
+      error instanceof InvalidRequestError
+    ) {
       throw error
     }
 

@@ -1,7 +1,7 @@
 import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types/http'
 import { errorMessageOrDefault } from '../../../utils/errors'
-import { NotAuthorizedError } from '@dcl/http-commons'
+import { NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { CommunityPostNotFoundError } from '../../../logic/community'
 
 export async function deleteCommunityPostHandler(
@@ -30,7 +30,11 @@ export async function deleteCommunityPostHandler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error deleting post: ${params.postId} in community: ${params.id}, error: ${message}`)
 
-    if (error instanceof CommunityPostNotFoundError || error instanceof NotAuthorizedError) {
+    if (
+      error instanceof CommunityPostNotFoundError ||
+      error instanceof NotAuthorizedError ||
+      error instanceof InvalidRequestError
+    ) {
       throw error
     }
 

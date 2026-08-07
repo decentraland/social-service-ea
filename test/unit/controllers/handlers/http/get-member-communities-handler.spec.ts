@@ -1,6 +1,7 @@
 import { getMemberCommunitiesHandler } from '../../../../../src/controllers/handlers/http/get-member-communities-handlers'
 import { createLogsMockedComponent } from '../../../../mocks/components'
 import { createMockCommunitiesComponent } from '../../../../mocks/communities'
+import { InvalidRequestError } from '@dcl/http-commons'
 import { CommunityRole } from '../../../../../src/types'
 import { ICommunitiesComponent, MemberCommunity } from '../../../../../src/logic/community'
 
@@ -79,6 +80,19 @@ describe('getMemberCommunitiesHandler', () => {
         pagination: { limit: 10, offset: 0 },
         onlyPublicVisible: true
       })
+    })
+  })
+
+  describe('when fetching the communities fails because the request carried a malformed identifier', () => {
+    let thrown: unknown
+
+    beforeEach(async () => {
+      mockCommunities.getMemberCommunities.mockRejectedValue(new InvalidRequestError('Invalid identifier'))
+      thrown = await makeRequest({ auth: memberAddress, authMetadata: {} }).catch((error: unknown) => error)
+    })
+
+    it('should propagate the error so the shared handler answers a 400 instead of a 500', () => {
+      expect(thrown).toBeInstanceOf(InvalidRequestError)
     })
   })
 

@@ -1,4 +1,4 @@
-import { getPaginationParams } from '@dcl/http-commons'
+import { getPaginationParams, InvalidRequestError } from '@dcl/http-commons'
 import { CommunityRole, HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { MemberCommunity } from '../../../logic/community'
 import { PaginatedResponse } from '@dcl/schemas'
@@ -37,6 +37,10 @@ export async function getManagedCommunitiesHandler(
     }
   } catch (error) {
     const message = errorMessageOrDefault(error)
+    if (error instanceof InvalidRequestError) {
+      throw error
+    }
+
     return {
       status: 500,
       body: {
