@@ -171,10 +171,33 @@ export interface ICommunitiesDatabaseComponent {
   isMemberOfCommunity(communityId: string, userAddress: EthAddress): Promise<boolean>
   getCommunityMemberRole(id: string, userAddress: EthAddress): Promise<CommunityRole>
   getCommunityMemberRoles(id: string, userAddresses: EthAddress[]): Promise<Record<string, CommunityRole>>
-  updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void>
-  transferCommunityOwnership(communityId: string, newOwnerAddress: EthAddress): Promise<void>
+  updateMemberRole(
+    communityId: string,
+    memberAddress: EthAddress,
+    newRole: CommunityRole,
+    actingAddress: EthAddress
+  ): Promise<void>
+  /**
+   * Atomically transfers ownership after revalidating the acting owner and target membership.
+   *
+   * @param communityId - Community whose ownership is being transferred.
+   * @param currentOwnerAddress - Authenticated owner authorizing the transfer.
+   * @param newOwnerAddress - Existing member who will become the owner.
+   * @throws {CommunityNotFoundError} If the active community no longer exists.
+   * @throws {NotAuthorizedError} If ownership or membership changed before the transaction acquired its locks.
+   */
+  transferCommunityOwnership(
+    communityId: string,
+    currentOwnerAddress: EthAddress,
+    newOwnerAddress: EthAddress
+  ): Promise<void>
+  banMemberAndRemoveRequests(
+    communityId: string,
+    bannedBy: EthAddress,
+    bannedMemberAddress: EthAddress
+  ): Promise<{ wasMember: boolean }>
   addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void>
-  kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void>
+  kickMemberFromCommunity(communityId: string, memberAddress: EthAddress, actingAddress: EthAddress): Promise<void>
   getCommunityMembers(
     id: string,
     options: {
@@ -438,6 +461,8 @@ export interface IPgComponent extends IBasePgComponent {
 export interface ICommunitiesDbHelperComponent {
   forceCommunityRemoval: (communityId: string) => Promise<void>
   forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
+  forceCommunityBanRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
+  forceCommunityOwner: (communityId: string, ownerAddress: string) => Promise<void>
   forceCommunityRequestRemoval: (requestId: string) => Promise<void>
   updateCommunityRequestStatus: (requestId: string, status: string) => Promise<void>
 }

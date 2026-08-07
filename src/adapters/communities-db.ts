@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings'
 import { AppComponents, ICommunitiesDatabaseComponent, CommunityRole, Pagination } from '../types'
+import { canActOnMember, canBanMember, canUpdateMemberRole } from '../types/entities'
 import {
   Community,
   CommunityDB,
@@ -22,7 +23,8 @@ import {
   CommunityVisibilityEnum,
   CommunityRankingMetrics,
   CommunityRankingMetricsDB,
-  CommunityNotFoundError
+  CommunityNotFoundError,
+  CommunityMemberBannedError
 } from '../logic/community'
 
 import { normalizeAddress } from '../utils/address'
@@ -40,11 +42,83 @@ import {
   CTE
 } from '../logic/queries'
 import { EthAddress } from '@dcl/schemas'
+import { NotAuthorizedError } from '@dcl/http-commons'
+import { PoolClient } from 'pg'
 
 export function createCommunitiesDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs'>
 ): ICommunitiesDatabaseComponent {
   const { pg } = components
+
+  // Global lock order: every transaction takes its (community, member) advisory buckets in sorted
+  // address order first, and only then any lock on the communities row.
+  async function lockCommunityMemberBuckets(
+    client: PoolClient,
+    communityId: string,
+    memberAddresses: string[]
+  ): Promise<void> {
+    for (const memberAddress of Array.from(new Set(memberAddresses)).sort()) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [communityId, memberAddress])
+    }
+  }
+
+  /**
+   * Locks an active community row for callers that are a no-op when it is absent.
+   *
+   * FOR NO KEY UPDATE, not FOR UPDATE: it still excludes the ban and kick paths, but does not
+   * block the FK's FOR KEY SHARE, which a concurrent member insert takes while already holding
+   * a tuple this transaction goes on to touch.
+   *
+   * @returns Whether an active community row was found and locked.
+   */
+  async function lockActiveCommunityRow(client: PoolClient, communityId: string): Promise<boolean> {
+    const result = await client.query(
+      SQL`SELECT 1 FROM communities WHERE id = ${communityId} AND active = true FOR NO KEY UPDATE`
+    )
+    return (result.rowCount ?? 0) > 0
+  }
+
+  /**
+   * Revalidates, under the locks this transaction already holds, that the actor may still act on
+   * the target. The service layer checks this before the transaction starts; by the time the locks
+   * are acquired the actor may have been demoted or the target's role may have changed.
+   *
+   * `isAllowed` is the same predicate the service layer used, so the two cannot drift apart.
+   */
+  async function assertActorStillAllowed(
+    client: PoolClient,
+    communityId: string,
+    actingAddress: string,
+    targetAddress: string,
+    isAllowed: (actorRole: CommunityRole, targetRole: CommunityRole) => boolean
+  ): Promise<void> {
+    const result = await client.query<{ member_address: string; role: CommunityRole }>(
+      SQL`SELECT member_address, role FROM community_members
+          WHERE community_id = ${communityId} AND member_address = ANY(${[actingAddress, targetAddress]})`
+    )
+    const roles = new Map(result.rows.map((row) => [normalizeAddress(row.member_address), row.role]))
+
+    if (!isAllowed(roles.get(actingAddress) ?? CommunityRole.None, roles.get(targetAddress) ?? CommunityRole.None)) {
+      throw new NotAuthorizedError(
+        `The user ${actingAddress} can no longer act on ${targetAddress} in community ${communityId}`
+      )
+    }
+  }
+
+  async function lockActiveCommunityOwner(client: PoolClient, communityId: string): Promise<string> {
+    const result = await client.query<{ owner_address: string }>(SQL`
+      SELECT owner_address
+      FROM communities
+      WHERE id = ${communityId} AND active = true
+      FOR UPDATE
+    `)
+
+    if (!result.rows[0]) {
+      throw new CommunityNotFoundError(communityId)
+    }
+
+    return normalizeAddress(result.rows[0].owner_address)
+  }
 
   return {
     async communityExists(
@@ -594,6 +668,7 @@ export function createCommunitiesDBComponent(
     },
 
     async addCommunityMember(member: Omit<CommunityMember, 'joinedAt'>): Promise<void> {
+      // No bucket lock: its only caller creates the community, so nothing else can contend for it.
       const query = SQL`
         INSERT INTO community_members (community_id, member_address, role)
         VALUES (${member.communityId}, ${normalizeAddress(member.memberAddress)}, ${member.role})
@@ -601,13 +676,41 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
-    async kickMemberFromCommunity(communityId: string, memberAddress: EthAddress): Promise<void> {
-      const query = SQL`
-        DELETE FROM community_members WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
-      `
-      await pg.query(query)
+    async kickMemberFromCommunity(
+      communityId: string,
+      memberAddress: EthAddress,
+      actingAddress: EthAddress
+    ): Promise<void> {
+      const normalizedMemberAddress = normalizeAddress(memberAddress)
+      const normalizedActingAddress = normalizeAddress(actingAddress)
+
+      await pg.withTransaction(async (client) => {
+        // Bucket before the communities row: see lockCommunityMemberBuckets.
+        await lockCommunityMemberBuckets(client, communityId, [normalizedActingAddress, normalizedMemberAddress])
+        const currentOwnerAddress = await lockActiveCommunityOwner(client, communityId)
+        // Leaving is self-service; only acting on someone else needs the hierarchy revalidated.
+        if (normalizedActingAddress !== normalizedMemberAddress) {
+          await assertActorStillAllowed(
+            client,
+            communityId,
+            normalizedActingAddress,
+            normalizedMemberAddress,
+            canActOnMember
+          )
+        }
+        if (currentOwnerAddress === normalizedMemberAddress) {
+          throw new NotAuthorizedError(`The owner cannot leave the community ${communityId}`)
+        }
+
+        await client.query(SQL`
+          DELETE FROM community_members
+          WHERE community_id = ${communityId} AND member_address = ${normalizedMemberAddress}
+        `)
+      })
     },
 
+    // Seeding helper for integration tests. Production ban flows use banMemberAndRemoveRequests,
+    // which applies the locking and atomicity this one does not.
     async banMemberFromCommunity(
       communityId: string,
       bannedBy: EthAddress,
@@ -622,19 +725,62 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
+    async banMemberAndRemoveRequests(
+      communityId: string,
+      bannedBy: EthAddress,
+      bannedMemberAddress: EthAddress
+    ): Promise<{ wasMember: boolean }> {
+      const normalizedAddressToBan = normalizeAddress(bannedMemberAddress)
+      const normalizedBannedBy = normalizeAddress(bannedBy)
+      return pg.withTransaction(async (client) => {
+        // Bucket before the communities row: see lockCommunityMemberBuckets.
+        await lockCommunityMemberBuckets(client, communityId, [normalizedBannedBy, normalizedAddressToBan])
+        const currentOwnerAddress = await lockActiveCommunityOwner(client, communityId)
+        // canBanMember, not canActOnMember: banning a non-member is allowed, so a target who is
+        // not (or is no longer) a member must not escape the ban.
+        await assertActorStillAllowed(client, communityId, normalizedBannedBy, normalizedAddressToBan, canBanMember)
+        if (currentOwnerAddress === normalizedAddressToBan) {
+          throw new NotAuthorizedError(`The owner of community ${communityId} cannot be banned`)
+        }
+
+        const banQuery = SQL`INSERT INTO community_bans (community_id, banned_address, banned_by, active)
+          VALUES (${communityId}, ${normalizedAddressToBan}, ${normalizedBannedBy}, true)
+          ON CONFLICT (community_id, banned_address) DO UPDATE SET active = true`
+        await client.query(banQuery.text, banQuery.values)
+        const removedMember = await client.query(
+          'DELETE FROM community_members WHERE community_id = $1 AND member_address = $2 RETURNING member_address',
+          [communityId, normalizedAddressToBan]
+        )
+        await client.query('DELETE FROM community_requests WHERE community_id = $1 AND member_address = $2', [
+          communityId,
+          normalizedAddressToBan
+        ])
+        return { wasMember: (removedMember.rowCount ?? 0) > 0 }
+      })
+    },
+
     async unbanMemberFromCommunity(
       communityId: string,
       unbannedBy: EthAddress,
       unbannedMemberAddress: EthAddress
     ): Promise<void> {
-      const query = SQL`
-        UPDATE community_bans 
-        SET active = false, unbanned_by = ${normalizeAddress(unbannedBy)}, unbanned_at = now()
-        WHERE community_id = ${communityId} 
-          AND banned_address = ${normalizeAddress(unbannedMemberAddress)}
-          AND active = true
-      `
-      await pg.query(query)
+      const normalizedUnbannedBy = normalizeAddress(unbannedBy)
+      const normalizedMemberAddress = normalizeAddress(unbannedMemberAddress)
+
+      await pg.withTransaction(async (client) => {
+        // Same buckets the ban takes, so the two cannot interleave and undo each other. No
+        // communities row lock: the unban neither reads nor changes the owner.
+        await lockCommunityMemberBuckets(client, communityId, [normalizedUnbannedBy, normalizedMemberAddress])
+        await assertActorStillAllowed(client, communityId, normalizedUnbannedBy, normalizedMemberAddress, canBanMember)
+
+        await client.query(SQL`
+          UPDATE community_bans
+          SET active = false, unbanned_by = ${normalizedUnbannedBy}, unbanned_at = now()
+          WHERE community_id = ${communityId}
+            AND banned_address = ${normalizedMemberAddress}
+            AND active = true
+        `)
+      })
     },
 
     async isMemberBanned(communityId: string, memberAddress: EthAddress): Promise<boolean> {
@@ -693,50 +839,119 @@ export function createCommunitiesDBComponent(
       return pg.getCount(query)
     },
 
-    async updateMemberRole(communityId: string, memberAddress: EthAddress, newRole: CommunityRole): Promise<void> {
-      const query = SQL`
-        UPDATE community_members 
-        SET role = ${newRole}
-        WHERE community_id = ${communityId} AND member_address = ${normalizeAddress(memberAddress)}
-      `
-      await pg.query(query)
+    async updateMemberRole(
+      communityId: string,
+      memberAddress: EthAddress,
+      newRole: CommunityRole,
+      actingAddress: EthAddress
+    ): Promise<void> {
+      const normalizedMemberAddress = normalizeAddress(memberAddress)
+      const normalizedActingAddress = normalizeAddress(actingAddress)
+
+      await pg.withTransaction(async (client) => {
+        // Bucket before the communities row: see lockCommunityMemberBuckets.
+        await lockCommunityMemberBuckets(client, communityId, [normalizedActingAddress, normalizedMemberAddress])
+        const currentOwnerAddress = await lockActiveCommunityOwner(client, communityId)
+        // The full rule, not just the hierarchy: a demoted owner keeps canActOnMember over members
+        // but loses assign_roles.
+        await assertActorStillAllowed(
+          client,
+          communityId,
+          normalizedActingAddress,
+          normalizedMemberAddress,
+          (actorRole, targetRole) => canUpdateMemberRole(actorRole, targetRole, newRole)
+        )
+        if (currentOwnerAddress === normalizedMemberAddress) {
+          throw new NotAuthorizedError(`The owner role cannot be changed in community ${communityId}`)
+        }
+
+        await client.query(SQL`
+          UPDATE community_members
+          SET role = ${newRole}
+          WHERE community_id = ${communityId} AND member_address = ${normalizedMemberAddress}
+        `)
+      })
     },
 
-    async transferCommunityOwnership(communityId: string, newOwnerAddress: EthAddress): Promise<void> {
+    async transferCommunityOwnership(
+      communityId: string,
+      currentOwnerAddress: EthAddress,
+      newOwnerAddress: EthAddress
+    ): Promise<void> {
+      const normalizedCurrentOwner = normalizeAddress(currentOwnerAddress)
       const normalizedNewOwner = normalizeAddress(newOwnerAddress)
 
       await pg.withTransaction(async (client) => {
-        // Lock community row and fetch current owner
-        const lockResult = await client.query<{ owner_address: string }>(SQL`
-          SELECT owner_address
-          FROM communities
-          WHERE id = ${communityId}
-          FOR UPDATE
-        `)
-
-        if (!lockResult.rows[0]) {
-          throw new CommunityNotFoundError(communityId)
+        // Both buckets, sorted, before the communities row: see lockCommunityMemberBuckets.
+        await lockCommunityMemberBuckets(client, communityId, [normalizedCurrentOwner, normalizedNewOwner])
+        const lockedOwnerAddress = await lockActiveCommunityOwner(client, communityId)
+        if (lockedOwnerAddress !== normalizedCurrentOwner) {
+          throw new NotAuthorizedError(
+            `The user ${normalizedCurrentOwner} doesn't have permission to transfer ownership in community ${communityId}`
+          )
         }
 
-        const oldOwner = lockResult.rows[0].owner_address
+        const membersResult = await client.query<{ member_address: string; role: CommunityRole }>(SQL`
+          SELECT member_address, role
+          FROM community_members
+          WHERE community_id = ${communityId}
+            AND member_address IN (${normalizedCurrentOwner}, ${normalizedNewOwner})
+          ORDER BY member_address
+          FOR UPDATE
+        `)
+        const roles = new Map(
+          membersResult.rows.map(({ member_address, role }) => [normalizeAddress(member_address), role])
+        )
 
-        await client.query(SQL`
+        if (roles.get(normalizedCurrentOwner) !== CommunityRole.Owner) {
+          throw new NotAuthorizedError(
+            `The user ${normalizedCurrentOwner} doesn't have permission to transfer ownership in community ${communityId}`
+          )
+        }
+
+        const newOwnerRole = roles.get(normalizedNewOwner)
+        if (
+          newOwnerRole !== CommunityRole.Member &&
+          newOwnerRole !== CommunityRole.Moderator &&
+          newOwnerRole !== CommunityRole.Owner
+        ) {
+          throw new NotAuthorizedError(
+            `The target user ${normalizedNewOwner} is not a member of community ${communityId}`
+          )
+        }
+
+        const communityUpdate = await client.query(SQL`
           UPDATE communities
           SET owner_address = ${normalizedNewOwner}, updated_at = now() 
-          WHERE id = ${communityId}
+          WHERE id = ${communityId} AND owner_address = ${normalizedCurrentOwner} AND active = true
         `)
+        if (communityUpdate.rowCount !== 1) {
+          throw new NotAuthorizedError(
+            `The user ${normalizedCurrentOwner} doesn't have permission to transfer ownership in community ${communityId}`
+          )
+        }
 
-        await client.query(SQL`
+        const oldOwnerUpdate = await client.query(SQL`
           UPDATE community_members 
           SET role = ${CommunityRole.Moderator}
-          WHERE community_id = ${communityId} AND member_address = ${oldOwner}
+          WHERE community_id = ${communityId} AND member_address = ${normalizedCurrentOwner} AND role = ${CommunityRole.Owner}
         `)
+        if (oldOwnerUpdate.rowCount !== 1) {
+          throw new NotAuthorizedError(
+            `The user ${normalizedCurrentOwner} doesn't have permission to transfer ownership in community ${communityId}`
+          )
+        }
 
-        await client.query(SQL`
+        const newOwnerUpdate = await client.query(SQL`
           UPDATE community_members 
           SET role = ${CommunityRole.Owner}
           WHERE community_id = ${communityId} AND member_address = ${normalizedNewOwner}
         `)
+        if (newOwnerUpdate.rowCount !== 1) {
+          throw new NotAuthorizedError(
+            `The target user ${normalizedNewOwner} is not a member of community ${communityId}`
+          )
+        }
       })
     },
 
@@ -812,21 +1027,37 @@ export function createCommunitiesDBComponent(
       type: CommunityRequestType
     ): Promise<MemberRequest> {
       const id = randomUUID()
-      const query = SQL`
-        INSERT INTO community_requests (id, community_id, member_address, type, status)
-        VALUES (${id}, ${communityId}, ${normalizeAddress(memberAddress)}, ${type}, ${CommunityRequestStatus.Pending})
-        RETURNING id
-      `
+      const normalizedMemberAddress = normalizeAddress(memberAddress)
 
-      const result = await pg.query(query)
+      return pg.withTransaction(async (client) => {
+        // Same bucket the ban takes, so a request cannot be created for a member a concurrent
+        // ban is in the middle of removing. The ban deletes requests, so without this the
+        // insert could land just after that cleanup and leave a pending request for a banned user.
+        await lockCommunityMemberBuckets(client, communityId, [normalizedMemberAddress])
 
-      return {
-        id: result.rows[0].id,
-        communityId,
-        memberAddress,
-        type,
-        status: CommunityRequestStatus.Pending
-      }
+        const activeBan = await client.query(
+          'SELECT 1 FROM community_bans WHERE community_id = $1 AND banned_address = $2 AND active = true',
+          [communityId, normalizedMemberAddress]
+        )
+        if ((activeBan.rowCount ?? 0) > 0) {
+          throw new CommunityMemberBannedError(communityId, normalizedMemberAddress)
+        }
+
+        const query = SQL`
+          INSERT INTO community_requests (id, community_id, member_address, type, status)
+          VALUES (${id}, ${communityId}, ${normalizedMemberAddress}, ${type}, ${CommunityRequestStatus.Pending})
+          RETURNING id
+        `
+        const result = await client.query(query)
+
+        return {
+          id: result.rows[0].id,
+          communityId,
+          memberAddress,
+          type,
+          status: CommunityRequestStatus.Pending
+        }
+      })
     },
 
     async getMemberRequests(
@@ -957,6 +1188,13 @@ export function createCommunitiesDBComponent(
 
     async acceptAllRequestsToJoin(communityId: string): Promise<string[]> {
       return pg.withTransaction(async (client) => {
+        // Serializes against every ban, which locks the same row; the NOT EXISTS below would
+        // otherwise re-read per statement under READ COMMITTED. No bucket lock: the member set
+        // is unbounded and only known mid-transaction.
+        if (!(await lockActiveCommunityRow(client, communityId))) {
+          return []
+        }
+
         const addMembersQuery = SQL`
           INSERT INTO community_members (community_id, member_address, role)
           SELECT cr.community_id, cr.member_address, ${CommunityRole.Member}
@@ -999,6 +1237,16 @@ export function createCommunitiesDBComponent(
     async joinMemberAndRemoveRequests(member: Omit<CommunityMember, 'joinedAt'>): Promise<string | undefined> {
       const normalizedMemberAddress = normalizeAddress(member.memberAddress)
       return pg.withTransaction(async (client) => {
+        // Bucket first; the INSERT below reaches the communities row via the FK's implicit lock.
+        await lockCommunityMemberBuckets(client, member.communityId, [normalizedMemberAddress])
+        const activeBan = await client.query(
+          'SELECT 1 FROM community_bans WHERE community_id = $1 AND banned_address = $2 AND active = true',
+          [member.communityId, normalizedMemberAddress]
+        )
+        if ((activeBan.rowCount ?? 0) > 0) {
+          throw new CommunityMemberBannedError(member.communityId, normalizedMemberAddress)
+        }
+
         // Add member to community
         const addMemberQuery = SQL`
           INSERT INTO community_members (community_id, member_address, role)
