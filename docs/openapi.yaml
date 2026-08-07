@@ -255,6 +255,12 @@ paths:
             application/json:
               schema:
                 $ref: './schemas.yaml#/components/schemas/CreateCommunity201OkResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:

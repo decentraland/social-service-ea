@@ -10,8 +10,8 @@ import { AIComplianceError, CommunityNotCompliantError } from '../../src/logic/c
 export async function createLargeThumbnailBuffer(targetSize = 600 * 1024): Promise<Buffer> {
   // Produce a valid PNG larger than the 500KB thumbnail limit but under the 1MB request body
   // cap, so this exercises the thumbnail size validation specifically. We pad a small valid PNG
-  // up to the target size (file-type still detects PNG from the header); this is deterministic
-  // and fast, unlike generating a multi-megabyte random image.
+  // up to the target size (the signature check still identifies PNG from the leading bytes);
+  // this is deterministic and fast, unlike generating a multi-megabyte random image.
   const png = await new Jimp({ width: 16, height: 16 }).getBuffer('image/png')
   if (png.length >= targetSize) {
     return png

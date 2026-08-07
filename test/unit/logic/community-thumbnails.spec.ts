@@ -1,3 +1,4 @@
+import { UnsupportedThumbnailFormatError } from '../../../src/logic/community/errors'
 import { createCommunityThumbnailComponent } from '../../../src/logic/community/thumbnails'
 import { ICommunityThumbnailComponent } from '../../../src/logic/community/types'
 import { createS3ComponentMock } from '../../mocks/components/s3'
@@ -58,14 +59,22 @@ describe('when uploading a community thumbnail', () => {
   })
 
   describe('and the bytes announce nothing recognisable', () => {
-    // The validator rejects these before storage, so this only pins the
-    // behaviour if something ever reaches here another way.
+    // The validator rejects these before storage, so this pins the fail-closed
+    // invariant if something ever reaches here another way.
+    let thrown: unknown
+
     beforeEach(async () => {
-      await communityThumbnail.uploadThumbnail(COMMUNITY_ID, Buffer.alloc(2048, 0x61))
+      thrown = await communityThumbnail
+        .uploadThumbnail(COMMUNITY_ID, Buffer.alloc(2048, 0x61))
+        .catch((error) => error)
     })
 
-    it('should fall back to the type every thumbnail used to be stored as', () => {
-      expect(mockStorage.storeFile).toHaveBeenCalledWith(expect.any(Buffer), THUMBNAIL_KEY, 'image/png')
+    it('should reject the upload instead of storing it under a default type', () => {
+      expect(thrown).toBeInstanceOf(UnsupportedThumbnailFormatError)
+    })
+
+    it('should not store anything', () => {
+      expect(mockStorage.storeFile).not.toHaveBeenCalled()
     })
   })
 

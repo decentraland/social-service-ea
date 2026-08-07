@@ -273,6 +273,7 @@ export interface ICommunityThumbnailComponent {
   buildThumbnailUrl(communityId: string): string
   getThumbnail(communityId: string): Promise<string | undefined>
   getThumbnails(communityIds: string[]): Promise<Record<string, string | undefined>>
+  /** @throws {UnsupportedThumbnailFormatError} when the bytes carry no supported image signature */
   uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string>
 }
 
