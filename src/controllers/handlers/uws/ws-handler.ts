@@ -8,7 +8,7 @@ import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { isErrorWithMessage } from '../../../utils/errors'
-import { WsPoolFullError } from '../../../logic/ws-pool'
+import { WsAdmissionError } from '../../../logic/ws-pool'
 import { isSceneSigner } from '../../../utils/auth-metadata'
 
 const textDecoder = new TextDecoder()
@@ -29,7 +29,7 @@ export async function registerWsHandler(
   const { logs, uwsServer, metrics, fetcher, rpcServer, config, tracing, wsPool } = components
   const logger = logs.getLogger('ws-handler')
 
-  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_MS')) ?? 300000 // 5 minutes in ms
+  const authTimeoutInMs = (await config.getNumber('WS_AUTH_TIMEOUT_IN_MS')) ?? 30000
   const authSignatureExpirationInMs = (await config.getNumber('WS_AUTH_SIGNATURE_EXPIRATION_IN_MS')) ?? 300000 // 5 minutes in ms
 
   function changeStage(data: WsUserData, newData: Partial<WsUserData>) {
@@ -165,6 +165,7 @@ export async function registerWsHandler(
         isConnected: true,
         transport
       })
+      wsPool.markAuthenticated(data)
 
       transport.on('close', () => {
         logger.debug('Transport close event received', {
@@ -278,12 +279,16 @@ export async function registerWsHandler(
     upgrade: (res, req, context) => {
       const { labels, end } = onRequestStart(metrics, req.getMethod(), '/ws')
       const wsConnectionId = randomUUID()
+      const clientIp = textDecoder.decode(res.getRemoteAddressAsText())
 
       res.upgrade(
         {
           isConnected: false,
           auth: false,
+          authenticating: false,
           wsConnectionId,
+          connectionStartTime: Date.now(),
+          clientIp,
           transport: null
         },
         req.getHeader('sec-websocket-key'),
@@ -330,8 +335,8 @@ export async function registerWsHandler(
         // increments ws_connections_rejected), so log it rather than reporting it to Sentry
         // as an exception, which would flood on a busy instance. Any other, genuinely
         // unexpected acquisition failure is still captured.
-        if (error instanceof WsPoolFullError) {
-          logger.warn('Rejected connection: WebSocket pool is full', {
+        if (error instanceof WsAdmissionError) {
+          logger.warn('Rejected connection by WebSocket admission control', {
             wsConnectionId: data.wsConnectionId,
             error: error.message
           })
@@ -360,10 +365,8 @@ export async function registerWsHandler(
         logger.warn('Authentication already in progress', {
           wsConnectionId: data.wsConnectionId
         })
-        // Guarded like every ws I/O site: ws.send() throws on an already-closed socket, which
-        // inside this async handler would surface as an unhandled rejection.
         try {
-          ws.send(JSON.stringify({ error: 'Authentication already in progress, please try again later' }))
+          ws.end(3003, 'Authentication already in progress')
         } catch (err) {}
         return
       }

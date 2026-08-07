@@ -132,6 +132,15 @@ export const metricDeclarations = {
     help: "Number of subscription updates dropped because a connection's value queue overflowed (slow consumer)",
     labelNames: ['event']
   },
+  ws_unauthenticated_connections_rejected: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of unauthenticated WebSocket connections rejected by admission limits',
+    labelNames: ['scope']
+  },
+  ws_connection_attempt_tracking_evictions: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of times per-IP connection-attempt tracking evicted entries to stay within its size bound'
+  },
   ai_compliance_validation_duration_seconds: {
     type: IMetricsComponent.HistogramType,
     help: 'Duration of AI compliance validation in seconds',

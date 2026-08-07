@@ -2,7 +2,11 @@ import { WebSocket } from 'uWebSockets.js'
 import { IConfigComponent, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { createWsPoolComponent } from '../../../src/logic/ws-pool/component'
 import { IWsPoolComponent } from '../../../src/logic/ws-pool/types'
-import { WsPoolFullError } from '../../../src/logic/ws-pool/errors'
+import {
+  WsConnectionRateLimitError,
+  WsPoolFullError,
+  WsUnauthenticatedLimitError
+} from '../../../src/logic/ws-pool/errors'
 import { createLogsMockedComponent, createMockConfigComponent, mockMetrics } from '../../mocks/components'
 import { WsUserData } from '../../../src/types'
 
@@ -80,7 +84,7 @@ describe('when registering multiple connections', () => {
   const sndConnectionId = 'connection-456'
 
   beforeEach(() => {
-    mockWebSocket.getUserData.mockReturnValueOnce({
+    mockWebSocket.getUserData.mockReturnValue({
       isConnected: true,
       auth: true,
       authenticating: false,
@@ -480,5 +484,165 @@ describe('when getting the connection ids', () => {
     it('should return an empty array', () => {
       expect(wsPool.getConnectionIds()).toEqual([])
     })
+  })
+})
+
+describe('when a client reaches the unauthenticated connection limit', () => {
+  let firstWebSocket: jest.Mocked<WebSocket<WsUserData>>
+  let secondWebSocket: jest.Mocked<WebSocket<WsUserData>>
+  let error: Error | undefined
+
+  beforeEach(async () => {
+    mockConfigComponent.getNumber.mockImplementation(async (key) => {
+      if (key === 'WS_MAX_UNAUTHENTICATED_CONNECTIONS_PER_IP') return 1
+      return undefined
+    })
+    wsPool = await createWsPoolComponent({
+      metrics: mockMetricsComponent,
+      logs: mockLogger,
+      config: mockConfigComponent
+    })
+    firstWebSocket = {
+      getUserData: jest.fn().mockReturnValue({
+        isConnected: true,
+        auth: false,
+        authenticating: false,
+        wsConnectionId: 'unauthenticated-1',
+        connectionStartTime: Date.now(),
+        clientIp: '203.0.113.8'
+      })
+    } as unknown as jest.Mocked<WebSocket<WsUserData>>
+    secondWebSocket = {
+      getUserData: jest.fn().mockReturnValue({
+        isConnected: true,
+        auth: false,
+        authenticating: false,
+        wsConnectionId: 'unauthenticated-2',
+        connectionStartTime: Date.now(),
+        clientIp: '203.0.113.8'
+      })
+    } as unknown as jest.Mocked<WebSocket<WsUserData>>
+    wsPool.registerConnection(firstWebSocket)
+    try {
+      wsPool.registerConnection(secondWebSocket)
+    } catch (caught) {
+      error = caught as Error
+    }
+  })
+
+  it('should reject another pre-authentication socket from the same client', () => {
+    expect(error).toBeInstanceOf(WsUnauthenticatedLimitError)
+  })
+
+  it('should record a client-scoped admission rejection', () => {
+    expect(mockMetricsComponent.increment).toHaveBeenCalledWith('ws_unauthenticated_connections_rejected', {
+      scope: 'client'
+    })
+  })
+
+  it('should release the client slot after authentication succeeds', () => {
+    wsPool.markAuthenticated(firstWebSocket.getUserData())
+
+    expect(() => wsPool.registerConnection(secondWebSocket)).not.toThrow()
+  })
+})
+
+describe('when a client exceeds the connection-attempt budget', () => {
+  let error: Error | undefined
+
+  beforeEach(async () => {
+    mockConfigComponent.getNumber.mockImplementation(async (key) => {
+      if (key === 'WS_MAX_CONNECTION_ATTEMPTS_PER_IP') return 1
+      return undefined
+    })
+    wsPool = await createWsPoolComponent({
+      metrics: mockMetricsComponent,
+      logs: mockLogger,
+      config: mockConfigComponent
+    })
+    const makeSocket = (connectionId: string) =>
+      ({
+        getUserData: jest.fn().mockReturnValue({
+          isConnected: true,
+          auth: false,
+          authenticating: false,
+          wsConnectionId: connectionId,
+          connectionStartTime: Date.now(),
+          clientIp: '203.0.113.9'
+        })
+      }) as unknown as jest.Mocked<WebSocket<WsUserData>>
+    wsPool.registerConnection(makeSocket('attempt-1'))
+    try {
+      wsPool.registerConnection(makeSocket('attempt-2'))
+    } catch (caught) {
+      error = caught as Error
+    }
+  })
+
+  it('should reject rapid reconnect attempts from the same client', () => {
+    expect(error).toBeInstanceOf(WsConnectionRateLimitError)
+  })
+})
+
+describe('when per-IP limits are configured but the connection carries no address', () => {
+  let register: () => void
+
+  beforeEach(async () => {
+    mockConfigComponent.getNumber.mockImplementation(async (key) => {
+      if (key === 'WS_MAX_UNAUTHENTICATED_CONNECTIONS_PER_IP') return 1
+      if (key === 'WS_MAX_CONNECTION_ATTEMPTS_PER_IP') return 1
+      return undefined
+    })
+    wsPool = await createWsPoolComponent({
+      metrics: mockMetricsComponent,
+      logs: mockLogger,
+      config: mockConfigComponent
+    })
+    const makeSocket = (connectionId: string) =>
+      ({
+        getUserData: jest.fn().mockReturnValue({
+          isConnected: true,
+          auth: false,
+          authenticating: false,
+          wsConnectionId: connectionId,
+          connectionStartTime: Date.now()
+        })
+      }) as unknown as jest.Mocked<WebSocket<WsUserData>>
+    wsPool.registerConnection(makeSocket('unattributable-1'))
+    register = () => wsPool.registerConnection(makeSocket('unattributable-2'))
+  })
+
+  it('should admit further connections rather than throttling every user behind the shared edge', () => {
+    expect(register).not.toThrow()
+  })
+})
+
+describe('when per-IP limits are not configured', () => {
+  let register: () => void
+
+  beforeEach(async () => {
+    mockConfigComponent.getNumber.mockResolvedValue(undefined)
+    wsPool = await createWsPoolComponent({
+      metrics: mockMetricsComponent,
+      logs: mockLogger,
+      config: mockConfigComponent
+    })
+    const makeSocket = (connectionId: string) =>
+      ({
+        getUserData: jest.fn().mockReturnValue({
+          isConnected: true,
+          auth: false,
+          authenticating: false,
+          wsConnectionId: connectionId,
+          connectionStartTime: Date.now(),
+          clientIp: '203.0.113.10'
+        })
+      }) as unknown as jest.Mocked<WebSocket<WsUserData>>
+    wsPool.registerConnection(makeSocket('opt-in-1'))
+    register = () => wsPool.registerConnection(makeSocket('opt-in-2'))
+  })
+
+  it('should not apply any per-IP cap', () => {
+    expect(register).not.toThrow()
   })
 })
