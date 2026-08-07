@@ -9,6 +9,7 @@ import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/U
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { WsPoolFullError } from '../../../logic/ws-pool'
+import { isSceneSigner } from '../../../utils/auth-metadata'
 
 const textDecoder = new TextDecoder()
 
@@ -118,7 +119,7 @@ export async function registerWsHandler(
         fetcher,
         expiration: authSignatureExpirationInMs,
         // Scene signers are not accepted on this surface, matching the HTTP routes.
-        metadataValidator: (metadata) => metadata?.signer !== 'decentraland-kernel-scene'
+        metadataValidator: (metadata) => !isSceneSigner(metadata)
       })
 
       if (data.timeout) {
