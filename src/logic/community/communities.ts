@@ -268,17 +268,15 @@ export function createCommunityComponent(
         as?: EthAddress
       }
     ): Promise<AggregatedCommunityWithMemberAndVoiceChatData> => {
-      const [community, membersCount, voiceChatStatus] = await Promise.all([
-        communitiesDb.getCommunity(id, options?.as),
-        communitiesDb.getCommunityMembersCount(id),
-        commsGatekeeper.getCommunityVoiceChatStatus(id)
-      ])
+      const community = await communitiesDb.getCommunity(id, options?.as)
 
       if (!community) {
         throw new CommunityNotFoundError(id)
       }
 
-      const [ownerName, isHostingLiveEvent] = await Promise.all([
+      const [membersCount, voiceChatStatus, ownerName, isHostingLiveEvent] = await Promise.all([
+        communitiesDb.getCommunityMembersCount(id),
+        commsGatekeeper.getCommunityVoiceChatStatus(id),
         communityOwners.getOwnerName(community.ownerAddress, community.id),
         communityEvents.isCurrentlyHostingEvents(community.id)
       ])
@@ -292,17 +290,17 @@ export function createCommunityComponent(
         as?: EthAddress
       }
     ): Promise<AggregatedCommunityWithMemberAndVoiceChatDataV2> => {
-      const [community, membersCount, voiceChatStatus] = await Promise.all([
-        communitiesDb.getCommunity(id, options?.as),
-        communitiesDb.getCommunityMembersCount(id),
-        commsGatekeeper.getCommunityVoiceChatStatus(id)
-      ])
+      const community = await communitiesDb.getCommunity(id, options?.as)
 
       if (!community) {
         throw new CommunityNotFoundError(id)
       }
 
-      const isHostingLiveEvent = await communityEvents.isCurrentlyHostingEvents(community.id)
+      const [membersCount, voiceChatStatus, isHostingLiveEvent] = await Promise.all([
+        communitiesDb.getCommunityMembersCount(id),
+        commsGatekeeper.getCommunityVoiceChatStatus(id),
+        communityEvents.isCurrentlyHostingEvents(community.id)
+      ])
 
       return toCommunityWithMembersCountV2({ ...community, isHostingLiveEvent }, membersCount, voiceChatStatus)
     },
@@ -310,16 +308,16 @@ export function createCommunityComponent(
     getCommunityPublicInformation: async (
       id: string
     ): Promise<Omit<CommunityPublicInformationWithVoiceChat, 'isHostingLiveEvent'>> => {
-      const [community, voiceChatStatus] = await Promise.all([
-        communitiesDb.getCommunityPublicInformation(id),
-        commsGatekeeper.getCommunityVoiceChatStatus(id)
-      ])
+      const community = await communitiesDb.getCommunityPublicInformation(id)
 
       if (!community) {
         throw new CommunityNotFoundError(id)
       }
 
-      const ownerName = await communityOwners.getOwnerName(community.ownerAddress, community.id)
+      const [voiceChatStatus, ownerName] = await Promise.all([
+        commsGatekeeper.getCommunityVoiceChatStatus(id),
+        communityOwners.getOwnerName(community.ownerAddress, community.id)
+      ])
 
       return toPublicCommunityWithVoiceChat({ ...community, ownerName }, voiceChatStatus)
     },
@@ -327,14 +325,13 @@ export function createCommunityComponent(
     getCommunityPublicInformationWithoutProfile: async (
       id: string
     ): Promise<Omit<CommunityPublicInformationWithVoiceChatV2, 'isHostingLiveEvent'>> => {
-      const [community, voiceChatStatus] = await Promise.all([
-        communitiesDb.getCommunityPublicInformation(id),
-        commsGatekeeper.getCommunityVoiceChatStatus(id)
-      ])
+      const community = await communitiesDb.getCommunityPublicInformation(id)
 
       if (!community) {
         throw new CommunityNotFoundError(id)
       }
+
+      const voiceChatStatus = await commsGatekeeper.getCommunityVoiceChatStatus(id)
 
       return toPublicCommunityWithVoiceChatV2(community, voiceChatStatus)
     },

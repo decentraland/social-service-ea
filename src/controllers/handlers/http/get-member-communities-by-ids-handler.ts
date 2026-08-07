@@ -2,6 +2,7 @@ import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { normalizeAddress } from '../../../utils/address'
 import { GetMemberCommunitiesByIdsRequestBody } from './schemas'
+import { InvalidRequestError } from '@dcl/http-commons'
 
 export type GetMemberCommunitiesByIdsResponse = {
   communities: Array<{ id: string }>
@@ -49,6 +50,10 @@ export async function getMemberCommunitiesByIdsHandler(
   } catch (error) {
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting communities by IDs for member ${memberAddress}: ${message}`)
+
+    if (error instanceof InvalidRequestError) {
+      throw error
+    }
 
     return {
       status: 500,

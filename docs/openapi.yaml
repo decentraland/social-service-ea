@@ -42,6 +42,17 @@ info:
     - **User profiles** with claimed names and avatars
     - **Online status tracking** for community members
 
+    ## Request limits
+
+    Request bodies are capped server-wide at **1 MiB** by default, enforced at the
+    transport before any route or schema runs. A request whose body exceeds the cap
+    is answered with `413 Payload Too Large` and is not parsed. Multipart uploads
+    carry their own, smaller limits: a community thumbnail must be between 1 KB and
+    500 KB.
+
+    The cap is deployment-configurable through `HTTP_MAX_REQUEST_BODY_BYTES`, so a
+    given environment may advertise a different value.
+
     ## Authentication
 
     This API uses two authentication methods:

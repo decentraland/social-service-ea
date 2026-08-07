@@ -278,7 +278,8 @@ export interface ICommunitiesDatabaseComponent {
 
 export interface IVoiceDatabaseComponent {
   areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
-  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
+  /** Returns null when either participant already has a pending call. */
+  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string | null>
   getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
   deletePrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
   getPrivateVoiceChatForCalleeAddress(calleeAddress: string): Promise<PrivateVoiceChat | null>

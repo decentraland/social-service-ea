@@ -1,7 +1,7 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityNotFoundError } from '../../../logic/community/errors'
-import { NotAuthorizedError } from '@dcl/http-commons'
+import { NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 
 export async function deleteCommunityHandler(
   context: Pick<
@@ -31,7 +31,11 @@ export async function deleteCommunityHandler(
 
     logger.error(`Error deleting community: ${id}, error: ${message}`)
 
-    if (error instanceof CommunityNotFoundError || error instanceof NotAuthorizedError) {
+    if (
+      error instanceof CommunityNotFoundError ||
+      error instanceof NotAuthorizedError ||
+      error instanceof InvalidRequestError
+    ) {
       throw error
     }
 

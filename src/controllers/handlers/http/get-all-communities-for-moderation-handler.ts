@@ -1,4 +1,4 @@
-import { getPaginationParams } from '@dcl/http-commons'
+import { getPaginationParams, InvalidRequestError } from '@dcl/http-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
@@ -57,6 +57,10 @@ export async function getAllCommunitiesForModerationHandler(
   } catch (error) {
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting communities for moderation: ${message}`)
+
+    if (error instanceof InvalidRequestError) {
+      throw error
+    }
 
     return {
       status: 500,

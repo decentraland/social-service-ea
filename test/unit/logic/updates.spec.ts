@@ -49,7 +49,10 @@ describe('Updates Handlers', () => {
     mockLogs = createLogsMockedComponent()
     logger = mockLogs.getLogger('test')
 
-    subscribersContext = createSubscribersContext({ logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+    subscribersContext = createSubscribersContext(
+      { logs: mockLogs, metrics: mockMetrics, config: mockConfig },
+      createWsPoolMockedComponent()
+    )
     subscribersContext.addConnection('0x456', 'conn-456')
     subscribersContext.addConnection('0x789', 'conn-789')
 
@@ -915,6 +918,30 @@ describe('Updates Handlers', () => {
           expect(calleeEmitSpy).not.toHaveBeenCalled()
         })
       })
+
+      describe('and the update carries the call credentials', () => {
+        let connectionUrl: string
+        let infoSpy: jest.SpyInstance
+
+        beforeEach(async () => {
+          connectionUrl = 'livekit:https://voice.example.com?access_token=example-token'
+          update.callId = callId
+          update.credentials = { connectionUrl }
+          infoSpy = jest.spyOn(logger, 'info')
+          await updateHandler.privateVoiceChatUpdateHandler(JSON.stringify(update))
+        })
+
+        it('should log the call id and the status only', () => {
+          expect(infoSpy).toHaveBeenCalledWith('Private voice chat update', {
+            callId,
+            status: VoiceChatStatus.ACCEPTED
+          })
+        })
+
+        it('should not write the connection url to the logs', () => {
+          expect(JSON.stringify(infoSpy.mock.calls)).not.toContain(connectionUrl)
+        })
+      })
     })
 
     describe('and the voice chat status is REJECTED', () => {
@@ -1238,7 +1265,10 @@ describe('Updates Handlers', () => {
 
       mockRegistry.getProfile.mockResolvedValue(mockProfile)
 
-      subscribersContext = createSubscribersContext({ logs: mockLogs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+      subscribersContext = createSubscribersContext(
+        { logs: mockLogs, metrics: mockMetrics, config: mockConfig },
+        createWsPoolMockedComponent()
+      )
       subscribersContext.addConnection('0x123', 'conn-123')
 
       rpcContext = {
@@ -1280,10 +1310,7 @@ describe('Updates Handlers', () => {
       })
 
       it('should not log per occurrence (tracked only via the metric to avoid flooding)', () => {
-        expect(logger.debug).not.toHaveBeenCalledWith(
-          'Duplicate subscription detected, ignoring',
-          expect.anything()
-        )
+        expect(logger.debug).not.toHaveBeenCalledWith('Duplicate subscription detected, ignoring', expect.anything())
       })
 
       it('should not parse any update', () => {
@@ -1724,7 +1751,10 @@ describe('Updates Handlers', () => {
         // Return the generator to trigger finally block
         await generator.return(undefined)
 
-        expect(unregisterSpy).toHaveBeenCalledWith('conn-123', expect.objectContaining({ destroy: expect.any(Function) }))
+        expect(unregisterSpy).toHaveBeenCalledWith(
+          'conn-123',
+          expect.objectContaining({ destroy: expect.any(Function) })
+        )
       })
 
       it('should unregister generator even when an error occurs', async () => {
