@@ -1,11 +1,13 @@
 import { createServer } from 'net'
-import { createServerComponent, Router } from '@dcl/http-server'
+import { createServerComponent, FullHttpServerComponent, Router } from '@dcl/http-server'
 import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { createMockConfigComponent } from '../../mocks/components/config'
 import { createLogsMockedComponent } from '../../mocks/components'
 import { resolveMaxRequestBodyBytes } from '../../../src/utils/requestBodyLimit'
 
 const MAX_BODY_BYTES = 1024
+
+type TestServerContext = Record<string, never>
 
 /** Asks the OS for a port nothing is using, so the test cannot collide. */
 async function findFreePort(): Promise<number> {
@@ -26,8 +28,7 @@ async function findFreePort(): Promise<number> {
  * drives a real listening server rather than a handler.
  */
 describe('when the server is given a request body cap', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let server: any
+  let server: FullHttpServerComponent<TestServerContext>
   let port: number
   let handler: jest.Mock
 
@@ -35,7 +36,7 @@ describe('when the server is given a request body cap', () => {
     port = await findFreePort()
     handler = jest.fn().mockResolvedValue({ status: 200, body: { ok: true } })
 
-    server = await createServerComponent(
+    server = await createServerComponent<TestServerContext>(
       {
         config: createMockConfigComponent({
           requireNumber: jest.fn().mockResolvedValue(port),
@@ -46,20 +47,21 @@ describe('when the server is given a request body cap', () => {
       { maxBodySize: resolveMaxRequestBodyBytes(MAX_BODY_BYTES) }
     )
 
-    const router = new Router()
+    const router = new Router<TestServerContext>()
     router.post('/echo', handler)
     server.use(router.middleware())
     server.setContext({})
 
-    await server[START_COMPONENT]({ started: () => true, live: () => true, getComponents: () => ({}) })
+    await server[START_COMPONENT]!({ started: () => true, live: () => true, getComponents: () => ({}) })
   })
 
   afterEach(async () => {
-    await server[STOP_COMPONENT]()
+    await server[STOP_COMPONENT]!()
   })
 
   describe('and a request body fits within the cap', () => {
     let response: Response
+    let responseBody: string
 
     beforeEach(async () => {
       response = await fetch(`http://127.0.0.1:${port}/echo`, {
@@ -67,6 +69,8 @@ describe('when the server is given a request body cap', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ padding: 'a'.repeat(100) })
       })
+      // Drained so the socket is released instead of pinned by an unread body.
+      responseBody = await response.text()
     })
 
     it('should reach the route', () => {
@@ -75,6 +79,7 @@ describe('when the server is given a request body cap', () => {
 
     it('should answer normally', () => {
       expect(response.status).toBe(200)
+      expect(responseBody).toBe(JSON.stringify({ ok: true }))
     })
   })
 
@@ -87,6 +92,8 @@ describe('when the server is given a request body cap', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ padding: 'a'.repeat(MAX_BODY_BYTES * 2) })
       })
+      // Drained so the socket is released instead of pinned by an unread body.
+      await response.text()
     })
 
     it('should answer 413 Payload Too Large', () => {
