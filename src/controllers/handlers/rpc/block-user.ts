@@ -4,7 +4,7 @@ import {
   BlockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
-import { parseProfileToBlockedUser } from '../../../logic/friends'
+import { parseAddressToBlockedUser, parseProfileToBlockedUser } from '../../../logic/friends'
 import { InvalidRequestError } from '../../errors/rpc.errors'
 import { ProfileNotFoundError } from '../../../logic/friends/errors'
 import { normalizeAddress } from '../../../utils/address'
@@ -32,7 +32,9 @@ export function blockUserService({ components: { logs, friends } }: RPCServiceCo
         response: {
           $case: 'ok',
           ok: {
-            profile: parseProfileToBlockedUser(profile, blockedAt)
+            profile: profile
+              ? parseProfileToBlockedUser(profile, blockedAt)
+              : parseAddressToBlockedUser(blockedAddress, blockedAt)
           }
         }
       }
