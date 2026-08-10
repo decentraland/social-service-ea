@@ -113,10 +113,12 @@ beforeEach(async () => {
 describe('when starting a private voice chat', () => {
   let callerAddress: string
   let calleeAddress: string
+  let pendingCallId: string
 
   beforeEach(() => {
     callerAddress = '0xBceaD48696C30eBfF0725D842116D334aAd585C1'
     calleeAddress = '0x2B72b8d597c553b3173bca922B9ad871da751dA5'
+    pendingCallId = 'pending-call-id'
   })
 
   describe('and the caller and callee are the same user', () => {
@@ -195,6 +197,7 @@ describe('when starting a private voice chat', () => {
         })
         areUsersBeingCalledOrCallingSomeoneMock.mockResolvedValueOnce(false)
         isUserInAVoiceChatMock.mockResolvedValueOnce(false).mockResolvedValueOnce(false)
+        createPrivateVoiceChatMock.mockResolvedValueOnce(pendingCallId)
       })
 
       it('should continue with the voice chat creation', async () => {
@@ -253,6 +256,7 @@ describe('when starting a private voice chat', () => {
         })
         areUsersBeingCalledOrCallingSomeoneMock.mockResolvedValueOnce(false)
         isUserInAVoiceChatMock.mockResolvedValueOnce(false).mockResolvedValueOnce(false)
+        createPrivateVoiceChatMock.mockResolvedValueOnce(pendingCallId)
       })
 
       it('should continue with the voice chat creation', async () => {
@@ -333,6 +337,25 @@ describe('when starting a private voice chat', () => {
           calleeAddress,
           status: 'requested'
         })
+      })
+    })
+
+    describe('and a competing request reserves either participant first', () => {
+      let error: Error | undefined
+
+      beforeEach(async () => {
+        areUsersBeingCalledOrCallingSomeoneMock.mockResolvedValueOnce(false)
+        isUserInAVoiceChatMock.mockResolvedValueOnce(false).mockResolvedValueOnce(false)
+        createPrivateVoiceChatMock.mockResolvedValueOnce(null)
+        error = await voice.startPrivateVoiceChat(callerAddress, calleeAddress).catch((caught) => caught)
+      })
+
+      it('should reject with a users-are-calling-someone-else error', () => {
+        expect(error).toBeInstanceOf(UsersAreCallingSomeoneElseError)
+      })
+
+      it('should not publish a call intent', () => {
+        expect(publishInChannelMock).not.toHaveBeenCalled()
       })
     })
   })

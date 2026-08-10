@@ -1,7 +1,7 @@
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { MemberCommunity } from '../../../logic/community'
-import { getPaginationParams } from '@dcl/http-commons'
+import { getPaginationParams, InvalidRequestError } from '@dcl/http-commons'
 import { getPaginationResultProperties } from '../../../utils/pagination'
 import { PaginatedResponse } from '@dcl/schemas'
 import { normalizeAddress } from '../../../utils/address'
@@ -48,6 +48,10 @@ export async function getMemberCommunitiesHandler(
   } catch (error) {
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting communities where ${memberAddress} is a member: ${message}`)
+
+    if (error instanceof InvalidRequestError) {
+      throw error
+    }
 
     return {
       status: 500,

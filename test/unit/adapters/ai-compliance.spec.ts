@@ -375,7 +375,7 @@ describe('AIComplianceComponent', () => {
         })
 
         it('should validate only the thumbnail field', async () => {
-          const result = await aiCompliance.validateCommunityContent({ thumbnailBuffer })
+          const result = await aiCompliance.validateCommunityContent({ thumbnailBuffer, thumbnailMime: 'image/png' })
 
           expect(result.isCompliant).toBe(true)
           expect(mockOpenAICreate).toHaveBeenCalledWith(
@@ -518,6 +518,21 @@ describe('AIComplianceComponent', () => {
               ])
             })
           )
+        })
+
+        it('should label the bytes with the media type it was given, not a default', async () => {
+          await aiCompliance.validateCommunityContent({
+            name,
+            description,
+            thumbnailBuffer,
+            thumbnailMime: 'image/jpeg'
+          })
+
+          const imageUrl = mockOpenAICreate.mock.calls[0][0].input[0].content.find(
+            (part: { type: string }) => part.type === 'input_image'
+          ).image_url
+
+          expect(imageUrl.startsWith('data:image/jpeg;base64,')).toBe(true)
         })
       })
 

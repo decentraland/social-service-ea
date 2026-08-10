@@ -221,8 +221,16 @@ describe('Community Component', () => {
         )
 
         expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId, userAddress)
-        expect(mockCommunitiesDB.getCommunityMembersCount).toHaveBeenCalledWith(communityId)
-        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+        expect(mockCommunitiesDB.getCommunityMembersCount).not.toHaveBeenCalled()
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).not.toHaveBeenCalled()
+      })
+
+      it('should not contact Gatekeeper from the profile-free lookup', async () => {
+        await expect(communityComponent.getCommunityWithoutProfile(communityId, { as: userAddress })).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).not.toHaveBeenCalled()
       })
     })
   })
@@ -284,7 +292,15 @@ describe('Community Component', () => {
         )
 
         expect(mockCommunitiesDB.getCommunityPublicInformation).toHaveBeenCalledWith(communityId)
-        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).toHaveBeenCalledWith(communityId)
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).not.toHaveBeenCalled()
+      })
+
+      it('should not contact Gatekeeper from the profile-free public lookup', async () => {
+        await expect(communityComponent.getCommunityPublicInformationWithoutProfile(communityId)).rejects.toThrow(
+          new CommunityNotFoundError(communityId)
+        )
+
+        expect(mockCommsGatekeeper.getCommunityVoiceChatStatus).not.toHaveBeenCalled()
       })
     })
   })
@@ -588,7 +604,6 @@ describe('Community Component', () => {
             expect(result.total).toBe(0)
           })
         })
-
 
         describe('and the unlisted community is private', () => {
           describe('and the user is a member', () => {

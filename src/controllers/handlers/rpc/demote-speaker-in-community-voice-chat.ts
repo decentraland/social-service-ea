@@ -9,11 +9,13 @@ import {
   InvalidCommunityIdError,
   InvalidUserAddressError,
   CommunityVoiceChatPermissionError,
+  validateCommunityVoiceChatModerator,
   validateCommunityVoiceChatTargetUser
 } from '../../../logic/community-voice'
 import { isErrorWithMessage } from '../../../utils/errors'
 import { CommunityRole } from '../../../types/entities'
 import { CommunityPrivacyEnum } from '../../../logic/community'
+import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function demoteSpeakerInCommunityVoiceChatService({
   components: { logs, commsGatekeeper, communitiesDb }
@@ -43,14 +45,13 @@ export function demoteSpeakerInCommunityVoiceChatService({
 
       const isSelfDemote = context.address.toLowerCase() === request.userAddress.toLowerCase()
 
-      // Get community information to check privacy setting
+      // getCommunity already resolves the acting user's role, so no extra round-trip here.
       const community = await communitiesDb.getCommunity(request.communityId, context.address)
       if (!community) {
         throw new InvalidCommunityIdError()
       }
 
-      // Get the role of the acting user (person making the request)
-      const actingUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, context.address)
+      const actingUserRole = community.role ?? CommunityRole.None
 
       // For private communities, acting user must be a member
       // For public communities, we allow voice chat participants to manage themselves and moderators to manage others
@@ -60,13 +61,23 @@ export function demoteSpeakerInCommunityVoiceChatService({
 
       // If user is trying to demote someone else, check permissions
       if (!isSelfDemote) {
-        // Only owners and moderators can demote other users
-        if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
-          throw new CommunityVoiceChatPermissionError('Only community owners and moderators can demote other speakers')
-        }
+        // Owner/moderator gate; the owner cannot be demoted by anyone else.
+        const { targetUserRole, isTargetUserBanned } = await validateCommunityVoiceChatModerator(
+          communitiesDb,
+          request.communityId,
+          context.address,
+          request.userAddress,
+          'demote other speakers'
+        )
 
         // Validate target user can be demoted based on community privacy and membership
-        await validateCommunityVoiceChatTargetUser(communitiesDb, community, request.communityId, request.userAddress)
+        validateCommunityVoiceChatTargetUser(
+          community,
+          request.communityId,
+          request.userAddress,
+          targetUserRole,
+          isTargetUserBanned
+        )
 
         logger.info('Permission check passed: moderator/owner demoting another user', {
           communityId: request.communityId,
@@ -138,7 +149,11 @@ export function demoteSpeakerInCommunityVoiceChatService({
         }
       }
 
-      if (error instanceof InvalidCommunityIdError || error instanceof InvalidUserAddressError) {
+      if (
+        error instanceof InvalidCommunityIdError ||
+        error instanceof InvalidUserAddressError ||
+        error instanceof InvalidGatekeeperIdentifierError
+      ) {
         return {
           response: {
             $case: 'invalidRequest',

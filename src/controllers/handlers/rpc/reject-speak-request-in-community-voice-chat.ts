@@ -11,7 +11,11 @@ import {
   CommunityVoiceChatPermissionError
 } from '../../../logic/community-voice/errors'
 import { isErrorWithMessage } from '../../../utils/errors'
-import { CommunityRole } from '../../../types/entities'
+import {
+  validateCommunityVoiceChatModerator,
+  validateCommunityVoiceChatTargetMembership
+} from '../../../logic/community-voice/validation'
+import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function rejectSpeakRequestInCommunityVoiceChatService({
   components: { logs, commsGatekeeper, communitiesDb }
@@ -39,17 +43,25 @@ export function rejectSpeakRequestInCommunityVoiceChatService({
         throw new InvalidUserAddressError()
       }
 
-      // Check permissions: only owners and moderators can reject speak requests
-      const actingUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, context.address)
-      if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
-        throw new CommunityVoiceChatPermissionError('Only community owners and moderators can reject speak requests')
+      // Owner/moderator gate, owner protection and community lookup issued together. Authorization
+      // is reported first on purpose: a caller with no role learns nothing about the community.
+      const [community, { actingUserRole, targetUserRole }] = await Promise.all([
+        communitiesDb.getCommunity(request.communityId, context.address),
+        validateCommunityVoiceChatModerator(
+          communitiesDb,
+          request.communityId,
+          context.address,
+          request.userAddress,
+          'reject speak requests'
+        )
+      ])
+
+      if (!community) {
+        throw new InvalidCommunityIdError()
       }
 
-      // Verify the target user is a member of the community
-      const targetUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, request.userAddress)
-      if (targetUserRole === CommunityRole.None) {
-        throw new UserNotCommunityMemberError(request.userAddress, request.communityId)
-      }
+      // Public guests can raise a hand; a banned target stays rejectable since denying grants nothing.
+      validateCommunityVoiceChatTargetMembership(community, request.communityId, request.userAddress, targetUserRole)
 
       logger.info('Permission check passed: moderator/owner rejecting speak request', {
         communityId: request.communityId,
@@ -111,7 +123,11 @@ export function rejectSpeakRequestInCommunityVoiceChatService({
         }
       }
 
-      if (error instanceof InvalidCommunityIdError || error instanceof InvalidUserAddressError) {
+      if (
+        error instanceof InvalidCommunityIdError ||
+        error instanceof InvalidUserAddressError ||
+        error instanceof InvalidGatekeeperIdentifierError
+      ) {
         return {
           response: {
             $case: 'invalidRequest',

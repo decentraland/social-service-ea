@@ -273,6 +273,7 @@ export interface ICommunityThumbnailComponent {
   buildThumbnailUrl(communityId: string): string
   getThumbnail(communityId: string): Promise<string | undefined>
   getThumbnails(communityIds: string[]): Promise<Record<string, string | undefined>>
+  /** @throws {UnsupportedThumbnailFormatError} when the bytes carry no supported image signature */
   uploadThumbnail(communityId: string, thumbnail: Buffer): Promise<string>
 }
 
@@ -489,8 +490,9 @@ export type CommunityWithUserInformationAndVoiceChat = CommunityWithUserInformat
   voiceChatStatus: CommunityVoiceChatStatus | null
 }
 
+// `privacy` is not narrowed to Public: since #346/#347 this shape also carries private communities.
 export type CommunityPublicInformation = Omit<CommunityWithUserInformation, 'role' | 'friends' | 'privacy'> & {
-  privacy: CommunityPrivacyEnum.Public
+  privacy: CommunityPrivacyEnum
 }
 
 export type CommunityPublicInformationWithVoiceChat = CommunityPublicInformation & {
@@ -524,7 +526,7 @@ export type CommunityWithUserInformationAndVoiceChatV2 = CommunityWithUserInform
 }
 
 export type CommunityPublicInformationV2 = Omit<CommunityWithUserInformationV2, 'role' | 'friends' | 'privacy'> & {
-  privacy: CommunityPrivacyEnum.Public
+  privacy: CommunityPrivacyEnum
 }
 
 export type CommunityPublicInformationWithVoiceChatV2 = CommunityPublicInformationV2 & {

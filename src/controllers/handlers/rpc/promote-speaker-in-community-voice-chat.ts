@@ -9,10 +9,11 @@ import {
   InvalidCommunityIdError,
   InvalidUserAddressError,
   CommunityVoiceChatPermissionError,
+  validateCommunityVoiceChatModerator,
   validateCommunityVoiceChatTargetUser
 } from '../../../logic/community-voice'
 import { isErrorWithMessage } from '../../../utils/errors'
-import { CommunityRole } from '../../../types/entities'
+import { InvalidGatekeeperIdentifierError } from '../../../adapters/comms-gatekeeper'
 
 export function promoteSpeakerInCommunityVoiceChatService({
   components: { logs, commsGatekeeper, communitiesDb }
@@ -40,20 +41,31 @@ export function promoteSpeakerInCommunityVoiceChatService({
         throw new InvalidUserAddressError()
       }
 
-      // Check permissions: only owners and moderators can promote speakers
-      const actingUserRole = await communitiesDb.getCommunityMemberRole(request.communityId, context.address)
-      if (actingUserRole !== CommunityRole.Owner && actingUserRole !== CommunityRole.Moderator) {
-        throw new CommunityVoiceChatPermissionError('Only community owners and moderators can promote speakers')
-      }
+      // Owner/moderator gate, owner protection and community lookup issued together. Authorization
+      // is reported first on purpose: a caller with no role learns nothing about the community.
+      const [community, { actingUserRole, targetUserRole, isTargetUserBanned }] = await Promise.all([
+        communitiesDb.getCommunity(request.communityId, context.address),
+        validateCommunityVoiceChatModerator(
+          communitiesDb,
+          request.communityId,
+          context.address,
+          request.userAddress,
+          'promote speakers'
+        )
+      ])
 
-      // Get community information to check privacy setting
-      const community = await communitiesDb.getCommunity(request.communityId, context.address)
       if (!community) {
         throw new InvalidCommunityIdError()
       }
 
       // Validate target user can be promoted based on community privacy and membership
-      await validateCommunityVoiceChatTargetUser(communitiesDb, community, request.communityId, request.userAddress)
+      validateCommunityVoiceChatTargetUser(
+        community,
+        request.communityId,
+        request.userAddress,
+        targetUserRole,
+        isTargetUserBanned
+      )
 
       logger.info('Permission check passed: moderator/owner promoting speaker', {
         communityId: request.communityId,
@@ -116,7 +128,11 @@ export function promoteSpeakerInCommunityVoiceChatService({
         }
       }
 
-      if (error instanceof InvalidCommunityIdError || error instanceof InvalidUserAddressError) {
+      if (
+        error instanceof InvalidCommunityIdError ||
+        error instanceof InvalidUserAddressError ||
+        error instanceof InvalidGatekeeperIdentifierError
+      ) {
         return {
           response: {
             $case: 'invalidRequest',

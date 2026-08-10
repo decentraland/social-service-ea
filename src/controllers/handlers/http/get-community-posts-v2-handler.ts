@@ -1,6 +1,6 @@
 import { DecentralandSignatureContext } from '@dcl/crypto-middleware'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types/http'
-import { getPaginationParams, NotAuthorizedError } from '@dcl/http-commons'
+import { getPaginationParams, NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { CommunityPostWithLikes } from '../../../logic/community/types'
 import { CommunityNotFoundError } from '../../../logic/community/errors'
 import { errorMessageOrDefault } from '../../../utils/errors'
@@ -46,7 +46,11 @@ export async function getCommunityPostsV2Handler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting posts (v2) for community: ${params.id}, error: ${message}`)
 
-    if (error instanceof CommunityNotFoundError || error instanceof NotAuthorizedError) {
+    if (
+      error instanceof CommunityNotFoundError ||
+      error instanceof NotAuthorizedError ||
+      error instanceof InvalidRequestError
+    ) {
       throw error
     }
 

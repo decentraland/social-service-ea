@@ -2,7 +2,7 @@ import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { normalizeAddress } from '../../../utils/address'
 import { MemberCommunityRequestV2 } from '../../../logic/community/types'
-import { getPaginationParams, NotAuthorizedError } from '@dcl/http-commons'
+import { getPaginationParams, NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { PaginatedResponse } from '@dcl/schemas'
 import { getPaginationResultProperties } from '../../../utils/pagination'
 import { parseRequestTypeFilter } from '../../../logic/community/utils'
@@ -61,7 +61,7 @@ export async function getMemberRequestsV2Handler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error getting member requests (v2) for ${targetAddress}: ${message}`)
 
-    if (error instanceof NotAuthorizedError) {
+    if (error instanceof NotAuthorizedError || error instanceof InvalidRequestError) {
       throw error
     }
 

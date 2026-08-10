@@ -1,4 +1,4 @@
-import { NotAuthorizedError } from '@dcl/http-commons'
+import { NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { CommunityPostNotFoundError } from '../../../logic/community/errors'
@@ -28,7 +28,11 @@ export async function likeCommunityPostHandler(
     const message = errorMessageOrDefault(error)
     logger.error(`Error liking post: ${postId} in community: ${communityId}, error: ${message}`)
 
-    if (error instanceof CommunityPostNotFoundError || error instanceof NotAuthorizedError) {
+    if (
+      error instanceof CommunityPostNotFoundError ||
+      error instanceof NotAuthorizedError ||
+      error instanceof InvalidRequestError
+    ) {
       throw error
     }
 

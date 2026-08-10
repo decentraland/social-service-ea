@@ -77,6 +77,9 @@ export async function createVoiceComponent({
 
     // Records the call intent in the database
     const callId = await voiceDb.createPrivateVoiceChat(callerAddress, calleeAddress)
+    if (!callId) {
+      throw new UsersAreCallingSomeoneElseError()
+    }
 
     // Send the call to the callee and send the event to the analytics
     await pubsub.publishInChannel(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {

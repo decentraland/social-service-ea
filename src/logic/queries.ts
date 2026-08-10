@@ -107,11 +107,12 @@ export function getFriendsFromListBaseQuery(userAddress: string, otherUserAddres
   const userFriendsCTE = getUserFriendsCTE(userAddress)
   const blockedForUserCTE = getBlockedForUserCTE(userAddress)
   const normalizedOtherUserAddresses = otherUserAddresses.map(normalizeAddress)
+  // Correlated against the row's own address: comparing the block list to the whole batch makes
+  // the subquery a constant, so one block anywhere in the batch would empty the result.
   return useCTEs([userFriendsCTE, blockedForUserCTE])
     .append(`SELECT uf.address FROM ${userFriendsCTE.name} uf `)
     .append(SQL`WHERE uf.address = ANY(${normalizedOtherUserAddresses}) AND NOT EXISTS (`)
-    .append(`SELECT 1 FROM ${blockedForUserCTE.name} b `)
-    .append(SQL`WHERE b.address = ANY(${normalizedOtherUserAddresses}))`)
+    .append(`SELECT 1 FROM ${blockedForUserCTE.name} b WHERE b.address = uf.address)`)
 }
 
 export function getFriendsBaseQuery(

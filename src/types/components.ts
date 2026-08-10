@@ -204,6 +204,14 @@ export interface ICommunitiesDatabaseComponent {
     unbannedMemberAddress: EthAddress
   ): Promise<void>
   isMemberBanned(communityId: string, bannedMemberAddress: EthAddress): Promise<boolean>
+  /**
+   * Resolves which of the given addresses are actively banned from the community, in one query.
+   *
+   * @param communityId - Community ID
+   * @param memberAddresses - Addresses to look up
+   * @returns The normalized subset of the given addresses that is banned
+   */
+  getBannedMemberAddresses(communityId: string, memberAddresses: EthAddress[]): Promise<string[]>
   getBannedMembers(communityId: string, userAddress: EthAddress, pagination: Pagination): Promise<BannedMember[]>
   getBannedMembersCount(communityId: string): Promise<number>
   updateCommunity(
@@ -272,7 +280,8 @@ export interface ICommunitiesDatabaseComponent {
 
 export interface IVoiceDatabaseComponent {
   areUsersBeingCalledOrCallingSomeone(userAddresses: string[]): Promise<boolean>
-  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string>
+  /** Returns null when either participant already has a pending call. */
+  createPrivateVoiceChat(callerAddress: string, calleeAddress: string): Promise<string | null>
   getPrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
   deletePrivateVoiceChat(callId: string): Promise<PrivateVoiceChat | null>
   getPrivateVoiceChatForCalleeAddress(calleeAddress: string): Promise<PrivateVoiceChat | null>
@@ -446,7 +455,7 @@ export interface ICommunitiesDbHelperComponent {
 }
 
 export interface IStorageComponent {
-  storeFile: (file: Buffer, key: string) => Promise<string>
+  storeFile: (file: Buffer, key: string, contentType?: string) => Promise<string>
   exists: (key: string) => Promise<boolean>
   existsMultiple: (keys: string[]) => Promise<Record<string, boolean>>
 }
