@@ -5,14 +5,18 @@ import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/
 import { createFriendsComponent } from '../../../src/logic/friends/component'
 import { IFriendsComponent } from '../../../src/logic/friends/types'
 import { createFriendsDBMockedComponent } from '../../mocks/components/friends-db'
-import { mockConfig, mockRedis, mockRegistry } from '../../mocks/components'
+import { mockConfig, mockMetrics, mockRedis, mockRegistry } from '../../mocks/components'
 import { createMockProfile } from '../../mocks/profile'
 import { createLogsMockedComponent, createMockedPubSubComponent } from '../../mocks/components'
 import { createSNSMockedComponent } from '../../mocks/components/sns'
 import { BLOCKED_USERS_DEFAULT_LIMIT, FRIENDS_DEFAULT_LIMIT } from '../../../src/utils/friendship-pagination'
 import { Action, Friendship, User, BlockedUserWithDate, FriendshipRequest, FriendshipAction } from '../../../src/types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../../src/adapters/pubsub'
-import { BlockedUserError, InvalidFriendshipActionError } from '../../../src/logic/friends/errors'
+import {
+  BlockedUserError,
+  FriendshipRateLimitError,
+  InvalidFriendshipActionError
+} from '../../../src/logic/friends/errors'
 import { sendNotification } from '../../../src/logic/notifications'
 
 jest.mock('../../../src/logic/notifications', () => ({
@@ -40,6 +44,8 @@ describe('Friends Component', () => {
     mockSNS = createSNSMockedComponent({})
     mockSendNotification = sendNotification as jest.MockedFunction<typeof sendNotification>
     mockSendNotification.mockResolvedValue()
+    // mockRedis is shared across the file and jest.clearAllMocks() keeps implementations: reset to permissive.
+    mockRedis.consumeRateLimit.mockReset().mockResolvedValue(true)
     const logs = createLogsMockedComponent()
 
     friendsComponent = await createFriendsComponent({
@@ -47,7 +53,10 @@ describe('Friends Component', () => {
       registry: mockRegistry,
       pubsub: mockPubSub,
       sns: mockSNS,
-      logs
+      logs,
+      redis: mockRedis,
+      config: mockConfig,
+      metrics: mockMetrics
     })
   })
 
@@ -322,6 +331,152 @@ describe('Friends Component', () => {
         })
 
         expect(mockRegistry.getProfiles).toHaveBeenCalledWith(['0xfriend1'])
+      })
+    })
+  })
+
+  describe('when the friendship mutation rate limit is exhausted', () => {
+    let error: Error | undefined
+    let targetAddress: string
+
+    beforeEach(async () => {
+      targetAddress = '0x2234567890123456789012345678901234567890'
+      mockRedis.consumeRateLimit.mockResolvedValueOnce(false)
+      error = await friendsComponent.blockUser(mockUserAddress, targetAddress).catch((caught) => caught)
+    })
+
+    it('should reject the mutation with a rate limit error', () => {
+      expect(error).toBeInstanceOf(FriendshipRateLimitError)
+    })
+
+    it('should reject before reading the target profile', () => {
+      expect(mockRegistry.getProfile).not.toHaveBeenCalled()
+    })
+
+    it('should reject before writing friendship state', () => {
+      expect(mockFriendsDB.executeTx).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the rate limiter backend is unreachable', () => {
+    let targetAddress: string
+    let result: Awaited<ReturnType<typeof friendsComponent.blockUser>> | undefined
+    let error: Error | undefined
+
+    beforeEach(async () => {
+      targetAddress = '0x2234567890123456789012345678901234567890'
+      // Scoped to this context only: the top-level beforeEach resets this mock back to permissive.
+      mockRedis.consumeRateLimit.mockRejectedValue(new Error('The client is closed'))
+      mockRegistry.getProfile.mockResolvedValueOnce(createMockProfile(targetAddress))
+      mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb({} as jest.Mocked<PoolClient>))
+      mockFriendsDB.getFriendship.mockResolvedValueOnce(undefined)
+      mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: new Date() })
+      result = await friendsComponent.blockUser(mockUserAddress, targetAddress).catch((caught) => {
+        error = caught
+        return undefined
+      })
+    })
+
+    it('should allow the mutation instead of failing the request', () => {
+      expect(error).toBeUndefined()
+    })
+
+    it('should complete the block', () => {
+      expect(result).toBeDefined()
+    })
+
+    it('should record that the limiter was bypassed', () => {
+      expect(mockMetrics.increment).toHaveBeenCalledWith('friendship_rate_limiter_unavailable')
+    })
+  })
+
+  describe('when the rate limiter counts consumption per bucket', () => {
+    let senderAddress: string
+    let recipientAddress: string
+    let pairRateLimit: number
+    let consumedByKey: Map<string, number>
+
+    beforeEach(() => {
+      senderAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      recipientAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+      pairRateLimit = 10 // FRIENDSHIP_RATE_LIMIT_PER_PAIR default
+      consumedByKey = new Map<string, number>()
+
+      // Mirrors the INCR-and-compare limiter in the Redis adapter, so buckets are told apart by key.
+      mockRedis.consumeRateLimit.mockImplementation(async (key: string, limit: number) => {
+        const consumed = (consumedByKey.get(key) ?? 0) + 1
+        consumedByKey.set(key, consumed)
+        return consumed <= limit
+      })
+
+      mockFriendsDB.executeTx.mockImplementation(async (cb) => cb({} as jest.Mocked<PoolClient>))
+      mockFriendsDB.getFriendship.mockResolvedValue(undefined)
+      mockFriendsDB.blockUser.mockResolvedValue({ id: 'block-id', blocked_at: new Date() })
+      mockFriendsDB.recordFriendshipAction.mockResolvedValue('action-id')
+    })
+
+    describe('and one account exhausts the pair budget with friendship mutations against another', () => {
+      let senderError: Error | undefined
+      let recipientError: Error | undefined
+
+      beforeEach(async () => {
+        senderError = undefined
+        recipientError = undefined
+
+        mockFriendsDB.isFriendshipBlocked.mockResolvedValue(false)
+        mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(undefined)
+        mockFriendsDB.createFriendship.mockResolvedValue({ id: 'friendship-id', created_at: new Date() })
+        mockRegistry.getProfiles.mockResolvedValue([
+          createMockProfile(senderAddress),
+          createMockProfile(recipientAddress)
+        ])
+        mockRegistry.getProfile.mockResolvedValue(createMockProfile(senderAddress))
+
+        for (let attempt = 0; attempt < pairRateLimit; attempt++) {
+          await friendsComponent.upsertFriendship(senderAddress, recipientAddress, Action.REQUEST, null)
+        }
+
+        senderError = await friendsComponent
+          .upsertFriendship(senderAddress, recipientAddress, Action.REQUEST, null)
+          .then(() => undefined)
+          .catch((caught) => caught)
+        recipientError = await friendsComponent
+          .blockUser(recipientAddress, senderAddress)
+          .then(() => undefined)
+          .catch((caught) => caught)
+      })
+
+      it('should reject further friendship mutations from the sender', () => {
+        expect(senderError).toBeInstanceOf(FriendshipRateLimitError)
+      })
+
+      it('should still let the recipient block the sender', () => {
+        expect(recipientError).toBeUndefined()
+      })
+    })
+
+    describe('and the same actor loops block and unblock at the same target', () => {
+      let loopError: Error | undefined
+
+      beforeEach(async () => {
+        loopError = undefined
+
+        mockFriendsDB.unblockUser.mockResolvedValue(undefined)
+        mockRegistry.getProfile.mockResolvedValue(createMockProfile(recipientAddress))
+
+        for (let attempt = 0; attempt < pairRateLimit / 2; attempt++) {
+          await friendsComponent.blockUser(senderAddress, recipientAddress)
+          await friendsComponent.unblockUser(senderAddress, recipientAddress)
+        }
+
+        loopError = await friendsComponent
+          .blockUser(senderAddress, recipientAddress)
+          .then(() => undefined)
+          .catch((caught) => caught)
+      })
+
+      it('should reject the block once the directional pair budget is spent', () => {
+        expect(loopError).toBeInstanceOf(FriendshipRateLimitError)
       })
     })
   })

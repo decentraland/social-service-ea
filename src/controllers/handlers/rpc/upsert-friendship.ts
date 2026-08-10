@@ -7,7 +7,7 @@ import {
 import { Action, RpcServerContext, RPCServiceContext } from '../../../types'
 import { parseUpsertFriendshipRequest, parseFriendshipRequestToFriendshipRequestResponse } from '../../../logic/friends'
 import { isErrorWithMessage } from '../../../utils/errors'
-import { BlockedUserError, InvalidFriendshipActionError } from '../../../logic/friends/errors'
+import { BlockedUserError, FriendshipRateLimitError, InvalidFriendshipActionError } from '../../../logic/friends/errors'
 
 export function upsertFriendshipService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
   const logger = logs.getLogger('upsert-friendship-service')
@@ -48,7 +48,7 @@ export function upsertFriendshipService({ components: { logs, friends } }: RPCSe
     } catch (error) {
       logger.error(`Error upserting friendship: ${isErrorWithMessage(error) ? error.message : 'Unknown error'}`)
 
-      if (error instanceof InvalidRequestError) {
+      if (error instanceof InvalidRequestError || error instanceof FriendshipRateLimitError) {
         return {
           response: {
             $case: 'invalidRequest',

@@ -15,3 +15,10 @@ export class InvalidFriendshipActionError extends Error {
     super(message)
   }
 }
+
+export class FriendshipRateLimitError extends Error {
+  constructor() {
+    super('Too many friendship or block actions. Please try again later')
+    this.name = 'FriendshipRateLimitError'
+  }
+}
