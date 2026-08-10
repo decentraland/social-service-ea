@@ -192,7 +192,8 @@ describe('Community Voice Logic', () => {
             )
             expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
               communityId,
-              expect.any(Number)
+              expect.any(Number),
+              expect.stringMatching(/^(all|members)$/)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
@@ -201,7 +202,8 @@ describe('Community Voice Logic', () => {
               worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg',
-              creatorAddress
+              creatorAddress,
+              notificationScope: expect.stringMatching(/^(all|members)$/)
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -229,7 +231,8 @@ describe('Community Voice Logic', () => {
             )
             expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
               communityId,
-              expect.any(Number)
+              expect.any(Number),
+              expect.stringMatching(/^(all|members)$/)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
@@ -238,7 +241,8 @@ describe('Community Voice Logic', () => {
               worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg',
-              creatorAddress
+              creatorAddress,
+              notificationScope: expect.stringMatching(/^(all|members)$/)
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -292,7 +296,8 @@ describe('Community Voice Logic', () => {
             )
             expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
               communityId,
-              expect.any(Number)
+              expect.any(Number),
+              expect.stringMatching(/^(all|members)$/)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
@@ -301,7 +306,8 @@ describe('Community Voice Logic', () => {
               worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg',
-              creatorAddress
+              creatorAddress,
+              notificationScope: expect.stringMatching(/^(all|members)$/)
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -329,7 +335,8 @@ describe('Community Voice Logic', () => {
             )
             expect(mockCommunityVoiceChatCache.setCommunityVoiceChat).toHaveBeenCalledWith(
               communityId,
-              expect.any(Number)
+              expect.any(Number),
+              expect.stringMatching(/^(all|members)$/)
             )
             expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
               communityId,
@@ -338,7 +345,8 @@ describe('Community Voice Logic', () => {
               worlds: [],
               communityName: 'Test Community',
               communityImage: 'test-community.jpg',
-              creatorAddress
+              creatorAddress,
+              notificationScope: expect.stringMatching(/^(all|members)$/)
             })
             expect(mockAnalytics.fireEvent).toHaveBeenCalledWith(AnalyticsEvent.START_COMMUNITY_CALL, {
               call_id: communityId,
@@ -364,7 +372,8 @@ describe('Community Voice Logic', () => {
               worlds: [],
               communityName: 'Test Community', // Still gets community info even when places fail
               communityImage: 'test-community.jpg',
-              creatorAddress
+              creatorAddress,
+              notificationScope: expect.stringMatching(/^(all|members)$/)
             })
           })
         })
@@ -387,7 +396,8 @@ describe('Community Voice Logic', () => {
               worlds: [],
               communityName: 'Test Community', // Still gets community info even when placesApi fails
               communityImage: 'test-community.jpg',
-              creatorAddress
+              creatorAddress,
+              notificationScope: expect.stringMatching(/^(all|members)$/)
             })
           })
         })

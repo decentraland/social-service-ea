@@ -1225,9 +1225,8 @@ describe('Updates Handlers', () => {
         })
       })
 
-      describe('and the room ends after the community stopped being discoverable', () => {
+      describe('and a room announced to everyone ends after the community turned private', () => {
         beforeEach(async () => {
-          // Started while public and listed, so non-members saw it; private by the time it ends.
           mockCommunitiesDb.getCommunity.mockResolvedValue({
             privacy: CommunityPrivacyEnum.Private,
             visibility: CommunityVisibilityEnum.All
@@ -1240,7 +1239,8 @@ describe('Updates Handlers', () => {
               positions: [],
               worlds: [],
               communityName: '',
-              creatorAddress: '0x123'
+              creatorAddress: '0x123',
+              notificationScope: 'all'
             })
           )
         })
@@ -1251,6 +1251,55 @@ describe('Updates Handlers', () => {
 
         it('should reach the members too', () => {
           expect(emitSpy456).toHaveBeenCalled()
+        })
+      })
+
+      describe('and a room that was never announced beyond its members ends', () => {
+        beforeEach(async () => {
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: '',
+              creatorAddress: '0x123',
+              notificationScope: 'members'
+            })
+          )
+        })
+
+        it('should reach the members', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
+
+        it('should not tell a non-member the hidden community had a room', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and a broadly announced room ends while the member query is failing', () => {
+        beforeEach(async () => {
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
+            throw new Error('Community members query failed')
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: '',
+              creatorAddress: '0x123',
+              notificationScope: 'all'
+            })
+          )
+        })
+
+        it('should still clear the call for everyone rather than losing the cleanup', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+          expect(emitSpy789).toHaveBeenCalled()
         })
       })
 

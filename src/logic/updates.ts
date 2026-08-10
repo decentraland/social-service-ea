@@ -337,55 +337,62 @@ export function createUpdateHandlerComponent(
     const allOnlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
-    // An ended update reaches everyone online. Both publishers strip it to the community id and the
-    // status — no name, image, positions or worlds — so it discloses nothing the started update
-    // would have. Filtering it by the community's *current* privacy would instead strand anyone who
-    // saw the start and then had the community turn private, unlisted or deleted underneath them,
-    // leaving a call that never ends in their UI.
+    // The audience is decided at START and carried on the event, so an ended update reaches exactly
+    // the people who saw the start — even if the community turned private, unlisted or deleted in
+    // between. Deriving it from the community's *current* state would either strand those people or
+    // announce a hidden community's room to everyone.
     const isEnded = update.status === ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED
+    let scope = update.notificationScope
 
-    let communityMemberAddresses: Set<string>
-    let isDiscoverableCommunity = false
+    if (!scope) {
+      // No recorded scope: a room started before this field existed, or whose cache entry is gone.
+      // Resolve it from the community, and fail closed to members if that cannot be answered.
+      try {
+        const community = await communitiesDb.getCommunity(update.communityId)
 
-    try {
-      // The member query is an async generator: it does not start until iterated, so there is
-      // nothing to parallelize against the community read.
-      const community = isEnded ? null : await communitiesDb.getCommunity(update.communityId)
+        if (!community && !isEnded) {
+          logger.warn(`No active community ${update.communityId} for a voice chat update; dropping it`)
+          return
+        }
 
-      if (!isEnded && !community) {
-        logger.warn(`No active community ${update.communityId} for a voice chat update; dropping it`)
-        return
-      }
-
-      // Only a public AND listed community is announced beyond its membership. Unlisted ones are
-      // reachable by direct link but hidden from discovery, so a room opening must not surface one
-      // to someone who is not in it. Matches the community listing's own filter.
-      isDiscoverableCommunity =
-        community?.privacy === CommunityPrivacyEnum.Public && community?.visibility === CommunityVisibilityEnum.All
-
-      communityMemberAddresses = new Set<string>()
-
-      for await (const batch of communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)) {
-        batch.forEach(({ memberAddress }) => {
-          communityMemberAddresses.add(memberAddress)
+        scope =
+          community?.privacy === CommunityPrivacyEnum.Public && community?.visibility === CommunityVisibilityEnum.All
+            ? 'all'
+            : 'members'
+      } catch (error) {
+        logger.error(`Could not resolve the audience for a voice chat update in ${update.communityId}`, {
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
         })
+        if (!isEnded) return
+        scope = 'members'
       }
-    } catch (error) {
-      // Fail closed on a started update: it names the community and carries its image, parcel
-      // positions and worlds, so a lookup failure must not become a broadcast to everyone online.
-      logger.error(
-        `Failed to resolve the audience for a community voice chat update in ${update.communityId}; dropping it`,
-        { error: isErrorWithMessage(error) ? error.message : 'Unknown error' }
-      )
-      return
     }
 
-    // A public, listed community's room is announced to everyone online, annotated with whether
-    // they belong to it. Anything private or unlisted reaches its members only.
+    // A broad-scope update needs no membership lookup at all, so cleanup for the largest audience
+    // cannot be lost to a transient query failure.
+    const communityMemberAddresses = new Set<string>()
+
+    if (scope === 'members' || !isEnded) {
+      try {
+        // An async generator: the query starts when iterated, so there is nothing to parallelize.
+        for await (const batch of communityMembers.getOnlineMembersFromCommunity(
+          update.communityId,
+          onlineSubscribers
+        )) {
+          batch.forEach(({ memberAddress }) => communityMemberAddresses.add(memberAddress))
+        }
+      } catch (error) {
+        logger.error(`Failed to resolve the members for a voice chat update in ${update.communityId}`, {
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+        })
+        // A start cannot be delivered without knowing who may see it. An ended update still goes to
+        // the broad audience if that is its scope; only a member-scoped one is lost here.
+        if (!isEnded || scope === 'members') return
+      }
+    }
+
     const recipients =
-      isEnded || isDiscoverableCommunity
-        ? onlineSubscribers
-        : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
+      scope === 'all' ? onlineSubscribers : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
 
     const baseUpdate = { ...update }
 

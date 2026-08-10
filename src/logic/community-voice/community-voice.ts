@@ -1,10 +1,16 @@
 import { Events } from '@dcl/schemas'
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
-import { AppComponents, CommunityVoiceChat, CommunityRole, CommunityVoiceChatStatus } from '../../types'
+import {
+  AppComponents,
+  CommunityVoiceChat,
+  CommunityRole,
+  CommunityVoiceChatStatus,
+  CommunityVoiceChatNotificationScope
+} from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage, errorMessageOrDefault } from '../../utils/errors'
 import { separatePositionsAndWorlds } from '../../utils/places'
-import { ActiveCommunityVoiceChat, CommunityPrivacyEnum } from '../community/types'
+import { ActiveCommunityVoiceChat, CommunityPrivacyEnum, CommunityVisibilityEnum } from '../community/types'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   CommunityVoiceChatNotFoundError,
@@ -125,14 +131,13 @@ export async function createCommunityVoiceComponent({
       )
       logger.info(`Community voice chat room created for community ${communityId}`)
 
-      // Add to cache as active
       const createdAt = Date.now()
-      await communityVoiceChatCache.setCommunityVoiceChat(communityId, createdAt)
 
       // Get community information for the update
       let communityPositions: string[] = []
       let communityWorlds: string[] = []
       let communityName = ''
+      let notificationScope: CommunityVoiceChatNotificationScope = 'members'
       let communityImage: string | undefined = undefined
 
       try {
@@ -145,6 +150,12 @@ export async function createCommunityVoiceComponent({
         if (community) {
           communityName = community.name
           communityImage = thumbnail || undefined
+          // Recorded now, so the ended update can reach exactly this audience even if the
+          // community's privacy or visibility changes before the room finishes.
+          notificationScope =
+            community.privacy === CommunityPrivacyEnum.Public && community.visibility === CommunityVisibilityEnum.All
+              ? 'all'
+              : 'members'
         }
 
         // Get community places and separate positions from worlds
@@ -182,6 +193,10 @@ export async function createCommunityVoiceComponent({
         // Continue without community info - non-critical error
       }
 
+      // Cached after the lookup so the scope is recorded with the room: the ended update reads it
+      // back to reach the audience the start actually had.
+      await communityVoiceChatCache.setCommunityVoiceChat(communityId, createdAt, notificationScope)
+
       await Promise.all([
         // Publish start event with community information using protocol enum
         pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
@@ -191,7 +206,8 @@ export async function createCommunityVoiceComponent({
           worlds: communityWorlds,
           communityName,
           communityImage,
-          creatorAddress
+          creatorAddress,
+          notificationScope
         }),
         communityBroadcaster.broadcast(
           {
@@ -279,6 +295,9 @@ export async function createCommunityVoiceComponent({
       await commsGatekeeper.endCommunityVoiceChatRoom(communityId, userAddress)
       logger.info(`Community voice chat room ended for community ${communityId}`)
 
+      // Read the recorded audience before dropping the entry that holds it.
+      const cachedChatOnEnd = await communityVoiceChatCache.getCommunityVoiceChat(communityId)
+
       // Remove from cache
       await communityVoiceChatCache.removeCommunityVoiceChat(communityId)
 
@@ -289,7 +308,9 @@ export async function createCommunityVoiceComponent({
         positions: undefined,
         worlds: undefined,
         communityName: undefined,
-        communityImage: undefined
+        communityImage: undefined,
+        // The audience the room was announced to at start; cleanup must reach exactly them.
+        notificationScope: cachedChatOnEnd?.notificationScope
       })
 
       // Analytics event

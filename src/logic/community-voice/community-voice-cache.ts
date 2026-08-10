@@ -1,5 +1,5 @@
 import { isErrorWithMessage } from '../../utils/errors'
-import { AppComponents } from '../../types'
+import { AppComponents, CommunityVoiceChatNotificationScope } from '../../types'
 
 /**
  * Represents an active community voice chat in the cache
@@ -9,6 +9,8 @@ export interface CachedCommunityVoiceChat {
   isActive: boolean
   lastChecked: number
   createdAt: number
+  /** Who the room was announced to at start; absent for rooms cached before this was recorded. */
+  notificationScope?: CommunityVoiceChatNotificationScope
 }
 
 /**
@@ -20,7 +22,11 @@ export interface ICommunityVoiceChatCacheComponent {
    * @param communityId - The community ID
    * @param createdAt - When the voice chat was created (optional, defaults to now)
    */
-  setCommunityVoiceChat(communityId: string, createdAt?: number): Promise<void>
+  setCommunityVoiceChat(
+    communityId: string,
+    createdAt?: number,
+    notificationScope?: CommunityVoiceChatNotificationScope
+  ): Promise<void>
 
   /**
    * Gets a community voice chat from the cache
@@ -66,7 +72,11 @@ export function createCommunityVoiceChatCacheComponent({
     return `${CACHE_PREFIX}${communityId}`
   }
 
-  async function setCommunityVoiceChat(communityId: string, createdAt: number = Date.now()): Promise<void> {
+  async function setCommunityVoiceChat(
+    communityId: string,
+    createdAt: number = Date.now(),
+    notificationScope?: CommunityVoiceChatNotificationScope
+  ): Promise<void> {
     const now = Date.now()
     const existing = await getCommunityVoiceChat(communityId)
 
@@ -74,7 +84,9 @@ export function createCommunityVoiceChatCacheComponent({
       communityId,
       isActive: true, // Always true for active chats
       lastChecked: now,
-      createdAt: existing?.createdAt ?? createdAt
+      createdAt: existing?.createdAt ?? createdAt,
+      // The scope belongs to the room's start; the poller must not overwrite it on a refresh.
+      notificationScope: existing?.notificationScope ?? notificationScope
     }
 
     await redis.put(getCacheKey(communityId), cachedChat, { EX: CACHE_TTL })
