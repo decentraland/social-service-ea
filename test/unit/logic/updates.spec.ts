@@ -4,7 +4,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createUpdateHandlerComponent } from '../../../src/logic/updates'
-import { CommunityPrivacyEnum } from '../../../src/logic/community'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../../src/logic/community'
 import { mockRegistry, mockFriendsDB, createMockPeersStatsComponent } from '../../mocks/components'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { Emitter } from 'mitt'
@@ -62,7 +62,9 @@ describe('Updates Handlers', () => {
 
     mockCommunitiesDb = {
       getCommunityMemberRole: jest.fn(),
-      getCommunity: jest.fn().mockResolvedValue({ privacy: CommunityPrivacyEnum.Public })
+      getCommunity: jest
+        .fn()
+        .mockResolvedValue({ privacy: CommunityPrivacyEnum.Public, visibility: CommunityVisibilityEnum.All })
     }
 
     mockPeersStats = createMockPeersStatsComponent()
@@ -1167,7 +1169,10 @@ describe('Updates Handlers', () => {
 
       describe('and the community is private', () => {
         beforeEach(async () => {
-          mockCommunitiesDb.getCommunity.mockResolvedValue({ privacy: CommunityPrivacyEnum.Private })
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
 
           await updateHandler.communityVoiceChatUpdateHandler(
             JSON.stringify({
@@ -1187,6 +1192,35 @@ describe('Updates Handlers', () => {
         })
 
         it('should not name the community to a non-member', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the community is public but unlisted', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.Unlisted
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              voiceChatId: 'voice-chat-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1', '1,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-image.jpg',
+              creatorAddress: '0x123'
+            })
+          )
+        })
+
+        it('should tell the members', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
+
+        it('should not surface an unlisted community to a non-member', () => {
           expect(emitSpy789).not.toHaveBeenCalled()
         })
       })

@@ -7,7 +7,7 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
-import { CommunityPrivacyEnum } from './community'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from './community'
 import { isErrorWithMessage } from '../utils/errors'
 import { VoiceChatStatus } from './voice/types'
 import { IUpdateHandlerComponent } from '../types/components'
@@ -335,7 +335,7 @@ export function createUpdateHandlerComponent(
     const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
     let communityMemberAddresses: Set<string>
-    let isPublicCommunity: boolean
+    let isDiscoverableCommunity: boolean
 
     try {
       const [community, batches] = await Promise.all([
@@ -343,7 +343,11 @@ export function createUpdateHandlerComponent(
         Promise.resolve(communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers))
       ])
 
-      isPublicCommunity = community?.privacy === CommunityPrivacyEnum.Public
+      // Only a public AND listed community is announced beyond its membership. Unlisted ones are
+      // reachable by direct link but hidden from discovery, so a room opening must not surface one
+      // to someone who is not in it. Matches the community listing's own filter.
+      isDiscoverableCommunity =
+        community?.privacy === CommunityPrivacyEnum.Public && community?.visibility === CommunityVisibilityEnum.All
       communityMemberAddresses = new Set<string>()
 
       for await (const batch of batches) {
@@ -361,9 +365,9 @@ export function createUpdateHandlerComponent(
       return
     }
 
-    // A private community's room is only announced to its members. A public one is announced to
-    // everyone online, annotated with whether they belong to it.
-    const recipients = isPublicCommunity
+    // A public, listed community's room is announced to everyone online, annotated with whether
+    // they belong to it. Anything private or unlisted reaches its members only.
+    const recipients = isDiscoverableCommunity
       ? onlineSubscribers
       : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
 
