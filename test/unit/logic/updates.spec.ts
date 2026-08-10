@@ -1303,6 +1303,59 @@ describe('Updates Handlers', () => {
         })
       })
 
+      describe('and a member-scoped room ends while the member query is failing', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: [],
+              worlds: [],
+              communityName: 'Private community',
+              creatorAddress: '0x123',
+              notificationScope: 'members'
+            })
+          )
+
+          emitSpy456.mockClear()
+          emitSpy789.mockClear()
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
+            throw new Error('Community members query failed')
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: '',
+              notificationScope: 'members'
+            })
+          )
+        })
+
+        it('should clear the call for a member from the start-time audience', () => {
+          expect(emitSpy456).toHaveBeenCalledWith(
+            'communityVoiceChatUpdate',
+            expect.objectContaining({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              isMember: true
+            })
+          )
+        })
+
+        it('should not disclose the ended room to a non-member', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
       describe('and the community no longer exists when a room starts', () => {
         beforeEach(async () => {
           mockCommunitiesDb.getCommunity.mockResolvedValue(null)

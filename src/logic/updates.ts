@@ -83,6 +83,11 @@ export function createUpdateHandlerComponent(
   const { logs, subscribersContext, friendsDb, communitiesDb, communityMembers, registry, metrics, peersStats } =
     components
   const logger = logs.getLogger('update-handler')
+  // Each pub/sub consumer records the local audience that was eligible for a member-scoped
+  // STARTED update. Reusing it for ENDED both reaches members who left during the call and keeps
+  // cleanup independent from a transient membership-query failure. A missing entry (restart or
+  // legacy room) falls back to resolving the current members below.
+  const memberScopedVoiceChatAudiences = new Map<string, Set<string>>()
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
     return async (message: string) => {
@@ -368,11 +373,12 @@ export function createUpdateHandlerComponent(
       }
     }
 
-    // A broad-scope update needs no membership lookup at all, so cleanup for the largest audience
-    // cannot be lost to a transient query failure.
+    // A broad-scope update and a member-scoped cleanup with a start-time audience need no
+    // membership lookup, so their cleanup cannot be lost to a transient query failure.
     const communityMemberAddresses = new Set<string>()
+    const startTimeMemberAudience = isEnded ? memberScopedVoiceChatAudiences.get(update.communityId) : undefined
 
-    if (scope === 'members' || !isEnded) {
+    if (!isEnded || (scope === 'members' && !startTimeMemberAudience)) {
       try {
         // An async generator: the query starts when iterated, so there is nothing to parallelize.
         for await (const batch of communityMembers.getOnlineMembersFromCommunity(
@@ -385,21 +391,37 @@ export function createUpdateHandlerComponent(
         logger.error(`Failed to resolve the members for a voice chat update in ${update.communityId}`, {
           error: isErrorWithMessage(error) ? error.message : 'Unknown error'
         })
-        // A start cannot be delivered without knowing who may see it. An ended update still goes to
-        // the broad audience if that is its scope; only a member-scoped one is lost here.
+        // A start cannot be delivered without knowing who may see it. An ended update normally has
+        // its start-time audience; this fallback can only fail for a legacy room or after a restart.
         if (!isEnded || scope === 'members') return
       }
     }
 
     const recipients =
-      scope === 'all' ? onlineSubscribers : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
+      scope === 'all'
+        ? onlineSubscribers
+        : onlineSubscribers.filter((address) => (startTimeMemberAudience ?? communityMemberAddresses).has(address))
+
+    if (!isEnded) {
+      if (scope === 'members') {
+        const audience = new Set(recipients)
+        // The creator is deliberately excluded from STARTED delivery because they initiated the
+        // room, but they still have active-call UI and must receive a later cleanup.
+        if (creatorAddress && allOnlineSubscribers.includes(creatorAddress)) {
+          audience.add(creatorAddress)
+        }
+        memberScopedVoiceChatAudiences.set(update.communityId, audience)
+      } else {
+        memberScopedVoiceChatAudiences.delete(update.communityId)
+      }
+    }
 
     const baseUpdate = { ...update }
 
     await processInBatches(
       recipients,
       (userAddress) => {
-        const isMember = communityMemberAddresses.has(userAddress)
+        const isMember = scope === 'members' || communityMemberAddresses.has(userAddress)
         const updateEmitter = subscribersContext.getSubscriber(userAddress)
         if (updateEmitter) {
           updateEmitter.emit('communityVoiceChatUpdate', { ...baseUpdate, isMember })
@@ -407,6 +429,10 @@ export function createUpdateHandlerComponent(
       },
       20 // Process 20 users before yielding the event loop
     )
+
+    if (isEnded) {
+      memberScopedVoiceChatAudiences.delete(update.communityId)
+    }
 
     logger.info(`Community voice chat update sent to ${recipients.length} online users`)
   })
