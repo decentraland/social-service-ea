@@ -933,7 +933,6 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               expect(communityIds).toContain(listedCommunityId)
             })
           })
-
         })
       })
 
@@ -1321,6 +1320,16 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(body.data.total).toBeGreaterThanOrEqual(2)
           expect(body.data.page).toBe(1)
           expect(body.data.limit).toBe(50)
+        })
+      })
+
+      describe('and no search query is given', () => {
+        it('should respond with a 400 rather than returning every community', async () => {
+          const response = await makeRequest(identity, '/v1/communities?minimal=true&limit=50')
+
+          expect(response.status).toBe(400)
+          const body = await response.json()
+          expect(body.message).toContain('at least 3 characters')
         })
       })
 

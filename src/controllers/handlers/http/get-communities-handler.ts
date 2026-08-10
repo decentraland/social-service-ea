@@ -42,7 +42,9 @@ export async function getCommunitiesHandler(
         throw new NotAuthorizedError('Authentication required for minimal community search')
       }
 
-      if (search && search.length < MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE) {
+      // Required, not just bounded: without a term the query returns every community, which turns
+      // name search into a walkable directory.
+      if (!search || search.length < MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE) {
         throw new InvalidRequestError(
           `Search query must be at least ${MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE} characters when using minimal`
         )
