@@ -25,6 +25,13 @@ export const MAX_PAGINATION_OFFSET = 100_000
  * so an omitted or oversized page size cannot turn into an unbounded query and an unbounded
  * downstream profile lookup.
  *
+ * The caps are applied silently. `PaginatedResponse` carries only `total` and `page`, so a caller
+ * cannot see that its requested limit was reduced, and one that derives its next offset from the
+ * size it asked for would skip rows rather than re-page. That is why each maximum above is set at
+ * or above the largest page a shipping client actually requests: today no caller is ever capped.
+ * A client raising its page size past these values needs the constant raised in the same change,
+ * or an effective-limit field added to the protocol response.
+ *
  * @param pagination - Optional pagination supplied by an RPC or internal caller
  * @param bounds - The default and maximum limit for this particular call
  * @returns A positive bounded limit and a nonnegative bounded offset
