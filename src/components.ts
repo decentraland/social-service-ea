@@ -294,7 +294,7 @@ export async function initComponents(): Promise<AppComponents> {
   )
 
   const userMutes = await createUserMutesComponent({ userMutesDb, logs })
-  const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs })
+  const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs, redis, config, metrics })
   const updateHandler = createUpdateHandlerComponent({
     logs,
     subscribersContext,

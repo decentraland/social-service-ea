@@ -134,7 +134,9 @@ export interface IFriendsDatabaseComponent {
   unblockUser(blockerAddress: string, blockedAddress: string, txClient?: PoolClient): Promise<void>
   blockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
   unblockUsers(blockerAddress: string, blockedAddresses: string[]): Promise<void>
-  getBlockedUsers(blockerAddress: string): Promise<BlockedUserWithDate[]>
+  /** Returns the complete list unless `pagination` is supplied. See the note on the implementation. */
+  getBlockedUsers(blockerAddress: string, pagination?: Pagination): Promise<BlockedUserWithDate[]>
+  getBlockedUsersCount(blockerAddress: string): Promise<number>
   getBlockedByUsers(blockedAddress: string): Promise<BlockedUserWithDate[]>
   isFriendshipBlocked(blockerAddress: string, blockedAddress: string): Promise<boolean>
   executeTx<T>(cb: (client: PoolClient) => Promise<T>): Promise<T>
@@ -293,6 +295,7 @@ export interface IRedisComponent extends IBaseComponent {
   sRem: (key: string, members: string | string[]) => Promise<number>
   sMembers: (key: string) => Promise<string[]>
   sCard: (key: string) => Promise<number>
+  consumeRateLimit: (key: string, limit: number, windowSeconds: number) => Promise<boolean>
 }
 
 export interface ICacheComponent extends IBaseCacheComponent {

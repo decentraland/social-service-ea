@@ -70,7 +70,7 @@ describe('when getting blocked users', () => {
       it('should return an empty list', async () => {
         const response = await getBlockedUsers({ pagination: { limit: 10, offset: 0 } }, rpcContext)
 
-        expect(getBlockedUsersMethod).toHaveBeenCalledWith(rpcContext.address)
+        expect(getBlockedUsersMethod).toHaveBeenCalledWith(rpcContext.address, { limit: 10, offset: 0 })
         expect(response).toEqual({
           profiles: [],
           paginationData: {
@@ -95,7 +95,7 @@ describe('when getting blocked users', () => {
       it('should return the list of blocked users with the pagination data for the page', async () => {
         const response = await getBlockedUsers({ pagination: { limit: 2, offset: 0 } }, rpcContext)
 
-        expect(getBlockedUsersMethod).toHaveBeenCalledWith(rpcContext.address)
+        expect(getBlockedUsersMethod).toHaveBeenCalledWith(rpcContext.address, { limit: 2, offset: 0 })
         expect(response).toEqual({
           profiles: parseProfilesToBlockedUsers(blockedUsersData.blockedProfiles, blockedUsersData.blockedUsers),
           paginationData: {
