@@ -1225,6 +1225,57 @@ describe('Updates Handlers', () => {
         })
       })
 
+      describe('and the room ends after the community stopped being discoverable', () => {
+        beforeEach(async () => {
+          // Started while public and listed, so non-members saw it; private by the time it ends.
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: '',
+              creatorAddress: '0x123'
+            })
+          )
+        })
+
+        it('should still reach a non-member so their call UI is cleared', () => {
+          expect(emitSpy789).toHaveBeenCalled()
+        })
+
+        it('should reach the members too', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
+      })
+
+      describe('and the community no longer exists when a room starts', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue(null)
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1'],
+              communityName: 'Test Community',
+              communityImage: 'test-image.jpg',
+              creatorAddress: '0x123'
+            })
+          )
+        })
+
+        it('should drop the update rather than emitting to anyone', () => {
+          expect(emitSpy456).not.toHaveBeenCalled()
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
       describe('and the audience cannot be resolved', () => {
         beforeEach(async () => {
           mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {

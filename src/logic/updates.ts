@@ -6,6 +6,7 @@ import {
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
+import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { normalizeAddress } from '../utils/address'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from './community'
 import { isErrorWithMessage } from '../utils/errors'
@@ -327,37 +328,51 @@ export function createUpdateHandlerComponent(
   })
 
   const communityVoiceChatUpdateHandler = handleUpdate<'communityVoiceChatUpdate'>(async (update) => {
-    logger.info('Community voice chat update', { update: JSON.stringify(update) })
+    // Allowlist the loggable fields: a started update carries the community's name, image, parcel
+    // positions and worlds, and this runs before the audience is decided.
+    logger.info('Community voice chat update', { communityId: update.communityId, status: update.status })
 
     // Get all online subscribers, excluding the creator if present (creator already knows about their action)
     const creatorAddress = update.creatorAddress?.toLowerCase()
     const allOnlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
+    // An ended update reaches everyone online. Both publishers strip it to the community id and the
+    // status — no name, image, positions or worlds — so it discloses nothing the started update
+    // would have. Filtering it by the community's *current* privacy would instead strand anyone who
+    // saw the start and then had the community turn private, unlisted or deleted underneath them,
+    // leaving a call that never ends in their UI.
+    const isEnded = update.status === ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED
+
     let communityMemberAddresses: Set<string>
-    let isDiscoverableCommunity: boolean
+    let isDiscoverableCommunity = false
 
     try {
-      const [community, batches] = await Promise.all([
-        communitiesDb.getCommunity(update.communityId),
-        Promise.resolve(communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers))
-      ])
+      // The member query is an async generator: it does not start until iterated, so there is
+      // nothing to parallelize against the community read.
+      const community = isEnded ? null : await communitiesDb.getCommunity(update.communityId)
+
+      if (!isEnded && !community) {
+        logger.warn(`No active community ${update.communityId} for a voice chat update; dropping it`)
+        return
+      }
 
       // Only a public AND listed community is announced beyond its membership. Unlisted ones are
       // reachable by direct link but hidden from discovery, so a room opening must not surface one
       // to someone who is not in it. Matches the community listing's own filter.
       isDiscoverableCommunity =
         community?.privacy === CommunityPrivacyEnum.Public && community?.visibility === CommunityVisibilityEnum.All
+
       communityMemberAddresses = new Set<string>()
 
-      for await (const batch of batches) {
+      for await (const batch of communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)) {
         batch.forEach(({ memberAddress }) => {
           communityMemberAddresses.add(memberAddress)
         })
       }
     } catch (error) {
-      // Fail closed. The payload names the community and carries its image, parcel positions and
-      // worlds, so a lookup failure must not become a broadcast to everyone online.
+      // Fail closed on a started update: it names the community and carries its image, parcel
+      // positions and worlds, so a lookup failure must not become a broadcast to everyone online.
       logger.error(
         `Failed to resolve the audience for a community voice chat update in ${update.communityId}; dropping it`,
         { error: isErrorWithMessage(error) ? error.message : 'Unknown error' }
@@ -367,9 +382,10 @@ export function createUpdateHandlerComponent(
 
     // A public, listed community's room is announced to everyone online, annotated with whether
     // they belong to it. Anything private or unlisted reaches its members only.
-    const recipients = isDiscoverableCommunity
-      ? onlineSubscribers
-      : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
+    const recipients =
+      isEnded || isDiscoverableCommunity
+        ? onlineSubscribers
+        : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
 
     const baseUpdate = { ...update }
 
