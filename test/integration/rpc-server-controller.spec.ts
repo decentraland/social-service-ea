@@ -672,6 +672,7 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
 
       // Setup spies for DB methods to verify interactions
       communitiesDbSpy.getCommunityMemberRole = jest.spyOn(communitiesDb, 'getCommunityMemberRole')
+      communitiesDbSpy.getCommunityMemberRoles = jest.spyOn(communitiesDb, 'getCommunityMemberRoles')
       communitiesDbSpy.getCommunity = jest.spyOn(communitiesDb, 'getCommunity')
       communitiesDbSpy.isMemberBanned = jest.spyOn(communitiesDb, 'isMemberBanned')
 
@@ -1046,11 +1047,11 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
             userAddress: targetMemberAddress
           })
 
-          // Verify DB interactions occurred
-          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(
-            communityId,
-            rpcClient.authAddress.toLowerCase()
-          )
+          // Verify DB interactions occurred. Moderation resolves both roles in one batched read.
+          expect(communitiesDbSpy.getCommunityMemberRoles).toHaveBeenCalledWith(communityId, [
+            rpcClient.authAddress.toLowerCase(),
+            targetMemberAddress.toLowerCase()
+          ])
           // For public communities, no additional validation calls are made for target user
           expect(communitiesDbSpy.getCommunity).toHaveBeenCalledWith(communityId, rpcClient.authAddress.toLowerCase())
 
@@ -1101,11 +1102,11 @@ test('RPC Server Controller', function ({ components, stubComponents }) {
             userAddress: targetMemberAddress
           })
 
-          // Verify DB interactions occurred
-          expect(communitiesDbSpy.getCommunityMemberRole).toHaveBeenCalledWith(
-            communityId,
-            rpcClient.authAddress.toLowerCase()
-          )
+          // Verify DB interactions occurred. Moderation resolves both roles in one batched read.
+          expect(communitiesDbSpy.getCommunityMemberRoles).toHaveBeenCalledWith(communityId, [
+            rpcClient.authAddress.toLowerCase(),
+            targetMemberAddress.toLowerCase()
+          ])
           // For kick operations, no validation is performed on target user
 
           // Verify external service calls

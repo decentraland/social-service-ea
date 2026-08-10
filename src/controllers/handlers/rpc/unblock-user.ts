@@ -4,9 +4,9 @@ import {
   UnblockUserResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
-import { parseProfileToBlockedUser } from '../../../logic/friends'
+import { parseAddressToBlockedUser, parseProfileToBlockedUser } from '../../../logic/friends'
 import { InvalidRequestError } from '../../errors/rpc.errors'
-import { ProfileNotFoundError } from '../../../logic/friends/errors'
+import { FriendshipRateLimitError, ProfileNotFoundError } from '../../../logic/friends/errors'
 import { normalizeAddress } from '../../../utils/address'
 
 export function unblockUserService({ components: { logs, friends } }: RPCServiceContext<'logs' | 'friends'>) {
@@ -32,7 +32,9 @@ export function unblockUserService({ components: { logs, friends } }: RPCService
         response: {
           $case: 'ok',
           ok: {
-            profile: parseProfileToBlockedUser(unblockedUserProfile)
+            profile: unblockedUserProfile
+              ? parseProfileToBlockedUser(unblockedUserProfile)
+              : parseAddressToBlockedUser(blockedAddress)
           }
         }
       }
@@ -51,7 +53,7 @@ export function unblockUserService({ components: { logs, friends } }: RPCService
             }
           }
         }
-      } else if (error instanceof InvalidRequestError) {
+      } else if (error instanceof InvalidRequestError || error instanceof FriendshipRateLimitError) {
         return {
           response: {
             $case: 'invalidRequest',

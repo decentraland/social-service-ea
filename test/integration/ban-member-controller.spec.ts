@@ -188,7 +188,7 @@ test('Ban Member Controller', function ({ components, spyComponents }) {
             expect(spyComponents.communityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_BANNED,
-              key: expect.stringContaining(`${communityId}-${targetMemberAddress}-`),
+              key: `${communityId}-${targetMemberAddress}`,
               timestamp: expect.any(Number),
               metadata: {
                 id: communityId,

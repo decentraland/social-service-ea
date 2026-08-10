@@ -9,7 +9,14 @@ import {
 } from '../../../logic/settings/utils'
 import { RpcServerContext, RPCServiceContext } from '../../../types'
 import { isErrorWithMessage } from '../../../utils/errors'
+import { PrivateMessagesPrivacy } from '../../../types'
 
+/**
+ * Creates the social-settings RPC handler with fail-closed Gatekeeper synchronization.
+ *
+ * @param context RPC service components.
+ * @returns A handler for social-settings updates.
+ */
 export function upsertSocialSettingsService({
   components: { logs, friendsDb, commsGatekeeper }
 }: RPCServiceContext<'logs' | 'friendsDb' | 'commsGatekeeper'>) {
@@ -37,16 +44,32 @@ export function upsertSocialSettingsService({
 
       const dbSettings = convertRPCSettingsIntoDBSettings(request)
 
-      // Update the private message privacy metadata in the comms gatekeeper and the database
-      const [_, settings] = await Promise.all([
-        dbSettings.private_messages_privacy !== undefined
-          ? await commsGatekeeper
-              .updateUserPrivateMessagePrivacyMetadata(context.address, dbSettings.private_messages_privacy)
-              // Ignore errors
-              .catch((_) => undefined)
-          : Promise.resolve(),
-        friendsDb.upsertSocialSettings(context.address, dbSettings)
-      ])
+      const { private_messages_privacy: privacyUpdate, ...otherSettings } = dbSettings
+
+      let settings: Awaited<ReturnType<typeof friendsDb.upsertSocialSettings>>
+      if (privacyUpdate === PrivateMessagesPrivacy.ONLY_FRIENDS) {
+        // Tightening must reach Gatekeeper first. If it fails, the permissive database value is
+        // left untouched and the client receives an error instead of a false success.
+        try {
+          await commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(context.address, privacyUpdate)
+        } catch (error) {
+          // Settings Gatekeeper has no say over are still persisted, so a co-submitted change
+          // is not silently discarded along with the privacy one.
+          if (Object.keys(otherSettings).length > 0) {
+            await friendsDb.upsertSocialSettings(context.address, otherSettings)
+          }
+          throw error
+        }
+
+        settings = await friendsDb.upsertSocialSettings(context.address, dbSettings)
+      } else {
+        // Loosening is written locally first. If Gatekeeper then fails it retains the more
+        // restrictive value, which is inconsistent but fail-closed and visible to the client.
+        settings = await friendsDb.upsertSocialSettings(context.address, dbSettings)
+        if (privacyUpdate !== undefined) {
+          await commsGatekeeper.updateUserPrivateMessagePrivacyMetadata(context.address, privacyUpdate)
+        }
+      }
 
       return {
         response: {

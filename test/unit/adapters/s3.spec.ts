@@ -107,12 +107,44 @@ describe('S3 Adapter', () => {
   })
 
   describe('storeFile()', () => {
+    let fileBuffer: Buffer
+    let Upload: jest.Mock
+
+    beforeEach(() => {
+      fileBuffer = Buffer.from('test content')
+      Upload = require('@aws-sdk/lib-storage').Upload
+      Upload.mockClear()
+    })
+
     describe('when storing a file', () => {
       it('should return the correct S3 URL', async () => {
-        const fileBuffer = Buffer.from('test content')
         const result = await s3Adapter.storeFile(fileBuffer, 'test-key')
 
         expect(result).toBe('https://s3.amazonaws.com/test-bucket/social/test-key')
+      })
+    })
+
+    describe('when a content type is given', () => {
+      it('should store the object under that content type', async () => {
+        await s3Adapter.storeFile(fileBuffer, 'test-key', 'image/webp')
+
+        expect(Upload).toHaveBeenCalledWith(
+          expect.objectContaining({
+            params: expect.objectContaining({ ContentType: 'image/webp' })
+          })
+        )
+      })
+    })
+
+    describe('when no content type is given', () => {
+      it('should fall back to image/png, as every stored object did before', async () => {
+        await s3Adapter.storeFile(fileBuffer, 'test-key')
+
+        expect(Upload).toHaveBeenCalledWith(
+          expect.objectContaining({
+            params: expect.objectContaining({ ContentType: 'image/png' })
+          })
+        )
       })
     })
   })

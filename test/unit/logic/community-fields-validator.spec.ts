@@ -5,24 +5,14 @@ import { InvalidRequestError } from '@dcl/http-commons'
 import { CommunityPrivacyEnum } from '../../../src/logic/community'
 import { IConfigComponent } from '@well-known-components/interfaces'
 
-// Mock file-type module
-jest.mock('file-type', () => ({
-  fromBuffer: jest.fn()
-}))
-
-import fileType from 'file-type'
-
 describe('CommunityFieldsValidator', () => {
   let configMock: jest.Mocked<IConfigComponent>
   let fieldsValidator: ICommunityFieldsValidatorComponent
-  let mockFileType: jest.Mocked<typeof fileType>
 
   beforeEach(async () => {
     configMock = createMockConfigComponent({
       getString: jest.fn().mockResolvedValue('admin,moderator,test')
     })
-
-    mockFileType = fileType as jest.Mocked<typeof fileType>
 
     fieldsValidator = await createCommunityFieldsValidatorComponent({
       config: configMock
@@ -260,68 +250,98 @@ describe('CommunityFieldsValidator', () => {
 
     describe('and thumbnail validation', () => {
       describe('and thumbnail is valid', () => {
-        beforeEach(() => {
-          mockFileType.fromBuffer.mockResolvedValue({
-            mime: 'image/png',
-            ext: 'png'
-          } as any)
-        })
+        // One case per advertised format, so dropping a signature cannot pass
+        // unnoticed. Each buffer carries the format's leading bytes, which is
+        // what the validator inspects, padded past the 1KB minimum.
+        describe.each([
+          ['PNG', [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
+          ['JPEG', [0xff, 0xd8, 0xff, 0xe0]],
+          ['GIF87a', [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]],
+          ['GIF89a', [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]],
+          [
+            'WebP',
+            [0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]
+          ]
+        ])('and the thumbnail is a %s', (_format: string, signature: number[]) => {
+          let validImageBuffer: Buffer
+          let formData: { fields: { name: { value: string } } }
 
-        it('should pass validation for valid image buffer', async () => {
-          const validImageBuffer = Buffer.alloc(2048) // 2KB buffer
-          const formData = {
-            fields: {
-              name: { value: 'Test Community' }
+          beforeEach(() => {
+            validImageBuffer = Buffer.alloc(2048)
+            Buffer.from(signature).copy(validImageBuffer)
+            formData = {
+              fields: {
+                name: { value: 'Test Community' }
+              }
             }
-          }
+          })
 
-          const result = await fieldsValidator.validate(formData, validImageBuffer)
+          it('should pass validation and keep the buffer', async () => {
+            const result = await fieldsValidator.validate(formData, validImageBuffer)
 
-          expect(result.thumbnailBuffer).toBe(validImageBuffer)
+            expect(result.thumbnailBuffer).toBe(validImageBuffer)
+          })
         })
       })
 
       describe('and thumbnail is invalid', () => {
-        it('should throw error for non-image buffer', async () => {
-          mockFileType.fromBuffer.mockResolvedValue(null)
-          const invalidBuffer = Buffer.from('not-an-image')
-          const formData = {
+        let formData: { fields: { name: { value: string } } }
+
+        beforeEach(() => {
+          formData = {
             fields: {
               name: { value: 'Test Community' }
             }
           }
-
-          await expect(fieldsValidator.validate(formData, invalidBuffer)).rejects.toThrow(InvalidRequestError)
         })
 
-        it('should throw error for buffer smaller than 1KB', async () => {
-          mockFileType.fromBuffer.mockResolvedValue({
-            mime: 'image/png',
-            ext: 'png'
-          } as any)
-          const smallBuffer = Buffer.from('small')
-          const formData = {
-            fields: {
-              name: { value: 'Test Community' }
-            }
-          }
+        describe('and the bytes do not have a supported image signature', () => {
+          let invalidBuffer: Buffer
 
-          await expect(fieldsValidator.validate(formData, smallBuffer)).rejects.toThrow(InvalidRequestError)
+          beforeEach(() => {
+            invalidBuffer = Buffer.alloc(2048, 0x61)
+          })
+
+          afterEach(() => {
+            invalidBuffer = Buffer.alloc(0)
+          })
+
+          it('should reject the thumbnail without invoking a media-container parser', async () => {
+            await expect(fieldsValidator.validate(formData, invalidBuffer)).rejects.toThrow(InvalidRequestError)
+          })
         })
 
-        it('should throw error for buffer larger than 500KB', async () => {
-          mockFileType.fromBuffer.mockResolvedValue({
-            mime: 'image/png',
-            ext: 'png'
-          } as any)
-          const largeBuffer = Buffer.alloc(501 * 1024)
-          const formData = {
-            fields: {
-              name: { value: 'Test Community' }
-            }
-          }
+        describe('and the thumbnail is smaller than 1KB', () => {
+          let smallBuffer: Buffer
 
-          await expect(fieldsValidator.validate(formData, largeBuffer)).rejects.toThrow(InvalidRequestError)
+          beforeEach(() => {
+            smallBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+          })
+
+          afterEach(() => {
+            smallBuffer = Buffer.alloc(0)
+          })
+
+          it('should reject the thumbnail before checking its signature', async () => {
+            await expect(fieldsValidator.validate(formData, smallBuffer)).rejects.toThrow(InvalidRequestError)
+          })
+        })
+
+        describe('and the thumbnail is larger than 500KB', () => {
+          let largeBuffer: Buffer
+
+          beforeEach(() => {
+            largeBuffer = Buffer.alloc(501 * 1024)
+            Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(largeBuffer)
+          })
+
+          afterEach(() => {
+            largeBuffer = Buffer.alloc(0)
+          })
+
+          it('should reject the thumbnail before checking its signature', async () => {
+            await expect(fieldsValidator.validate(formData, largeBuffer)).rejects.toThrow(InvalidRequestError)
+          })
         })
       })
     })
