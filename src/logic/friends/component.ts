@@ -81,6 +81,24 @@ export async function createFriendsComponent(
     if (!pairAllowed) throw new FriendshipRateLimitError()
   }
 
+  /**
+   * Best-effort profile lookup for response enrichment.
+   *
+   * A wallet with no deployed profile — or one the registry cannot reduce to a minimal profile —
+   * must still be blockable, so this never decides whether the block happens.
+   */
+  async function tryGetProfile(address: string): Promise<Profile | null> {
+    try {
+      return await registry.getProfile(address)
+    } catch (error) {
+      logger.warn('Could not resolve a profile for a blocked address; continuing without it', {
+        address,
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      return null
+    }
+  }
+
   return {
     getFriendsProfiles: async (
       userAddress: EthAddress,
@@ -100,11 +118,6 @@ export async function createFriendsComponent(
     },
     blockUser: async (blockerAddress: string, blockedAddress: string): Promise<BlockedUser> => {
       await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
-      const profile = await registry.getProfile(blockedAddress)
-
-      if (!profile) {
-        throw new ProfileNotFoundError(blockedAddress)
-      }
 
       const { actionId, blockedAt } = await friendsDb.executeTx(async (tx) => {
         const { blocked_at: blockedAt } = await friendsDb.blockUser(blockerAddress, blockedAddress, tx)
@@ -137,7 +150,7 @@ export async function createFriendsComponent(
         })
       ])
 
-      return { profile, blockedAt }
+      return { profile: await tryGetProfile(blockedAddress), blockedAt }
     },
     getBlockedUsers: async (
       userAddress: string,
@@ -232,13 +245,8 @@ export async function createFriendsComponent(
         total: sentRequestsCount
       }
     },
-    unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile> => {
+    unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile | null> => {
       await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
-      const profile = await registry.getProfile(blockedAddress)
-
-      if (!profile) {
-        throw new ProfileNotFoundError(blockedAddress)
-      }
 
       const actionId = await friendsDb.executeTx(async (tx) => {
         await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
@@ -267,7 +275,7 @@ export async function createFriendsComponent(
         })
       ])
 
-      return profile
+      return tryGetProfile(blockedAddress)
     },
     upsertFriendship: async (
       userAddress: EthAddress,

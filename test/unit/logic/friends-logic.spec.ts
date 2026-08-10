@@ -1035,15 +1035,22 @@ describe('Friends Component', () => {
       blockedAt = new Date()
     })
 
-    describe('and the profile is not found', () => {
-      beforeEach(() => {
-        mockRegistry.getProfile.mockResolvedValueOnce(null)
+    describe('and the registry cannot resolve a profile for the target', () => {
+      let result: Awaited<ReturnType<typeof friendsComponent.blockUser>>
+
+      beforeEach(async () => {
+        mockFriendsDB.blockUser.mockResolvedValueOnce({ id: 'block-id', blocked_at: blockedAt })
+        mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+        mockRegistry.getProfile.mockRejectedValueOnce(new Error(`Profile not found: ${blockedAddress}`))
+        result = await friendsComponent.blockUser(mockUserAddress, blockedAddress)
       })
 
-      it('should reject with a profileNotFound error', async () => {
-        await expect(friendsComponent.blockUser(mockUserAddress, blockedAddress)).rejects.toThrow(
-          `Profile not found for address ${blockedAddress}`
-        )
+      it('should still write the block', () => {
+        expect(mockFriendsDB.blockUser).toHaveBeenCalledWith(mockUserAddress, blockedAddress, mockClient)
+      })
+
+      it('should report no profile rather than failing', () => {
+        expect(result.profile).toBeNull()
       })
     })
 
@@ -1163,15 +1170,22 @@ describe('Friends Component', () => {
       mockProfile = createMockProfile(blockedAddress)
     })
 
-    describe('and the profile is not found', () => {
-      beforeEach(() => {
-        mockRegistry.getProfile.mockResolvedValueOnce(null)
+    describe('and the registry cannot resolve a profile for the target', () => {
+      let result: Awaited<ReturnType<typeof friendsComponent.unblockUser>>
+
+      beforeEach(async () => {
+        mockFriendsDB.unblockUser.mockResolvedValueOnce(undefined)
+        mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+        mockRegistry.getProfile.mockRejectedValueOnce(new Error(`Profile not found: ${blockedAddress}`))
+        result = await friendsComponent.unblockUser(mockUserAddress, blockedAddress)
       })
 
-      it('should reject with a profileNotFound error', async () => {
-        await expect(friendsComponent.unblockUser(mockUserAddress, blockedAddress)).rejects.toThrow(
-          `Profile not found for address ${blockedAddress}`
-        )
+      it('should still remove the block', () => {
+        expect(mockFriendsDB.unblockUser).toHaveBeenCalledWith(mockUserAddress, blockedAddress, mockClient)
+      })
+
+      it('should report no profile rather than failing', () => {
+        expect(result).toBeNull()
       })
     })
 

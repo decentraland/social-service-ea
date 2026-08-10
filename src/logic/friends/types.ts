@@ -4,7 +4,8 @@ import { Pagination } from '@dcl/protocol/out-js/decentraland/social_service/v2/
 import { Action, BlockedUserWithDate, FriendshipAction, FriendshipRequest } from '../../types'
 
 export type BlockedUser = {
-  profile: Profile
+  /** Null when the registry has no resolvable profile; the block still happened. */
+  profile: Profile | null
   blockedAt: Date
 }
 
@@ -26,7 +27,7 @@ export interface IFriendsComponent {
     pagination?: Pagination
   ): Promise<{ friendsProfiles: Profile[]; total: number }>
   blockUser(blockerAddress: string, blockedAddress: string): Promise<BlockedUser>
-  unblockUser(blockerAddress: string, blockedAddress: string): Promise<Profile>
+  unblockUser(blockerAddress: string, blockedAddress: string): Promise<Profile | null>
   upsertFriendship(
     userAddress: EthAddress,
     friendAddress: EthAddress,
