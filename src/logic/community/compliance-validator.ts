@@ -1,3 +1,4 @@
+import { InvalidRequestError } from '@dcl/http-commons'
 import { FeatureFlag } from '../../adapters/feature-flags'
 import { detectImageMimeType } from './image-signature'
 import { AppComponents } from '../../types'
@@ -39,14 +40,21 @@ export function createCommunityComplianceValidatorComponent(
           hasThumbnail: String(!!thumbnailBuffer)
         })
 
-        const validationResult = await aiCompliance.validateCommunityContent({
-          name,
-          description,
-          thumbnailBuffer,
-          // Label the bytes as what they are: the validator accepts JPEG, GIF and
-          // WebP, and the provider is told the media type it is being given.
-          thumbnailMime: thumbnailBuffer ? (detectImageMimeType(thumbnailBuffer) ?? undefined) : undefined
-        })
+        // Label the bytes as what they are: the validator accepts JPEG, GIF and WebP, and the
+        // provider is told the media type it is being given. The field validator rejects an
+        // undetectable thumbnail before this runs, so failing here means an internal caller skipped
+        // it — refuse rather than send unlabelled bytes to the moderation gate.
+        const thumbnailMime = thumbnailBuffer ? detectImageMimeType(thumbnailBuffer) : undefined
+
+        if (thumbnailBuffer && !thumbnailMime) {
+          throw new InvalidRequestError('Thumbnail must start with a supported PNG, JPEG, GIF or WebP signature')
+        }
+
+        const validationResult = await aiCompliance.validateCommunityContent(
+          thumbnailBuffer && thumbnailMime
+            ? { name, description, thumbnailBuffer, thumbnailMime }
+            : { name, description }
+        )
 
         if (!validationResult.isCompliant) {
           logger.warn('Community content is not compliant', {
