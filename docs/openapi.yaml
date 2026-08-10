@@ -255,7 +255,10 @@ paths:
                 thumbnail:
                   type: string
                   format: binary
-                  description: 'Community thumbnail image'
+                  description: |
+                    Community thumbnail image. Must be a PNG, JPEG, GIF or WebP file
+                    (identified by its leading signature bytes) between 1KB and 500KB.
+                    Other image formats are rejected with a 400 response.
       responses:
         '201':
           description: Community created successfully
@@ -263,6 +266,12 @@ paths:
             application/json:
               schema:
                 $ref: './schemas.yaml#/components/schemas/CreateCommunity201OkResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Signed Fetch required
           content:
@@ -364,7 +373,10 @@ paths:
                 thumbnail:
                   type: string
                   format: binary
-                  description: 'Community thumbnail image'
+                  description: |
+                    Community thumbnail image. Must be a PNG, JPEG, GIF or WebP file
+                    (identified by its leading signature bytes) between 1KB and 500KB.
+                    Other image formats are rejected with a 400 response.
       responses:
         '200':
           description: Community updated successfully
