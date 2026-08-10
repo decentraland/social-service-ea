@@ -11,6 +11,7 @@ import {
 } from '../../types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapters/pubsub'
 import { getProfileUserId } from '../profiles'
+import { isErrorWithMessage } from '../../utils/errors'
 import { sendNotification, shouldNotify } from '../notifications'
 import { BlockedUserError, InvalidFriendshipActionError, ProfileNotFoundError } from './errors'
 import { getNewFriendshipStatus, validateNewFriendshipAction } from './friendships'
@@ -21,6 +22,24 @@ export async function createFriendsComponent(
 ): Promise<IFriendsComponent> {
   const { friendsDb, registry, pubsub, sns, logs } = components
   const logger = logs.getLogger('friends-component')
+
+  /**
+   * Best-effort profile lookup for response enrichment.
+   *
+   * A wallet with no deployed profile — or one the registry cannot reduce to a minimal profile —
+   * must still be blockable, so this never decides whether the block happens.
+   */
+  async function tryGetProfile(address: string): Promise<Profile | null> {
+    try {
+      return await registry.getProfile(address)
+    } catch (error) {
+      logger.warn('Could not resolve a profile for a blocked address; continuing without it', {
+        address,
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      return null
+    }
+  }
 
   return {
     getFriendsProfiles: async (
@@ -40,12 +59,6 @@ export async function createFriendsComponent(
       }
     },
     blockUser: async (blockerAddress: string, blockedAddress: string): Promise<BlockedUser> => {
-      const profile = await registry.getProfile(blockedAddress)
-
-      if (!profile) {
-        throw new ProfileNotFoundError(blockedAddress)
-      }
-
       const { actionId, blockedAt } = await friendsDb.executeTx(async (tx) => {
         const { blocked_at: blockedAt } = await friendsDb.blockUser(blockerAddress, blockedAddress, tx)
 
@@ -77,7 +90,7 @@ export async function createFriendsComponent(
         })
       ])
 
-      return { profile, blockedAt }
+      return { profile: await tryGetProfile(blockedAddress), blockedAt }
     },
     getBlockedUsers: async (
       userAddress: string
@@ -166,13 +179,7 @@ export async function createFriendsComponent(
         total: sentRequestsCount
       }
     },
-    unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile> => {
-      const profile = await registry.getProfile(blockedAddress)
-
-      if (!profile) {
-        throw new ProfileNotFoundError(blockedAddress)
-      }
-
+    unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile | null> => {
       const actionId = await friendsDb.executeTx(async (tx) => {
         await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
 
@@ -200,7 +207,7 @@ export async function createFriendsComponent(
         })
       ])
 
-      return profile
+      return tryGetProfile(blockedAddress)
     },
     upsertFriendship: async (
       userAddress: EthAddress,
