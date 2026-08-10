@@ -1,7 +1,7 @@
 import { InvalidRequestError } from '@dcl/http-commons'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '.'
 import { AppComponents } from '../../types/system'
-import { detectImageMimeType } from './image-signature'
+import { detectImageMimeType, UNSUPPORTED_IMAGE_SIGNATURE_MESSAGE } from './image-signature'
 import {
   ICommunityFieldsValidatorComponent,
   CommunityFieldsValidationOptions,
@@ -87,7 +87,7 @@ export async function createCommunityFieldsValidatorComponent(
         }
 
         if (!detectImageMimeType(thumbnailBuffer)) {
-          throw new InvalidRequestError('Thumbnail must start with a supported PNG, JPEG, GIF or WebP signature')
+          throw new InvalidRequestError(UNSUPPORTED_IMAGE_SIGNATURE_MESSAGE)
         }
       }
 

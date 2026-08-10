@@ -1,6 +1,6 @@
 import { InvalidRequestError } from '@dcl/http-commons'
 import { FeatureFlag } from '../../adapters/feature-flags'
-import { detectImageMimeType } from './image-signature'
+import { detectImageMimeType, UNSUPPORTED_IMAGE_SIGNATURE_MESSAGE } from './image-signature'
 import { AppComponents } from '../../types'
 import { errorMessageOrDefault } from '../../utils/errors'
 import { CommunityNotCompliantError } from './errors'
@@ -47,7 +47,7 @@ export function createCommunityComplianceValidatorComponent(
         const thumbnailMime = thumbnailBuffer ? detectImageMimeType(thumbnailBuffer) : undefined
 
         if (thumbnailBuffer && !thumbnailMime) {
-          throw new InvalidRequestError('Thumbnail must start with a supported PNG, JPEG, GIF or WebP signature')
+          throw new InvalidRequestError(UNSUPPORTED_IMAGE_SIGNATURE_MESSAGE)
         }
 
         const validationResult = await aiCompliance.validateCommunityContent(

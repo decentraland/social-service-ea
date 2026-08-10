@@ -19,6 +19,10 @@ const WEBP_FORM_TYPE = 'WEBP'
 
 export type SupportedImageMimeType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp'
 
+/** Rejection message for bytes that announce none of the formats above. */
+export const UNSUPPORTED_IMAGE_SIGNATURE_MESSAGE =
+  'Thumbnail must start with a supported PNG, JPEG, GIF or WebP signature'
+
 /**
  * Reads the media type a buffer's leading bytes announce.
  *
