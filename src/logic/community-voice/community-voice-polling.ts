@@ -118,7 +118,7 @@ export function createCommunityVoiceChatPollingComponent({
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId: cachedChat.communityId,
         status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
-        ended_at: endedAt,
+        endedAt,
         positions: [], // Empty for ended events
         worlds: [], // Empty for ended events
         communityName: '', // Will be fetched by handler if needed

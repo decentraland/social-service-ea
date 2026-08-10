@@ -146,6 +146,10 @@ export async function createCommunityVoiceComponent({
 
       const createdAt = Date.now()
 
+      // Persist the room and its fanout class before optional enrichment. The poller and ENDED
+      // propagation must not lose track of an active room if enrichment is slow or interrupted.
+      await communityVoiceChatCache.setCommunityVoiceChat(communityId, createdAt, notificationScope)
+
       let communityPositions: string[] = []
       let communityWorlds: string[] = []
       let communityImage: string | undefined = undefined
@@ -194,10 +198,6 @@ export async function createCommunityVoiceComponent({
           }`
         )
       }
-
-      // Cached after the lookup so the scope is recorded with the room: the ended update reads it
-      // back to reach the audience the start actually had.
-      await communityVoiceChatCache.setCommunityVoiceChat(communityId, createdAt, notificationScope)
 
       await Promise.all([
         // Publish start event with community information using protocol enum
@@ -303,10 +303,13 @@ export async function createCommunityVoiceComponent({
       // Remove from cache
       await communityVoiceChatCache.removeCommunityVoiceChat(communityId)
 
+      const endedAt = Date.now()
+
       // Publish end event - we don't need community details for ENDED status
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId,
         status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+        endedAt,
         positions: undefined,
         worlds: undefined,
         communityName: undefined,

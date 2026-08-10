@@ -422,6 +422,14 @@ describe('Community Voice Logic', () => {
               notificationScope: 'all'
             })
           })
+
+          it('should cache the active room before attempting optional enrichment', async () => {
+            await communityVoice.startCommunityVoiceChat(communityId, creatorAddress)
+
+            expect(mockCommunityVoiceChatCache.setCommunityVoiceChat.mock.invocationCallOrder[0]).toBeLessThan(
+              mockCommunityThumbnail.getThumbnail.mock.invocationCallOrder[0]
+            )
+          })
         })
       })
     })
@@ -553,6 +561,7 @@ describe('Community Voice Logic', () => {
           expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
             communityId,
             status: 1, // ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED
+            endedAt: expect.any(Number),
             positions: undefined,
             worlds: undefined,
             communityName: undefined,

@@ -11,16 +11,18 @@ import { isErrorWithMessage } from '../../../utils/errors'
 function parseEmittedUpdateToCommunityVoiceChatUpdate(
   update: SubscriptionEventsEmitter['communityVoiceChatUpdate']
 ): CommunityVoiceChatUpdate {
-  return {
+  return CommunityVoiceChatUpdate.fromPartial({
     communityId: update.communityId,
-    createdAt: Date.now(),
+    createdAt: update.createdAt,
     status: update.status,
-    positions: update.positions || [],
-    worlds: update.worlds || [],
-    isMember: update.isMember || false,
-    communityName: update.communityName || '',
-    communityImage: update.communityImage
-  } as CommunityVoiceChatUpdate
+    endedAt: update.endedAt,
+    positions: update.positions,
+    worlds: update.worlds,
+    isMember: update.isMember,
+    communityName: update.communityName,
+    communityImage: update.communityImage,
+    streamClosed: update.streamClosed
+  })
 }
 
 export function subscribeToCommunityVoiceChatUpdatesService({
