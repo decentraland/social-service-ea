@@ -202,6 +202,14 @@ export interface ICommunitiesDatabaseComponent {
     unbannedMemberAddress: EthAddress
   ): Promise<void>
   isMemberBanned(communityId: string, bannedMemberAddress: EthAddress): Promise<boolean>
+  /**
+   * Resolves which of the given addresses are actively banned from the community, in one query.
+   *
+   * @param communityId - Community ID
+   * @param memberAddresses - Addresses to look up
+   * @returns The normalized subset of the given addresses that is banned
+   */
+  getBannedMemberAddresses(communityId: string, memberAddresses: EthAddress[]): Promise<string[]>
   getBannedMembers(communityId: string, userAddress: EthAddress, pagination: Pagination): Promise<BannedMember[]>
   getBannedMembersCount(communityId: string): Promise<number>
   updateCommunity(

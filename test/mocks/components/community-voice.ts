@@ -3,6 +3,7 @@ import { ICommunityVoiceComponent } from '../../../src/logic/community-voice'
 export function createCommunityVoiceMockedComponent({
   startCommunityVoiceChat = jest.fn(),
   joinCommunityVoiceChat = jest.fn(),
+  requestToSpeakInCommunityVoiceChat = jest.fn(),
   muteSpeakerInCommunityVoiceChat = jest.fn(),
   getCommunityVoiceChat = jest.fn(),
   getActiveCommunityVoiceChats = jest.fn(),
@@ -12,6 +13,7 @@ export function createCommunityVoiceMockedComponent({
   return {
     startCommunityVoiceChat,
     joinCommunityVoiceChat,
+    requestToSpeakInCommunityVoiceChat,
     muteSpeakerInCommunityVoiceChat,
     getCommunityVoiceChat,
     getActiveCommunityVoiceChats,
