@@ -4,6 +4,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createUpdateHandlerComponent } from '../../../src/logic/updates'
+import { CommunityPrivacyEnum } from '../../../src/logic/community'
 import { mockRegistry, mockFriendsDB, createMockPeersStatsComponent } from '../../mocks/components'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { Emitter } from 'mitt'
@@ -61,7 +62,7 @@ describe('Updates Handlers', () => {
 
     mockCommunitiesDb = {
       getCommunityMemberRole: jest.fn(),
-      getCommunity: jest.fn()
+      getCommunity: jest.fn().mockResolvedValue({ privacy: CommunityPrivacyEnum.Public })
     }
 
     mockPeersStats = createMockPeersStatsComponent()
@@ -72,6 +73,7 @@ describe('Updates Handlers', () => {
       friendsDb: mockFriendsDB,
       registry: mockRegistry,
       communityMembers: mockCommunityMembers,
+      communitiesDb: mockCommunitiesDb as any,
       metrics: mockMetrics,
       peersStats: mockPeersStats
     })
@@ -1163,35 +1165,55 @@ describe('Updates Handlers', () => {
         })
       })
 
-      it('should send fallback updates when community members query fails, excluding the creator', async () => {
-        const update = {
-          communityId: 'community-1',
-          voiceChatId: 'voice-chat-1',
-          status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
-          positions: ['1,1', '1,2'],
-          communityName: 'Test Community',
-          communityImage: 'test-image.jpg',
-          creatorAddress: '0x123'
-        }
+      describe('and the community is private', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({ privacy: CommunityPrivacyEnum.Private })
 
-        // Mock community members to throw an error
-        mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
-          throw new Error('Community members query failed')
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              voiceChatId: 'voice-chat-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1', '1,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-image.jpg',
+              creatorAddress: '0x123'
+            })
+          )
         })
 
-        await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
+        it('should tell the members', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
 
-        // Should send fallback updates to all users with isMember: false, except the creator
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false
+        it('should not name the community to a non-member', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
         })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false
+      })
+
+      describe('and the audience cannot be resolved', () => {
+        beforeEach(async () => {
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
+            throw new Error('Community members query failed')
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              voiceChatId: 'voice-chat-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1', '1,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-image.jpg',
+              creatorAddress: '0x123'
+            })
+          )
         })
-        // Creator should NOT be notified
-        expect(emitSpy123).not.toHaveBeenCalled()
+
+        it('should drop the update rather than broadcasting it to everyone online', () => {
+          expect(emitSpy456).not.toHaveBeenCalled()
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
       })
     })
 

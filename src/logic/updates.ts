@@ -7,6 +7,8 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
 import { normalizeAddress } from '../utils/address'
+import { CommunityPrivacyEnum } from './community'
+import { isErrorWithMessage } from '../utils/errors'
 import { VoiceChatStatus } from './voice/types'
 import { IUpdateHandlerComponent } from '../types/components'
 
@@ -67,10 +69,18 @@ async function processInBatches<T>(
 export function createUpdateHandlerComponent(
   components: Pick<
     AppComponents,
-    'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry' | 'metrics' | 'peersStats'
+    | 'logs'
+    | 'subscribersContext'
+    | 'friendsDb'
+    | 'communitiesDb'
+    | 'communityMembers'
+    | 'registry'
+    | 'metrics'
+    | 'peersStats'
   >
 ): IUpdateHandlerComponent {
-  const { logs, subscribersContext, friendsDb, communityMembers, registry, metrics, peersStats } = components
+  const { logs, subscribersContext, friendsDb, communitiesDb, communityMembers, registry, metrics, peersStats } =
+    components
   const logger = logs.getLogger('update-handler')
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
@@ -324,55 +334,54 @@ export function createUpdateHandlerComponent(
     const allOnlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
+    let communityMemberAddresses: Set<string>
+    let isPublicCommunity: boolean
+
     try {
-      // Get all online members of this community in a single efficient query
-      const batches = communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)
-      const communityMemberAddresses = new Set<string>()
+      const [community, batches] = await Promise.all([
+        communitiesDb.getCommunity(update.communityId),
+        Promise.resolve(communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers))
+      ])
+
+      isPublicCommunity = community?.privacy === CommunityPrivacyEnum.Public
+      communityMemberAddresses = new Set<string>()
 
       for await (const batch of batches) {
         batch.forEach(({ memberAddress }) => {
           communityMemberAddresses.add(memberAddress)
         })
       }
-
-      // Pre-create the base update object to avoid repeated object spreads
-      const baseUpdate = { ...update }
-
-      // Notify ALL online users with personalized membership info (excluding the creator)
-      // Process in batches to yield the event loop and prevent blocking
-      await processInBatches(
-        onlineSubscribers,
-        (userAddress) => {
-          const isMember = communityMemberAddresses.has(userAddress)
-          const updateEmitter = subscribersContext.getSubscriber(userAddress)
-          if (updateEmitter) {
-            // Reuse base update, only set isMember property
-            updateEmitter.emit('communityVoiceChatUpdate', { ...baseUpdate, isMember })
-          }
-        },
-        20 // Process 20 users before yielding the event loop
-      )
-
-      logger.info(`Community voice chat update sent to ${onlineSubscribers.length} online users`)
     } catch (error) {
-      logger.error(`Failed to process community voice chat update for community ${update.communityId}: ${error}`)
-
-      // Fallback: send update to all users without membership info (still excluding the creator)
-      const fallbackUpdate = { ...update, isMember: false }
-
-      await processInBatches(
-        onlineSubscribers,
-        (userAddress) => {
-          const updateEmitter = subscribersContext.getSubscriber(userAddress)
-          if (updateEmitter) {
-            updateEmitter.emit('communityVoiceChatUpdate', fallbackUpdate)
-          }
-        },
-        20
+      // Fail closed. The payload names the community and carries its image, parcel positions and
+      // worlds, so a lookup failure must not become a broadcast to everyone online.
+      logger.error(
+        `Failed to resolve the audience for a community voice chat update in ${update.communityId}; dropping it`,
+        { error: isErrorWithMessage(error) ? error.message : 'Unknown error' }
       )
-
-      logger.warn(`Sent fallback community voice chat update to ${onlineSubscribers.length} online users`)
+      return
     }
+
+    // A private community's room is only announced to its members. A public one is announced to
+    // everyone online, annotated with whether they belong to it.
+    const recipients = isPublicCommunity
+      ? onlineSubscribers
+      : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
+
+    const baseUpdate = { ...update }
+
+    await processInBatches(
+      recipients,
+      (userAddress) => {
+        const isMember = communityMemberAddresses.has(userAddress)
+        const updateEmitter = subscribersContext.getSubscriber(userAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('communityVoiceChatUpdate', { ...baseUpdate, isMember })
+        }
+      },
+      20 // Process 20 users before yielding the event loop
+    )
+
+    logger.info(`Community voice chat update sent to ${recipients.length} online users`)
   })
 
   async function* handleSubscriptionUpdates<T, U>({
