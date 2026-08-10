@@ -1164,7 +1164,7 @@ describe('Updates Handlers', () => {
         )
       })
 
-      describe('and the community is private', () => {
+      describe('and the community is private despite a carried all scope', () => {
         beforeEach(async () => {
           mockCommunitiesDb.getCommunity.mockResolvedValue({
             privacy: CommunityPrivacyEnum.Private,
@@ -1179,7 +1179,8 @@ describe('Updates Handlers', () => {
               positions: ['1,1', '1,2'],
               communityName: 'Test Community',
               communityImage: 'test-image.jpg',
-              creatorAddress: '0x123'
+              creatorAddress: '0x123',
+              notificationScope: 'all'
             })
           )
         })

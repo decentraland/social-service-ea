@@ -336,19 +336,19 @@ export function createUpdateHandlerComponent(
     const allOnlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
-    // The audience is decided at START and carried on the event, so an ended update reaches exactly
-    // the people who saw the start — even if the community turned private, unlisted or deleted in
-    // between. Deriving it from the community's *current* state would either strand those people or
-    // announce a hidden community's room to everyone.
+    // STARTED always derives its scope from the authoritative community row. ENDED carries the
+    // start-time fanout class so privacy/visibility changes do not turn a member-only cleanup into a
+    // broadcast (or suppress broad cleanup). This is best-effort rather than a recipient snapshot:
+    // member-scoped ENDED updates are delivered to the members who are online when cleanup runs.
     const isEnded = update.status === ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED
     let scope =
-      update.notificationScope === 'all' || update.notificationScope === 'members'
+      isEnded && (update.notificationScope === 'all' || update.notificationScope === 'members')
         ? update.notificationScope
         : undefined
 
     if (!scope) {
-      // No recorded scope: a room started before this field existed, or whose cache entry is gone.
-      // Resolve it from the community, and fail closed to members if that cannot be answered.
+      // STARTED always resolves the current community. ENDED reaches this fallback only when its
+      // recorded scope is missing or invalid; fail closed to members if the row cannot be read.
       try {
         const community = await communitiesDb.getCommunity(update.communityId)
 

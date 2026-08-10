@@ -123,7 +123,7 @@ export function createCommunityVoiceChatPollingComponent({
         worlds: [], // Empty for ended events
         communityName: '', // Will be fetched by handler if needed
         communityImage: undefined,
-        // The audience the room was announced to at start; cleanup must reach exactly them.
+        // Preserve the start-time fanout class for best-effort cleanup by the update handler.
         notificationScope: cachedChat.notificationScope
       })
 
