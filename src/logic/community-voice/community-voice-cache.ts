@@ -79,14 +79,16 @@ export function createCommunityVoiceChatCacheComponent({
   ): Promise<void> {
     const now = Date.now()
     const existing = await getCommunityVoiceChat(communityId)
+    const isNewRoom = notificationScope !== undefined
 
     const cachedChat: CachedCommunityVoiceChat = {
       communityId,
       isActive: true, // Always true for active chats
       lastChecked: now,
-      createdAt: existing?.createdAt ?? createdAt,
-      // The scope belongs to the room's start; the poller must not overwrite it on a refresh.
-      notificationScope: existing?.notificationScope ?? notificationScope
+      // An explicit scope comes only from the start path and identifies a new room. Poller
+      // refreshes omit it and preserve the room metadata already in the cache.
+      createdAt: isNewRoom ? createdAt : (existing?.createdAt ?? createdAt),
+      notificationScope: notificationScope ?? existing?.notificationScope
     }
 
     await redis.put(getCacheKey(communityId), cachedChat, { EX: CACHE_TTL })

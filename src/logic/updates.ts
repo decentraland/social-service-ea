@@ -89,11 +89,9 @@ export function createUpdateHandlerComponent(
       try {
         const update = JSON.parse(message) as SubscriptionEventsEmitter[T]
         await handler(update)
-      } catch (error: any) {
-        logger.error(`Error handling update: ${error.message}`, {
-          error,
-          message
-        })
+      } catch (error) {
+        const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown error'
+        logger.error(`Error handling update: ${errorMessage}`, { error: errorMessage })
       }
     }
   }
@@ -385,9 +383,11 @@ export function createUpdateHandlerComponent(
         logger.error(`Failed to resolve the members for a voice chat update in ${update.communityId}`, {
           error: isErrorWithMessage(error) ? error.message : 'Unknown error'
         })
-        // A start cannot be delivered without knowing who may see it. An ended update still goes to
-        // the broad audience if that is its scope; only a member-scoped one is lost here.
-        if (!isEnded || scope === 'members') return
+        // Member-scoped updates cannot be delivered safely without the lookup. For a public/listed
+        // start, membership is only an annotation: clear partial results and announce it to all
+        // eligible subscribers with the safe non-member fallback.
+        if (scope === 'members') return
+        communityMemberAddresses.clear()
       }
     }
 

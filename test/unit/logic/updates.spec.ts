@@ -124,7 +124,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -250,7 +250,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -303,7 +303,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -324,10 +324,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({
-            error,
-            message: JSON.stringify(update)
-          })
+          expect.objectContaining({ error: error.message })
         )
       })
     })
@@ -490,7 +487,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -519,7 +516,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ error, message: JSON.stringify(update) })
+          expect.objectContaining({ error: error.message })
         )
 
         expect(emitSpy456).not.toHaveBeenCalled()
@@ -754,7 +751,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -784,7 +781,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ error, message: JSON.stringify(update) })
+          expect.objectContaining({ error: error.message })
         )
 
         expect(emitSpy456).not.toHaveBeenCalled()
@@ -833,7 +830,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -1325,9 +1322,10 @@ describe('Updates Handlers', () => {
         })
       })
 
-      describe('and the audience cannot be resolved', () => {
+      describe('and membership cannot be resolved for a public listed community', () => {
         beforeEach(async () => {
           mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
+            yield [{ communityId: 'community-1', memberAddress: '0x456' }]
             throw new Error('Community members query failed')
           })
 
@@ -1344,9 +1342,76 @@ describe('Updates Handlers', () => {
           )
         })
 
-        it('should drop the update rather than broadcasting it to everyone online', () => {
+        it('should announce the room to a member with the safe non-member fallback', () => {
+          expect(emitSpy456).toHaveBeenCalledWith(
+            'communityVoiceChatUpdate',
+            expect.objectContaining({ isMember: false })
+          )
+        })
+
+        it('should announce the room to a non-member with the safe non-member fallback', () => {
+          expect(emitSpy789).toHaveBeenCalledWith(
+            'communityVoiceChatUpdate',
+            expect.objectContaining({ isMember: false })
+          )
+        })
+      })
+
+      describe('and membership cannot be resolved for a private community', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
+            throw new Error('Community members query failed')
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1'],
+              communityName: 'Private metadata',
+              creatorAddress: '0x123'
+            })
+          )
+        })
+
+        it('should not emit the private update to a member whose membership could not be confirmed', () => {
           expect(emitSpy456).not.toHaveBeenCalled()
+        })
+
+        it('should not emit the private update to a non-member', () => {
           expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and delivery throws after parsing a private update', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
+          emitSpy456.mockImplementationOnce(() => {
+            throw new Error('Subscriber delivery failed')
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['secret-position'],
+              communityName: 'Private metadata',
+              communityImage: 'secret-image'
+            })
+          )
+        })
+
+        it('should log the error without the raw update message', () => {
+          expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Subscriber delivery failed'), {
+            error: 'Subscriber delivery failed'
+          })
         })
       })
     })
@@ -1401,7 +1466,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -2026,7 +2091,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })

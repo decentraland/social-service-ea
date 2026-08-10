@@ -116,10 +116,13 @@ describe('Community Voice Chat Cache Component', () => {
         communityId,
         isActive: true,
         lastChecked: FIXED_LAST_CHECKED,
-        createdAt: FIXED_CREATED_AT
+        createdAt: FIXED_CREATED_AT,
+        notificationScope: 'all' as const
       }
+      let newRoomCreatedAt: number
 
       beforeEach(() => {
+        newRoomCreatedAt = FIXED_NOW + 10000
         mockRedisPut.mockResolvedValue(undefined)
         mockRedisGet.mockResolvedValue(existingChat)
       })
@@ -133,7 +136,22 @@ describe('Community Voice Chat Cache Component', () => {
             communityId,
             isActive: true,
             lastChecked: FIXED_NOW,
-            createdAt: FIXED_CREATED_AT // Should preserve existing createdAt
+            createdAt: FIXED_CREATED_AT, // Should preserve existing createdAt
+            notificationScope: 'all'
+          }),
+          { EX: 24 * 60 * 60 }
+        )
+      })
+
+      it('should replace stale room metadata when an explicit scope identifies a new room', async () => {
+        await cache.setCommunityVoiceChat(communityId, newRoomCreatedAt, 'members')
+
+        expect(mockRedisPut).toHaveBeenCalledWith(
+          'community-voice-chat:test-community-123',
+          expect.objectContaining({
+            communityId,
+            createdAt: newRoomCreatedAt,
+            notificationScope: 'members'
           }),
           { EX: 24 * 60 * 60 }
         )
