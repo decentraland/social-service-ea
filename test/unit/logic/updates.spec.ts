@@ -1097,14 +1097,14 @@ describe('Updates Handlers', () => {
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
 
         // Should notify online subscribers except the creator
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: true // 456 is a member
-        })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 789 is not a member
-        })
+        expect(emitSpy456).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: true })
+        )
+        expect(emitSpy789).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
         // Creator should NOT be notified
         expect(emitSpy123).not.toHaveBeenCalled()
       })
@@ -1122,18 +1122,18 @@ describe('Updates Handlers', () => {
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
 
         // Should notify ALL online subscribers with personalized membership info
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: true // 456 is a member
-        })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 789 is not a member
-        })
-        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 123 is not a member
-        })
+        expect(emitSpy456).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: true })
+        )
+        expect(emitSpy789).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
+        expect(emitSpy123).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
       })
 
       it('should notify ALL online users even when no positions are available', async () => {
@@ -1150,18 +1150,18 @@ describe('Updates Handlers', () => {
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
 
         // Should notify ALL online subscribers with personalized membership info
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: true // 456 is a member
-        })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 789 is not a member
-        })
-        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 123 is not a member
-        })
+        expect(emitSpy456).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: true })
+        )
+        expect(emitSpy789).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
+        expect(emitSpy123).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
       })
 
       describe('and the community is private', () => {
@@ -1266,11 +1266,50 @@ describe('Updates Handlers', () => {
           )
         })
 
-        it('should reach the members', () => {
-          expect(emitSpy456).toHaveBeenCalled()
+        it('should emit only the client-safe protocol payload to members', () => {
+          expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+            communityId: 'community-1',
+            createdAt: expect.any(Number),
+            status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+            endedAt: undefined,
+            positions: [],
+            isMember: true,
+            communityName: '',
+            communityImage: undefined,
+            worlds: [],
+            streamClosed: undefined
+          })
         })
 
         it('should not tell a non-member the hidden community had a room', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and an ended update carries a malformed notification scope', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: '',
+              notificationScope: 'everyone'
+            })
+          )
+        })
+
+        it('should resolve the fallback scope and deliver cleanup to a member', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
+
+        it('should not treat the malformed scope as a broad audience', () => {
           expect(emitSpy789).not.toHaveBeenCalled()
         })
       })
@@ -1443,18 +1482,18 @@ describe('Updates Handlers', () => {
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
 
         // Should notify ALL online subscribers with personalized membership info
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: true // 456 is a member
-        })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 789 is not a member
-        })
-        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 123 is not a member
-        })
+        expect(emitSpy456).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: true })
+        )
+        expect(emitSpy789).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
+        expect(emitSpy123).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
       })
     })
 

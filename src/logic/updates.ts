@@ -1,4 +1,5 @@
 import {
+  CommunityVoiceChatUpdate,
   ConnectivityStatus,
   SubscriptionStreamClosed,
   SubscriptionStreamClosedReason
@@ -340,7 +341,10 @@ export function createUpdateHandlerComponent(
     // between. Deriving it from the community's *current* state would either strand those people or
     // announce a hidden community's room to everyone.
     const isEnded = update.status === ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED
-    let scope = update.notificationScope
+    let scope =
+      update.notificationScope === 'all' || update.notificationScope === 'members'
+        ? update.notificationScope
+        : undefined
 
     if (!scope) {
       // No recorded scope: a room started before this field existed, or whose cache entry is gone.
@@ -394,7 +398,20 @@ export function createUpdateHandlerComponent(
     const recipients =
       scope === 'all' ? onlineSubscribers : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
 
-    const baseUpdate = { ...update }
+    // Build the protocol payload explicitly at the emitter boundary. Internal routing fields such
+    // as creatorAddress and notificationScope must never rely on a later parser to strip them.
+    const clientSafeUpdate: CommunityVoiceChatUpdate = {
+      communityId: update.communityId,
+      createdAt: update.createdAt ?? Date.now(),
+      status: update.status,
+      endedAt: update.endedAt,
+      positions: update.positions ?? [],
+      isMember: false,
+      communityName: update.communityName ?? '',
+      communityImage: update.communityImage,
+      worlds: update.worlds ?? [],
+      streamClosed: update.streamClosed
+    }
 
     await processInBatches(
       recipients,
@@ -402,7 +419,7 @@ export function createUpdateHandlerComponent(
         const isMember = communityMemberAddresses.has(userAddress)
         const updateEmitter = subscribersContext.getSubscriber(userAddress)
         if (updateEmitter) {
-          updateEmitter.emit('communityVoiceChatUpdate', { ...baseUpdate, isMember })
+          updateEmitter.emit('communityVoiceChatUpdate', { ...clientSafeUpdate, isMember })
         }
       },
       20 // Process 20 users before yielding the event loop
