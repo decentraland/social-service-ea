@@ -148,7 +148,7 @@ describe('Community Bans Component', () => {
             expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
               type: Events.Type.COMMUNITY,
               subType: Events.SubType.Community.MEMBER_BANNED,
-              key: expect.stringContaining(`${communityId}-${targetAddress}-`),
+              key: `${communityId}-${targetAddress}`,
               timestamp: expect.any(Number),
               metadata: {
                 id: communityId,
@@ -198,23 +198,11 @@ describe('Community Bans Component', () => {
             })
           })
 
-          it('should publish SNS event for member ban', async () => {
+          it('should not tell a non-member they were removed from the community', async () => {
             await communityBansComponent.banMember(communityId, bannerAddress, targetAddress)
-
-            expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
-            // Wait for setImmediate callback to execute
             await new Promise((resolve) => setImmediate(resolve))
-            expect(mockCommunityBroadcaster.broadcast).toHaveBeenCalledWith({
-              type: Events.Type.COMMUNITY,
-              subType: Events.SubType.Community.MEMBER_BANNED,
-              key: expect.stringContaining(`${communityId}-${targetAddress}-`),
-              timestamp: expect.any(Number),
-              metadata: {
-                id: communityId,
-                name: 'Test Community',
-                memberAddress: targetAddress
-              }
-            })
+
+            expect(mockCommunityBroadcaster.broadcast).not.toHaveBeenCalled()
           })
         })
       })
