@@ -141,7 +141,7 @@ export async function createFriendsComponent(
     },
     getBlockedUsers: async (
       userAddress: string,
-      pagination?: Pagination
+      pagination: Pagination
     ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }> => {
       // total must be the row count, not the page length: clients page until they reach it.
       const [blockedUsers, total] = await Promise.all([

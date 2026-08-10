@@ -18,6 +18,7 @@ import {
   InvalidFriendshipActionError
 } from '../../../src/logic/friends/errors'
 import { sendNotification } from '../../../src/logic/notifications'
+import { normalizeBlockedUsersPagination } from '../../../src/utils/friendship-pagination'
 
 jest.mock('../../../src/logic/notifications', () => ({
   ...jest.requireActual('../../../src/logic/notifications'),
@@ -482,6 +483,10 @@ describe('Friends Component', () => {
   })
 
   describe('when getting blocked users', () => {
+    // The component takes a page explicitly; this is the same page the RPC handler resolves to
+    // when a caller sends no pagination.
+    const blockedUsersPage = normalizeBlockedUsersPagination()
+
     describe('and the user has blocked users', () => {
       let mockBlockedUsers: BlockedUserWithDate[]
       let mockProfiles: Profile[]
@@ -504,7 +509,7 @@ describe('Friends Component', () => {
       })
 
       it('should return blocked users with profiles and total count', async () => {
-        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)
 
         expect(result).toEqual({
           blockedUsers: mockBlockedUsers,
@@ -528,7 +533,7 @@ describe('Friends Component', () => {
       })
 
       it('should return empty arrays with zero total', async () => {
-        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)
 
         expect(result).toEqual({
           blockedUsers: [],
@@ -550,7 +555,9 @@ describe('Friends Component', () => {
       })
 
       it('should propagate the error', async () => {
-        await expect(friendsComponent.getBlockedUsers(mockUserAddress)).rejects.toThrow('Database connection failed')
+        await expect(friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)).rejects.toThrow(
+          'Database connection failed'
+        )
 
         expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
           limit: BLOCKED_USERS_DEFAULT_LIMIT,
@@ -574,7 +581,9 @@ describe('Friends Component', () => {
       })
 
       it('should propagate the error', async () => {
-        await expect(friendsComponent.getBlockedUsers(mockUserAddress)).rejects.toThrow('Catalyst service unavailable')
+        await expect(friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)).rejects.toThrow(
+          'Catalyst service unavailable'
+        )
 
         expect(mockFriendsDB.getBlockedUsers).toHaveBeenCalledWith(mockUserAddress, {
           limit: BLOCKED_USERS_DEFAULT_LIMIT,
@@ -601,7 +610,7 @@ describe('Friends Component', () => {
       })
 
       it('should return the profiles that were successfully retrieved', async () => {
-        const result = await friendsComponent.getBlockedUsers(mockUserAddress)
+        const result = await friendsComponent.getBlockedUsers(mockUserAddress, blockedUsersPage)
 
         expect(result).toEqual({
           blockedUsers: mockBlockedUsers,

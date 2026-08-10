@@ -63,6 +63,17 @@ describe('when normalizing friendship request pagination', () => {
     })
   })
 
+  describe('and the requested limit is a fraction below one', () => {
+    beforeEach(() => {
+      pagination = { limit: 0.5, offset: 0 }
+      result = normalizeFriendshipRequestsPagination(pagination)
+    })
+
+    it('should fall back to the default rather than asking for zero rows', () => {
+      expect(result.limit).toBe(FRIENDSHIP_REQUESTS_DEFAULT_LIMIT)
+    })
+  })
+
   describe('and the requested offset exceeds the maximum', () => {
     beforeEach(() => {
       pagination = { limit: 10, offset: 2147483647 }

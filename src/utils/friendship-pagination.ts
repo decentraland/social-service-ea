@@ -36,14 +36,16 @@ export function normalizePagination(
   const requestedLimit = pagination?.limit
   const requestedOffset = pagination?.offset
 
+  // Floor before testing the value, not after: 0.5 floors to 0, and asking for less than one
+  // whole row is an unset page size rather than a request for none.
+  const flooredLimit =
+    typeof requestedLimit === 'number' && Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : undefined
+  const flooredOffset =
+    typeof requestedOffset === 'number' && Number.isFinite(requestedOffset) ? Math.floor(requestedOffset) : undefined
+
   const limit =
-    typeof requestedLimit === 'number' && Number.isFinite(requestedLimit) && requestedLimit > 0
-      ? Math.min(Math.floor(requestedLimit), bounds.maxLimit)
-      : bounds.defaultLimit
-  const offset =
-    typeof requestedOffset === 'number' && Number.isFinite(requestedOffset) && requestedOffset >= 0
-      ? Math.min(Math.floor(requestedOffset), MAX_PAGINATION_OFFSET)
-      : 0
+    flooredLimit !== undefined && flooredLimit >= 1 ? Math.min(flooredLimit, bounds.maxLimit) : bounds.defaultLimit
+  const offset = flooredOffset !== undefined && flooredOffset >= 0 ? Math.min(flooredOffset, MAX_PAGINATION_OFFSET) : 0
 
   return { limit, offset }
 }

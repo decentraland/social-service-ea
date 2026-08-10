@@ -10,9 +10,15 @@ export type BlockedUser = {
 
 export interface IFriendsComponent {
   blockUser(blockerAddress: string, blockedAddress: string): Promise<BlockedUser>
+  /**
+   * Reads one page of the caller's blocked users.
+   *
+   * The page is required: this returns a bounded page, never the full list, and an omitted
+   * argument would quietly mean "the first default page" to a caller expecting everything.
+   */
   getBlockedUsers(
     userAddress: string,
-    pagination?: Pagination
+    pagination: Pagination
   ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }>
   getBlockingStatus(userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }>
   getFriendsProfiles(
