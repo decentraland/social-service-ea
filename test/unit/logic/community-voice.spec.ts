@@ -373,7 +373,7 @@ describe('Community Voice Logic', () => {
               communityName: 'Test Community', // Still gets community info even when places fail
               communityImage: 'test-community.jpg',
               creatorAddress,
-              notificationScope: expect.stringMatching(/^(all|members)$/)
+              notificationScope: 'all'
             })
           })
         })
@@ -397,7 +397,29 @@ describe('Community Voice Logic', () => {
               communityName: 'Test Community', // Still gets community info even when placesApi fails
               communityImage: 'test-community.jpg',
               creatorAddress,
-              notificationScope: expect.stringMatching(/^(all|members)$/)
+              notificationScope: 'all'
+            })
+          })
+        })
+
+        describe('when thumbnail enrichment fails', () => {
+          beforeEach(() => {
+            mockRegistry.getProfile.mockResolvedValue(createMockProfile(creatorAddress))
+            mockCommunityThumbnail.getThumbnail.mockRejectedValue(new Error('Thumbnail fetch failed'))
+          })
+
+          it('should preserve the public notification scope without an image', async () => {
+            await communityVoice.startCommunityVoiceChat(communityId, creatorAddress)
+
+            expect(mockPubsub.publishInChannel).toHaveBeenCalledWith(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
+              communityId,
+              status: 0,
+              positions: ['1,1', '1,2', '2,1', '2,2'],
+              worlds: [],
+              communityName: 'Test Community',
+              communityImage: undefined,
+              creatorAddress,
+              notificationScope: 'all'
             })
           })
         })

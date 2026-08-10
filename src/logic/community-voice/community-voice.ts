@@ -122,6 +122,19 @@ export async function createCommunityVoiceComponent({
       // Fetch user profile data using helper function
       const profileData = await getUserProfileData(creatorAddress)
 
+      // Resolve the audience from required community data before creating the room or fetching
+      // optional enrichment. Thumbnail or place failures must never downgrade a public/listed room
+      // to member-only notifications.
+      const community = await communitiesDb.getCommunity(communityId)
+      if (!community) {
+        throw new CommunityVoiceChatNotFoundError(communityId)
+      }
+      const communityName = community.name
+      const notificationScope: CommunityVoiceChatNotificationScope =
+        community.privacy === CommunityPrivacyEnum.Public && community.visibility === CommunityVisibilityEnum.All
+          ? 'all'
+          : 'members'
+
       // Create room in comms-gatekeeper and get credentials directly
       const credentials = await commsGatekeeper.createCommunityVoiceChatRoom(
         communityId,
@@ -133,31 +146,21 @@ export async function createCommunityVoiceComponent({
 
       const createdAt = Date.now()
 
-      // Get community information for the update
       let communityPositions: string[] = []
       let communityWorlds: string[] = []
-      let communityName = ''
-      let notificationScope: CommunityVoiceChatNotificationScope = 'members'
       let communityImage: string | undefined = undefined
 
       try {
-        // Get community basic info and thumbnail
-        const [community, thumbnail] = await Promise.all([
-          communitiesDb.getCommunity(communityId),
-          communityThumbnail.getThumbnail(communityId)
-        ])
+        communityImage = (await communityThumbnail.getThumbnail(communityId)) || undefined
+      } catch (error) {
+        logger.warn(
+          `Failed to fetch the thumbnail for community ${communityId}: ${
+            isErrorWithMessage(error) ? error.message : 'Unknown error'
+          }`
+        )
+      }
 
-        if (community) {
-          communityName = community.name
-          communityImage = thumbnail || undefined
-          // Recorded now, so the ended update can reach exactly this audience even if the
-          // community's privacy or visibility changes before the room finishes.
-          notificationScope =
-            community.privacy === CommunityPrivacyEnum.Public && community.visibility === CommunityVisibilityEnum.All
-              ? 'all'
-              : 'members'
-        }
-
+      try {
         // Get community places and separate positions from worlds
         const places = await communitiesDb.getCommunityPlaces(communityId)
         const placeIds = places.map((place) => place.id)
@@ -186,11 +189,10 @@ export async function createCommunityVoiceComponent({
         }
       } catch (error) {
         logger.warn(
-          `Failed to fetch community information for community ${communityId}: ${
+          `Failed to fetch places for community ${communityId}: ${
             isErrorWithMessage(error) ? error.message : 'Unknown error'
           }`
         )
-        // Continue without community info - non-critical error
       }
 
       // Cached after the lookup so the scope is recorded with the room: the ended update reads it
