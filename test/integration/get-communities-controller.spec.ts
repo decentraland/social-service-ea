@@ -1307,22 +1307,6 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         })
       })
 
-      describe('and the search query is missing', () => {
-        it('should respond with listed communities and pagination params', async () => {
-          const response = await makeRequest(identity, '/v1/communities?minimal=true&limit=50')
-
-          expect(response.status).toBe(200)
-          const body = await response.json()
-          const names = body.data.results.map((c: { name: string }) => c.name)
-          expect(names).toContain('Alpha Minimal Community')
-          expect(names).toContain('Beta Minimal Community')
-          expect(names).not.toContain('Alpha Unlisted Minimal')
-          expect(body.data.total).toBeGreaterThanOrEqual(2)
-          expect(body.data.page).toBe(1)
-          expect(body.data.limit).toBe(50)
-        })
-      })
-
       describe('and no search query is given', () => {
         it('should respond with a 400 rather than returning every community', async () => {
           const response = await makeRequest(identity, '/v1/communities?minimal=true&limit=50')
