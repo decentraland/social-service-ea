@@ -381,7 +381,7 @@ export type ISubscribersContext = IBaseComponent & {
 }
 
 export type ITracingComponent = IBaseComponent & {
-  captureException(error: Error, context?: Record<string, any>): void
+  captureException(error: unknown, context?: Record<string, any>): void
 }
 
 export type ICommsGatekeeperComponent = {
