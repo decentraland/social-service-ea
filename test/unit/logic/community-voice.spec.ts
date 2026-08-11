@@ -39,6 +39,7 @@ describe('Community Voice Logic', () => {
   let mockCommunityVoiceChatCache: jest.Mocked<ICommunityVoiceChatCacheComponent>
   let mockPlacesApi: jest.Mocked<any>
   let mockCommunityThumbnail: jest.Mocked<any>
+  let mockCommunityPlaces: jest.Mocked<any>
   let mockCommunityBroadcaster: jest.Mocked<ICommunityBroadcasterComponent>
 
   const communityId = 'test-community-id'
@@ -64,7 +65,8 @@ describe('Community Voice Logic', () => {
       getCommunity: jest.fn(),
       isMemberBanned: jest.fn(),
       getBannedMemberAddresses: jest.fn().mockResolvedValue([]),
-      getCommunityPlaces: jest.fn()
+      getCommunityPlaces: jest.fn(),
+      getCommunities: jest.fn()
     }
 
     mockPubsub = {
@@ -107,7 +109,7 @@ describe('Community Voice Logic', () => {
       broadcast: jest.fn().mockResolvedValue(undefined)
     }
 
-    const mockCommunityPlaces = {
+    mockCommunityPlaces = {
       getPlaces: jest.fn(),
       validateAndAddPlaces: jest.fn(),
       addPlaces: jest.fn(),
@@ -1728,6 +1730,81 @@ describe('Community Voice Logic', () => {
         await expect(communityVoice.requestToSpeakInCommunityVoiceChat(communityId, '', true)).rejects.toThrow(
           InvalidUserAddressError
         )
+      })
+    })
+  })
+
+  describe('when listing the active community voice chats for a user', () => {
+    let communityId: string
+    let result: Awaited<ReturnType<typeof communityVoice.getActiveCommunityVoiceChatsForUser>>
+
+    beforeEach(() => {
+      communityId = 'community-1'
+      mockCommsGatekeeper.getAllActiveCommunityVoiceChats.mockResolvedValue([
+        { communityId, participantCount: 3, moderatorCount: 1 }
+      ] as any)
+      mockCommunityThumbnail.getThumbnail.mockResolvedValue(undefined)
+      // A non-member only ever sees a room that has somewhere to go.
+      mockCommunityPlaces.getPlacesWithPositionsAndWorlds.mockResolvedValue({ positions: ['1,1'], worlds: [] })
+    })
+
+    describe('and the caller is not a member of a public but unlisted community', () => {
+      beforeEach(async () => {
+        mockCommunitiesDb.getCommunities.mockResolvedValue([
+          {
+            id: communityId,
+            name: 'Unlisted Community',
+            role: CommunityRole.None,
+            privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.Unlisted
+          } as any
+        ])
+
+        result = await communityVoice.getActiveCommunityVoiceChatsForUser('0xnonmember')
+      })
+
+      it('should not surface the room to them', () => {
+        expect(result).toEqual([])
+      })
+    })
+
+    describe('and the caller is not a member of a public listed community', () => {
+      beforeEach(async () => {
+        mockCommunitiesDb.getCommunities.mockResolvedValue([
+          {
+            id: communityId,
+            name: 'Listed Community',
+            role: CommunityRole.None,
+            privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All
+          } as any
+        ])
+
+        result = await communityVoice.getActiveCommunityVoiceChatsForUser('0xnonmember')
+      })
+
+      it('should surface the room to them', () => {
+        expect(result).toHaveLength(1)
+      })
+    })
+
+    describe('and the caller is a member of an unlisted community', () => {
+      beforeEach(async () => {
+        mockCommunitiesDb.getCommunities.mockResolvedValue([
+          {
+            id: communityId,
+            name: 'Unlisted Community',
+            role: CommunityRole.Member,
+            privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.Unlisted
+          } as any
+        ])
+
+        result = await communityVoice.getActiveCommunityVoiceChatsForUser('0xmember')
+      })
+
+      it('should surface the room to them', () => {
+        expect(result).toHaveLength(1)
       })
     })
   })

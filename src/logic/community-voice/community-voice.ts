@@ -391,6 +391,7 @@ export async function createCommunityVoiceComponent({
           {
             isMember: community.role !== CommunityRole.None,
             privacy: community.privacy,
+            visibility: community.visibility,
             name: community.name
           }
         ])
@@ -417,11 +418,13 @@ export async function createCommunityVoiceComponent({
             return null
           }
 
-          const { isMember, privacy, name: communityName } = membership
+          const { isMember, privacy, visibility, name: communityName } = membership
           const { participantCount, moderatorCount } = voiceChatStatus
 
-          // Early privacy check: for non-members, only include public communities
-          if (!isMember && privacy !== CommunityPrivacyEnum.Public) {
+          // A non-member only sees a room in a community anyone could have found: public AND listed.
+          // The query above asks for unlisted communities too, so without the visibility half an
+          // unlisted community's name, image, positions, worlds and live head-count reach any caller.
+          if (!isMember && !(privacy === CommunityPrivacyEnum.Public && visibility === CommunityVisibilityEnum.All)) {
             return null
           }
 
