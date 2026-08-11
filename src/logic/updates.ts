@@ -347,26 +347,29 @@ export function createUpdateHandlerComponent(
         : undefined
 
     if (!scope) {
-      // STARTED always resolves the current community. ENDED reaches this fallback only when its
-      // recorded scope is missing or invalid; fail closed to members if the row cannot be read.
-      try {
-        const community = await communitiesDb.getCommunity(update.communityId)
+      // ENDED must not derive a broad audience from mutable current visibility. Missing or invalid
+      // start-time scope fails closed so legacy or malformed updates cannot reveal hidden activity.
+      if (isEnded) {
+        scope = 'members'
+      } else {
+        try {
+          const community = await communitiesDb.getCommunity(update.communityId)
 
-        if (!community && !isEnded) {
-          logger.warn(`No active community ${update.communityId} for a voice chat update; dropping it`)
+          if (!community) {
+            logger.warn(`No active community ${update.communityId} for a voice chat update; dropping it`)
+            return
+          }
+
+          scope =
+            community.privacy === CommunityPrivacyEnum.Public && community.visibility === CommunityVisibilityEnum.All
+              ? 'all'
+              : 'members'
+        } catch (error) {
+          logger.error(`Could not resolve the audience for a voice chat update in ${update.communityId}`, {
+            error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+          })
           return
         }
-
-        scope =
-          community?.privacy === CommunityPrivacyEnum.Public && community?.visibility === CommunityVisibilityEnum.All
-            ? 'all'
-            : 'members'
-      } catch (error) {
-        logger.error(`Could not resolve the audience for a voice chat update in ${update.communityId}`, {
-          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
-        })
-        if (!isEnded) return
-        scope = 'members'
       }
     }
 

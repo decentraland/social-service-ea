@@ -1290,7 +1290,7 @@ describe('Updates Handlers', () => {
       describe('and an ended update carries a malformed notification scope', () => {
         beforeEach(async () => {
           mockCommunitiesDb.getCommunity.mockResolvedValue({
-            privacy: CommunityPrivacyEnum.Private,
+            privacy: CommunityPrivacyEnum.Public,
             visibility: CommunityVisibilityEnum.All
           })
 
@@ -1311,6 +1311,33 @@ describe('Updates Handlers', () => {
         })
 
         it('should not treat the malformed scope as a broad audience', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and an ended update has no notification scope', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: ''
+            })
+          )
+        })
+
+        it('should deliver cleanup to a member', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
+
+        it('should not derive a broad audience from current public visibility', () => {
           expect(emitSpy789).not.toHaveBeenCalled()
         })
       })
