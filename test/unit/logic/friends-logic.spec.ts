@@ -1030,9 +1030,32 @@ describe('Friends Component', () => {
     beforeEach(() => {
       mockClient = {} as jest.Mocked<PoolClient>
       mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
-      blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+      blockedAddress = '0x12356abc4078a0cc3b89b419928b857b8af826ef'
       mockProfile = createMockProfile(blockedAddress)
       blockedAt = new Date()
+    })
+
+    describe('and the target address is checksummed', () => {
+      let checksummed: string
+      let lowercased: string
+
+      beforeEach(async () => {
+        checksummed = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+        lowercased = checksummed.toLowerCase()
+
+        mockFriendsDB.blockUser.mockResolvedValueOnce({ blocked_at: blockedAt } as any)
+        mockFriendsDB.getFriendship.mockResolvedValueOnce(null)
+
+        await friendsComponent.blockUser(mockUserAddress, checksummed)
+      })
+
+      it('should publish the block update with the address the subscription filters compare against', () => {
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(BLOCK_UPDATES_CHANNEL, {
+          blockerAddress: mockUserAddress,
+          blockedAddress: lowercased,
+          isBlocked: true
+        })
+      })
     })
 
     describe('and the registry cannot resolve a profile for the target', () => {
@@ -1166,7 +1189,7 @@ describe('Friends Component', () => {
     beforeEach(() => {
       mockClient = {} as jest.Mocked<PoolClient>
       mockFriendsDB.executeTx.mockImplementationOnce(async (cb) => cb(mockClient))
-      blockedAddress = '0x12356abC4078a0Cc3b89b419928b857B8AF826ef'
+      blockedAddress = '0x12356abc4078a0cc3b89b419928b857b8af826ef'
       mockProfile = createMockProfile(blockedAddress)
     })
 
