@@ -340,11 +340,9 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
         })
 
         afterEach(async () => {
-          await components.communitiesDb.unbanMemberFromCommunity(
-            publicCommunityId,
-            '0x9876543210987654321098765432109876543210',
-            address
-          )
+          // Raw removal, matching the raw seeding above: the owner has no membership row here,
+          // so the production unban path would reject them.
+          await components.communitiesDbHelper.forceCommunityBanRemoval(publicCommunityId, [address])
         })
 
         it('should not return the community user is banned from', async () => {

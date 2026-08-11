@@ -75,11 +75,9 @@ export async function createCommunityBansComponent(
 
       await communityRoles.validatePermissionToBanMemberFromCommunity(communityId, bannerAddress, targetAddress)
 
-      const doesTargetUserBelongsToCommunity = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
+      const { wasMember } = await communitiesDb.banMemberAndRemoveRequests(communityId, bannerAddress, targetAddress)
 
-      if (doesTargetUserBelongsToCommunity) {
-        await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
-
+      if (wasMember) {
         await communitiesDb.unlikePostsFromCommunity(communityId, targetAddress)
 
         analytics.fireEvent(AnalyticsEvent.BAN_MEMBER_FROM_COMMUNITY, {
@@ -88,11 +86,6 @@ export async function createCommunityBansComponent(
           target_user_id: targetAddress.toLowerCase()
         })
       }
-
-      await communitiesDb.banMemberFromCommunity(communityId, bannerAddress, targetAddress)
-
-      // Remove any pending join requests/invites so the ban cannot be circumvented by later accepting them.
-      await communitiesDb.removeMemberRequests(communityId, targetAddress)
 
       // For private communities, also kick user from voice chat if they are in one
       if (community.privacy === CommunityPrivacyEnum.Private) {

@@ -102,10 +102,8 @@ describe('Community Bans Component', () => {
 
         describe('and the target is a member of the community', () => {
           beforeEach(() => {
-            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(true)
-            mockCommunitiesDB.kickMemberFromCommunity.mockResolvedValue()
+            mockCommunitiesDB.banMemberAndRemoveRequests.mockResolvedValue({ wasMember: true })
             mockCommunitiesDB.unlikePostsFromCommunity.mockResolvedValue()
-            mockCommunitiesDB.banMemberFromCommunity.mockResolvedValue()
           })
 
           it('should kick and ban the member from the community', async () => {
@@ -117,15 +115,12 @@ describe('Community Bans Component', () => {
               bannerAddress,
               targetAddress
             )
-            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
-            expect(mockCommunitiesDB.kickMemberFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockCommunitiesDB.unlikePostsFromCommunity).toHaveBeenCalledWith(communityId, targetAddress)
-            expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(
+            expect(mockCommunitiesDB.banMemberAndRemoveRequests).toHaveBeenCalledWith(
               communityId,
               bannerAddress,
               targetAddress
             )
-            expect(mockCommunitiesDB.removeMemberRequests).toHaveBeenCalledWith(communityId, targetAddress)
           })
 
           it('should publish member status update to pubsub', async () => {
@@ -161,8 +156,7 @@ describe('Community Bans Component', () => {
 
         describe('and the target is not a member of the community', () => {
           beforeEach(() => {
-            mockCommunitiesDB.isMemberOfCommunity.mockResolvedValue(false)
-            mockCommunitiesDB.banMemberFromCommunity.mockResolvedValue()
+            mockCommunitiesDB.banMemberAndRemoveRequests.mockResolvedValue({ wasMember: false })
           })
 
           it('should ban the non-member without kicking them', async () => {
@@ -174,17 +168,13 @@ describe('Community Bans Component', () => {
               bannerAddress,
               targetAddress
             )
-            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
             expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
             expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
-            expect(mockCommunitiesDB.banMemberFromCommunity).toHaveBeenCalledWith(
+            expect(mockCommunitiesDB.banMemberAndRemoveRequests).toHaveBeenCalledWith(
               communityId,
               bannerAddress,
               targetAddress
             )
-            // Even a non-member's pending requests/invites must be cleared so the ban can't be
-            // circumvented by later accepting them.
-            expect(mockCommunitiesDB.removeMemberRequests).toHaveBeenCalledWith(communityId, targetAddress)
           })
 
           it('should publish member status update to pubsub', async () => {

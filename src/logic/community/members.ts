@@ -136,7 +136,7 @@ export async function createCommunityMembersComponent(
       throw new InvalidRequestError(`The user ${targetAddress} doesn't have any names`)
     }
 
-    await communitiesDb.transferCommunityOwnership(communityId, targetAddress)
+    await communitiesDb.transferCommunityOwnership(communityId, updaterAddress, targetAddress)
 
     void broadcastOwnershipTransferred(communityId, updaterAddress, targetAddress).catch((error: any) => {
       logger.error('Unhandled error in broadcastOwnershipTransferred', { error: error.message, communityId })
@@ -240,7 +240,7 @@ export async function createCommunityMembersComponent(
 
       await communityRoles.validatePermissionToKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
 
-      await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
+      await communitiesDb.kickMemberFromCommunity(communityId, targetAddress, kickerAddress)
 
       await communitiesDb.unlikePostsFromCommunity(communityId, targetAddress)
 
@@ -347,7 +347,8 @@ export async function createCommunityMembersComponent(
 
       await communityRoles.validatePermissionToLeaveCommunity(communityId, memberAddress)
 
-      await communitiesDb.kickMemberFromCommunity(communityId, memberAddress)
+      // Leaving: the member is their own actor.
+      await communitiesDb.kickMemberFromCommunity(communityId, memberAddress, memberAddress)
 
       await communitiesDb.unlikePostsFromCommunity(communityId, memberAddress)
 
@@ -396,7 +397,7 @@ export async function createCommunityMembersComponent(
       // Default role update path
       await communityRoles.validatePermissionToUpdateMemberRole(communityId, updaterAddress, targetAddress, newRole)
 
-      await communitiesDb.updateMemberRole(communityId, targetAddress, newRole)
+      await communitiesDb.updateMemberRole(communityId, targetAddress, newRole, updaterAddress)
     },
 
     aggregateWithProfiles,

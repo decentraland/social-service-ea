@@ -1,4 +1,12 @@
 import { EthAddress } from '@dcl/schemas'
+import { NotAuthorizedError } from '@dcl/http-commons'
+
+export class CommunityMemberBannedError extends NotAuthorizedError {
+  constructor(communityId: string, memberAddress: string) {
+    super(`The user ${memberAddress} is banned from community ${communityId}`)
+    this.name = 'CommunityMemberBannedError'
+  }
+}
 
 export class CommunityNotFoundError extends Error {
   constructor(public readonly id: string) {
