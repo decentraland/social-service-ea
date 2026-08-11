@@ -1,5 +1,5 @@
 import { isErrorWithMessage } from '../../utils/errors'
-import { AppComponents } from '../../types'
+import { AppComponents, CommunityVoiceChatNotificationScope } from '../../types'
 
 /**
  * Represents an active community voice chat in the cache
@@ -9,6 +9,8 @@ export interface CachedCommunityVoiceChat {
   isActive: boolean
   lastChecked: number
   createdAt: number
+  /** Who the room was announced to at start; absent for rooms cached before this was recorded. */
+  notificationScope?: CommunityVoiceChatNotificationScope
 }
 
 /**
@@ -20,7 +22,11 @@ export interface ICommunityVoiceChatCacheComponent {
    * @param communityId - The community ID
    * @param createdAt - When the voice chat was created (optional, defaults to now)
    */
-  setCommunityVoiceChat(communityId: string, createdAt?: number): Promise<void>
+  setCommunityVoiceChat(
+    communityId: string,
+    createdAt?: number,
+    notificationScope?: CommunityVoiceChatNotificationScope
+  ): Promise<void>
 
   /**
    * Gets a community voice chat from the cache
@@ -66,15 +72,23 @@ export function createCommunityVoiceChatCacheComponent({
     return `${CACHE_PREFIX}${communityId}`
   }
 
-  async function setCommunityVoiceChat(communityId: string, createdAt: number = Date.now()): Promise<void> {
+  async function setCommunityVoiceChat(
+    communityId: string,
+    createdAt: number = Date.now(),
+    notificationScope?: CommunityVoiceChatNotificationScope
+  ): Promise<void> {
     const now = Date.now()
     const existing = await getCommunityVoiceChat(communityId)
+    const isNewRoom = notificationScope !== undefined
 
     const cachedChat: CachedCommunityVoiceChat = {
       communityId,
       isActive: true, // Always true for active chats
       lastChecked: now,
-      createdAt: existing?.createdAt ?? createdAt
+      // An explicit scope comes only from the start path and identifies a new room. Poller
+      // refreshes omit it and preserve the room metadata already in the cache.
+      createdAt: isNewRoom ? createdAt : (existing?.createdAt ?? createdAt),
+      notificationScope: notificationScope ?? existing?.notificationScope
     }
 
     await redis.put(getCacheKey(communityId), cachedChat, { EX: CACHE_TTL })

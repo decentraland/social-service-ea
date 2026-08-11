@@ -256,6 +256,7 @@ async function initComponents(): Promise<TestComponents> {
     logs,
     subscribersContext,
     friendsDb,
+    communitiesDb,
     communityMembers,
     registry,
     metrics,

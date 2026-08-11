@@ -16,6 +16,9 @@ export type RPCServiceContext<ComponentNames extends keyof AppComponents> = {
 
 export type Context<Path extends string = any> = IHttpServerComponent.PathAwareContext<GlobalContext, Path>
 
+/** Who a community voice room was announced to. */
+export type CommunityVoiceChatNotificationScope = 'all' | 'members'
+
 export type SubscriptionEventsEmitter = {
   friendshipUpdate: {
     id: string
@@ -59,6 +62,9 @@ export type SubscriptionEventsEmitter = {
   }
   communityVoiceChatUpdate: CommunityVoiceChatUpdate & {
     creatorAddress?: string // Internal field to exclude creator from notifications
+    // Internal field: who the room was announced to when it STARTED. Carried on the ended update
+    // so cleanup reaches exactly that audience, whatever the community's privacy is by then.
+    notificationScope?: CommunityVoiceChatNotificationScope
   }
   communityDeletedUpdate: {
     communityId: string

@@ -297,6 +297,7 @@ export async function initComponents(): Promise<AppComponents> {
   const friends = await createFriendsComponent({ friendsDb, registry, pubsub, sns, logs, redis, config, metrics })
   const updateHandler = createUpdateHandlerComponent({
     logs,
+    communitiesDb,
     subscribersContext,
     friendsDb,
     communityMembers,

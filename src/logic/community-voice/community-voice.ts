@@ -1,10 +1,16 @@
 import { Events } from '@dcl/schemas'
 import { COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL } from '../../adapters/pubsub'
-import { AppComponents, CommunityVoiceChat, CommunityRole, CommunityVoiceChatStatus } from '../../types'
+import {
+  AppComponents,
+  CommunityVoiceChat,
+  CommunityRole,
+  CommunityVoiceChatStatus,
+  CommunityVoiceChatNotificationScope
+} from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
 import { isErrorWithMessage, errorMessageOrDefault } from '../../utils/errors'
 import { separatePositionsAndWorlds } from '../../utils/places'
-import { ActiveCommunityVoiceChat, CommunityPrivacyEnum } from '../community/types'
+import { ActiveCommunityVoiceChat, CommunityPrivacyEnum, CommunityVisibilityEnum } from '../community/types'
 import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   CommunityVoiceChatNotFoundError,
@@ -116,6 +122,19 @@ export async function createCommunityVoiceComponent({
       // Fetch user profile data using helper function
       const profileData = await getUserProfileData(creatorAddress)
 
+      // Resolve the audience from required community data before creating the room or fetching
+      // optional enrichment. Thumbnail or place failures must never downgrade a public/listed room
+      // to member-only notifications.
+      const community = await communitiesDb.getCommunity(communityId)
+      if (!community) {
+        throw new CommunityVoiceChatNotFoundError(communityId)
+      }
+      const communityName = community.name
+      const notificationScope: CommunityVoiceChatNotificationScope =
+        community.privacy === CommunityPrivacyEnum.Public && community.visibility === CommunityVisibilityEnum.All
+          ? 'all'
+          : 'members'
+
       // Create room in comms-gatekeeper and get credentials directly
       const credentials = await commsGatekeeper.createCommunityVoiceChatRoom(
         communityId,
@@ -125,28 +144,27 @@ export async function createCommunityVoiceComponent({
       )
       logger.info(`Community voice chat room created for community ${communityId}`)
 
-      // Add to cache as active
       const createdAt = Date.now()
-      await communityVoiceChatCache.setCommunityVoiceChat(communityId, createdAt)
 
-      // Get community information for the update
+      // Persist the room and its fanout class before optional enrichment. The poller and ENDED
+      // propagation must not lose track of an active room if enrichment is slow or interrupted.
+      await communityVoiceChatCache.setCommunityVoiceChat(communityId, createdAt, notificationScope)
+
       let communityPositions: string[] = []
       let communityWorlds: string[] = []
-      let communityName = ''
       let communityImage: string | undefined = undefined
 
       try {
-        // Get community basic info and thumbnail
-        const [community, thumbnail] = await Promise.all([
-          communitiesDb.getCommunity(communityId),
-          communityThumbnail.getThumbnail(communityId)
-        ])
+        communityImage = (await communityThumbnail.getThumbnail(communityId)) || undefined
+      } catch (error) {
+        logger.warn(
+          `Failed to fetch the thumbnail for community ${communityId}: ${
+            isErrorWithMessage(error) ? error.message : 'Unknown error'
+          }`
+        )
+      }
 
-        if (community) {
-          communityName = community.name
-          communityImage = thumbnail || undefined
-        }
-
+      try {
         // Get community places and separate positions from worlds
         const places = await communitiesDb.getCommunityPlaces(communityId)
         const placeIds = places.map((place) => place.id)
@@ -175,11 +193,10 @@ export async function createCommunityVoiceComponent({
         }
       } catch (error) {
         logger.warn(
-          `Failed to fetch community information for community ${communityId}: ${
+          `Failed to fetch places for community ${communityId}: ${
             isErrorWithMessage(error) ? error.message : 'Unknown error'
           }`
         )
-        // Continue without community info - non-critical error
       }
 
       await Promise.all([
@@ -191,7 +208,8 @@ export async function createCommunityVoiceComponent({
           worlds: communityWorlds,
           communityName,
           communityImage,
-          creatorAddress
+          creatorAddress,
+          notificationScope
         }),
         communityBroadcaster.broadcast(
           {
@@ -279,17 +297,25 @@ export async function createCommunityVoiceComponent({
       await commsGatekeeper.endCommunityVoiceChatRoom(communityId, userAddress)
       logger.info(`Community voice chat room ended for community ${communityId}`)
 
+      // Read the recorded audience before dropping the entry that holds it.
+      const cachedChatOnEnd = await communityVoiceChatCache.getCommunityVoiceChat(communityId)
+
       // Remove from cache
       await communityVoiceChatCache.removeCommunityVoiceChat(communityId)
+
+      const endedAt = Date.now()
 
       // Publish end event - we don't need community details for ENDED status
       await pubsub.publishInChannel(COMMUNITY_VOICE_CHAT_UPDATES_CHANNEL, {
         communityId,
         status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+        endedAt,
         positions: undefined,
         worlds: undefined,
         communityName: undefined,
-        communityImage: undefined
+        communityImage: undefined,
+        // Preserve the start-time fanout class for best-effort cleanup by the update handler.
+        notificationScope: cachedChatOnEnd?.notificationScope
       })
 
       // Analytics event
