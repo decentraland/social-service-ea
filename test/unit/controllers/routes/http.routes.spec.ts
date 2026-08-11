@@ -1,5 +1,9 @@
 import { wellKnownComponents } from '@dcl/crypto-middleware'
+import { Router } from '@dcl/http-server'
+import { errorHandler } from '@dcl/http-commons'
 import { setupHttpRoutes } from '../../../../src/controllers/routes/http.routes'
+import { communitiesErrorsHandler } from '../../../../src/controllers/middlewares/communities-errors'
+import { reportUnhandledErrors } from '../../../../src/controllers/middlewares/report-unhandled-errors'
 import { GlobalContext } from '../../../../src/types'
 
 jest.mock('@dcl/crypto-middleware', () => ({
@@ -104,5 +108,38 @@ describe('when setting up the http routes', () => {
     it('should accept it on every signed-fetch route', () => {
       expect(results).toEqual(acceptedByEveryRoute)
     })
+  })
+})
+
+describe('when registering the error-handling middlewares', () => {
+  let registered: unknown[]
+
+  beforeEach(async () => {
+    const useSpy = jest.spyOn(Router.prototype, 'use')
+
+    await setupHttpRoutes({
+      components: {
+        fetcher: { fetch: jest.fn() },
+        config: { getString: jest.fn().mockResolvedValue(undefined) },
+        schemaValidator: { withSchemaValidatorMiddleware: jest.fn(() => async () => ({ status: 200 })) }
+      }
+    } as unknown as GlobalContext)
+
+    registered = useSpy.mock.calls.map((call) => call[0])
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  // Registration order is composition order (koa-style onion), and this middleware only works in
+  // one position: inside `errorHandler`, which swallows the error into a 500 and never rethrows,
+  // and outside `communitiesErrorsHandler`, whose mapped 4xx must never reach the reporter.
+  it('should place the reporter between the shared handler and the community mapper', () => {
+    const errorMiddlewares = registered.filter((middleware) =>
+      [errorHandler, reportUnhandledErrors, communitiesErrorsHandler].includes(middleware as never)
+    )
+
+    expect(errorMiddlewares).toEqual([errorHandler, reportUnhandledErrors, communitiesErrorsHandler])
   })
 })
