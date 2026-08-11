@@ -7,12 +7,12 @@ jest.mock('@dcl/crypto-middleware', () => ({
   bearerTokenMiddleware: jest.fn(() => async () => ({ status: 200 }))
 }))
 
+type MetadataValidator = (metadata: Record<string, unknown> | undefined) => boolean
+
 describe('when setting up the http routes', () => {
-  let metadataValidators: Array<(metadata: Record<string, unknown> | undefined) => boolean>
+  let metadataValidators: MetadataValidator[]
 
   beforeEach(async () => {
-    ;(wellKnownComponents as jest.Mock).mockClear()
-
     await setupHttpRoutes({
       components: {
         fetcher: { fetch: jest.fn() },
@@ -24,6 +24,10 @@ describe('when setting up the http routes', () => {
     metadataValidators = (wellKnownComponents as jest.Mock).mock.calls.map((call) => call[0].metadataValidator)
   })
 
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
   it('should install the signed-fetch middleware on more than one route', () => {
     expect(metadataValidators.length).toBeGreaterThan(1)
   })
@@ -32,29 +36,73 @@ describe('when setting up the http routes', () => {
     expect(metadataValidators.every((validator) => typeof validator === 'function')).toBe(true)
   })
 
-  it('should reject a chain declaring the scene signer on every signed-fetch route', () => {
-    expect(metadataValidators.map((validator) => validator({ signer: 'decentraland-kernel-scene' }))).toEqual(
-      metadataValidators.map(() => false)
-    )
+  describe('and a chain declares the scene signer', () => {
+    let results: boolean[]
+    let rejectedByEveryRoute: boolean[]
+
+    beforeEach(() => {
+      results = metadataValidators.map((validator) => validator({ signer: 'decentraland-kernel-scene' }))
+      rejectedByEveryRoute = metadataValidators.map(() => false)
+    })
+
+    it('should reject it on every signed-fetch route', () => {
+      expect(results).toEqual(rejectedByEveryRoute)
+    })
   })
 
-  it('should reject the scene signer whatever casing it arrives in', () => {
-    expect(metadataValidators.map((validator) => validator({ signer: 'Decentraland-Kernel-Scene' }))).toEqual(
-      metadataValidators.map(() => false)
-    )
+  describe('and the scene signer arrives with different casing', () => {
+    let results: boolean[]
+    let rejectedByEveryRoute: boolean[]
+
+    beforeEach(() => {
+      results = metadataValidators.map((validator) => validator({ signer: 'Decentraland-Kernel-Scene' }))
+      rejectedByEveryRoute = metadataValidators.map(() => false)
+    })
+
+    it('should reject it on every signed-fetch route', () => {
+      expect(results).toEqual(rejectedByEveryRoute)
+    })
   })
 
-  it('should accept the empty metadata explorer clients send', () => {
-    expect(metadataValidators.map((validator) => validator({}))).toEqual(metadataValidators.map(() => true))
+  describe('and the metadata is the empty object explorer clients send', () => {
+    let results: boolean[]
+    let acceptedByEveryRoute: boolean[]
+
+    beforeEach(() => {
+      results = metadataValidators.map((validator) => validator({}))
+      acceptedByEveryRoute = metadataValidators.map(() => true)
+    })
+
+    it('should accept it on every signed-fetch route', () => {
+      expect(results).toEqual(acceptedByEveryRoute)
+    })
   })
 
-  it('should accept a chain signed by any other signer', () => {
-    expect(metadataValidators.map((validator) => validator({ signer: 'dcl:explorer' }))).toEqual(
-      metadataValidators.map(() => true)
-    )
+  describe('and the chain is signed by another signer', () => {
+    let results: boolean[]
+    let acceptedByEveryRoute: boolean[]
+
+    beforeEach(() => {
+      results = metadataValidators.map((validator) => validator({ signer: 'dcl:explorer' }))
+      acceptedByEveryRoute = metadataValidators.map(() => true)
+    })
+
+    it('should accept it on every signed-fetch route', () => {
+      expect(results).toEqual(acceptedByEveryRoute)
+    })
   })
 
-  it('should accept absent metadata without throwing', () => {
-    expect(metadataValidators.map((validator) => validator(undefined))).toEqual(metadataValidators.map(() => true))
+  describe('and no metadata is supplied at all', () => {
+    let results: boolean[]
+    let acceptedByEveryRoute: boolean[]
+
+    beforeEach(() => {
+      results = metadataValidators.map((validator) => validator(undefined))
+      acceptedByEveryRoute = metadataValidators.map(() => true)
+    })
+
+    it('should accept it on every signed-fetch route', () => {
+      expect(results).toEqual(acceptedByEveryRoute)
+    })
   })
 })
