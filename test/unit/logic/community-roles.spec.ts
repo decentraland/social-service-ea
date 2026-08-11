@@ -65,6 +65,32 @@ describe('Community Roles Component', () => {
       })
     })
 
+    describe('and the target is not a member of the community', () => {
+      let nonMemberAddress: string
+
+      beforeEach(() => {
+        nonMemberAddress = '0x1111111111111111111111111111111111111111'
+        mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
+          [ownerAddress]: CommunityRole.Owner,
+          [moderatorAddress]: CommunityRole.Moderator,
+          [memberAddress]: CommunityRole.Member,
+          [nonMemberAddress]: CommunityRole.None
+        })
+      })
+
+      it('should allow a moderator through, so the kick can be the no-op it is', async () => {
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, moderatorAddress, nonMemberAddress)
+        ).resolves.not.toThrow()
+      })
+
+      it('should refuse a plain member exactly as it would for a member target', async () => {
+        await expect(
+          roles.validatePermissionToKickMemberFromCommunity(communityId, memberAddress, nonMemberAddress)
+        ).rejects.toThrow(NotAuthorizedError)
+      })
+    })
+
     describe('and the user is a moderator', () => {
       beforeEach(() => {
         mockCommunitiesDB.getCommunityMemberRoles.mockResolvedValue({
@@ -1035,9 +1061,7 @@ describe('Community Roles Component', () => {
 
       it('should throw NotAuthorizedError as members cannot delete posts', async () => {
         await expect(roles.validatePermissionToDeletePost(mockPost, memberAddress)).rejects.toThrow(
-          new NotAuthorizedError(
-            `The user ${memberAddress} doesn't have permission to delete posts from the community`
-          )
+          new NotAuthorizedError(`The user ${memberAddress} doesn't have permission to delete posts from the community`)
         )
       })
     })

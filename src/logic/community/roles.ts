@@ -114,7 +114,13 @@ export function createCommunityRolesComponent(
       const kickerRole = roles[normalizeAddress(kickerAddress)]
       const targetRole = roles[normalizeAddress(targetAddress)]
 
-      if (!canActOnMember(kickerRole, targetRole)) {
+      // A non-member has no role to rank against, and nothing can act on None, so ranking against it
+      // would refuse every caller. Authorize against the lowest actionable role instead: an owner or
+      // moderator passes and the kick is a no-op, anyone else gets the same refusal they would get
+      // for a member — which is what stops the two answers from revealing who is in the community.
+      const effectiveTargetRole = isMember(targetRole) ? targetRole : CommunityRole.Member
+
+      if (!canActOnMember(kickerRole, effectiveTargetRole)) {
         throw new NotAuthorizedError(
           `The user ${kickerAddress} doesn't have permission to kick ${targetAddress} from community ${communityId}`
         )

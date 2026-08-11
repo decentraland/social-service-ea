@@ -231,14 +231,17 @@ export async function createCommunityMembersComponent(
         throw new CommunityNotFoundError(communityId)
       }
 
+      // Authorize before reading membership. The two outcomes differ — 204 for a non-member, 401 for
+      // a member — so checking membership first let an unauthorized caller probe a private roster one
+      // address at a time. banMember and unbanMember already order it this way.
+      await communityRoles.validatePermissionToKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
+
       const doesTargetUserBelongsToCommunity = await communitiesDb.isMemberOfCommunity(communityId, targetAddress)
 
       if (!doesTargetUserBelongsToCommunity) {
         logger.info(`Target ${targetAddress} is not a member of community ${communityId}, returning 204`)
         return
       }
-
-      await communityRoles.validatePermissionToKickMemberFromCommunity(communityId, kickerAddress, targetAddress)
 
       await communitiesDb.kickMemberFromCommunity(communityId, targetAddress)
 
