@@ -7,7 +7,7 @@ import { AppComponents, WsAuthenticatedUserData, WsNotAuthenticatedUserData, WsU
 import { normalizeAddress } from '../../../utils/address'
 import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/UWebSocketTransport'
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
-import { isErrorWithMessage } from '../../../utils/errors'
+import { isErrorWithMessage, isExpectedAuthRejection } from '../../../utils/errors'
 import { WsPoolFullError } from '../../../logic/ws-pool'
 import { isSceneSigner } from '../../../utils/auth-metadata'
 
@@ -198,14 +198,28 @@ export async function registerWsHandler(
 
       rpcServer.attachUser({ transport, address, wsConnectionId: data.wsConnectionId })
     } catch (error: any) {
-      logger.error(`Error verifying auth chain: ${error.message}`, {
-        wsConnectionId: data.wsConnectionId
-      })
-      metrics.increment('ws_auth_errors')
-      tracing.captureException(error, {
-        address: getAddress(data),
-        wsConnectionId: data.wsConnectionId
-      })
+      const expectedRejection = isExpectedAuthRejection(error)
+
+      if (expectedRejection) {
+        // The credentials themselves were turned down — an expired ephemeral key, a stale
+        // signature, a malformed chain. Clients reconnect with old sessions all the time, so this
+        // is routine traffic, not a fault: the HTTP routes answer the identical failure with a
+        // plain 401 and no Sentry report. Escalating it here only buries the failures that matter.
+        logger.warn(`Rejected auth chain: ${error.message}`, {
+          statusCode: error.statusCode,
+          wsConnectionId: data.wsConnectionId
+        })
+      } else {
+        logger.error(`Error verifying auth chain: ${error.message}`, {
+          wsConnectionId: data.wsConnectionId
+        })
+        tracing.captureException(error, {
+          address: getAddress(data),
+          wsConnectionId: data.wsConnectionId
+        })
+      }
+
+      metrics.increment('ws_auth_errors', { type: expectedRejection ? 'client_rejected' : 'server_error' })
       // The client may have disconnected while verify() was in flight; end() on an
       // already-closed socket throws and would escape the async message handler as an
       // unhandled rejection.

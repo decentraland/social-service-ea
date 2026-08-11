@@ -2,7 +2,13 @@ import { CommunityRole } from '../../../src/types'
 import { NotAuthorizedError, InvalidRequestError } from '@dcl/http-commons'
 import { CommunityNotFoundError } from '../../../src/logic/community/errors'
 import { mockCommunitiesDB } from '../../mocks/components/communities-db'
-import { mockLogs, mockCatalystClient, mockRegistry, createMockPeersStatsComponent, mockPubSub } from '../../mocks/components'
+import {
+  mockLogs,
+  mockCatalystClient,
+  mockRegistry,
+  createMockPeersStatsComponent,
+  mockPubSub
+} from '../../mocks/components'
 import { createCommsGatekeeperMockedComponent } from '../../mocks/components/comms-gatekeeper'
 import { createCommunityMembersComponent } from '../../../src/logic/community/members'
 import {
@@ -719,7 +725,8 @@ describe('Community Members Component', () => {
             )
 
             expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
-            expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
+            // Never read for an unauthorized caller: the 204/401 split is what leaked the roster.
+            expect(mockCommunitiesDB.isMemberOfCommunity).not.toHaveBeenCalled()
             expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).toHaveBeenCalledWith(
               communityId,
               kickerAddress,
@@ -742,8 +749,11 @@ describe('Community Members Component', () => {
           await communityMembersComponent.kickMember(communityId, kickerAddress, targetAddress)
 
           expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(communityId)
-          expect(mockCommunitiesDB.isMemberOfCommunity).toHaveBeenCalledWith(communityId, targetAddress)
-          expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).not.toHaveBeenCalled()
+          expect(mockCommunityRoles.validatePermissionToKickMemberFromCommunity).toHaveBeenCalledWith(
+            communityId,
+            kickerAddress,
+            targetAddress
+          )
           expect(mockCommunitiesDB.kickMemberFromCommunity).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.unlikePostsFromCommunity).not.toHaveBeenCalled()
           expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
@@ -872,7 +882,10 @@ describe('Community Members Component', () => {
 
       describe('and the community is private', () => {
         beforeEach(() => {
-          mockCommunitiesDB.getCommunity.mockResolvedValue({ ...publicCommunity, privacy: CommunityPrivacyEnum.Private })
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...publicCommunity,
+            privacy: CommunityPrivacyEnum.Private
+          })
         })
 
         it('should throw NotAuthorizedError without joining, since private communities require a request', async () => {
