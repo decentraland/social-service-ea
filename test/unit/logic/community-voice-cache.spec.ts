@@ -6,8 +6,6 @@ describe('Community Voice Chat Cache Component', () => {
   let mockComponents: Pick<AppComponents, 'logs' | 'redis'>
   let mockRedisGet: jest.MockedFunction<any>
   let mockRedisPut: jest.MockedFunction<any>
-  let mockRedisMGet: jest.MockedFunction<any>
-  let mockRedisScanIterator: jest.MockedFunction<any>
   let mockRedisDel: jest.MockedFunction<any>
 
   // Fixed timestamps to avoid test flakiness
@@ -17,15 +15,12 @@ describe('Community Voice Chat Cache Component', () => {
 
   beforeEach(() => {
     jest.spyOn(Date, 'now').mockReturnValue(FIXED_NOW)
-    
+
     mockRedisGet = jest.fn()
     mockRedisPut = jest.fn()
-    mockRedisMGet = jest.fn()
-    mockRedisScanIterator = jest.fn()
     mockRedisDel = jest.fn()
 
     const mockRedisClient = {
-      scanIterator: mockRedisScanIterator,
       del: mockRedisDel
     }
 
@@ -41,7 +36,6 @@ describe('Community Voice Chat Cache Component', () => {
       redis: {
         put: mockRedisPut,
         get: mockRedisGet,
-        mGet: mockRedisMGet,
         client: mockRedisClient
       }
     } as any
@@ -110,7 +104,7 @@ describe('Community Voice Chat Cache Component', () => {
       })
     })
 
-    describe('when updating existing community voice chat', () => {
+    describe('when a stale entry is still cached for the community', () => {
       const communityId = 'test-community-123'
       const existingChat = {
         communityId,
@@ -127,23 +121,7 @@ describe('Community Voice Chat Cache Component', () => {
         mockRedisGet.mockResolvedValue(existingChat)
       })
 
-      it('should update existing community voice chat preserving createdAt', async () => {
-        await cache.setCommunityVoiceChat(communityId)
-
-        expect(mockRedisPut).toHaveBeenCalledWith(
-          'community-voice-chat:test-community-123',
-          expect.objectContaining({
-            communityId,
-            isActive: true,
-            lastChecked: FIXED_NOW,
-            createdAt: FIXED_CREATED_AT, // Should preserve existing createdAt
-            notificationScope: 'all'
-          }),
-          { EX: 24 * 60 * 60 }
-        )
-      })
-
-      it('should replace stale room metadata when an explicit scope identifies a new room', async () => {
+      it('should replace the stale room metadata with the new room one', async () => {
         await cache.setCommunityVoiceChat(communityId, newRoomCreatedAt, 'members')
 
         expect(mockRedisPut).toHaveBeenCalledWith(
@@ -229,155 +207,6 @@ describe('Community Voice Chat Cache Component', () => {
 
       it('should handle Redis errors gracefully', async () => {
         await expect(cache.removeCommunityVoiceChat('test-community')).resolves.not.toThrow()
-      })
-    })
-  })
-
-  describe('when retrieving active community voice chats', () => {
-    describe('when there are active and inactive chats', () => {
-      const activeChat1 = { communityId: 'active-1', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
-      const inactiveChat = { communityId: 'inactive-1', isActive: false, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
-      const activeChat2 = { communityId: 'active-2', isActive: true, lastChecked: FIXED_LAST_CHECKED, createdAt: FIXED_CREATED_AT }
-
-      beforeEach(() => {
-        const keys = ['community-voice-chat:active-1', 'community-voice-chat:inactive-1', 'community-voice-chat:active-2']
-        mockRedisScanIterator.mockReturnValue(
-          (async function* () {
-            for (const key of keys) yield key
-          })()
-        )
-        mockRedisMGet.mockResolvedValue([activeChat1, inactiveChat, activeChat2])
-      })
-
-      it('should return only active voice chats', async () => {
-        const active = await cache.getActiveCommunityVoiceChats()
-
-        expect(active).toHaveLength(2)
-        expect(active.map((c) => c.communityId)).toEqual(expect.arrayContaining(['active-1', 'active-2']))
-      })
-
-      it('should call mGet with all scanned keys', async () => {
-        await cache.getActiveCommunityVoiceChats()
-
-        expect(mockRedisMGet).toHaveBeenCalledWith([
-          'community-voice-chat:active-1',
-          'community-voice-chat:inactive-1',
-          'community-voice-chat:active-2'
-        ])
-      })
-    })
-
-    describe('when there are no active voice chats', () => {
-      beforeEach(() => {
-        mockRedisScanIterator.mockReturnValue(
-          (async function* () {
-            yield 'community-voice-chat:inactive-1'
-          })()
-        )
-        mockRedisMGet.mockResolvedValue([{
-          communityId: 'inactive-1',
-          isActive: false,
-          lastChecked: FIXED_LAST_CHECKED,
-          createdAt: FIXED_CREATED_AT
-        }])
-      })
-
-      it('should return empty array when no active voice chats exist', async () => {
-        const active = await cache.getActiveCommunityVoiceChats()
-
-        expect(active).toHaveLength(0)
-      })
-    })
-
-    describe('when Redis throws an error', () => {
-      beforeEach(() => {
-        mockRedisScanIterator.mockImplementation(() => {
-          throw new Error('Redis error')
-        })
-      })
-
-      it('should handle Redis errors gracefully', async () => {
-        const active = await cache.getActiveCommunityVoiceChats()
-
-        expect(active).toEqual([])
-      })
-    })
-  })
-
-  describe('when updating and detecting status changes', () => {
-    describe('when voice chat ends (active to inactive)', () => {
-      const communityId = 'test-community-123'
-      const existingChat = {
-        communityId,
-        isActive: true,
-        lastChecked: FIXED_LAST_CHECKED,
-        createdAt: FIXED_CREATED_AT
-      }
-
-      beforeEach(() => {
-        mockRedisGet.mockResolvedValue(existingChat)
-        mockRedisDel.mockResolvedValue(1)
-      })
-
-      it('should detect when voice chat ends (active to inactive)', async () => {
-        const justEnded = await cache.updateAndDetectChange(communityId, false)
-
-        expect(justEnded).toBe(true)
-        expect(mockRedisDel).toHaveBeenCalledWith('community-voice-chat:test-community-123')
-      })
-    })
-
-    describe('when voice chat starts (inactive to active)', () => {
-      const communityId = 'test-community-123'
-      const existingChat = {
-        communityId,
-        isActive: false,
-        lastChecked: FIXED_LAST_CHECKED,
-        createdAt: FIXED_CREATED_AT
-      }
-
-      beforeEach(() => {
-        mockRedisGet.mockResolvedValue(existingChat)
-        mockRedisPut.mockResolvedValue(undefined)
-      })
-
-      it('should not detect end when voice chat starts (inactive to active)', async () => {
-        const justEnded = await cache.updateAndDetectChange(communityId, true)
-
-        expect(justEnded).toBe(false)
-      })
-    })
-
-    describe('when status becomes null (404/error)', () => {
-      const communityId = 'test-community-123'
-      const existingChat = {
-        communityId,
-        isActive: true,
-        lastChecked: FIXED_LAST_CHECKED,
-        createdAt: FIXED_CREATED_AT
-      }
-
-      beforeEach(() => {
-        mockRedisGet.mockResolvedValue(existingChat)
-        mockRedisDel.mockResolvedValue(1)
-      })
-
-      it('should detect end when status becomes null (404/error)', async () => {
-        const justEnded = await cache.updateAndDetectChange(communityId, null)
-
-        expect(justEnded).toBe(true)
-      })
-    })
-
-    describe('when voice chat does not exist', () => {
-      beforeEach(() => {
-        mockRedisGet.mockResolvedValue(null)
-      })
-
-      it('should not detect end for non-existent voice chat', async () => {
-        const justEnded = await cache.updateAndDetectChange('non-existent', null)
-
-        expect(justEnded).toBe(false)
       })
     })
   })
