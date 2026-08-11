@@ -25,6 +25,7 @@ import {
   normalizeFriendsPagination,
   normalizeFriendshipRequestsPagination
 } from '../../utils/friendship-pagination'
+import { normalizeAddress } from '../../utils/address'
 import { BlockedUser, IFriendsComponent } from './types'
 
 // Pair rate-limit buckets. The two scopes MUST keep separate keys: a friendship is symmetric, a block is not.
@@ -116,7 +117,13 @@ export async function createFriendsComponent(
         total
       }
     },
-    blockUser: async (blockerAddress: string, blockedAddress: string): Promise<BlockedUser> => {
+    blockUser: async (blockerAddress: string, rawBlockedAddress: string): Promise<BlockedUser> => {
+      // Normalize once, up front. EthAddress.validate accepts EIP-55 mixed case and the database
+      // layer lowercases on write, so an un-normalized value here would still block correctly but
+      // publish an address the subscription filters — which compare against the always-lowercased
+      // connection address — would never match, leaving the blocked user's client unaware.
+      const blockedAddress = normalizeAddress(rawBlockedAddress)
+
       await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
 
       const { actionId, blockedAt } = await friendsDb.executeTx(async (tx) => {
@@ -245,7 +252,9 @@ export async function createFriendsComponent(
         total: sentRequestsCount
       }
     },
-    unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile | null> => {
+    unblockUser: async (blockerAddress: string, rawBlockedAddress: string): Promise<Profile | null> => {
+      const blockedAddress = normalizeAddress(rawBlockedAddress)
+
       await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
 
       const actionId = await friendsDb.executeTx(async (tx) => {
