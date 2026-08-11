@@ -44,7 +44,7 @@ export async function reportUnhandledErrors(
     return await next()
   } catch (error: unknown) {
     if (!isExpectedRequestFailure(error)) {
-      ctx.components.tracing.captureException(error as Error, {
+      ctx.components.tracing.captureException(error, {
         address: ctx.verification?.auth,
         method: ctx.request.method,
         // Path only — the query string on these routes carries caller-supplied values.

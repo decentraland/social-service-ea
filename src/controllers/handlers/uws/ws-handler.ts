@@ -45,7 +45,7 @@ export async function registerWsHandler(
         address: data.address,
         wsConnectionId
       })
-      tracing.captureException(error as Error, { address: data.address, wsConnectionId })
+      tracing.captureException(error, { address: data.address, wsConnectionId })
     }
   }
 
@@ -58,7 +58,7 @@ export async function registerWsHandler(
         address,
         wsConnectionId
       })
-      tracing.captureException(error as Error, { address, wsConnectionId })
+      tracing.captureException(error, { address, wsConnectionId })
     }
   }
 
@@ -202,7 +202,7 @@ export async function registerWsHandler(
         wsConnectionId: data.wsConnectionId
       })
       metrics.increment('ws_auth_errors')
-      tracing.captureException(error as Error, {
+      tracing.captureException(error, {
         address: getAddress(data),
         wsConnectionId: data.wsConnectionId
       })
@@ -243,7 +243,7 @@ export async function registerWsHandler(
       try {
         ws.send(JSON.stringify({ error: 'Error processing message' }))
       } catch (err) {}
-      tracing.captureException(error as Error, {
+      tracing.captureException(error, {
         address: getAddress(data),
         wsConnectionId: data.wsConnectionId
       })
@@ -340,7 +340,7 @@ export async function registerWsHandler(
             wsConnectionId: data.wsConnectionId,
             error: error.message
           })
-          tracing.captureException(error as Error, {
+          tracing.captureException(error, {
             address: getAddress(data),
             wsConnectionId: data.wsConnectionId
           })
