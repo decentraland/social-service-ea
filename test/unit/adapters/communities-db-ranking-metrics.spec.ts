@@ -64,9 +64,20 @@ describe('when accumulating community ranking metrics', () => {
       await communitiesDb.updateCommunityRankingMetrics(communityId, { events_count: 1 })
     })
 
-    it('should saturate the sum instead of letting it overflow', () => {
-      expect(query.mock.calls[0][0].text).toContain('events_count = LEAST(community_ranking_metrics.events_count + ')
-      expect(query.mock.calls[0][0].text).toContain(', 2147483647)')
+    it('should widen the column before adding, so the sum cannot overflow before it is clamped', () => {
+      expect(query.mock.calls[0][0].text).toContain(
+        'events_count = LEAST(community_ranking_metrics.events_count::bigint + '
+      )
+    })
+
+    it('should widen the contribution too, and narrow only the clamped result', () => {
+      expect(query.mock.calls[0][0].text).toContain('::bigint, 2147483647)::integer')
+    })
+
+    it('should never add two integers before the clamp', () => {
+      // int + int is evaluated before LEAST sees it, so this shape raises 22003 on a column already
+      // near the maximum — the exact row the clamp exists to unstick.
+      expect(query.mock.calls[0][0].text).not.toContain('community_ranking_metrics.events_count + ')
     })
   })
 

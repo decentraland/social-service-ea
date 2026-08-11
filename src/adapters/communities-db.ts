@@ -1302,10 +1302,13 @@ export function createCommunitiesDBComponent(
           } else {
             // Saturate rather than overflow: these columns are int4 and nothing ever decrements
             // them, so a single out-of-range increment would otherwise freeze the metric for good.
+            // The addition is widened to bigint first — Postgres evaluates int + int before LEAST
+            // sees it, so clamping the result cannot rescue a column already close to the maximum,
+            // which is exactly the row this is meant to unstick.
             return acc
-              .append(`${key} = LEAST(community_ranking_metrics.${key} + `)
+              .append(`${key} = LEAST(community_ranking_metrics.${key}::bigint + `)
               .append(SQL`${value}`)
-              .append(`, ${MAX_INT4})`)
+              .append(`::bigint, ${MAX_INT4})::integer`)
               .append(index === array.length - 1 ? '' : ', ')
           }
         },
