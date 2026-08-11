@@ -262,7 +262,11 @@ export async function createVoiceComponent({
     try {
       const privateVoiceChat = await voiceDb.getPrivateVoiceChatOfUser(address)
       if (privateVoiceChat) {
-        await endPrivateVoiceChat(privateVoiceChat.id, privateVoiceChat.callee_address)
+        // End it as whoever actually dropped. The lookup matches caller or callee, and the end path
+        // nulls the acting side out of the ENDED payload so the *other* party is the one notified —
+        // so naming the callee here meant a caller's disconnect told only the caller, leaving the
+        // callee ringing until expiry.
+        await endPrivateVoiceChat(privateVoiceChat.id, address)
       }
     } catch (error) {
       logger.error(
