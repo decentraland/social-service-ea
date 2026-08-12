@@ -2,7 +2,7 @@ import { InvalidRequestError } from '@dcl/http-commons'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '.'
 import { AppComponents } from '../../types/system'
 import { detectImageMimeType, UNSUPPORTED_IMAGE_SIGNATURE_MESSAGE } from './image-signature'
-import { normalizeNameForComparison } from './name-normalization'
+import { hasVisibleContent, normalizeNameForComparison } from './name-normalization'
 import {
   ICommunityFieldsValidatorComponent,
   CommunityFieldsValidationOptions,
@@ -51,7 +51,7 @@ export async function createCommunityFieldsValidatorComponent(
       }
 
       if (requireName || name !== undefined) {
-        if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        if (!name || typeof name !== 'string' || !hasVisibleContent(name)) {
           throw new InvalidRequestError('Name must be a non-empty string')
         } else if (name.length > 30) {
           throw new InvalidRequestError('Name must be less or equal to 30 characters')

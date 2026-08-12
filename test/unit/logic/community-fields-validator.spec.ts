@@ -88,6 +88,42 @@ describe('CommunityFieldsValidator', () => {
           )
         })
 
+        it('should throw error for a restricted name wearing an invisible character', async () => {
+          const formData = {
+            fields: {
+              name: { value: 'admin\u200B' }
+            }
+          }
+
+          await expect(fieldsValidator.validate(formData, undefined, { requireName: true })).rejects.toThrow(
+            InvalidRequestError
+          )
+        })
+
+        it('should throw error for a restricted name spelled with a lookalike letter', async () => {
+          const formData = {
+            fields: {
+              name: { value: '\u0430dmin' } // Cyrillic a
+            }
+          }
+
+          await expect(fieldsValidator.validate(formData, undefined, { requireName: true })).rejects.toThrow(
+            InvalidRequestError
+          )
+        })
+
+        it('should throw error for a name that is only invisible characters', async () => {
+          const formData = {
+            fields: {
+              name: { value: '\u200B\u2060\u2800' }
+            }
+          }
+
+          await expect(fieldsValidator.validate(formData, undefined, { requireName: true })).rejects.toThrow(
+            InvalidRequestError
+          )
+        })
+
         it('should throw error for restricted name with different case', async () => {
           const formData = {
             fields: {
@@ -258,10 +294,7 @@ describe('CommunityFieldsValidator', () => {
           ['JPEG', [0xff, 0xd8, 0xff, 0xe0]],
           ['GIF87a', [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]],
           ['GIF89a', [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]],
-          [
-            'WebP',
-            [0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]
-          ]
+          ['WebP', [0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]]
         ])('and the thumbnail is a %s', (_format: string, signature: number[]) => {
           let validImageBuffer: Buffer
           let formData: { fields: { name: { value: string } } }

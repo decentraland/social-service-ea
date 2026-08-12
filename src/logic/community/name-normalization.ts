@@ -9,7 +9,7 @@
  */
 const INVISIBLE_CODE_POINTS =
   // eslint-disable-next-line no-misleading-character-class
-  /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\u2800\u3164\uFE00-\uFE0F\uFEFF\uFFA0]/gu
+  /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\u2800\u3164\uFE00-\uFE0F\uFEFF\uFFA0\u{E0000}-\u{E007F}\u{E0100}-\u{E01EF}]/gu
 
 /**
  * Letters from other scripts that render as Latin ones, mapped to what they imitate.
@@ -39,6 +39,9 @@ const CONFUSABLE_TO_LATIN: Record<string, string> = {
   ԝ: 'w',
   ѡ: 'w',
   ғ: 'f',
+  ӏ: 'l',
+  Ӏ: 'l',
+  ӕ: 'ae',
   // Greek
   α: 'a',
   β: 'b',
@@ -54,6 +57,8 @@ const CONFUSABLE_TO_LATIN: Record<string, string> = {
   γ: 'y',
   ϲ: 'c',
   ϳ: 'j',
+  ꞷ: 'w',
+  ѵ: 'v',
   // Other lookalikes
   ı: 'i',
   ȷ: 'j',
@@ -92,4 +97,18 @@ export function normalizeNameForComparison(name: string): string {
     .toLowerCase()
     .replace(/\s+/gu, ' ')
     .trim()
+}
+
+/**
+ * Whether a name has any content a reader can actually see.
+ *
+ * `trim()` answers this for whitespace only, so a name built entirely from zero-width or filler
+ * characters is a non-empty string by that measure and an empty one on screen.
+ *
+ * @param name - A submitted community name
+ * @returns Whether anything remains once invisible characters are removed
+ * @public
+ */
+export function hasVisibleContent(name: string): boolean {
+  return normalizeNameForComparison(name).length > 0
 }
