@@ -1,5 +1,6 @@
 import { getPaginationParams, InvalidRequestError, NotAuthorizedError } from '@dcl/http-commons'
-import { CommunityRole, HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { parseMembershipFilters } from '../../../utils/membership-filters'
+import { HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { PaginatedResponse } from '@dcl/schemas'
 import {
@@ -80,12 +81,8 @@ export async function getCommunitiesHandler(
 
     logger.info(`Getting communities`)
 
-    const onlyMemberOf = url.searchParams.get('onlyMemberOf')?.toLowerCase() === 'true'
     const onlyWithActiveVoiceChat = url.searchParams.get('onlyWithActiveVoiceChat')?.toLowerCase() === 'true'
-    const roles: CommunityRole[] = url.searchParams
-      .getAll('roles')
-      .filter((role) => Object.values(CommunityRole).includes(role as CommunityRole))
-      .map((role) => role as CommunityRole)
+    const { onlyMemberOf, roles } = parseMembershipFilters(url.searchParams, userAddress)
 
     const { communities: communitiesData, total } = userAddress
       ? await communities.getCommunities(userAddress, {
@@ -93,7 +90,7 @@ export async function getCommunitiesHandler(
           search,
           onlyMemberOf,
           onlyWithActiveVoiceChat,
-          roles: roles?.length > 0 ? roles : undefined
+          roles
         })
       : await communities.getCommunitiesPublicInformation({ pagination, search, onlyWithActiveVoiceChat })
 
