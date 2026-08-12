@@ -2,6 +2,7 @@ import { InvalidRequestError } from '@dcl/http-commons'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '.'
 import { AppComponents } from '../../types/system'
 import { detectImageMimeType, UNSUPPORTED_IMAGE_SIGNATURE_MESSAGE } from './image-signature'
+import { normalizeNameForComparison } from './name-normalization'
 import {
   ICommunityFieldsValidatorComponent,
   CommunityFieldsValidationOptions,
@@ -18,7 +19,7 @@ export async function createCommunityFieldsValidatorComponent(
 
   const restrictedNames = ((await config.getString('RESTRICTED_NAMES')) || '')
     .split(',')
-    .map((name) => name.trim().toLowerCase())
+    .map((name) => normalizeNameForComparison(name))
     .filter(Boolean)
 
   return {
@@ -54,7 +55,7 @@ export async function createCommunityFieldsValidatorComponent(
           throw new InvalidRequestError('Name must be a non-empty string')
         } else if (name.length > 30) {
           throw new InvalidRequestError('Name must be less or equal to 30 characters')
-        } else if (restrictedNames.includes(name.trim().toLowerCase())) {
+        } else if (restrictedNames.includes(normalizeNameForComparison(name))) {
           throw new InvalidRequestError('Name is not allowed')
         }
       }
