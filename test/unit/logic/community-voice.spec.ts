@@ -761,6 +761,76 @@ describe('Community Voice Logic', () => {
         })
       })
 
+      describe('and a ban lands while the join is in flight', () => {
+        let thrown: unknown
+
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity!.mockResolvedValue({
+            id: communityId,
+            name: 'Test Community',
+            description: 'Test Description',
+            ownerAddress: '0x123',
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All,
+            active: true,
+            role: CommunityRole.Member
+          })
+          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
+          mockRegistry.getProfile.mockResolvedValue(createMockProfile(userAddress))
+          mockCommsGatekeeper.getCommunityVoiceChatCredentials.mockResolvedValue({
+            connectionUrl: 'test-connection-url'
+          })
+          // Not banned when the join is authorized; banned by the time the seat exists.
+          mockCommunitiesDb.isMemberBanned!.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+
+          thrown = await communityVoice
+            .joinCommunityVoiceChat(communityId, userAddress)
+            .then(() => undefined)
+            .catch((error: unknown) => error)
+        })
+
+        it('should refuse the join', () => {
+          expect(thrown).toBeInstanceOf(NotAuthorizedError)
+        })
+
+        it('should evict the seat the ban was too early to remove', () => {
+          expect(mockCommsGatekeeper.kickUserFromCommunityVoiceChat).toHaveBeenCalledWith(communityId, userAddress)
+        })
+      })
+
+      describe('and a ban lands while the join is in flight and the eviction fails', () => {
+        let thrown: unknown
+
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity!.mockResolvedValue({
+            id: communityId,
+            name: 'Test Community',
+            description: 'Test Description',
+            ownerAddress: '0x123',
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All,
+            active: true,
+            role: CommunityRole.Member
+          })
+          mockCommunitiesDb.getCommunityMemberRole!.mockResolvedValue(CommunityRole.Member)
+          mockRegistry.getProfile.mockResolvedValue(createMockProfile(userAddress))
+          mockCommsGatekeeper.getCommunityVoiceChatCredentials.mockResolvedValue({
+            connectionUrl: 'test-connection-url'
+          })
+          mockCommunitiesDb.isMemberBanned!.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+          mockCommsGatekeeper.kickUserFromCommunityVoiceChat.mockRejectedValueOnce(new Error('gatekeeper down'))
+
+          thrown = await communityVoice
+            .joinCommunityVoiceChat(communityId, userAddress)
+            .then(() => undefined)
+            .catch((error: unknown) => error)
+        })
+
+        it('should still refuse rather than returning credentials', () => {
+          expect(thrown).toBeInstanceOf(NotAuthorizedError)
+        })
+      })
+
       describe('when joining public community as non-member', () => {
         beforeEach(() => {
           mockCommunitiesDb.getCommunity!.mockResolvedValue({
