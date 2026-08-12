@@ -41,6 +41,28 @@ import {
 } from '../logic/queries'
 import { EthAddress } from '@dcl/schemas'
 
+const MAX_INT4 = 2147483647
+
+/**
+ * Largest contribution a single event may make to each ranking counter.
+ *
+ * These are the metric's own scoring ceilings, so a bigger value could not raise the score anyway —
+ * clamping keeps one caller-supplied number from pinning a counter that nothing decrements.
+ */
+const MAX_METRIC_CONTRIBUTION: Record<string, number> = {
+  events_count: 50,
+  events_total_attendees: 1000,
+  photos_count: 100,
+  streams_count: 20,
+  streams_total_participants: 500
+}
+
+function clampMetricContribution(key: string, value: number): number {
+  const max = MAX_METRIC_CONTRIBUTION[key] ?? MAX_INT4
+  if (!Number.isFinite(value) || value < 0) return 0
+  return Math.min(Math.trunc(value), max)
+}
+
 export function createCommunitiesDBComponent(
   components: Pick<AppComponents, 'pg' | 'logs'>
 ): ICommunitiesDatabaseComponent {
@@ -1265,7 +1287,11 @@ export function createCommunitiesDBComponent(
         >
       >
     ): Promise<void> {
-      const definedMetrics = Object.fromEntries(Object.entries(metrics).filter(([_, value]) => value !== undefined))
+      const definedMetrics = Object.fromEntries(
+        Object.entries(metrics)
+          .filter(([_, value]) => value !== undefined)
+          .map(([key, value]) => [key, typeof value === 'number' ? clampMetricContribution(key, value) : value])
+      )
 
       if (Object.keys(definedMetrics).length === 0) {
         return
@@ -1288,9 +1314,15 @@ export function createCommunitiesDBComponent(
               .append(SQL`${value}`)
               .append(index === array.length - 1 ? '' : ', ')
           } else {
+            // Saturate rather than overflow: these columns are int4 and nothing ever decrements
+            // them, so a single out-of-range increment would otherwise freeze the metric for good.
+            // The addition is widened to bigint first — Postgres evaluates int + int before LEAST
+            // sees it, so clamping the result cannot rescue a column already close to the maximum,
+            // which is exactly the row this is meant to unstick.
             return acc
-              .append(`${key} = community_ranking_metrics.${key} + `)
+              .append(`${key} = LEAST(community_ranking_metrics.${key}::bigint + `)
               .append(SQL`${value}`)
+              .append(`::bigint, ${MAX_INT4})::integer`)
               .append(index === array.length - 1 ? '' : ', ')
           }
         },

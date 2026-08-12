@@ -448,6 +448,8 @@ export interface IPgComponent extends IBasePgComponent {
 }
 
 export interface ICommunitiesDbHelperComponent {
+  forceRankingMetricValue(communityId: string, metric: string, value: number): Promise<void>
+  getRankingMetricValue(communityId: string, metric: string): Promise<number | undefined>
   forceCommunityRemoval: (communityId: string) => Promise<void>
   forceCommunityMemberRemoval: (communityId: string, memberAddresses: string[]) => Promise<void>
   forceCommunityRequestRemoval: (requestId: string) => Promise<void>
