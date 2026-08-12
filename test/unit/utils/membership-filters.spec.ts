@@ -77,27 +77,19 @@ describe('when parsing the membership filters of a community listing request', (
     })
   })
 
-  describe('and a requested role is not a community role', () => {
-    let thrown: unknown
+  describe('and one requested role is unrecognized alongside a valid one', () => {
+    let result: ReturnType<typeof parseMembershipFilters>
 
     beforeEach(() => {
-      try {
-        parseMembershipFilters(new URLSearchParams('roles=owner&roles=onwer'), userAddress)
-      } catch (error) {
-        thrown = error
-      }
+      result = parseMembershipFilters(new URLSearchParams('roles=owner&roles=onwer'), userAddress)
     })
 
-    it('should refuse rather than silently drop it', () => {
-      expect(thrown).toBeInstanceOf(InvalidRequestError)
-    })
-
-    it('should name the value it could not accept', () => {
-      expect((thrown as Error).message).toContain('onwer')
+    it('should keep the valid one, so the answer is narrower rather than wider', () => {
+      expect(result.roles).toEqual([CommunityRole.Owner])
     })
   })
 
-  describe('and every requested role is invalid', () => {
+  describe('and every requested role is unrecognized', () => {
     let thrown: unknown
 
     beforeEach(() => {
@@ -108,8 +100,25 @@ describe('when parsing the membership filters of a community listing request', (
       }
     })
 
-    it('should refuse rather than falling back to no filter at all', () => {
+    it('should refuse rather than dropping the filter and widening the listing', () => {
       expect(thrown).toBeInstanceOf(InvalidRequestError)
+    })
+
+    it('should name the value it could not accept', () => {
+      expect((thrown as Error).message).toContain('nonsense')
+    })
+  })
+
+  describe('and the roles parameter is present but empty', () => {
+    let result: ReturnType<typeof parseMembershipFilters>
+
+    beforeEach(() => {
+      // Clients serialize an unset field this way; it means no filter, not an invalid one.
+      result = parseMembershipFilters(new URLSearchParams('roles=&roles='), undefined)
+    })
+
+    it('should treat it as no filter at all, even without an identity', () => {
+      expect(result).toEqual({ onlyMemberOf: false, roles: undefined })
     })
   })
 })

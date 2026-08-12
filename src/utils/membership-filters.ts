@@ -10,37 +10,36 @@ import { CommunityRole } from '../types/entities'
  * with an unfiltered listing, which is what a caller asking for "communities I moderate" would
  * otherwise receive.
  *
- * An unrecognized role is refused for the same reason: dropping it silently leaves the request
- * looking filtered while the answer is not.
+ * Unrecognized roles are dropped, which keeps a partially valid filter working: `roles=owner&roles=x`
+ * still filters by owner, so the answer is narrower than asked for rather than wider. Dropping *every*
+ * value is different — the filter disappears and the listing widens to everything — so that is
+ * refused. Empty values are treated as absent, since clients serialize unset fields as `roles=`.
  *
  * @param searchParams - The request's query parameters
  * @param userAddress - The verified caller, if the request carried a valid signature
  * @returns The filters to pass to the listing query
  * @throws NotAuthorizedError when a filter needs an identity the request does not have
- * @throws InvalidRequestError when a supplied role is not a community role
+ * @throws InvalidRequestError when every supplied role is unrecognized
  */
 export function parseMembershipFilters(
   searchParams: URLSearchParams,
   userAddress?: string
 ): { onlyMemberOf: boolean; roles?: CommunityRole[] } {
   const onlyMemberOf = searchParams.get('onlyMemberOf')?.toLowerCase() === 'true'
-  const requestedRoles = searchParams.getAll('roles')
 
   const validRoles = Object.values(CommunityRole)
-  const unknownRoles = requestedRoles.filter((role) => !validRoles.includes(role as CommunityRole))
+  const requestedRoles = searchParams.getAll('roles').filter((role) => role.trim().length > 0)
+  const roles = requestedRoles.filter((role) => validRoles.includes(role as CommunityRole)) as CommunityRole[]
 
-  if (unknownRoles.length > 0) {
+  if (requestedRoles.length > 0 && roles.length === 0) {
     throw new InvalidRequestError(
-      `Unknown community role: ${unknownRoles.join(', ')}. Valid roles are ${validRoles.join(', ')}`
+      `Unknown community role: ${requestedRoles.join(', ')}. Valid roles are ${validRoles.join(', ')}`
     )
   }
 
-  if (!userAddress && (requestedRoles.length > 0 || onlyMemberOf)) {
+  if (!userAddress && (roles.length > 0 || onlyMemberOf)) {
     throw new NotAuthorizedError('Authentication required to filter communities by your own membership')
   }
 
-  return {
-    onlyMemberOf,
-    roles: requestedRoles.length > 0 ? (requestedRoles as CommunityRole[]) : undefined
-  }
+  return { onlyMemberOf, roles: roles.length > 0 ? roles : undefined }
 }
