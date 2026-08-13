@@ -94,31 +94,15 @@ export function getUserFriendsCTE(userAddress: string): CTE {
   }
 }
 
-function getBlockedForUserCTE(userAddress: string): CTE {
-  const normalizedUserAddress = normalizeAddress(userAddress)
-  return {
-    query: SQL`SELECT DISTINCT 
-      CASE WHEN b.blocker_address = ${normalizedUserAddress}
-      THEN b.blocked_address
-      ELSE b.blocker_address
-    END as address
-    FROM blocks b
-    WHERE b.blocker_address = ${normalizedUserAddress}
-      OR b.blocked_address = ${normalizedUserAddress}`,
-    name: 'blocked_for_user'
-  }
-}
-
 export function getFriendsFromListBaseQuery(userAddress: string, otherUserAddresses: string[]): SQLStatement {
   const userFriendsCTE = getUserFriendsCTE(userAddress)
-  const blockedForUserCTE = getBlockedForUserCTE(userAddress)
   const normalizedOtherUserAddresses = otherUserAddresses.map(normalizeAddress)
-  // Correlated against the row's own address: comparing the block list to the whole batch makes
-  // the subquery a constant, so one block anywhere in the batch would empty the result.
-  return useCTEs([userFriendsCTE, blockedForUserCTE])
+  // The CTE already excludes anyone in a block relationship with this user, in either direction, so
+  // there is no second filter here. There used to be one, built from a materialized list of the
+  // user's blocks; it expressed the same set and is gone rather than left looking load-bearing.
+  return useCTEs([userFriendsCTE])
     .append(`SELECT uf.address FROM ${userFriendsCTE.name} uf `)
-    .append(SQL`WHERE uf.address = ANY(${normalizedOtherUserAddresses}) AND NOT EXISTS (`)
-    .append(`SELECT 1 FROM ${blockedForUserCTE.name} b WHERE b.address = uf.address)`)
+    .append(SQL`WHERE uf.address = ANY(${normalizedOtherUserAddresses})`)
 }
 
 export function getFriendsBaseQuery(
