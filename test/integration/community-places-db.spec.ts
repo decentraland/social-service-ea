@@ -3,7 +3,7 @@ import { test } from '../components'
 import { mockCommunity } from '../mocks/communities'
 import { createCommunity } from './utils/communities'
 
-test('Community Places Update', function ({ components }) {
+test('Community Places DB', function ({ components }) {
   let communityId: string
   let keptA: string
   let keptB: string
