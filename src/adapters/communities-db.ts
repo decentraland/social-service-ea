@@ -328,7 +328,10 @@ export function createCommunitiesDBComponent(
       const query = SQL`DELETE FROM community_places WHERE community_id = ${communityId}`
 
       if (exceptPlaceIds.length > 0) {
-        query.append(SQL` AND id <> ANY(${exceptPlaceIds})`)
+        // ALL, not ANY: `id <> ANY(list)` asks whether the id differs from at least one element,
+        // which is true of every row once the list holds two, so the exceptions were deleted along
+        // with everything else.
+        query.append(SQL` AND id <> ALL(${exceptPlaceIds})`)
       }
 
       await pg.query(query)
