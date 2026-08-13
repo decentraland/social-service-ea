@@ -450,6 +450,45 @@ describe('CommunityFieldsValidator', () => {
     })
   })
 
+  describe('when a privacy or visibility value is not one the enum names', () => {
+    describe.each([
+      ['privacy', 'Private'],
+      ['privacy', 'priv'],
+      ['privacy', 'xyz'],
+      ['privacy', ''],
+      ['visibility', 'Unlisted'],
+      ['visibility', 'hidden']
+    ])('and %s is sent as "%s"', (field, value) => {
+      it('should throw rather than resolve to the permissive side', async () => {
+        await expect(
+          fieldsValidator.validate({ fields: { name: { value: 'A Community' }, [field]: { value } } }, undefined, {
+            requireName: true
+          })
+        ).rejects.toThrow(InvalidRequestError)
+      })
+    })
+  })
+
+  describe('when a privacy or visibility value is one the enum names', () => {
+    describe.each([
+      ['privacy', 'private'],
+      ['privacy', 'public'],
+      ['visibility', 'all'],
+      ['visibility', 'unlisted'],
+      ['privacy', ' private ']
+    ])('and %s is sent as "%s"', (field, value) => {
+      it('should pass it through', async () => {
+        const result = await fieldsValidator.validate(
+          { fields: { name: { value: 'A Community' }, [field]: { value } } },
+          undefined,
+          { requireName: true }
+        )
+
+        expect(result[field as 'privacy' | 'visibility']).toBe(value.trim())
+      })
+    })
+  })
+
   describe('when a restricted name contains letters other scripts imitate', () => {
     beforeEach(async () => {
       configMock = createMockConfigComponent({
