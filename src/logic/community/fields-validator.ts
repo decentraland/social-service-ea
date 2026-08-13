@@ -2,7 +2,7 @@ import { InvalidRequestError } from '@dcl/http-commons'
 import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '.'
 import { AppComponents } from '../../types/system'
 import { detectImageMimeType, UNSUPPORTED_IMAGE_SIGNATURE_MESSAGE } from './image-signature'
-import { hasVisibleContent, normalizeNameForComparison } from './name-normalization'
+import { normalizeNameForComparison } from './name-normalization'
 import {
   ICommunityFieldsValidatorComponent,
   CommunityFieldsValidationOptions,
@@ -51,11 +51,15 @@ export async function createCommunityFieldsValidatorComponent(
       }
 
       if (requireName || name !== undefined) {
-        if (!name || typeof name !== 'string' || !hasVisibleContent(name)) {
+        // Reduced once and reused: an empty comparison form means nothing visible was submitted,
+        // and the same form is what the restricted list is compared against.
+        const comparableName = typeof name === 'string' ? normalizeNameForComparison(name) : ''
+
+        if (!name || typeof name !== 'string' || comparableName.length === 0) {
           throw new InvalidRequestError('Name must be a non-empty string')
         } else if (name.length > 30) {
           throw new InvalidRequestError('Name must be less or equal to 30 characters')
-        } else if (restrictedNames.includes(normalizeNameForComparison(name))) {
+        } else if (restrictedNames.includes(comparableName)) {
           throw new InvalidRequestError('Name is not allowed')
         }
       }

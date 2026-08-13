@@ -1,15 +1,16 @@
 /**
  * Characters that occupy no visual space, so two names differing only by these read identically.
  *
- * Written as escapes on purpose: a class of literal invisible characters cannot be reviewed, which
- * is the same property that makes them useful for slipping past a denylist. Covers the Unicode
- * default-ignorable range plus the blanks that belong to no whitespace class — the braille blank is
- * a symbol and the Hangul filler a letter, so neither `trim()` nor `\s` touches them, and one
- * appended to a reserved name was enough to pass.
+ * `Default_Ignorable_Code_Point` is the Unicode property for exactly this: soft hyphen, the
+ * zero-width and bidi marks, Hangul fillers, every variation selector including the supplementary
+ * ones, the tag block, and the format characters scattered through the higher planes. Enumerating
+ * them by hand does not converge — each pass over this file found another range — so the property
+ * does the work and only what it deliberately excludes is listed.
+ *
+ * U+2800 BRAILLE PATTERN BLANK is the exception worth carrying: it is a symbol rather than a format
+ * character, so no property claims it, yet it renders as nothing.
  */
-const INVISIBLE_CODE_POINTS =
-  // eslint-disable-next-line no-misleading-character-class
-  /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\u2800\u3164\uFE00-\uFE0F\uFEFF\uFFA0\u{E0000}-\u{E007F}\u{E0100}-\u{E01EF}]/gu
+const INVISIBLE_CODE_POINTS = /[\p{Default_Ignorable_Code_Point}\u2800]/gu
 
 /**
  * Letters from other scripts that render as Latin ones, mapped to what they imitate.
@@ -97,18 +98,4 @@ export function normalizeNameForComparison(name: string): string {
     .toLowerCase()
     .replace(/\s+/gu, ' ')
     .trim()
-}
-
-/**
- * Whether a name has any content a reader can actually see.
- *
- * `trim()` answers this for whitespace only, so a name built entirely from zero-width or filler
- * characters is a non-empty string by that measure and an empty one on screen.
- *
- * @param name - A submitted community name
- * @returns Whether anything remains once invisible characters are removed
- * @public
- */
-export function hasVisibleContent(name: string): boolean {
-  return normalizeNameForComparison(name).length > 0
 }
