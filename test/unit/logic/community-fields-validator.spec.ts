@@ -88,40 +88,68 @@ describe('CommunityFieldsValidator', () => {
           )
         })
 
-        it('should throw error for a restricted name wearing an invisible character', async () => {
-          const formData = {
-            fields: {
-              name: { value: 'admin\u200B' }
-            }
-          }
-
-          await expect(fieldsValidator.validate(formData, undefined, { requireName: true })).rejects.toThrow(
-            InvalidRequestError
-          )
+        // Every invisible code point below is an escape on purpose: a literal cannot be reviewed,
+        // which is the same property that makes these useful for slipping past the list.
+        describe.each([
+          ['zero width space', 'admin\u200B'],
+          ['word joiner', 'admin\u2060'],
+          ['braille pattern blank', 'admin\u2800'],
+          ['soft hyphen', 'admin\u00AD'],
+          ['hangul filler', 'admin\u3164'],
+          ['byte order mark', 'admin\uFEFF'],
+          ['right-to-left override', 'admin\u202E'],
+          ['variation selector 16', 'admin\uFE0F'],
+          ['mongolian free variation selector', 'admin\u180F'],
+          ['variation selector supplement', 'admin\u{E0100}'],
+          ['cancel tag', 'admin\u{E007F}'],
+          ['tag letter', 'admin\u{E0041}'],
+          ['shorthand format', 'admin\u{1BCA0}'],
+          ['musical begin beam', 'admin\u{1D173}'],
+          ['inside the word', 'ad\u200Bmin']
+        ])('and a restricted name is padded with an invisible character (%s)', (_label, name) => {
+          it('should throw error', async () => {
+            await expect(
+              fieldsValidator.validate({ fields: { name: { value: name } } }, undefined, { requireName: true })
+            ).rejects.toThrow(InvalidRequestError)
+          })
         })
 
-        it('should throw error for a restricted name spelled with a lookalike letter', async () => {
-          const formData = {
-            fields: {
-              name: { value: '\u0430dmin' } // Cyrillic a
-            }
-          }
-
-          await expect(fieldsValidator.validate(formData, undefined, { requireName: true })).rejects.toThrow(
-            InvalidRequestError
-          )
+        describe.each([
+          ['Cyrillic a', '\u0430dmin'],
+          ['fullwidth', '\uFF41\uFF44\uFF4D\uFF49\uFF4E'],
+          ['decomposed', 'admin'.normalize('NFD')]
+        ])('and a restricted name is written in a lookalike form (%s)', (_label, name) => {
+          it('should throw error', async () => {
+            await expect(
+              fieldsValidator.validate({ fields: { name: { value: name } } }, undefined, { requireName: true })
+            ).rejects.toThrow(InvalidRequestError)
+          })
         })
 
-        it('should throw error for a name that is only invisible characters', async () => {
-          const formData = {
-            fields: {
-              name: { value: '\u200B\u2060\u2800' }
-            }
-          }
+        describe.each([
+          ['zero width and word joiner', '\u200B\u2060'],
+          ['braille blanks', '\u2800\u2800'],
+          ['tag letter alone', '\u{E0041}'],
+          ['musical format alone', '\u{1D173}']
+        ])('and the name is only invisible characters (%s)', (_label, name) => {
+          it('should throw error', async () => {
+            await expect(
+              fieldsValidator.validate({ fields: { name: { value: name } } }, undefined, { requireName: true })
+            ).rejects.toThrow(InvalidRequestError)
+          })
+        })
 
-          await expect(fieldsValidator.validate(formData, undefined, { requireName: true })).rejects.toThrow(
-            InvalidRequestError
-          )
+        describe.each([
+          ['a near miss', 'administrator'],
+          ['a name containing it', 'admin fans'],
+          ['a name in another script', '\u0434\u043E\u043C'],
+          ['a Greek name', '\u03BA\u03BF\u03B9\u03BD\u03CC\u03C4\u03B7\u03C4\u03B1']
+        ])('and the name only resembles a restricted one (%s)', (_label, name) => {
+          it('should pass validation', async () => {
+            await expect(
+              fieldsValidator.validate({ fields: { name: { value: name } } }, undefined, { requireName: true })
+            ).resolves.toBeDefined()
+          })
         })
 
         it('should throw error for restricted name with different case', async () => {
@@ -419,6 +447,37 @@ describe('CommunityFieldsValidator', () => {
         expect(result.placeIds).toEqual(['place1', 'place2'])
         expect(result.privacy).toBe(CommunityPrivacyEnum.Private)
       })
+    })
+  })
+
+  describe('when a restricted name contains letters other scripts imitate', () => {
+    beforeEach(async () => {
+      configMock = createMockConfigComponent({
+        getString: jest.fn().mockResolvedValue('decentraland')
+      })
+
+      fieldsValidator = await createCommunityFieldsValidatorComponent({
+        config: configMock
+      })
+    })
+
+    describe.each([
+      ['Cyrillic palochka for the l', 'decentra\u04CFand'],
+      ['uppercase palochka', 'decentra\u04C0and'],
+      ['Cyrillic ie for the e', 'd\u0435centraland'],
+      ['Greek omicron for the o', 'dec\u03BFntraland'.replace('\u03BFntr', 'entr')]
+    ])('and the name substitutes one of them (%s)', (_label, name) => {
+      it('should throw error', async () => {
+        await expect(
+          fieldsValidator.validate({ fields: { name: { value: name } } }, undefined, { requireName: true })
+        ).rejects.toThrow(InvalidRequestError)
+      })
+    })
+
+    it('should still allow a name that merely looks similar', async () => {
+      await expect(
+        fieldsValidator.validate({ fields: { name: { value: 'decentralands' } } }, undefined, { requireName: true })
+      ).resolves.toBeDefined()
     })
   })
 
