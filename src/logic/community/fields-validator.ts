@@ -110,6 +110,32 @@ function normalizeNameForComparison(name: string): string {
     .trim()
 }
 
+/**
+ * Reads an enum-valued form field, refusing anything the enum does not name.
+ *
+ * These fields were cast rather than checked, and every consumer compares against one member and
+ * treats the rest as its opposite — so `Private` with a capital P, or any typo, quietly resolved to
+ * the permissive side. Refusing is the only reading that cannot silently widen access.
+ */
+function parseEnumField<T extends Record<string, string>>(
+  value: string | undefined,
+  allowed: T,
+  field: string
+): T[keyof T] | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+
+  const trimmed = value.trim()
+  const values = Object.values(allowed) as string[]
+
+  if (!values.includes(trimmed)) {
+    throw new InvalidRequestError(`Invalid ${field}: ${trimmed || '(empty)'}. Valid values are ${values.join(', ')}`)
+  }
+
+  return trimmed as T[keyof T]
+}
+
 const MIN_THUMBNAIL_BYTES = 1024
 const MAX_THUMBNAIL_BYTES = 500 * 1024
 
@@ -201,8 +227,8 @@ export async function createCommunityFieldsValidatorComponent(
         name,
         description,
         placeIds,
-        privacy: (privacy?.trim() as CommunityPrivacyEnum) ?? undefined,
-        visibility: (visibility?.trim() as CommunityVisibilityEnum) ?? undefined,
+        privacy: parseEnumField(privacy, CommunityPrivacyEnum, 'privacy'),
+        visibility: parseEnumField(visibility, CommunityVisibilityEnum, 'visibility'),
         thumbnailBuffer
       }
     }

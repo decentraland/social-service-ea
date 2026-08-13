@@ -433,11 +433,12 @@ test('Update Community Controller', async function ({ components, stubComponents
                 expect(body.message).toBe('Community updated successfully')
               })
 
-              it('should not update the community privacy if it contains a invalid value', async () => {
-                const existingCommunity = await components.communitiesDb.getCommunity(
-                  communityId,
-                  identity.realAccount.address
-                )
+              it('should reject an invalid privacy value rather than resolve it to public', async () => {
+                // The community is made private first: while it is public, refusing the value and
+                // silently resolving it to public are the same outcome, which is why this went
+                // unnoticed.
+                await components.communitiesDb.updateCommunity(communityId, { private: true })
+
                 const response = await makeMultipartRequest(
                   identity,
                   `/v1/communities/${communityId}`,
@@ -448,10 +449,10 @@ test('Update Community Controller', async function ({ components, stubComponents
                   'PUT'
                 )
 
-                expect(response.status).toBe(200)
-                const body = await response.json()
-                expect(body.data.privacy).toBe(existingCommunity.privacy)
-                expect(body.message).toBe('Community updated successfully')
+                expect(response.status).toBe(400)
+
+                const stored = await components.communitiesDb.getCommunity(communityId, identity.realAccount.address)
+                expect(stored.privacy).toBe(CommunityPrivacyEnum.Private)
               })
             })
 
@@ -551,11 +552,10 @@ test('Update Community Controller', async function ({ components, stubComponents
                 expect(body.message).toBe('Community updated successfully')
               })
 
-              it('should not update the community visibility if it contains a invalid value', async () => {
-                const existingCommunity = await components.communitiesDb.getCommunity(
-                  communityId,
-                  identity.realAccount.address
-                )
+              it('should reject an invalid visibility value rather than resolve it to listed', async () => {
+                // Unlisted first, for the same reason as the privacy case above.
+                await components.communitiesDb.updateCommunity(communityId, { unlisted: true })
+
                 const response = await makeMultipartRequest(
                   identity,
                   `/v1/communities/${communityId}`,
@@ -566,10 +566,10 @@ test('Update Community Controller', async function ({ components, stubComponents
                   'PUT'
                 )
 
-                expect(response.status).toBe(200)
-                const body = await response.json()
-                expect(body.data.visibility).toBe(existingCommunity.visibility)
-                expect(body.message).toBe('Community updated successfully')
+                expect(response.status).toBe(400)
+
+                const stored = await components.communitiesDb.getCommunity(communityId, identity.realAccount.address)
+                expect(stored.visibility).toBe(CommunityVisibilityEnum.Unlisted)
               })
             })
 
