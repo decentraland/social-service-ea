@@ -53,7 +53,7 @@
     "@aws-sdk/lib-storage": "^3.826.0",
     "@dcl/analytics-component": "^1.0.5",
     "@dcl/core-commons": "^0.10.1",
-    "@dcl/crypto-middleware": "^4.1.1",
+    "@dcl/crypto-middleware": "^5.1.0",
     "@dcl/features-component": "^1.0.2",
     "@dcl/fetch-component": "^1.1.1",
     "@dcl/http-commons": "^2.0.0",
