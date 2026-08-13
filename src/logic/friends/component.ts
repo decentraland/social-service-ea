@@ -202,8 +202,12 @@ export async function createFriendsComponent(
       requestedAddress: string,
       pagination?: Pagination
     ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
-      // The pair block is enforced inside the query, so the rows and the count agree even if a block
-      // lands between them, and there is one place holding the rule rather than two.
+      // Both queries carry the pair-block predicate, so neither can return data for a blocked pair
+      // and the rule lives in one place rather than beside the call. They are still two statements
+      // under READ COMMITTED, so a block committed between them can leave the total disagreeing with
+      // the list for that one response — each is correct on its own snapshot, and the next read
+      // agrees. Making them agree would need a single rows-plus-count statement or a shared
+      // transaction, which is more than a transient count mismatch warrants.
       const [mutualFriends, total] = await Promise.all([
         friendsDb.getMutualFriends(requesterAddress, requestedAddress, normalizeFriendsPagination(pagination)),
         friendsDb.getMutualFriendsCount(requesterAddress, requestedAddress)

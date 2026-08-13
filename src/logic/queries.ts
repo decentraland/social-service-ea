@@ -263,7 +263,7 @@ export function getMutualFriendsBaseQuery(
     .append(SQL`)`)
     // The two subqueries above filter each side by that side's own blocks. Neither asks whether
     // these two have blocked each other, so the pair predicate belongs here — in the query rather
-    // than beside it, so the rows and the count are decided against the same snapshot.
+    // than beside it, so every caller gets the rule and the rows and the count apply the same one.
     .append(
       SQL` AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_address = ${normalizedUserAddress1} AND b.blocked_address = ${normalizedUserAddress2}) OR (b.blocker_address = ${normalizedUserAddress2} AND b.blocked_address = ${normalizedUserAddress1}))`
     )
