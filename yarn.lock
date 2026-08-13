@@ -1072,10 +1072,10 @@
   resolved "https://registry.yarnpkg.com/@dcl/hashing/-/hashing-3.0.4.tgz#4df2a4cb3a8114765aed34cb57b91c93bf33bfb3"
   integrity sha512-Cg+MoIOn+BYmQV2q8zSFnNYY+GldlnUazwBnfgrq3i66ZxOaZ65h01btd8OUtSAlfWG4VTNIOHDjtKqmuwJNBg==
 
-"@dcl/http-commons@^2.0.0":
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/@dcl/http-commons/-/http-commons-2.0.0.tgz#9792dfc04ef4e2afcd21cafc2fb118006ba1e4cc"
-  integrity sha512-KewSUxnEBhjCw4TyNPrSTHOoFVc2ZiyBAkpok2t4z50ZqWDLh+3agFBlUP2VMLQGz3UOM+DPwyLf+p2TOOItdw==
+"@dcl/http-commons@^2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@dcl/http-commons/-/http-commons-2.0.1.tgz#6b413b626de51780b415e8866f809526d715a8d5"
+  integrity sha512-IpsROKMLAOGYFw8JOeJWmMPHlZk4JPrC2FUg/Ya0PlYJoG/lLwZqyJdNhwldxczNjzx97xQK1M03VZBcg9xopA==
   dependencies:
     "@dcl/core-commons" "^0.10.0"
     "@dcl/schemas" "^18.0.0"
