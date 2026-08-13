@@ -151,13 +151,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of communities per page. When `minimal=true`, max is 50.
+            minimum: 1
+            maximum: 100
+          description: Number of communities per page. When `minimal=true`, max is 50. Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of communities to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of communities to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
         - name: search
           in: query
           required: false
@@ -529,13 +533,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of members per page.
+            minimum: 1
+            maximum: 100
+          description: Number of members per page. Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of members to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of members to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
         - name: onlyOnline
           in: query
           required: false
@@ -736,13 +744,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of communities per page.
+            minimum: 1
+            maximum: 100
+          description: Number of communities per page. Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of communities to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of communities to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
       responses:
         '200':
           description: Communities found
@@ -851,13 +863,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of banned members per page.
+            minimum: 1
+            maximum: 100
+          description: Number of banned members per page. Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of banned members to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of banned members to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
       responses:
         '200':
           description: Banned members found
@@ -999,13 +1015,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of places per page.
+            minimum: 1
+            maximum: 100
+          description: Number of places per page. Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of places to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of places to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
       responses:
         '200':
           description: Places found
@@ -1163,13 +1183,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of communities per page.
+            minimum: 1
+            maximum: 100
+          description: Number of communities per page. Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of communities to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of communities to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
       responses:
         '200':
           description: Managed communities found
@@ -1380,13 +1404,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of requests per page.
+            minimum: 1
+            maximum: 100
+          description: Number of requests per page. Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of requests to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of requests to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
         - name: type
           in: query
           required: false
@@ -1570,13 +1598,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of requests per page.
+            minimum: 1
+            maximum: 100
+          description: Number of requests per page. Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of requests to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of requests to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
         - name: type
           in: query
           required: false
@@ -1792,13 +1824,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of communities per page.
+            minimum: 1
+            maximum: 100
+          description: Number of communities per page. Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of communities to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of communities to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
         - name: search
           in: query
           required: false
@@ -1857,13 +1893,17 @@ paths:
           required: false
           schema:
             type: integer
-          description: Number of posts per page (max 100).
+            minimum: 1
+            maximum: 100
+          description: Number of posts per page (max 100). Values above the maximum are reduced to it.
         - name: offset
           in: query
           required: false
           schema:
             type: integer
-          description: Number of posts to skip.
+            minimum: 0
+            maximum: 100000
+          description: Number of posts to skip. Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
       responses:
         '200':
           description: Posts found
@@ -2086,14 +2126,18 @@ paths:
           in: query
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
             default: 10
-          description: Number of results per page
+          description: Number of results per page Values above the maximum are reduced to it.
         - name: offset
           in: query
           schema:
             type: integer
+            minimum: 0
+            maximum: 100000
             default: 0
-          description: Number of results to skip
+          description: Number of results to skip Values above the maximum are capped rather than rejected, so paging past it returns the last page again.
         - name: address
           in: query
           schema:
@@ -2147,11 +2191,15 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
         - name: offset
           in: query
           required: false
           schema:
             type: integer
+            minimum: 0
+            maximum: 100000
         - name: search
           in: query
           required: false
@@ -2264,11 +2312,15 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
         - name: offset
           in: query
           required: false
           schema:
             type: integer
+            minimum: 0
+            maximum: 100000
         - name: onlyOnline
           in: query
           required: false
@@ -2323,11 +2375,15 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
         - name: offset
           in: query
           required: false
           schema:
             type: integer
+            minimum: 0
+            maximum: 100000
       responses:
         '200':
           description: Banned members found
@@ -2383,11 +2439,15 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
         - name: offset
           in: query
           required: false
           schema:
             type: integer
+            minimum: 0
+            maximum: 100000
       responses:
         '200':
           description: Community requests found
@@ -2437,11 +2497,15 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
         - name: offset
           in: query
           required: false
           schema:
             type: integer
+            minimum: 0
+            maximum: 100000
       responses:
         '200':
           description: Member requests found
@@ -2485,11 +2549,15 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
         - name: offset
           in: query
           required: false
           schema:
             type: integer
+            minimum: 0
+            maximum: 100000
       responses:
         '200':
           description: Posts found
