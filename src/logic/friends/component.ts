@@ -202,16 +202,8 @@ export async function createFriendsComponent(
       requestedAddress: string,
       pagination?: Pagination
     ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
-      // The query filters each side by that side's own blocks, but never asks whether these two have
-      // blocked each other — so after B blocks A, A still read the intersection of their friend lists
-      // while every other pair-scoped operation refused. Answer as though there were none rather than
-      // erroring, so the result carries no more than the friendship status already reports.
-      const isBlocked = await friendsDb.isFriendshipBlocked(requesterAddress, requestedAddress)
-
-      if (isBlocked) {
-        return { friendsProfiles: [], total: 0 }
-      }
-
+      // The pair block is enforced inside the query, so the rows and the count agree even if a block
+      // lands between them, and there is one place holding the rule rather than two.
       const [mutualFriends, total] = await Promise.all([
         friendsDb.getMutualFriends(requesterAddress, requestedAddress, normalizeFriendsPagination(pagination)),
         friendsDb.getMutualFriendsCount(requesterAddress, requestedAddress)

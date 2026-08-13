@@ -65,7 +65,12 @@ export function useCTEs(CTEs: CTE[]) {
 }
 
 /**
- * Returns a CTE to get the user's friends without taking into account the blocked users
+ * Returns a CTE for the user's active friends, excluding anyone either side has blocked.
+ *
+ * `is_active` alone is not sufficient. Blocking deactivates the friendship in the same transaction,
+ * but `upsertFriendship` reads the block state outside its transaction and takes no row lock, so an
+ * ACCEPT racing a BLOCK can leave a `blocks` row beside `is_active = true`.
+ *
  * @param userAddress - The address of the user
  * @returns A CTE for the user's friends
  */
@@ -256,6 +261,12 @@ export function getMutualFriendsBaseQuery(
     .append(SQL` FROM friendsA f_b WHERE f_b.address IN (`)
     .append(friendsSubquery(normalizedUserAddress2, 'f_b'))
     .append(SQL`)`)
+    // The two subqueries above filter each side by that side's own blocks. Neither asks whether
+    // these two have blocked each other, so the pair predicate belongs here — in the query rather
+    // than beside it, so the rows and the count are decided against the same snapshot.
+    .append(
+      SQL` AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_address = ${normalizedUserAddress1} AND b.blocked_address = ${normalizedUserAddress2}) OR (b.blocker_address = ${normalizedUserAddress2} AND b.blocked_address = ${normalizedUserAddress1}))`
+    )
 
   if (!onlyCount) {
     query.append(SQL` ORDER BY f_b.address`)

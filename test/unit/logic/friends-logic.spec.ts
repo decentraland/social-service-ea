@@ -424,7 +424,6 @@ describe('Friends Component', () => {
         senderError = undefined
         recipientError = undefined
 
-        mockFriendsDB.isFriendshipBlocked.mockResolvedValue(false)
         mockFriendsDB.getLastFriendshipActionByUsers.mockResolvedValue(undefined)
         mockFriendsDB.createFriendship.mockResolvedValue({ id: 'friendship-id', created_at: new Date() })
         mockRegistry.getProfiles.mockResolvedValue([
@@ -712,26 +711,6 @@ describe('Friends Component', () => {
       pagination = { limit: 10, offset: 0 }
       requesterAddress = '0x123'
       requestedAddress = '0x456'
-    })
-
-    describe('and one of them has blocked the other', () => {
-      let result: Awaited<ReturnType<typeof friendsComponent.getMutualFriendsProfiles>>
-
-      beforeEach(async () => {
-        mockFriendsDB.isFriendshipBlocked.mockResolvedValueOnce(true)
-        mockFriendsDB.getMutualFriends.mockResolvedValue([{ address: '0xmutual1' }])
-        mockFriendsDB.getMutualFriendsCount.mockResolvedValue(1)
-
-        result = await friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
-      })
-
-      it('should answer as though there were none', () => {
-        expect(result).toEqual({ friendsProfiles: [], total: 0 })
-      })
-
-      it('should not read the intersection of their friend lists', () => {
-        expect(mockFriendsDB.getMutualFriends).not.toHaveBeenCalled()
-      })
     })
 
     describe('and there are mutual friends', () => {
