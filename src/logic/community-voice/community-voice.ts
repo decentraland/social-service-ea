@@ -8,6 +8,7 @@ import {
   CommunityVoiceChatNotificationScope
 } from '../../types'
 import { AnalyticsEvent } from '../../types/analytics'
+import { NotAuthorizedError } from '@dcl/http-commons'
 import { isErrorWithMessage, errorMessageOrDefault } from '../../utils/errors'
 import { separatePositionsAndWorlds } from '../../utils/places'
 import { ActiveCommunityVoiceChat, CommunityPrivacyEnum, CommunityVisibilityEnum } from '../community/types'
@@ -269,6 +270,25 @@ export async function createCommunityVoiceComponent({
       userRole,
       profileData
     )
+
+    // Re-read the ban now that the seat exists. The check above happens two round trips earlier, and a
+    // ban committing in between issues its eviction while there is still nobody to evict — so it
+    // no-ops and this join would hand out a live seat to someone already banned. Ordering the two
+    // checks around the seat makes them cover each other: a ban landing before this read is caught
+    // here, and one landing after finds the participant it needs to remove.
+    if (await communitiesDb.isMemberBanned(communityId, userAddress)) {
+      logger.warn(`User ${userAddress} was banned from community ${communityId} while joining; evicting`)
+
+      try {
+        await commsGatekeeper.kickUserFromCommunityVoiceChat(communityId, userAddress)
+      } catch (error) {
+        logger.error(`Failed to evict ${userAddress} from community ${communityId} after a racing ban`, {
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+        })
+      }
+
+      throw new NotAuthorizedError(`The user ${userAddress} is banned from community ${communityId}`)
+    }
 
     // Analytics event
     analytics.fireEvent(AnalyticsEvent.JOIN_COMMUNITY_CALL, {
