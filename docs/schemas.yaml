@@ -20,10 +20,17 @@ components:
       properties:
         limit:
           type: integer
-          description: 'Number of items per page'
+          minimum: 1
+          maximum: 100
+          description: 'Number of items per page. Values above the maximum are reduced to it.'
         offset:
           type: integer
-          description: 'Number of items to skip'
+          minimum: 0
+          maximum: 100000
+          description: >-
+            Number of items to skip. Values above the maximum are capped rather than rejected, so a
+            request paging past it returns the last page again instead of an empty result. Compare
+            against the offset echoed in the response to detect it.
     PaginatedResponse:
       type: object
       required:
@@ -41,10 +48,10 @@ components:
           description: 'Total number of items'
         limit:
           type: integer
-          description: 'Number of items per page'
+          description: 'Number of items per page actually applied, which may be lower than requested'
         offset:
           type: integer
-          description: 'Number of items skipped'
+          description: 'Number of items actually skipped, which may be lower than requested'
         page:
           type: integer
           description: 'Current page number (1-indexed)'
