@@ -83,7 +83,8 @@ export function getUserFriendsCTE(userAddress: string): CTE {
     AND (
       f.address_requester = ${normalizedUserAddress}
       OR f.address_requested = ${normalizedUserAddress}
-    )`,
+    )
+    AND `.append(getBlockingCondition(normalizedUserAddress)),
     name: 'user_friends'
   }
 }

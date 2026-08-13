@@ -714,6 +714,26 @@ describe('Friends Component', () => {
       requestedAddress = '0x456'
     })
 
+    describe('and one of them has blocked the other', () => {
+      let result: Awaited<ReturnType<typeof friendsComponent.getMutualFriendsProfiles>>
+
+      beforeEach(async () => {
+        mockFriendsDB.isFriendshipBlocked.mockResolvedValueOnce(true)
+        mockFriendsDB.getMutualFriends.mockResolvedValue([{ address: '0xmutual1' }])
+        mockFriendsDB.getMutualFriendsCount.mockResolvedValue(1)
+
+        result = await friendsComponent.getMutualFriendsProfiles(requesterAddress, requestedAddress, pagination)
+      })
+
+      it('should answer as though there were none', () => {
+        expect(result).toEqual({ friendsProfiles: [], total: 0 })
+      })
+
+      it('should not read the intersection of their friend lists', () => {
+        expect(mockFriendsDB.getMutualFriends).not.toHaveBeenCalled()
+      })
+    })
+
     describe('and there are mutual friends', () => {
       let mockMutualFriends: User[]
       let mockProfiles: Profile[]
@@ -722,6 +742,7 @@ describe('Friends Component', () => {
         mockMutualFriends = [{ address: '0xmutual1' }, { address: '0xmutual2' }, { address: '0xmutual3' }]
         mockProfiles = [createMockProfile('0xmutual1'), createMockProfile('0xmutual2'), createMockProfile('0xmutual3')]
 
+        mockFriendsDB.isFriendshipBlocked.mockResolvedValue(false)
         mockFriendsDB.getMutualFriends.mockResolvedValue(mockMutualFriends)
         mockFriendsDB.getMutualFriendsCount.mockResolvedValue(3)
         mockRegistry.getProfiles.mockResolvedValue(mockProfiles)
