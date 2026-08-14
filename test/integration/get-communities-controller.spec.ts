@@ -1327,6 +1327,31 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         })
       })
 
+      describe('and the caller is banned from a matching community', () => {
+        beforeEach(async () => {
+          await components.communitiesDb.banMemberFromCommunity(minimalCommunityId1, address, address)
+        })
+
+        afterEach(async () => {
+          await components.communitiesDb.unbanMemberFromCommunity(minimalCommunityId1, address, address)
+        })
+
+        it('should omit it from the results', async () => {
+          const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha%20Minimal&limit=10')
+
+          expect(response.status).toBe(200)
+          const body = await response.json()
+          expect(body.data.results.map((c: { id: string }) => c.id)).not.toContain(minimalCommunityId1)
+        })
+
+        it('should exclude it from the total, so the count matches the rows', async () => {
+          const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha%20Minimal&limit=10')
+
+          const body = await response.json()
+          expect(body.data.total).toBe(body.data.results.length)
+        })
+      })
+
       describe('and the search query is valid', () => {
         describe('and the user is not a member of the unlisted community', () => {
           it('should respond with matching listed communities and pagination params', async () => {

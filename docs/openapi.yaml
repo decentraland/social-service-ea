@@ -2181,8 +2181,15 @@ paths:
       description: |
         Same as GET /v1/communities but the response contains only addresses: the owner
         address (no owner name) and mutual-friend addresses (string[]) instead of friend
-        profiles. The `minimal` search branch is unchanged (it already returns no profile
-        information).
+        profiles.
+
+        **Minimal Mode (minimal=true):**
+        Identical to v1, and subject to the same requirements: authentication is required,
+        `search` is required with a minimum of 3 characters, and only `search` is honoured —
+        `onlyMemberOf`, `onlyWithActiveVoiceChat` and `roles` are ignored. A request with
+        `minimal=true` and no search term, or one shorter than 3 characters, is rejected with
+        400; without authentication, 401. Results exclude communities the caller is banned
+        from, and `total` excludes them too.
       security:
         - SignedFetch: []
       parameters:
@@ -2205,6 +2212,7 @@ paths:
           required: false
           schema:
             type: string
+          description: Search term to filter communities by name. Required when `minimal=true` (minimum 3 characters).
         - name: onlyMemberOf
           in: query
           required: false
@@ -2243,6 +2251,12 @@ paths:
             application/json:
               schema:
                 $ref: './schemas.yaml#/components/schemas/GetCommunitiesV2200OkResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
