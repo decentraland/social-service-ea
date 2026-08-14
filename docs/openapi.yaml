@@ -215,6 +215,12 @@ paths:
             application/json:
               schema:
                 $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - authentication is required when `minimal=true`
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
@@ -2253,6 +2259,12 @@ paths:
                 $ref: './schemas.yaml#/components/schemas/GetCommunitiesV2200OkResponse'
         '400':
           description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: './schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - authentication is required when `minimal=true`
           content:
             application/json:
               schema:

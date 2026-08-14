@@ -58,13 +58,13 @@ export async function getCommunitiesV2Handler(
       const limit = Math.min(pagination.limit, MAX_LIMIT_FOR_MINIMAL_RESPONSE)
 
       logger.info('Searching communities (v2) with minimal response', {
-        userAddress: userAddress!,
+        userAddress,
         search,
         limit
       })
 
       const { communities: communitiesResult, total } = await communities.searchCommunities(search, {
-        userAddress: userAddress!,
+        userAddress,
         limit,
         offset: pagination.offset
       })
