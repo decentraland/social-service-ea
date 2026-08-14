@@ -269,9 +269,15 @@ export interface ICommunitiesDatabaseComponent {
     >
   ): Promise<void>
   getVisibleCommunitiesByIds(communityIds: string[], userAddress: EthAddress): Promise<Array<{ id: string }>>
+  /**
+   * Searches communities by name for a specific caller.
+   *
+   * The address is required, not incidental: it is what the query filters unlisted communities and
+   * bans against, so a caller without one would search the whole table.
+   */
   searchCommunities(
     search: string,
-    options: { userAddress?: EthAddress; limit: number; offset: number }
+    options: { userAddress: EthAddress; limit: number; offset: number }
   ): Promise<{
     results: Array<{ id: string; name: string; membersCount: number; privacy: CommunityPrivacyEnum }>
     total: number

@@ -43,24 +43,24 @@ export async function getCommunitiesHandler(
         throw new NotAuthorizedError('Authentication required for minimal community search')
       }
 
-      if (search && search.length < MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE) {
+      // Required, not just bounded: without a term the query returns every community, which turns
+      // name search into a walkable directory.
+      if (!search || search.length < MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE) {
         throw new InvalidRequestError(
           `Search query must be at least ${MIN_SEARCH_LENGTH_FOR_MINIMAL_RESPONSE} characters when using minimal`
         )
       }
-    }
 
-    if (minimal) {
       const limit = Math.min(pagination.limit, MAX_LIMIT_FOR_MINIMAL_RESPONSE)
 
       logger.info('Searching communities with minimal response', {
-        userAddress: userAddress!,
-        search: search as string,
+        userAddress,
+        search,
         limit
       })
 
-      const { communities: communitiesResult, total } = await communities.searchCommunities(search ?? '', {
-        userAddress: userAddress!,
+      const { communities: communitiesResult, total } = await communities.searchCommunities(search, {
+        userAddress,
         limit,
         offset: pagination.offset
       })

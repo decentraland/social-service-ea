@@ -127,6 +127,13 @@ test('Get Communities Controller v2', function ({ components, spyComponents }) {
       })
     })
 
+    describe('and no search query is given', () => {
+      it('should respond with a 400 rather than returning every community', async () => {
+        const response = await makeRequest(identity, `/v2/communities?minimal=true`)
+        expect(response.status).toBe(400)
+      })
+    })
+
     describe('and the search query is too short', () => {
       it('should respond with a 400 status code', async () => {
         const response = await makeRequest(identity, `/v2/communities?minimal=true&search=ab`)

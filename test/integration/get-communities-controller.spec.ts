@@ -933,7 +933,6 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
               expect(communityIds).toContain(listedCommunityId)
             })
           })
-
         })
       })
 
@@ -1308,19 +1307,13 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
         })
       })
 
-      describe('and the search query is missing', () => {
-        it('should respond with listed communities and pagination params', async () => {
+      describe('and no search query is given', () => {
+        it('should respond with a 400 rather than returning every community', async () => {
           const response = await makeRequest(identity, '/v1/communities?minimal=true&limit=50')
 
-          expect(response.status).toBe(200)
+          expect(response.status).toBe(400)
           const body = await response.json()
-          const names = body.data.results.map((c: { name: string }) => c.name)
-          expect(names).toContain('Alpha Minimal Community')
-          expect(names).toContain('Beta Minimal Community')
-          expect(names).not.toContain('Alpha Unlisted Minimal')
-          expect(body.data.total).toBeGreaterThanOrEqual(2)
-          expect(body.data.page).toBe(1)
-          expect(body.data.limit).toBe(50)
+          expect(body.message).toContain('at least 3 characters')
         })
       })
 
@@ -1331,6 +1324,31 @@ test('Get Communities Controller', function ({ components, spyComponents }) {
           expect(response.status).toBe(400)
           const body = await response.json()
           expect(body.message).toContain('at least 3 characters')
+        })
+      })
+
+      describe('and the caller is banned from a matching community', () => {
+        beforeEach(async () => {
+          await components.communitiesDb.banMemberFromCommunity(minimalCommunityId1, address, address)
+        })
+
+        afterEach(async () => {
+          await components.communitiesDb.unbanMemberFromCommunity(minimalCommunityId1, address, address)
+        })
+
+        it('should omit it from the results', async () => {
+          const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha%20Minimal&limit=10')
+
+          expect(response.status).toBe(200)
+          const body = await response.json()
+          expect(body.data.results.map((c: { id: string }) => c.id)).not.toContain(minimalCommunityId1)
+        })
+
+        it('should exclude it from the total, so the count matches the rows', async () => {
+          const response = await makeRequest(identity, '/v1/communities?minimal=true&search=Alpha%20Minimal&limit=10')
+
+          const body = await response.json()
+          expect(body.data.total).toBe(body.data.results.length)
         })
       })
 

@@ -1420,7 +1420,9 @@ export function createCommunitiesDBComponent(
       const baseCondition = SQL`
         FROM communities c
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedUserAddress} AND cb.active = true
         WHERE c.active = true
+          AND cb.banned_address IS NULL
           AND (
             c.unlisted = false
             OR EXISTS (
@@ -1432,7 +1434,9 @@ export function createCommunitiesDBComponent(
 
       const countBaseCondition = SQL`
         FROM communities c
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedUserAddress} AND cb.active = true
         WHERE c.active = true
+          AND cb.banned_address IS NULL
           AND (
             c.unlisted = false
             OR EXISTS (
