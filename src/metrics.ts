@@ -40,7 +40,11 @@ export const metricDeclarations = {
   },
   ws_auth_errors: {
     type: IMetricsComponent.CounterType,
-    help: 'Number of WebSocket authentication errors'
+    help: 'Number of WebSocket authentication errors',
+    // 'client_rejected' for credentials the middleware turned down (4xx), 'server_error' for
+    // anything on our side — an unreachable catalyst or an unexpected throw. Only the latter
+    // is worth alerting on.
+    labelNames: ['type']
   },
   ws_auth_race_condition_aborted: {
     type: IMetricsComponent.CounterType,
@@ -131,6 +135,10 @@ export const metricDeclarations = {
     type: IMetricsComponent.CounterType,
     help: "Number of subscription updates dropped because a connection's value queue overflowed (slow consumer)",
     labelNames: ['event']
+  },
+  friendship_rate_limiter_unavailable: {
+    type: IMetricsComponent.CounterType,
+    help: 'Number of friendship/block mutations allowed because the Redis rate limiter was unreachable'
   },
   ai_compliance_validation_duration_seconds: {
     type: IMetricsComponent.HistogramType,

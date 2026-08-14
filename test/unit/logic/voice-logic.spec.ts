@@ -826,13 +826,43 @@ describe('when ending incoming or outgoing private voice chat for a user', () =>
         publishInChannelMock.mockResolvedValueOnce(undefined)
       })
 
-      it('should end the private voice chat with the private voice chat id and the callee address and resolve', async () => {
+      it('should tell the caller, who is the party still online', async () => {
         await voice.endIncomingOrOutgoingPrivateVoiceChatForUser(userAddress)
         expect(getPrivateVoiceChatOfUserMock).toHaveBeenCalledWith(userAddress)
         expect(deletePrivateVoiceChatMock).toHaveBeenCalledWith(privateVoiceChat.id)
         expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
           callId: privateVoiceChat.id,
           callerAddress: privateVoiceChat.caller_address,
+          status: VoiceChatStatus.ENDED
+        })
+      })
+    })
+
+    describe('and it is the caller who dropped', () => {
+      let callerDroppedChat: PrivateVoiceChat
+      let calleeAddress: string
+
+      beforeEach(() => {
+        calleeAddress = '0x2B72b8d597c553b3173bca922B9ad871da751dA5'.toLowerCase()
+        callerDroppedChat = {
+          id: 'voice-chat-456',
+          caller_address: userAddress,
+          callee_address: calleeAddress,
+          created_at: new Date()
+        }
+
+        getPrivateVoiceChatOfUserMock.mockReset()
+        getPrivateVoiceChatOfUserMock.mockResolvedValueOnce(callerDroppedChat)
+        getPrivateVoiceChatMock.mockResolvedValueOnce(callerDroppedChat)
+        deletePrivateVoiceChatMock.mockResolvedValueOnce(callerDroppedChat)
+        publishInChannelMock.mockResolvedValueOnce(undefined)
+      })
+
+      it('should tell the callee, so their ringing call is cleared', async () => {
+        await voice.endIncomingOrOutgoingPrivateVoiceChatForUser(userAddress)
+        expect(publishInChannelMock).toHaveBeenCalledWith(PRIVATE_VOICE_CHAT_UPDATES_CHANNEL, {
+          callId: callerDroppedChat.id,
+          calleeAddress,
           status: VoiceChatStatus.ENDED
         })
       })

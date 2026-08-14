@@ -10,17 +10,95 @@ import {
   FriendshipStatus
 } from '../../types'
 import { BLOCK_UPDATES_CHANNEL, FRIENDSHIP_UPDATES_CHANNEL } from '../../adapters/pubsub'
+import { isErrorWithMessage } from '../../utils/errors'
 import { getProfileUserId } from '../profiles'
 import { sendNotification, shouldNotify } from '../notifications'
-import { BlockedUserError, InvalidFriendshipActionError, ProfileNotFoundError } from './errors'
+import {
+  BlockedUserError,
+  FriendshipRateLimitError,
+  InvalidFriendshipActionError,
+  ProfileNotFoundError
+} from './errors'
 import { getNewFriendshipStatus, validateNewFriendshipAction } from './friendships'
+import {
+  normalizeBlockedUsersPagination,
+  normalizeFriendsPagination,
+  normalizeFriendshipRequestsPagination
+} from '../../utils/friendship-pagination'
+import { normalizeAddress } from '../../utils/address'
 import { BlockedUser, IFriendsComponent } from './types'
 
+// Pair rate-limit buckets. The two scopes MUST keep separate keys: a friendship is symmetric, a block is not.
+const PAIR_RATE_LIMIT_KEY = {
+  // Friendship: one bucket per unordered pair, both directions share it.
+  symmetric: (actor: string, target: string): string => `friends:rate:pair:sym:${[actor, target].sort().join(':')}`,
+  // Block/unblock: one bucket per ordered pair, so one account cannot spend the budget the other
+  // needs to block back.
+  directional: (actor: string, target: string): string => `friends:rate:pair:dir:${actor}:${target}`
+} as const
+
+type PairRateLimitScope = keyof typeof PAIR_RATE_LIMIT_KEY
+
 export async function createFriendsComponent(
-  components: Pick<AppComponents, 'friendsDb' | 'registry' | 'pubsub' | 'sns' | 'logs'>
+  components: Pick<AppComponents, 'friendsDb' | 'registry' | 'pubsub' | 'sns' | 'logs' | 'redis' | 'config' | 'metrics'>
 ): Promise<IFriendsComponent> {
-  const { friendsDb, registry, pubsub, sns, logs } = components
+  const { friendsDb, registry, pubsub, sns, logs, redis, config, metrics } = components
   const logger = logs.getLogger('friends-component')
+  const rateLimitWindowSeconds = (await config.getNumber('FRIENDSHIP_RATE_LIMIT_WINDOW_SECONDS')) ?? 60
+  const actorRateLimit = (await config.getNumber('FRIENDSHIP_RATE_LIMIT_PER_ACTOR')) ?? 30
+  const pairRateLimit = (await config.getNumber('FRIENDSHIP_RATE_LIMIT_PER_PAIR')) ?? 10
+
+  /**
+   * Consumes one rate-limit token, failing open if Redis is unreachable.
+   *
+   * The limiter is an abuse control, not an authorization control: a Redis outage must not
+   * take friendship and block mutations down with it. Exhaustion still rejects.
+   */
+  async function consumeOrFailOpen(key: string, limit: number): Promise<boolean> {
+    try {
+      return await redis.consumeRateLimit(key, limit, rateLimitWindowSeconds)
+    } catch (error) {
+      logger.error('Friendship rate limiter unavailable, allowing the action', {
+        key,
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      metrics.increment('friendship_rate_limiter_unavailable')
+      return true
+    }
+  }
+
+  async function enforceMutationRateLimit(
+    actorAddress: string,
+    targetAddress: string,
+    scope: PairRateLimitScope
+  ): Promise<void> {
+    const actor = actorAddress.toLowerCase()
+    const target = targetAddress.toLowerCase()
+
+    const actorAllowed = await consumeOrFailOpen(`friends:rate:actor:${actor}`, actorRateLimit)
+    if (!actorAllowed) throw new FriendshipRateLimitError()
+
+    const pairAllowed = await consumeOrFailOpen(PAIR_RATE_LIMIT_KEY[scope](actor, target), pairRateLimit)
+    if (!pairAllowed) throw new FriendshipRateLimitError()
+  }
+
+  /**
+   * Best-effort profile lookup for response enrichment.
+   *
+   * A wallet with no deployed profile — or one the registry cannot reduce to a minimal profile —
+   * must still be blockable, so this never decides whether the block happens.
+   */
+  async function tryGetProfile(address: string): Promise<Profile | null> {
+    try {
+      return await registry.getProfile(address)
+    } catch (error) {
+      logger.warn('Could not resolve a profile for a blocked address; continuing without it', {
+        address,
+        error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+      })
+      return null
+    }
+  }
 
   return {
     getFriendsProfiles: async (
@@ -28,7 +106,7 @@ export async function createFriendsComponent(
       pagination?: Pagination
     ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
       const [friends, total] = await Promise.all([
-        friendsDb.getFriends(userAddress, { pagination, onlyActive: true }),
+        friendsDb.getFriends(userAddress, { pagination: normalizeFriendsPagination(pagination), onlyActive: true }),
         friendsDb.getFriendsCount(userAddress, { onlyActive: true })
       ])
 
@@ -39,12 +117,14 @@ export async function createFriendsComponent(
         total
       }
     },
-    blockUser: async (blockerAddress: string, blockedAddress: string): Promise<BlockedUser> => {
-      const profile = await registry.getProfile(blockedAddress)
+    blockUser: async (blockerAddress: string, rawBlockedAddress: string): Promise<BlockedUser> => {
+      // Normalize once, up front. EthAddress.validate accepts EIP-55 mixed case and the database
+      // layer lowercases on write, so an un-normalized value here would still block correctly but
+      // publish an address the subscription filters — which compare against the always-lowercased
+      // connection address — would never match, leaving the blocked user's client unaware.
+      const blockedAddress = normalizeAddress(rawBlockedAddress)
 
-      if (!profile) {
-        throw new ProfileNotFoundError(blockedAddress)
-      }
+      await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
 
       const { actionId, blockedAt } = await friendsDb.executeTx(async (tx) => {
         const { blocked_at: blockedAt } = await friendsDb.blockUser(blockerAddress, blockedAddress, tx)
@@ -77,19 +157,23 @@ export async function createFriendsComponent(
         })
       ])
 
-      return { profile, blockedAt }
+      return { profile: await tryGetProfile(blockedAddress), blockedAt }
     },
     getBlockedUsers: async (
-      userAddress: string
+      userAddress: string,
+      pagination: Pagination
     ): Promise<{ blockedUsers: BlockedUserWithDate[]; blockedProfiles: Profile[]; total: number }> => {
-      const blockedUsers = await friendsDb.getBlockedUsers(userAddress)
-      const blockedAddresses = blockedUsers.map((user) => user.address)
-      const profiles = await registry.getProfiles(blockedAddresses)
+      // total must be the row count, not the page length: clients page until they reach it.
+      const [blockedUsers, total] = await Promise.all([
+        friendsDb.getBlockedUsers(userAddress, normalizeBlockedUsersPagination(pagination)),
+        friendsDb.getBlockedUsersCount(userAddress)
+      ])
+      const profiles = await registry.getProfiles(blockedUsers.map((user) => user.address))
 
       return {
         blockedUsers,
         blockedProfiles: profiles,
-        total: blockedAddresses.length
+        total
       }
     },
     getBlockingStatus: async (userAddress: string): Promise<{ blockedUsers: string[]; blockedByUsers: string[] }> => {
@@ -119,7 +203,7 @@ export async function createFriendsComponent(
       pagination?: Pagination
     ): Promise<{ friendsProfiles: Profile[]; total: number }> => {
       const [mutualFriends, total] = await Promise.all([
-        friendsDb.getMutualFriends(requesterAddress, requestedAddress, pagination),
+        friendsDb.getMutualFriends(requesterAddress, requestedAddress, normalizeFriendsPagination(pagination)),
         friendsDb.getMutualFriendsCount(requesterAddress, requestedAddress)
       ])
 
@@ -134,8 +218,9 @@ export async function createFriendsComponent(
       userAddress: string,
       pagination?: Pagination
     ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }> => {
+      const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
       const [pendingRequests, pendingRequestsCount] = await Promise.all([
-        friendsDb.getReceivedFriendshipRequests(userAddress, pagination),
+        friendsDb.getReceivedFriendshipRequests(userAddress, boundedPagination),
         friendsDb.getReceivedFriendshipRequestsCount(userAddress)
       ])
 
@@ -152,8 +237,9 @@ export async function createFriendsComponent(
       userAddress: string,
       pagination?: Pagination
     ): Promise<{ requests: FriendshipRequest[]; profiles: Profile[]; total: number }> => {
+      const boundedPagination = normalizeFriendshipRequestsPagination(pagination)
       const [sentRequests, sentRequestsCount] = await Promise.all([
-        friendsDb.getSentFriendshipRequests(userAddress, pagination),
+        friendsDb.getSentFriendshipRequests(userAddress, boundedPagination),
         friendsDb.getSentFriendshipRequestsCount(userAddress)
       ])
 
@@ -166,12 +252,10 @@ export async function createFriendsComponent(
         total: sentRequestsCount
       }
     },
-    unblockUser: async (blockerAddress: string, blockedAddress: string): Promise<Profile> => {
-      const profile = await registry.getProfile(blockedAddress)
+    unblockUser: async (blockerAddress: string, rawBlockedAddress: string): Promise<Profile | null> => {
+      const blockedAddress = normalizeAddress(rawBlockedAddress)
 
-      if (!profile) {
-        throw new ProfileNotFoundError(blockedAddress)
-      }
+      await enforceMutationRateLimit(blockerAddress, blockedAddress, 'directional')
 
       const actionId = await friendsDb.executeTx(async (tx) => {
         await friendsDb.unblockUser(blockerAddress, blockedAddress, tx)
@@ -200,7 +284,7 @@ export async function createFriendsComponent(
         })
       ])
 
-      return profile
+      return tryGetProfile(blockedAddress)
     },
     upsertFriendship: async (
       userAddress: EthAddress,
@@ -208,6 +292,7 @@ export async function createFriendsComponent(
       action: Action,
       metadata: Record<string, string> | null
     ) => {
+      await enforceMutationRateLimit(userAddress, friendAddress, 'symmetric')
       const isBlocked = await friendsDb.isFriendshipBlocked(userAddress, friendAddress)
 
       if (isBlocked) {

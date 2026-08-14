@@ -2,7 +2,8 @@ import { ILoggerComponent } from '@well-known-components/interfaces'
 import {
   BlockedUsersMessagesVisibilitySetting,
   PrivateMessagePrivacySetting,
-  UpsertSocialSettingsPayload
+  UpsertSocialSettingsPayload,
+  UpsertSocialSettingsResponse
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { upsertSocialSettingsService } from '../../../../../src/controllers/handlers/rpc/upsert-social-settings'
 import { convertDBSettingsToRPCSettings } from '../../../../../src/logic/settings'
@@ -186,22 +187,83 @@ describe('upsertSocialSettingsService', () => {
     expect(result.response.$case).toEqual('ok')
   })
 
-  it('should not reject when the comms gatekeeper throws an error', async () => {
-    const payload: UpsertSocialSettingsPayload = {
-      privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS
-    }
-    const expectedDBSettings: DBSocialSettings = {
-      address: testAddress,
-      private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
-      blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
-      show_situation_reactions: DBSituationReactionsVisibility.SHOW
-    }
+  describe('when Gatekeeper rejects a privacy-tightening update', () => {
+    let payload: UpsertSocialSettingsPayload
+    let result: UpsertSocialSettingsResponse
 
-    upsertSocialSettingsMock.mockResolvedValueOnce(expectedDBSettings)
-    commsGatekeeperMock.mockRejectedValueOnce(new Error('Comms gatekeeper error'))
+    beforeEach(async () => {
+      payload = { privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS }
+      commsGatekeeperMock.mockRejectedValueOnce(new Error('Comms gatekeeper error'))
+      result = await upsertSocialSettings(payload, context)
+    })
 
-    const result = await upsertSocialSettings(payload, context)
-    expect(result.response.$case).toEqual('ok')
+    it('should return an internal server error', () => {
+      expect(result.response.$case).toEqual('internalServerError')
+    })
+
+    it('should leave the permissive database setting unchanged', () => {
+      expect(upsertSocialSettingsMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when Gatekeeper rejects a privacy-tightening update submitted alongside another setting', () => {
+    let payload: UpsertSocialSettingsPayload
+    let result: UpsertSocialSettingsResponse
+
+    beforeEach(async () => {
+      payload = {
+        privateMessagesPrivacy: PrivateMessagePrivacySetting.ONLY_FRIENDS,
+        blockedUsersMessagesVisibility: BlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+      }
+      commsGatekeeperMock.mockRejectedValueOnce(new Error('Comms gatekeeper error'))
+      result = await upsertSocialSettings(payload, context)
+    })
+
+    it('should return an internal server error', () => {
+      expect(result.response.$case).toEqual('internalServerError')
+    })
+
+    it('should still persist the setting Gatekeeper has no say over', () => {
+      expect(upsertSocialSettingsMock).toHaveBeenCalledWith(testAddress, {
+        blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES
+      })
+    })
+
+    it('should not persist the privacy change that Gatekeeper rejected', () => {
+      expect(upsertSocialSettingsMock).not.toHaveBeenCalledWith(
+        testAddress,
+        expect.objectContaining({ private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS })
+      )
+    })
+  })
+
+  describe('when Gatekeeper rejects a privacy-loosening update', () => {
+    let payload: UpsertSocialSettingsPayload
+    let result: UpsertSocialSettingsResponse
+    let expectedDBSettings: DBSocialSettings
+
+    beforeEach(async () => {
+      payload = { privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL }
+      expectedDBSettings = {
+        address: testAddress,
+        private_messages_privacy: DBPrivateMessagesPrivacy.ALL,
+        blocked_users_messages_visibility: DBBlockedUsersMessagesVisibilitySetting.DO_NOT_SHOW_MESSAGES,
+        show_situation_reactions: DBSituationReactionsVisibility.SHOW
+      }
+      upsertSocialSettingsMock.mockResolvedValueOnce(expectedDBSettings)
+      commsGatekeeperMock.mockRejectedValueOnce(new Error('Comms gatekeeper error'))
+      result = await upsertSocialSettings(payload, context)
+    })
+
+    it('should return an internal server error', () => {
+      expect(result.response.$case).toEqual('internalServerError')
+    })
+
+    it('should write the permissive database value before Gatekeeper retains its restrictive value', () => {
+      expect(upsertSocialSettingsMock).toHaveBeenCalledWith(testAddress, {
+        private_messages_privacy: DBPrivateMessagesPrivacy.ALL
+      })
+    })
   })
 
   it('should return invalid request when no settings are provided', async () => {

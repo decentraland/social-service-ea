@@ -53,6 +53,7 @@ import { wellKnownComponents } from '@dcl/crypto-middleware'
 import { multipartParserWrapper } from '../../utils/multipart'
 import { isSceneSigner } from '../../utils/auth-metadata'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
+import { reportUnhandledErrors } from '../middlewares/report-unhandled-errors'
 import {
   UpdateMemberRoleSchema,
   UpdateCommunityPartiallySchema,
@@ -85,6 +86,10 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
     })
 
   router.use(errorHandler)
+  // Between the two on purpose: errorHandler turns the error into a 500 without rethrowing, so
+  // nothing outside it can see what failed, and communitiesErrorsHandler maps its own errors to
+  // 4xx below, so those never reach the reporter.
+  router.use(reportUnhandledErrors)
   router.use(communitiesErrorsHandler)
 
   if (API_ADMIN_TOKEN) {

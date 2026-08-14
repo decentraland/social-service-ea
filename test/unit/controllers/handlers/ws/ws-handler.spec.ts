@@ -11,6 +11,13 @@ jest.mock('@dcl/crypto-middleware')
 
 const WS_AUTH_TIMEOUT_IN_MS = 30000
 
+// `@dcl/crypto-middleware` is auto-mocked above, so its real RequestError class is not
+// constructible here. This builds the same shape the library throws: an Error named
+// 'RequestError' carrying the status code it assigns to the failure (4xx for anything
+// wrong with the client's credentials, 503 when the catalyst is unreachable).
+const requestError = (message: string, statusCode: number) =>
+  Object.assign(new Error(message), { name: 'RequestError', statusCode })
+
 describe('ws-handler', () => {
   let wsHandlers: any
   let mockWs: any
@@ -271,6 +278,59 @@ describe('ws-handler', () => {
         await expect(
           wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
         ).resolves.toBeUndefined()
+      })
+
+      describe('and the middleware rejects the credentials the client presented', () => {
+        beforeEach(() => {
+          ;(verify as jest.Mock).mockRejectedValue(requestError('Expired signature: signature timestamp: 1', 401))
+        })
+
+        it('should still close the socket as unauthorized', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockWs.end).toHaveBeenCalledWith(3003, 'Unauthorized')
+        })
+
+        it('should not report the rejection to Sentry, matching how the HTTP routes answer the same failure', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockTracing.captureException).not.toHaveBeenCalled()
+        })
+
+        it('should count the rejection apart from server-side auth failures', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'client_rejected' })
+        })
+      })
+
+      describe('and the catalyst cannot be reached while verifying', () => {
+        beforeEach(() => {
+          ;(verify as jest.Mock).mockRejectedValue(
+            requestError('Error connecting to catalyst "https://peer.decentraland.org": fetch failed', 503)
+          )
+        })
+
+        it('should report the failure to Sentry so the outage stays visible', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockTracing.captureException).toHaveBeenCalled()
+        })
+
+        it('should count it as a server-side auth failure', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(JSON.stringify({ type: 'auth', data: 'test' })))
+
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'server_error' })
+        })
+      })
+
+      describe('and the client sends a payload that is not valid JSON', () => {
+        it('should report it to Sentry, since it never reached the middleware', async () => {
+          await wsHandlers.message(mockWs, Buffer.from(''))
+
+          expect(mockTracing.captureException).toHaveBeenCalled()
+          expect(mockMetrics.increment).toHaveBeenCalledWith('ws_auth_errors', { type: 'server_error' })
+        })
       })
 
       describe('and the transport is closed by the RPC layer while the socket is still connected', () => {

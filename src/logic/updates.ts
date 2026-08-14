@@ -1,4 +1,5 @@
 import {
+  CommunityVoiceChatUpdate,
   ConnectivityStatus,
   SubscriptionStreamClosed,
   SubscriptionStreamClosedReason
@@ -6,7 +7,10 @@ import {
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { Action, AppComponents, RpcServerContext, SubscriptionEventsEmitter } from '../types'
 import emitterToAsyncGenerator from '../utils/emitterToGenerator'
+import { CommunityVoiceChatStatus as ProtocolCommunityVoiceChatStatus } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { normalizeAddress } from '../utils/address'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from './community'
+import { isErrorWithMessage } from '../utils/errors'
 import { VoiceChatStatus } from './voice/types'
 import { IUpdateHandlerComponent } from '../types/components'
 
@@ -67,10 +71,18 @@ async function processInBatches<T>(
 export function createUpdateHandlerComponent(
   components: Pick<
     AppComponents,
-    'logs' | 'subscribersContext' | 'friendsDb' | 'communityMembers' | 'registry' | 'metrics' | 'peersStats'
+    | 'logs'
+    | 'subscribersContext'
+    | 'friendsDb'
+    | 'communitiesDb'
+    | 'communityMembers'
+    | 'registry'
+    | 'metrics'
+    | 'peersStats'
   >
 ): IUpdateHandlerComponent {
-  const { logs, subscribersContext, friendsDb, communityMembers, registry, metrics, peersStats } = components
+  const { logs, subscribersContext, friendsDb, communitiesDb, communityMembers, registry, metrics, peersStats } =
+    components
   const logger = logs.getLogger('update-handler')
 
   function handleUpdate<T extends keyof SubscriptionEventsEmitter>(handler: UpdateHandler<T>) {
@@ -78,11 +90,9 @@ export function createUpdateHandlerComponent(
       try {
         const update = JSON.parse(message) as SubscriptionEventsEmitter[T]
         await handler(update)
-      } catch (error: any) {
-        logger.error(`Error handling update: ${error.message}`, {
-          error,
-          message
-        })
+      } catch (error) {
+        const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown error'
+        logger.error(`Error handling update: ${errorMessage}`, { error: errorMessage })
       }
     }
   }
@@ -317,62 +327,108 @@ export function createUpdateHandlerComponent(
   })
 
   const communityVoiceChatUpdateHandler = handleUpdate<'communityVoiceChatUpdate'>(async (update) => {
-    logger.info('Community voice chat update', { update: JSON.stringify(update) })
+    // Allowlist the loggable fields: a started update carries the community's name, image, parcel
+    // positions and worlds, and this runs before the audience is decided.
+    logger.info('Community voice chat update', { communityId: update.communityId, status: update.status })
 
     // Get all online subscribers, excluding the creator if present (creator already knows about their action)
     const creatorAddress = update.creatorAddress?.toLowerCase()
     const allOnlineSubscribers = subscribersContext.getLocalSubscribersAddresses()
     const onlineSubscribers = allOnlineSubscribers.filter((address) => !creatorAddress || address !== creatorAddress)
 
-    try {
-      // Get all online members of this community in a single efficient query
-      const batches = communityMembers.getOnlineMembersFromCommunity(update.communityId, onlineSubscribers)
-      const communityMemberAddresses = new Set<string>()
+    // STARTED always derives its scope from the authoritative community row. ENDED carries the
+    // start-time fanout class so privacy/visibility changes do not turn a member-only cleanup into a
+    // broadcast (or suppress broad cleanup). This is best-effort rather than a recipient snapshot:
+    // member-scoped ENDED updates are delivered to the members who are online when cleanup runs.
+    const isEnded = update.status === ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED
+    let scope =
+      isEnded && (update.notificationScope === 'all' || update.notificationScope === 'members')
+        ? update.notificationScope
+        : undefined
 
-      for await (const batch of batches) {
-        batch.forEach(({ memberAddress }) => {
-          communityMemberAddresses.add(memberAddress)
-        })
+    if (!scope) {
+      // ENDED must not derive a broad audience from mutable current visibility. Missing or invalid
+      // start-time scope fails closed so legacy or malformed updates cannot reveal hidden activity.
+      if (isEnded) {
+        scope = 'members'
+      } else {
+        try {
+          const community = await communitiesDb.getCommunity(update.communityId)
+
+          if (!community) {
+            logger.warn(`No active community ${update.communityId} for a voice chat update; dropping it`)
+            return
+          }
+
+          scope =
+            community.privacy === CommunityPrivacyEnum.Public && community.visibility === CommunityVisibilityEnum.All
+              ? 'all'
+              : 'members'
+        } catch (error) {
+          logger.error(`Could not resolve the audience for a voice chat update in ${update.communityId}`, {
+            error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+          })
+          return
+        }
       }
-
-      // Pre-create the base update object to avoid repeated object spreads
-      const baseUpdate = { ...update }
-
-      // Notify ALL online users with personalized membership info (excluding the creator)
-      // Process in batches to yield the event loop and prevent blocking
-      await processInBatches(
-        onlineSubscribers,
-        (userAddress) => {
-          const isMember = communityMemberAddresses.has(userAddress)
-          const updateEmitter = subscribersContext.getSubscriber(userAddress)
-          if (updateEmitter) {
-            // Reuse base update, only set isMember property
-            updateEmitter.emit('communityVoiceChatUpdate', { ...baseUpdate, isMember })
-          }
-        },
-        20 // Process 20 users before yielding the event loop
-      )
-
-      logger.info(`Community voice chat update sent to ${onlineSubscribers.length} online users`)
-    } catch (error) {
-      logger.error(`Failed to process community voice chat update for community ${update.communityId}: ${error}`)
-
-      // Fallback: send update to all users without membership info (still excluding the creator)
-      const fallbackUpdate = { ...update, isMember: false }
-
-      await processInBatches(
-        onlineSubscribers,
-        (userAddress) => {
-          const updateEmitter = subscribersContext.getSubscriber(userAddress)
-          if (updateEmitter) {
-            updateEmitter.emit('communityVoiceChatUpdate', fallbackUpdate)
-          }
-        },
-        20
-      )
-
-      logger.warn(`Sent fallback community voice chat update to ${onlineSubscribers.length} online users`)
     }
+
+    // A broad-scope update needs no membership lookup at all, so cleanup for the largest audience
+    // cannot be lost to a transient query failure.
+    const communityMemberAddresses = new Set<string>()
+
+    if (scope === 'members' || !isEnded) {
+      try {
+        // An async generator: the query starts when iterated, so there is nothing to parallelize.
+        for await (const batch of communityMembers.getOnlineMembersFromCommunity(
+          update.communityId,
+          onlineSubscribers
+        )) {
+          batch.forEach(({ memberAddress }) => communityMemberAddresses.add(memberAddress))
+        }
+      } catch (error) {
+        logger.error(`Failed to resolve the members for a voice chat update in ${update.communityId}`, {
+          error: isErrorWithMessage(error) ? error.message : 'Unknown error'
+        })
+        // Member-scoped updates cannot be delivered safely without the lookup. For a public/listed
+        // start, membership is only an annotation: clear partial results and announce it to all
+        // eligible subscribers with the safe non-member fallback.
+        if (scope === 'members') return
+        communityMemberAddresses.clear()
+      }
+    }
+
+    const recipients =
+      scope === 'all' ? onlineSubscribers : onlineSubscribers.filter((address) => communityMemberAddresses.has(address))
+
+    // Build the protocol payload explicitly at the emitter boundary. Internal routing fields such
+    // as creatorAddress and notificationScope must never rely on a later parser to strip them.
+    const clientSafeUpdate: CommunityVoiceChatUpdate = {
+      communityId: update.communityId,
+      createdAt: update.createdAt ?? Date.now(),
+      status: update.status,
+      endedAt: update.endedAt,
+      positions: update.positions ?? [],
+      isMember: false,
+      communityName: update.communityName ?? '',
+      communityImage: update.communityImage,
+      worlds: update.worlds ?? [],
+      streamClosed: update.streamClosed
+    }
+
+    await processInBatches(
+      recipients,
+      (userAddress) => {
+        const isMember = communityMemberAddresses.has(userAddress)
+        const updateEmitter = subscribersContext.getSubscriber(userAddress)
+        if (updateEmitter) {
+          updateEmitter.emit('communityVoiceChatUpdate', { ...clientSafeUpdate, isMember })
+        }
+      },
+      20 // Process 20 users before yielding the event loop
+    )
+
+    logger.info(`Community voice chat update sent to ${recipients.length} online users`)
   })
 
   async function* handleSubscriptionUpdates<T, U>({

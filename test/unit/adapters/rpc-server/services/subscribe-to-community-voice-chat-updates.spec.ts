@@ -7,11 +7,7 @@ import {
   SubscriptionStreamClosedReason
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { subscribeToCommunityVoiceChatUpdatesService } from '../../../../../src/controllers/handlers/rpc/subscribe-to-community-voice-chat-updates'
-import {
-  IUpdateHandlerComponent,
-  RpcServerContext,
-  SubscriptionEventsEmitter
-} from '../../../../../src/types'
+import { IUpdateHandlerComponent, RpcServerContext, SubscriptionEventsEmitter } from '../../../../../src/types'
 import { createLogsMockedComponent, createMockUpdateHandlerComponent } from '../../../../mocks/components'
 import { createSubscribersContext } from '../../../../../src/adapters/rpc-server'
 import { mockMetrics } from '../../../../mocks/components/metrics'
@@ -40,7 +36,10 @@ describe('when subscribing to community voice chat updates', () => {
 
     rpcContext = {
       address: userAddress,
-      subscribersContext: createSubscribersContext({ logs, metrics: mockMetrics, config: mockConfig }, createWsPoolMockedComponent())
+      subscribersContext: createSubscribersContext(
+        { logs, metrics: mockMetrics, config: mockConfig },
+        createWsPoolMockedComponent()
+      )
     }
   })
 
@@ -133,23 +132,20 @@ describe('when subscribing to community voice chat updates', () => {
           communityId,
           createdAt: expect.any(Number),
           status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          endedAt: undefined,
           positions: ['1,1', '1,2', '2,1', '2,2'],
           worlds: ['TestWorld'],
           isMember: true,
           communityName: 'Test Community',
-          communityImage: 'test-image.jpg'
+          communityImage: 'test-image.jpg',
+          streamClosed: undefined
         })
       })
 
-      it('should use current timestamp for createdAt', () => {
-        const beforeCall = Date.now()
-        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(
-          update
-        ) as CommunityVoiceChatUpdate
-        const afterCall = Date.now()
+      it('should preserve the emitted created timestamp', () => {
+        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)
 
-        expect(result.createdAt).toBeGreaterThanOrEqual(beforeCall)
-        expect(result.createdAt).toBeLessThanOrEqual(afterCall)
+        expect(result).toEqual(expect.objectContaining({ createdAt: update.createdAt }))
       })
     })
 
@@ -180,12 +176,46 @@ describe('when subscribing to community voice chat updates', () => {
           communityId: 'minimal-community',
           createdAt: expect.any(Number),
           status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+          endedAt: undefined,
           positions: [],
           worlds: [],
           isMember: false,
           communityName: 'Minimal Community',
-          communityImage: undefined
+          communityImage: undefined,
+          streamClosed: undefined
         })
+      })
+    })
+
+    describe('when the update has an end timestamp', () => {
+      let endedAt: number
+
+      beforeEach(async () => {
+        endedAt = Date.now()
+        update = {
+          communityId,
+          createdAt: endedAt - 1000,
+          status: CommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+          endedAt,
+          positions: [],
+          worlds: [],
+          isMember: true,
+          communityName: 'Test Community',
+          communityImage: undefined
+        }
+
+        mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {
+          yield update
+        })
+
+        const generator = service({} as Empty, rpcContext)
+        await generator.next()
+      })
+
+      it('should preserve the emitted end timestamp', () => {
+        const result = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser(update)
+
+        expect(result).toEqual(expect.objectContaining({ endedAt }))
       })
     })
   })
@@ -248,9 +278,11 @@ describe('when subscribing to community voice chat updates', () => {
 
   describe('when building the final stream-closed message', () => {
     let streamClosed: SubscriptionStreamClosed
+    let streamClosedUpdate: CommunityVoiceChatUpdate
 
     beforeEach(async () => {
       streamClosed = { reason: SubscriptionStreamClosedReason.STREAM_CLOSED_DUPLICATE_SUBSCRIPTION }
+      streamClosedUpdate = CommunityVoiceChatUpdate.fromPartial({ streamClosed })
       mockUpdateHandler.handleSubscriptionUpdates.mockImplementationOnce(async function* () {})
 
       const generator = service({} as Empty, rpcContext)
@@ -258,8 +290,8 @@ describe('when subscribing to community voice chat updates', () => {
     })
 
     it('should build an update with protobuf defaults carrying the stream-closed notice', () => {
-      const buildStreamClosedUpdate = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0]
-        .buildStreamClosedUpdate!
+      const buildStreamClosedUpdate =
+        mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].buildStreamClosedUpdate!
 
       // All other fields are the protobuf zero-value defaults; clients must ignore them
       // when streamClosed is present.
@@ -273,6 +305,12 @@ describe('when subscribing to community voice chat updates', () => {
         worlds: [],
         streamClosed
       })
+    })
+
+    it('should preserve a stream-closed notice received by the parser', () => {
+      const parser = mockUpdateHandler.handleSubscriptionUpdates.mock.calls[0][0].parser
+
+      expect(parser(streamClosedUpdate)).toEqual(streamClosedUpdate)
     })
   })
 })

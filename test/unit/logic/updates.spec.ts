@@ -4,6 +4,7 @@ import {
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { createUpdateHandlerComponent } from '../../../src/logic/updates'
+import { CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../../src/logic/community'
 import { mockRegistry, mockFriendsDB, createMockPeersStatsComponent } from '../../mocks/components'
 import { IPeersStatsComponent } from '../../../src/logic/peers-stats'
 import { Emitter } from 'mitt'
@@ -61,7 +62,9 @@ describe('Updates Handlers', () => {
 
     mockCommunitiesDb = {
       getCommunityMemberRole: jest.fn(),
-      getCommunity: jest.fn()
+      getCommunity: jest
+        .fn()
+        .mockResolvedValue({ privacy: CommunityPrivacyEnum.Public, visibility: CommunityVisibilityEnum.All })
     }
 
     mockPeersStats = createMockPeersStatsComponent()
@@ -72,6 +75,7 @@ describe('Updates Handlers', () => {
       friendsDb: mockFriendsDB,
       registry: mockRegistry,
       communityMembers: mockCommunityMembers,
+      communitiesDb: mockCommunitiesDb as any,
       metrics: mockMetrics,
       peersStats: mockPeersStats
     })
@@ -120,7 +124,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -246,7 +250,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -299,7 +303,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -320,10 +324,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({
-            error,
-            message: JSON.stringify(update)
-          })
+          expect.objectContaining({ error: error.message })
         )
       })
     })
@@ -486,7 +487,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -515,7 +516,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ error, message: JSON.stringify(update) })
+          expect.objectContaining({ error: error.message })
         )
 
         expect(emitSpy456).not.toHaveBeenCalled()
@@ -750,7 +751,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -780,7 +781,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ error, message: JSON.stringify(update) })
+          expect.objectContaining({ error: error.message })
         )
 
         expect(emitSpy456).not.toHaveBeenCalled()
@@ -829,7 +830,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -1096,14 +1097,14 @@ describe('Updates Handlers', () => {
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
 
         // Should notify online subscribers except the creator
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: true // 456 is a member
-        })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 789 is not a member
-        })
+        expect(emitSpy456).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: true })
+        )
+        expect(emitSpy789).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
         // Creator should NOT be notified
         expect(emitSpy123).not.toHaveBeenCalled()
       })
@@ -1121,18 +1122,18 @@ describe('Updates Handlers', () => {
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
 
         // Should notify ALL online subscribers with personalized membership info
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: true // 456 is a member
-        })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 789 is not a member
-        })
-        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 123 is not a member
-        })
+        expect(emitSpy456).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: true })
+        )
+        expect(emitSpy789).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
+        expect(emitSpy123).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
       })
 
       it('should notify ALL online users even when no positions are available', async () => {
@@ -1149,49 +1150,336 @@ describe('Updates Handlers', () => {
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
 
         // Should notify ALL online subscribers with personalized membership info
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: true // 456 is a member
+        expect(emitSpy456).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: true })
+        )
+        expect(emitSpy789).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
+        expect(emitSpy123).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
+      })
+
+      describe('and the community is private despite a carried all scope', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              voiceChatId: 'voice-chat-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1', '1,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-image.jpg',
+              creatorAddress: '0x123',
+              notificationScope: 'all'
+            })
+          )
         })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 789 is not a member
+
+        it('should tell the members', () => {
+          expect(emitSpy456).toHaveBeenCalled()
         })
-        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 123 is not a member
+
+        it('should not name the community to a non-member', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
         })
       })
 
-      it('should send fallback updates when community members query fails, excluding the creator', async () => {
-        const update = {
-          communityId: 'community-1',
-          voiceChatId: 'voice-chat-1',
-          status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
-          positions: ['1,1', '1,2'],
-          communityName: 'Test Community',
-          communityImage: 'test-image.jpg',
-          creatorAddress: '0x123'
-        }
+      describe('and the community is public but unlisted', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.Unlisted
+          })
 
-        // Mock community members to throw an error
-        mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
-          throw new Error('Community members query failed')
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              voiceChatId: 'voice-chat-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1', '1,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-image.jpg',
+              creatorAddress: '0x123'
+            })
+          )
         })
 
-        await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
+        it('should tell the members', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
 
-        // Should send fallback updates to all users with isMember: false, except the creator
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false
+        it('should not surface an unlisted community to a non-member', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
         })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false
+      })
+
+      describe('and a room announced to everyone ends after the community turned private', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: '',
+              creatorAddress: '0x123',
+              notificationScope: 'all'
+            })
+          )
         })
-        // Creator should NOT be notified
-        expect(emitSpy123).not.toHaveBeenCalled()
+
+        it('should still reach a non-member so their call UI is cleared', () => {
+          expect(emitSpy789).toHaveBeenCalled()
+        })
+
+        it('should reach the members too', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
+      })
+
+      describe('and a room that was never announced beyond its members ends', () => {
+        beforeEach(async () => {
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: '',
+              creatorAddress: '0x123',
+              notificationScope: 'members'
+            })
+          )
+        })
+
+        it('should emit only the client-safe protocol payload to members', () => {
+          expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
+            communityId: 'community-1',
+            createdAt: expect.any(Number),
+            status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+            endedAt: undefined,
+            positions: [],
+            isMember: true,
+            communityName: '',
+            communityImage: undefined,
+            worlds: [],
+            streamClosed: undefined
+          })
+        })
+
+        it('should not tell a non-member the hidden community had a room', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and an ended update carries a malformed notification scope', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: '',
+              notificationScope: 'everyone'
+            })
+          )
+        })
+
+        it('should resolve the fallback scope and deliver cleanup to a member', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
+
+        it('should not treat the malformed scope as a broad audience', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and an ended update has no notification scope', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Public,
+            visibility: CommunityVisibilityEnum.All
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: ''
+            })
+          )
+        })
+
+        it('should deliver cleanup to a member', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+        })
+
+        it('should not derive a broad audience from current public visibility', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and a broadly announced room ends while the member query is failing', () => {
+        beforeEach(async () => {
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
+            throw new Error('Community members query failed')
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_ENDED,
+              positions: [],
+              worlds: [],
+              communityName: '',
+              creatorAddress: '0x123',
+              notificationScope: 'all'
+            })
+          )
+        })
+
+        it('should still clear the call for everyone rather than losing the cleanup', () => {
+          expect(emitSpy456).toHaveBeenCalled()
+          expect(emitSpy789).toHaveBeenCalled()
+        })
+      })
+
+      describe('and the community no longer exists when a room starts', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue(null)
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1'],
+              communityName: 'Test Community',
+              communityImage: 'test-image.jpg',
+              creatorAddress: '0x123'
+            })
+          )
+        })
+
+        it('should drop the update rather than emitting to anyone', () => {
+          expect(emitSpy456).not.toHaveBeenCalled()
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and membership cannot be resolved for a public listed community', () => {
+        beforeEach(async () => {
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
+            yield [{ communityId: 'community-1', memberAddress: '0x456' }]
+            throw new Error('Community members query failed')
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              voiceChatId: 'voice-chat-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1', '1,2'],
+              communityName: 'Test Community',
+              communityImage: 'test-image.jpg',
+              creatorAddress: '0x123'
+            })
+          )
+        })
+
+        it('should announce the room to a member with the safe non-member fallback', () => {
+          expect(emitSpy456).toHaveBeenCalledWith(
+            'communityVoiceChatUpdate',
+            expect.objectContaining({ isMember: false })
+          )
+        })
+
+        it('should announce the room to a non-member with the safe non-member fallback', () => {
+          expect(emitSpy789).toHaveBeenCalledWith(
+            'communityVoiceChatUpdate',
+            expect.objectContaining({ isMember: false })
+          )
+        })
+      })
+
+      describe('and membership cannot be resolved for a private community', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
+          mockCommunityMembers.getOnlineMembersFromCommunity.mockImplementation(async function* () {
+            throw new Error('Community members query failed')
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['1,1'],
+              communityName: 'Private metadata',
+              creatorAddress: '0x123'
+            })
+          )
+        })
+
+        it('should not emit the private update to a member whose membership could not be confirmed', () => {
+          expect(emitSpy456).not.toHaveBeenCalled()
+        })
+
+        it('should not emit the private update to a non-member', () => {
+          expect(emitSpy789).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and delivery throws after parsing a private update', () => {
+        beforeEach(async () => {
+          mockCommunitiesDb.getCommunity.mockResolvedValue({
+            privacy: CommunityPrivacyEnum.Private,
+            visibility: CommunityVisibilityEnum.All
+          })
+          emitSpy456.mockImplementationOnce(() => {
+            throw new Error('Subscriber delivery failed')
+          })
+
+          await updateHandler.communityVoiceChatUpdateHandler(
+            JSON.stringify({
+              communityId: 'community-1',
+              status: ProtocolCommunityVoiceChatStatus.COMMUNITY_VOICE_CHAT_STARTED,
+              positions: ['secret-position'],
+              communityName: 'Private metadata',
+              communityImage: 'secret-image'
+            })
+          )
+        })
+
+        it('should log the error without the raw update message', () => {
+          expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Subscriber delivery failed'), {
+            error: 'Subscriber delivery failed'
+          })
+        })
       })
     })
 
@@ -1222,18 +1510,18 @@ describe('Updates Handlers', () => {
         await updateHandler.communityVoiceChatUpdateHandler(JSON.stringify(update))
 
         // Should notify ALL online subscribers with personalized membership info
-        expect(emitSpy456).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: true // 456 is a member
-        })
-        expect(emitSpy789).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 789 is not a member
-        })
-        expect(emitSpy123).toHaveBeenCalledWith('communityVoiceChatUpdate', {
-          ...update,
-          isMember: false // 123 is not a member
-        })
+        expect(emitSpy456).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: true })
+        )
+        expect(emitSpy789).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
+        expect(emitSpy123).toHaveBeenCalledWith(
+          'communityVoiceChatUpdate',
+          expect.objectContaining({ communityId: update.communityId, isMember: false })
+        )
       })
     })
 
@@ -1245,7 +1533,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })
@@ -1870,7 +2158,7 @@ describe('Updates Handlers', () => {
 
         expect(errorSpy).toHaveBeenCalledWith(
           expect.stringContaining('Error handling update:'),
-          expect.objectContaining({ message: 'invalid json' })
+          expect.objectContaining({ error: expect.anything() })
         )
       })
     })

@@ -10,8 +10,8 @@ import { AIComplianceError, CommunityNotCompliantError } from '../../src/logic/c
 export async function createLargeThumbnailBuffer(targetSize = 600 * 1024): Promise<Buffer> {
   // Produce a valid PNG larger than the 500KB thumbnail limit but under the 1MB request body
   // cap, so this exercises the thumbnail size validation specifically. We pad a small valid PNG
-  // up to the target size (file-type still detects PNG from the header); this is deterministic
-  // and fast, unlike generating a multi-megabyte random image.
+  // up to the target size (the signature check still identifies PNG from the leading bytes);
+  // this is deterministic and fast, unlike generating a multi-megabyte random image.
   const png = await new Jimp({ width: 16, height: 16 }).getBuffer('image/png')
   if (png.length >= targetSize) {
     return png
@@ -310,14 +310,28 @@ test('Create Community Controller', async function ({ components, stubComponents
             })
 
             describe('and an invalid thumbnail is provided', () => {
-              it('should respond with a 400 status code when trying to upload a file that is not an image', async () => {
-                const response = await makeMultipartRequest(identity, '/v1/communities', {
-                  ...validBody,
-                  thumbnailPath: require('path').join(__dirname, 'fixtures/example.txt')
+              describe('and the file carries no image signature', () => {
+                let response: Response
+                let body: Record<string, unknown>
+
+                beforeEach(async () => {
+                  // Over the 1KB floor on purpose, so the size bound passes and the signature
+                  // check is the one that rejects it.
+                  response = await makeMultipartRequest(identity, '/v1/communities', {
+                    ...validBody,
+                    thumbnailBuffer: Buffer.alloc(2 * 1024, 0x61)
+                  })
+                  body = await response.json()
                 })
-                expect(response.status).toBe(400)
-                expect(await response.json()).toMatchObject({
-                  message: 'Thumbnail must be a valid image file'
+
+                it('should respond with a 400 status code', () => {
+                  expect(response.status).toBe(400)
+                })
+
+                it('should say which signatures are accepted', () => {
+                  expect(body).toMatchObject({
+                    message: 'Thumbnail must start with a supported PNG, JPEG, GIF or WebP signature'
+                  })
                 })
               })
 

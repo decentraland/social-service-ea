@@ -6,6 +6,22 @@ import { getProfileInfo, getProfileUserId } from '../profiles'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/lambdas-client'
 import { BlockedUserWithDate, SubscriptionEventsEmitter } from '../../types'
 
+/**
+ * Builds the response entry for a blocked address whose profile could not be resolved.
+ *
+ * The block is real, so the address is what the client needs; the display fields are simply absent.
+ */
+export function parseAddressToBlockedUser(address: string, blockedAt?: Date): BlockedUserProfile {
+  return {
+    address: address.toLowerCase(),
+    name: '',
+    nameColor: undefined,
+    hasClaimedName: false,
+    profilePictureUrl: '',
+    blockedAt: blockedAt?.getTime()
+  }
+}
+
 export function parseProfileToBlockedUser(profile: Profile, blockedAt?: Date): BlockedUserProfile {
   const { name, nameColor, userId, hasClaimedName, profilePictureUrl } = getProfileInfo(profile)
 

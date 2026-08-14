@@ -113,19 +113,24 @@ export async function createCommunityBansComponent(
         status: ConnectivityStatus.OFFLINE
       })
 
-      const timestamp = Date.now()
-      void communityBroadcaster.broadcast({
-        type: Events.Type.COMMUNITY,
-        subType: Events.SubType.Community.MEMBER_BANNED,
-        key: `${communityId}-${targetAddress}-${timestamp}`,
-        timestamp,
-        metadata: {
-          id: communityId,
-          name: community.name,
-          memberAddress: targetAddress,
-          thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
-        }
-      })
+      // Only someone who was actually in the community is told they were removed from it. Banning a
+      // non-member pre-emptively is allowed, but it is not an event that concerns them.
+      if (doesTargetUserBelongsToCommunity) {
+        void communityBroadcaster.broadcast({
+          type: Events.Type.COMMUNITY,
+          subType: Events.SubType.Community.MEMBER_BANNED,
+          // Stable per banned member, so a repeat ban is deduplicated downstream rather than
+          // delivering another notification.
+          key: `${communityId}-${targetAddress}`,
+          timestamp: Date.now(),
+          metadata: {
+            id: communityId,
+            name: community.name,
+            memberAddress: targetAddress,
+            thumbnailUrl: communityThumbnail.buildThumbnailUrl(communityId)
+          }
+        })
+      }
     },
 
     unbanMember: async (communityId: string, unbannerAddress: EthAddress, targetAddress: EthAddress): Promise<void> => {
