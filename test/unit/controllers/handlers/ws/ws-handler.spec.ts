@@ -7,13 +7,19 @@ import { mockTracing } from '../../../../mocks/components/tracing'
 import { createWsPoolMockedComponent } from '../../../../mocks/components/ws-pool'
 import { IWsPoolComponent } from '../../../../../src/logic/ws-pool'
 
-jest.mock('@dcl/crypto-middleware')
+// Only `verify()` is replaced. `rejectIfSigner` has to stay real: it builds the metadata gate at
+// module load, and the real predicate is exactly what the assertions below check.
+jest.mock('@dcl/crypto-middleware', () => ({
+  ...jest.requireActual('@dcl/crypto-middleware'),
+  verify: jest.fn()
+}))
 
 const WS_AUTH_TIMEOUT_IN_MS = 30000
 
-// `@dcl/crypto-middleware` is auto-mocked above, so its real RequestError class is not
-// constructible here. This builds the same shape the library throws: an Error named
-// 'RequestError' carrying the status code it assigns to the failure (4xx for anything
+// Built by hand rather than with the library's RequestError on purpose: `isExpectedAuthRejection`
+// checks the error structurally so it still holds if a second copy of the middleware ends up in the
+// dependency tree, and these tests should exercise that. The shape is what the library throws: an
+// Error named 'RequestError' carrying the status code it assigns to the failure (4xx for anything
 // wrong with the client's credentials, 503 when the catalyst is unreachable).
 const requestError = (message: string, statusCode: number) =>
   Object.assign(new Error(message), { name: 'RequestError', statusCode })
@@ -581,7 +587,9 @@ describe('ws-handler', () => {
       expect(metadataValidator({ signer: 'decentraland-kernel-scene' })).toBe(false)
     })
 
-    it('should reject the scene signer whatever casing it arrives in', () => {
+    // Refused rather than folded: the metadata reaches the validator exactly as signed, so a
+    // re-cased value must not be normalized into a comparison it would then pass.
+    it('should reject a re-cased scene signer instead of reading it as another signer', () => {
       expect(metadataValidator({ signer: 'Decentraland-Kernel-Scene' })).toBe(false)
     })
 

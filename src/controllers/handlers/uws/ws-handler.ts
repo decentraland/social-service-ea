@@ -9,7 +9,7 @@ import { IUWebSocketEventMap, createUWebSocketTransport } from '../../../utils/U
 import { isAuthenticated, isNotAuthenticated } from '../../../utils/wsUserData'
 import { isErrorWithMessage, isExpectedAuthRejection } from '../../../utils/errors'
 import { WsPoolFullError } from '../../../logic/ws-pool'
-import { isSceneSigner } from '../../../utils/auth-metadata'
+import { rejectSceneSigner } from '../../../utils/auth-metadata'
 
 const textDecoder = new TextDecoder()
 
@@ -118,8 +118,10 @@ export async function registerWsHandler(
       const verifyResult = await verify('get', '/', JSON.parse(authChainMessage), {
         fetcher,
         expiration: authSignatureExpirationInMs,
-        // Scene signers are not accepted on this surface, matching the HTTP routes.
-        metadataValidator: (metadata) => !isSceneSigner(metadata)
+        // Scene signers are not accepted on this surface, matching the HTTP routes. Runs before
+        // signature verification, and the rejection it raises leaves through the catch below as a
+        // 3003 close — there is no weaker check for it to fall back to.
+        metadataValidator: rejectSceneSigner
       })
 
       if (data.timeout) {

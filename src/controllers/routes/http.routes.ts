@@ -51,7 +51,7 @@ import {
 } from '../handlers/http'
 import { wellKnownComponents } from '@dcl/crypto-middleware'
 import { multipartParserWrapper } from '../../utils/multipart'
-import { isSceneSigner } from '../../utils/auth-metadata'
+import { rejectSceneSigner } from '../../utils/auth-metadata'
 import { communitiesErrorsHandler } from '../middlewares/communities-errors'
 import { reportUnhandledErrors } from '../middlewares/report-unhandled-errors'
 import {
@@ -82,7 +82,9 @@ export async function setupHttpRoutes(context: GlobalContext): Promise<Router<Gl
         error: err.message,
         message: 'This endpoint requires a signed fetch request. See ADR-44.'
       }),
-      metadataValidator: (metadata) => !isSceneSigner(metadata) // prevent requests from scenes
+      // Refuses a scene-signed chain, and a re-spelled `signer` rather than folding it: 6.x hands
+      // the handler exactly the metadata bytes the client signed, so nothing may be rewritten here.
+      metadataValidator: rejectSceneSigner
     })
 
   router.use(errorHandler)

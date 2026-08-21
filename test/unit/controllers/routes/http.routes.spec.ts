@@ -6,7 +6,10 @@ import { communitiesErrorsHandler } from '../../../../src/controllers/middleware
 import { reportUnhandledErrors } from '../../../../src/controllers/middlewares/report-unhandled-errors'
 import { GlobalContext } from '../../../../src/types'
 
+// Only the middleware factories are replaced. `rejectIfSigner` has to stay real: it builds the
+// metadata gate at module load, and the real predicate is exactly what the assertions below check.
 jest.mock('@dcl/crypto-middleware', () => ({
+  ...jest.requireActual('@dcl/crypto-middleware'),
   wellKnownComponents: jest.fn(() => async () => ({ status: 200 })),
   bearerTokenMiddleware: jest.fn(() => async () => ({ status: 200 }))
 }))
@@ -54,6 +57,8 @@ describe('when setting up the http routes', () => {
     })
   })
 
+  // The metadata is no longer folded anywhere: it reaches the validator exactly as signed. A
+  // re-cased value is therefore refused rather than normalized, so it cannot read as "not a scene".
   describe('and the scene signer arrives with different casing', () => {
     let results: boolean[]
     let rejectedByEveryRoute: boolean[]

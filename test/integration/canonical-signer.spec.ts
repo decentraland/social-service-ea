@@ -4,7 +4,8 @@ import { createAuthHeaders, createTestIdentity, Identity, makeAuthenticatedReque
 
 const PATH = '/v1/mutes'
 const SIGNED_METADATA = { signer: 'decentraland-kernel-scene' }
-const DELIVERED_METADATA = JSON.stringify({ signer: 'Decentraland-Kernel-Scene' })
+const RECASED_VALUE = JSON.stringify({ signer: 'Decentraland-Kernel-Scene' })
+const RECASED_KEY = JSON.stringify({ Signer: 'decentraland-kernel-scene' })
 
 test('Canonical Signer', function ({ components }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -15,40 +16,102 @@ test('Canonical Signer', function ({ components }) {
     identity = await createTestIdentity()
   })
 
-  describe('when the canonical signer was signed but a mixed-case spelling is delivered', () => {
-    it('should reject the request at the auth-chain layer', async () => {
-      // The canonical payload is lowercased before signing, so a metadata value differing only in
-      // case shares the signature. Overwriting the header after signing leaves the request genuinely
-      // authentic while reading differently to any case-sensitive comparison downstream. This is the
-      // attack, not a mock: nothing here weakens the signature.
-      //
-      // `isSceneSigner` already normalizes casing, so this service was never bypassable here — it
-      // rejected the same request one layer later with `Invalid metadata content`. The assertion
-      // pins the rejection to the auth-chain layer, which runs before signature verification and
-      // before any consumer metadataValidator.
-      const headers = createAuthHeaders('GET', PATH, SIGNED_METADATA, identity)
-      headers[AUTH_METADATA_HEADER] = DELIVERED_METADATA
+  describe('when the canonical signer was signed but a re-cased value is delivered', () => {
+    let headers: Record<string, string>
 
+    beforeEach(async () => {
+      // Nothing here weakens the signature: the headers are genuinely signed, and only the
+      // delivered metadata is rewritten afterwards. Under the current payload format that rewrite
+      // no longer keeps the signature valid, but the metadata gate answers first — it runs before
+      // signature verification — and refuses the non-canonical value outright rather than folding
+      // it into a comparison it would then pass.
+      headers = createAuthHeaders('GET', PATH, SIGNED_METADATA, identity)
+      headers[AUTH_METADATA_HEADER] = RECASED_VALUE
+    })
+
+    it('should refuse the request with a 400 from the metadata gate', async () => {
       const response = await components.localHttpFetch.fetch(PATH, { method: 'GET', headers })
       const body = await response.json()
 
       expect(response.status).toBe(400)
-      // The raw metadata is echoed back truncated at 64 characters, so match the prefix.
-      expect(body.error).toMatch(/^Invalid chain metadata: /)
+      // The metadata is echoed back truncated at 64 characters, so match the prefix.
+      expect(body.error).toMatch(/^Invalid metadata content: /)
+    })
+  })
+
+  describe('when the canonical signer was signed but the key is delivered under another spelling', () => {
+    let headers: Record<string, string>
+
+    beforeEach(async () => {
+      // The gate reads `signer` and nothing else, so this metadata does not claim to be a scene and
+      // passes it. What refuses the request is the signature: the metadata bytes are part of the
+      // signed payload now, so `{"Signer":...}` no longer shares a signature with `{"signer":...}`
+      // and cannot read as absent while staying authentic.
+      headers = createAuthHeaders('GET', PATH, SIGNED_METADATA, identity)
+      headers[AUTH_METADATA_HEADER] = RECASED_KEY
+    })
+
+    it('should refuse the request with a 401 because the key is covered by the signature', async () => {
+      const response = await components.localHttpFetch.fetch(PATH, { method: 'GET', headers })
+      const body = await response.json()
+
+      expect(response.status).toBe(401)
+      expect(body.error).toMatch(/^Invalid signature/)
+    })
+  })
+
+  describe('when a metadata field the service does not gate on is re-cased after signing', () => {
+    let headers: Record<string, string>
+
+    beforeEach(async () => {
+      // Consumer-defined fields are bound too, not just the reserved ones. `sceneId` is not read
+      // anywhere in this service, and re-casing it still invalidates the request.
+      headers = createAuthHeaders('GET', PATH, { sceneId: 'bafkreiabcdef' }, identity)
+      headers[AUTH_METADATA_HEADER] = JSON.stringify({ sceneId: 'BAFKREIABCDEF' })
+    })
+
+    it('should refuse the request with a 401', async () => {
+      const response = await components.localHttpFetch.fetch(PATH, { method: 'GET', headers })
+      const body = await response.json()
+
+      expect(response.status).toBe(401)
+      expect(body.error).toMatch(/^Invalid signature/)
     })
   })
 
   describe('when the canonical signer is delivered exactly as signed', () => {
-    it('should reject it as a scene request', async () => {
-      const headers = createAuthHeaders('GET', PATH, SIGNED_METADATA, identity)
+    let headers: Record<string, string>
 
+    beforeEach(async () => {
+      headers = createAuthHeaders('GET', PATH, SIGNED_METADATA, identity)
+    })
+
+    it('should refuse the request as a scene request', async () => {
       const response = await components.localHttpFetch.fetch(PATH, { method: 'GET', headers })
       const body = await response.json()
 
-      // The canonical spelling is already lowercase, so it passes the auth-chain guard and is
-      // rejected one layer later by the route's own `!isSceneSigner(metadata)` validator.
+      // Authentic, and still not welcome on this surface: the route's metadata gate turns down any
+      // chain signed on a scene's behalf.
       expect(response.status).toBe(400)
       expect(body.error).toMatch(/^Invalid metadata content: /)
+    })
+  })
+
+  describe('when a signed metadata field carries upper case and is delivered untouched', () => {
+    let headers: Record<string, string>
+
+    beforeEach(async () => {
+      // The signer and the verifier build the same bytes, so mixed-case metadata is ordinary
+      // traffic — it is only a rewrite between signing and delivery that fails.
+      headers = createAuthHeaders('GET', PATH, { sceneId: 'BafkreiAbcDef' }, identity)
+    })
+
+    it('should authenticate normally and reach the handler', async () => {
+      const response = await components.localHttpFetch.fetch(PATH, { method: 'GET', headers })
+      const body = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(body.data.results).toEqual([])
     })
   })
 
@@ -57,7 +120,7 @@ test('Canonical Signer', function ({ components }) {
       const response = await makeRequest(identity, PATH)
       const body = await response.json()
 
-      // Ordinary user traffic must be untouched by the guard: this gets all the way to the handler,
+      // Ordinary user traffic must be untouched by the gate: this gets all the way to the handler,
       // which reports no mutes for this freshly generated identity.
       expect(response.status).toBe(200)
       expect(body.data.results).toEqual([])
