@@ -593,6 +593,19 @@ describe('ws-handler', () => {
       expect(metadataValidator({ signer: 'Decentraland-Kernel-Scene' })).toBe(false)
     })
 
+    // The key is re-spelled here, not the value, and that is a different problem: a re-cased value
+    // is refused by the check above, but a re-spelled key presented no `signer` at all, so the gate
+    // read it as absent and answered "allowed" for metadata that names the signer it exists to
+    // refuse. Nor is the signature a backstop — the key is part of the signed payload, so a
+    // scene-driven client signs it under this spelling and the chain verifies cleanly.
+    //
+    // This handshake gates every RPC service on the socket, so the gate answering "allowed" is what
+    // stands between a scene-signed connection and all of them. @dcl/crypto-middleware 6.3.0 treats
+    // a key that case-folds to `signer` without being spelled exactly that as a rejection.
+    it('should reject a scene signer delivered under a re-spelled key rather than reading it as absent', () => {
+      expect(metadataValidator({ Signer: 'decentraland-kernel-scene' })).toBe(false)
+    })
+
     it('should accept the empty metadata the explorer client sends on this socket', () => {
       expect(metadataValidator({})).toBe(true)
     })
