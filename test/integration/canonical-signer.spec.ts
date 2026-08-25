@@ -6,6 +6,7 @@ const PATH = '/v1/mutes'
 const SIGNED_METADATA = { signer: 'decentraland-kernel-scene' }
 const RECASED_VALUE = JSON.stringify({ signer: 'Decentraland-Kernel-Scene' })
 const RECASED_KEY = JSON.stringify({ Signer: 'decentraland-kernel-scene' })
+const RESPELLED_KEY_METADATA = { Signer: 'decentraland-kernel-scene' }
 
 test('Canonical Signer', function ({ components }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -43,20 +44,48 @@ test('Canonical Signer', function ({ components }) {
     let headers: Record<string, string>
 
     beforeEach(async () => {
-      // The gate reads `signer` and nothing else, so this metadata does not claim to be a scene and
-      // passes it. What refuses the request is the signature: the metadata bytes are part of the
-      // signed payload now, so `{"Signer":...}` no longer shares a signature with `{"signer":...}`
-      // and cannot read as absent while staying authentic.
+      // Two layers refuse this now, and the earlier one wins. The signature would refuse it a step
+      // later — the metadata bytes are part of the signed payload, so `{"Signer":...}` no longer
+      // shares a signature with `{"signer":...}` — but from @dcl/crypto-middleware 6.3.0 the
+      // metadata gate answers first, and it runs before signature verification. So this is a 400
+      // from the gate rather than the 401 the signature produces, and it costs no catalyst
+      // round-trip.
       headers = createAuthHeaders('GET', PATH, SIGNED_METADATA, identity)
       headers[AUTH_METADATA_HEADER] = RECASED_KEY
     })
 
-    it('should refuse the request with a 401 because the key is covered by the signature', async () => {
+    it('should refuse the request with a 400 from the metadata gate, before the signature is checked', async () => {
       const response = await components.localHttpFetch.fetch(PATH, { method: 'GET', headers })
       const body = await response.json()
 
-      expect(response.status).toBe(401)
-      expect(body.error).toMatch(/^Invalid signature/)
+      expect(response.status).toBe(400)
+      expect(body.error).toMatch(/^Invalid metadata content: /)
+    })
+  })
+
+  describe('and the re-spelled key is itself covered by the signature', () => {
+    let headers: Record<string, string>
+
+    beforeEach(async () => {
+      // The case above leans on the signature to refuse the request, because the delivered metadata
+      // was rewritten after signing. Nothing is rewritten here: `Signer` is what was signed, so the
+      // chain is authentic and the signature has nothing to object to. A scene-driven client only
+      // has to spell the key that way when it signs, which costs it nothing.
+      //
+      // That leaves the metadata gate as the only thing standing, and before
+      // @dcl/crypto-middleware 6.3.0 it read the exact key, found no `signer`, and answered
+      // "allowed" for metadata naming the very signer it exists to refuse. 6.3.0 treats a key that
+      // case-folds to `signer` without being spelled exactly that as a rejection rather than an
+      // absence — refused outright, with nothing folded and no value rewritten.
+      headers = createAuthHeaders('GET', PATH, RESPELLED_KEY_METADATA, identity)
+    })
+
+    it('should refuse the request with a 400 from the metadata gate', async () => {
+      const response = await components.localHttpFetch.fetch(PATH, { method: 'GET', headers })
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body.error).toMatch(/^Invalid metadata content: /)
     })
   })
 
