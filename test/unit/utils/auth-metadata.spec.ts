@@ -94,12 +94,15 @@ describe('rejectSceneSigner', () => {
       accepted = rejectSceneSigner({ Signer: SCENE_SIGNER })
     })
 
-    // The gate reads `signer` and nothing else, so this metadata does not claim to be a scene and
-    // the predicate has no reason to refuse it. What makes that safe is the payload format rather
-    // than the gate: the key is inside the signature now, so re-spelling it after signing fails
-    // verification outright — see the integration coverage in `canonical-signer.spec.ts`.
-    it('should accept the request, leaving the key spelling to the signature', () => {
-      expect(accepted).toBe(true)
+    // Refused by the gate rather than left to the signature. Re-spelling the key costs a client
+    // nothing as long as it signs it that way, so the chain verifies cleanly and the signature has
+    // nothing to object to — the gate is the only thing standing, and it has to answer. From
+    // @dcl/crypto-middleware 6.3.0 a key that case-folds to `signer` without being spelled exactly
+    // that is a rejection rather than an absence, so metadata naming the very signer this gate
+    // exists to refuse no longer reads as "no signer here". Nothing is folded and no value is
+    // rewritten — see the integration coverage in `canonical-signer.spec.ts`.
+    it('should reject the request instead of reading the signer as absent', () => {
+      expect(accepted).toBe(false)
     })
   })
 
