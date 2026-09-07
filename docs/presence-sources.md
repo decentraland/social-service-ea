@@ -46,7 +46,9 @@ cached statuses of a whole batch are read with a **single** `MGET` (`redis.clien
 positional alignment with the requested keys — `redis.mGet` drops nulls and cannot be used here)
 before anything is published. Only the addresses whose status actually changed are then written and
 published. Writes stay one `SET` per flipped peer because each carries its own TTL
-(`STATUS_CACHE_TTL_IN_SECONDS`).
+(`STATUS_CACHE_TTL_IN_SECONDS`), but they are issued in chunks of `STATUS_PUBLISH_CHUNK_SIZE` (100)
+rather than one `Promise.all` over the whole batch: a publisher-start snapshot flips every peer of a
+server at once and each flip costs one `SET` plus two `PUBLISH`.
 
 ## `PRESENCE_SOURCE`
 
@@ -54,14 +56,32 @@ published. Writes stay one `SET` per flipped peer because each carries its own T
 configuration change behaves exactly like before this work package. An unrecognised value falls back
 to the default.
 
-| mode | NATS subscriptions | synchronizer writes | `getConnectedPeers()` serves |
-|---|---|---|---|
-| `archipelago` (default) | the five `peer.*` subjects | `connected-peers` | `connected-peers` ∪ `world-connected-peers` |
-| `pulse` | `engine.parcel_changes` only | `connected-peers-pulse` | `connected-peers-pulse` |
-| `both` | the five `peer.*` subjects **and** `engine.parcel_changes` | `connected-peers` **and** `connected-peers-pulse` | `connected-peers` ∪ `world-connected-peers` |
+| mode | NATS subscriptions | synchronizer writes | status namespace / publishes | `getConnectedPeers()` serves |
+|---|---|---|---|---|
+| `archipelago` (default) | the five `peer.*` subjects | `connected-peers` | `peer-status:` → publishes | `connected-peers` ∪ `world-connected-peers` |
+| `pulse` | `engine.parcel_changes` only | `connected-peers-pulse` | `peer-status:` → publishes | `connected-peers-pulse` |
+| `both` | the five `peer.*` subjects **and** `engine.parcel_changes` | `connected-peers` **and** `connected-peers-pulse` | archipelago: `peer-status:` → publishes; pulse: `peer-status-pulse:` → **shadow, publishes nothing** | `connected-peers` ∪ `world-connected-peers` |
 
-`both` is the dual-source window: both feeds run and both caches are filled, but reads still come
-from the old set, so the new source can be observed under production traffic without serving it.
+### `both` is a shadow window
+
+In `both`, **only the archipelago handlers publish**. The `engine.parcel_changes` handler decodes
+every batch, derives its status events and dedupes them exactly as in `pulse` mode, but against its
+own key namespace (`peer-status-pulse:<address>`, same `STATUS_CACHE_TTL_IN_SECONDS`), and it never
+writes to `FRIEND_STATUS_UPDATES_CHANNEL` or `COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL`. So in
+`both` neither the read path (`getConnectedPeers()` serves the old set) nor the push path is fed by
+the source under evaluation: a peer that Pulse has evicted while archipelago still heartbeats it —
+exactly the disagreement the window exists to measure — cannot produce a spurious offline blip for
+a client.
+
+The two namespaces are separate for a second reason: they are what makes the flip counters
+meaningful. If both feeds deduped against `peer-status:`, whichever feed observed a transition first
+would record the flip and the other would see `cached === status` and record none, so `pulseFlips`
+would read ≈ 0 for a *perfectly healthy* Pulse — the same 0 it reads when the subscription is dead.
+With one namespace per feed, `archipelagoFlips` and `pulseFlips` each measure their own feed's flip
+volume and can be compared.
+
+In `pulse` mode the Pulse feed is the only feed: it owns the live `peer-status:` namespace and it
+publishes.
 
 ### The 60 s diff logger
 
@@ -70,14 +90,28 @@ While `PRESENCE_SOURCE=both`, `peer-tracking` logs one `Presence source diff` li
 
 | field | meaning |
 |---|---|
-| `archipelagoPeers` / `pulsePeers` | size of each cached peer set |
+| `archipelagoPeers` / `pulsePeers` | size of each cached peer set (`connected-peers` vs `connected-peers-pulse`) |
 | `onlyInArchipelago` / `onlyInPulse` | one half of the symmetric difference each |
 | `symmetricDifference` | their sum |
-| `archipelagoFlips` / `pulseFlips` | status flips published by each feed since the previous line |
+| `archipelagoFlips` / `pulseFlips` | status flips each feed recorded in its own namespace since the previous line |
 
-The flip counters are per window: they reset every time a line is logged. A healthy window has a
-small, stable symmetric difference (peers in flight between the two 5 s polls) and comparable flip
-counts.
+Both address sets are lowercased before the symmetric difference is taken: `archipelago-stats`
+returns `peer.id` verbatim while `pulse-stats` normalises, so one EIP-55 wallet would otherwise be
+counted in `onlyInArchipelago` *and* in `onlyInPulse` and read as a divergence that is pure casing.
+
+The flip counters are per window: they reset every time a line is logged. `pulseFlips` counts the
+transitions the shadow feed derived, not events published (in `both` the shadow feed publishes
+nothing). A healthy window has a small, stable symmetric difference (peers in flight between the two
+5 s polls) and comparable flip counts.
+
+### Known exposure: a dropped OFFLINE (follow-up)
+
+`peer-status:` is written only by the event path. If a batch is lost — an `MGET` rejection, a decode
+error, a NATS gap — the peer stays cached `ONLINE` until `STATUS_CACHE_TTL_IN_SECONDS` (1 h) expires,
+because Pulse never repeats an exit entry and the 5 s `/peers?all=true` poll refreshes the peer
+*sets* but never the status cache. This is the same exposure as today's `peer.*.disconnect` path, so
+it is recorded rather than fixed here; reconciling the status cache from the 5 s poll is a follow-up
+to take if metrics show stuck-`ONLINE` peers.
 
 ## Staged deletion of the world-peer bookkeeping
 
@@ -100,12 +134,13 @@ staged-deletion step into a repo-wide optional-component refactor.
 | `ARCHIPELAGO_STATS_URL` | — | Stays until `PRESENCE_SOURCE` is removed. Required when `PRESENCE_SOURCE` is `archipelago` or `both`. |
 | `PEER_SYNC_INTERVAL_MS` | `5000` | Reconciliation poll interval, both sources. |
 | `PEERS_SYNC_CACHE_TTL_MS` | `10000` | TTL of the reconciled peer sets. |
-| `STATUS_CACHE_TTL_IN_SECONDS` | `3600` | TTL of `peer-status:<address>`, the per-peer dedupe cache. |
+| `STATUS_CACHE_TTL_IN_SECONDS` | `3600` | TTL of `peer-status:<address>` and of the shadow `peer-status-pulse:<address>`, the per-peer dedupe caches. |
 
 ## Rollout
 
 1. Deploy with `PRESENCE_SOURCE` unset (`archipelago`) — no behaviour change.
-2. Set `PULSE_URL`, switch to `both`, watch `Presence source diff`.
+2. Set `PULSE_URL` (required from here on: startup fails without it in `both`/`pulse`), switch to
+   `both`, watch `Presence source diff`. Nothing is served or published from Pulse in this step.
 3. Switch to `pulse` once the symmetric difference is stable and small.
 4. Rollback at any point is a single environment variable.
 5. (Step 8 of the programme rollout) delete `worlds-stats`, `archipelago-stats`,
