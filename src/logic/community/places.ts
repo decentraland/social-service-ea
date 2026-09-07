@@ -162,13 +162,15 @@ export async function createCommunityPlacesComponent(
 
     removePlace: async (communityId: string, userAddress: EthAddress, placeId: string): Promise<void> => {
       await validateCommunityExists(communityId)
+
+      // Authorize the caller before reading whether the place is attached. The outcomes differ — 404
+      // for a place the community does not hold, 401 for one it does — so checking existence first
+      // let a caller with no standing walk the place list of a private community, the same list
+      // getPlaces refuses to non-members.
+      await communityRoles.validatePermissionToRemovePlacesFromCommunity(communityId, userAddress)
+
       await validatePlaceExists(communityId, placeId)
       await validateOwnership([placeId], userAddress)
-      const memberRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-
-      if (memberRole !== CommunityRole.Owner) {
-        await communityRoles.validatePermissionToRemovePlacesFromCommunity(communityId, userAddress)
-      }
 
       await communitiesDb.removeCommunityPlace(communityId, placeId)
     },

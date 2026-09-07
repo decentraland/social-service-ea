@@ -584,7 +584,6 @@ describe('Community Places Component', () => {
       placeExists = false
       mockCommunitiesDB.communityExists.mockResolvedValue(false)
       mockCommunitiesDB.communityPlaceExists.mockResolvedValue(placeExists)
-      mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.Member)
       mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity.mockResolvedValue()
       mockCommunitiesDB.removeCommunityPlace.mockResolvedValue()
       // Mock place ownership validation
@@ -609,45 +608,28 @@ describe('Community Places Component', () => {
       })
 
       describe('and the place exists', () => {
-              beforeEach(() => {
-        placeExists = true
-        mockCommunitiesDB.communityPlaceExists.mockResolvedValueOnce(placeExists)
-      })
-
-      describe('and the user is the community owner', () => {
         beforeEach(() => {
-          mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Owner)
+          placeExists = true
+          mockCommunitiesDB.communityPlaceExists.mockResolvedValueOnce(placeExists)
         })
 
-        it('should remove the place bypassing permission validation for community owners', async () => {
+        it('should validate the remove_places permission before removing the place', async () => {
           await communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)
 
           expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-          expect(mockCommunitiesDB.communityPlaceExists).toHaveBeenCalledWith(communityId, placeId)
-          expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, mockUserAddress)
-          expect(mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity).not.toHaveBeenCalled()
-          expect(mockCommunitiesDB.removeCommunityPlace).toHaveBeenCalledWith(communityId, placeId)
-        })
-      })
-
-      describe('and the user is not the community owner', () => {
-        beforeEach(() => {
-          mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Moderator)
-        })
-
-        it('should validate permissions before removing the place for non-owners', async () => {
-          await communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)
-
-          expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
-          expect(mockCommunitiesDB.communityPlaceExists).toHaveBeenCalledWith(communityId, placeId)
-          expect(mockCommunitiesDB.getCommunityMemberRole).toHaveBeenCalledWith(communityId, mockUserAddress)
           expect(mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity).toHaveBeenCalledWith(
             communityId,
             mockUserAddress
           )
+          expect(mockCommunitiesDB.communityPlaceExists).toHaveBeenCalledWith(communityId, placeId)
           expect(mockCommunitiesDB.removeCommunityPlace).toHaveBeenCalledWith(communityId, placeId)
         })
-      })
+
+        it('should not look the caller role up itself, since the permission validator already reads it', async () => {
+          await communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)
+
+          expect(mockCommunitiesDB.getCommunityMemberRole).not.toHaveBeenCalled()
+        })
       })
 
       describe('and the place does not exist', () => {
@@ -662,8 +644,32 @@ describe('Community Places Component', () => {
           )
 
           expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+          expect(mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity).toHaveBeenCalledWith(
+            communityId,
+            mockUserAddress
+          )
           expect(mockCommunitiesDB.communityPlaceExists).toHaveBeenCalledWith(communityId, placeId)
-          expect(mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.removeCommunityPlace).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the caller does not have permission to remove places', () => {
+        beforeEach(() => {
+          mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity.mockRejectedValue(
+            new NotAuthorizedError(
+              `The user ${mockUserAddress} doesn't have permission to remove places from the community`
+            )
+          )
+        })
+
+        it('should throw NotAuthorizedError without reading whether the place belongs to the community', async () => {
+          await expect(communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)).rejects.toThrow(
+            NotAuthorizedError
+          )
+
+          // Never read for an unauthorized caller: the 404/401 split is what leaked the place list.
+          expect(mockCommunitiesDB.communityPlaceExists).not.toHaveBeenCalled()
+          expect(mockPlacesApi.getDestinations).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.removeCommunityPlace).not.toHaveBeenCalled()
         })
       })

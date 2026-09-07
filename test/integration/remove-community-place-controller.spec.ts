@@ -132,6 +132,23 @@ test('Remove Community Place Controller', function ({ components, spyComponents,
               message: `The user ${userAddress} doesn't have permission to remove places from the community`
             })
           })
+
+          describe('and the place is not in the community', () => {
+            let absentPlaceId: string
+
+            beforeEach(async () => {
+              absentPlaceId = randomUUID()
+            })
+
+            it('should respond with the same 401 status code an attached place gets, so the answer discloses no place list', async () => {
+              const response = await makeRequest(
+                identity,
+                `/v1/communities/${communityId}/places/${absentPlaceId}`,
+                'DELETE'
+              )
+              expect(response.status).toBe(401)
+            })
+          })
         })
 
         describe('and the user is a member', () => {
