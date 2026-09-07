@@ -18,8 +18,9 @@ export const WORLD_PEERS_CACHE_KEY = 'world-connected-peers'
  *
  * - `archipelago`: the five `peer.*` NATS subjects + archipelago-stats `GET /peers` (today).
  * - `pulse`: one `engine.parcel_changes` subscription + Pulse `GET /peers?all=true`.
- * - `both`: the dual-source window — both feeds run, both caches are filled, reads still come from
- *   the archipelago set and the difference between the two is logged every minute.
+ * - `both`: the dual-source window — both feeds run and both caches are filled, but the Pulse feed
+ *   is a shadow (own `peer-status-pulse:` namespace, own flip counter, publishes nothing); reads
+ *   still come from the archipelago set and the difference between the two is logged every minute.
  */
 export enum PresenceSource {
   ARCHIPELAGO = 'archipelago',

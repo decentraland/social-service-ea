@@ -9,6 +9,7 @@ import {
   PARCEL_CHANGES_SUBJECT,
   PEER_STATUS_HANDLERS,
   PEER_STATUS_KEY_PREFIX,
+  PEER_STATUS_KEY_PREFIX_PULSE,
   PeerStatusHandlerEvent,
   PRESENCE_DIFF_INTERVAL_MS
 } from '../../../src/adapters/peer-tracking'
@@ -107,6 +108,15 @@ describe('PeerTrackingComponent', () => {
   function getParcelChangesHandler() {
     const call = mockNats.subscribe.mock.calls.find(([subject]) => subject === PARCEL_CHANGES_SUBJECT)
     return call?.[1] as (err: Error | null, msg: NatsMsg) => Promise<void>
+  }
+
+  function getLegacyHandler(pattern: string) {
+    const call = mockNats.subscribe.mock.calls.find(([subject]) => subject === pattern)
+    return call?.[1] as (err: Error | null, msg: NatsMsg) => Promise<void>
+  }
+
+  function cachedKeysWithPrefix(prefix: string) {
+    return [...redisStore.keys()].filter((key) => key.startsWith(prefix))
   }
 
   beforeEach(() => {
@@ -404,6 +414,60 @@ describe('PeerTrackingComponent', () => {
         expect(mockNats.subscribe).toHaveBeenCalledWith(handler.pattern, expect.any(Function))
       })
     })
+
+    describe('and a Pulse batch arrives', () => {
+      // A1: `both` is a shadow window. The feed under evaluation must not reach the channels
+      // clients actually watch, and must not share the live dedupe namespace.
+      it('should publish nothing to the live channels', async () => {
+        const handler = getParcelChangesHandler()
+
+        await handler(null, parcelChangesMessage('01-snapshot.bin'))
+
+        expect(mockPubSub.publishInChannel).not.toHaveBeenCalled()
+      })
+
+      it('should keep its status map under its own key namespace, never the live one', async () => {
+        const handler = getParcelChangesHandler()
+
+        await handler(null, parcelChangesMessage('01-snapshot.bin'))
+
+        expect(cachedKeysWithPrefix(PEER_STATUS_KEY_PREFIX_PULSE)).toHaveLength(5)
+        expect(cachedKeysWithPrefix(PEER_STATUS_KEY_PREFIX)).toEqual([])
+        expect(mockRedis.client.mGet).toHaveBeenCalledWith([
+          `${PEER_STATUS_KEY_PREFIX_PULSE}0x0000000000000000000000000000000000000001`,
+          `${PEER_STATUS_KEY_PREFIX_PULSE}0x0000000000000000000000000000000000000002`,
+          `${PEER_STATUS_KEY_PREFIX_PULSE}0x0000000000000000000000000000000000000003`,
+          `${PEER_STATUS_KEY_PREFIX_PULSE}0x0000000000000000000000000000000000000004`,
+          `${PEER_STATUS_KEY_PREFIX_PULSE}0x0000000000000000000000000000000000000005`
+        ])
+      })
+
+      it('should stay idempotent inside its own namespace', async () => {
+        const handler = getParcelChangesHandler()
+
+        await handler(null, parcelChangesMessage('01-snapshot.bin'))
+        mockRedis.put.mockClear()
+
+        await handler(null, parcelChangesMessage('01-snapshot.bin'))
+
+        expect(mockRedis.put).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a legacy peer event arrives', () => {
+      it('should still publish it, from the live namespace', async () => {
+        const handler = getLegacyHandler('peer.*.heartbeat')
+
+        await handler(null, { subject: 'peer.0x123.heartbeat', data: undefined as any })
+
+        expect(mockPubSub.publishInChannel).toHaveBeenCalledWith(FRIEND_STATUS_UPDATES_CHANNEL, {
+          address: '0x123',
+          status: ConnectivityStatus.ONLINE
+        })
+        expect(cachedKeysWithPrefix(PEER_STATUS_KEY_PREFIX)).toEqual([`${PEER_STATUS_KEY_PREFIX}0x123`])
+        expect(cachedKeysWithPrefix(PEER_STATUS_KEY_PREFIX_PULSE)).toEqual([])
+      })
+    })
   })
 
   describe('when PRESENCE_SOURCE is both and the diff logger ticks', () => {
@@ -444,6 +508,29 @@ describe('PeerTrackingComponent', () => {
         pulseFlips: 1
       })
       expect(JSON.stringify(logged![1])).not.toContain('0x')
+    })
+
+    it('should count each feed independently when both observe the same wallet', async () => {
+      mockRedis.get.mockResolvedValue([] as any)
+
+      const parcelChangesHandler = getParcelChangesHandler()
+      const heartbeatHandler = getLegacyHandler('peer.*.heartbeat')
+
+      // W1 is one of the five ONLINE entries of 01-snapshot.bin, and the same wallet heartbeats on
+      // the legacy feed: a shared dedupe cache would let whichever feed arrives first swallow the
+      // other's flip.
+      await heartbeatHandler(null, {
+        subject: 'peer.0x0000000000000000000000000000000000000001.heartbeat',
+        data: undefined as any
+      })
+      await parcelChangesHandler(null, parcelChangesMessage('01-snapshot.bin'))
+
+      await jest.advanceTimersByTimeAsync(PRESENCE_DIFF_INTERVAL_MS)
+
+      const logged = (mockLogs.getLogger('peer-tracking-component').info as jest.Mock).mock.calls.find(
+        ([message]) => message === 'Presence source diff'
+      )
+      expect(logged![1]).toEqual(expect.objectContaining({ archipelagoFlips: 1, pulseFlips: 5 }))
     })
 
     it('should reset the per-window flip counters after every line', async () => {

@@ -47,6 +47,13 @@ export const PARCEL_CHANGES_SUBJECT = 'engine.parcel_changes'
 
 export const PEER_STATUS_KEY_PREFIX = 'peer-status:'
 
+/**
+ * Shadow namespace of the Pulse feed while `PRESENCE_SOURCE=both` (A1), with the same TTL as the
+ * live one. Keeping the two dedupe caches apart is what makes `archipelagoFlips` and `pulseFlips`
+ * measure each feed's own flip volume instead of which feed won the race.
+ */
+export const PEER_STATUS_KEY_PREFIX_PULSE = 'peer-status-pulse:'
+
 export const PRESENCE_DIFF_INTERVAL_MS = 60_000
 
 export type PeerStatusChange = {
@@ -55,6 +62,19 @@ export type PeerStatusChange = {
 }
 
 type PresenceFeed = 'archipelago' | 'pulse'
+
+/**
+ * How one feed writes. `keyPrefix` is the dedupe namespace it owns and `publishes` says whether its
+ * transitions reach the live friend/community channels. A1: in `both` the Pulse feed is a shadow —
+ * it derives, dedupes and counts under `peer-status-pulse:` but publishes nothing, so the source
+ * still under evaluation cannot put an offline blip in front of a client. In `pulse` it is the only
+ * feed and owns the live `peer-status:` namespace.
+ */
+type PresenceFeedConfig = {
+  feed: PresenceFeed
+  keyPrefix: string
+  publishes: boolean
+}
 
 /**
  * C5, the whole rule: one status event per `ParcelChange`, `parcel` present means the peer stands
@@ -90,10 +110,20 @@ export async function createPeerTrackingComponent({
   let diffIntervalId: NodeJS.Timeout | null = null
   const flipsInWindow: Record<PresenceFeed, number> = { archipelago: 0, pulse: 0 }
 
-  async function readCachedStatuses(addresses: string[]): Promise<(ConnectivityStatus | null)[]> {
+  const archipelagoFeed: PresenceFeedConfig = {
+    feed: 'archipelago',
+    keyPrefix: PEER_STATUS_KEY_PREFIX,
+    publishes: true
+  }
+  const pulseFeed: PresenceFeedConfig =
+    presenceSource === PresenceSource.BOTH
+      ? { feed: 'pulse', keyPrefix: PEER_STATUS_KEY_PREFIX_PULSE, publishes: false }
+      : { feed: 'pulse', keyPrefix: PEER_STATUS_KEY_PREFIX, publishes: true }
+
+  async function readCachedStatuses(keyPrefix: string, addresses: string[]): Promise<(ConnectivityStatus | null)[]> {
     // `redis.mGet` drops nulls, which would break the alignment with `addresses`, so the client's
     // MGET is used directly: one round-trip per batch, one value per requested key.
-    const values = await redis.client.mGet(addresses.map((address) => PEER_STATUS_KEY_PREFIX + address))
+    const values = await redis.client.mGet(addresses.map((address) => keyPrefix + address))
 
     return values.map((value) => {
       if (value === null || value === undefined) {
@@ -109,10 +139,16 @@ export async function createPeerTrackingComponent({
     })
   }
 
-  async function publishStatusChange({ address, status }: PeerStatusChange): Promise<void> {
-    await redis.put(PEER_STATUS_KEY_PREFIX + address, status, {
+  async function applyStatusChange(feed: PresenceFeedConfig, { address, status }: PeerStatusChange): Promise<void> {
+    await redis.put(feed.keyPrefix + address, status, {
       EX: statusCacheTtlInSeconds
     })
+
+    // A shadow feed stops here: its status map exists only to count its own flips.
+    if (!feed.publishes) {
+      return
+    }
+
     await Promise.all([
       pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
         address,
@@ -129,7 +165,7 @@ export async function createPeerTrackingComponent({
    * Reads the cached status of every address in one MGET, then publishes only the peers whose
    * status actually changed. This dedupe is what makes snapshot batches idempotent.
    */
-  async function applyStatusChanges(changes: PeerStatusChange[], feed: PresenceFeed): Promise<void> {
+  async function applyStatusChanges(changes: PeerStatusChange[], feed: PresenceFeedConfig): Promise<void> {
     if (changes.length === 0) {
       return
     }
@@ -142,14 +178,14 @@ export async function createPeerTrackingComponent({
     }
 
     const addresses = [...latestByAddress.keys()]
-    const cachedStatuses = await readCachedStatuses(addresses)
+    const cachedStatuses = await readCachedStatuses(feed.keyPrefix, addresses)
     const flipped = addresses
       .map((address, index) => ({ address, status: latestByAddress.get(address)!, cached: cachedStatuses[index] }))
       .filter(({ status, cached }) => cached !== status)
 
-    await Promise.all(flipped.map(publishStatusChange))
+    await Promise.all(flipped.map((change) => applyStatusChange(feed, change)))
 
-    flipsInWindow[feed] += flipped.length
+    flipsInWindow[feed.feed] += flipped.length
   }
 
   /**
@@ -169,7 +205,7 @@ export async function createPeerTrackingComponent({
    */
   async function handlePeerEvent(peerId: string, handler: PeerStatusHandler) {
     try {
-      await applyStatusChanges([{ address: peerId, status: handler.status }], 'archipelago')
+      await applyStatusChanges([{ address: peerId, status: handler.status }], archipelagoFeed)
       await updateWorldsStats(peerId, handler)
     } catch (error: any) {
       logger.error('Error handling peer event:', {
@@ -236,7 +272,7 @@ export async function createPeerTrackingComponent({
 
         logContractViolations(batch)
 
-        await applyStatusChanges(parcelChangesToStatusEvents(batch), 'pulse')
+        await applyStatusChanges(parcelChangesToStatusEvents(batch), pulseFeed)
       } catch (error: any) {
         logger.error('Error handling parcel changes batch:', {
           error: error.message,
