@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
+import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 import { createPulseStatsComponent } from '../../../src/adapters/pulse-stats'
 import { IPulseStatsComponent } from '../../../src/types'
 import { createMockConfigComponent, mockFetcher, mockLogs, mockRedis } from '../../mocks/components'
@@ -68,6 +69,57 @@ describe('PulseStatsComponent', () => {
 
       await expect(buildComponent(source, requireString)).resolves.toBeDefined()
       expect(requireString).not.toHaveBeenCalled()
+    })
+
+    // R2-F1: the tests above inject a `requireString` that throws, which only proves the adapter
+    // asks. `.env.default` is a *live* config source inside the deployed image (`src/components.ts`
+    // loads `['.env.default', '.env']`, the Dockerfile copies the file into the process's cwd), so a
+    // placeholder in it would satisfy `requireString` and A2's loud boot failure would never happen
+    // where it matters. These resolve `PULSE_URL` exactly as the container does.
+    describe('and the config is the real dotenv component reading the committed .env.default', () => {
+      const ENV_DEFAULT_PATH = resolve(__dirname, '../../../.env.default')
+
+      let envSnapshot: NodeJS.ProcessEnv
+
+      beforeEach(() => {
+        envSnapshot = { ...process.env }
+        delete process.env.PULSE_URL
+        process.env.PRESENCE_SOURCE = 'pulse'
+      })
+
+      afterEach(() => {
+        for (const key of Object.keys(process.env)) {
+          if (!(key in envSnapshot)) {
+            delete process.env[key]
+          }
+        }
+        Object.assign(process.env, envSnapshot)
+      })
+
+      async function buildWithRealConfig() {
+        const config = await createDotEnvConfigComponent({ path: [ENV_DEFAULT_PATH] })
+
+        return createPulseStatsComponent({ logs: mockLogs, redis: mockRedis, config, fetcher: mockFetcher })
+      }
+
+      it('should fail to start in pulse mode when .env.default is the only source of PULSE_URL', async () => {
+        await expect(buildWithRealConfig()).rejects.toThrow('PULSE_URL')
+      })
+
+      it('should start in pulse mode when PULSE_URL resolves to an absolute http(s) URL', async () => {
+        process.env.PULSE_URL = 'http://pulse.example.com'
+
+        await expect(buildWithRealConfig()).resolves.toBeDefined()
+      })
+
+      it.each(['<URL>', '', 'pulse.example.com', 'ftp://pulse.example.com'])(
+        'should fail to start in pulse mode when PULSE_URL resolves to %p',
+        async (value) => {
+          process.env.PULSE_URL = value
+
+          await expect(buildWithRealConfig()).rejects.toThrow('PULSE_URL')
+        }
+      )
     })
   })
 

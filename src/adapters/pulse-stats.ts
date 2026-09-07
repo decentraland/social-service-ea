@@ -3,6 +3,30 @@ import { normalizeAddress } from '../utils/address'
 import { getPresenceSource, PEERS_CACHE_KEY_PULSE, usesPulsePresence } from '../utils/peers'
 
 /**
+ * A2: presence of the key is not enough. `.env.default` ships inside the image and is a live config
+ * source (`src/components.ts` loads `['.env.default', '.env']` with the process cwd at `/app`), so a
+ * placeholder — or an operator's empty string, or a bare hostname — would satisfy `requireString`
+ * and leave the loud boot failure unreachable exactly where it matters. Validate the resolved value.
+ *
+ * The value itself is never put in the message: a URL is not this service's secret to print.
+ */
+function assertAbsoluteHttpUrl(key: string, value: string): string {
+  let protocol: string
+
+  try {
+    protocol = new URL(value).protocol
+  } catch {
+    throw new Error(`Configuration: ${key} must be an absolute http(s) URL`)
+  }
+
+  if (protocol !== 'http:' && protocol !== 'https:') {
+    throw new Error(`Configuration: ${key} must be an absolute http(s) URL`)
+  }
+
+  return value
+}
+
+/**
  * Reconciliation source for `PRESENCE_SOURCE=pulse|both`: Pulse's all-realms peer list.
  *
  * `GET /peers?all=true` is the unfiltered, every-realm view (worlds included), which is why this
@@ -21,7 +45,7 @@ export async function createPulseStatsComponent({
   // Pulse source a missing URL is a total presence outage whose only symptom would be a fetch error
   // every 5 s — so it becomes a loud boot failure instead.
   const url = usesPulsePresence(presenceSource)
-    ? await config.requireString('PULSE_URL')
+    ? assertAbsoluteHttpUrl('PULSE_URL', await config.requireString('PULSE_URL'))
     : await config.getString('PULSE_URL')
 
   return {
