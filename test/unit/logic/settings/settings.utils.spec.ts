@@ -1,6 +1,7 @@
 import {
   PrivateMessagePrivacySetting,
   BlockedUsersMessagesVisibilitySetting,
+  SituationReactionsVisibility,
   SocialSettings
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
@@ -29,7 +30,8 @@ describe('convertDBSettingsToRPCSettings', () => {
 
     expect(convertDBSettingsToRPCSettings(dbSettings)).toEqual({
       privateMessagesPrivacy: rpcPrivacy,
-      blockedUsersMessagesVisibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES
+      blockedUsersMessagesVisibility: BlockedUsersMessagesVisibilitySetting.SHOW_MESSAGES,
+      showSituationReactions: SituationReactionsVisibility.SHOW
     })
   })
 
@@ -47,10 +49,28 @@ describe('convertDBSettingsToRPCSettings', () => {
 
       expect(convertDBSettingsToRPCSettings(dbSettings)).toEqual({
         privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL,
-        blockedUsersMessagesVisibility: rpcVisibility
+        blockedUsersMessagesVisibility: rpcVisibility,
+        showSituationReactions: SituationReactionsVisibility.SHOW
       })
     }
   )
+
+  describe('and the situation reactions visibility is not persisted in the DB', () => {
+    it.each([DBBlockedVisibility.SHOW_MESSAGES, DBBlockedVisibility.DO_NOT_SHOW_MESSAGES])(
+      'should default showSituationReactions to SHOW regardless of the other DB settings ("%s")',
+      (dbVisibility) => {
+        const dbSettings: DBSocialSettings = {
+          address: '0x123',
+          private_messages_privacy: DBPrivateMessagesPrivacy.ONLY_FRIENDS,
+          blocked_users_messages_visibility: dbVisibility
+        }
+
+        expect(convertDBSettingsToRPCSettings(dbSettings).showSituationReactions).toEqual(
+          SituationReactionsVisibility.SHOW
+        )
+      }
+    )
+  })
 })
 
 describe('convertRPCSettingsIntoDBSettings', () => {
@@ -95,6 +115,25 @@ describe('convertRPCSettingsIntoDBSettings', () => {
     expect(convertRPCSettingsIntoDBSettings(rpcSettings)).toEqual({
       private_messages_privacy: DBPrivateMessagesPrivacy.ALL
     })
+  })
+
+  it('should ignore showSituationReactions since there is no DB column for it yet', () => {
+    const rpcSettings: Partial<SocialSettings> = {
+      privateMessagesPrivacy: PrivateMessagePrivacySetting.ALL,
+      showSituationReactions: SituationReactionsVisibility.HIDE
+    }
+
+    expect(convertRPCSettingsIntoDBSettings(rpcSettings)).toEqual({
+      private_messages_privacy: DBPrivateMessagesPrivacy.ALL
+    })
+  })
+
+  it('should return no DB settings when only showSituationReactions is provided', () => {
+    const rpcSettings: Partial<SocialSettings> = {
+      showSituationReactions: SituationReactionsVisibility.HIDE
+    }
+
+    expect(convertRPCSettingsIntoDBSettings(rpcSettings)).toEqual({})
   })
 
   it('should throw error for unknown private messages privacy setting', () => {

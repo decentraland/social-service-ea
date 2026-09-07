@@ -1,7 +1,8 @@
 import {
   PrivateMessagePrivacySetting as RPCPrivateMessagePrivacySetting,
   SocialSettings as RPCSocialSettings,
-  BlockedUsersMessagesVisibilitySetting as RPCBlockedUsersMessagesVisibilitySetting
+  BlockedUsersMessagesVisibilitySetting as RPCBlockedUsersMessagesVisibilitySetting,
+  SituationReactionsVisibility as RPCSituationReactionsVisibility
 } from '@dcl/protocol/out-js/decentraland/social_service/v2/social_service_v2.gen'
 import {
   BlockedUsersMessagesVisibilitySetting as DBBlockedUsersMessagesVisibilitySetting,
@@ -12,6 +13,12 @@ import {
 
 const DEFAULT_DB_PRIVATE_MESSAGES_PRIVACY = DBPrivateMessagesPrivacy.ALL
 const DEFAULT_RPC_PRIVATE_MESSAGE_PRIVACY = RPCPrivateMessagePrivacySetting.ALL
+// `SocialSettings.show_situation_reactions` (field 3 of
+// decentraland.social_service.v2.SocialSettings) is required by the protocol but has no DB column
+// yet, so it is not persisted: every read reports the most permissive value, matching how the other
+// two settings default (ALL / SHOW_MESSAGES). Replace this with the stored value once the column and
+// its migration exist.
+const DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY = RPCSituationReactionsVisibility.SHOW
 
 const RPC_PRIVATE_MESSAGE_PRIVACY_TO_DB_PRIVATE_MESSAGE_PRIVACY: Record<
   RPCPrivateMessagePrivacySetting,
@@ -62,7 +69,9 @@ export function convertDBSettingsToRPCSettings(settings: DBSocialSettings): RPCS
     blockedUsersMessagesVisibility:
       DB_BLOCKED_USERS_MESSAGES_VISIBILITY_TO_RPC_BLOCKED_USERS_MESSAGES_VISIBILITY[
         settings.blocked_users_messages_visibility
-      ]
+      ],
+    // Not persisted yet: see DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY
+    showSituationReactions: DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY
   }
 }
 
@@ -80,6 +89,9 @@ export function convertRPCSettingsIntoDBSettings(
       settings.blockedUsersMessagesVisibility
     )
   }
+
+  // `settings.showSituationReactions` is intentionally ignored: there is no DB column to persist it
+  // into yet (see DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY).
 
   return dbSettings
 }
