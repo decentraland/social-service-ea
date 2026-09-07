@@ -99,10 +99,26 @@ Both address sets are lowercased before the symmetric difference is taken: `arch
 returns `peer.id` verbatim while `pulse-stats` normalises, so one EIP-55 wallet would otherwise be
 counted in `onlyInArchipelago` *and* in `onlyInPulse` and read as a divergence that is pure casing.
 
-The flip counters are per window: they reset every time a line is logged. `pulseFlips` counts the
-transitions the shadow feed derived, not events published (in `both` the shadow feed publishes
-nothing). A healthy window has a small, stable symmetric difference (peers in flight between the two
-5 s polls) and comparable flip counts.
+The flip counters are per window: they reset on every tick, including a tick whose Redis read failed
+(that window's flips are dropped with its line rather than added to the next one). `pulseFlips`
+counts the transitions the shadow feed derived, not events published (in `both` the shadow feed
+publishes nothing).
+
+**The gate for step 3 is the set difference, not the flip counts.** A healthy window has a small,
+stable `symmetricDifference` — only peers in flight between the two 5 s polls. The two flip counters
+are *indicative, not comparable one-to-one*: the archipelago feed derives transitions the Pulse feed
+structurally does not, so a perfectly healthy window shows more archipelago flips than Pulse ones.
+
+- A world exit publishes `peer.<addr>.world.leave`, mapped to OFFLINE, and the next client heartbeat
+  maps back to ONLINE: **two** archipelago flips. On the Pulse side the same exit is one non-null
+  entry for the new realm, i.e. ONLINE for a peer already ONLINE: **zero** flips.
+- `peer.*.connect` is also mapped to OFFLINE, so wherever that subject is still published a connect
+  costs two archipelago flips against Pulse's one.
+
+So a window with 100 connects, 100 disconnects and 100 world exits reads `archipelagoFlips: 400,
+pulseFlips: 200` with both feeds working. What the counters are for is liveness, one direction only:
+`pulseFlips: 0` while `archipelagoFlips > 0` means the `engine.parcel_changes` subscription is dead.
+Do not normalise the ratio and do not delay the switch over a 2x gap.
 
 ### Known exposure: a dropped OFFLINE (follow-up)
 
@@ -130,7 +146,7 @@ staged-deletion step into a repo-wide optional-component refactor.
 | key | default | notes |
 |---|---|---|
 | `PRESENCE_SOURCE` | `archipelago` | `archipelago` \| `pulse` \| `both`. Unknown values fall back to `archipelago`. |
-| `PULSE_URL` | — | Pulse base URL. Required when `PRESENCE_SOURCE` is `pulse` or `both`. |
+| `PULSE_URL` | — | Pulse base URL. Required when `PRESENCE_SOURCE` is `pulse` or `both`, and validated at boot: it must parse as an absolute `http(s)` URL or component creation throws. Deliberately **commented out** in `.env.default`, because that file is a live config source inside the image and a placeholder there would satisfy the check. |
 | `ARCHIPELAGO_STATS_URL` | — | Stays until `PRESENCE_SOURCE` is removed. Required when `PRESENCE_SOURCE` is `archipelago` or `both`. |
 | `PEER_SYNC_INTERVAL_MS` | `5000` | Reconciliation poll interval, both sources. |
 | `PEERS_SYNC_CACHE_TTL_MS` | `10000` | TTL of the reconciled peer sets. |
@@ -139,9 +155,12 @@ staged-deletion step into a repo-wide optional-component refactor.
 ## Rollout
 
 1. Deploy with `PRESENCE_SOURCE` unset (`archipelago`) — no behaviour change.
-2. Set `PULSE_URL` (required from here on: startup fails without it in `both`/`pulse`), switch to
-   `both`, watch `Presence source diff`. Nothing is served or published from Pulse in this step.
-3. Switch to `pulse` once the symmetric difference is stable and small.
+2. Set `PULSE_URL` **on every task definition that will ever run `both` or `pulse`** — from here on
+   startup fails without it, and fails just as loudly on a value that is not an absolute `http(s)`
+   URL. Switch to `both` and watch `Presence source diff`. Nothing is served or published from Pulse
+   in this step.
+3. Switch to `pulse` once `symmetricDifference` is stable and small. That is the gate; the flip
+   counters are not comparable one-to-one (see above) — use them only to confirm `pulseFlips > 0`.
 4. Rollback at any point is a single environment variable.
 5. (Step 8 of the programme rollout) delete `worlds-stats`, `archipelago-stats`,
    `ARCHIPELAGO_STATS_URL` and the flag.
