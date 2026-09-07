@@ -2,6 +2,12 @@ import { AppComponents, IWorldsStatsComponent } from '../types'
 import { WORLD_PEERS_CACHE_KEY } from '../utils/peers'
 import { normalizeAddress } from '../utils/address'
 
+/**
+ * @deprecated Iteration 2 / WP4. Pulse's `engine.parcel_changes` feed carries the realm of every
+ * peer and `GET /peers?all=true` already covers worlds, so the separate world-peer set and the
+ * `peer.*.world.*` handlers that fill it are redundant. Only exercised when `PRESENCE_SOURCE` is
+ * `archipelago` or `both`; deleted at rollout step 8. See `docs/presence-sources.md`.
+ */
 export async function createWorldsStatsComponent({
   logs,
   redis
