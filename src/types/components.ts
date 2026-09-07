@@ -276,10 +276,25 @@ export interface IStatsComponent {
   getPeers(): Promise<string[]>
 }
 
+/**
+ * @deprecated Iteration 2 / WP4. Superseded by `IPulseStatsComponent`. Kept while
+ * `PRESENCE_SOURCE` can still select `archipelago`; deleted at rollout step 8.
+ * See `docs/presence-sources.md`.
+ */
 export type IArchipelagoStatsComponent = IStatsComponent & {
   fetchPeers(): Promise<string[]>
 }
 
+/** Pulse's all-realms peer list (`GET ${PULSE_URL}/peers?all=true`), the target presence source. */
+export type IPulseStatsComponent = IStatsComponent & {
+  fetchPeers(): Promise<string[]>
+}
+
+/**
+ * @deprecated Iteration 2 / WP4. The Pulse feed carries every peer's realm, so world peers need no
+ * separate set and no `peer.*.world.*` handlers. Only exercised when `PRESENCE_SOURCE` is
+ * `archipelago` or `both`; deleted at rollout step 8. See `docs/presence-sources.md`.
+ */
 export type IWorldsStatsComponent = IStatsComponent & {
   onPeerConnect(address: string): Promise<void>
   onPeerDisconnect(address: string): Promise<void>

@@ -16,6 +16,7 @@ import {
   IRedisComponent,
   IPubSubComponent,
   IArchipelagoStatsComponent,
+  IPulseStatsComponent,
   IWorldsStatsComponent,
   IPeersSynchronizer,
   IPeerTrackingComponent,
@@ -120,6 +121,7 @@ export type BaseComponents = {
   peerTracking: IPeerTrackingComponent
   peersStats: IPeersStatsComponent
   peersSynchronizer: IPeersSynchronizer
+  pulseStats: IPulseStatsComponent
   pg: IPgComponent
   placesApi: IPlacesApiComponent
   pubsub: IPubSubComponent

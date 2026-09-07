@@ -18,6 +18,7 @@ import { createRedisComponent } from './adapters/redis'
 import { createPubSubComponent } from './adapters/pubsub'
 import { createUWsComponent } from '@well-known-components/uws-http-server'
 import { createArchipelagoStatsComponent } from './adapters/archipelago-stats'
+import { createPulseStatsComponent } from './adapters/pulse-stats'
 import { createPeersSynchronizerComponent } from './adapters/peers-synchronizer'
 import { createNatsComponent } from '@well-known-components/nats-component'
 import { createPeerTrackingComponent } from './adapters/peer-tracking'
@@ -51,6 +52,7 @@ import { createReferralComponent } from './logic/referral'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
 import { createPeersStatsComponent } from './logic/peers-stats'
+import { getPresenceSource } from './utils/peers'
 import { createS3Adapter } from './adapters/s3'
 import { createJobComponent } from './logic/job'
 import { createPlacesApiAdapter } from './adapters/places-api'
@@ -149,7 +151,9 @@ export async function initComponents(): Promise<AppComponents> {
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
+  const presenceSource = await getPresenceSource(config)
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
+  const pulseStats = await createPulseStatsComponent({ logs, config, fetcher, redis })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
   const nats = await createNatsComponent({ logs, config })
   const commsGatekeeper = await createCommsGatekeeperComponent({ logs, config, fetcher })
@@ -178,7 +182,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
-  const peersStats = createPeersStatsComponent({ archipelagoStats, worldsStats })
+  const peersStats = createPeersStatsComponent({ archipelagoStats, pulseStats, worldsStats }, presenceSource)
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
 
   const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
@@ -301,7 +305,13 @@ export async function initComponents(): Promise<AppComponents> {
     updateHandler
   })
 
-  const peersSynchronizer = await createPeersSynchronizerComponent({ logs, archipelagoStats, redis, config })
+  const peersSynchronizer = await createPeersSynchronizerComponent({
+    logs,
+    archipelagoStats,
+    pulseStats,
+    redis,
+    config
+  })
   const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
   const wsPool = createWsPoolComponent({ logs, metrics })
 
@@ -382,6 +392,7 @@ export async function initComponents(): Promise<AppComponents> {
     pg,
     placesApi,
     pubsub,
+    pulseStats,
     queue,
     communityRanking,
     redis,

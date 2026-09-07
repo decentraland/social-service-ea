@@ -1,6 +1,11 @@
 import { AppComponents, IArchipelagoStatsComponent } from '../types'
 import { PEERS_CACHE_KEY } from '../utils/peers'
 
+/**
+ * @deprecated Iteration 2 / WP4. Superseded by `src/adapters/pulse-stats.ts`. Only used when
+ * `PRESENCE_SOURCE` is `archipelago` or `both`; deleted together with `ARCHIPELAGO_STATS_URL` at
+ * rollout step 8. See `docs/presence-sources.md`.
+ */
 export async function createArchipelagoStatsComponent({
   logs,
   config,
