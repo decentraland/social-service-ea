@@ -107,9 +107,24 @@ export function createCommunityRequestsComponent(
     callerAddress: string
   ): Promise<MemberRequest> {
     let createdRequest: MemberRequest
-    const community = await communitiesDb.getCommunity(communityId, memberAddress)
+    const community = await communitiesDb.getCommunity(communityId)
     if (!community) {
       throw new CommunityNotFoundError(communityId)
+    }
+
+    // Authorize the caller before reading anything about the target. The outcomes differ — 400 when
+    // the target is already a member or 401 when it is not, and a distinct 401 when it is banned —
+    // so deciding those first let a caller with no standing walk a private roster one address at a
+    // time, the same roster the members endpoint refuses to non-members. kickMember orders it this
+    // way for the same reason.
+    if (type === CommunityRequestType.Invite) {
+      await communityRoles.validatePermissionToInviteUsers(communityId, callerAddress)
+    } else if (memberAddress.toLowerCase() !== callerAddress.toLowerCase()) {
+      throw new InvalidCommunityRequestError(`User trying to impersonate another user`)
+    }
+
+    if (community.privacy === CommunityPrivacyEnum.Public && type === CommunityRequestType.RequestToJoin) {
+      throw new InvalidCommunityRequestError(`Public communities do not accept requests to join`)
     }
 
     const isBanned = await communitiesDb.isMemberBanned(communityId, memberAddress)
@@ -117,20 +132,11 @@ export function createCommunityRequestsComponent(
       throw new NotAuthorizedError(`The user ${memberAddress} is banned from the community ${communityId}`)
     }
 
-    if (community.privacy === CommunityPrivacyEnum.Public && type === CommunityRequestType.RequestToJoin) {
-      throw new InvalidCommunityRequestError(`Public communities do not accept requests to join`)
-    }
-
-    if (community.role !== CommunityRole.None) {
+    const memberRole = await communitiesDb.getCommunityMemberRole(communityId, memberAddress)
+    if (memberRole !== CommunityRole.None) {
       throw new InvalidCommunityRequestError(
         `User cannot join since it is already a member of the community: ${community.name} (${community.id})`
       )
-    }
-
-    if (type === CommunityRequestType.Invite) {
-      await communityRoles.validatePermissionToInviteUsers(communityId, callerAddress)
-    } else if (memberAddress.toLowerCase() !== callerAddress.toLowerCase()) {
-      throw new InvalidCommunityRequestError(`User trying to impersonate another user`)
     }
 
     const existingMemberRequests = await communitiesDb.getCommunityRequests(communityId, {

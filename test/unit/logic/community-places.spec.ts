@@ -662,8 +662,33 @@ describe('Community Places Component', () => {
           )
 
           expect(mockCommunitiesDB.communityExists).toHaveBeenCalledWith(communityId)
+          expect(mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity).toHaveBeenCalledWith(
+            communityId,
+            mockUserAddress
+          )
           expect(mockCommunitiesDB.communityPlaceExists).toHaveBeenCalledWith(communityId, placeId)
-          expect(mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity).not.toHaveBeenCalled()
+          expect(mockCommunitiesDB.removeCommunityPlace).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the caller does not have permission to remove places', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunityMemberRole.mockResolvedValue(CommunityRole.None)
+          mockCommunityRoles.validatePermissionToRemovePlacesFromCommunity.mockRejectedValue(
+            new NotAuthorizedError(
+              `The user ${mockUserAddress} doesn't have permission to remove places from the community`
+            )
+          )
+        })
+
+        it('should throw NotAuthorizedError without reading whether the place belongs to the community', async () => {
+          await expect(communityPlacesComponent.removePlace(communityId, mockUserAddress, placeId)).rejects.toThrow(
+            NotAuthorizedError
+          )
+
+          // Never read for an unauthorized caller: the 404/401 split is what leaked the place list.
+          expect(mockCommunitiesDB.communityPlaceExists).not.toHaveBeenCalled()
+          expect(mockPlacesApi.getDestinations).not.toHaveBeenCalled()
           expect(mockCommunitiesDB.removeCommunityPlace).not.toHaveBeenCalled()
         })
       })

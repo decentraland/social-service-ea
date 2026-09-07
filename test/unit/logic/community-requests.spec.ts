@@ -232,7 +232,7 @@ describe('Community Requests Component', () => {
 
           describe('and user does not belong to community', () => {
             beforeEach(() => {
-              community.role = CommunityRole.None
+              mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.None)
             })
 
             describe('and there are no pending requests for the user', () => {
@@ -327,7 +327,7 @@ describe('Community Requests Component', () => {
 
           describe('and user already belongs to community', () => {
             beforeEach(() => {
-              community.role = CommunityRole.Member
+              mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
             })
 
             it('should throw an InvalidCommunityRequestError with correct message', async () => {
@@ -388,7 +388,7 @@ describe('Community Requests Component', () => {
 
         describe('and user does not belong to community', () => {
           beforeEach(() => {
-            community.role = CommunityRole.None
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.None)
           })
 
           describe('and there are no pending requests for the user', () => {
@@ -592,7 +592,7 @@ describe('Community Requests Component', () => {
 
         describe('and user already belongs to community', () => {
           beforeEach(() => {
-            community.role = CommunityRole.Member
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
           })
 
           it('should throw an InvalidCommunityRequestError with correct message', async () => {
@@ -639,11 +639,46 @@ describe('Community Requests Component', () => {
               communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
             ).rejects.toThrow(NotAuthorizedError)
           })
+
+          it('should resolve the community without the target address and read nothing else about the target', async () => {
+            await expect(
+              communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+            ).rejects.toThrow(NotAuthorizedError)
+
+            // Never read for an unauthorized caller: the 400/401 split is what leaked the roster.
+            expect(mockCommunitiesDB.getCommunity).toHaveBeenCalledWith(community.id)
+            expect(mockCommunitiesDB.isMemberBanned).not.toHaveBeenCalled()
+            expect(mockCommunitiesDB.getCommunityMemberRole).not.toHaveBeenCalled()
+          })
+
+          describe('and the target already belongs to the community', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
+            })
+
+            it('should throw a NotAuthorizedError instead of the InvalidCommunityRequestError that discloses the membership', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              ).rejects.toThrow(NotAuthorizedError)
+            })
+          })
+
+          describe('and the target is banned from the community', () => {
+            beforeEach(() => {
+              mockCommunitiesDB.isMemberBanned.mockResolvedValueOnce(true)
+            })
+
+            it('should throw a NotAuthorizedError that does not name the ban', async () => {
+              await expect(
+                communityRequestsComponent.createCommunityRequest(community.id, userAddress, type, callerAddress)
+              ).rejects.toThrow('User does not have permission')
+            })
+          })
         })
 
         describe('and user does not belong to community', () => {
           beforeEach(() => {
-            community.role = CommunityRole.None
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.None)
           })
 
           describe('and there are no pending requests for the user', () => {
@@ -793,7 +828,7 @@ describe('Community Requests Component', () => {
 
         describe('and user already belongs to community', () => {
           beforeEach(() => {
-            community.role = CommunityRole.Member
+            mockCommunitiesDB.getCommunityMemberRole.mockResolvedValueOnce(CommunityRole.Member)
             mockCommunityRoles.validatePermissionToInviteUsers.mockResolvedValueOnce()
           })
 
