@@ -91,7 +91,10 @@ export function convertRPCSettingsIntoDBSettings(
   }
 
   // `settings.showSituationReactions` is intentionally ignored: there is no DB column to persist it
-  // into yet (see DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY).
+  // into yet (see DEFAULT_RPC_SITUATION_REACTIONS_VISIBILITY). Note the consequence, which is
+  // deliberate (D1): `upsertSocialSettings` *accepts* a payload carrying the field and then drops
+  // it, so the response reports the default rather than the value the caller sent. Persistence
+  // lands with whoever adds the column and the migration; until then no caller can make it stick.
 
   return dbSettings
 }
