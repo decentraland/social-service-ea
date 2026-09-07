@@ -629,6 +629,44 @@ describe('PeerTrackingComponent', () => {
       expect(lines).toEqual([5, 0])
     })
 
+    // R2-F3: the component-level `redis.get` rethrows, so a blip at the tick means no line — and if
+    // the counters survived it, the next line would report two windows as one and every per-minute
+    // rate an operator reads off it would be ~2x, with an error line a minute earlier as the only
+    // trace.
+    it('should reset the per-window flip counters even when the diff read fails', async () => {
+      let readFails = true
+      mockRedis.get.mockImplementation(async () => {
+        if (readFails) {
+          throw new Error('Redis timeout')
+        }
+
+        return [] as any
+      })
+
+      const parcelChangesHandler = getParcelChangesHandler()
+      await parcelChangesHandler(null, parcelChangesMessage('01-snapshot.bin'))
+
+      await jest.advanceTimersByTimeAsync(PRESENCE_DIFF_INTERVAL_MS)
+
+      expect(mockLogs.getLogger('peer-tracking-component').error).toHaveBeenCalledWith(
+        'Error logging the presence source diff',
+        { error: 'Redis timeout' }
+      )
+
+      readFails = false
+      await parcelChangesHandler(null, parcelChangesMessage('03-exit.bin'))
+
+      await jest.advanceTimersByTimeAsync(PRESENCE_DIFF_INTERVAL_MS)
+
+      const lines = (mockLogs.getLogger('peer-tracking-component').info as jest.Mock).mock.calls
+        .filter(([message]) => message === 'Presence source diff')
+        .map(([, extra]) => extra.pulseFlips)
+
+      // Only the one flip of the window that actually logged: the five of the failed window are
+      // dropped with it, not carried over.
+      expect(lines).toEqual([1])
+    })
+
     it('should stop logging once the component is stopped', async () => {
       mockRedis.get.mockResolvedValue([] as any)
 

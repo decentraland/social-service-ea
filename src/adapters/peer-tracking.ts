@@ -300,9 +300,17 @@ export async function createPeerTrackingComponent({
 
   /**
    * Dual-source window observability: one line per minute, counts only — never addresses.
-   * The flip counters are per window and reset on every line.
+   * The flip counters are per window and reset on every tick.
    */
   async function logPresenceSourceDiff(): Promise<void> {
+    // Taken and reset before the awaits: `redis.get` rethrows, so a blip at the tick loses the line
+    // — and if the counters survived it, the next line would report two windows as one and every
+    // per-minute rate read off it would be ~2x. Flips that land while the reads are in flight belong
+    // to the next window, which is what a per-window counter means.
+    const flips = { ...flipsInWindow }
+    flipsInWindow.archipelago = 0
+    flipsInWindow.pulse = 0
+
     try {
       const [archipelagoPeers, pulsePeers] = await Promise.all([
         redis.get<string[]>(PEERS_CACHE_KEY),
@@ -335,12 +343,9 @@ export async function createPeerTrackingComponent({
         onlyInArchipelago,
         onlyInPulse,
         symmetricDifference: onlyInArchipelago + onlyInPulse,
-        archipelagoFlips: flipsInWindow.archipelago,
-        pulseFlips: flipsInWindow.pulse
+        archipelagoFlips: flips.archipelago,
+        pulseFlips: flips.pulse
       })
-
-      flipsInWindow.archipelago = 0
-      flipsInWindow.pulse = 0
     } catch (error: any) {
       logger.error('Error logging the presence source diff', { error: error.message })
     }
