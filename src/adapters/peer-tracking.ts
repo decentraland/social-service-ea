@@ -54,6 +54,14 @@ export const PEER_STATUS_KEY_PREFIX = 'peer-status:'
  */
 export const PEER_STATUS_KEY_PREFIX_PULSE = 'peer-status-pulse:'
 
+/**
+ * Upper bound on how many peers of one batch are written and published concurrently. Reads are one
+ * MGET per batch, but a publisher-start snapshot can carry a whole Genesis City server, and each
+ * flipped peer costs one SET plus two PUBLISH — issuing all of them in a single tick is what this
+ * chunk size prevents.
+ */
+export const STATUS_PUBLISH_CHUNK_SIZE = 100
+
 export const PRESENCE_DIFF_INTERVAL_MS = 60_000
 
 export type PeerStatusChange = {
@@ -183,7 +191,15 @@ export async function createPeerTrackingComponent({
       .map((address, index) => ({ address, status: latestByAddress.get(address)!, cached: cachedStatuses[index] }))
       .filter(({ status, cached }) => cached !== status)
 
-    await Promise.all(flipped.map((change) => applyStatusChange(feed, change)))
+    // Chunked instead of one Promise.all over the whole batch: a first snapshot flips every peer of
+    // a server at once and each flip costs one SET plus two PUBLISH.
+    for (let offset = 0; offset < flipped.length; offset += STATUS_PUBLISH_CHUNK_SIZE) {
+      await Promise.all(
+        flipped
+          .slice(offset, offset + STATUS_PUBLISH_CHUNK_SIZE)
+          .map((change) => applyStatusChange(feed, { address: change.address, status: change.status }))
+      )
+    }
 
     flipsInWindow[feed.feed] += flipped.length
   }

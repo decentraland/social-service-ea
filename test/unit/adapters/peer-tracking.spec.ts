@@ -11,7 +11,8 @@ import {
   PEER_STATUS_KEY_PREFIX,
   PEER_STATUS_KEY_PREFIX_PULSE,
   PeerStatusHandlerEvent,
-  PRESENCE_DIFF_INTERVAL_MS
+  PRESENCE_DIFF_INTERVAL_MS,
+  STATUS_PUBLISH_CHUNK_SIZE
 } from '../../../src/adapters/peer-tracking'
 import {
   COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL,
@@ -316,6 +317,61 @@ describe('PeerTrackingComponent', () => {
 
         expect(mockWorldsStats.onPeerConnect).not.toHaveBeenCalled()
         expect(mockWorldsStats.onPeerDisconnect).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a snapshot far larger than the publish chunk size arrives', () => {
+      const SNAPSHOT_SIZE = 250
+
+      function bigSnapshot() {
+        const changes = Array.from({ length: SNAPSHOT_SIZE }, (_, index) => ({
+          address: `0x${(index + 1).toString(16).padStart(40, '0')}`,
+          realm: 'main',
+          parcel: { x: index, y: index }
+        }))
+        const data = ParcelChangesBatch.encode({
+          serverName: 'pulse-1',
+          seq: 1,
+          snapshot: true,
+          serverTime: 0,
+          changes
+        }).finish()
+
+        return { changes, message: { subject: PARCEL_CHANGES_SUBJECT, data } as NatsMsg }
+      }
+
+      it('should publish one event per entry, still with a single MGET', async () => {
+        const handler = getParcelChangesHandler()
+        const { changes, message } = bigSnapshot()
+
+        await handler(null, message)
+
+        const events = emittedFriendEvents()
+        expect(events).toHaveLength(SNAPSHOT_SIZE)
+        expect(new Set(events.map((event) => event.address))).toEqual(new Set(changes.map((change) => change.address)))
+        expect(events.every((event) => event.status === ConnectivityStatus.ONLINE)).toBe(true)
+        expect(mockRedis.client.mGet).toHaveBeenCalledTimes(1)
+      })
+
+      it('should bound the write/publish fan-out to the chunk size', async () => {
+        const handler = getParcelChangesHandler()
+        const { message } = bigSnapshot()
+        let inFlight = 0
+        let maxInFlight = 0
+
+        mockRedis.put.mockImplementation(async (key: string, value: unknown) => {
+          inFlight++
+          maxInFlight = Math.max(maxInFlight, inFlight)
+          await Promise.resolve()
+          redisStore.set(key, JSON.stringify(value))
+          inFlight--
+        })
+
+        await handler(null, message)
+
+        expect(maxInFlight).toBeLessThanOrEqual(STATUS_PUBLISH_CHUNK_SIZE)
+        // and not serialised one peer at a time either
+        expect(maxInFlight).toBeGreaterThan(1)
       })
     })
 
