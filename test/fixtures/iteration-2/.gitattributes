@@ -1,0 +1,3 @@
+# Fixture bytes must survive every checkout unchanged.
+*.bin binary
+* text=auto eol=lf
