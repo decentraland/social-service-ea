@@ -533,6 +533,30 @@ describe('PeerTrackingComponent', () => {
       expect(logged![1]).toEqual(expect.objectContaining({ archipelagoFlips: 1, pulseFlips: 5 }))
     })
 
+    it('should ignore address casing when diffing the two reconciled sets', async () => {
+      const mixedCase = '0x00000000000000000000000000000000000000AB'
+      mockRedis.get.mockImplementation(async (key: string) => {
+        if (key === PEERS_CACHE_KEY) return [mixedCase] as any
+        if (key === PEERS_CACHE_KEY_PULSE) return [mixedCase.toLowerCase()] as any
+        return null
+      })
+
+      await jest.advanceTimersByTimeAsync(PRESENCE_DIFF_INTERVAL_MS)
+
+      const logged = (mockLogs.getLogger('peer-tracking-component').info as jest.Mock).mock.calls.find(
+        ([message]) => message === 'Presence source diff'
+      )
+      expect(logged![1]).toEqual(
+        expect.objectContaining({
+          archipelagoPeers: 1,
+          pulsePeers: 1,
+          onlyInArchipelago: 0,
+          onlyInPulse: 0,
+          symmetricDifference: 0
+        })
+      )
+    })
+
     it('should reset the per-window flip counters after every line', async () => {
       mockRedis.get.mockResolvedValue([] as any)
 

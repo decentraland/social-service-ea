@@ -293,8 +293,11 @@ export async function createPeerTrackingComponent({
         redis.get<string[]>(PEERS_CACHE_KEY_PULSE)
       ])
 
-      const archipelagoSet = new Set(archipelagoPeers ?? [])
-      const pulseSet = new Set(pulsePeers ?? [])
+      // archipelago-stats returns `peer.id` verbatim and pulse-stats lowercases it, so one
+      // EIP-55 wallet would otherwise show up on both sides of the symmetric difference and read
+      // as a divergence that is pure casing.
+      const archipelagoSet = new Set((archipelagoPeers ?? []).map(normalizeAddress))
+      const pulseSet = new Set((pulsePeers ?? []).map(normalizeAddress))
 
       let onlyInArchipelago = 0
       archipelagoSet.forEach((address) => {
