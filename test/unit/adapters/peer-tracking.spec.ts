@@ -667,6 +667,42 @@ describe('PeerTrackingComponent', () => {
       expect(lines).toEqual([1])
     })
 
+    // R2-F2: the baseline docs/presence-sources.md now states instead of the withdrawn "comparable
+    // flip counts" claim. The same world exit is two archipelago flips and zero pulse flips, so an
+    // operator must not read a 2x gap as a lossy Pulse feed.
+    it('should count a world exit as two archipelago flips and no pulse flip at all', async () => {
+      mockRedis.get.mockResolvedValue([] as any)
+
+      const parcelChangesHandler = getParcelChangesHandler()
+      const leaveWorldHandler = getLegacyHandler('peer.*.world.leave')
+      const heartbeatHandler = getLegacyHandler('peer.*.heartbeat')
+      const address = '0x0000000000000000000000000000000000000001'
+
+      // First window: W1 ends up ONLINE on both feeds.
+      await parcelChangesHandler(null, parcelChangesMessage('01-snapshot.bin'))
+      await heartbeatHandler(null, { subject: `peer.${address}.heartbeat`, data: undefined as any })
+
+      await jest.advanceTimersByTimeAsync(PRESENCE_DIFF_INTERVAL_MS)
+
+      // Second window, one world exit: OFFLINE on `world.leave`, ONLINE again on the next
+      // heartbeat, while Pulse reports the same peer standing in the realm it moved to — ONLINE for
+      // a peer already ONLINE, which is nothing to flip.
+      await leaveWorldHandler(null, { subject: `peer.${address}.world.leave`, data: undefined as any })
+      await heartbeatHandler(null, { subject: `peer.${address}.heartbeat`, data: undefined as any })
+      await parcelChangesHandler(null, parcelChangesMessage('01-snapshot.bin'))
+
+      await jest.advanceTimersByTimeAsync(PRESENCE_DIFF_INTERVAL_MS)
+
+      const lines = (mockLogs.getLogger('peer-tracking-component').info as jest.Mock).mock.calls
+        .filter(([message]) => message === 'Presence source diff')
+        .map(([, extra]) => ({ archipelagoFlips: extra.archipelagoFlips, pulseFlips: extra.pulseFlips }))
+
+      expect(lines).toEqual([
+        { archipelagoFlips: 1, pulseFlips: 5 },
+        { archipelagoFlips: 2, pulseFlips: 0 }
+      ])
+    })
+
     it('should stop logging once the component is stopped', async () => {
       mockRedis.get.mockResolvedValue([] as any)
 
