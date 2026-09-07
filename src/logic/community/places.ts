@@ -167,11 +167,7 @@ export async function createCommunityPlacesComponent(
       // for a place the community does not hold, 401 for one it does — so checking existence first
       // let a caller with no standing walk the place list of a private community, the same list
       // getPlaces refuses to non-members.
-      const memberRole = await communitiesDb.getCommunityMemberRole(communityId, userAddress)
-
-      if (memberRole !== CommunityRole.Owner) {
-        await communityRoles.validatePermissionToRemovePlacesFromCommunity(communityId, userAddress)
-      }
+      await communityRoles.validatePermissionToRemovePlacesFromCommunity(communityId, userAddress)
 
       await validatePlaceExists(communityId, placeId)
       await validateOwnership([placeId], userAddress)
