@@ -26,6 +26,51 @@ describe('PulseStatsComponent', () => {
     })
   })
 
+  describe('when the component is created', () => {
+    function buildComponent(presenceSource: string | undefined, requireString: jest.Mock) {
+      return createPulseStatsComponent({
+        logs: mockLogs,
+        redis: mockRedis,
+        config: createMockConfigComponent({
+          getString: jest.fn(async (key: string) => (key === 'PRESENCE_SOURCE' ? presenceSource : undefined)),
+          requireString: requireString as any
+        }),
+        fetcher: mockFetcher
+      })
+    }
+
+    // A2: selecting the Pulse source without a URL used to degrade into an empty peer set and a
+    // log line every 5 s. It has to be a loud boot failure instead.
+    it.each(['pulse', 'both'])('should fail to start in %s mode when PULSE_URL is missing', async (source) => {
+      const requireString = jest.fn(async (key: string) => {
+        throw new Error(`Configuration: string ${key} is required`)
+      })
+
+      await expect(buildComponent(source, requireString)).rejects.toThrow('PULSE_URL')
+      expect(requireString).toHaveBeenCalledWith('PULSE_URL')
+    })
+
+    it.each(['pulse', 'both'])('should use the required PULSE_URL in %s mode', async (source) => {
+      const requireString = jest.fn(async (_key: string) => PULSE_URL)
+
+      const component = await buildComponent(source, requireString)
+      mockFetcher.fetch.mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ ok: true, peers: [] })
+      } as any)
+      await component.fetchPeers()
+
+      expect(mockFetcher.fetch).toHaveBeenCalledWith(`${PULSE_URL}/peers?all=true`)
+    })
+
+    it.each([undefined, 'archipelago'])('should not require PULSE_URL when PRESENCE_SOURCE is %s', async (source) => {
+      const requireString = jest.fn()
+
+      await expect(buildComponent(source, requireString)).resolves.toBeDefined()
+      expect(requireString).not.toHaveBeenCalled()
+    })
+  })
+
   describe('when fetching peers', () => {
     describe('and Pulse answers the all-realms golden body', () => {
       beforeEach(() => {
@@ -58,9 +103,7 @@ describe('PulseStatsComponent', () => {
       })
 
       it('should lowercase them', async () => {
-        await expect(pulseStats.fetchPeers()).resolves.toEqual([
-          '0x00000000000000000000000000000000000000ab'
-        ])
+        await expect(pulseStats.fetchPeers()).resolves.toEqual(['0x00000000000000000000000000000000000000ab'])
       })
     })
 

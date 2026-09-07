@@ -1,6 +1,6 @@
 import { AppComponents, IPulseStatsComponent } from '../types'
 import { normalizeAddress } from '../utils/address'
-import { PEERS_CACHE_KEY_PULSE } from '../utils/peers'
+import { getPresenceSource, PEERS_CACHE_KEY_PULSE, usesPulsePresence } from '../utils/peers'
 
 /**
  * Reconciliation source for `PRESENCE_SOURCE=pulse|both`: Pulse's all-realms peer list.
@@ -16,7 +16,13 @@ export async function createPulseStatsComponent({
   redis
 }: Pick<AppComponents, 'logs' | 'config' | 'fetcher' | 'redis'>): Promise<IPulseStatsComponent> {
   const logger = logs.getLogger('pulse-stats-component')
-  const url = await config.getString('PULSE_URL')
+  const presenceSource = await getPresenceSource(config)
+  // A2: this component is constructed in every mode, but the moment `PRESENCE_SOURCE` selects the
+  // Pulse source a missing URL is a total presence outage whose only symptom would be a fetch error
+  // every 5 s — so it becomes a loud boot failure instead.
+  const url = usesPulsePresence(presenceSource)
+    ? await config.requireString('PULSE_URL')
+    : await config.getString('PULSE_URL')
 
   return {
     async fetchPeers() {
