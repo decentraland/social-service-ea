@@ -561,11 +561,24 @@ describe('friendsDb', () => {
     })
 
     it('should exclude a requested address the caller has a block with, matching that address alone', () => {
-      expect(queryText).toContain('WHERE b.address = uf.address')
+      // The exclusion lives in the friends CTE now, correlated to each friendship row through the
+      // same CASE that resolves the counterparty — so it still matches one address at a time.
+      expect(queryText.replace(/\s+/gu, ' ')).toMatch(
+        /NOT EXISTS \(SELECT 1 FROM blocks b WHERE .*b\.blocked_address = CASE WHEN f\.address_requester/u
+      )
+    })
+
+    it('should check the block in both directions', () => {
+      const predicate = queryText.replace(/\s+/gu, ' ')
+      expect(predicate).toContain('b.blocker_address = $')
+      expect(predicate).toContain('b.blocked_address = $')
     })
 
     it('should never compare the block list against the whole requested batch', () => {
+      // The defect this replaced compared a materialized block list to the entire batch, which made
+      // the subquery a constant: one block anywhere emptied the whole result.
       expect(queryText).not.toMatch(/b\.address\s*=\s*ANY/)
+      expect(queryText).not.toContain('blocked_for_user')
     })
   })
 
