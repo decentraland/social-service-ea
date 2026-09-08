@@ -35,7 +35,6 @@ import {
   IRegistryComponent
 } from './components'
 import { ICommunityVoiceChatCacheComponent } from '../logic/community-voice/community-voice-cache'
-import { ICommunityVoiceChatPollingComponent } from '../logic/community-voice/community-voice-polling'
 import {
   ICommunitiesComponent,
   ICommunityBansComponent,
@@ -141,8 +140,6 @@ export type BaseComponents = {
   cdnCacheInvalidator: ICdnCacheInvalidatorComponent
   friends: IFriendsComponent
   communityVoiceChatCache: ICommunityVoiceChatCacheComponent
-  communityVoiceChatPolling: ICommunityVoiceChatPollingComponent
-  communityVoiceChatPollingJob?: IJobComponent
   communityRankingCalculationJob?: IJobComponent
   slack: ISlackComponent
   schemaValidator: ISchemaValidatorComponent<GlobalContext>
