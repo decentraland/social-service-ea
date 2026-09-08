@@ -124,6 +124,8 @@ export function createCommunitiesDBComponent(
     },
 
     async getCommunityPublicInformation(id: string): Promise<Omit<CommunityPublicInformation, 'ownerName'> | null> {
+      // The `onlyPublic` argument below reaches the members-count CTE, which is LEFT JOINed and only
+      // computes counts, so it filters nothing. The predicate has to sit in this query's own WHERE.
       const baseQuery = useCTEs([getCommunitiesWithMembersCountCTE({ onlyPublic: true })]).append(
         SQL`
         SELECT 
@@ -136,7 +138,7 @@ export function createCommunitiesDBComponent(
           cwmc."membersCount"
         FROM communities c
         LEFT JOIN communities_with_members_count cwmc ON c.id = cwmc.id
-        WHERE c.id = ${id} AND c.active = true`
+        WHERE c.id = ${id} AND c.active = true AND c.private = false`
       )
 
       const result = await pg.query<Omit<CommunityPublicInformation, 'ownerName'>>(baseQuery)

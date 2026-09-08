@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { CommunityRole } from '../../src/types'
 import { test } from '../components'
 import { createTestIdentity, Identity, makeAuthenticatedRequest } from './utils/auth'
-import { CommunityOwnerNotFoundError, CommunityPrivacyEnum, CommunityVisibilityEnum } from '../../src/logic/community'
+import {
+  CommunityOwnerNotFoundError,
+  CommunityPrivacyEnum,
+  CommunityRequestType,
+  CommunityVisibilityEnum
+} from '../../src/logic/community'
 
 test('Get Community Controller', function ({ components, spyComponents }) {
   const makeRequest = makeAuthenticatedRequest(components)
@@ -44,6 +49,60 @@ test('Get Community Controller', function ({ components, spyComponents }) {
             unlisted: false
           })
           communityId = id
+        })
+
+        describe('and the community is private and the caller is signed but not a member', () => {
+          beforeEach(async () => {
+            await components.communitiesDb.updateCommunity(communityId, { private: true })
+          })
+
+          it('should respond with a 404 on v1', async () => {
+            const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+
+            expect(response.status).toBe(404)
+          })
+
+          it('should respond with a 404 on v2', async () => {
+            const response = await makeRequest(identity, `/v2/communities/${communityId}`)
+
+            expect(response.status).toBe(404)
+          })
+
+          describe('and the caller holds a pending invite', () => {
+            beforeEach(async () => {
+              await components.communitiesDb.createCommunityRequest(
+                communityId,
+                identity.realAccount.address.toLowerCase(),
+                CommunityRequestType.Invite
+              )
+            })
+
+            it('should let them read it, so they can act on the invitation', async () => {
+              const response = await makeRequest(identity, `/v1/communities/${communityId}`)
+
+              expect(response.status).toBe(200)
+            })
+          })
+        })
+
+        describe('and the community is private', () => {
+          beforeEach(async () => {
+            await components.communitiesDb.updateCommunity(communityId, { private: true })
+          })
+
+          it('should respond with a 404 rather than its name, description and owner', async () => {
+            const { localHttpFetch } = components
+            const response = await localHttpFetch.fetch(`/v1/communities/${communityId}`)
+
+            expect(response.status).toBe(404)
+          })
+
+          it('should respond with a 404 on v2 as well', async () => {
+            const { localHttpFetch } = components
+            const response = await localHttpFetch.fetch(`/v2/communities/${communityId}`)
+
+            expect(response.status).toBe(404)
+          })
         })
 
         it('should respond with a 200 status code', async () => {

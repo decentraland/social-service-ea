@@ -134,6 +134,73 @@ describe('Community Component', () => {
   describe('when getting a community', () => {
     const userAddress = '0x1234567890123456789012345678901234567890'
 
+    describe('and the community is private', () => {
+      beforeEach(() => {
+        mockCommunitiesDB.getCommunityMembersCount.mockResolvedValue(10)
+        mockCommsGatekeeper.getCommunityVoiceChatStatus.mockResolvedValue({
+          isActive: false,
+          participantCount: 0,
+          moderatorCount: 0
+        })
+        mockCommunityOwners.getOwnerName.mockResolvedValue('Test Owner Name')
+        mockCommunityEvents.isCurrentlyHostingEvents.mockResolvedValue(false)
+      })
+
+      describe('and the caller is not a member', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Private,
+            role: CommunityRole.None
+          })
+          mockCommunitiesDB.getCommunityRequests.mockResolvedValue([])
+        })
+
+        it('should answer as though the community does not exist', async () => {
+          await expect(communityComponent.getCommunity(communityId, { as: userAddress })).rejects.toThrow(
+            CommunityNotFoundError
+          )
+        })
+
+        it('should not disclose it through the v2 read either', async () => {
+          await expect(communityComponent.getCommunityWithoutProfile(communityId, { as: userAddress })).rejects.toThrow(
+            CommunityNotFoundError
+          )
+        })
+      })
+
+      describe('and the caller holds a pending invite', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Private,
+            role: CommunityRole.None
+          })
+          mockCommunitiesDB.getCommunityRequests.mockResolvedValue([{ id: 'request-1' }] as any)
+        })
+
+        it('should let them read it, so they can act on the invitation', async () => {
+          await expect(communityComponent.getCommunity(communityId, { as: userAddress })).resolves.toBeDefined()
+        })
+      })
+
+      describe('and the caller is a member', () => {
+        beforeEach(() => {
+          mockCommunitiesDB.getCommunity.mockResolvedValue({
+            ...mockCommunity,
+            privacy: CommunityPrivacyEnum.Private,
+            role: CommunityRole.Member
+          })
+          mockCommunitiesDB.getCommunityRequests.mockResolvedValue([])
+        })
+
+        it('should return it without looking for an invite', async () => {
+          await expect(communityComponent.getCommunity(communityId, { as: userAddress })).resolves.toBeDefined()
+          expect(mockCommunitiesDB.getCommunityRequests).not.toHaveBeenCalled()
+        })
+      })
+    })
+
     describe('and the community exists', () => {
       const mockVoiceChatStatus = {
         isActive: true,
