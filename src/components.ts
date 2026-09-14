@@ -52,7 +52,6 @@ import { createReferralComponent } from './logic/referral'
 import { createMessageProcessorComponent, createMessagesConsumerComponent } from './logic/sqs'
 import { createMemoryQueueAdapter } from './adapters/memory-queue'
 import { createPeersStatsComponent } from './logic/peers-stats'
-import { getPresenceSource } from './utils/peers'
 import { createS3Adapter } from './adapters/s3'
 import { createJobComponent } from './logic/job'
 import { createPlacesApiAdapter } from './adapters/places-api'
@@ -151,7 +150,6 @@ export async function initComponents(): Promise<AppComponents> {
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const redis = await createRedisComponent({ logs, config })
   const pubsub = createPubSubComponent({ logs, redis })
-  const presenceSource = await getPresenceSource(config)
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, fetcher, redis })
   const pulseStats = await createPulseStatsComponent({ logs, config, fetcher, redis })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
@@ -182,7 +180,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
-  const peersStats = createPeersStatsComponent({ archipelagoStats, pulseStats, worldsStats }, presenceSource)
+  const peersStats = createPeersStatsComponent({ pulseStats })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })
 
   const communityBroadcaster = createCommunityBroadcasterComponent({ sns, communitiesDb })
@@ -307,7 +305,6 @@ export async function initComponents(): Promise<AppComponents> {
 
   const peersSynchronizer = await createPeersSynchronizerComponent({
     logs,
-    archipelagoStats,
     pulseStats,
     redis,
     config

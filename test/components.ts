@@ -69,7 +69,6 @@ import { createReferralDBComponent } from '../src/adapters/referral-db'
 import { createReferralComponent } from '../src/logic/referral/referral'
 import { createMemoryQueueAdapter } from '../src/adapters/memory-queue'
 import { createPeersStatsComponent } from '../src/logic/peers-stats'
-import { getPresenceSource } from '../src/utils/peers'
 import { createStorageHelper } from './integration/utils/storage'
 import { createUpdateHandlerComponent } from '../src/logic/updates'
 import { AnalyticsEventPayload } from '../src/types/analytics'
@@ -161,7 +160,6 @@ async function initComponents(): Promise<TestComponents> {
   const sns = createSNSMockedComponent({})
   const storage = await createS3Adapter({ config })
   const subscribersContext = createSubscribersContext()
-  const presenceSource = await getPresenceSource(config)
   const archipelagoStats = await createArchipelagoStatsComponent({ logs, config, redis, fetcher })
   const pulseStats = await createPulseStatsComponent({ logs, config, redis, fetcher })
   const worldsStats = await createWorldsStatsComponent({ logs, redis })
@@ -178,7 +176,7 @@ async function initComponents(): Promise<TestComponents> {
     pubsub,
     analytics
   })
-  const peersStats = createPeersStatsComponent({ archipelagoStats, pulseStats, worldsStats }, presenceSource)
+  const peersStats = createPeersStatsComponent({ pulseStats })
   const communityRoles = createCommunityRolesComponent({ communitiesDb, logs })
   const placesApi = await createPlacesApiAdapter({ fetcher, config })
   const communityThumbnail = await createCommunityThumbnailComponent({ config, storage })

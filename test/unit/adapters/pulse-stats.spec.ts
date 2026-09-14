@@ -4,7 +4,7 @@ import { createDotEnvConfigComponent } from '@well-known-components/env-config-p
 import { createPulseStatsComponent } from '../../../src/adapters/pulse-stats'
 import { IPulseStatsComponent } from '../../../src/types'
 import { createMockConfigComponent, mockFetcher, mockLogs, mockRedis } from '../../mocks/components'
-import { PEERS_CACHE_KEY_PULSE } from '../../../src/utils/peers'
+import { PEERS_CACHE_KEY } from '../../../src/utils/peers'
 
 const PULSE_URL = 'https://pulse.example.com'
 
@@ -21,40 +21,38 @@ describe('PulseStatsComponent', () => {
       logs: mockLogs,
       redis: mockRedis,
       config: createMockConfigComponent({
-        getString: jest.fn(async (key: string) => (key === 'PULSE_URL' ? PULSE_URL : undefined))
+        requireString: jest.fn(async (key: string) => (key === 'PULSE_URL' ? PULSE_URL : undefined))
       }),
       fetcher: mockFetcher
     })
   })
 
   describe('when the component is created', () => {
-    function buildComponent(presenceSource: string | undefined, requireString: jest.Mock) {
+    function buildComponent(requireString: jest.Mock) {
       return createPulseStatsComponent({
         logs: mockLogs,
         redis: mockRedis,
-        config: createMockConfigComponent({
-          getString: jest.fn(async (key: string) => (key === 'PRESENCE_SOURCE' ? presenceSource : undefined)),
-          requireString: requireString as any
-        }),
+        config: createMockConfigComponent({ requireString: requireString as any }),
         fetcher: mockFetcher
       })
     }
 
-    // A2: selecting the Pulse source without a URL used to degrade into an empty peer set and a
-    // log line every 5 s. It has to be a loud boot failure instead.
-    it.each(['pulse', 'both'])('should fail to start in %s mode when PULSE_URL is missing', async (source) => {
+    // A2: Pulse is the only presence source, so a missing URL is a total presence outage whose only
+    // symptom used to be a fetch error every 5 s. It has to be a loud boot failure instead, always —
+    // there is no other mode where the requirement is relaxed.
+    it('should fail to start when PULSE_URL is missing', async () => {
       const requireString = jest.fn(async (key: string) => {
         throw new Error(`Configuration: string ${key} is required`)
       })
 
-      await expect(buildComponent(source, requireString)).rejects.toThrow('PULSE_URL')
+      await expect(buildComponent(requireString)).rejects.toThrow('PULSE_URL')
       expect(requireString).toHaveBeenCalledWith('PULSE_URL')
     })
 
-    it.each(['pulse', 'both'])('should use the required PULSE_URL in %s mode', async (source) => {
+    it('should use the required PULSE_URL to fetch peers', async () => {
       const requireString = jest.fn(async (_key: string) => PULSE_URL)
 
-      const component = await buildComponent(source, requireString)
+      const component = await buildComponent(requireString)
       mockFetcher.fetch.mockResolvedValue({
         ok: true,
         json: jest.fn().mockResolvedValue({ ok: true, peers: [] })
@@ -64,18 +62,11 @@ describe('PulseStatsComponent', () => {
       expect(mockFetcher.fetch).toHaveBeenCalledWith(`${PULSE_URL}/peers?all=true`)
     })
 
-    it.each([undefined, 'archipelago'])('should not require PULSE_URL when PRESENCE_SOURCE is %s', async (source) => {
-      const requireString = jest.fn()
-
-      await expect(buildComponent(source, requireString)).resolves.toBeDefined()
-      expect(requireString).not.toHaveBeenCalled()
-    })
-
-    // R2-F1: the tests above inject a `requireString` that throws, which only proves the adapter
-    // asks. `.env.default` is a *live* config source inside the deployed image (`src/components.ts`
-    // loads `['.env.default', '.env']`, the Dockerfile copies the file into the process's cwd), so a
-    // placeholder in it would satisfy `requireString` and A2's loud boot failure would never happen
-    // where it matters. These resolve `PULSE_URL` exactly as the container does.
+    // R2-F1: a `requireString` that throws only proves the adapter asks. `.env.default` is a *live*
+    // config source inside the deployed image (`src/components.ts` loads `['.env.default', '.env']`,
+    // the Dockerfile copies the file into the process's cwd), so a placeholder in it would satisfy
+    // `requireString` and A2's loud boot failure would never happen where it matters. These resolve
+    // `PULSE_URL` exactly as the container does.
     describe('and the config is the real dotenv component reading the committed .env.default', () => {
       const ENV_DEFAULT_PATH = resolve(__dirname, '../../../.env.default')
 
@@ -84,7 +75,6 @@ describe('PulseStatsComponent', () => {
       beforeEach(() => {
         envSnapshot = { ...process.env }
         delete process.env.PULSE_URL
-        process.env.PRESENCE_SOURCE = 'pulse'
       })
 
       afterEach(() => {
@@ -102,18 +92,18 @@ describe('PulseStatsComponent', () => {
         return createPulseStatsComponent({ logs: mockLogs, redis: mockRedis, config, fetcher: mockFetcher })
       }
 
-      it('should fail to start in pulse mode when .env.default is the only source of PULSE_URL', async () => {
+      it('should fail to start when .env.default is the only source of PULSE_URL', async () => {
         await expect(buildWithRealConfig()).rejects.toThrow('PULSE_URL')
       })
 
-      it('should start in pulse mode when PULSE_URL resolves to an absolute http(s) URL', async () => {
+      it('should start when PULSE_URL resolves to an absolute http(s) URL', async () => {
         process.env.PULSE_URL = 'http://pulse.example.com'
 
         await expect(buildWithRealConfig()).resolves.toBeDefined()
       })
 
       it.each(['<URL>', '', 'pulse.example.com', 'ftp://pulse.example.com'])(
-        'should fail to start in pulse mode when PULSE_URL resolves to %p',
+        'should fail to start when PULSE_URL resolves to %p',
         async (value) => {
           process.env.PULSE_URL = value
 
@@ -181,11 +171,11 @@ describe('PulseStatsComponent', () => {
   })
 
   describe('when getting peers from the cache', () => {
-    it('should read the pulse cache key', async () => {
+    it('should read the shared reconciled-peers cache key', async () => {
       mockRedis.get.mockResolvedValue(['0x123'])
 
       await expect(pulseStats.getPeers()).resolves.toEqual(['0x123'])
-      expect(mockRedis.get).toHaveBeenCalledWith(PEERS_CACHE_KEY_PULSE)
+      expect(mockRedis.get).toHaveBeenCalledWith(PEERS_CACHE_KEY)
     })
 
     it('should return an empty array when nothing is cached', async () => {
