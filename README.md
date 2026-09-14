@@ -57,13 +57,11 @@ docker compose logs -f
 
 For detailed setup instructions, see [Getting Started](https://github.com/decentraland/social-service-ea/wiki/Getting-Started).
 
-### Presence sources
+### Presence
 
-Who is online comes either from archipelago (five `peer.*` NATS subjects + `ARCHIPELAGO_STATS_URL`)
-or from Pulse (one `engine.parcel_changes` subscription + `PULSE_URL`). `PRESENCE_SOURCE`
-(`archipelago` | `pulse` | `both`, default `archipelago`) selects which, and `both` runs the two side
-by side and logs their difference every 60 s. See
-[docs/presence-sources.md](docs/presence-sources.md).
+Who is online comes from Pulse, the only presence source: one NATS subject consumed,
+`engine.parcel_changes`, plus reconciliation against `GET ${PULSE_URL}/peers?all=true`. `PULSE_URL`
+is required at boot. See [docs/presence.md](docs/presence.md).
 
 ## License
 
