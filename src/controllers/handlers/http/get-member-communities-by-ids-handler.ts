@@ -1,17 +1,18 @@
-import { HandlerContextWithPath, HTTPResponse } from '../../../types'
+import { CommunityRole, HandlerContextWithPath, HTTPResponse } from '../../../types'
 import { errorMessageOrDefault } from '../../../utils/errors'
 import { normalizeAddress } from '../../../utils/address'
 import { GetMemberCommunitiesByIdsRequestBody } from './schemas'
 import { InvalidRequestError } from '@dcl/http-commons'
 
 export type GetMemberCommunitiesByIdsResponse = {
-  communities: Array<{ id: string }>
+  communities: Array<{ id: string; role: CommunityRole }>
 }
 
 /**
- * Handler to validate a batch of community IDs and return only those visible to a user.
+ * Handler to filter a batch of community IDs down to the ones the address is a member of.
  * This endpoint uses bearer token authentication (admin token) and is intended to be
- * called by other services (like worlds-content-server) to validate community IDs.
+ * called by other services (like worlds-content-server) that authorize users based on
+ * community membership. Only actual memberships are returned, never merely visible communities.
  */
 export async function getMemberCommunitiesByIdsHandler(
   context: Pick<
@@ -37,13 +38,13 @@ export async function getMemberCommunitiesByIdsHandler(
       communityIdsCount: communityIds.length
     })
 
-    const visibleCommunities = await communitiesDb.getVisibleCommunitiesByIds(communityIds, normalizedMemberAddress)
+    const memberCommunities = await communitiesDb.getMemberCommunitiesByIds(communityIds, normalizedMemberAddress)
 
     return {
       status: 200,
       body: {
         data: {
-          communities: visibleCommunities
+          communities: memberCommunities
         }
       }
     }

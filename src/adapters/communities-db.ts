@@ -1375,25 +1375,30 @@ export function createCommunitiesDBComponent(
       await pg.query(query)
     },
 
-    async getVisibleCommunitiesByIds(communityIds: string[], userAddress: EthAddress): Promise<Array<{ id: string }>> {
+    async getMemberCommunitiesByIds(
+      communityIds: string[],
+      memberAddress: EthAddress
+    ): Promise<Array<{ id: string; role: CommunityRole }>> {
       if (communityIds.length === 0) {
         return []
       }
 
-      const normalizedUserAddress = normalizeAddress(userAddress)
+      const normalizedMemberAddress = normalizeAddress(memberAddress)
 
+      // Only an existing membership row qualifies a community here. Listing and privacy are ignored on
+      // purpose: other services use this result to authorize users, so a listed community the address
+      // never joined must not come back as if it were a membership.
       const query = SQL`
-        SELECT DISTINCT c.id
+        SELECT c.id, cm.role
         FROM communities c
-        LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedUserAddress}
-        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedUserAddress} AND cb.active = true
+        JOIN community_members cm ON c.id = cm.community_id AND cm.member_address = ${normalizedMemberAddress}
+        LEFT JOIN community_bans cb ON c.id = cb.community_id AND cb.banned_address = ${normalizedMemberAddress} AND cb.active = true
         WHERE c.id = ANY(${communityIds})
           AND c.active = true
           AND cb.banned_address IS NULL
-          AND (c.unlisted = false OR cm.member_address IS NOT NULL)
       `
 
-      const result = await pg.query<{ id: string }>(query)
+      const result = await pg.query<{ id: string; role: CommunityRole }>(query)
       return result.rows
     },
 

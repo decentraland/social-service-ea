@@ -268,7 +268,17 @@ export interface ICommunitiesDatabaseComponent {
       >
     >
   ): Promise<void>
-  getVisibleCommunitiesByIds(communityIds: string[], userAddress: EthAddress): Promise<Array<{ id: string }>>
+  /**
+   * Returns, out of the given ids, the active communities the address is a member of together with its role.
+   *
+   * Only an existing membership row qualifies. Listing and privacy are ignored on purpose: the result backs
+   * authorization decisions in other services, so visibility must never stand in for membership.
+   * Communities the address is banned from are excluded.
+   */
+  getMemberCommunitiesByIds(
+    communityIds: string[],
+    memberAddress: EthAddress
+  ): Promise<Array<{ id: string; role: CommunityRole }>>
   /**
    * Searches communities by name for a specific caller.
    *

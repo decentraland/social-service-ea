@@ -3,7 +3,7 @@ import {
   GetMemberCommunitiesByIdsResponse
 } from '../../../../../src/controllers/handlers/http/get-member-communities-by-ids-handler'
 import { createLogsMockedComponent, mockCommunitiesDB } from '../../../../mocks/components'
-import { HTTPResponse } from '../../../../../src/types'
+import { CommunityRole, HTTPResponse } from '../../../../../src/types'
 
 describe('getMemberCommunitiesByIdsHandler', () => {
   let mockLogs: ReturnType<typeof createLogsMockedComponent>
@@ -29,85 +29,82 @@ describe('getMemberCommunitiesByIdsHandler', () => {
 
       beforeEach(() => {
         memberAddress = '0x1234567890123456789012345678901234567890'
-        communityIds = [
-          'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-          'b2c3d4e5-f6a7-8901-bcde-f12345678901'
-        ]
+        communityIds = ['a1b2c3d4-e5f6-7890-abcd-ef1234567890', 'b2c3d4e5-f6a7-8901-bcde-f12345678901']
         mockRequest.json.mockResolvedValue({ communityIds })
       })
 
-      describe('and all communities are visible to the user', () => {
-        let visibleCommunities: Array<{ id: string }>
+      describe('and the address is a member of all the requested communities', () => {
+        let memberCommunities: Array<{ id: string; role: CommunityRole }>
 
         beforeEach(() => {
-          visibleCommunities = [{ id: communityIds[0] }, { id: communityIds[1] }]
-          mockCommunitiesDb.getVisibleCommunitiesByIds.mockResolvedValue(visibleCommunities)
+          memberCommunities = [
+            { id: communityIds[0], role: CommunityRole.Member },
+            { id: communityIds[1], role: CommunityRole.Moderator }
+          ]
+          mockCommunitiesDb.getMemberCommunitiesByIds.mockResolvedValue(memberCommunities)
         })
 
-        it('should return all visible communities with status 200', async () => {
-          const result = await getMemberCommunitiesByIdsHandler({
+        it('should respond with a 200 and every community along with the role held in it', async () => {
+          const result = (await getMemberCommunitiesByIdsHandler({
             components: { communitiesDb: mockCommunitiesDb, logs: mockLogs },
             params: { address: memberAddress },
             request: mockRequest
-          } as any) as HTTPResponse<GetMemberCommunitiesByIdsResponse>
+          } as any)) as HTTPResponse<GetMemberCommunitiesByIdsResponse>
 
           expect(result.status).toBe(200)
           expect(result.body).toEqual({
             data: {
-              communities: visibleCommunities
+              communities: memberCommunities
             }
           })
         })
 
-        it('should call getVisibleCommunitiesByIds with normalized address', async () => {
+        it('should look up the memberships with the normalized address', async () => {
           await getMemberCommunitiesByIdsHandler({
             components: { communitiesDb: mockCommunitiesDb, logs: mockLogs },
             params: { address: memberAddress.toUpperCase() },
             request: mockRequest
           } as any)
 
-          expect(mockCommunitiesDb.getVisibleCommunitiesByIds).toHaveBeenCalledWith(
-            communityIds,
-            memberAddress
-          )
+          expect(mockCommunitiesDb.getMemberCommunitiesByIds).toHaveBeenCalledWith(communityIds, memberAddress)
         })
       })
 
-      describe('and some communities are not visible to the user', () => {
-        let visibleCommunities: Array<{ id: string }>
+      describe('and the address is a member of only some of the requested communities', () => {
+        let memberCommunities: Array<{ id: string; role: CommunityRole }>
 
         beforeEach(() => {
-          visibleCommunities = [{ id: communityIds[0] }]
-          mockCommunitiesDb.getVisibleCommunitiesByIds.mockResolvedValue(visibleCommunities)
+          memberCommunities = [{ id: communityIds[0], role: CommunityRole.Member }]
+          mockCommunitiesDb.getMemberCommunitiesByIds.mockResolvedValue(memberCommunities)
         })
 
-        it('should return only visible communities', async () => {
-          const result = await getMemberCommunitiesByIdsHandler({
+        it('should respond only with the communities the address is a member of', async () => {
+          const result = (await getMemberCommunitiesByIdsHandler({
             components: { communitiesDb: mockCommunitiesDb, logs: mockLogs },
             params: { address: memberAddress },
             request: mockRequest
-          } as any) as HTTPResponse<GetMemberCommunitiesByIdsResponse>
+          } as any)) as HTTPResponse<GetMemberCommunitiesByIdsResponse>
 
           expect(result.status).toBe(200)
           expect(result.body).toEqual({
             data: {
-              communities: [{ id: communityIds[0] }]
+              communities: [{ id: communityIds[0], role: CommunityRole.Member }]
             }
           })
         })
       })
 
-      describe('and no communities are visible to the user', () => {
+      describe('and the address is not a member of any of the requested communities', () => {
         beforeEach(() => {
-          mockCommunitiesDb.getVisibleCommunitiesByIds.mockResolvedValue([])
+          mockCommunitiesDb.getMemberCommunitiesByIds.mockResolvedValue([])
         })
 
-        it('should return an empty array', async () => {
-          const result = await getMemberCommunitiesByIdsHandler({
+        it('should respond with an empty list of communities', async () => {
+          const result = (await getMemberCommunitiesByIdsHandler({
             components: { communitiesDb: mockCommunitiesDb, logs: mockLogs },
             params: { address: memberAddress },
             request: mockRequest
-          } as any) as HTTPResponse<GetMemberCommunitiesByIdsResponse>
+          } as any)) as HTTPResponse<GetMemberCommunitiesByIdsResponse>
 
           expect(result.status).toBe(200)
           expect(result.body).toEqual({
@@ -129,10 +126,10 @@ describe('getMemberCommunitiesByIdsHandler', () => {
         communityIds = ['a1b2c3d4-e5f6-7890-abcd-ef1234567890']
         dbError = new Error('Database connection failed')
         mockRequest.json.mockResolvedValue({ communityIds })
-        mockCommunitiesDb.getVisibleCommunitiesByIds.mockRejectedValue(dbError)
+        mockCommunitiesDb.getMemberCommunitiesByIds.mockRejectedValue(dbError)
       })
 
-      it('should return status 500 with error message', async () => {
+      it('should respond with a 500 and the error message', async () => {
         const result = await getMemberCommunitiesByIdsHandler({
           components: { communitiesDb: mockCommunitiesDb, logs: mockLogs },
           params: { address: memberAddress },
@@ -163,17 +160,19 @@ describe('getMemberCommunitiesByIdsHandler', () => {
         memberAddress = '0xAbCdEf1234567890123456789012345678901234'
         communityIds = ['a1b2c3d4-e5f6-7890-abcd-ef1234567890']
         mockRequest.json.mockResolvedValue({ communityIds })
-        mockCommunitiesDb.getVisibleCommunitiesByIds.mockResolvedValue([{ id: communityIds[0] }])
+        mockCommunitiesDb.getMemberCommunitiesByIds.mockResolvedValue([
+          { id: communityIds[0], role: CommunityRole.Member }
+        ])
       })
 
-      it('should normalize the address to lowercase', async () => {
+      it('should normalize the address to lowercase before looking up the memberships', async () => {
         await getMemberCommunitiesByIdsHandler({
           components: { communitiesDb: mockCommunitiesDb, logs: mockLogs },
           params: { address: memberAddress },
           request: mockRequest
         } as any)
 
-        expect(mockCommunitiesDb.getVisibleCommunitiesByIds).toHaveBeenCalledWith(
+        expect(mockCommunitiesDb.getMemberCommunitiesByIds).toHaveBeenCalledWith(
           communityIds,
           memberAddress.toLowerCase()
         )

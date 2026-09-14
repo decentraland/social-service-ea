@@ -5,84 +5,94 @@ import { mockCommunity } from '../mocks/communities'
 test('Get Member Communities By IDs Controller', function ({ components, spyComponents }) {
   describe('when getting member communities by IDs', () => {
     let address: string
+    let ownerAddress: string
+    let headers: Record<string, string>
     let publicCommunityId: string
+    let publicCommunityWithMembershipId: string
     let privateCommunityId: string
     let privateCommunityWithMembershipId: string
     let unlistedCommunityId: string
     let unlistedCommunityWithMembershipId: string
-    let headers: Record<string, string>
 
     beforeEach(async () => {
       address = '0x1234567890123456789012345678901234567890'
+      ownerAddress = '0x9876543210987654321098765432109876543210'
 
       headers = {
         Authorization: 'Bearer test-token',
         'Content-Type': 'application/json'
       }
 
-      // Create a public community (visible to all)
       const publicResult = await components.communitiesDb.createCommunity(
         mockCommunity({
           name: 'Public Community',
-          description: 'A public community',
-          owner_address: '0x9876543210987654321098765432109876543210',
+          description: 'A public community the address has not joined',
+          owner_address: ownerAddress,
           private: false
         })
       )
       publicCommunityId = publicResult.id
 
-      // Create a private community (not visible unless member)
+      const publicMemberResult = await components.communitiesDb.createCommunity(
+        mockCommunity({
+          name: 'Public Community with Membership',
+          description: 'A public community the address is a member of',
+          owner_address: ownerAddress,
+          private: false
+        })
+      )
+      publicCommunityWithMembershipId = publicMemberResult.id
+
       const privateResult = await components.communitiesDb.createCommunity(
         mockCommunity({
           name: 'Private Community',
-          description: 'A private community',
-          owner_address: '0x9876543210987654321098765432109876543210',
+          description: 'A private community the address has not joined',
+          owner_address: ownerAddress,
           private: true
         })
       )
       privateCommunityId = privateResult.id
 
-      // Create a private community where user is a member
       const privateMemberResult = await components.communitiesDb.createCommunity(
         mockCommunity({
           name: 'Private Community with Membership',
-          description: 'A private community where user is a member',
-          owner_address: '0x9876543210987654321098765432109876543210',
+          description: 'A private community the address is a member of',
+          owner_address: ownerAddress,
           private: true
         })
       )
       privateCommunityWithMembershipId = privateMemberResult.id
 
-      // Add user as member of the private community
-      await components.communitiesDb.addCommunityMember({
-        communityId: privateCommunityWithMembershipId,
-        memberAddress: address,
-        role: CommunityRole.Member
-      })
-
-      // Create an unlisted community (not visible unless member)
       const unlistedResult = await components.communitiesDb.createCommunity(
         mockCommunity({
           name: 'Unlisted Community',
-          description: 'An unlisted community',
-          owner_address: '0x9876543210987654321098765432109876543210',
+          description: 'An unlisted community the address has not joined',
+          owner_address: ownerAddress,
           unlisted: true
         })
       )
       unlistedCommunityId = unlistedResult.id
 
-      // Create an unlisted community where user is a member
       const unlistedMemberResult = await components.communitiesDb.createCommunity(
         mockCommunity({
           name: 'Unlisted Community with Membership',
-          description: 'An unlisted community where user is a member',
-          owner_address: '0x9876543210987654321098765432109876543210',
+          description: 'An unlisted community the address is a member of',
+          owner_address: ownerAddress,
           unlisted: true
         })
       )
       unlistedCommunityWithMembershipId = unlistedMemberResult.id
 
-      // Add user as member of the unlisted community
+      await components.communitiesDb.addCommunityMember({
+        communityId: publicCommunityWithMembershipId,
+        memberAddress: address,
+        role: CommunityRole.Member
+      })
+      await components.communitiesDb.addCommunityMember({
+        communityId: privateCommunityWithMembershipId,
+        memberAddress: address,
+        role: CommunityRole.Member
+      })
       await components.communitiesDb.addCommunityMember({
         communityId: unlistedCommunityWithMembershipId,
         memberAddress: address,
@@ -91,9 +101,11 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
     })
 
     afterEach(async () => {
+      await components.communitiesDbHelper.forceCommunityMemberRemoval(publicCommunityWithMembershipId, [address])
       await components.communitiesDbHelper.forceCommunityMemberRemoval(privateCommunityWithMembershipId, [address])
       await components.communitiesDbHelper.forceCommunityMemberRemoval(unlistedCommunityWithMembershipId, [address])
       await components.communitiesDbHelper.forceCommunityRemoval(publicCommunityId)
+      await components.communitiesDbHelper.forceCommunityRemoval(publicCommunityWithMembershipId)
       await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityId)
       await components.communitiesDbHelper.forceCommunityRemoval(privateCommunityWithMembershipId)
       await components.communitiesDbHelper.forceCommunityRemoval(unlistedCommunityId)
@@ -107,7 +119,7 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ communityIds: [publicCommunityId] })
+            body: JSON.stringify({ communityIds: [publicCommunityWithMembershipId] })
           })
           expect(response.status).toBe(401)
         })
@@ -122,7 +134,7 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
               Authorization: 'Bearer invalid-token',
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ communityIds: [publicCommunityId] })
+            body: JSON.stringify({ communityIds: [publicCommunityWithMembershipId] })
           })
           expect(response.status).toBe(401)
         })
@@ -168,10 +180,16 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
         })
 
         describe('and communityIds exceeds maximum limit', () => {
-          it('should respond with a 400 status code', async () => {
-            const tooManyIds = Array.from({ length: 51 }, (_, i) =>
-              `00000000-0000-0000-0000-${i.toString().padStart(12, '0')}`
+          let tooManyIds: string[]
+
+          beforeEach(() => {
+            tooManyIds = Array.from(
+              { length: 51 },
+              (_, i) => `00000000-0000-0000-0000-${i.toString().padStart(12, '0')}`
             )
+          })
+
+          it('should respond with a 400 status code', async () => {
             const { localHttpFetch } = components
             const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
               method: 'POST',
@@ -183,8 +201,8 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
         })
       })
 
-      describe('and requesting public communities', () => {
-        it('should return the public community', async () => {
+      describe('and requesting a public community the address has not joined', () => {
+        it('should respond with no communities even though the community is listed', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
@@ -196,14 +214,33 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
           expect(response.status).toBe(200)
           expect(body).toEqual({
             data: {
-              communities: [{ id: publicCommunityId }]
+              communities: []
             }
           })
         })
       })
 
-      describe('and requesting private communities without membership', () => {
-        it('should return the private community', async () => {
+      describe('and requesting a public community the address is a member of', () => {
+        it('should respond with the community and the member role', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ communityIds: [publicCommunityWithMembershipId] })
+          })
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body).toEqual({
+            data: {
+              communities: [{ id: publicCommunityWithMembershipId, role: CommunityRole.Member }]
+            }
+          })
+        })
+      })
+
+      describe('and requesting a private community the address has not joined', () => {
+        it('should respond with no communities even though the community is listed', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
@@ -215,45 +252,33 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
           expect(response.status).toBe(200)
           expect(body).toEqual({
             data: {
-              communities: [{ id: privateCommunityId }]
+              communities: []
             }
           })
         })
       })
 
-      describe('and requesting a mix of communities', () => {
-        it('should return only addable communities', async () => {
+      describe('and requesting a private community the address is a member of', () => {
+        it('should respond with the community and the member role', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({
-              communityIds: [
-                publicCommunityId,
-                privateCommunityId,
-                privateCommunityWithMembershipId,
-                unlistedCommunityId,
-                unlistedCommunityWithMembershipId
-              ]
-            })
+            body: JSON.stringify({ communityIds: [privateCommunityWithMembershipId] })
           })
           const body = await response.json()
 
           expect(response.status).toBe(200)
-          expect(body.data.communities).toHaveLength(4)
-          expect(body.data.communities.map((c: { id: string }) => c.id)).toEqual(
-            expect.arrayContaining([
-              publicCommunityId,
-              privateCommunityId,
-              privateCommunityWithMembershipId,
-              unlistedCommunityWithMembershipId
-            ])
-          )
+          expect(body).toEqual({
+            data: {
+              communities: [{ id: privateCommunityWithMembershipId, role: CommunityRole.Member }]
+            }
+          })
         })
       })
 
-      describe('and requesting unlisted communities without membership', () => {
-        it('should not return the unlisted community', async () => {
+      describe('and requesting an unlisted community the address has not joined', () => {
+        it('should respond with no communities', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
@@ -271,8 +296,8 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
         })
       })
 
-      describe('and requesting unlisted communities with membership', () => {
-        it('should return the unlisted community', async () => {
+      describe('and requesting an unlisted community the address is a member of', () => {
+        it('should respond with the community and the member role', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
@@ -284,75 +309,152 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
           expect(response.status).toBe(200)
           expect(body).toEqual({
             data: {
-              communities: [{ id: unlistedCommunityWithMembershipId }]
+              communities: [{ id: unlistedCommunityWithMembershipId, role: CommunityRole.Member }]
+            }
+          })
+        })
+      })
+
+      describe('and requesting a mix of communities', () => {
+        it('should respond only with the communities the address is a member of', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              communityIds: [
+                publicCommunityId,
+                publicCommunityWithMembershipId,
+                privateCommunityId,
+                privateCommunityWithMembershipId,
+                unlistedCommunityId,
+                unlistedCommunityWithMembershipId
+              ]
+            })
+          })
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body.data.communities).toHaveLength(3)
+          expect(body.data.communities).toEqual(
+            expect.arrayContaining([
+              { id: publicCommunityWithMembershipId, role: CommunityRole.Member },
+              { id: privateCommunityWithMembershipId, role: CommunityRole.Member },
+              { id: unlistedCommunityWithMembershipId, role: CommunityRole.Member }
+            ])
+          )
+        })
+      })
+
+      describe('and the address holds a moderator role in a community', () => {
+        beforeEach(async () => {
+          await components.communitiesDb.addCommunityMember({
+            communityId: privateCommunityId,
+            memberAddress: address,
+            role: CommunityRole.Moderator
+          })
+        })
+
+        afterEach(async () => {
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(privateCommunityId, [address])
+        })
+
+        it('should respond with the community and the moderator role', async () => {
+          const { localHttpFetch } = components
+          const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ communityIds: [privateCommunityId] })
+          })
+          const body = await response.json()
+
+          expect(response.status).toBe(200)
+          expect(body).toEqual({
+            data: {
+              communities: [{ id: privateCommunityId, role: CommunityRole.Moderator }]
             }
           })
         })
       })
 
       describe('and requesting non-existent communities', () => {
-        it('should not return non-existent communities', async () => {
-          const nonExistentId = '00000000-0000-0000-0000-000000000000'
+        let nonExistentId: string
+
+        beforeEach(() => {
+          nonExistentId = '00000000-0000-0000-0000-000000000000'
+        })
+
+        it('should respond only with the existing community the address is a member of', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ communityIds: [publicCommunityId, nonExistentId] })
+            body: JSON.stringify({ communityIds: [publicCommunityWithMembershipId, nonExistentId] })
           })
           const body = await response.json()
 
           expect(response.status).toBe(200)
           expect(body).toEqual({
             data: {
-              communities: [{ id: publicCommunityId }]
+              communities: [{ id: publicCommunityWithMembershipId, role: CommunityRole.Member }]
             }
           })
         })
       })
 
-      describe('and checking any user address', () => {
-        it('should allow checking any address without restriction', async () => {
-          const otherAddress = '0x9876543210987654321098765432109876543210'
+      describe('and checking a different address', () => {
+        let otherAddress: string
+
+        beforeEach(async () => {
+          otherAddress = ownerAddress
+          await components.communitiesDb.addCommunityMember({
+            communityId: publicCommunityId,
+            memberAddress: otherAddress,
+            role: CommunityRole.Member
+          })
+        })
+
+        afterEach(async () => {
+          await components.communitiesDbHelper.forceCommunityMemberRemoval(publicCommunityId, [otherAddress])
+        })
+
+        it('should respond only with the memberships of that address', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${otherAddress}/communities`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ communityIds: [publicCommunityId] })
+            body: JSON.stringify({ communityIds: [publicCommunityId, publicCommunityWithMembershipId] })
           })
           const body = await response.json()
 
           expect(response.status).toBe(200)
           expect(body).toEqual({
             data: {
-              communities: [{ id: publicCommunityId }]
+              communities: [{ id: publicCommunityId, role: CommunityRole.Member }]
             }
           })
         })
       })
 
-      describe('and the user is banned from a community', () => {
+      describe('and the address is banned from a community it is a member of', () => {
         beforeEach(async () => {
-          await components.communitiesDb.banMemberFromCommunity(
-            publicCommunityId,
-            '0x9876543210987654321098765432109876543210',
-            address
-          )
+          await components.communitiesDb.banMemberFromCommunity(publicCommunityWithMembershipId, ownerAddress, address)
         })
 
         afterEach(async () => {
           await components.communitiesDb.unbanMemberFromCommunity(
-            publicCommunityId,
-            '0x9876543210987654321098765432109876543210',
+            publicCommunityWithMembershipId,
+            ownerAddress,
             address
           )
         })
 
-        it('should not return the community user is banned from', async () => {
+        it('should respond with no communities', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ communityIds: [publicCommunityId] })
+            body: JSON.stringify({ communityIds: [publicCommunityWithMembershipId] })
           })
           const body = await response.json()
 
@@ -367,17 +469,17 @@ test('Get Member Communities By IDs Controller', function ({ components, spyComp
 
       describe('and the database query fails', () => {
         beforeEach(() => {
-          spyComponents.communitiesDb.getVisibleCommunitiesByIds.mockRejectedValue(
+          spyComponents.communitiesDb.getMemberCommunitiesByIds.mockRejectedValue(
             new Error('Database connection failed')
           )
         })
 
-        it('should respond with a 500 status code and error message', async () => {
+        it('should respond with a 500 status code', async () => {
           const { localHttpFetch } = components
           const response = await localHttpFetch.fetch(`/v1/members/${address}/communities`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ communityIds: [publicCommunityId] })
+            body: JSON.stringify({ communityIds: [publicCommunityWithMembershipId] })
           })
           expect(response.status).toBe(500)
         })
