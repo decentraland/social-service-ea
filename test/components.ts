@@ -296,7 +296,7 @@ async function initComponents(): Promise<TestComponents> {
     voice,
     updateHandler
   })
-  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config })
 
   const localUwsFetch = await createLocalFetchComponent(uwsHttpServerConfig)
   const localHttpFetch = await createLocalFetchComponent(apiSeverConfig)

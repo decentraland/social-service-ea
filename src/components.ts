@@ -312,7 +312,7 @@ export async function initComponents(): Promise<AppComponents> {
     redis,
     config
   })
-  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config, worldsStats })
+  const peerTracking = await createPeerTrackingComponent({ logs, pubsub, nats, redis, config })
   const wsPool = createWsPoolComponent({ logs, metrics })
 
   const expirePrivateVoiceChatJob = createJobComponent(

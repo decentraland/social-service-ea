@@ -6,53 +6,14 @@ import { ParcelChangesBatch } from '@dcl/protocol/out-js/decentraland/pulse/puls
 import { NatsMsg } from '@well-known-components/nats-component/dist/types'
 import { COMMUNITY_MEMBER_CONNECTIVITY_UPDATES_CHANNEL, FRIEND_STATUS_UPDATES_CHANNEL } from './pubsub'
 import { normalizeAddress } from '../utils/address'
-import {
-  getPresenceSource,
-  PEERS_CACHE_KEY,
-  PEERS_CACHE_KEY_PULSE,
-  PresenceSource,
-  usesArchipelagoPresence,
-  usesPulsePresence
-} from '../utils/peers'
-
-export type PeerStatusHandler = {
-  event: PeerStatusHandlerEvent
-  pattern: string
-  status: ConnectivityStatus
-}
-
-export enum PeerStatusHandlerEvent {
-  CONNECT = 'connect',
-  DISCONNECT = 'disconnect',
-  HEARTBEAT = 'heartbeat',
-  JOIN_WORLD = 'join_world',
-  LEAVE_WORLD = 'leave_world'
-}
 
 /**
- * @deprecated Iteration 2 / WP4. Superseded by the single `PARCEL_CHANGES_SUBJECT` subscription.
- * Only subscribed when `PRESENCE_SOURCE` is `archipelago` or `both`; deleted at rollout step 8.
- * See `docs/presence-sources.md`.
+ * The one presence feed, per C1: Pulse's `decentraland.pulse.ParcelChangesBatch`, published on this
+ * single NATS subject. There is no other subscription and no configurable source.
  */
-export const PEER_STATUS_HANDLERS: PeerStatusHandler[] = [
-  { event: PeerStatusHandlerEvent.CONNECT, pattern: 'peer.*.connect', status: ConnectivityStatus.OFFLINE },
-  { event: PeerStatusHandlerEvent.DISCONNECT, pattern: 'peer.*.disconnect', status: ConnectivityStatus.OFFLINE },
-  { event: PeerStatusHandlerEvent.HEARTBEAT, pattern: 'peer.*.heartbeat', status: ConnectivityStatus.ONLINE },
-  { event: PeerStatusHandlerEvent.JOIN_WORLD, pattern: 'peer.*.world.join', status: ConnectivityStatus.ONLINE },
-  { event: PeerStatusHandlerEvent.LEAVE_WORLD, pattern: 'peer.*.world.leave', status: ConnectivityStatus.OFFLINE }
-]
-
-/** The one presence feed: `decentraland.pulse.ParcelChangesBatch` published by Pulse. */
 export const PARCEL_CHANGES_SUBJECT = 'engine.parcel_changes'
 
 export const PEER_STATUS_KEY_PREFIX = 'peer-status:'
-
-/**
- * Shadow namespace of the Pulse feed while `PRESENCE_SOURCE=both` (A1), with the same TTL as the
- * live one. Keeping the two dedupe caches apart is what makes `archipelagoFlips` and `pulseFlips`
- * measure each feed's own flip volume instead of which feed won the race.
- */
-export const PEER_STATUS_KEY_PREFIX_PULSE = 'peer-status-pulse:'
 
 /**
  * Upper bound on how many peers of one batch are written and published concurrently. Reads are one
@@ -62,26 +23,9 @@ export const PEER_STATUS_KEY_PREFIX_PULSE = 'peer-status-pulse:'
  */
 export const STATUS_PUBLISH_CHUNK_SIZE = 100
 
-export const PRESENCE_DIFF_INTERVAL_MS = 60_000
-
 export type PeerStatusChange = {
   address: string
   status: ConnectivityStatus
-}
-
-type PresenceFeed = 'archipelago' | 'pulse'
-
-/**
- * How one feed writes. `keyPrefix` is the dedupe namespace it owns and `publishes` says whether its
- * transitions reach the live friend/community channels. A1: in `both` the Pulse feed is a shadow —
- * it derives, dedupes and counts under `peer-status-pulse:` but publishes nothing, so the source
- * still under evaluation cannot put an offline blip in front of a client. In `pulse` it is the only
- * feed and owns the live `peer-status:` namespace.
- */
-type PresenceFeedConfig = {
-  feed: PresenceFeed
-  keyPrefix: string
-  publishes: boolean
 }
 
 /**
@@ -104,34 +48,16 @@ export async function createPeerTrackingComponent({
   pubsub,
   nats,
   redis,
-  config,
-  worldsStats
-}: Pick<
-  AppComponents,
-  'logs' | 'pubsub' | 'nats' | 'redis' | 'config' | 'worldsStats'
->): Promise<IPeerTrackingComponent> {
+  config
+}: Pick<AppComponents, 'logs' | 'pubsub' | 'nats' | 'redis' | 'config'>): Promise<IPeerTrackingComponent> {
   const logger = logs.getLogger('peer-tracking-component')
   const subscriptions = new Map<string, Subscription>()
   const statusCacheTtlInSeconds = (await config.getNumber('STATUS_CACHE_TTL_IN_SECONDS')) || 3600
-  const presenceSource = await getPresenceSource(config)
 
-  let diffIntervalId: NodeJS.Timeout | null = null
-  const flipsInWindow: Record<PresenceFeed, number> = { archipelago: 0, pulse: 0 }
-
-  const archipelagoFeed: PresenceFeedConfig = {
-    feed: 'archipelago',
-    keyPrefix: PEER_STATUS_KEY_PREFIX,
-    publishes: true
-  }
-  const pulseFeed: PresenceFeedConfig =
-    presenceSource === PresenceSource.BOTH
-      ? { feed: 'pulse', keyPrefix: PEER_STATUS_KEY_PREFIX_PULSE, publishes: false }
-      : { feed: 'pulse', keyPrefix: PEER_STATUS_KEY_PREFIX, publishes: true }
-
-  async function readCachedStatuses(keyPrefix: string, addresses: string[]): Promise<(ConnectivityStatus | null)[]> {
+  async function readCachedStatuses(addresses: string[]): Promise<(ConnectivityStatus | null)[]> {
     // `redis.mGet` drops nulls, which would break the alignment with `addresses`, so the client's
     // MGET is used directly: one round-trip per batch, one value per requested key.
-    const values = await redis.client.mGet(addresses.map((address) => keyPrefix + address))
+    const values = await redis.client.mGet(addresses.map((address) => PEER_STATUS_KEY_PREFIX + address))
 
     return values.map((value) => {
       if (value === null || value === undefined) {
@@ -147,15 +73,10 @@ export async function createPeerTrackingComponent({
     })
   }
 
-  async function applyStatusChange(feed: PresenceFeedConfig, { address, status }: PeerStatusChange): Promise<void> {
-    await redis.put(feed.keyPrefix + address, status, {
+  async function applyStatusChange({ address, status }: PeerStatusChange): Promise<void> {
+    await redis.put(PEER_STATUS_KEY_PREFIX + address, status, {
       EX: statusCacheTtlInSeconds
     })
-
-    // A shadow feed stops here: its status map exists only to count its own flips.
-    if (!feed.publishes) {
-      return
-    }
 
     await Promise.all([
       pubsub.publishInChannel(FRIEND_STATUS_UPDATES_CHANNEL, {
@@ -173,7 +94,7 @@ export async function createPeerTrackingComponent({
    * Reads the cached status of every address in one MGET, then publishes only the peers whose
    * status actually changed. This dedupe is what makes snapshot batches idempotent.
    */
-  async function applyStatusChanges(changes: PeerStatusChange[], feed: PresenceFeedConfig): Promise<void> {
+  async function applyStatusChanges(changes: PeerStatusChange[]): Promise<void> {
     if (changes.length === 0) {
       return
     }
@@ -186,7 +107,7 @@ export async function createPeerTrackingComponent({
     }
 
     const addresses = [...latestByAddress.keys()]
-    const cachedStatuses = await readCachedStatuses(feed.keyPrefix, addresses)
+    const cachedStatuses = await readCachedStatuses(addresses)
     const flipped = addresses
       .map((address, index) => ({ address, status: latestByAddress.get(address)!, cached: cachedStatuses[index] }))
       .filter(({ status, cached }) => cached !== status)
@@ -197,56 +118,8 @@ export async function createPeerTrackingComponent({
       await Promise.all(
         flipped
           .slice(offset, offset + STATUS_PUBLISH_CHUNK_SIZE)
-          .map((change) => applyStatusChange(feed, { address: change.address, status: change.status }))
+          .map((change) => applyStatusChange({ address: change.address, status: change.status }))
       )
-    }
-
-    flipsInWindow[feed.feed] += flipped.length
-  }
-
-  /**
-   * @deprecated Iteration 2 / WP4, see `docs/presence-sources.md`.
-   */
-  async function updateWorldsStats(peerId: string, handler: PeerStatusHandler) {
-    if (handler.event === PeerStatusHandlerEvent.JOIN_WORLD) {
-      await worldsStats.onPeerConnect(peerId)
-    } else {
-      // This works as a backup mechanism to ensure we don't miss a world.leave event
-      await worldsStats.onPeerDisconnect(peerId)
-    }
-  }
-
-  /**
-   * @deprecated Iteration 2 / WP4, see `docs/presence-sources.md`.
-   */
-  async function handlePeerEvent(peerId: string, handler: PeerStatusHandler) {
-    try {
-      await applyStatusChanges([{ address: peerId, status: handler.status }], archipelagoFeed)
-      await updateWorldsStats(peerId, handler)
-    } catch (error: any) {
-      logger.error('Error handling peer event:', {
-        error: error.message,
-        peerId,
-        event: handler.event
-      })
-    }
-  }
-
-  /**
-   * @deprecated Iteration 2 / WP4, see `docs/presence-sources.md`.
-   */
-  function createMessageHandler(handler: PeerStatusHandler) {
-    return async (err: Error | null, message: NatsMsg) => {
-      if (err) {
-        logger.error(`Error processing peer ${handler.event} message:`, {
-          error: err.message,
-          pattern: handler.pattern
-        })
-        return
-      }
-
-      const peerId = message.subject.split('.')[1]
-      await handlePeerEvent(peerId, handler)
     }
   }
 
@@ -288,7 +161,7 @@ export async function createPeerTrackingComponent({
 
         logContractViolations(batch)
 
-        await applyStatusChanges(parcelChangesToStatusEvents(batch), pulseFeed)
+        await applyStatusChanges(parcelChangesToStatusEvents(batch))
       } catch (error: any) {
         logger.error('Error handling parcel changes batch:', {
           error: error.message,
@@ -298,62 +171,9 @@ export async function createPeerTrackingComponent({
     }
   }
 
-  /**
-   * Dual-source window observability: one line per minute, counts only — never addresses.
-   * The flip counters are per window and reset on every tick.
-   */
-  async function logPresenceSourceDiff(): Promise<void> {
-    // Taken and reset before the awaits: `redis.get` rethrows, so a blip at the tick loses the line
-    // — and if the counters survived it, the next line would report two windows as one and every
-    // per-minute rate read off it would be ~2x. Flips that land while the reads are in flight belong
-    // to the next window, which is what a per-window counter means.
-    const flips = { ...flipsInWindow }
-    flipsInWindow.archipelago = 0
-    flipsInWindow.pulse = 0
-
+  function subscribe(pattern: string, handler: (err: Error | null, message: NatsMsg) => Promise<void>) {
     try {
-      const [archipelagoPeers, pulsePeers] = await Promise.all([
-        redis.get<string[]>(PEERS_CACHE_KEY),
-        redis.get<string[]>(PEERS_CACHE_KEY_PULSE)
-      ])
-
-      // archipelago-stats returns `peer.id` verbatim and pulse-stats lowercases it, so one
-      // EIP-55 wallet would otherwise show up on both sides of the symmetric difference and read
-      // as a divergence that is pure casing.
-      const archipelagoSet = new Set((archipelagoPeers ?? []).map(normalizeAddress))
-      const pulseSet = new Set((pulsePeers ?? []).map(normalizeAddress))
-
-      let onlyInArchipelago = 0
-      archipelagoSet.forEach((address) => {
-        if (!pulseSet.has(address)) {
-          onlyInArchipelago++
-        }
-      })
-
-      let onlyInPulse = 0
-      pulseSet.forEach((address) => {
-        if (!archipelagoSet.has(address)) {
-          onlyInPulse++
-        }
-      })
-
-      logger.info('Presence source diff', {
-        archipelagoPeers: archipelagoSet.size,
-        pulsePeers: pulseSet.size,
-        onlyInArchipelago,
-        onlyInPulse,
-        symmetricDifference: onlyInArchipelago + onlyInPulse,
-        archipelagoFlips: flips.archipelago,
-        pulseFlips: flips.pulse
-      })
-    } catch (error: any) {
-      logger.error('Error logging the presence source diff', { error: error.message })
-    }
-  }
-
-  function subscribe(key: string, pattern: string, handler: (err: Error | null, message: NatsMsg) => Promise<void>) {
-    try {
-      subscriptions.set(key, nats.subscribe(pattern, handler))
+      subscriptions.set(pattern, nats.subscribe(pattern, handler))
     } catch (error: any) {
       logger.error(`Error subscribing to ${pattern}`, {
         error: error.message
@@ -363,29 +183,11 @@ export async function createPeerTrackingComponent({
 
   return {
     async subscribeToPeerStatusUpdates() {
-      logger.info('Subscribing to peer status updates', { presenceSource })
+      logger.info('Subscribing to peer status updates', { subject: PARCEL_CHANGES_SUBJECT })
 
-      if (usesArchipelagoPresence(presenceSource)) {
-        PEER_STATUS_HANDLERS.forEach((handler) => {
-          subscribe(handler.event, handler.pattern, createMessageHandler(handler))
-        })
-      }
-
-      if (usesPulsePresence(presenceSource)) {
-        subscribe(PARCEL_CHANGES_SUBJECT, PARCEL_CHANGES_SUBJECT, createParcelChangesHandler())
-      }
-
-      if (presenceSource === PresenceSource.BOTH) {
-        diffIntervalId = setInterval(() => {
-          void logPresenceSourceDiff()
-        }, PRESENCE_DIFF_INTERVAL_MS)
-      }
+      subscribe(PARCEL_CHANGES_SUBJECT, createParcelChangesHandler())
     },
     async stop() {
-      if (diffIntervalId) {
-        clearInterval(diffIntervalId)
-        diffIntervalId = null
-      }
       subscriptions.forEach((subscription) => subscription.unsubscribe())
       subscriptions.clear()
     },
